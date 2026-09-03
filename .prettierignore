@@ -1,0 +1,9 @@
+node_modules
+dist
+build
+out
+generated
+pnpm-lock.yaml
+docs/reference
+docs/design
+CLAUDE-FABLE-5.md

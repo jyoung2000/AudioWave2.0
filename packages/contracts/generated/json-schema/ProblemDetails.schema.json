@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ProblemDetails",
+  "type": "object",
+  "properties": {
+    "type": {
+      "default": "about:blank",
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "status": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "detail": {
+      "type": "string"
+    },
+    "code": {
+      "description": "Machine-readable error code",
+      "type": "string"
+    },
+    "correlationId": {
+      "type": "string"
+    },
+    "retryAfterSeconds": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "type",
+    "title",
+    "status"
+  ],
+  "additionalProperties": false
+}

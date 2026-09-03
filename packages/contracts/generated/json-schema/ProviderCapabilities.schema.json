@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ProviderCapabilities",
+  "type": "object",
+  "properties": {
+    "metadata": {
+      "type": "string",
+      "enum": [
+        "available",
+        "requires_auth",
+        "restricted",
+        "unsupported",
+        "temporarily_unavailable"
+      ]
+    },
+    "search": {
+      "type": "string",
+      "enum": [
+        "available",
+        "requires_auth",
+        "restricted",
+        "unsupported",
+        "temporarily_unavailable"
+      ]
+    },
+    "preview": {
+      "type": "string",
+      "enum": [
+        "available",
+        "requires_auth",
+        "restricted",
+        "unsupported",
+        "temporarily_unavailable"
+      ]
+    },
+    "playback": {
+      "type": "string",
+      "enum": [
+        "available",
+        "requires_auth",
+        "restricted",
+        "unsupported",
+        "temporarily_unavailable"
+      ]
+    },
+    "importLikes": {
+      "type": "string",
+      "enum": [
+        "available",
+        "requires_auth",
+        "restricted",
+        "unsupported",
+        "temporarily_unavailable"
+      ]
+    },
+    "importPlaylists": {
+      "type": "string",
+      "enum": [
+        "available",
+        "requires_auth",
+        "restricted",
+        "unsupported",
+        "temporarily_unavailable"
+      ]
+    },
+    "creatorDownload": {
+      "type": "string",
+      "enum": [
+        "available",
+        "requires_auth",
+        "restricted",
+        "unsupported",
+        "temporarily_unavailable"
+      ]
+    },
+    "userOwnedDownload": {
+      "type": "string",
+      "enum": [
+        "available",
+        "requires_auth",
+        "restricted",
+        "unsupported",
+        "temporarily_unavailable"
+      ]
+    },
+    "groupSync": {
+      "type": "string",
+      "enum": [
+        "exact",
+        "near",
+        "best_effort",
+        "unsupported"
+      ]
+    },
+    "eq": {
+      "type": "string",
+      "enum": [
+        "available",
+        "requires_auth",
+        "restricted",
+        "unsupported",
+        "temporarily_unavailable"
+      ]
+    },
+    "reason": {
+      "description": "Human-readable explanation for \"Why unavailable?\"",
+      "type": "string",
+      "maxLength": 400
+    }
+  },
+  "required": [
+    "metadata",
+    "search",
+    "preview",
+    "playback",
+    "importLikes",
+    "importPlaylists",
+    "creatorDownload",
+    "userOwnedDownload",
+    "groupSync",
+    "eq"
+  ],
+  "additionalProperties": false
+}

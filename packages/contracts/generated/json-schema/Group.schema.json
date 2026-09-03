@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Group",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+      "description": "UUID (v7 preferred; stable across sync)"
+    },
+    "schemaVersion": {
+      "default": 1,
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+      "description": "UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+      "description": "UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z"
+    },
+    "deletedAt": {
+      "default": null,
+      "description": "Tombstone; retained per compaction policy",
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+          "description": "UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "hubId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+      "description": "UUID (v7 preferred; stable across sync)"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "ownerId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "status": {
+      "default": "active",
+      "type": "string",
+      "enum": [
+        "active",
+        "archived"
+      ]
+    },
+    "settings": {
+      "type": "object",
+      "properties": {
+        "maxQueuePerUser": {
+          "default": 25,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 500
+        },
+        "duplicatePolicy": {
+          "default": "reject-in-queue",
+          "type": "string",
+          "enum": [
+            "allow",
+            "reject-in-queue",
+            "reject-recent"
+          ]
+        },
+        "cooldownSeconds": {
+          "default": 0,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3600
+        },
+        "fairQueue": {
+          "default": false,
+          "type": "boolean"
+        },
+        "voteSkipThreshold": {
+          "default": 0.5,
+          "description": "Fraction of listeners required",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "maxTrackDurationMs": {
+          "default": 1200000,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 21600000,
+          "description": "Duration in milliseconds"
+        },
+        "guestsMayRequest": {
+          "default": true,
+          "type": "boolean"
+        },
+        "driftHardSeekThresholdMs": {
+          "default": 400,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "driftSoftCorrectMs": {
+          "default": 60,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "maxQueuePerUser",
+        "duplicatePolicy",
+        "cooldownSeconds",
+        "fairQueue",
+        "voteSkipThreshold",
+        "maxTrackDurationMs",
+        "guestsMayRequest",
+        "driftHardSeekThresholdMs",
+        "driftSoftCorrectMs"
+      ],
+      "additionalProperties": false
+    },
+    "inviteCodeHash": {
+      "default": null,
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "id",
+    "schemaVersion",
+    "createdAt",
+    "updatedAt",
+    "deletedAt",
+    "hubId",
+    "name",
+    "ownerId",
+    "status",
+    "settings",
+    "inviteCodeHash"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ProviderAppConfigInput",
+  "type": "object",
+  "properties": {
+    "provider": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,31}$",
+      "description": "Provider slug, e.g. local, hub, companion, musicbrainz, youtube, soundcloud, bandcamp, spotify, public-domain, external-tool"
+    },
+    "enabled": {
+      "default": true,
+      "type": "boolean"
+    },
+    "clientId": {
+      "type": "string",
+      "maxLength": 400
+    },
+    "clientSecret": {
+      "description": "Write-only; never returned",
+      "type": "string",
+      "maxLength": 400
+    },
+    "apiKey": {
+      "description": "Write-only; never returned",
+      "type": "string",
+      "maxLength": 400
+    },
+    "applicationId": {
+      "type": "string",
+      "maxLength": 400
+    },
+    "redirectUri": {
+      "type": "string",
+      "format": "uri"
+    },
+    "contactEmail": {
+      "description": "Used in descriptive user agents (MusicBrainz)",
+      "type": "string",
+      "format": "email",
+      "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+    },
+    "extra": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "maxLength": 400
+      }
+    }
+  },
+  "required": [
+    "provider",
+    "enabled"
+  ],
+  "additionalProperties": false
+}

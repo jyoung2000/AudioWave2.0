@@ -1,0 +1,45 @@
+{
+  "name": "@now-playing/windows-companion",
+  "version": "0.1.0",
+  "description": "Now Playing Companion for Windows — secure Electron desktop app for filesystem library management, provider connections, authorized downloads, import, backup, sync and remote access.",
+  "license": "MIT",
+  "type": "module",
+  "private": true,
+  "main": "dist/main/index.cjs",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "tsc -p tsconfig.json --noEmit && node scripts/build.mjs && vite build --config src/renderer/vite.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "package": "pnpm build && electron-builder --win --config electron-builder.config.cjs",
+    "package:dir": "pnpm build && electron-builder --dir --config electron-builder.config.cjs",
+    "release-metadata": "node scripts/release-metadata.mjs",
+    "test": "vitest run --project unit --project integration"
+  },
+  "dependencies": {
+    "@now-playing/contracts": "workspace:*",
+    "@now-playing/domain": "workspace:*",
+    "better-sqlite3": "13.0.3",
+    "chokidar": "5.0.0",
+    "music-metadata": "11.15.0",
+    "ws": "8.21.3",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@now-playing/aqua-ui": "workspace:*",
+    "@now-playing/audio-core": "workspace:*",
+    "@now-playing/test-fixtures": "workspace:*",
+    "@types/better-sqlite3": "9.6.0",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "@types/ws": "8.18.1",
+    "@vitejs/plugin-react": "6.1.1",
+    "electron": "44.1.1",
+    "electron-builder": "26.15.3",
+    "esbuild": "0.28.2",
+    "happy-dom": "20.14.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "typescript": "6.0.3",
+    "vite": "8.2.2"
+  }
+}

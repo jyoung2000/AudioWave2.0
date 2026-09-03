@@ -1,0 +1,53 @@
+{
+  "name": "now-playing-suite",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Now Playing — an offline-first music player PWA, a self-hosted hub, and a Windows companion, sharing versioned contracts.",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22.12.0",
+    "pnpm": ">=10"
+  },
+  "scripts": {
+    "dev": "concurrently -n player,hub -c blue,green \"pnpm dev:player\" \"pnpm dev:hub\"",
+    "dev:player": "pnpm --filter @now-playing/music-player dev",
+    "dev:hub": "pnpm --filter @now-playing/hub dev",
+    "dev:windows": "pnpm --filter @now-playing/windows-companion dev",
+    "build": "pnpm -r --filter './packages/*' build && pnpm build:player && pnpm build:hub && pnpm build:windows",
+    "build:packages": "pnpm -r --filter './packages/*' build",
+    "build:player": "pnpm build:packages && pnpm --filter @now-playing/music-player build",
+    "build:hub": "pnpm build:packages && pnpm --filter @now-playing/hub build",
+    "build:windows": "pnpm build:packages && pnpm --filter @now-playing/windows-companion build",
+    "generate": "pnpm --filter @now-playing/contracts generate && pnpm --filter @now-playing/test-fixtures generate",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "pnpm -r --workspace-concurrency=4 typecheck",
+    "test": "pnpm test:unit && pnpm test:contracts && pnpm test:integration",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:contracts": "vitest run --project contracts",
+    "test:a11y": "pnpm --filter @now-playing/music-player test:a11y",
+    "test:e2e": "pnpm --filter @now-playing/music-player test:e2e && pnpm --filter @now-playing/hub test:e2e",
+    "test:security": "vitest run --project security",
+    "verify": "node scripts/verify.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.62.1",
+    "@types/node": "26.4.1",
+    "concurrently": "10.0.5",
+    "eslint": "10.9.1",
+    "eslint-plugin-jsx-a11y": "6.10.2",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.12.0",
+    "prettier": "3.9.6",
+    "rimraf": "6.1.3",
+    "tsx": "4.23.13",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.69.0",
+    "vitest": "5.0.0"
+  }
+}

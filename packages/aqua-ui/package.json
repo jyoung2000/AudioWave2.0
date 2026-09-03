@@ -1,0 +1,44 @@
+{
+  "name": "@now-playing/aqua-ui",
+  "version": "1.0.0",
+  "description": "Aqua (Snow Leopard / iTunes 9 profile) React component library and semantic design tokens shared by the player, hub GUI and Windows companion.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles.css": "./src/styles/aqua.css",
+    "./tokens.json": "./src/styles/tokens.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "vite --config gallery/vite.config.ts",
+    "build:gallery": "vite build --config gallery/vite.config.ts",
+    "test": "vitest run --project dom --project unit"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "dependencies": {
+    "@now-playing/contracts": "workspace:*",
+    "@now-playing/domain": "workspace:*",
+    "@tanstack/react-virtual": "3.14.10"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "10.4.1",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.7",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "@vitejs/plugin-react": "6.1.1",
+    "axe-core": "4.13.0",
+    "happy-dom": "20.14.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "typescript": "6.0.3",
+    "vite": "8.2.2"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EqBand",
+  "type": "object",
+  "properties": {
+    "frequencyHz": {
+      "type": "number",
+      "minimum": 10,
+      "maximum": 24000
+    },
+    "gainDb": {
+      "type": "number",
+      "minimum": -12,
+      "maximum": 12
+    },
+    "q": {
+      "default": 1.1,
+      "type": "number",
+      "minimum": 0.05,
+      "maximum": 36
+    },
+    "type": {
+      "default": "peaking",
+      "type": "string",
+      "enum": [
+        "peaking",
+        "lowshelf",
+        "highshelf",
+        "lowpass",
+        "highpass",
+        "notch",
+        "bandpass"
+      ]
+    },
+    "enabled": {
+      "default": true,
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "frequencyHz",
+    "gainDb",
+    "q",
+    "type",
+    "enabled"
+  ],
+  "additionalProperties": false
+}

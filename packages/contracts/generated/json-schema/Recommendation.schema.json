@@ -1,0 +1,203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Recommendation",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+      "description": "UUID (v7 preferred; stable across sync)"
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "for-you",
+        "playlist",
+        "genre",
+        "similar",
+        "deep",
+        "new-releases",
+        "recent"
+      ]
+    },
+    "contextId": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "string",
+          "maxLength": 200
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "canonicalTrackId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "artistName": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "albumName": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "string",
+          "maxLength": 300
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "genre": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "string",
+          "maxLength": 60
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "year": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "score": {
+      "type": "number"
+    },
+    "tier": {
+      "type": "string",
+      "enum": [
+        "strong",
+        "related",
+        "emerging",
+        "experimental"
+      ]
+    },
+    "candidateSource": {
+      "type": "string",
+      "maxLength": 60
+    },
+    "reasons": {
+      "maxItems": 10,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "signal": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "weight": {
+            "type": "number"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "signal",
+          "weight",
+          "text"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "availability": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{1,31}$",
+            "description": "Provider slug, e.g. local, hub, companion, musicbrainz, youtube, soundcloud, bandcamp, spotify, public-domain, external-tool"
+          },
+          "providerTrackId": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "playable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "provider",
+          "providerTrackId",
+          "playable"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+      "description": "UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z"
+    },
+    "feedback": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "like",
+            "not-for-me",
+            "less-from-artist",
+            "already-know",
+            "dismiss",
+            "accepted"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "id",
+    "mode",
+    "contextId",
+    "canonicalTrackId",
+    "title",
+    "artistName",
+    "albumName",
+    "genre",
+    "year",
+    "score",
+    "tier",
+    "candidateSource",
+    "reasons",
+    "availability",
+    "createdAt",
+    "feedback"
+  ],
+  "additionalProperties": false
+}

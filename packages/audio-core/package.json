@@ -1,0 +1,25 @@
+{
+  "name": "@now-playing/audio-core",
+  "version": "1.0.0",
+  "description": "Web Audio DSP chain (preamp → retune worklet → 10-band EQ → limiter → analyser → output) with honest retune semantics; used by the player and the Windows companion renderer.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./worklets/pitch-shifter": "./src/worklets/pitch-shifter.worklet.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --project unit"
+  },
+  "dependencies": {
+    "@now-playing/contracts": "workspace:*",
+    "@now-playing/domain": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3"
+  }
+}

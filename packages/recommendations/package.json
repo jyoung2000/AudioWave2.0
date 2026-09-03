@@ -1,0 +1,25 @@
+{
+  "name": "@now-playing/recommendations",
+  "version": "1.0.0",
+  "description": "Deterministic, inspectable hybrid recommender: multi-dimension taste profiles, behaviour learning with skip intelligence and time decay, candidate generation, weighted ranking, diversity pass, modes and offline evaluation.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --project unit",
+    "evaluate": "tsx scripts/evaluate.ts"
+  },
+  "dependencies": {
+    "@now-playing/contracts": "workspace:*",
+    "@now-playing/domain": "workspace:*"
+  },
+  "devDependencies": {
+    "@now-playing/test-fixtures": "workspace:*",
+    "tsx": "4.23.13",
+    "typescript": "6.0.3"
+  }
+}

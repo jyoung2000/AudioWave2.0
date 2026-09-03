@@ -1,0 +1,4897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Now Playing — status bar header</title>
+<style>
+  :root {
+    --page: #ffffff;
+    --ink: #1b1c1f;
+
+    /* Bar gradient, sampled row-by-row from the reference */
+    --bar-top: #f5f6f7;
+    --bar-1:   #eef0f1;
+    --bar-2:   #e8eaea;
+    --bar-3:   #e2e6e5;
+    --bar-4:   #dfe4e1;
+    --bar-5:   #dce2de;
+    --bar-bot: #d9dfe1;
+    --bar-edge: rgba(31, 41, 45, 0.22);
+    --bar-emboss: rgba(255, 255, 255, 0.55);
+
+    /* Search pill */
+    --field-bg-top:  #f2f2f2;
+    --field-bg-mid:  #fbfbfb;
+    --field-bg-bot:  #ffffff;
+    --field-ring:    rgba(0, 0, 0, 0.2);
+    --field-shadow:  rgba(0, 0, 0, 0.32);
+    --field-lip:     rgba(255, 255, 255, 0.7);
+    --field-icon:    #8e8e91;
+    --field-hint:    #ababab;
+
+    /* 2011 iOS segmented control */
+    --seg-border:   rgba(0, 0, 0, 0.36);
+    --seg-divider:  rgba(0, 0, 0, 0.3);
+    --seg-lip:      rgba(255, 255, 255, 0.65);
+    --seg-face-top: #fdfdfd;
+    --seg-face-mid: #f0f1f2;
+    --seg-face-bot: #dcdee0;
+    --seg-on-top:   #767c85;
+    --seg-on-mid:   #939aa3;
+    --seg-on-bot:   #a9b0b8;
+    --seg-ink:      #43464b;
+    --seg-ink-on:   #ffffff;
+
+    --avatar-size: 20px;
+    --avatar-face-2: #f3f3f3;
+    --avatar-ring: rgba(0, 0, 0, 0.26);
+    --avatar-lip: rgba(255, 255, 255, 0.7);
+
+    --player-bg: #ffffff;
+    --player-title: #000000;
+    --player-meta: #575757;
+    --player-time: #000000;
+    /* iPod Classic progress bar, sampled from the hardware photos: a soft
+       cap edge, sky blue that BRIGHTENS downward, a saturated cyan dip band
+       at two-thirds (from the Classic), then a bright cyan glow along the
+       bottom. Ribbing kept, but as a whisper — the photos barely show it. */
+    --bar-fill: linear-gradient(to bottom,
+      #8fb9e4 0%, #79b7f2 12%, #62b4f8 30%, #4fa9f2 48%,
+      #2b9bec 62%, #24b4f4 74%, #63d0f8 88%, #a5e9fd 100%);
+    /* the track is near-white with a gentle mid dip and a bright lip */
+    --bar-track: linear-gradient(to bottom,
+      #e9ecee 0%, #f7f9fa 14%, #f2f4f5 45%, #e9ebec 62%,
+      #f5f7f8 82%, #feffff 100%);
+    --bar-line: rgba(0, 0, 0, 0.16);
+    /* Aqua scroller gel (sampled 10.3 thumb) — now only the music list's
+       overlay scroller uses it */
+    --gel-fill-v: linear-gradient(to right,
+      #16407f 0%, #6ea3ec 12%, #8cb8ea 24%, #458ad8 45%,
+      #5fa8f1 58%, #83c9fd 78%, #9fd2ee 92%, #3f6a86 100%);
+    --live: #cc1027;
+    --live-halo: rgba(204, 16, 39, 0.32);
+
+    /* transport */
+    --tb-ink:     #1b1c1f;
+    --tb-muted:   #8b9099;
+    --tb-on-bot:  #2f6ec0;
+    --vol-fill-a: #9aa1a9;
+    --vol-fill-b: #b7bdc4;
+    --vol-face:   #ffffff;
+
+    /* library, iTunes 10 — the cooled Aqua stripe, glossy grey header with
+       embossed bold labels, and NO rules between rows: the stripe alone
+       separates them */
+    --lib-bg:        #ffffff;
+    --lib-alt:       #f2f5f9;
+    --lib-border:    #ababab;
+    --lib-head-top:  #f8f8f8;   /* light at the top again, unlike iTunes 11 */
+    --lib-head-bot:  #dadada;
+    --lib-head-rule: #adadad;
+    --lib-head-sep:  #cccccc;
+    --lib-head-ink:  #3a3d41;
+    --lib-head-emboss: rgba(255, 255, 255, 0.8);
+    --lib-sort-top:  #e8eef7;   /* the sorted column tints blue */
+    --lib-sort-bot:  #cfdbeb;
+    --lib-head-hot-top: #efefef;  /* header under the pointer */
+    --lib-head-hot-bot: #cfcfcf;
+    --lib-sort-hot-top: #dde7f4;  /* sorted header under the pointer */
+    --lib-sort-hot-bot: #c2d2e6;
+    --lib-ink:       #000000;
+    --lib-soft:      #222326;
+    --lib-badge:     #dfe3e9;
+    --lib-badge-ink: #3b3f47;
+    --lib-accent:    #2b6fd6;
+    --lib-icon:      #8a8f98;
+    --lib-star:      #f0a422;
+    --lib-np:        #dde9f8;   /* playing row, when not the selection */
+    --lib-sel-top:   #5b8dd9;   /* the iTunes 10 active highlight */
+    --lib-sel-bot:   #3a6cc4;
+    --ctx-bg:       rgba(247, 247, 250, 0.88);
+    --ctx-ink:      #1b1c1f;
+    --ctx-sep:      rgba(0, 0, 0, 0.12);
+
+    /* search popover, sampled from the iTunes 11 Up Next reference */
+    --srch-bg:       #f9f9f9;
+    --srch-head-top: #f6f6f6;
+    --srch-head-bot: #eeeeee;
+    --srch-rule:     #dedede;
+    --srch-ink:      #2c2c2c;
+    --srch-soft:     #9b9b9b;
+    --srch-hot:      #ececec;
+    --srch-border:   rgba(0, 0, 0, 0.25);
+    --srch-lip:      rgba(255, 255, 255, 0.6);
+    --srch-art-top:  #fbfbfb;
+    --srch-art-bot:  #e3e3e3;
+    --srch-art-ink:  #a9a9a9;
+    --srch-art-ring: rgba(0, 0, 0, 0.14);
+    --srch-chev:     #8f8f8f;
+    --srch-dot:      #c9c9c9;
+    --srch-dot-on:   #7c7c7c;
+    --srch-pf:       #dcdcdc;
+    --srch-pf-ink:   #5c5c5c;
+    --stage-size: clamp(160px, 42vw, 260px);
+
+    --bar-pad: 14px;
+    --bar-type: 13px;
+    --field-height: 26px;
+  }
+
+  /* ---------- the header ---------- */
+
+  .statusbar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background-image: linear-gradient(
+      to bottom,
+      var(--bar-top) 0%,
+      var(--bar-1)  14%,
+      var(--bar-2)  30%,
+      var(--bar-3)  46%,
+      var(--bar-4)  62%,
+      var(--bar-5)  78%,
+      var(--bar-bot) 100%
+    );
+    border-bottom: 1px solid var(--bar-edge);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  }
+
+  /* Grid with equal side columns, so the pill is optically centred in the bar
+     rather than centred in whatever space the two ends happen to leave. */
+  .statusbar__inner {
+    display: grid;
+    grid-template-columns: minmax(min-content, 1fr) minmax(0, 380px) minmax(min-content, 1fr);
+    align-items: center;
+    column-gap: 16px;
+    padding: 7px var(--bar-pad);
+    font: 700 var(--bar-type)/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI",
+          Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--ink);
+    text-shadow: 0 1px 0 var(--bar-emboss);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* No overflow clipping, so the descender on "Playing" survives */
+  .statusbar__label {
+    grid-area: label;
+    white-space: nowrap;
+    letter-spacing: 0.005em;
+    padding-right: 1px;
+  }
+
+  .statusbar__status {
+    grid-area: status;
+    justify-self: end;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  /* ---------- search pill ---------- */
+
+  .search {
+    grid-area: search;
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .search__icon {
+    position: absolute;
+    left: 9px;
+    width: 14px;
+    height: 14px;
+    color: var(--field-icon);
+    pointer-events: none;
+  }
+
+  .search__input {
+    width: 100%;
+    height: var(--field-height);
+    padding: 0 11px 0 28px;
+    border: 0;
+    border-radius: 999px;
+    background-image: linear-gradient(
+      to bottom,
+      var(--field-bg-top) 0%,
+      var(--field-bg-mid) 26%,
+      var(--field-bg-bot) 62%
+    );
+    box-shadow:
+      inset 0 0 0 1px var(--field-ring),
+      inset 0 2px 3px var(--field-shadow),
+      0 1px 0 var(--field-lip);
+    font: 400 12px/1 inherit;
+    color: var(--ink);
+    text-shadow: none;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .search__input::placeholder {
+    color: var(--field-hint);
+    opacity: 1;
+  }
+
+  .search__input::-webkit-search-cancel-button { -webkit-appearance: none; }
+
+  .search__input:focus { outline: none; }
+
+  .search__input:focus-visible {
+    outline: 2px solid rgba(27, 28, 31, 0.5);
+    outline-offset: 1px;
+  }
+
+  /* ---------- search results, iTunes 11 Up Next popover ----------
+     Palette sampled from the reference: near-white card (#f9f9f9) with a
+     faint gradient header, #2c2c2c titles over #9b9b9b "Artist — Album"
+     subtitles, hover rows a few points darker than the card. */
+
+  .srch {
+    position: absolute;
+    top: calc(100% + 9px);
+    /* pinned to both edges of .search, so the sheet is always exactly as
+       wide as the pill above it at every breakpoint — no measuring, and
+       nothing to clamp against the viewport */
+    left: 0;
+    right: 0;
+    z-index: 900;
+    overflow: hidden;                    /* rounds every child at the corners */
+    border-radius: 5px;
+    border: 1px solid var(--srch-border);
+    background: var(--srch-bg);
+    box-shadow:
+      inset 0 1px 0 var(--srch-lip),
+      0 2px 6px rgba(0, 0, 0, 0.22),
+      0 14px 32px rgba(0, 0, 0, 0.4);
+    font-family: "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", "Segoe UI", system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 400;
+    text-shadow: none;
+    color: var(--srch-ink);
+  }
+
+  .srch__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 27px;
+    padding: 0 10px;
+    border-bottom: 1px solid var(--srch-rule);
+    background-image: linear-gradient(to bottom, var(--srch-head-top), var(--srch-head-bot));
+  }
+
+  .srch__count { margin: 0; color: var(--srch-soft); }
+  .srch__count b { font-weight: 700; color: var(--srch-ink); }
+
+  .srch__clear {
+    padding: 2px 4px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    font: inherit;
+    color: var(--srch-soft);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .srch__clear:hover { color: var(--srch-ink); }
+  .srch__clear:focus { outline: none; }
+  .srch__clear:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
+
+  .srch__row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 8px 0 9px;
+    cursor: default;
+  }
+
+  .srch__row:hover,
+  .srch__row.is-hot { background: var(--srch-hot); }
+
+  /* the artwork tile: real cover when the track has one, otherwise the grey
+     beamed-note placeholder from the reference's last row. Doubles as the
+     preview button, so it is a real <button> when there is audio to play. */
+  .srch__art {
+    position: relative;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    border-radius: 2px;
+    overflow: hidden;
+    background-image: linear-gradient(to bottom, var(--srch-art-top), var(--srch-art-bot));
+    box-shadow: inset 0 0 0 1px var(--srch-art-ring);
+    color: var(--srch-art-ink);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .srch__art > svg { width: 15px; height: 15px; fill: currentColor; }
+
+  .srch__art img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  button.srch__art { cursor: pointer; }
+  button.srch__art:focus { outline: none; }
+  button.srch__art:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
+
+  /* the scrim carries both the play glyph and the countdown ring, so one
+     opacity transition covers the whole affordance */
+  .srch__scrim {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.42);
+    opacity: 0;
+    transition: opacity 0.14s ease;
+  }
+
+  .srch__row:hover button.srch__art .srch__scrim,
+  button.srch__art:focus-visible .srch__scrim,
+  .srch__art.is-preview .srch__scrim { opacity: 1; }
+
+  @media (hover: none) { button.srch__art .srch__scrim { opacity: 1; } }
+
+  .srch__scrim svg { width: 30px; height: 30px; overflow: visible; }
+  .srch__glyph { fill: #fff; }
+  .srch__ring { fill: none; stroke: rgba(255, 255, 255, 0.35); stroke-width: 2; }
+
+  /* dasharray is the full circumference; the offset is driven from JS as a
+     fraction of the 15 seconds elapsed */
+  .srch__ring--on {
+    stroke: #fff;
+    stroke-linecap: round;
+    stroke-dasharray: 84.82;
+    stroke-dashoffset: calc(84.82px * (1 - var(--p, 0)));
+    transform: rotate(-90deg);
+    transform-origin: 15px 15px;
+  }
+
+  .srch__art:not(.is-preview) .srch__ring,
+  .srch__art:not(.is-preview) .srch__ring--on,
+  .srch__art:not(.is-preview) .srch__stop { display: none; }
+  .srch__art.is-preview .srch__play { display: none; }
+
+  /* one badge per platform, matching the library's monochrome initials —
+     no logos, those are trademarks */
+  .srch__links { flex: none; display: flex; gap: 3px; }
+
+  .srch__pf {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 16px;
+    border-radius: 3px;
+    background: var(--srch-pf);
+    color: var(--srch-pf-ink);
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .srch__pf[data-len="1"] { font-size: 9px; }
+  .srch__pf:hover { background: var(--lib-accent); color: #fff; }
+  .srch__pf:focus { outline: none; }
+  .srch__pf:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
+
+  /* time over bpm, right-aligned tabular figures like the library columns */
+  .srch__nums {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    min-width: 34px;
+    font-variant-numeric: tabular-nums;
+    line-height: 13px;
+  }
+
+  .srch__bpm { color: var(--srch-soft); }
+
+  .srch__meta {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .srch__title,
+  .srch__sub {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 13px;
+  }
+
+  .srch__sub { color: var(--srch-soft); }
+
+  .srch__dur {
+    flex: none;
+    margin-right: 2px;
+    color: var(--srch-soft);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .srch__row.is-adding { opacity: 0.55; }
+
+  .srch__go {
+    flex: none;
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 1px var(--srch-chev);
+    color: var(--srch-chev);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 15px;
+    text-align: center;
+    opacity: 0;
+  }
+
+  .srch__row:hover .srch__go,
+  .srch__row.is-hot .srch__go { opacity: 1; }
+  @media (hover: none) { .srch__go { opacity: 1; } }
+
+  .srch__msg {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-height: 40px;
+    padding: 8px 12px;
+    color: var(--srch-soft);
+  }
+
+  /* the 12-spoke fan; each spoke's inline delay staggers one shared fade */
+  .srch__spin { position: relative; flex: none; width: 16px; height: 16px; }
+
+  .srch__spin i {
+    position: absolute;
+    left: 7px;
+    top: 0;
+    width: 2px;
+    height: 4.5px;
+    border-radius: 1px;
+    background: var(--srch-soft);
+    transform-origin: 1px 8px;
+    opacity: 0.25;
+    animation: srch-spin 1s linear infinite;
+  }
+
+  @keyframes srch-spin { 0% { opacity: 1; } 100% { opacity: 0.25; } }
+
+  .srch__foot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 26px;
+    border-top: 1px solid var(--srch-rule);
+    background-image: linear-gradient(to bottom, var(--srch-head-top), var(--srch-head-bot));
+  }
+
+  .srch__foot[hidden] { display: none; }
+
+  .srch__page {
+    width: 22px;
+    height: 18px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--srch-soft);
+    font: 700 13px/17px "Lucida Grande", "Lucida Sans Unicode", "Segoe UI", system-ui, sans-serif;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .srch__page:hover:not(:disabled) { color: var(--srch-ink); }
+  .srch__page:disabled { opacity: 0.35; cursor: default; }
+  .srch__page:focus { outline: none; }
+
+  .srch__dots { display: inline-flex; gap: 5px; }
+  .srch__dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--srch-dot); }
+  .srch__dots i.is-on { background: var(--srch-dot-on); }
+
+  .srch__live {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .srch__spin i { animation: none; opacity: 0.6; }
+    .srch__scrim { transition: none; }
+  }
+
+  /* ---------- solo / group, iOS 5 segmented control ---------- */
+
+  .segmented {
+    display: inline-flex;
+    flex: none;
+    border-radius: 999px;
+    overflow: hidden;
+    box-shadow: inset 0 0 0 1px var(--seg-border),
+                0 1px 0 var(--seg-lip);
+  }
+
+  .segmented__item {
+    position: relative;
+    width: 36px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    background-image: linear-gradient(
+      to bottom,
+      var(--seg-face-top) 0%,
+      var(--seg-face-mid) 48%,
+      var(--seg-face-bot) 100%
+    );
+    color: var(--seg-ink);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .segmented__item + .segmented__item {
+    box-shadow: inset 1px 0 0 var(--seg-divider);
+  }
+
+  /* pressed-in segment: darker face with the light coming from below */
+  .segmented__item[aria-checked="true"] {
+    background-image: linear-gradient(
+      to bottom,
+      var(--seg-on-top) 0%,
+      var(--seg-on-mid) 55%,
+      var(--seg-on-bot) 100%
+    );
+    color: var(--seg-ink-on);
+    box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.42),
+                inset 1px 0 0 rgba(0, 0, 0, 0.25);
+  }
+
+  .segmented__item:active { filter: brightness(0.94); }
+  .segmented__item:focus { outline: none; }
+
+  .segmented__item:focus-visible {
+    outline: 2px solid rgba(27, 28, 31, 0.5);
+    outline-offset: 2px;
+    z-index: 1;
+  }
+
+  .segmented__item svg {
+    display: block;
+    width: 21px;
+    height: 14px;
+    margin: 0 auto;
+    fill: currentColor;
+    filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.75));
+  }
+
+  .segmented__item[aria-checked="true"] svg {
+    filter: drop-shadow(0 -1px 0 rgba(0, 0, 0, 0.45));
+  }
+
+  .statusbar__time {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+  }
+
+  /* ---------- profile avatar ---------- */
+
+  .statusbar__avatar {
+    position: relative;
+    flex: none;
+    display: block;
+    width: var(--avatar-size);
+    height: var(--avatar-size);
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background-image: linear-gradient(
+      to bottom,
+      #ffffff 0%,
+      #ffffff 58%,
+      var(--avatar-face-2) 100%
+    );
+    box-shadow: 0 1px 0 var(--avatar-lip);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .statusbar__avatar svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Ring sits above the silhouette, so the shoulders can run to the edge */
+  .statusbar__avatar::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 1px var(--avatar-ring),
+                inset 0 1px 2px rgba(0, 0, 0, 0.16);
+    pointer-events: none;
+  }
+
+  /* Invisible padding so the tap target clears 30px without growing the bar */
+  .statusbar__avatar::after {
+    content: "";
+    position: absolute;
+    inset: -5px;
+  }
+
+  .statusbar__avatar:hover {
+  }
+
+  .statusbar__avatar:active { transform: translateY(0.5px); }
+  .statusbar__avatar:focus { outline: none; }
+
+  .statusbar__avatar:focus-visible {
+    outline: 2px solid rgba(27, 28, 31, 0.5);
+    outline-offset: 2px;
+  }
+
+  /* ---------- responsive ---------- */
+
+  /* Wide: one row — label | pill | mode + time + avatar */
+  @media (min-width: 720px) {
+    .statusbar__inner {
+      grid-template-areas: "label search status";
+    }
+  }
+
+  /* Narrow: the pill drops to its own full-width row under the status line */
+  @media (max-width: 719px) {
+    .statusbar__inner {
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas:
+        "label  status"
+        "search search";
+      column-gap: 10px;
+      row-gap: 7px;
+      padding-bottom: 9px;
+    }
+
+    .statusbar__label {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* iOS Safari zooms the page when a focused field is under 16px, which
+       throws the whole sticky header off. Size the field up instead of
+       fighting it with maximum-scale, which would block pinch-zoom. */
+    .search__input {
+      height: 32px;
+      padding-left: 32px;
+      font-size: 16px;
+    }
+
+    .search__icon { left: 11px; width: 15px; height: 15px; }
+  }
+
+  @media (max-width: 560px) {
+    :root {
+      --bar-pad: 11px;
+      --bar-type: 12px;
+      --field-height: 32px;
+      --avatar-size: 22px;
+    }
+    .statusbar__status { gap: 8px; }
+    .segmented__item { width: 32px; }
+  }
+
+  /* At the narrowest sizes the label alone earns its row */
+  @media (max-width: 340px) {
+    .statusbar__inner { column-gap: 8px; }
+    .segmented__item { width: 30px; }
+  }
+
+  @media (min-width: 900px) {
+    .statusbar__inner {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding-left: 24px;
+      padding-right: 24px;
+    }
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page: #0e0f12;
+      --ink: #f1f2f4;
+
+      --bar-top: #34373d;
+      --bar-1:   #2f3238;
+      --bar-2:   #2a2d33;
+      --bar-3:   #25282e;
+      --bar-4:   #212429;
+      --bar-5:   #1e2126;
+      --bar-bot: #1a1d22;
+      --bar-edge: rgba(0, 0, 0, 0.6);
+      --bar-emboss: transparent;
+
+      --field-bg-top: #141619;
+      --field-bg-mid: #1b1e23;
+      --field-bg-bot: #24272d;
+      --field-ring:   rgba(0, 0, 0, 0.7);
+      --field-shadow: rgba(0, 0, 0, 0.75);
+      --field-lip:    rgba(255, 255, 255, 0.08);
+      --field-icon:   #85898f;
+      --field-hint:   #7c8087;
+
+      --seg-border:   rgba(0, 0, 0, 0.7);
+      --seg-divider:  rgba(0, 0, 0, 0.55);
+      --seg-lip:      rgba(255, 255, 255, 0.08);
+      --seg-face-top: #3a3d44;
+      --seg-face-mid: #33363c;
+      --seg-face-bot: #292c31;
+      --seg-on-top:   #14161a;
+      --seg-on-mid:   #1c1f24;
+      --seg-on-bot:   #23262c;
+      --seg-ink:      #c3c7cf;
+      --seg-ink-on:   #ffffff;
+
+      --avatar-ring: rgba(0, 0, 0, 0.55);
+      --avatar-lip: rgba(255, 255, 255, 0.1);
+
+      --player-bg: #0e0f12;
+      --player-title: #ffffff;
+      --player-meta: #9ba0a8;
+      --player-time: #f1f2f4;
+      /* the screen content is unchanged on the black hardware — only the
+         well around it deepens */
+      --bar-track: linear-gradient(to bottom,
+        #16181c 0%, #202329 18%, #1c1f24 45%, #171a1f 62%,
+        #22262c 82%, #2e333a 100%);
+      --bar-line: rgba(0, 0, 0, 0.72);
+      --live: #ff4d62;
+      --live-halo: rgba(255, 77, 98, 0.36);
+
+      --tb-ink:     #ccd1d8;
+      --tb-muted:   #7f858e;
+      --tb-on-bot:  #5fa0ea;
+      --vol-fill-a: #6e747c;
+      --vol-fill-b: #878e96;
+      --vol-face:   #1b1e23;
+
+      --lib-bg:        #16181c;
+      --lib-alt:       #1b1f26;
+      --lib-border:    #08090b;
+      --lib-head-top:  #3a3d44;
+      --lib-head-bot:  #26292e;
+      --lib-head-rule: #0f1114;
+      --lib-head-sep:  #17191d;
+      --lib-head-ink:  #c6cbd3;
+      --lib-head-emboss: rgba(0, 0, 0, 0.55);
+      --lib-sort-top:  #2c3a4e;
+      --lib-sort-bot:  #233043;
+      --lib-head-hot-top: #45484f;
+      --lib-head-hot-bot: #303338;
+      --lib-sort-hot-top: #36485f;
+      --lib-sort-hot-bot: #2b3b52;
+      --lib-ink:       #f2f3f5;
+      --lib-soft:      #d4d8df;
+      --lib-badge:     #2f333b;
+      --lib-badge-ink: #d6dae1;
+      --lib-accent:    #6aa3f2;
+      --lib-icon:      #8d939c;
+      --lib-star:      #f4b241;
+      --lib-np:        #22354f;
+      --ctx-bg:       rgba(40, 42, 48, 0.9);
+      --ctx-ink:      #eef0f3;
+      --ctx-sep:      rgba(255, 255, 255, 0.12);
+
+      --srch-bg:       #26282e;
+      --srch-head-top: #2e3138;
+      --srch-head-bot: #25272d;
+      --srch-rule:     rgba(0, 0, 0, 0.5);
+      --srch-ink:      #eef0f3;
+      --srch-soft:     #8d939c;
+      --srch-hot:      #32353c;
+      --srch-border:   rgba(0, 0, 0, 0.65);
+      --srch-lip:      rgba(255, 255, 255, 0.07);
+      --srch-art-top:  #33363d;
+      --srch-art-bot:  #24262b;
+      --srch-art-ink:  #8d939c;
+      --srch-art-ring: rgba(255, 255, 255, 0.1);
+      --srch-chev:     #9aa0a9;
+      --srch-dot:      #4a4e56;
+      --srch-dot-on:   #b8bdc5;
+      --srch-pf:       #3a3e46;
+      --srch-pf-ink:   #ccd1d9;
+    }
+    .statusbar { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08); }
+    .search__input:focus-visible,
+    .statusbar__avatar:focus-visible,
+    .segmented__item:focus-visible { outline-color: rgba(241, 242, 244, 0.6); }
+    .segmented__item svg { filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.5)); }
+  }
+
+  /* ---------- media player ---------- */
+
+  .player {
+    background: var(--player-bg);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    /* The 3D canvas deliberately bleeds past the art column so its shadow can
+       fade out. `clip` contains that horizontally without creating a scroll
+       container or clipping the bleed vertically, which `hidden` would. */
+    overflow-x: clip;
+  }
+
+  .player__inner {
+    position: relative;
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 46px var(--bar-pad) 40px;
+  }
+
+  .player__top {
+    display: flex;
+    align-items: center;
+    gap: 30px;
+  }
+
+  /* .player__stage reserves the layout box and takes the drag; the canvas
+     inside it overflows on every side so shadows fade into the page instead
+     of being clipped square at the canvas edge. */
+  .player__art {
+    flex: none;
+    width: var(--stage-size);
+  }
+
+  .player__stage {
+    position: relative;
+    width: var(--stage-size);
+    height: var(--stage-size);
+    cursor: grab;
+    touch-action: pan-y;
+  }
+
+  .player__stage.is-dragging { cursor: grabbing; }
+
+  .player__stage canvas {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  /* keep copy above the bleeding canvas */
+  .player__meta,
+  .player__scrub {
+    position: relative;
+    z-index: 1;
+  }
+
+  .player__fallback {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 78%;
+    aspect-ratio: 1.136;
+    transform: translate(-50%, -50%) perspective(640px) rotateY(20deg);
+    border-radius: 2px;
+    background-image:
+      radial-gradient(circle at 50% 78%, #ffd84d 0%, #ff9d1c 34%, #f4600f 62%, #d9370a 100%),
+      linear-gradient(to bottom, #8fd3f0 0%, rgba(143, 211, 240, 0) 32%);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22), 0 1px 3px rgba(0, 0, 0, 0.2);
+  }
+
+  .player[data-mode="group"] .player__fallback {
+    background-image:
+      radial-gradient(circle at 50% 30%, #7fd8f7 0%, #2f8fdc 34%, #233f97 62%, #0d1338 100%);
+  }
+
+  .player__stage.is-3d .player__fallback { display: none; }
+
+  .player__meta { min-width: 0; }
+
+  .player__title {
+    margin: 0 0 2px;
+    font-size: 21px;
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -0.012em;
+    color: var(--player-title);
+  }
+
+  .player__artist,
+  .player__album {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.45;
+    color: var(--player-meta);
+  }
+
+  /* scrubber */
+
+  /* iPod 5G scrubber. Every value is a fixed px, so it is pixel-identical
+     on phone, tablet and desktop; the bar spans the row and the time stamps
+     sit beneath its ends, as on the device. No knob — the iPod had none. */
+  .player__scrub {
+    margin-top: 22px;
+  }
+
+  .player__track {
+    position: relative;
+    height: 12px;
+    border-radius: 2px;          /* the Classic's ends are nearly square */
+    background-image: var(--bar-track);
+    box-shadow: inset 0 0 0 1px var(--bar-line),
+                inset 0 1px 1px rgba(0, 0, 0, 0.12);
+    cursor: pointer;
+    touch-action: none;
+  }
+
+  /* expanded invisible hit area for touch */
+  .player__track::after {
+    content: "";
+    position: absolute;
+    inset: -8px 0;
+  }
+
+  .player__fill {
+    position: absolute;
+    top: 1px;
+    bottom: 1px;
+    left: 1px;
+    width: 13%;
+    border-radius: 1px;
+    background-image:
+      /* soft triangle wave, not 1px lines: each rib fades in and out across
+         the full 5px period, so it reads as sheen rather than stripes */
+      repeating-linear-gradient(to right,
+        rgba(255, 255, 255, 0) 0,
+        rgba(255, 255, 255, 0.1) 2.5px,
+        rgba(255, 255, 255, 0) 5px),
+      var(--bar-fill);
+    box-shadow: inset -1px 0 0 rgba(20, 110, 180, 0.35);
+  }
+
+  .player__stamps {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 6px;
+  }
+
+  .player__time {
+    flex: none;
+    font-size: 14px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--player-time);
+  }
+
+  .player__track.is-live {
+    cursor: default;
+    pointer-events: none;
+  }
+
+  /* An author `display` rule outranks the UA stylesheet's [hidden] rule, so
+     without this the marker stays visible in solo mode even though the JS
+     sets the attribute. Applied broadly so it can't bite the next element. */
+  [hidden] { display: none !important; }
+
+  /* The dot sets width/height and flex: none, both of which need a flex
+     parent to mean anything — without this rule the span stays inline, the
+     dot collapses to zero width, and LIVE falls back to inherited 16px body
+     type beside the 14px bold stamp it replaces. */
+  .player__live {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 7px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    color: var(--live);
+  }
+
+  .player__live-dot {
+    position: relative;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--live);
+    flex: none;
+  }
+
+  .player__live-dot::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    animation: live-pulse 1.9s cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
+  }
+
+  @keyframes live-pulse {
+    0%   { box-shadow: 0 0 0 0 var(--live-halo); }
+    70%  { box-shadow: 0 0 0 7px transparent; }
+    100% { box-shadow: 0 0 0 0 transparent; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .player__live-dot::after { animation: none; }
+  }
+
+
+  .player__track:focus { outline: none; }
+
+  .player__track:focus-visible {
+    outline: 2px solid rgba(24, 160, 235, 0.85);
+    outline-offset: 2px;
+  }
+
+  /* ---------- transport — the primary controls ----------
+     No chrome behind them: the glyphs sit on the page. The keys live in the
+     middle column of a three-column grid; the side columns are deliberately
+     unequal (0.78fr / 1fr) so the cluster sits about 24px left of true centre.
+     The row's right edge is pinned to the right edge of the blue progress
+     track above it — measured in JS and written to --track-inset-r, because
+     the duration / LIVE label that sits beside the track changes width — so
+     the volume slider ends exactly under the bar. */
+
+  .transport {
+    display: grid;
+    grid-template-columns: 0.78fr auto 1fr;
+    align-items: center;
+    margin-top: 10px;
+    margin-right: var(--track-inset-r, 0px);
+  }
+
+  .transport__keys {
+    grid-column: 2;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .transport__key {
+    position: relative;
+    width: 48px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--tb-ink);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .transport__key--play { width: 64px; height: 52px; }
+
+  .transport__key svg {
+    display: block;
+    width: 26px;
+    height: 26px;
+    margin: 0 auto;
+    fill: currentColor;
+  }
+
+  .transport__key--play svg { width: 36px; height: 36px; }
+  .transport__key--aux  svg { width: 22px; height: 22px; }
+  .transport__key--aux { color: var(--tb-muted); }
+
+  .transport__key:hover:not([disabled]) {
+    background: rgba(0, 0, 0, 0.05);
+  }
+
+  /* pressed in — the one bit of iOS 5 depth that survives without a slab */
+  .transport__key:active:not([disabled]) {
+    background: rgba(0, 0, 0, 0.1);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.28);
+  }
+
+  /* latched: repeat on, or saved offline */
+  .transport__key[aria-pressed="true"]:not(.transport__key--play) {
+    color: var(--tb-on-bot);
+    background: rgba(47, 110, 192, 0.1);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.14);
+  }
+
+  .transport__key[disabled] {
+    cursor: default;
+    opacity: 0.3;
+  }
+
+  .transport__key:focus { outline: none; }
+  .transport__key:focus-visible {
+    outline: 2px solid rgba(24, 160, 235, 0.9);
+    outline-offset: 1px;
+  }
+
+  .transport__glyph { margin: 0 auto; }
+  .transport__key .transport__glyph--pause { display: none; }
+  .transport__key.is-playing .transport__glyph--play { display: none; }
+  .transport__key.is-playing .transport__glyph--pause { display: block; }
+
+  /* ---------- volume ---------- */
+
+  .volume {
+    grid-column: 3;
+    justify-self: end;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: 122px;
+  }
+
+  .volume__icon {
+    flex: none;
+    width: 13px;
+    height: 13px;
+    fill: currentColor;
+    color: var(--tb-muted);
+  }
+
+  .volume__track {
+    position: relative;
+    flex: 1 1 auto;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--vol-face);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.36),
+                inset 0 -1px 0 rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    touch-action: none;
+  }
+
+  .volume__fill {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 72%;
+    border-radius: 3px;
+    background-image: linear-gradient(to bottom, var(--vol-fill-a), var(--vol-fill-b));
+  }
+
+  .volume__knob {
+    position: absolute;
+    top: 50%;
+    left: 72%;
+    width: 15px;
+    height: 15px;
+    margin-left: -7.5px;
+    transform: translateY(-50%);
+    border-radius: 50%;
+    background-image: linear-gradient(to bottom, #ffffff 0%, #f2f3f4 52%, #dfe1e4 100%);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.34),
+                inset 0 1px 0 rgba(255, 255, 255, 0.9),
+                0 1px 2px rgba(0, 0, 0, 0.38);
+    pointer-events: none;
+  }
+
+  .volume__track:focus { outline: none; }
+  .volume__track:focus-visible {
+    outline: 2px solid rgba(24, 160, 235, 0.9);
+    outline-offset: 3px;
+  }
+
+  /* ---------- library, iTunes 10 list view ---------- */
+
+  .library {
+    position: relative;
+    z-index: 1;
+    margin-top: 28px;
+    /* flush to the section edges: no side borders, and negative margins eat
+       the player's own horizontal padding */
+    margin-left: calc(var(--bar-pad) * -1);
+    margin-right: calc(var(--bar-pad) * -1);
+    border-top: 1px solid var(--lib-border);
+    border-bottom: 1px solid var(--lib-border);
+    background: var(--lib-bg);
+    /* Lucida Grande is the whole flavour of a 2010 Mac list */
+    font-family: "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", "Segoe UI", system-ui, sans-serif;
+    font-size: 11px;
+  }
+
+  /* The scrolling happens one level in: an overlay scroller cannot live
+     inside the element that scrolls, or it would scroll away with the rows. */
+  .library__scroll {
+    max-height: 253px;              /* header + 13 rows; 16 songs -> it scrolls */
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;          /* the native bars are fully replaced */
+  }
+
+  .library__scroll::-webkit-scrollbar { display: none; }
+
+  /* ---------- overlay scroller: Aqua gel, fades when idle ----------
+     Native scrollbar internals can't animate opacity, which is why this is
+     built from elements. Invisible but still hoverable, so brushing the
+     right gutter reveals it without scrolling. */
+  .library__bar {
+    position: absolute;
+    top: 21px;                      /* clears the sticky header */
+    right: 3px;
+    bottom: 3px;
+    width: 11px;
+    z-index: 3;
+    border-radius: 6px;
+    background: rgba(118, 128, 142, 0.16);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .library.is-scrolling .library__bar,
+  .library__bar:hover {
+    opacity: 1;
+  }
+
+  .library__thumb {
+    position: absolute;
+    left: 2px;
+    right: 2px;
+    top: 0;
+    height: 40px;
+    border-radius: 4px;
+    background-image: var(--gel-fill-v);
+    box-shadow: inset 0 0 0 1px rgba(16, 64, 127, 0.4);
+    cursor: default;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .library__bar { transition: none; }
+  }
+
+  .library table {
+    width: 100%;
+    /* separate, not collapse: sticky headers drop their borders mid-scroll
+       under border-collapse in Chromium */
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+  }
+
+  .library th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    height: 18px;
+    padding: 0 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-align: left;
+    color: var(--lib-head-ink);
+    text-shadow: 0 1px 0 var(--lib-head-emboss);
+    background-image: linear-gradient(to bottom, var(--lib-head-top), var(--lib-head-bot));
+    border-bottom: 1px solid var(--lib-head-rule);
+    border-right: 1px solid var(--lib-head-sep);
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  .library th[data-sort] { cursor: default; }
+
+  /* Two bugs lived here. The hover gradient was hardcoded light grey, so it
+     went white over the dark theme; and it was unguarded, so a tap on a
+     touch screen left the hover stuck on the column it sorted. Gating on a
+     real pointer fixes the sticky tap, and [aria-sort] outranks plain hover
+     so the sorted column stays blue while you're over it. */
+  @media (hover: hover) and (pointer: fine) {
+    .library th[data-sort]:hover {
+      background-image: linear-gradient(to bottom, var(--lib-head-hot-top), var(--lib-head-hot-bot));
+    }
+
+    .library th[data-sort][aria-sort]:hover {
+      background-image: linear-gradient(to bottom, var(--lib-sort-hot-top), var(--lib-sort-hot-bot));
+    }
+  }
+
+  /* iTunes 10 shows where the order comes from: the sorted column goes blue */
+  .library th[aria-sort] {
+    color: var(--lib-ink);
+    background-image: linear-gradient(to bottom, var(--lib-sort-top), var(--lib-sort-bot));
+  }
+
+  /* the sort indicator lives in the header's right corner, as in iTunes */
+  .lib-sort {
+    float: right;
+    margin: 0 0 0 4px;
+    font-size: 8px;
+    line-height: 18px;
+    opacity: 0.7;
+  }
+
+  .library th:last-child { border-right: 0; }
+
+  /* 18px rows with NO rules and no highlight line — in iTunes 10 the Aqua
+     stripe alone separates rows, which is what keeps the list feeling light
+     at this density */
+  .library td {
+    height: 18px;
+    padding: 0 6px;
+    color: var(--lib-soft);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+  }
+
+  /* period type is uniform 11px; the title keeps its weight so it still
+     anchors the row */
+  .lib-title {
+    font-weight: 700;
+    color: var(--lib-ink);
+  }
+
+  /* row number gutter; the playing row shows the speaker here instead */
+  .lib-idx {
+    padding: 0 6px 0 4px;
+    text-align: right;
+    color: var(--lib-ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* the # sits over its numbers, not off to the left: .library th's own
+     text-align: left outranks .lib-idx, so it has to be beaten on
+     specificity rather than order. The 5px right padding is 6px less the
+     1px separator border the header carries and the body cells don't —
+     without that trim the # lands a pixel left of every number under it. */
+  .library th.lib-idx {
+    text-align: right;
+    padding-right: 5px;
+  }
+
+  /* Icon columns: header and rows share the same box — zero side padding,
+     centred, identical icon size — so the glyphs sit on one vertical line. */
+  .library th.lib-icon,
+  .library td.lib-icon {
+    padding: 0;
+    text-align: center;
+  }
+
+  .library th.lib-icon svg {
+    display: block;
+    width: 13px;
+    height: 13px;
+    margin: 0 auto;
+    fill: currentColor;
+  }
+
+  .library tbody tr { cursor: default; }
+  .library tbody tr:nth-child(even) { background: var(--lib-alt); }
+
+  /* the playing song: a steady tint whether or not it's the selection */
+  .library tbody tr.is-playing,
+  .library tbody tr.is-playing:nth-child(even) { background: var(--lib-np); }
+  .library tbody tr.is-playing .lib-title { font-weight: 700; }
+
+  /* ---------- marquee, on the playing row only ----------
+     Apple's label marquee doesn't loop like a ticker. It parks, glides far
+     enough left to show the tail, parks again, glides back, and repeats —
+     ease-in-out at both ends so it never snaps. The clipped edge is
+     dissolved by a gradient instead of stamped with an ellipsis, and the
+     gradient grows with the travel, so an edge only goes soft once there is
+     something hidden behind it. Both fades are 0 at rest, which collapses
+     the mask to fully opaque and leaves the cell pixel-identical to a
+     non-playing one. */
+  .lib-mq {
+    --mq-fade-l: 0px;
+    --mq-fade-r: 0px;
+    display: block;
+    /* clip, not hidden: hidden on one axis promotes the other to auto and
+       the resulting scroll box shaves descenders in an 18px row */
+    overflow-x: clip;
+    -webkit-mask-image: linear-gradient(to right,
+      transparent 0, #000 var(--mq-fade-l),
+      #000 calc(100% - var(--mq-fade-r)), transparent 100%);
+    mask-image: linear-gradient(to right,
+      transparent 0, #000 var(--mq-fade-l),
+      #000 calc(100% - var(--mq-fade-r)), transparent 100%);
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+  }
+
+  @supports not (overflow-x: clip) {
+    .lib-mq { overflow: hidden; }
+  }
+
+  .lib-mq__in {
+    display: inline-block;
+    white-space: nowrap;
+  }
+
+  .library tbody tr:focus { outline: none; }
+  .library tbody tr:focus-visible { box-shadow: inset 0 0 0 2px rgba(24, 160, 235, 0.9); }
+
+  .library tbody tr[aria-selected="true"],
+  .library tbody tr[aria-selected="true"]:nth-child(even),
+  .library tbody tr[aria-selected="true"].is-playing {
+    background-image: linear-gradient(to bottom, var(--lib-sel-top), var(--lib-sel-bot));
+  }
+
+  .library tbody tr[aria-selected="true"] td:first-child {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);   /* gel top light */
+  }
+
+  .library tbody tr[aria-selected="true"] td,
+  .library tbody tr[aria-selected="true"] .lib-title,
+  .library tbody tr[aria-selected="true"] .lib-btn,
+  .library tbody tr[aria-selected="true"] .lib-np { color: #fff; }
+
+  .library tbody tr[aria-selected="true"] .lib-pf {
+    background: rgba(255, 255, 255, 0.28);
+    color: #fff;
+  }
+
+  .lib-num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* platform: a monochrome initial badge (no logos — those are trademarks),
+     with the platform name in the tooltip and the accessible label */
+  .lib-pf {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 14px;
+    border-radius: 3px;
+    background: var(--lib-badge);
+    color: var(--lib-badge-ink);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-decoration: none;
+    vertical-align: middle;
+  }
+
+  .lib-pf[data-len="2"] { font-size: 8px; letter-spacing: 0; }
+  .lib-pf:hover { background: var(--lib-accent); color: #fff; }
+  .lib-pf:focus { outline: none; }
+  .lib-pf:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
+
+  .lib-np {
+    display: block;
+    width: 11px;
+    height: 11px;
+    margin-left: auto;
+    color: var(--lib-accent);
+    fill: currentColor;
+  }
+
+  .lib-btn {
+    width: 22px;
+    height: 16px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--lib-icon);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .lib-btn svg {
+    display: block;
+    width: 12px;
+    height: 12px;
+    margin: 0 auto;
+    fill: currentColor;
+  }
+
+  .lib-btn:hover { background: rgba(0, 0, 0, 0.06); }
+  .lib-btn:focus { outline: none; }
+  .lib-btn:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
+  .lib-dl[aria-pressed="true"] { color: var(--lib-accent); }
+  .lib-star[aria-pressed="true"] { color: var(--lib-star); }
+  .library tbody tr[aria-selected="true"] .lib-star[aria-pressed="true"] { color: #ffd166; }
+
+  @media (max-width: 620px) { .lib-col-album { display: none; } }
+  @media (max-width: 560px) { .lib-col-bpm { display: none; } }
+  /* Artist used to drop at 420px, which took it off every phone. It now
+     holds down to 360px: below ~368px its 22% share would make it wider
+     than the Song column, and above that both columns simply get tight —
+     which the marquee now handles rather than hiding the field. */
+  @media (max-width: 360px) { .lib-col-artist { display: none; } }
+
+  /* ---------- context menu, iOS ---------- */
+
+  .ctx {
+    position: fixed;
+    z-index: 1000;
+    min-width: 210px;
+    padding: 5px;
+    border-radius: 12px;
+    background: var(--ctx-bg);
+    -webkit-backdrop-filter: saturate(180%) blur(18px);
+    backdrop-filter: saturate(180%) blur(18px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24),
+                0 0 0 0.5px rgba(0, 0, 0, 0.2);
+    font-size: 14px;
+    color: var(--ctx-ink);
+  }
+
+  .ctx__item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: default;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .ctx__item:hover:not([disabled]),
+  .ctx__item:focus-visible,
+  .ctx__item.is-open {
+    background: var(--lib-accent);
+    color: #fff;
+    outline: none;
+  }
+
+  .ctx__item[disabled] { opacity: 0.5; }
+  .ctx__chev { margin-left: auto; opacity: 0.6; font-size: 16px; line-height: 1; }
+  .ctx__check { width: 14px; flex: none; font-weight: 700; }
+  .ctx__sep { height: 1px; margin: 5px 8px; background: var(--ctx-sep); }
+
+  .ctx__sub {
+    position: absolute;
+    top: -5px;
+    left: 100%;
+    margin-left: 2px;
+    min-width: 200px;
+    padding: 5px;
+    border-radius: 12px;
+    background: var(--ctx-bg);
+    -webkit-backdrop-filter: saturate(180%) blur(18px);
+    backdrop-filter: saturate(180%) blur(18px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24), 0 0 0 0.5px rgba(0, 0, 0, 0.2);
+    color: var(--ctx-ink);
+    display: none;
+  }
+
+  .ctx__sub.is-flip { left: auto; right: 100%; margin-left: 0; margin-right: 2px; }
+  .ctx__item--parent:hover > .ctx__sub,
+  .ctx__item--parent.is-open > .ctx__sub { display: block; }
+
+  /* ---------- new playlist sheet ---------- */
+
+  .sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.28);
+  }
+
+  .sheet {
+    width: 270px;
+    border-radius: 14px;
+    overflow: hidden;
+    background: var(--ctx-bg);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.3);
+    color: var(--ctx-ink);
+    text-align: center;
+  }
+
+  .sheet__body { padding: 18px 16px 14px; }
+  .sheet__title { margin: 0 0 4px; font-size: 17px; font-weight: 600; }
+  .sheet__msg { margin: 0 0 12px; font-size: 13px; opacity: 0.7; }
+
+  .sheet__input {
+    width: 100%;
+    height: 32px;
+    padding: 0 9px;
+    border: 1px solid rgba(0, 0, 0, 0.22);
+    border-radius: 7px;
+    font: inherit;
+    font-size: 14px;
+    background: var(--lib-bg);
+    color: var(--lib-ink);
+  }
+
+  .sheet__actions { display: flex; border-top: 1px solid var(--ctx-sep); }
+
+  .sheet__btn {
+    flex: 1;
+    height: 44px;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    font-size: 17px;
+    color: var(--lib-accent);
+    cursor: pointer;
+  }
+
+  .sheet__btn + .sheet__btn { border-left: 1px solid var(--ctx-sep); font-weight: 600; }
+  .sheet__btn:active { background: rgba(0, 0, 0, 0.06); }
+
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 28px;
+    z-index: 1002;
+    transform: translateX(-50%);
+    padding: 9px 16px;
+    border-radius: 999px;
+    background: rgba(28, 30, 36, 0.92);
+    color: #fff;
+    font-size: 13.5px;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+  }
+
+  .toast.is-on { opacity: 1; }
+
+  /* not enough room beside the keys on a phone: volume drops beneath, centred,
+     and the row goes back to full width so the stack is centred on the page */
+  @media (max-width: 560px) {
+    .transport {
+      grid-template-columns: 1fr;
+      justify-items: center;
+      row-gap: 8px;
+      margin-right: 0;
+    }
+    .transport__keys { grid-column: 1; }
+    .volume { grid-column: 1; justify-self: center; }
+  }
+
+  /* Stacking at 560 (not 430) keeps the art column centred for every width
+     where the canvas bleed would otherwise run off the left edge. */
+  @media (max-width: 560px) {
+    .player__top {
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 10px;
+    }
+    .player__meta { width: 100%; }
+  }
+
+  @media (max-width: 560px) {
+    .player__inner { padding: 32px var(--bar-pad) 28px; }
+    .player__top { gap: 16px; }
+    .player__title { font-size: 18px; }
+    .player__artist,
+    .player__album { font-size: 13px; }
+    /* the scrubber is deliberately absent from every media query:
+       identical groove, gel and knob at all widths */
+    .transport__keys { gap: 2px; }
+    .transport__key { width: 44px; height: 40px; }
+    .transport__key--play { width: 56px; height: 48px; }
+    .transport__key svg { width: 24px; height: 24px; }
+    .transport__key--play svg { width: 32px; height: 32px; }
+    .transport__key--aux svg { width: 20px; height: 20px; }
+  }
+
+  /* ---------- demo page underneath (delete when dropping the header in) ---------- */
+
+  * { box-sizing: border-box; }
+
+  html {
+    -webkit-text-size-adjust: 100%;   /* stop iOS inflating type in landscape */
+    text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 "Helvetica Neue", Arial, sans-serif;
+  }
+
+  .demo {
+    max-width: 34rem;
+    margin: 0 auto;
+    padding: 56px 24px 120px;
+  }
+
+  .demo p {
+    line-height: 1.65;
+    font-size: 15px;
+    max-width: 62ch;
+  }
+</style>
+</head>
+<body>
+
+<header class="statusbar">
+  <div class="statusbar__inner">
+    <span class="statusbar__label">Now Playing</span>
+
+    <div class="search" role="search">
+      <svg class="search__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2"/>
+        <path d="M10.1 10.1 L14 14" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
+      </svg>
+      <input class="search__input" type="search" id="q" placeholder="Search or paste a link"
+             aria-label="Search YouTube, SoundCloud and Bandcamp, or paste a link"
+             role="combobox" aria-expanded="false" aria-controls="srchList"
+             aria-autocomplete="list" autocomplete="off" spellcheck="false">
+
+      <!-- Search results: the iTunes 11 Up Next popover — count + Clear in a
+           gradient header, 40px rows of art / title / "Artist — Platform",
+           a circled chevron on the hot row, pager in the footer. -->
+      <div class="srch" id="srch" hidden>
+        <div class="srch__head">
+          <p class="srch__count" id="srchCount"></p>
+          <button class="srch__clear" type="button" id="srchClear">Clear</button>
+        </div>
+        <div class="srch__body" id="srchBody"></div>
+        <div class="srch__foot" id="srchFoot" hidden>
+          <button class="srch__page" type="button" id="srchPrev" tabindex="-1" aria-label="Previous page">&#8249;</button>
+          <span class="srch__dots" id="srchDots" aria-hidden="true"></span>
+          <button class="srch__page" type="button" id="srchNext" tabindex="-1" aria-label="Next page">&#8250;</button>
+        </div>
+        <p class="srch__live" id="srchLive" role="status"></p>
+      </div>
+    </div>
+
+    <div class="statusbar__status">
+      <!-- Same silhouette as the profile avatar, scaled: head radius, head
+           height and shoulder span are the avatar's proportions at k = 1.0
+           (solo), 0.85 (front of the group) and 0.62 (the two behind). -->
+      <div class="segmented" role="radiogroup" aria-label="Listening mode" id="mode">
+        <button class="segmented__item" type="button" role="radio" aria-checked="false"
+                data-mode="solo" aria-label="Solo listening" tabindex="-1">
+          <svg viewBox="0 0 30 20" aria-hidden="true">
+            <circle cx="15" cy="7.5" r="3.5"/>
+            <path d="M7.5 20C7.5 15.3 10.8 13 15 13s7.5 2.3 7.5 7z"/>
+          </svg>
+        </button>
+        <button class="segmented__item" type="button" role="radio" aria-checked="true"
+                data-mode="group" aria-label="Group listening">
+          <svg viewBox="0 0 30 20" aria-hidden="true">
+            <defs>
+              <!-- Cuts a gap around the front figure so three same-coloured
+                   silhouettes don't merge into one blob at 14px. -->
+              <mask id="groupMask" maskUnits="userSpaceOnUse" x="0" y="0" width="30" height="20">
+                <rect width="30" height="20" fill="#fff"/>
+                <g fill="#000" stroke="#000" stroke-width="2.8" stroke-linejoin="round">
+                  <circle cx="15" cy="9.375" r="2.975"/>
+                  <path d="M8.625 20C8.625 16.005 11.43 14.05 15 14.05s6.375 1.955 6.375 5.95z"/>
+                </g>
+              </mask>
+            </defs>
+            <g mask="url(#groupMask)">
+              <circle cx="6" cy="11.25" r="2.17"/>
+              <path d="M1.35 19C1.35 16.086 3.396 14.66 6 14.66s4.65 1.426 4.65 4.34z"/>
+              <circle cx="24" cy="11.25" r="2.17"/>
+              <path d="M19.35 19c0-2.914 2.046-4.34 4.65-4.34s4.65 1.426 4.65 4.34z"/>
+            </g>
+            <circle cx="15" cy="9.375" r="2.975"/>
+            <path d="M8.625 20C8.625 16.005 11.43 14.05 15 14.05s6.375 1.955 6.375 5.95z"/>
+          </svg>
+        </button>
+      </div>
+      <time class="statusbar__time" id="clock" datetime="11:35">11:35</time>
+
+      <button class="statusbar__avatar" id="profile" type="button" aria-label="Your profile">
+        <svg viewBox="0 0 40 40" aria-hidden="true">
+          <defs>
+            <linearGradient id="avatarFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="var(--avatar-fill-top)"/>
+              <stop offset="1" stop-color="var(--avatar-fill-bot)"/>
+            </linearGradient>
+            <clipPath id="avatarClip"><circle cx="20" cy="20" r="20"/></clipPath>
+          </defs>
+          <g clip-path="url(#avatarClip)" fill="url(#avatarFill)">
+            <circle cx="20" cy="15" r="7"/>
+            <path d="M5 40 C5 30.6 11.6 26 20 26 C28.4 26 35 30.6 35 40 Z"/>
+          </g>
+        </svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<section class="player" aria-label="Now playing">
+  <div class="player__inner">
+    <div class="player__top">
+      <div class="player__art">
+        <div class="player__stage" id="stage">
+          <div class="player__fallback" aria-hidden="true"></div>
+        </div>
+      </div>
+
+      <div class="player__meta">
+        <h2 class="player__title">Midnight Set, Side B</h2>
+        <p class="player__artist">Fennel Grove</p>
+        <p class="player__album">Long Wave Sessions, Vol. 2</p>
+      </div>
+    </div>
+
+    <div class="player__scrub">
+      <div class="player__track" id="track" role="slider" tabindex="0"
+           aria-label="Seek" aria-valuemin="0" aria-valuemax="178" aria-valuenow="23">
+        <div class="player__fill" id="fill"></div>
+      </div>
+      <div class="player__stamps">
+        <span class="player__time" id="elapsed">00:23</span>
+        <span class="player__time" id="remaining">-02:35</span>
+        <span class="player__live" id="live" role="status" hidden>
+          <span class="player__live-dot" aria-hidden="true"></span>LIVE
+        </span>
+      </div>
+    </div>
+
+    <div class="transport" role="group" aria-label="Playback controls">
+      <div class="transport__keys">
+        <button class="transport__key transport__key--aux" id="download" type="button"
+                aria-label="Download for offline" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path class="dl-arrow" d="M10.8 3h2.4v7.7h4.1L12 17.1 6.7 10.7h4.1z"/>
+            <path class="dl-check" d="M9.9 15.4 6.4 11.9l1.9-1.9 1.6 1.6 5.8-5.8 1.9 1.9z" hidden/>
+            <path d="M4.6 19h14.8v2.1H4.6z"/>
+          </svg>
+        </button>
+
+        <button class="transport__key" id="prev" type="button" aria-label="Previous track">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 6.6h2.1v10.8H4z"/>
+            <path d="M13.4 6.6v10.8L6.6 12z"/>
+            <path d="M20.6 6.6v10.8L13.8 12z"/>
+          </svg>
+        </button>
+
+        <button class="transport__key transport__key--play" id="play" type="button"
+                aria-label="Pause" aria-pressed="true">
+          <svg class="transport__glyph transport__glyph--play" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M7.4 4.8 19 12 7.4 19.2z"/>
+          </svg>
+          <svg class="transport__glyph transport__glyph--pause" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M7.1 5.2h3.5v13.6H7.1zM13.4 5.2h3.5v13.6h-3.5z"/>
+          </svg>
+        </button>
+
+        <button class="transport__key" id="next" type="button" aria-label="Next track">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3.4 6.6 10.2 12 3.4 17.4z"/>
+            <path d="M10.6 6.6 17.4 12l-6.8 5.4z"/>
+            <path d="M17.9 6.6H20v10.8h-2.1z"/>
+          </svg>
+        </button>
+
+        <button class="transport__key transport__key--aux" id="repeat" type="button"
+                aria-label="Repeat" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <g fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round">
+              <path d="M6.6 8.4h8.6a3.6 3.6 0 0 1 3.6 3.6v0.8"/>
+              <path d="M17.4 15.6H8.8a3.6 3.6 0 0 1-3.6-3.6v-0.8"/>
+            </g>
+            <path d="M16.6 12.6h4.4l-2.2 3.8z"/>
+            <path d="M7.4 11.4H3l2.2-3.8z"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="volume">
+        <svg class="volume__icon" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M2 6.2h2.6L7.8 3.4v9.2L4.6 9.8H2z"/>
+        </svg>
+        <div class="volume__track" id="volume" role="slider" tabindex="0"
+             aria-label="Volume" aria-valuemin="0" aria-valuemax="100" aria-valuenow="72">
+          <div class="volume__fill" id="volumeFill"></div>
+          <div class="volume__knob" id="volumeKnob"></div>
+        </div>
+        <svg class="volume__icon" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M1 6.2h2.6L6.8 3.4v9.2L3.6 9.8H1z"/>
+          <g fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+            <path d="M9.4 5.6a3.3 3.3 0 0 1 0 4.8"/>
+            <path d="M11.6 3.6a6.2 6.2 0 0 1 0 8.8"/>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <div class="library" id="library">
+      <div class="library__scroll" id="libraryScroll">
+      <table aria-label="Library">
+        <colgroup>
+          <col style="width: 34px">
+          <col style="width: 38px">
+          <col>
+          <col class="lib-col-artist" style="width: 22%">
+          <col style="width: 54px">
+          <col class="lib-col-bpm" style="width: 48px">
+          <col style="width: 40px">
+          <col style="width: 40px">
+          <col class="lib-col-album" style="width: 26%">
+        </colgroup>
+        <thead>
+          <tr>
+            <th scope="col" class="lib-idx" aria-label="Track number">#</th>
+            <th scope="col" class="lib-icon" aria-label="Platform">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm6.9 9h-3a15.5 15.5 0 0 0-1.3-5.4A8 8 0 0 1 18.9 11zM12 4.1c.9 1.1 1.7 3.4 2 6.9h-4c.3-3.5 1.1-5.8 2-6.9zM5.1 11a8 8 0 0 1 4.3-5.4A15.5 15.5 0 0 0 8.1 11h-3zm0 2h3c.2 2.1.6 3.9 1.3 5.4A8 8 0 0 1 5.1 13zM12 19.9c-.9-1.1-1.7-3.4-2-6.9h4c-.3 3.5-1.1 5.8-2 6.9zm2.6-.5c.7-1.5 1.1-3.3 1.3-5.4h3a8 8 0 0 1-4.3 5.4z"/></svg>
+            </th>
+            <th scope="col" data-sort="title" aria-sort="ascending">Song<span class="lib-sort" aria-hidden="true">&#9650;</span></th>
+            <th scope="col" class="lib-col-artist" data-sort="artist">Artist</th>
+            <th scope="col" class="lib-num" data-sort="duration">Time</th>
+            <th scope="col" class="lib-num lib-col-bpm" data-sort="bpm">BPM</th>
+            <th scope="col" class="lib-icon" aria-label="Download">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.8 3h2.4v7.7h4.1L12 17.1 6.7 10.7h4.1z"/><path d="M4.6 19h14.8v2.1H4.6z"/></svg>
+            </th>
+            <th scope="col" class="lib-icon" aria-label="Star">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.5 6.1 20.6l1.2-6.5L2.5 9.5l6.6-.9z"/></svg>
+            </th>
+            <th scope="col" class="lib-col-album" data-sort="album">Album</th>
+          </tr>
+        </thead>
+        <tbody id="libraryRows"></tbody>
+      </table>
+      </div>
+      <div class="library__bar" id="libraryBar" aria-hidden="true">
+        <div class="library__thumb" id="libraryThumb"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<main class="demo">
+  <p>Above 720px the search pill sits centred between the label and the right-hand controls. Below that it drops to its own full-width row, so nothing has to squeeze.</p>
+  <p>Drag or click the scrubber to seek, or tab into it and use the arrow keys.</p>
+  <p style="margin-top:900px">End of the demo page.</p>
+</main>
+
+<div class="ctx" id="ctx" role="menu" aria-label="Song actions" hidden></div>
+
+<div class="sheet-backdrop" id="sheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="sheet__body">
+      <p class="sheet__title" id="sheetTitle">New Playlist</p>
+      <p class="sheet__msg">Enter a name for this playlist.</p>
+      <input class="sheet__input" id="sheetInput" type="text" placeholder="Playlist" maxlength="60" autocomplete="off">
+    </div>
+    <div class="sheet__actions">
+      <button class="sheet__btn" type="button" id="sheetCancel">Cancel</button>
+      <button class="sheet__btn" type="button" id="sheetCreate">Create</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+  /* Both albums, in one place: the inline script reads the metadata, the 3D
+     module reads `cover` and `back` to generate its textures. Solo is a fixed
+     track you control; group is a live broadcast you're tuned into. */
+  window.ALBUMS = {
+    solo: {
+      title: 'Midnight Set, Side B',
+      artist: 'Fennel Grove',
+      album: 'Long Wave Sessions, Vol. 2',
+      live: false,
+      total: 178,
+      start: 23,
+      nowPlaying: 'Midnight Set',
+      cover: {
+        glowY: 0.78,
+        stops: [[0, '#ffe07a'], [0.16, '#ffc63a'], [0.4, '#f9911a'],
+                [0.68, '#e5540f'], [1, '#a82407']],
+        wash: { rgb: '104, 178, 219', a: 0.92, from: 'top', span: 0.42 },
+        rayAlpha: 0.11,
+      },
+      back: {
+        grad: ['#25100a', '#6d2a0c', '#ad4a12'],
+        echo: 'rgba(255,186,86,0.4)',
+        echoAt: [0.8, 0.16],
+        spine: 'FENNEL GROVE — MIDNIGHT SET, SIDE B',
+        tracks: ['Ember Line', 'Slow Carousel', 'Paper Harbour', 'Midnight Set',
+                 'Side B', 'Long Wave', 'Fennel', 'Closing Hour'],
+        footer: 'Long Wave Recordings · LWR-042',
+      },
+    },
+    group: {
+      title: 'Harbour Lights',
+      artist: 'Cassette Bloom',
+      album: 'Live from Pier 9',
+      live: true,
+      start: 1247,          // seconds into the broadcast
+      nowPlaying: 'Harbour Lights',
+      cover: {
+        glowY: 0.3,
+        stops: [[0, '#e8fbff'], [0.14, '#7fd8f7'], [0.38, '#2f8fdc'],
+                [0.66, '#233f97'], [1, '#0d1338']],
+        wash: { rgb: '18, 24, 66', a: 0.85, from: 'bottom', span: 0.46 },
+        rayAlpha: 0.07,
+      },
+      back: {
+        grad: ['#070d26', '#152a63', '#2f6aa8'],
+        echo: 'rgba(126,216,247,0.34)',
+        echoAt: [0.24, 0.2],
+        spine: 'CASSETTE BLOOM — LIVE FROM PIER 9',
+        tracks: ['Signal Fade', 'Harbour Lights', 'Nine Below', 'Tideline',
+                 'Blue Hour', 'Gantry', 'Saltwater', 'Last Ferry'],
+        footer: 'Pier 9 Broadcasts · P9B-Live',
+      },
+    },
+  };
+
+  /* Library. `url` opens the song on its original platform; these point at each
+     platform's search so the demo links actually go somewhere — swap in the
+     real track URLs. */
+  window.LIBRARY = (function () {
+    var solo = { artist: 'Fennel Grove', album: 'Long Wave Sessions, Vol. 2' };
+    var grp  = { artist: 'Cassette Bloom', album: 'Live from Pier 9' };
+    var platforms = {
+      bandcamp:   { name: 'Bandcamp',   url: function (q) { return 'https://bandcamp.com/search?q=' + q; } },
+      soundcloud: { name: 'SoundCloud', url: function (q) { return 'https://soundcloud.com/search?q=' + q; } },
+      youtube:    { name: 'YouTube',    url: function (q) { return 'https://www.youtube.com/results?search_query=' + q; } },
+      spotify:    { name: 'Spotify',    url: function (q) { return 'https://open.spotify.com/search/' + q; } },
+    };
+    var rows = [
+      ['Ember Line',     solo, 214, 118, 'bandcamp'],
+      ['Slow Carousel',  solo, 262,  96, 'soundcloud'],
+      ['Paper Harbour',  solo, 198, 124, 'bandcamp'],
+      ['Midnight Set',   solo, 178, 112, 'spotify'],
+      ['Side B',         solo, 241, 104, 'youtube'],
+      ['Long Wave',      solo, 305,  88, 'bandcamp'],
+      ['Fennel',         solo, 187, 128, 'soundcloud'],
+      ['Closing Hour',   solo, 276,  92, 'spotify'],
+      ['Signal Fade',    grp,  233, 120, 'soundcloud'],
+      ['Harbour Lights', grp,  251, 116, 'bandcamp'],
+      ['Nine Below',     grp,  204, 126, 'youtube'],
+      ['Tideline',       grp,  289,  98, 'spotify'],
+      ['Blue Hour',      grp,  222, 108, 'bandcamp'],
+      ['Gantry',         grp,  195, 132, 'soundcloud'],
+      ['Saltwater',      grp,  267, 100, 'youtube'],
+      ['Last Ferry',     grp,  312,  84, 'bandcamp'],
+    ];
+    return rows.map(function (r, i) {
+      var pf = platforms[r[4]];
+      return {
+        id: 'song-' + (i + 1),
+        title: r[0], artist: r[1].artist, album: r[1].album,
+        duration: r[2], bpm: r[3],
+        platform: pf.name,
+        url: pf.url(encodeURIComponent(r[1].artist + ' ' + r[0])),
+      };
+    });
+  })();
+
+  /* One key-value store for everything that persists: prefers the artifact
+     storage API, falls back to localStorage on a normal site, then to memory
+     if a sandbox blocks both. Every path is guarded. */
+  window.kv = (function () {
+    var art = (window.storage && typeof window.storage.get === 'function') ? window.storage : null;
+    var ls = null;
+    if (!art) {
+      try { localStorage.setItem('__probe', '1'); localStorage.removeItem('__probe'); ls = localStorage; }
+      catch (e) { /* sandboxed or disabled */ }
+    }
+    var mem = {};
+    function fromMem(key) { return mem[key] === undefined ? null : mem[key]; }
+    return {
+      get: function (key) {
+        if (art) {
+          return art.get(key)
+            .then(function (r) { return r ? JSON.parse(r.value) : null; })
+            .catch(function () { return fromMem(key); });
+        }
+        try { if (ls) { var r = ls.getItem(key); return Promise.resolve(r ? JSON.parse(r) : null); } }
+        catch (e) { /* fall through */ }
+        return Promise.resolve(fromMem(key));
+      },
+      set: function (key, value) {
+        mem[key] = value;
+        try {
+          var json = JSON.stringify(value);
+          if (art) { var p = art.set(key, json); if (p && p.catch) p.catch(function () {}); }
+          else if (ls) ls.setItem(key, json);
+        } catch (e) { /* quota or sandbox — memory copy still holds */ }
+      },
+    };
+  })();
+
+  // Clock that flips exactly on the minute, and re-syncs when the tab wakes up.
+  (function () {
+    var el = document.getElementById('clock');
+    var timer;
+
+    function render() {
+      var d = new Date();
+      var h = String(d.getHours()).padStart(2, '0');
+      var m = String(d.getMinutes()).padStart(2, '0');
+      var t = h + ':' + m;               // swap to hour12 formatting if you want AM/PM
+      if (el.textContent !== t) {
+        el.textContent = t;
+        el.setAttribute('datetime', t);
+      }
+    }
+
+    function sync() {
+      clearTimeout(timer);
+      render();
+      var now = new Date();
+      var untilNextMinute = 60000 - (now.getSeconds() * 1000 + now.getMilliseconds());
+      timer = setTimeout(sync, untilNextMinute + 20);
+    }
+
+    sync();
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) sync();
+    });
+    window.addEventListener('focus', sync);
+  })();
+
+  // Search hook — replace with your own handler.
+  /* ---- search ----
+     One page ends up opened from very different places — the Claude artifact
+     viewer (strict CSP: only api.anthropic.com is fetchable), a downloaded
+     file on a phone (no CSP, but cross-origin fetch dies on CORS), or a
+     normal web host. No single source works everywhere, so search walks a
+     provider chain and takes the first one that answers with rows:
+
+       1. yt-dlp companion  http://127.0.0.1:8642 — optional local helper
+          (search-server.py, next to this file). Real YouTube + SoundCloud
+          search with exact titles, uploaders, thumbnails and durations.
+       2. iTunes Search API — keyless; fetch first, JSONP when CORS refuses.
+          Art, 30s preview audio (the 15s clip source), duration.
+       3. Anthropic API + web search — only resolves inside the artifact
+          sandbox, where 1 and 2 are blocked by CSP.
+       4. Offline: one launcher row per platform, carrying the query.
+
+     Pasted links resolve through their own chain (companion /resolve →
+     site oEmbed → noembed.com, a CORS-open oEmbed relay → Anthropic), and
+     keep the slug reading if everything misses. BPM isn't in any of those
+     answers, so visible rows are enriched lazily from Deezer's JSONP API,
+     the only keyless source that carries tempo. */
+  (function () {
+    var input = document.getElementById('q');
+    var pop = document.getElementById('srch');
+    if (!input || !pop) return;
+
+    var count = document.getElementById('srchCount');
+    var body = document.getElementById('srchBody');
+    var foot = document.getElementById('srchFoot');
+    var dots = document.getElementById('srchDots');
+    var prevBtn = document.getElementById('srchPrev');
+    var nextBtn = document.getElementById('srchNext');
+    var live = document.getElementById('srchLive');
+
+    var PAGE = 5;
+    var CLIP = 15;                 // seconds of preview
+    var TAIL = 0.7;                // seconds of volume ramp before the cut
+    var COMPANION = 'http://127.0.0.1:8642';
+    var results = [], page = 0, hot = -1, state = 'idle', lastQ = '', seq = 0;
+
+    var HOSTS = /^(www\.)?(youtube\.com|music\.youtube\.com|youtu\.be|soundcloud\.com|on\.soundcloud\.com|bandcamp\.com|[a-z0-9-]+\.bandcamp\.com)$/i;
+    var NOTE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.6 3 9.8 5.2a1 1 0 0 0-.8 1v9.7a3.1 3.1 0 1 0 1.6 2.7V9.6l7.6-1.7v5.6a3.1 3.1 0 1 0 1.6 2.7V3.8a.8.8 0 0 0-1-.8z"/></svg>';
+    var PLATFORMS = [
+      { name: 'YouTube',    ini: 'YT', find: 'https://www.youtube.com/results?search_query=' },
+      { name: 'SoundCloud', ini: 'SC', find: 'https://soundcloud.com/search?q=' },
+      { name: 'Bandcamp',   ini: 'B',  find: 'https://bandcamp.com/search?q=' },
+    ];
+
+    function esc(t) {
+      return String(t).replace(/[&<>"]/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+      });
+    }
+
+    function fmtTime(sec) {
+      sec = Math.round(sec);
+      return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+    }
+
+    /* ---- transport ---- */
+
+    var cbN = 0;
+
+    function jsonp(url, ms) {
+      return new Promise(function (res, rej) {
+        var cb = '__srchCB' + (++cbN);
+        var el = document.createElement('script');
+        var done = false;
+        var t = setTimeout(function () { fail(); }, ms || 12000);
+        function cleanup() {
+          clearTimeout(t);
+          try { delete window[cb]; } catch (e) { window[cb] = undefined; }
+          if (el.parentNode) el.parentNode.removeChild(el);
+        }
+        function fail() { if (done) return; done = true; cleanup(); rej(new Error('jsonp')); }
+        window[cb] = function (d) { if (done) return; done = true; cleanup(); res(d); };
+        el.onerror = fail;
+        el.src = url + (url.indexOf('?') < 0 ? '?' : '&') + 'callback=' + cb;
+        document.head.appendChild(el);
+      });
+    }
+
+    function getJSON(url, allowJsonp, ms) {
+      var ctl = window.AbortController ? new AbortController() : null;
+      var t = ctl ? setTimeout(function () { ctl.abort(); }, ms || 12000) : 0;
+      return fetch(url, { signal: ctl ? ctl.signal : undefined })
+        .then(function (r) { clearTimeout(t); if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+        .catch(function (e) {
+          clearTimeout(t);
+          if (allowJsonp) return jsonp(url, ms);
+          throw e;
+        });
+    }
+
+    /* ---- result shape ---- */
+
+    function findLinks(t, a) {
+      var q = encodeURIComponent(((a ? a + ' ' : '') + t).trim());
+      return PLATFORMS.map(function (pf) {
+        return { name: pf.name, ini: pf.ini, url: pf.find + q };
+      });
+    }
+
+    function track(t, a, al, art, prev, canonical, platform, d, bpm) {
+      return {
+        t: t, a: a || '', al: al || '', art: art || null, prev: prev || null,
+        u: canonical || null, p: platform || null,
+        d: d > 0 ? Math.round(d) : null,
+        bpm: bpm > 0 ? Math.round(bpm) : null,
+        bpmTried: false,
+        links: findLinks(t, a),
+      };
+    }
+
+    /* ---- providers ---- */
+
+    function fromITunes(d) {
+      var rows = (d && d.results) || [], out = [], seen = {};
+      for (var i = 0; i < rows.length && out.length < 25; i++) {
+        var r = rows[i];
+        if (!r || !r.trackName) continue;
+        var key = (r.trackName + '|' + (r.artistName || '')).toLowerCase();
+        if (seen[key]) continue;
+        seen[key] = 1;
+        var art = r.artworkUrl100 ? r.artworkUrl100.replace('100x100', '200x200') : null;
+        out.push(track(r.trackName, r.artistName, r.collectionName, art, r.previewUrl,
+                       null, null, r.trackTimeMillis ? r.trackTimeMillis / 1000 : 0));
+      }
+      return out;
+    }
+
+    function itunesSearch(q) {
+      var u = 'https://itunes.apple.com/search?media=music&entity=song&limit=25&term=' + encodeURIComponent(q);
+      return getJSON(u, true).then(fromITunes);
+    }
+
+    /* the local helper answers this shape directly; anything else listening
+       on the port fails the guards and the chain moves on */
+    function fromCompanion(d) {
+      var rows = (d && d.results) || [], out = [];
+      for (var i = 0; i < rows.length && out.length < 25; i++) {
+        var r = rows[i] || {};
+        if (typeof r.t !== 'string' || !r.t) continue;
+        out.push(track(r.t, r.a, r.al, r.art, null, r.u, r.p, r.d, r.bpm));
+      }
+      return out;
+    }
+
+    function companionSearch(q) {
+      return getJSON(COMPANION + '/search?q=' + encodeURIComponent(q), false, 20000)
+        .then(fromCompanion);
+    }
+
+    /* in-artifact: the platform injects credentials; everywhere else this
+       endpoint doesn't resolve and the chain has already succeeded or moved on */
+    function anthropic(prompt) {
+      return getJSON2Post('https://api.anthropic.com/v1/messages', {
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }],
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+      }).then(function (d) {
+        return (d.content || []).map(function (b) { return b.type === 'text' ? b.text : ''; }).join('\n');
+      });
+    }
+
+    function getJSON2Post(url, bodyObj) {
+      var ctl = window.AbortController ? new AbortController() : null;
+      var t = ctl ? setTimeout(function () { ctl.abort(); }, 25000) : 0;
+      return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bodyObj),
+        signal: ctl ? ctl.signal : undefined,
+      }).then(function (r) { clearTimeout(t); if (!r.ok) throw new Error('http ' + r.status); return r.json(); },
+              function (e) { clearTimeout(t); throw e; });
+    }
+
+    function pluck(text, openCh, closeCh) {
+      var i = text.indexOf(openCh), j = text.lastIndexOf(closeCh);
+      if (i < 0 || j <= i) throw new Error('no json');
+      return JSON.parse(text.slice(i, j + 1));
+    }
+
+    function anthropicSearch(q) {
+      var prompt = 'Find real songs or music videos matching this search: "' + q.replace(/"/g, "'") + '".\n' +
+        'Use web search on youtube.com (songs or videos), soundcloud.com (tracks) and bandcamp.com (tracks or albums). Include results from more than one platform when possible.\n' +
+        'Respond with ONLY minified JSON, no markdown fences, no prose: an array of at most 10 objects {"t":"title","a":"artist","p":"YouTube","u":"https url on that platform","d":duration_seconds,"bpm":tempo} where p is exactly one of "YouTube", "SoundCloud", "Bandcamp"; omit d or bpm when unknown.\n' +
+        'Only include entries whose URL you actually found via search. If nothing matches, respond [].';
+      return anthropic(prompt).then(function (text) {
+        var arr = pluck(text, '[', ']'), out = [], seen = {};
+        if (!Array.isArray(arr)) return out;
+        for (var i = 0; i < arr.length && out.length < 10; i++) {
+          var r = arr[i] || {};
+          if (typeof r.t !== 'string' || !r.t || typeof r.u !== 'string') continue;
+          if (r.p !== 'YouTube' && r.p !== 'SoundCloud' && r.p !== 'Bandcamp') continue;
+          var u; try { u = new URL(r.u); } catch (e) { continue; }
+          if ((u.protocol !== 'https:' && u.protocol !== 'http:') || !HOSTS.test(u.hostname)) continue;
+          if (seen[u.href]) continue;
+          seen[u.href] = 1;
+          out.push(track(r.t.slice(0, 140), typeof r.a === 'string' ? r.a.slice(0, 80) : '',
+                         '', null, null, u.href, r.p, +r.d, +r.bpm));
+        }
+        return out;
+      });
+    }
+
+    /* first provider to answer with rows wins; an honest empty answer only
+       counts once nothing later finds more */
+    function search(q) {
+      var chain = [companionSearch, itunesSearch, anthropicSearch];
+      var sawEmpty = false;
+      return (function step(i) {
+        if (i >= chain.length) return sawEmpty ? Promise.resolve([]) : Promise.reject(new Error('all failed'));
+        return chain[i](q).then(function (rows) {
+          if (rows && rows.length) return rows;
+          sawEmpty = true;
+          return step(i + 1);
+        }, function () { return step(i + 1); });
+      })(0);
+    }
+
+    /* ---- pasted links ---- */
+
+    function platformOf(host) {
+      if (/youtu/i.test(host)) return 'YouTube';
+      if (/soundcloud/i.test(host)) return 'SoundCloud';
+      if (/bandcamp/i.test(host)) return 'Bandcamp';
+      return null;
+    }
+
+    function humanize(s) {
+      try { s = decodeURIComponent(s); } catch (e) { /* keep raw */ }
+      return s.replace(/[-_+]+/g, ' ').trim()
+              .replace(/(^|\s)[a-z]/g, function (c) { return c.toUpperCase(); });
+    }
+
+    function urlish(text) {
+      return /^(https?:\/\/|www\.)\S+$/i.test(text) ||
+             /^[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?$/i.test(text);
+    }
+
+    function parseLink(text) {
+      if (/\s/.test(text)) return null;
+      var u;
+      try { u = new URL(/^https?:\/\//i.test(text) ? text : 'https://' + text); } catch (e) { return null; }
+      if (!HOSTS.test(u.hostname)) return null;
+      var p = platformOf(u.hostname);
+      var segs = u.pathname.split('/').filter(Boolean);
+      var t = '', a = '';
+      if (p === 'YouTube') {
+        t = 'YouTube video';
+      } else if (p === 'SoundCloud') {
+        a = segs[0] ? humanize(segs[0]) : '';
+        t = segs[1] ? humanize(segs[1]) : 'SoundCloud track';
+      } else {
+        var sub = u.hostname.split('.')[0].toLowerCase();
+        a = (sub !== 'bandcamp' && sub !== 'www') ? humanize(sub) : '';
+        t = segs[1] ? humanize(segs[1]) : (segs[0] ? humanize(segs[0]) : 'Bandcamp page');
+      }
+      return track(t, a, '', null, null, u.href, p);
+    }
+
+    function applyMeta(r, t, a, art, d) {
+      if (typeof t === 'string' && t) r.t = t.slice(0, 140);
+      if (typeof a === 'string' && a) r.a = a.slice(0, 80);
+      if (typeof art === 'string' && art) r.art = art;
+      if (d > 0) r.d = Math.round(d);
+      r.links = findLinks(r.t, r.a);
+      if (state === 'list' && results.indexOf(r) >= 0) render();
+    }
+
+    /* the site's own oEmbed goes first because it's authoritative, but
+       neither YouTube's nor SoundCloud's sends CORS headers, so in practice
+       noembed.com (which relays them with ACAO *) does the real work in a
+       browser; the companion beats both when it's running */
+    function resolveLink(r) {
+      var enc = encodeURIComponent(r.u);
+      var tries = [
+        function () {
+          return getJSON(COMPANION + '/resolve?q=' + enc, false, 20000).then(function (d) {
+            var e = d && d.results && d.results[0];
+            if (!e || !e.t) throw new Error('empty');
+            return { t: e.t, a: e.a, art: e.art, d: e.d };
+          });
+        },
+        function () {
+          var end = r.p === 'YouTube' ? 'https://www.youtube.com/oembed?format=json&url='
+                  : r.p === 'SoundCloud' ? 'https://soundcloud.com/oembed?format=json&url=' : null;
+          if (!end) return Promise.reject(new Error('no oembed'));
+          return getJSON(end + enc, false, 6000).then(function (d) {
+            if (!d || !d.title) throw new Error('empty');
+            return { t: d.title, a: d.author_name, art: d.thumbnail_url };
+          });
+        },
+        function () {
+          return getJSON('https://noembed.com/embed?url=' + enc, false, 8000).then(function (d) {
+            if (!d || d.error || !d.title) throw new Error(d && d.error || 'empty');
+            return { t: d.title, a: d.author_name, art: d.thumbnail_url };
+          });
+        },
+        function () {
+          return anthropic('Use web search to identify the song or video at this exact URL: ' + r.u + '\n' +
+            'Respond with ONLY minified JSON of the shape {"t":"title","a":"artist or channel","d":duration_seconds} — no prose, no markdown.'
+          ).then(function (text) {
+            var d = pluck(text, '{', '}');
+            if (typeof d.t !== 'string' || !d.t) throw new Error('empty');
+            return { t: d.t, a: d.a, d: +d.d };
+          });
+        },
+      ];
+      var mine = seq;
+      (function step(i) {
+        if (i >= tries.length || mine !== seq) return;
+        tries[i]().then(function (m) {
+          if (mine !== seq) return;
+          applyMeta(r, m.t, m.a, m.art, m.d);
+        }, function () { step(i + 1); });
+      })(0);
+    }
+
+    /* ---- BPM, lazily, for whatever page is showing ----
+       Deezer is the one keyless source that publishes tempo, over JSONP:
+       one search to pin the track id, one track call for the bpm (and the
+       duration, which fills rows that arrived without one). Cached by
+       artist|title; a miss renders as an em dash rather than retrying. */
+    var bpmCache = {};
+
+    function enrich() {
+      if (state !== 'list') return;
+      visible().forEach(function (r) {
+        if (r.bpm || r.bpmTried) return;
+        var key = (r.a + '|' + r.t).toLowerCase();
+        if (!bpmCache[key]) {
+          var q = encodeURIComponent((r.a ? r.a + ' ' : '') + r.t);
+          bpmCache[key] = jsonp('https://api.deezer.com/search?limit=1&output=jsonp&q=' + q, 7000)
+            .then(function (d) {
+              var hit = d && d.data && d.data[0];
+              if (!hit || !hit.id) throw new Error('no match');
+              return jsonp('https://api.deezer.com/track/' + hit.id + '?output=jsonp', 7000)
+                .then(function (tr) {
+                  return { bpm: tr && tr.bpm > 0 ? Math.round(tr.bpm) : null,
+                           d: hit.duration > 0 ? Math.round(hit.duration) : null };
+                });
+            })
+            .catch(function () { return { bpm: null, d: null }; });
+        }
+        bpmCache[key].then(function (m) {
+          r.bpmTried = true;
+          if (m.bpm) r.bpm = m.bpm;
+          if (m.d && !r.d) r.d = m.d;
+          if (state === 'list' && visible().indexOf(r) >= 0) {
+            var el = body.querySelector('.srch__row[data-i="' + visible().indexOf(r) + '"]');
+            if (el) {
+              var tEl = el.querySelector('.srch__time'), bEl = el.querySelector('.srch__bpm');
+              if (tEl) tEl.textContent = r.d ? fmtTime(r.d) : '';
+              if (bEl) bEl.textContent = r.bpm ? r.bpm + ' bpm' : '\u2014';
+            }
+          }
+        });
+      });
+    }
+
+    /* ---- preview ---- */
+
+    var audio = null, playing = null, raf = 0;
+
+    function stopPreview() {
+      if (raf) { cancelAnimationFrame(raf); raf = 0; }
+      if (audio) { audio.pause(); audio.removeAttribute('src'); try { audio.load(); } catch (e) {} }
+      if (playing) {
+        var el = body.querySelector('.srch__art.is-preview');
+        if (el) { el.classList.remove('is-preview'); el.style.removeProperty('--p'); el.setAttribute('aria-pressed', 'false'); }
+      }
+      playing = null;
+    }
+
+    function tick() {
+      raf = 0;
+      if (!audio || !playing) return;
+      var el = body.querySelector('.srch__art.is-preview');
+      var p = Math.min(1, audio.currentTime / CLIP);
+      if (el) el.style.setProperty('--p', p.toFixed(4));
+      var left = CLIP - audio.currentTime;
+      audio.volume = left < TAIL ? Math.max(0, left / TAIL) : 1;
+      if (audio.currentTime >= CLIP) { stopPreview(); return; }
+      raf = requestAnimationFrame(tick);
+    }
+
+    function preview(i, el) {
+      var r = visible()[i];
+      if (!r || !r.prev) return;
+      var same = playing === r;
+      stopPreview();
+      if (same) return;
+      if (!audio) {
+        audio = new Audio();
+        audio.preload = 'none';
+        audio.addEventListener('ended', stopPreview);
+        audio.addEventListener('error', stopPreview);
+      }
+      playing = r;
+      audio.src = r.prev;
+      audio.volume = 1;
+      el.classList.add('is-preview');
+      el.style.setProperty('--p', '0');
+      el.setAttribute('aria-pressed', 'true');
+      var mine = playing;
+      audio.play().then(function () {
+        if (playing !== mine) return;
+        if (!raf) raf = requestAnimationFrame(tick);
+      }).catch(function () { if (playing === mine) stopPreview(); });
+    }
+
+    /* ---- popover ---- */
+
+    function open() { pop.hidden = false; input.setAttribute('aria-expanded', 'true'); }
+
+    function close() {
+      stopPreview();
+      pop.hidden = true;
+      hot = -1;
+      input.setAttribute('aria-expanded', 'false');
+      input.removeAttribute('aria-activedescendant');
+    }
+
+    function pages() { return Math.ceil(results.length / PAGE); }
+    function visible() { return results.slice(page * PAGE, page * PAGE + PAGE); }
+
+    function spinner() {
+      var s = '<span class="srch__spin" aria-hidden="true">';
+      for (var i = 0; i < 12; i++) {
+        s += '<i style="transform:rotate(' + (i * 30) + 'deg);animation-delay:' + (i / 12 - 1).toFixed(3) + 's"></i>';
+      }
+      return s + '</span>';
+    }
+
+    function msg(html) { body.innerHTML = '<div class="srch__msg">' + html + '</div>'; foot.hidden = true; }
+
+    function artHTML(r, i) {
+      var inner = r.art
+        ? '<img src="' + esc(r.art) + '" alt="" loading="lazy" onerror="this.remove()">' + NOTE
+        : NOTE;
+      if (!r.prev) return '<span class="srch__art" aria-hidden="true">' + inner + '</span>';
+      return '<button class="srch__art" type="button" data-preview="' + i + '" aria-pressed="false"' +
+        ' aria-label="Preview ' + esc(r.t) + ', 15 seconds">' + inner +
+        '<span class="srch__scrim">' +
+          '<svg viewBox="0 0 30 30" aria-hidden="true">' +
+            '<circle class="srch__ring" cx="15" cy="15" r="13.5"/>' +
+            '<circle class="srch__ring srch__ring--on" cx="15" cy="15" r="13.5"/>' +
+            '<path class="srch__glyph srch__play" d="M12 10.5 19 15l-7 4.5z"/>' +
+            '<rect class="srch__glyph srch__stop" x="11.5" y="11.5" width="7" height="7" rx="1"/>' +
+          '</svg>' +
+        '</span></button>';
+    }
+
+    function rowHTML(r, i) {
+      var sub = r.p ? (r.a ? esc(r.a) + ' \u2014 ' + r.p : r.p)
+                    : (r.a ? esc(r.a) + (r.al ? ' \u2014 ' + esc(r.al) : '') : (r.al ? esc(r.al) : ''));
+      var links = r.links.map(function (l) {
+        return '<a class="srch__pf" data-len="' + l.ini.length + '" href="' + esc(l.url) + '"' +
+          ' target="_blank" rel="noopener noreferrer" tabindex="-1"' +
+          ' aria-label="Find ' + esc(r.t) + ' on ' + l.name + '">' + l.ini + '</a>';
+      }).join('');
+      return '<div class="srch__row" role="option" id="srchOpt' + i + '" data-i="' + i + '" aria-selected="false">' +
+        artHTML(r, i) +
+        '<span class="srch__meta">' +
+          '<span class="srch__title">' + esc(r.t) + '</span>' +
+          '<span class="srch__sub">' + sub + '</span>' +
+        '</span>' +
+        '<span class="srch__nums">' +
+          '<span class="srch__time">' + (r.d ? fmtTime(r.d) : '') + '</span>' +
+          '<span class="srch__bpm">' + (r.bpm ? r.bpm + ' bpm' : (r.bpmTried ? '\u2014' : '')) + '</span>' +
+        '</span>' +
+        '<span class="srch__links">' + links + '</span>' +
+      '</div>';
+    }
+
+    function applyHot() {
+      var rows = body.querySelectorAll('.srch__row');
+      for (var i = 0; i < rows.length; i++) {
+        rows[i].classList.toggle('is-hot', i === hot);
+        rows[i].setAttribute('aria-selected', String(i === hot));
+      }
+      if (hot >= 0) input.setAttribute('aria-activedescendant', 'srchOpt' + hot);
+      else input.removeAttribute('aria-activedescendant');
+    }
+
+    function render() {
+      if (state === 'loading') {
+        count.innerHTML = 'Searching\u2026';
+        msg(spinner() + '<span>Searching\u2026</span>');
+        live.textContent = 'Searching';
+      } else if (state === 'error') {
+        count.innerHTML = 'Search';
+        body.innerHTML = '<div class="srch__msg">Couldn\u2019t reach search \u2014 open it on a platform instead:</div>' +
+          '<div role="listbox" id="srchList" aria-label="Search results">' +
+          PLATFORMS.map(function (pf, i) {
+            var u = pf.find + encodeURIComponent(lastQ);
+            return '<a class="srch__row" role="option" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer"' +
+              ' style="text-decoration:none;color:inherit" id="srchOpt' + i + '" aria-selected="false">' +
+              '<span class="srch__art" aria-hidden="true">' + NOTE + '</span>' +
+              '<span class="srch__meta"><span class="srch__title">Search ' + pf.name + '</span>' +
+              '<span class="srch__sub">' + esc(lastQ) + '</span></span>' +
+              '<span class="srch__go" aria-hidden="true">\u203a</span></a>';
+          }).join('') + '</div>';
+        foot.hidden = true;
+        live.textContent = 'Search unavailable';
+      } else if (state === 'badlink') {
+        count.innerHTML = 'Search';
+        msg('Only YouTube, SoundCloud and Bandcamp links work here.');
+        live.textContent = 'Unsupported link';
+      } else if (state === 'empty') {
+        count.innerHTML = '<b>Results:</b> 0 songs';
+        msg('No matches for \u201c' + esc(lastQ) + '\u201d.');
+        live.textContent = 'No results';
+      } else if (state === 'list') {
+        var n = results.length;
+        count.innerHTML = '<b>Results:</b> ' + n + (n === 1 ? ' song' : ' songs');
+        body.innerHTML = '<div role="listbox" id="srchList" aria-label="Search results">' +
+          visible().map(rowHTML).join('') + '</div>';
+        var pg = pages();
+        foot.hidden = pg < 2;
+        if (pg > 1) {
+          var d = '';
+          for (var i = 0; i < pg; i++) d += '<i' + (i === page ? ' class="is-on"' : '') + '></i>';
+          dots.innerHTML = d;
+          prevBtn.disabled = page === 0;
+          nextBtn.disabled = page === pg - 1;
+        }
+        applyHot();
+        enrich();
+        live.textContent = n + ' results' + (pg > 1 ? ', page ' + (page + 1) + ' of ' + pg : '');
+      }
+    }
+
+    function turn(delta, hotAt) {
+      var pg = pages(), p = Math.min(pg - 1, Math.max(0, page + delta));
+      if (p === page) return;
+      stopPreview();
+      page = p;
+      hot = hotAt === undefined ? -1 : hotAt;
+      render();
+    }
+
+    /* ---- flows ---- */
+
+    function go(q) {
+      stopPreview();
+      lastQ = q;
+      page = 0;
+      hot = -1;
+      var link = urlish(q) ? parseLink(q) : null;
+      if (urlish(q) && !link) { state = 'badlink'; results = []; open(); render(); return; }
+      var mine = ++seq;
+      if (link) {
+        results = [link];
+        state = 'list';
+        open(); render();
+        resolveLink(link);
+        return;
+      }
+      state = 'loading';
+      open(); render();
+      search(q).then(function (rows) {
+        if (mine !== seq) return;
+        results = rows;
+        state = rows.length ? 'list' : 'empty';
+        render();
+      }).catch(function () {
+        if (mine !== seq) return;
+        results = [];
+        state = 'error';
+        render();
+      });
+    }
+
+    function reset() {
+      stopPreview();
+      results = [];
+      state = 'idle';
+      lastQ = '';
+      seq++;
+      close();
+    }
+
+    /* ---- wiring ---- */
+
+    input.addEventListener('keydown', function (e) {
+      var showing = !pop.hidden;
+      if (e.key === 'Escape') {
+        if (showing) { e.preventDefault(); close(); }
+        return;
+      }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        if (!showing) {
+          if (state !== 'idle') { e.preventDefault(); open(); render(); }
+          return;
+        }
+        if (state !== 'list') return;
+        e.preventDefault();
+        var n = visible().length;
+        if (e.key === 'ArrowDown') {
+          if (hot < n - 1) { hot++; applyHot(); }
+          else if (page < pages() - 1) turn(1, 0);
+        } else {
+          if (hot > 0) { hot--; applyHot(); }
+          else if (page > 0) turn(-1, PAGE - 1);
+        }
+        return;
+      }
+      if (e.key === 'PageDown' && showing && state === 'list') { e.preventDefault(); turn(1); return; }
+      if (e.key === 'PageUp' && showing && state === 'list') { e.preventDefault(); turn(-1); return; }
+      if (e.key === 'Enter') {
+        if (showing && state === 'list' && hot >= 0) {
+          e.preventDefault();
+          var r = visible()[hot];
+          if (!r) return;
+          if (r.u) window.open(r.u, '_blank', 'noopener');
+          else {
+            var el = body.querySelector('.srch__row[data-i="' + hot + '"] .srch__art[data-preview]');
+            if (el) preview(hot, el);
+          }
+          return;
+        }
+        var q = input.value.trim();
+        if (!q) return;
+        e.preventDefault();
+        go(q);
+      }
+    });
+
+    input.addEventListener('input', function () { if (!input.value.trim()) reset(); });
+
+    function reopen() {
+      if (pop.hidden && state !== 'idle' && input.value.trim()) { open(); render(); }
+    }
+    input.addEventListener('focus', reopen);
+    input.addEventListener('click', reopen);
+
+    pop.addEventListener('mousedown', function (e) { if (!e.target.closest('a')) e.preventDefault(); });
+
+    body.addEventListener('click', function (e) {
+      var art = e.target.closest('.srch__art[data-preview]');
+      if (art) { e.preventDefault(); preview(+art.dataset.preview, art); return; }
+      if (e.target.closest('a')) return;
+      var row = e.target.closest('.srch__row');
+      if (!row || row.tagName === 'A') return;
+      var r = visible()[+row.dataset.i];
+      if (!r) return;
+      if (r.u) window.open(r.u, '_blank', 'noopener');
+      else {
+        var el = row.querySelector('.srch__art[data-preview]');
+        if (el) preview(+row.dataset.i, el);
+      }
+    });
+
+    prevBtn.addEventListener('click', function () { turn(-1); });
+    nextBtn.addEventListener('click', function () { turn(1); });
+
+    document.getElementById('srchClear').addEventListener('click', function () {
+      input.value = '';
+      reset();
+      input.focus();
+    });
+
+    document.addEventListener('mousedown', function (e) {
+      if (!pop.hidden && !e.target.closest('.search')) close();
+    });
+  })();
+
+  // Keeps the transport row's right edge under the progress track's right
+  // edge. The label beside the track ("-02:35" vs the LIVE marker) changes
+  // width with mode, and the track is the flex item that absorbs it, so
+  // observing the track catches every case including font loading.
+  (function () {
+    var inner = document.querySelector('.player__inner');
+    var track = document.getElementById('track');
+    function align() {
+      var ir = inner.getBoundingClientRect();
+      var tr = track.getBoundingClientRect();
+      var pad = parseFloat(getComputedStyle(inner).paddingRight) || 0;
+      var inset = Math.max(0, (ir.right - pad) - tr.right);
+      inner.style.setProperty('--track-inset-r', inset.toFixed(1) + 'px');
+    }
+    new ResizeObserver(align).observe(track);
+    document.addEventListener('player:album', align);
+    align();
+  })();
+
+  // Volume. Independent of playback mode — a live broadcast controls what you
+  // hear, not how loud it is.
+  (function () {
+    var track = document.getElementById('volume');
+    var fill = document.getElementById('volumeFill');
+    var knob = document.getElementById('volumeKnob');
+    var level = 72, dragging = false;
+
+    function paint() {
+      fill.style.width = level + '%';
+      knob.style.left = level + '%';
+      track.setAttribute('aria-valuenow', Math.round(level));
+      track.setAttribute('aria-valuetext', Math.round(level) + '%');
+    }
+
+    function set(e) {
+      var r = track.getBoundingClientRect();
+      level = Math.min(100, Math.max(0, ((e.clientX - r.left) / r.width) * 100));
+      paint();
+    }
+
+    track.addEventListener('pointerdown', function (e) {
+      dragging = true;
+      track.setPointerCapture(e.pointerId);
+      set(e);
+    });
+    track.addEventListener('pointermove', function (e) { if (dragging) set(e); });
+    track.addEventListener('pointerup', function () { dragging = false; });
+    track.addEventListener('pointercancel', function () { dragging = false; });
+
+    track.addEventListener('keydown', function (e) {
+      var step = e.shiftKey ? 10 : 4, handled = true;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowUp') level = Math.min(100, level + step);
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') level = Math.max(0, level - step);
+      else if (e.key === 'Home') level = 0;
+      else if (e.key === 'End') level = 100;
+      else handled = false;
+      if (handled) { e.preventDefault(); paint(); }
+    });
+
+    paint();
+  })();
+
+  /* Library list. Selection and star/download state per row; on desktop a
+     right-click (or Shift+F10 / the Menu key) opens a context menu for
+     playlists. Stars, downloads and playlists all persist through window.kv. */
+  (function () {
+    var LIB = window.LIBRARY;
+    var KEY = 'library:state';
+    var tbody = document.getElementById('libraryRows');
+    var section = document.querySelector('.player');
+    var desktop = matchMedia('(hover: hover) and (pointer: fine)').matches;
+    var state = { starred: {}, saved: {}, playlists: [] };
+    var selectedId = null;
+    var sortKey = 'title', sortDir = 1;
+
+    var ctx = document.getElementById('ctx');
+    var sheet = document.getElementById('sheet');
+    var sheetInput = document.getElementById('sheetInput');
+    var sheetCreate = document.getElementById('sheetCreate');
+    var sheetCancel = document.getElementById('sheetCancel');
+    var toast = document.getElementById('toast');
+    var toastTimer = 0;
+
+    function esc(t) {
+      return String(t).replace(/[&<>"]/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+      });
+    }
+    function fmt(sec) { return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); }
+    function song(id) { for (var i = 0; i < LIB.length; i++) if (LIB[i].id === id) return LIB[i]; return null; }
+    function nowPlayingTitle() { return window.ALBUMS[section.dataset.mode || 'group'].nowPlaying; }
+    function playingSong() {
+      var t = nowPlayingTitle();
+      for (var i = 0; i < LIB.length; i++) if (LIB[i].title === t) return LIB[i];
+      return null;
+    }
+    function sorted() {
+      var rows = LIB.slice();
+      rows.sort(function (a, b) {
+        var x = a[sortKey], y = b[sortKey];
+        var r = typeof x === 'number' ? x - y : String(x).localeCompare(String(y));
+        return r * sortDir;
+      });
+      return rows;
+    }
+    function save() { window.kv.set(KEY, state); }
+    function say(msg) {
+      toast.textContent = msg;
+      toast.classList.add('is-on');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { toast.classList.remove('is-on'); }, 1800);
+    }
+
+    /* ---- rows ---- */
+
+    var DL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.8 3h2.4v7.7h4.1L12 17.1 6.7 10.7h4.1z"/><path d="M4.6 19h14.8v2.1H4.6z"/></svg>';
+    var STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.5 6.1 20.6l1.2-6.5L2.5 9.5l6.6-.9z"/></svg>';
+    var NP = '<svg class="lib-np" viewBox="0 0 12 12" role="img" aria-label="Now playing"><path d="M1 4h2.4L6 1.6v8.8L3.4 8H1z"/><path d="M8 3.6a3 3 0 0 1 0 4.8" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>';
+    var INITIAL = { Bandcamp: 'B', SoundCloud: 'SC', YouTube: 'YT', Spotify: 'S' };
+
+    /* Only the playing row scrolls, and only when motion is welcome —
+       otherwise the cell keeps its plain text node so the ellipsis still
+       does the truncating. */
+    var reduceQ = matchMedia('(prefers-reduced-motion: reduce)');
+    function mq(text) {
+      return '<span class="lib-mq"><span class="lib-mq__in">' + esc(text) + '</span></span>';
+    }
+
+    function render() {
+      var np = nowPlayingTitle();
+      tbody.innerHTML = sorted().map(function (sg, i) {
+        var sel = sg.id === selectedId, playing = sg.title === np;
+        var ini = INITIAL[sg.platform] || sg.platform.charAt(0);
+        var roll = playing && !reduceQ.matches;
+        return '<tr data-id="' + sg.id + '" aria-selected="' + sel + '" tabindex="' + (sel ? 0 : -1) + '"' +
+            (playing ? ' class="is-playing" aria-current="true"' : '') + '>' +
+          '<td class="lib-idx">' + (playing ? NP : (i + 1)) + '</td>' +
+          '<td class="lib-icon"><a class="lib-pf" data-len="' + ini.length + '" href="' + esc(sg.url) + '"' +
+            ' target="_blank" rel="noopener noreferrer" title="' + esc(sg.platform) + '"' +
+            ' aria-label="Open ' + esc(sg.title) + ' on ' + esc(sg.platform) + ' in a new tab">' + ini + '</a></td>' +
+          '<td class="lib-title">' + (roll ? mq(sg.title) : esc(sg.title)) + '</td>' +
+          '<td class="lib-col-artist">' + (roll ? mq(sg.artist) : esc(sg.artist)) + '</td>' +
+          '<td class="lib-num">' + fmt(sg.duration) + '</td>' +
+          '<td class="lib-num lib-col-bpm">' + (sg.bpm || '\u2014') + '</td>' +
+          '<td class="lib-icon"><button class="lib-btn lib-dl" type="button" aria-pressed="' + !!state.saved[sg.id] + '"' +
+            ' aria-label="Download ' + esc(sg.title) + '">' + DL + '</button></td>' +
+          '<td class="lib-icon"><button class="lib-btn lib-star" type="button" aria-pressed="' + !!state.starred[sg.id] + '"' +
+            ' aria-label="Star ' + esc(sg.title) + '">' + STAR + '</button></td>' +
+          '<td class="lib-col-album">' + esc(sg.album) + '</td>' +
+        '</tr>';
+      }).join('');
+      if (!selectedId) { var first = tbody.querySelector('tr'); if (first) first.tabIndex = 0; }
+      MQ.sync();
+    }
+
+    /* ---- marquee ----
+       Distance is measured, never assumed: the glide is exactly the width
+       the cell is hiding, so the text stops with its last letter flush to
+       the right edge rather than overshooting into empty space. Duration
+       follows from a fixed rate, so a long title takes longer than a short
+       one and the apparent speed stays constant between them. Title and
+       artist share one clock — they leave and arrive together even though
+       they travel different distances — because two labels in one row
+       drifting out of step reads as a bug. */
+    var MQ = (function () {
+      var HOLD = 2000;        // ms parked at each end
+      var RATE = 38;          // px/sec, averaged across the ease
+      var MIN = 420;          // ms floor, so a 6px overflow isn't a twitch
+      var MAX = 6000;         // ms ceiling for a very long title
+      var FADE = 12;          // px of gradient over a clipped edge
+      var SLACK = 1;          // px; sub-pixel rounding is not an overflow
+
+      var items = [], ro = null, raf = 0, t0 = 0;
+
+      /* UIView's ease-in-out: sinusoidal, peaking at ~1.57x the mean rate */
+      function ease(t) { return 0.5 - Math.cos(Math.PI * t) / 2; }
+
+      function measure(it) {
+        var box = it.box.getBoundingClientRect().width;
+        var ink = it.ink.getBoundingClientRect().width;
+        it.dist = ink - box > SLACK ? ink - box : 0;
+        it.dur = Math.min(MAX, Math.max(MIN, it.dist / RATE * 1000));
+        if (!it.dist) paint(it, 0);
+      }
+
+      function paint(it, x) {
+        if (Math.abs(x - it.x) > 0.05) {
+          it.ink.style.transform = x ? 'translate3d(' + x.toFixed(2) + 'px,0,0)' : '';
+          it.x = x;
+        }
+        /* the fades track the travel: nothing is hidden to the left until
+           the label has actually moved, and the right edge goes hard again
+           as the tail arrives */
+        var l = Math.min(FADE, Math.max(0, -x));
+        var r = Math.min(FADE, Math.max(0, it.dist + x));
+        if (Math.abs(l - it.fl) > 0.05) { it.box.style.setProperty('--mq-fade-l', l.toFixed(2) + 'px'); it.fl = l; }
+        if (Math.abs(r - it.fr) > 0.05) { it.box.style.setProperty('--mq-fade-r', r.toFixed(2) + 'px'); it.fr = r; }
+      }
+
+      function tick(now) {
+        raf = 0;
+        var span = 0, i, it;
+        for (i = 0; i < items.length; i++) if (items[i].dur > span && items[i].dist) span = items[i].dur;
+        if (!span) return;
+
+        var cycle = HOLD * 2 + span * 2;
+        var p = (now - t0) % cycle;
+
+        for (i = 0; i < items.length; i++) {
+          it = items[i];
+          if (!it.dist) continue;
+          var x;
+          if (p < HOLD) x = 0;                                    // parked at the head
+          else if (p < HOLD + span) x = -it.dist * ease(Math.min(1, (p - HOLD) / it.dur));
+          else if (p < HOLD * 2 + span) x = -it.dist;             // parked at the tail
+          else x = -it.dist * (1 - ease(Math.min(1, (p - HOLD * 2 - span) / it.dur)));
+          paint(it, x);
+        }
+        raf = requestAnimationFrame(tick);
+      }
+
+      function start() {
+        if (raf) cancelAnimationFrame(raf);
+        raf = 0;
+        for (var i = 0; i < items.length; i++) if (items[i].dist) {
+          t0 = performance.now();
+          raf = requestAnimationFrame(tick);
+          return;
+        }
+      }
+
+      function remeasure() {
+        for (var i = 0; i < items.length; i++) measure(items[i]);
+        start();
+      }
+
+      function sync() {
+        if (raf) { cancelAnimationFrame(raf); raf = 0; }
+        if (ro) { ro.disconnect(); ro = null; }
+        items = [];
+
+        var boxes = tbody.querySelectorAll('tr.is-playing .lib-mq');
+        if (!boxes.length) return;
+
+        /* the columns hide at breakpoints, so a cell's width changes without
+           the window ever firing resize at this element */
+        if (window.ResizeObserver) ro = new ResizeObserver(remeasure);
+        for (var i = 0; i < boxes.length; i++) {
+          var it = { box: boxes[i], ink: boxes[i].firstElementChild, dist: 0, dur: MIN, x: 0, fl: 0, fr: 0 };
+          items.push(it);
+          measure(it);
+          if (ro) ro.observe(boxes[i]);
+        }
+        start();
+      }
+
+      /* rAF is parked while the tab is hidden; without this the first frame
+         back would land at an arbitrary point in the cycle */
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) start();
+      });
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(remeasure);
+
+      return { sync: sync };
+    })();
+
+    /* flipping the OS setting mid-session swaps the marquee for an ellipsis */
+    if (reduceQ.addEventListener) reduceQ.addEventListener('change', function () { render(); });
+    else if (reduceQ.addListener) reduceQ.addListener(function () { render(); });
+
+    /* Songs arriving from search. They are appended rather than merged into
+       an album, because they belong to neither of the two sessions — the
+       duration and tempo come from the catalogue the search hit, and the
+       platform badge from wherever the row pointed. */
+    var added = 0;
+
+    document.addEventListener('library:add', function (e) {
+      var d = e.detail;
+      var have = null;
+      for (var i = 0; i < LIB.length; i++) {
+        if (LIB[i].title.toLowerCase() === String(d.title).toLowerCase()) { have = LIB[i]; break; }
+      }
+      if (!have) {
+        have = {
+          id: 'song-add-' + (++added),
+          title: String(d.title).slice(0, 120),
+          artist: String(d.artist).slice(0, 80),
+          album: String(d.album).slice(0, 80),
+          duration: Math.max(0, Math.round(d.duration || 0)),
+          bpm: d.bpm || null,
+          platform: d.platform,
+          url: d.url,
+        };
+        LIB.push(have);
+        say('Added to library');
+      }
+      sortKey = 'title'; sortDir = 1;
+      selectedId = have.id;
+      render();
+      play(have.id);
+      var row = tbody.querySelector('tr[data-id="' + have.id + '"]');
+      if (row && row.scrollIntoView) row.scrollIntoView({ block: 'nearest' });
+    });
+
+    /* Selecting a row is what plays it — the list is the only place a
+       specific track can be chosen, so a select that didn't reach the
+       player left the list decorative. The player owns which song is
+       current, so this asks rather than assigns. */
+    function play(id) {
+      var sg = song(id);
+      if (!sg) return;
+      document.dispatchEvent(new CustomEvent('library:play', { detail: { song: sg } }));
+    }
+
+    function select(id, focus) {
+      selectedId = id;
+      var rows = tbody.querySelectorAll('tr');
+      for (var i = 0; i < rows.length; i++) {
+        var on = rows[i].dataset.id === id;
+        rows[i].setAttribute('aria-selected', String(on));
+        rows[i].tabIndex = on ? 0 : -1;
+        if (on && focus) rows[i].focus();
+      }
+    }
+
+    tbody.addEventListener('click', function (e) {
+      var btn = e.target.closest('.lib-btn');
+      var row = e.target.closest('tr');
+      if (!row) return;
+      if (btn) {
+        var id = row.dataset.id, isStar = btn.classList.contains('lib-star');
+        var bag = isStar ? state.starred : state.saved;
+        bag[id] = !bag[id];
+        btn.setAttribute('aria-pressed', String(bag[id]));
+        save();
+        if (!isStar) say(bag[id] ? 'Saved for offline' : 'Removed from downloads');
+        return;
+      }
+      if (e.target.closest('a')) return;
+      select(row.dataset.id, false);
+      play(row.dataset.id);
+    });
+
+    var thead = tbody.parentNode.querySelector('thead');
+    thead.addEventListener('click', function (e) {
+      var th = e.target.closest('th[data-sort]');
+      if (!th) return;
+      var key = th.dataset.sort;
+      if (key === sortKey) sortDir = -sortDir; else { sortKey = key; sortDir = 1; }
+      var ths = thead.querySelectorAll('th[data-sort]');
+      for (var i = 0; i < ths.length; i++) {
+        var on = ths[i] === th;
+        var arrow = ths[i].querySelector('.lib-sort');
+        if (on) {
+          ths[i].setAttribute('aria-sort', sortDir > 0 ? 'ascending' : 'descending');
+          if (!arrow) { arrow = document.createElement('span'); arrow.className = 'lib-sort'; arrow.setAttribute('aria-hidden', 'true'); ths[i].appendChild(arrow); }
+          arrow.textContent = sortDir > 0 ? '\u25B2' : '\u25BC';
+        } else {
+          ths[i].removeAttribute('aria-sort');
+          if (arrow) arrow.remove();
+        }
+      }
+      render();
+    });
+
+    tbody.addEventListener('keydown', function (e) {
+      var row = e.target.closest('tr');
+      if (!row) return;
+      var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+      var i = rows.indexOf(row);
+      if (e.key === 'ArrowDown' && i < rows.length - 1) { e.preventDefault(); select(rows[i + 1].dataset.id, true); }
+      else if (e.key === 'ArrowUp' && i > 0) { e.preventDefault(); select(rows[i - 1].dataset.id, true); }
+      else if (e.key === 'Home') { e.preventDefault(); select(rows[0].dataset.id, true); }
+      else if (e.key === 'End') { e.preventDefault(); select(rows[rows.length - 1].dataset.id, true); }
+      /* arrows move the selection, Return commits it — the Finder/iTunes
+         split, so you can walk a long list without restarting playback */
+      else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); play(row.dataset.id); }
+    });
+
+    /* ---- context menu (desktop) ---- */
+
+    var ctxSong = null;
+
+    function buildMenu(sg) {
+      var lists = state.playlists;
+      var items = lists.length
+        ? lists.map(function (pl) {
+            var has = pl.songs.indexOf(sg.id) >= 0;
+            return '<button class="ctx__item" type="button" role="menuitemcheckbox" aria-checked="' + has + '"' +
+              ' data-act="toggle" data-pl="' + pl.id + '"><span class="ctx__check" aria-hidden="true">' +
+              (has ? '\u2713' : '') + '</span>' + esc(pl.name) + '</button>';
+          }).join('')
+        : '<button class="ctx__item" type="button" role="menuitem" disabled>No playlists yet</button>';
+
+      ctx.innerHTML =
+        '<div class="ctx__item ctx__item--parent" role="menuitem" tabindex="0" aria-haspopup="menu" aria-expanded="false" data-act="parent">' +
+          'Add to Playlist<span class="ctx__chev" aria-hidden="true">\u203a</span>' +
+          '<div class="ctx__sub" role="menu" aria-label="Playlists">' + items +
+            '<div class="ctx__sep" role="separator"></div>' +
+            '<button class="ctx__item" type="button" role="menuitem" data-act="new-add">New Playlist\u2026</button>' +
+          '</div>' +
+        '</div>' +
+        '<button class="ctx__item" type="button" role="menuitem" data-act="new">New Playlist\u2026</button>';
+    }
+
+    function openMenu(sg, x, y) {
+      ctxSong = sg;
+      buildMenu(sg);
+      ctx.hidden = false;
+      var r = ctx.getBoundingClientRect();
+      ctx.style.left = Math.max(8, Math.min(x, innerWidth - r.width - 8)) + 'px';
+      ctx.style.top = Math.max(8, Math.min(y, innerHeight - r.height - 8)) + 'px';
+      // flip the submenu if it would run off the right edge
+      var sub = ctx.querySelector('.ctx__sub');
+      sub.classList.toggle('is-flip', r.right + 210 > innerWidth);
+      ctx.querySelector('.ctx__item').focus();
+    }
+
+    function closeMenu() {
+      if (ctx.hidden) return;
+      ctx.hidden = true;
+      var row = ctxSong && tbody.querySelector('tr[data-id="' + ctxSong.id + '"]');
+      ctxSong = null;
+      if (row) row.focus();
+    }
+
+    if (desktop) {
+      tbody.addEventListener('contextmenu', function (e) {
+        var row = e.target.closest('tr');
+        if (!row) return;
+        e.preventDefault();
+        select(row.dataset.id, false);
+        openMenu(song(row.dataset.id), e.clientX, e.clientY);
+      });
+      // Shift+F10 / the Menu key also fire `contextmenu`, at (0,0): use the row
+      tbody.addEventListener('contextmenu', function (e) {
+        if (e.button === 0 && e.clientX === 0 && e.clientY === 0) {
+          var row = e.target.closest('tr'); if (!row) return;
+          var rr = row.getBoundingClientRect();
+          openMenu(song(row.dataset.id), rr.left + 40, rr.bottom - 4);
+        }
+      });
+    }
+
+    ctx.addEventListener('click', function (e) {
+      var item = e.target.closest('[data-act]');
+      if (!item || item.disabled) return;
+      var act = item.dataset.act;
+      if (act === 'parent') { item.classList.toggle('is-open'); item.setAttribute('aria-expanded', item.classList.contains('is-open')); return; }
+      var sg = ctxSong;
+      closeMenu();
+      if (act === 'toggle') {
+        var pl = state.playlists.filter(function (p) { return p.id === item.dataset.pl; })[0];
+        var at = pl.songs.indexOf(sg.id);
+        if (at >= 0) { pl.songs.splice(at, 1); say('Removed from \u201c' + pl.name + '\u201d'); }
+        else { pl.songs.push(sg.id); say('Added to \u201c' + pl.name + '\u201d'); }
+        save();
+      } else if (act === 'new' || act === 'new-add') {
+        askName().then(function (name) {
+          if (!name) return;
+          var pl = { id: 'pl-' + Date.now().toString(36), name: name, songs: act === 'new-add' ? [sg.id] : [] };
+          state.playlists.push(pl);
+          save();
+          say(act === 'new-add' ? 'Added to \u201c' + name + '\u201d' : 'Created \u201c' + name + '\u201d');
+        });
+      }
+    });
+
+    ctx.addEventListener('keydown', function (e) {
+      var items = Array.prototype.slice.call(ctx.querySelectorAll('.ctx__item:not([disabled])'))
+        .filter(function (el) { return el.offsetParent !== null; });   // visible only
+      var i = items.indexOf(document.activeElement);
+      var parent = ctx.querySelector('.ctx__item--parent');
+      if (e.key === 'Escape') { e.preventDefault(); closeMenu(); }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); (items[i + 1] || items[0]).focus(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); (items[i - 1] || items[items.length - 1]).focus(); }
+      else if (e.key === 'ArrowRight' && document.activeElement === parent) {
+        e.preventDefault(); parent.classList.add('is-open'); parent.setAttribute('aria-expanded', 'true');
+        var f = parent.querySelector('.ctx__sub .ctx__item:not([disabled])'); if (f) f.focus();
+      }
+      else if (e.key === 'ArrowLeft' && parent.classList.contains('is-open') && document.activeElement !== parent) {
+        e.preventDefault(); parent.classList.remove('is-open'); parent.setAttribute('aria-expanded', 'false'); parent.focus();
+      }
+      else if ((e.key === 'Enter' || e.key === ' ') && document.activeElement === parent) {
+        e.preventDefault(); parent.click();
+      }
+    });
+
+    document.addEventListener('pointerdown', function (e) { if (!ctx.hidden && !ctx.contains(e.target)) closeMenu(); });
+    document.addEventListener('scroll', closeMenu, true);
+    addEventListener('resize', closeMenu);
+    addEventListener('blur', closeMenu);
+
+    /* ---- new playlist sheet ---- */
+
+    var resolveName = null;
+    function askName() {
+      return new Promise(function (resolve) {
+        resolveName = resolve;
+        sheetInput.value = '';
+        sheet.hidden = false;
+        sheetInput.focus();
+      });
+    }
+    function settle(value) {
+      if (!resolveName) return;
+      sheet.hidden = true;
+      var r = resolveName; resolveName = null;
+      r(value);
+    }
+    sheetCreate.addEventListener('click', function () { settle(sheetInput.value.trim() || null); });
+    sheetCancel.addEventListener('click', function () { settle(null); });
+    sheet.addEventListener('click', function (e) { if (e.target === sheet) settle(null); });
+    sheet.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); settle(sheetInput.value.trim() || null); }
+      else if (e.key === 'Escape') { e.preventDefault(); settle(null); }
+    });
+
+    /* ---- boot ---- */
+
+    function followPlaying() {
+      var sg = playingSong();
+      selectedId = sg ? sg.id : selectedId;
+      render();
+    }
+    document.addEventListener('player:album', followPlaying);
+    window.kv.get(KEY).then(function (saved) {
+      if (saved && typeof saved === 'object') {
+        state.starred = saved.starred || {};
+        state.saved = saved.saved || {};
+        state.playlists = Array.isArray(saved.playlists) ? saved.playlists : [];
+      }
+      followPlaying();
+    });
+    followPlaying();
+  })();
+
+  /* Overlay scroller for the music list. Shows while scrolling or dragging,
+     fades out 900ms after the last movement. Thumb drag and track clicks
+     both work; the wheel and keyboard scroll the inner container natively. */
+  (function () {
+    var sc = document.getElementById('libraryScroll');
+    var lib = document.getElementById('library');
+    var bar = document.getElementById('libraryBar');
+    var thumb = document.getElementById('libraryThumb');
+    if (!sc) return;
+    var hideTimer = 0, dragging = false, dragY = 0, dragTop = 0;
+
+    function metrics() {
+      return {
+        view: sc.clientHeight,
+        full: sc.scrollHeight,
+        max: sc.scrollHeight - sc.clientHeight,
+        trackH: bar.clientHeight,
+      };
+    }
+
+    function update() {
+      var m = metrics();
+      if (m.max <= 0) { bar.style.display = 'none'; return; }
+      bar.style.display = '';
+      var th = Math.max(26, Math.round(m.trackH * m.view / m.full));
+      var top = Math.round((m.trackH - th) * (sc.scrollTop / m.max));
+      thumb.style.height = th + 'px';
+      thumb.style.transform = 'translateY(' + top + 'px)';
+    }
+
+    function show() {
+      lib.classList.add('is-scrolling');
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(function () {
+        if (!dragging) lib.classList.remove('is-scrolling');
+      }, 900);
+    }
+
+    sc.addEventListener('scroll', function () { update(); show(); }, { passive: true });
+    addEventListener('resize', update);
+
+    thumb.addEventListener('pointerdown', function (e) {
+      dragging = true;
+      dragY = e.clientY;
+      dragTop = sc.scrollTop;
+      thumb.setPointerCapture(e.pointerId);
+      show();
+      e.preventDefault();
+    });
+    thumb.addEventListener('pointermove', function (e) {
+      if (!dragging) return;
+      var m = metrics();
+      var span = m.trackH - thumb.offsetHeight;
+      if (span > 0) sc.scrollTop = dragTop + (e.clientY - dragY) * (m.max / span);
+    });
+    function endDrag() { if (dragging) { dragging = false; show(); } }
+    thumb.addEventListener('pointerup', endDrag);
+    thumb.addEventListener('pointercancel', endDrag);
+
+    bar.addEventListener('pointerdown', function (e) {
+      if (e.target === thumb) return;
+      var m = metrics();
+      var span = m.trackH - thumb.offsetHeight;
+      var y = e.clientY - bar.getBoundingClientRect().top - thumb.offsetHeight / 2;
+      if (span > 0) sc.scrollTop = Math.max(0, Math.min(1, y / span)) * m.max;
+      show();
+    });
+
+    update();
+  })();
+
+  // Solo / group segmented control. Radiogroup semantics: one tab stop, arrow
+  // keys move between segments the way a native segmented control does.
+  (function () {
+    var group = document.getElementById('mode');
+    var items = Array.prototype.slice.call(group.querySelectorAll('[role="radio"]'));
+
+    function select(item, focus) {
+      items.forEach(function (el) {
+        var on = el === item;
+        el.setAttribute('aria-checked', String(on));
+        el.tabIndex = on ? 0 : -1;
+      });
+      if (focus) item.focus();
+      document.dispatchEvent(new CustomEvent('player:mode', {
+        detail: { mode: item.dataset.mode }
+      }));
+    }
+
+    group.addEventListener('click', function (e) {
+      var item = e.target.closest('[role="radio"]');
+      if (item) select(item, false);
+    });
+
+    group.addEventListener('keydown', function (e) {
+      var i = items.indexOf(document.activeElement);
+      if (i < 0) return;
+      var next = null;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = items[(i + 1) % items.length];
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = items[(i - 1 + items.length) % items.length];
+      else if (e.key === 'Home') next = items[0];
+      else if (e.key === 'End') next = items[items.length - 1];
+      else if (e.key === ' ' || e.key === 'Enter') next = items[i];
+      if (next) { e.preventDefault(); select(next, true); }
+    });
+  })();
+
+  // Profile hook — replace with your own handler.
+  document.getElementById('profile').addEventListener('click', function () {
+    console.log('profile clicked');
+  });
+
+  /* Transport. In solo you own the track: scrub, seek, pause. In group you're
+     tuned into a live broadcast — the position is not yours to move, so the
+     controls go inert and the duration is replaced by a live marker. */
+  (function () {
+    var mode = 'group';                       // matches the toggle's default
+    var dragging = false, playing = false;
+    var pos = { solo: window.ALBUMS.solo.start, group: window.ALBUMS.group.start };
+
+    var section = document.querySelector('.player');
+    var playBtn = document.getElementById('play');
+    var track = document.getElementById('track');
+    var fill = document.getElementById('fill');
+    var elapsedEl = document.getElementById('elapsed');
+    var remainEl = document.getElementById('remaining');
+    var liveEl = document.getElementById('live');
+    var prevBtn = document.getElementById('prev');
+    var nextBtn = document.getElementById('next');
+    var repeatBtn = document.getElementById('repeat');
+    var dlBtn = document.getElementById('download');
+    var repeatOn = false;
+    var titleEl = document.querySelector('.player__title');
+    var artistEl = document.querySelector('.player__artist');
+    var albumEl = document.querySelector('.player__album');
+
+    function album() { return window.ALBUMS[mode]; }
+
+    /* A track picked from the library, per mode. It shadows the album's own
+       title/artist/duration until you switch modes again. Choosing a track
+       is also what takes a group session off the live edge: you can't pick a
+       song out of a broadcast, so picking one means you've left it. */
+    var chosen = { solo: null, group: null };
+    var albumNP = { solo: window.ALBUMS.solo.nowPlaying, group: window.ALBUMS.group.nowPlaying };
+
+    /* dropping a chosen track puts the mode back exactly as it started —
+       its own now-playing title and its own position */
+    function unchoose(m) {
+      if (!chosen[m]) return;
+      chosen[m] = null;
+      window.ALBUMS[m].nowPlaying = albumNP[m];
+      pos[m] = window.ALBUMS[m].start;
+    }
+
+    function current() { return chosen[mode] || album(); }
+    function total() { var c = chosen[mode]; return c ? c.duration : album().total; }
+    function isLive() { return album().live && !chosen[mode]; }
+
+    function fmt(s) {
+      s = Math.max(0, Math.round(s));
+      var h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60;
+      return (h ? h + ':' + String(m).padStart(2, '0') : String(m).padStart(2, '0')) +
+             ':' + String(s % 60).padStart(2, '0');
+    }
+
+    function paint() {
+      var cur = pos[mode];
+      elapsedEl.textContent = fmt(cur);
+      if (isLive()) {
+        fill.style.width = '100%';            // always at the live edge
+        track.setAttribute('aria-label', 'Live broadcast, ' + fmt(cur) + ' elapsed');
+      } else {
+        var dur = total();
+        fill.style.width = (cur / dur) * 100 + '%';
+        remainEl.textContent = '-' + fmt(dur - cur);
+        track.setAttribute('aria-valuemax', dur);
+        track.setAttribute('aria-valuenow', Math.round(cur));
+        track.setAttribute('aria-valuetext', fmt(cur) + ' of ' + fmt(dur));
+      }
+    }
+
+    function setPlaying(p) {
+      playing = isLive() ? true : p;          // a broadcast can't be paused
+      playBtn.classList.toggle('is-playing', playing);
+      playBtn.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+      playBtn.setAttribute('aria-pressed', String(playing));
+      section.dataset.playing = String(playing);
+      document.dispatchEvent(new CustomEvent('player:state', { detail: { playing: playing } }));
+    }
+
+    function applyMode(next) {
+      mode = next;
+      var a = current(), live = isLive();
+
+      titleEl.textContent = a.title;
+      artistEl.textContent = a.artist;
+      albumEl.textContent = a.album;
+      section.dataset.mode = mode;
+
+      // Everything the broadcast owns goes inert. Volume is local to you, so
+      // it stays live in both modes.
+      [playBtn, prevBtn, nextBtn, repeatBtn, dlBtn].forEach(function (b) {
+        b.disabled = live;
+        b.title = live ? 'Live broadcast — unavailable' : '';
+      });
+      track.classList.toggle('is-live', live);
+      track.setAttribute('aria-disabled', String(live));
+      track.tabIndex = live ? -1 : 0;
+      track.setAttribute('role', live ? 'img' : 'slider');
+      if (live) {
+        track.removeAttribute('aria-valuenow');
+        track.removeAttribute('aria-valuetext');
+      } else {
+        track.setAttribute('aria-label', 'Seek');
+      }
+
+      remainEl.hidden = live;                 // duration <-> live marker
+      liveEl.hidden = !live;
+
+      dragging = false;
+      setPlaying(live ? true : playing);
+      paint();
+      document.dispatchEvent(new CustomEvent('player:album', { detail: { mode: mode } }));
+    }
+
+    function seek(e) {
+      if (isLive()) return;
+      var r = track.getBoundingClientRect();
+      pos[mode] = Math.min(total(),
+                  Math.max(0, ((e.clientX - r.left) / r.width) * total()));
+      paint();
+    }
+
+    playBtn.addEventListener('click', function () {
+      if (!isLive()) setPlaying(!playing);
+    });
+
+    track.addEventListener('pointerdown', function (e) {
+      if (isLive()) return;
+      dragging = true;
+      track.setPointerCapture(e.pointerId);
+      seek(e);
+    });
+    track.addEventListener('pointermove', function (e) { if (dragging) seek(e); });
+    track.addEventListener('pointerup', function () { dragging = false; });
+    track.addEventListener('pointercancel', function () { dragging = false; });
+
+    track.addEventListener('keydown', function (e) {
+      if (isLive()) return;
+      var step = e.shiftKey ? 15 : 5, dur = total(), handled = true;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowUp') pos[mode] = Math.min(dur, pos[mode] + step);
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') pos[mode] = Math.max(0, pos[mode] - step);
+      else if (e.key === 'Home') pos[mode] = 0;
+      else if (e.key === 'End') pos[mode] = dur;
+      else if (e.key === ' ') setPlaying(!playing);
+      else handled = false;
+      if (handled) { e.preventDefault(); paint(); }
+    });
+
+    // Previous: restart the track. With a real playlist this would step back
+    // only when you're within the first few seconds.
+    prevBtn.addEventListener('click', function () {
+      if (isLive()) return;
+      pos[mode] = 0;
+      paint();
+    });
+
+    nextBtn.addEventListener('click', function () {
+      if (isLive()) return;
+      pos[mode] = repeatOn ? 0 : total();
+      if (!repeatOn) setPlaying(false);
+      paint();
+    });
+
+    repeatBtn.addEventListener('click', function () {
+      if (isLive()) return;
+      repeatOn = !repeatOn;
+      repeatBtn.setAttribute('aria-pressed', String(repeatOn));
+    });
+
+    dlBtn.addEventListener('click', function () {
+      if (isLive()) return;
+      var saved = dlBtn.getAttribute('aria-pressed') !== 'true';
+      dlBtn.setAttribute('aria-pressed', String(saved));
+      dlBtn.setAttribute('aria-label', saved ? 'Saved offline' : 'Download for offline');
+      dlBtn.querySelector('.dl-arrow').hidden = saved;
+      dlBtn.querySelector('.dl-check').hidden = !saved;
+    });
+
+    /* switching modes by hand clears that mode's chosen track, which is how
+       a group session gets back to the live edge */
+    document.addEventListener('player:mode', function (e) {
+      unchoose(e.detail.mode);
+      applyMode(e.detail.mode);
+    });
+
+    /* A row in the library was chosen. The song carries its own artist, so
+       the session follows it into the matching mode rather than showing one
+       artist's cover over another's title. */
+    document.addEventListener('library:play', function (e) {
+      var sg = e.detail.song;
+      var target = window.ALBUMS.solo.artist === sg.artist ? 'solo' : 'group';
+      chosen[target] = { title: sg.title, artist: sg.artist, album: sg.album, duration: sg.duration };
+      window.ALBUMS[target].nowPlaying = sg.title;
+      pos[target] = 0;
+      playing = true;
+      applyMode(target);
+      setPlaying(true);
+    });
+
+    setInterval(function () {
+      if (!playing || dragging) return;
+      if (isLive()) { pos[mode] += 1; paint(); return; }   // broadcast clock climbs
+      if (pos[mode] < total()) {
+        pos[mode] += 1;
+        paint();
+        if (pos[mode] >= total()) {
+          if (repeatOn) { pos[mode] = 0; paint(); }
+          else setPlaying(false);
+        }
+      }
+    }, 1000);
+
+    applyMode(mode);
+  })();
+</script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+/* ------------------------------------------------------------------
+   CD jewel case — built procedurally from primitives (no model to load).
+   Roughly 8 draw calls, ~12k triangles, textures generated on a canvas.
+   If this module fails to load, the CSS cover in .player__fallback stays.
+------------------------------------------------------------------- */
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
+
+const stage = document.getElementById('stage');
+
+/* ---------- device tier ---------- */
+
+function detectTier() {
+  const ua = navigator.userAgent;
+  const uaMobile = navigator.userAgentData?.mobile ?? /Android|iPhone|iPod|Mobile/i.test(ua);
+  const isTablet = /iPad|Tablet|Silk/i.test(ua) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const mem = navigator.deviceMemory ?? 4;
+  const cores = navigator.hardwareConcurrency ?? 4;
+  if (navigator.connection?.saveData) return 'mobile';
+  if (uaMobile && !isTablet) return 'mobile';
+  if (isTablet) return 'tablet';
+  if (mem <= 4 || cores <= 4) return 'tablet';
+  return 'desktop';
+}
+
+const PRESETS = {
+  desktop: { dpr: 2,   tex: 1024, aniso: 8, seg: 4 },
+  tablet:  { dpr: 2,   tex: 512,  aniso: 4, seg: 3 },
+  mobile:  { dpr: 1.5, tex: 512,  aniso: 2, seg: 2 },
+};
+
+const tier = new URLSearchParams(location.search).get('quality') || detectTier();
+const P = PRESETS[tier] || PRESETS.tablet;
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- generated textures ---------- */
+
+// Placeholder sleeve art. Swap for real artwork:
+//   new THREE.TextureLoader().load('cover.jpg', t => { t.colorSpace = THREE.SRGBColorSpace; })
+function makeCoverTexture(size, T) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d');
+
+  const glow = g.createRadialGradient(size * 0.5, size * T.glowY, size * 0.015,
+                                      size * 0.5, size * T.glowY, size * 0.95);
+  T.stops.forEach(([at, col]) => glow.addColorStop(at, col));
+  g.fillStyle = glow;
+  g.fillRect(0, 0, size, size);
+
+  if (T.wash) {
+    const bottom = T.wash.from === 'bottom';
+    const y0 = bottom ? size : 0;
+    const y1 = bottom ? size * (1 - T.wash.span) : size * T.wash.span;
+    const wash = g.createLinearGradient(0, y0, 0, y1);
+    wash.addColorStop(0, `rgba(${T.wash.rgb}, ${T.wash.a})`);
+    wash.addColorStop(1, `rgba(${T.wash.rgb}, 0)`);
+    g.fillStyle = wash;
+    g.fillRect(0, bottom ? y1 : 0, size, size * T.wash.span);
+  }
+
+  g.save();
+  g.translate(size * 0.5, size * T.glowY);
+  g.globalCompositeOperation = 'overlay';
+  for (let i = 0; i < 30; i++) {
+    const a = (i / 30) * Math.PI * 2 + 0.25;
+    const w = 0.006 + Math.random() * 0.022;
+    g.beginPath();
+    g.moveTo(0, 0);
+    g.arc(0, 0, size * 1.4, a - w, a + w);
+    g.closePath();
+    g.fillStyle = 'rgba(255,255,255,' + (0.04 + Math.random() * T.rayAlpha) + ')';
+    g.fill();
+  }
+  g.restore();
+
+  // film grain, tiled from a small noise buffer
+  const nc = document.createElement('canvas');
+  nc.width = nc.height = 256;
+  const ng = nc.getContext('2d');
+  const noise = ng.createImageData(256, 256);
+  for (let i = 0; i < noise.data.length; i += 4) {
+    const v = 128 + (Math.random() - 0.5) * 70;
+    noise.data[i] = noise.data[i + 1] = noise.data[i + 2] = v;
+    noise.data[i + 3] = 255;
+  }
+  ng.putImageData(noise, 0, 0);
+  g.globalCompositeOperation = 'overlay';
+  g.globalAlpha = 0.07;
+  g.drawImage(nc, 0, 0, size, size);
+  g.globalAlpha = 1;
+  g.globalCompositeOperation = 'source-over';
+
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = P.aniso;
+  return t;
+}
+
+// Back inlay card: track listing, spine text, barcode.
+function makeBackTexture(w, T) {
+  const h = Math.round(w / 1.139);
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const g = c.getContext('2d');
+
+  const bg = g.createLinearGradient(0, 0, w, h);
+  bg.addColorStop(0.00, T.grad[0]);
+  bg.addColorStop(0.55, T.grad[1]);
+  bg.addColorStop(1.00, T.grad[2]);
+  g.fillStyle = bg;
+  g.fillRect(0, 0, w, h);
+
+  const ex = w * T.echoAt[0], ey = h * T.echoAt[1];
+  const echo = g.createRadialGradient(ex, ey, 0, ex, ey, w * 0.6);
+  echo.addColorStop(0, T.echo);
+  echo.addColorStop(1, T.echo.replace(/[\d.]+\)$/, '0)'));
+  g.fillStyle = echo;
+  g.fillRect(0, 0, w, h);
+
+  // Both edges of a tray card are spine flaps — they fold forward into the
+  // case's spines, so each carries the same caption.
+  const FLAP = 0.076;
+  for (const side of [0, 1]) {
+    const x0 = side ? w * (1 - FLAP) : 0;
+    g.fillStyle = 'rgba(0,0,0,0.34)';
+    g.fillRect(x0, 0, w * FLAP, h);
+    g.fillStyle = 'rgba(255,255,255,0.10)';           // fold crease
+    g.fillRect(side ? x0 : x0 + w * FLAP - 1.5, 0, 1.5, h);
+    g.save();
+    g.translate(x0 + w * FLAP * 0.5, h * 0.5);
+    g.rotate(side ? Math.PI / 2 : -Math.PI / 2);
+    g.fillStyle = 'rgba(255,236,214,0.88)';
+    g.font = '600 ' + Math.round(w * 0.025) + 'px system-ui, -apple-system, sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(T.spine, 0, 0);
+    g.restore();
+  }
+
+  const tracks = T.tracks;
+  g.textAlign = 'left';
+  g.textBaseline = 'alphabetic';
+  g.font = '500 ' + Math.round(w * 0.029) + 'px system-ui, -apple-system, sans-serif';
+  tracks.forEach((name, i) => {
+    const y = h * 0.2 + i * h * 0.071;
+    g.fillStyle = 'rgba(255,238,220,0.5)';
+    g.fillText(String(i + 1).padStart(2, '0'), w * 0.115, y);
+    g.fillStyle = 'rgba(255,247,238,0.92)';
+    g.fillText(name, w * 0.185, y);
+  });
+
+  const bx = w * 0.68, by = h * 0.75, bw = w * 0.20, bh = h * 0.14;
+  g.fillStyle = '#f2ede6';
+  g.fillRect(bx, by, bw, bh);
+  g.fillStyle = '#131313';
+  let x = bx + bw * 0.06;
+  while (x < bx + bw * 0.94) {
+    const lw = 1 + Math.random() * 3;
+    g.fillRect(x, by + bh * 0.14, lw, bh * 0.6);
+    x += lw + 1 + Math.random() * 3;
+  }
+
+  g.fillStyle = 'rgba(255,240,225,0.45)';
+  g.font = '400 ' + Math.round(w * 0.021) + 'px system-ui, -apple-system, sans-serif';
+  g.fillText(T.footer, w * 0.115, h * 0.93);
+
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = P.aniso;
+  return t;
+}
+
+// Roughness map for the lid. Faint arcs and smudges are what stop the plastic
+// reading as a perfect CG surface — real cases are always slightly scuffed.
+function makeScuffTexture(size) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d');
+
+  g.fillStyle = '#2e2e2e';
+  g.fillRect(0, 0, size, size);
+  g.lineCap = 'round';
+
+  for (let i = 0; i < 80; i++) {
+    const x = Math.random() * size, y = Math.random() * size;
+    const r = size * (0.25 + Math.random() * 0.9);
+    const a0 = Math.random() * Math.PI * 2;
+    g.beginPath();
+    g.arc(x, y, r, a0, a0 + 0.08 + Math.random() * 0.45);
+    g.strokeStyle = 'rgba(215,215,215,' + (0.05 + Math.random() * 0.24) + ')';
+    g.lineWidth = 0.5 + Math.random() * 1.7;
+    g.stroke();
+  }
+
+  for (let i = 0; i < 16; i++) {
+    const x = Math.random() * size, y = Math.random() * size;
+    const r = size * (0.05 + Math.random() * 0.15);
+    const s = g.createRadialGradient(x, y, 0, x, y, r);
+    s.addColorStop(0, 'rgba(160,160,160,0.22)');
+    s.addColorStop(1, 'rgba(160,160,160,0)');
+    g.fillStyle = s;
+    g.beginPath();
+    g.arc(x, y, r, 0, Math.PI * 2);
+    g.fill();
+  }
+
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.NoColorSpace;   // data map — must stay linear
+  return t;
+}
+
+function makeShadowTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d');
+  const r = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+  r.addColorStop(0.00, 'rgba(0,0,0,0.55)');
+  r.addColorStop(0.45, 'rgba(0,0,0,0.26)');
+  r.addColorStop(1.00, 'rgba(0,0,0,0)');
+  g.fillStyle = r;
+  g.fillRect(0, 0, 256, 256);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.NoColorSpace;
+  return t;
+}
+
+/* ---------- disc textures ---------- */
+
+// Label side: the sleeve art, printed on a silver base with a metallic ring
+// around the hub — the Y2K CD look.
+function makeLabelTexture(coverCanvas, size) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d');
+  const cx = size / 2, R = size / 2;
+
+  g.drawImage(coverCanvas, 0, 0, size, size);
+
+  // silver print bleeding through at the edges
+  const vign = g.createRadialGradient(cx, cx, R * 0.55, cx, cx, R);
+  vign.addColorStop(0, 'rgba(200,204,210,0)');
+  vign.addColorStop(1, 'rgba(200,204,210,0.28)');
+  g.fillStyle = vign;
+  g.fillRect(0, 0, size, size);
+
+  // hub ring — printed metallic band with a fine dark keyline
+  g.lineWidth = size * 0.028;
+  g.strokeStyle = '#c9cdd3';
+  g.beginPath(); g.arc(cx, cx, R * 0.40, 0, Math.PI * 2); g.stroke();
+  g.lineWidth = size * 0.006;
+  g.strokeStyle = 'rgba(40,40,44,0.7)';
+  g.beginPath(); g.arc(cx, cx, R * 0.385, 0, Math.PI * 2); g.stroke();
+  g.strokeStyle = 'rgba(255,255,255,0.55)';
+  g.beginPath(); g.arc(cx, cx, R * 0.415, 0, Math.PI * 2); g.stroke();
+
+  // outer keyline
+  g.lineWidth = size * 0.008;
+  g.strokeStyle = 'rgba(30,30,34,0.55)';
+  g.beginPath(); g.arc(cx, cx, R * 0.985, 0, Math.PI * 2); g.stroke();
+
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = P.aniso;
+  return t;
+}
+
+// Anisotropy direction map. RG encode a tangent-space direction, B is strength.
+// Direction is radial, so the specular lobe stretches into the spoke-like
+// streaks a real disc shows — the pits run in concentric tracks, so the
+// surface is rough across them (radially) and smooth along them.
+function makeAnisotropyTexture(size) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d');
+  const img = g.createImageData(size, size);
+  for (let py = 0; py < size; py++) {
+    for (let px = 0; px < size; px++) {
+      const dx = (2 * px / size) - 1;
+      const dy = 1 - (2 * py / size);      // flipY: canvas row 0 is v = 1
+      const len = Math.hypot(dx, dy) || 1;
+      const i = (py * size + px) * 4;
+      img.data[i]     = Math.round((dx / len * 0.5 + 0.5) * 255);
+      img.data[i + 1] = Math.round((dy / len * 0.5 + 0.5) * 255);
+      img.data[i + 2] = 255;
+      img.data[i + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.NoColorSpace;
+  return t;
+}
+
+// Thin-film thickness varies with radius, so iridescence resolves into
+// concentric rainbow bands that slide as the disc tilts.
+function makeThicknessTexture(size) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d');
+  const cx = size / 2;
+  const grad = g.createRadialGradient(cx, cx, 0, cx, cx, cx);
+  for (let i = 0; i <= 24; i++) {
+    const s = i / 24;
+    const v = Math.round(128 + Math.sin(s * Math.PI * 7.5) * 96 + (s - 0.5) * 40);
+    grad.addColorStop(s, `rgb(${v},${v},${v})`);
+  }
+  g.fillStyle = grad;
+  g.fillRect(0, 0, size, size);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.NoColorSpace;
+  return t;
+}
+
+// Roughness for the data side: faint radial streaks and a few soft sectors.
+// These are what flicker through the highlight as the disc spins — a
+// perfectly uniform surface would look frozen no matter how fast it turned.
+function makeGrooveTexture(size) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const g = c.getContext('2d');
+  const cx = size / 2;
+  g.fillStyle = '#3a3a3a';
+  g.fillRect(0, 0, size, size);
+
+  g.save();
+  g.translate(cx, cx);
+  g.lineCap = 'round';
+  for (let i = 0; i < 900; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const r0 = cx * (0.35 + Math.random() * 0.6);
+    const r1 = Math.min(cx, r0 + cx * (0.02 + Math.random() * 0.12));
+    g.strokeStyle = 'rgba(255,255,255,' + (0.02 + Math.random() * 0.07) + ')';
+    g.lineWidth = 0.5 + Math.random() * 1.2;
+    g.beginPath();
+    g.moveTo(Math.cos(a) * r0, Math.sin(a) * r0);
+    g.lineTo(Math.cos(a) * r1, Math.sin(a) * r1);
+    g.stroke();
+  }
+  for (let i = 0; i < 5; i++) {
+    const a = Math.random() * Math.PI * 2;
+    g.fillStyle = 'rgba(255,255,255,0.045)';
+    g.beginPath();
+    g.moveTo(0, 0);
+    g.arc(0, 0, cx, a, a + 0.25 + Math.random() * 0.4);
+    g.closePath();
+    g.fill();
+  }
+  g.restore();
+
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.NoColorSpace;
+  return t;
+}
+
+/* ---------- renderer ---------- */
+
+const renderer = new THREE.WebGLRenderer({
+  antialias: true,
+  alpha: true,
+  powerPreference: 'high-performance',
+  stencil: false,
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, P.dpr));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+const el = renderer.domElement;
+stage.appendChild(el);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 40);
+camera.position.set(0, 0, 3.9);
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+const envRT = pmrem.fromScene(new RoomEnvironment(), 0.03);
+scene.environment = envRT.texture;
+scene.environmentIntensity = 0.85;
+pmrem.dispose();
+
+/* ---------- lights ---------- */
+
+RectAreaLightUniformsLib.init();
+
+// Wide softbox upper-left: draws the long diagonal streak across the lid.
+const box1 = new THREE.RectAreaLight(0xffffff, 4.6, 3.2, 1.1);
+box1.position.set(-1.9, 1.9, 2.4);
+box1.lookAt(0, -0.1, 0);
+
+// Narrow vertical strip on the right: the second, tighter highlight.
+const box2 = new THREE.RectAreaLight(0xdce9ff, 3.0, 0.55, 3.4);
+box2.position.set(2.4, -0.5, 1.9);
+box2.lookAt(0, 0, 0);
+
+// Behind the case, so the back sleeve is lit once it spins around.
+const back = new THREE.RectAreaLight(0xffffff, 3.4, 2.8, 1.6);
+back.position.set(1.4, 1.2, -2.6);
+back.lookAt(0, 0, 0);
+
+const rim = new THREE.DirectionalLight(0xffffff, 1.3);
+rim.position.set(-2.6, 0.7, -2.0);
+
+const fill = new THREE.DirectionalLight(0xcfe0ff, 0.45);
+fill.position.set(1.4, -1.7, 2.6);
+
+scene.add(box1, box2, back, rim, fill);
+
+/* ---------- geometry ---------- */
+
+const W = 1.42, H = 1.25, D = 0.10;   // real jewel case is 142 x 125 x 10 mm
+const HINGE_W = 0.135;
+const SEG = P.seg;
+
+const scuffTex = makeScuffTexture(Math.min(P.tex, 512));
+
+/* Clear polystyrene as two layers, the way product renderers fake glass:
+   a faint tinted body that lets the sleeve through, and an additive specular
+   layer that carries the highlights at full strength no matter how faint the
+   body is. Cheaper than transmission, and it fades cleanly. */
+const glassBody = new THREE.MeshPhysicalMaterial({
+  color: 0xe6ebef,
+  metalness: 0,
+  roughness: 0.34,
+  roughnessMap: scuffTex,
+  specularIntensity: 0,
+  transparent: true,
+  opacity: 0.10,
+  depthWrite: false,
+});
+
+const glassSpec = new THREE.MeshPhysicalMaterial({
+  color: 0x000000,                  // no diffuse — reflections only
+  metalness: 0,
+  roughness: 0.34,
+  roughnessMap: scuffTex,
+  ior: 1.585,                       // polystyrene
+  clearcoat: 1.0,
+  clearcoatRoughness: 0.035,
+  envMapIntensity: 1.6,
+  transparent: true,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+});
+
+// Thin edges read denser than flat panels, and pick up a slight cool tint.
+const edgePlastic = new THREE.MeshPhysicalMaterial({
+  color: 0xd9e0e6,
+  metalness: 0,
+  roughness: 0.28,
+  clearcoat: 1.0,
+  clearcoatRoughness: 0.06,
+  envMapIntensity: 1.4,
+  transparent: true,
+  opacity: 0.5,
+  depthWrite: false,
+});
+
+const caseGroup = new THREE.Group();
+scene.add(caseGroup);
+
+// Real hinge: the lid pivots on two pins at the spine, on the parting line
+// where lid meets base — not on the case's centre plane. The lid has lips on
+// three sides only; its hinge edge is open so it can rotate.
+//
+// Depth budget, front to back. Nothing may cross a neighbour:
+//   +0.050 .. +0.036  lid panel
+//   +0.038 .. +0.030  retention nubs, sleeve, booklet
+//   +0.021 .. -0.022  black tray and its ribbed spine  ] inside the case,
+//   -0.026 .. -0.032  tray card backing                ] in front of the card
+//   -0.034            tray card artwork
+//   -0.036 .. -0.050  clear back panel
+const PARTING_Z = 0.012;
+const HINGE_X = -W / 2 + 0.008;
+const LID_H = H;                              // same outer size as the base
+
+const lidPivot = new THREE.Group();
+lidPivot.position.set(HINGE_X, 0, PARTING_Z);
+caseGroup.add(lidPivot);
+
+// Every material that belongs to the case, so it can fade as one. Materials
+// flagged `solid` stay opaque until a fade begins — opaque objects render
+// first and write depth, which is what lets the clear lid show them properly.
+const caseMats = [];
+function caseMat(mat, base = 1, solid = false) {
+  mat.transparent = !solid;
+  caseMats.push({ mat, base, solid });
+  return mat;
+}
+caseMat(glassBody, 0.10);
+caseMat(glassSpec, 1.0);
+caseMat(edgePlastic, 0.5);
+
+function glassPanel(geo) {
+  const body = new THREE.Mesh(geo, glassBody);
+  const spec = new THREE.Mesh(geo, glassSpec);
+  spec.renderOrder = 2;                 // highlights go down after everything else
+  body.add(spec);
+  return body;
+}
+
+// front lid
+const lid = glassPanel(new RoundedBoxGeometry(W - 0.004, LID_H, 0.014, SEG, 0.007));
+lid.position.set(-HINGE_X - 0.002, 0, 0.043 - PARTING_Z);
+
+// back panel
+const tray = glassPanel(new RoundedBoxGeometry(W, H, 0.014, SEG, 0.007));
+tray.position.z = -0.043;
+
+// side walls
+function wallSet(depth, z, dx, h, withHingeSide) {
+  const geos = [
+    new THREE.BoxGeometry(W, 0.012, depth).translate(dx,  h / 2 - 0.006, z),
+    new THREE.BoxGeometry(W, 0.012, depth).translate(dx, -h / 2 + 0.006, z),
+    new THREE.BoxGeometry(0.012, h, depth).translate(dx + W / 2 - 0.006, 0, z),
+  ];
+  if (withHingeSide) geos.push(new THREE.BoxGeometry(0.012, h, depth).translate(dx - W / 2 + 0.006, 0, z));
+  const merged = BufferGeometryUtils.mergeGeometries(geos);
+  geos.forEach(g => g.dispose());
+  return new THREE.Mesh(merged, edgePlastic);
+}
+const walls    = wallSet(0.062, -0.019, 0, H, true);
+const lidWalls = wallSet(0.036, 0.032 - PARTING_Z, -HINGE_X - 0.002, LID_H, false);
+
+// hinge posts on the base (top-left, bottom-left) and the lid's pins
+const postGeos = [];
+for (const sy of [1, -1]) {
+  postGeos.push(new THREE.BoxGeometry(0.030, 0.022, 0.022).translate(-W / 2 + 0.023, sy * (H / 2 - 0.026), PARTING_Z - 0.004));
+}
+const posts = new THREE.Mesh(BufferGeometryUtils.mergeGeometries(postGeos), edgePlastic);
+postGeos.forEach(g => g.dispose());
+
+const pinGeos = [];
+for (const sy of [1, -1]) {
+  pinGeos.push(new THREE.CylinderGeometry(0.006, 0.006, 0.02, 12).translate(0, sy * (LID_H / 2 + 0.008), 0));
+}
+const pins = new THREE.Mesh(
+  BufferGeometryUtils.mergeGeometries(pinGeos),
+  caseMat(new THREE.MeshPhysicalMaterial({ color: 0xd8dce2, roughness: 0.3, metalness: 0.1, clearcoat: 1 }), 1, true)
+);
+pinGeos.forEach(g => g.dispose());
+
+// sleeve art + its paper backing
+const artL = -W / 2 + HINGE_W + 0.024;
+const artR =  W / 2 - 0.012;
+const artW = artR - artL;
+const artX = (artL + artR) / 2;
+const artH = H - 0.024;
+
+const art = new THREE.Mesh(
+  new THREE.PlaneGeometry(artW, artH),
+  // colour multiplies the map — stands in for the light the lid absorbs,
+  // and keeps the sleeve from blowing out under the softboxes
+  caseMat(new THREE.MeshStandardMaterial({
+    color: 0xb2b2b2, roughness: 0.68,
+    metalness: 0, envMapIntensity: 0.7,
+  }), 1, true)
+);
+art.position.set(artX - HINGE_X, 0, 0.030 - PARTING_Z);
+
+const paper = new THREE.Mesh(
+  new THREE.BoxGeometry(artW, artH, 0.006),
+  caseMat(new THREE.MeshStandardMaterial({ color: 0xf2f0ec, roughness: 0.85 }), 1, true)
+);
+paper.position.set(artX - HINGE_X, 0, 0.026 - PARTING_Z);
+
+// back inlay card, facing -Z
+const backW = W - 0.03, backH = H - 0.03;
+const backArt = new THREE.Mesh(
+  new THREE.PlaneGeometry(backW, backH),
+  caseMat(new THREE.MeshStandardMaterial({
+    color: 0xbcbcbc, roughness: 0.72,
+    metalness: 0, envMapIntensity: 0.7,
+  }), 1, true)
+);
+backArt.position.z = -0.034;
+backArt.rotation.y = Math.PI;
+
+const backBoard = new THREE.Mesh(
+  new THREE.BoxGeometry(backW, backH, 0.006),
+  caseMat(new THREE.MeshStandardMaterial({ color: 0x17171a, roughness: 0.82 }), 1, true)
+);
+backBoard.position.z = -0.029;
+
+// The black tray: a full plate with a recessed disc well, and the ribbed
+// spine beside it. It lives *in front of* the tray card, the way it does in a
+// real case — running it past the card is what made the back look wrong.
+const hingeX = -W / 2 + HINGE_W / 2 + 0.012;
+const TRAY_Z = -0.002;
+
+// The disc lies on the face of the tray plate, not inside it. Everything here
+// is measured off DOCK_Z so the well, the hub and the disc stay consistent:
+//   plate face  -0.004
+//   disc        -0.003 .. +0.009   (DOCK_Z ± half thickness)
+//   well lip     encircles the disc at r 0.602..0.610
+//   hub          r 0.058, rises through the disc's 0.075 centre hole
+const DOCK_Z = 0.003;
+const hingeGeos = [
+  new THREE.BoxGeometry(HINGE_W, H - 0.05, 0.04).translate(hingeX, 0, TRAY_Z),
+  new THREE.BoxGeometry(W - HINGE_W - 0.06, H - 0.05, 0.012)
+    .translate(hingeX + HINGE_W / 2 + (W - HINGE_W - 0.06) / 2 + 0.004, 0, TRAY_Z - 0.008),
+  new THREE.TorusGeometry(0.606, 0.0045, 8, 72).translate(artX, 0, DOCK_Z),
+  new THREE.CylinderGeometry(0.058, 0.058, 0.019, 28).rotateX(Math.PI / 2).translate(artX, 0, DOCK_Z + 0.0025),
+  new THREE.TorusGeometry(0.066, 0.005, 8, 32).translate(artX, 0, DOCK_Z + 0.009),
+];
+for (let i = 0; i < 8; i++) {
+  const x = hingeX - HINGE_W / 2 + 0.014 + i * ((HINGE_W - 0.028) / 7);
+  hingeGeos.push(new THREE.BoxGeometry(0.009, H - 0.09, 0.018).translate(x, 0, TRAY_Z + 0.014));
+}
+const hinge = new THREE.Mesh(
+  BufferGeometryUtils.mergeGeometries(hingeGeos),
+  caseMat(new THREE.MeshPhysicalMaterial({
+    color: 0x101014, roughness: 0.42, metalness: 0,
+    clearcoat: 0.5, clearcoatRoughness: 0.3,
+  }), 1, true)
+);
+hingeGeos.forEach(g => g.dispose());
+
+// retention nubs on the inside of the lid
+const bossGeos = [];
+for (const [sx, sy] of [[-1, 1], [1, 1], [-1, -1], [1, -1], [-1, 0], [1, 0]]) {
+  const g = new THREE.CylinderGeometry(0.032, 0.032, 0.008, 16);
+  g.rotateX(Math.PI / 2);
+  g.translate(artX - HINGE_X + sx * (artW / 2 - 0.062), sy * (artH / 2 - 0.055), 0.034 - PARTING_Z);
+  bossGeos.push(g);
+}
+const bosses = new THREE.Mesh(
+  BufferGeometryUtils.mergeGeometries(bossGeos),
+  caseMat(new THREE.MeshPhysicalMaterial({
+    color: 0xffffff, transparent: true, opacity: 0.16,
+    roughness: 0.25, metalness: 0, clearcoat: 1,
+  }), 0.16)
+);
+bossGeos.forEach(g => g.dispose());
+
+lidPivot.add(lid, lidWalls, pins, art, paper, bosses);
+caseGroup.add(tray, walls, posts, backArt, backBoard, hinge);
+
+// where the disc sits when it's in the tray
+const dockSlot = new THREE.Object3D();
+dockSlot.position.set(artX, 0, DOCK_Z);
+caseGroup.add(dockSlot);
+
+/* ---------- the disc ---------- */
+
+// 120 mm disc, 15 mm hole, clear hub out to ~46 mm, 1.2 mm thick
+const DISC_R = 0.60, HOLE_R = 0.075, HUB_R = 0.23, DISC_T = 0.012;
+
+const anisoTex  = makeAnisotropyTexture(512);
+const thickTex  = makeThicknessTexture(512);
+const grooveTex = makeGrooveTexture(Math.min(P.tex, 512));
+
+// Data side. The base is a bright silver mirror with radial anisotropy; the
+// rainbow comes from a diffraction-grating term patched into the shader below,
+// because a pressed disc is a grating (1.6 µm track pitch), not a thin film.
+const dataMat = new THREE.MeshPhysicalMaterial({
+  color: 0xf1f3f6,
+  metalness: 1.0,
+  roughness: 0.30,
+  roughnessMap: grooveTex,
+  envMapIntensity: 1.1,
+  iridescence: 0.25,                 // a whisper of film colour in the flats
+  iridescenceIOR: 1.6,
+  iridescenceThicknessRange: [200, 600],
+  iridescenceThicknessMap: thickTex,
+  anisotropy: 0.9,
+  anisotropyMap: anisoTex,
+  clearcoat: 0.4,
+  clearcoatRoughness: 0.06,
+});
+
+// Directions toward the lights that produce spectral fans. Each one gives a
+// symmetric set of spokes; three of them give the multi-fan look of a real disc.
+const gratingLights = [
+  box1.position.clone().normalize(),
+  box2.position.clone().normalize(),
+  back.position.clone().normalize(),
+];
+const gratingUniforms = { uGratingDirs: { value: gratingLights }, uGratingStrength: { value: 1.15 } };
+
+dataMat.onBeforeCompile = shader => {
+  Object.assign(shader.uniforms, gratingUniforms);
+
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', `#include <common>
+      varying vec3 vGWorld;
+      varying vec3 vGRadial;`)
+    .replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
+      vGWorld  = (modelMatrix * vec4(position, 1.0)).xyz;
+      vGRadial = normalize(mat3(modelMatrix) * vec3(normalize(position.xy), 0.0));`);
+
+  shader.fragmentShader = shader.fragmentShader
+    .replace('#include <common>', `#include <common>
+      varying vec3 vGWorld;
+      varying vec3 vGRadial;
+      uniform vec3 uGratingDirs[3];
+      uniform float uGratingStrength;
+
+      // wavelength (nm) → linear rgb, gaussian bumps per channel
+      vec3 spectrum(float nm) {
+        float x = (nm - 380.0) / 400.0;
+        float r = exp(-pow((x - 0.66) * 4.2, 2.0)) + 0.32 * exp(-pow((x - 0.06) * 7.0, 2.0));
+        float g = exp(-pow((x - 0.40) * 4.6, 2.0));
+        float b = exp(-pow((x - 0.17) * 4.8, 2.0));
+        return clamp(vec3(r, g, b), 0.0, 1.0);
+      }`)
+    .replace('#include <opaque_fragment>', `
+      {
+        // Grating equation: sin(out) - sin(in) = m·λ / d, with the grating
+        // vector radial. Project the half-vector onto it; each order m returns
+        // the wavelength that reflects toward the eye here, if any is visible.
+        // Everything in view space: the shader's normal already is, and
+        // viewMatrix is a fragment uniform, so no inverse is needed.
+        vec3 V = normalize(vViewPosition);
+        vec3 radial = normalize(mat3(viewMatrix) * vGRadial);
+        vec3 grating = normalize(radial - normal * dot(radial, normal));
+        const float d = 1600.0;
+        vec3 rainbow = vec3(0.0);
+        for (int i = 0; i < 3; i++) {
+          vec3 L = normalize(mat3(viewMatrix) * uGratingDirs[i]);
+          vec3 Hv = L + V;
+          float u = abs(dot(Hv, grating));
+          float facing = max(dot(normal, L), 0.0) * max(dot(normal, V), 0.0);
+          for (int m = 1; m <= 2; m++) {
+            float lam = d * u / float(m);
+            float vis = smoothstep(380.0, 420.0, lam) * (1.0 - smoothstep(700.0, 780.0, lam));
+            rainbow += spectrum(lam) * vis * facing / float(m);
+          }
+        }
+        float clean = 1.0 - roughnessFactor * 0.9;      // scratches kill diffraction
+        outgoingLight += rainbow * uGratingStrength * clean * metalnessFactor;
+      }
+      #include <opaque_fragment>`);
+};
+dataMat.customProgramCacheKey = () => 'cd-grating';
+
+// Label side: printed on a silver base, so it keeps a little metal in it.
+const labelMat = new THREE.MeshPhysicalMaterial({
+  color: 0xd6d6d6,
+  metalness: 0.28,
+  roughness: 0.34,
+  clearcoat: 0.7,
+  clearcoatRoughness: 0.12,
+  envMapIntensity: 0.9,
+});
+
+const clearPoly = new THREE.MeshPhysicalMaterial({
+  color: 0xe9ecf0, transparent: true, opacity: 0.32,
+  roughness: 0.08, metalness: 0, ior: 1.58,
+  clearcoat: 1, clearcoatRoughness: 0.04,
+  side: THREE.DoubleSide, depthWrite: false,
+});
+
+const discPivot = new THREE.Group();   // placed and tilted by the animation
+const disc = new THREE.Group();        // spins about its own normal (+Z)
+discPivot.add(disc);
+scene.add(discPivot);
+
+const labelFace = new THREE.Mesh(new THREE.RingGeometry(HUB_R, DISC_R, 128, 1), labelMat);
+labelFace.position.z = DISC_T / 2;
+
+const dataFace = new THREE.Mesh(new THREE.RingGeometry(HUB_R, DISC_R, 128, 1), dataMat);
+dataFace.rotation.y = Math.PI;         // faces -Z
+dataFace.position.z = -DISC_T / 2;
+
+const hub = new THREE.Mesh(new THREE.RingGeometry(HOLE_R, HUB_R, 64, 1), clearPoly);
+
+// mirror band just inside the data area, and the dark stacking ring — the
+// two things your eye uses to read "CD" at the centre
+const mirrorBand = new THREE.Mesh(
+  new THREE.RingGeometry(0.186, 0.232, 96, 1),
+  new THREE.MeshPhysicalMaterial({ color: 0xf6f7f9, metalness: 1, roughness: 0.05, side: THREE.DoubleSide, envMapIntensity: 1.3 })
+);
+const stackRing = new THREE.Mesh(
+  new THREE.RingGeometry(0.162, 0.176, 64, 1),
+  new THREE.MeshStandardMaterial({ color: 0x2b2c31, roughness: 0.5, metalness: 0.2, side: THREE.DoubleSide })
+);
+
+const rimGeos = [
+  new THREE.CylinderGeometry(DISC_R, DISC_R, DISC_T, 128, 1, true).rotateX(Math.PI / 2),
+  new THREE.CylinderGeometry(HOLE_R, HOLE_R, DISC_T, 48, 1, true).rotateX(Math.PI / 2),
+];
+const rimMat = new THREE.MeshPhysicalMaterial({
+  color: 0xf2f5f8, transparent: true, opacity: 0.62,
+  roughness: 0.12, metalness: 0.15, ior: 1.58,
+  clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 1.6,
+  side: THREE.DoubleSide, depthWrite: false,
+});
+const rims = new THREE.Mesh(BufferGeometryUtils.mergeGeometries(rimGeos), rimMat);
+rimGeos.forEach(g => g.dispose());
+
+disc.add(labelFace, dataFace, hub, mirrorBand, stackRing, rims);
+
+// Soft contact shadow. Kept small enough that its gradient reaches zero alpha
+// well inside the frustum — otherwise it clips into a hard square at the
+// canvas edge.
+const shadowTex = makeShadowTexture();
+const shadow = new THREE.Mesh(
+  new THREE.PlaneGeometry(2.0, 1.85),
+  new THREE.MeshBasicMaterial({
+    map: shadowTex, transparent: true, depthWrite: false, opacity: 0.4,
+  })
+);
+shadow.position.set(0.1, -0.1, -0.5);
+scene.add(shadow);
+
+/* ---------- artwork ---------- */
+
+/* Swapping the sleeve, tray card and disc label together. The swap is held
+   until the case is fully shut (see pendingAlbum in tick), so the change is
+   never seen mid-animation — the case closes on one album and opens on the
+   other. */
+let liveTextures = null;
+
+function applyAlbum(name) {
+  const A = window.ALBUMS[name];
+  const cover = makeCoverTexture(P.tex, A.cover);
+  const back = makeBackTexture(P.tex, A.back);
+  const label = makeLabelTexture(cover.image, P.tex);
+
+  art.material.map = cover;
+  backArt.material.map = back;
+  labelMat.map = label;
+  art.material.needsUpdate = true;
+  backArt.material.needsUpdate = true;
+  labelMat.needsUpdate = true;
+
+  if (liveTextures) for (const t of liveTextures) t.dispose();
+  liveTextures = [cover, back, label];
+}
+
+/* ---------- playback state ---------- */
+
+const section = document.querySelector('.player');
+let playing = section.dataset.playing !== 'false';
+document.addEventListener('player:state', e => { playing = e.detail.playing; });
+
+let albumName = section.dataset.mode || 'group';
+let pendingAlbum = null;
+applyAlbum(albumName);
+
+document.addEventListener('player:album', e => {
+  if (e.detail.mode === albumName) return;
+  pendingAlbum = e.detail.mode;          // taken once the case is shut
+});
+
+/* ---------- interaction ---------- */
+
+const SPIN = 0.34;         // case idle spin, rad/s
+const DISPLAY_RY = 0.30;   // case angle while opening: hinge a little nearer
+const LID_OPEN = 2.62;     // ~150° — a jewel case falls open well past 90°,
+                           // and it keeps the lid clear of the disc's path
+const DISC_SPIN = reduceMotion ? 1.0 : 8.0;   // about its own axis
+const DISC_TURN = reduceMotion ? 0.0 : 0.42;  // turntable, so the rim and data side come round
+const DISC_TILT = -0.70;                      // tipped back, like a disc held up to the light
+const OPEN_DUR = 2.3;      // seconds for the whole open or close sequence
+
+let idleT = 0;
+let baseRY = 0.35;
+let curRY = 0.35, curRX = 0;
+let dragging = false, lastX = 0, lastY = 0;
+let openT = 0;             // 0 closed, 1 playing — starts closed and opens on load
+let spinSpeed = 0;
+let turn = 0;
+let wasPlaying = null;
+
+// Drag routes to whichever object is out: the disc while it's playing, the
+// case otherwise. A flick on release carries momentum that decays.
+let dragTarget = null;     // 'case' | 'disc'
+let lastDiscT = 0;
+let velY = 0, lastMoveT = 0;
+let flickY = 0, flickTarget = null;
+
+// Pose the user has dragged the models into. Nothing here decays or snaps
+// back — it holds until they move it again, and is written to storage.
+let caseYOffset = 0;       // horizontal, relative to the display angle
+let caseTilt = 0;          // vertical
+let discTilt = 0;          // vertical, on top of DISC_TILT
+                           // (the disc's horizontal angle is `turn` itself)
+
+const clampv = (v, a, b) => Math.min(b, Math.max(a, v));
+
+stage.addEventListener('pointerdown', e => {
+  dragging = true;
+  dragTarget = lastDiscT > 0.5 ? 'disc' : 'case';
+  flickY = 0;
+  velY = 0;
+  lastX = e.clientX;
+  lastY = e.clientY;
+  lastMoveT = performance.now();
+  stage.setPointerCapture(e.pointerId);
+  stage.classList.add('is-dragging');
+});
+
+stage.addEventListener('pointermove', e => {
+  if (!dragging) return;
+  const dx = e.clientX - lastX, dy = e.clientY - lastY;
+  const now = performance.now();
+  const dtm = Math.max((now - lastMoveT) / 1000, 0.004);
+  const scale = dragTarget === 'disc' ? 0.011 : 0.009;
+
+  if (dragTarget === 'disc') {
+    turn += dx * scale;
+    discTilt = clampv(discTilt + dy * 0.006, -0.55, 0.55);
+  } else {
+    baseRY += dx * scale;
+    // only meaningful while the case holds its display angle; when paused it
+    // free-spins, so there is no fixed angle to be offset from
+    if (playing) caseYOffset = wrapPi(caseYOffset + dx * scale);
+    caseTilt = clampv(caseTilt + dy * 0.005, -0.45, 0.45);
+  }
+
+  velY = velY * 0.55 + (dx * scale / dtm) * 0.45;   // smoothed, rad/s
+  lastX = e.clientX;
+  lastY = e.clientY;
+  lastMoveT = now;
+});
+
+function endDrag() {
+  if (!dragging) return;
+  dragging = false;
+  stage.classList.remove('is-dragging');
+  // released while still moving → carry the momentum
+  if (performance.now() - lastMoveT < 90) {
+    flickY = clampv(velY, -14, 14);
+    flickTarget = dragTarget;
+  }
+  dragTarget = null;
+  savePose();
+}
+stage.addEventListener('pointerup', endDrag);
+stage.addEventListener('pointercancel', endDrag);
+
+// double-click / double-tap puts everything back to the default pose
+stage.addEventListener('dblclick', () => {
+  caseYOffset = 0;
+  caseTilt = 0;
+  discTilt = 0;
+  turn = Math.round(turn / TWO_PI) * TWO_PI;
+  if (playing) baseRY = DISPLAY_RY + Math.round((curRY - DISPLAY_RY) / TWO_PI) * TWO_PI;
+  savePose();
+});
+
+/* ---------- pose persistence ----------
+   Goes through window.kv (defined in the inline script), the same store the
+   library uses, so there is one fallback chain for the whole page. */
+
+const POSE_KEY = 'nowplaying:pose';
+const wrapPi = a => {
+  const t = (a + Math.PI) % TWO_PI;
+  return (t < 0 ? t + TWO_PI : t) - Math.PI;
+};
+
+const poseStore = {
+  load: () => window.kv.get(POSE_KEY),
+  save: pose => window.kv.set(POSE_KEY, pose),
+};
+
+let saveTimer = 0;
+function savePose(immediate) {
+  clearTimeout(saveTimer);
+  const write = () => poseStore.save({
+    caseY: wrapPi(caseYOffset),
+    caseX: caseTilt,
+    discY: wrapPi(turn),
+    discX: discTilt,
+  });
+  if (immediate) write(); else saveTimer = setTimeout(write, 300);
+}
+
+poseStore.load().then(pose => {
+  if (!pose) return;
+  caseYOffset = pose.caseY || 0;
+  caseTilt = pose.caseX || 0;
+  discTilt = pose.discX || 0;
+  turn = pose.discY || 0;
+  baseRY = curRY = DISPLAY_RY + caseYOffset;
+});
+
+/* ---------- resize, visibility, loop ---------- */
+
+const BLEED = 0.48;
+const FILL  = 0.90;
+
+const playerInner = stage.closest('.player__inner');
+
+function resize() {
+  const stageW = Math.max(1, Math.round(stage.getBoundingClientRect().width));
+  // Never wider than the content box: the bleed exists to give the shadow room
+  // to fade, not to widen the page. The camera framing below reads canvasPx,
+  // so clamping here rescales the scene rather than cropping it.
+  const room = playerInner ? playerInner.clientWidth : Infinity;
+  const canvasPx = Math.min(Math.round(stageW * (1 + 2 * BLEED)), Math.floor(room));
+
+  renderer.setSize(canvasPx, canvasPx, false);
+  el.style.width = canvasPx + 'px';
+  el.style.height = canvasPx + 'px';
+
+  const visibleW = W * canvasPx / (FILL * stageW);
+  camera.aspect = 1;
+  camera.position.z = (visibleW / 2) / Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+  camera.updateProjectionMatrix();
+}
+resize();
+new ResizeObserver(resize).observe(stage);
+
+let visible = true;
+function updateLoop() {
+  renderer.setAnimationLoop(visible && !document.hidden ? tick : null);
+}
+new IntersectionObserver(entries => {
+  visible = entries[0].isIntersecting;
+  updateLoop();
+}, { threshold: 0 }).observe(stage);
+document.addEventListener('visibilitychange', updateLoop);
+
+const clamp01 = v => Math.min(1, Math.max(0, v));
+const remap = (a, b, v) => clamp01((v - a) / (b - a));
+const easeInOut = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const TWO_PI = Math.PI * 2;
+
+const dockPos = new THREE.Vector3(), dockQuat = new THREE.Quaternion();
+const hoverPos = new THREE.Vector3(0, 0.02, 1.6);    // centred, close: the disc becomes the hero
+const hoverQuat = new THREE.Quaternion();
+const hoverEuler = new THREE.Euler();
+
+const caseShadowPos = new THREE.Vector3(), discShadowPos = new THREE.Vector3(0.06, -0.16, 0.25);
+
+let painted = false;
+const clock = new THREE.Clock();
+
+function tick() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (!reduceMotion) idleT += dt;
+
+  /* --- state edges --- */
+  if (playing !== wasPlaying) {
+    if (playing) {
+      const home = DISPLAY_RY + caseYOffset;          // the angle they left it at
+      baseRY = home + Math.round((curRY - home) / TWO_PI) * TWO_PI;
+    } else {
+      baseRY = curRY;
+    }
+    wasPlaying = playing;
+  }
+
+  /* --- sequence. Three staggered curves off one progress value, so the
+         reverse (pause) plays the same beats in the opposite order:
+         open:  lid swings → disc lifts out → case fades away
+         close: case fades in → disc settles back → lid closes            --- */
+  // A pending album swap forces the case shut first, exactly like a pause.
+  const wantOpen = playing && pendingAlbum === null;
+  openT = clamp01(openT + (wantOpen ? 1 : -1) * dt / OPEN_DUR);
+  if (pendingAlbum !== null && openT <= 0.001) {
+    albumName = pendingAlbum;
+    pendingAlbum = null;
+    applyAlbum(albumName);
+  }
+  const lidT  = easeInOut(remap(0.00, 0.32, openT));
+  const discT = easeInOut(remap(0.46, 0.84, openT));   // rests in the tray first
+  const fadeT = easeInOut(remap(0.66, 1.00, openT));
+  const caseAlpha = 1 - fadeT;
+
+  /* --- case rotation --- */
+  if (playing) {
+    baseRY += Math.sin(idleT * 0.5) * 0.0004;
+  } else if (!dragging && !reduceMotion) {
+    baseRY += SPIN * dt;
+  }
+  // momentum from a flick, on whichever object was thrown
+  if (flickY !== 0) {
+    const step = flickY * dt;
+    if (flickTarget === 'disc') {
+      turn += step;
+    } else {
+      baseRY += step;
+      if (playing) caseYOffset = wrapPi(caseYOffset + step);
+    }
+    flickY *= Math.pow(0.12, dt);
+    if (Math.abs(flickY) < 0.02) { flickY = 0; savePose(); }
+  }
+
+  const targetRX = -0.05 + (reduceMotion ? 0 : Math.sin(idleT * 0.27) * 0.06) + caseTilt;
+  const kY = 1 - Math.pow(playing ? 0.06 : 0.002, dt);
+  const kX = 1 - Math.pow(0.002, dt);
+  curRY += (baseRY - curRY) * kY;
+  curRX += (targetRX - curRX) * kX;
+
+  caseGroup.rotation.y = curRY;
+  caseGroup.rotation.x = curRX;
+  lidPivot.rotation.y = -LID_OPEN * lidT;
+
+  /* --- case fade: opacity down, drift back and shrink a touch --- */
+  for (const { mat, base, solid } of caseMats) {
+    mat.opacity = base * caseAlpha;
+    if (solid) mat.transparent = caseAlpha < 0.999;
+  }
+  caseGroup.position.z = -0.35 * fadeT;
+  caseGroup.scale.setScalar(1 - 0.08 * fadeT);
+  caseGroup.visible = caseAlpha > 0.002;   // don't draw it at all once gone
+
+  /* --- disc: dock ↔ hover --- */
+  caseGroup.updateMatrixWorld();
+  dockSlot.getWorldPosition(dockPos);
+  dockSlot.getWorldQuaternion(dockQuat);
+
+  // Turntable while playing; when paused, ease to the nearest label-forward
+  // angle so it settles into the tray without a needless half-flip.
+  // Turntable only while playing and not being held; when paused the disc
+  // keeps whatever angle it was left at. Docking is unaffected — the pose
+  // slerps to the tray's own orientation as discT falls to zero.
+  const holdingDisc = dragging && dragTarget === 'disc';
+  if (playing && !holdingDisc) turn += DISC_TURN * dt;
+  lastDiscT = discT;
+
+  const wob = reduceMotion || holdingDisc ? 0 : discT;   // no wobble in the hand
+  hoverEuler.set(                       // XYZ order: Rx(tilt) · Ry(turn)
+    DISC_TILT + discTilt + Math.sin(idleT * 1.7) * 0.05 * wob,
+    turn + Math.sin(idleT * 1.3 + 1.0) * 0.06 * wob,
+    0
+  );
+  hoverQuat.setFromEuler(hoverEuler);
+
+  discPivot.position.lerpVectors(dockPos, hoverPos, discT);
+  const arc = Math.sin(discT * Math.PI);
+  discPivot.position.y += arc * 0.34;
+  discPivot.position.x += arc * 0.06;
+  discPivot.quaternion.slerpQuaternions(dockQuat, hoverQuat, discT);
+  // Always rendered: while the case is shut the booklet hides it, and as the
+  // lid swings the disc is already sitting in the tray where it belongs.
+  discPivot.visible = true;
+
+  const spinTarget = playing ? DISC_SPIN : 0;
+  spinSpeed += (spinTarget - spinSpeed) * (1 - Math.pow(playing ? 0.15 : 0.02, dt));
+  disc.rotation.z += spinSpeed * dt;
+
+  /* --- shadow: under the case while it's here, under the disc once it's gone --- */
+  caseShadowPos.set(0.1 + Math.sin(curRY) * 0.18, -0.1, -0.5);
+  shadow.position.lerpVectors(caseShadowPos, discShadowPos, discT);
+  shadow.scale.set(
+    THREE.MathUtils.lerp(0.55 + 0.45 * Math.abs(Math.cos(curRY)), 0.78, discT),
+    THREE.MathUtils.lerp(1, 0.78, discT), 1
+  );
+  shadow.material.opacity = THREE.MathUtils.lerp(0.4, 0.32, discT);
+
+  renderer.render(scene, camera);
+
+  if (!painted) {
+    painted = true;
+    stage.classList.add('is-3d');
+  }
+}
+
+renderer.setAnimationLoop(tick);
+
+/* ---------- disposal ---------- */
+
+addEventListener('pagehide', () => {
+  savePose(true);
+  renderer.setAnimationLoop(null);
+  scene.traverse(o => {
+    o.geometry?.dispose();
+    const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+    for (const m of mats) {
+      for (const v of Object.values(m)) if (v && v.isTexture) v.dispose();
+      m.dispose();
+    }
+  });
+  envRT.texture.dispose();
+  renderer.dispose();
+});
+</script>
+
+</body>
+</html>

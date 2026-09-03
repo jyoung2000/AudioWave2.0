@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HubIdentity",
+  "type": "object",
+  "properties": {
+    "hubId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+      "description": "UUID (v7 preferred; stable across sync)"
+    },
+    "name": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "contractsVersion": {
+      "type": "string"
+    },
+    "protocolVersion": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "minSupportedProtocolVersion": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "publicKey": {
+      "type": "string"
+    },
+    "fingerprint": {
+      "type": "string"
+    },
+    "bindMode": {
+      "type": "string",
+      "enum": [
+        "localhost",
+        "lan",
+        "remote"
+      ]
+    },
+    "publicEndpoint": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "uri"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "setupComplete": {
+      "type": "boolean"
+    },
+    "codeOnlyPairingAvailable": {
+      "type": "boolean",
+      "description": "True only when a reachable configured endpoint exists"
+    }
+  },
+  "required": [
+    "hubId",
+    "name",
+    "version",
+    "contractsVersion",
+    "protocolVersion",
+    "minSupportedProtocolVersion",
+    "publicKey",
+    "fingerprint",
+    "bindMode",
+    "publicEndpoint",
+    "setupComplete",
+    "codeOnlyPairingAvailable"
+  ],
+  "additionalProperties": false
+}

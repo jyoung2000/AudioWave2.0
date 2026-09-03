@@ -1,0 +1,888 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SearchResult",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300,
+      "description": "Stable id within a response: provider:kind:providerId"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "track",
+        "album",
+        "artist",
+        "playlist"
+      ]
+    },
+    "provider": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,31}$",
+      "description": "Provider slug, e.g. local, hub, companion, musicbrainz, youtube, soundcloud, bandcamp, spotify, public-domain, external-tool"
+    },
+    "providerId": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "artistName": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "string",
+          "maxLength": 300
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "albumName": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "string",
+          "maxLength": 300
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "durationMs": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "artworkUrl": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "uri"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "canonicalUrl": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "uri"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "year": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "genre": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "string",
+          "maxLength": 60
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "capabilities": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "type": "string",
+          "enum": [
+            "available",
+            "requires_auth",
+            "restricted",
+            "unsupported",
+            "temporarily_unavailable"
+          ]
+        },
+        "search": {
+          "type": "string",
+          "enum": [
+            "available",
+            "requires_auth",
+            "restricted",
+            "unsupported",
+            "temporarily_unavailable"
+          ]
+        },
+        "preview": {
+          "type": "string",
+          "enum": [
+            "available",
+            "requires_auth",
+            "restricted",
+            "unsupported",
+            "temporarily_unavailable"
+          ]
+        },
+        "playback": {
+          "type": "string",
+          "enum": [
+            "available",
+            "requires_auth",
+            "restricted",
+            "unsupported",
+            "temporarily_unavailable"
+          ]
+        },
+        "importLikes": {
+          "type": "string",
+          "enum": [
+            "available",
+            "requires_auth",
+            "restricted",
+            "unsupported",
+            "temporarily_unavailable"
+          ]
+        },
+        "importPlaylists": {
+          "type": "string",
+          "enum": [
+            "available",
+            "requires_auth",
+            "restricted",
+            "unsupported",
+            "temporarily_unavailable"
+          ]
+        },
+        "creatorDownload": {
+          "type": "string",
+          "enum": [
+            "available",
+            "requires_auth",
+            "restricted",
+            "unsupported",
+            "temporarily_unavailable"
+          ]
+        },
+        "userOwnedDownload": {
+          "type": "string",
+          "enum": [
+            "available",
+            "requires_auth",
+            "restricted",
+            "unsupported",
+            "temporarily_unavailable"
+          ]
+        },
+        "groupSync": {
+          "type": "string",
+          "enum": [
+            "exact",
+            "near",
+            "best_effort",
+            "unsupported"
+          ]
+        },
+        "eq": {
+          "type": "string",
+          "enum": [
+            "available",
+            "requires_auth",
+            "restricted",
+            "unsupported",
+            "temporarily_unavailable"
+          ]
+        },
+        "reason": {
+          "description": "Human-readable explanation for \"Why unavailable?\"",
+          "type": "string",
+          "maxLength": 400
+        }
+      },
+      "required": [
+        "metadata",
+        "search",
+        "preview",
+        "playback",
+        "importLikes",
+        "importPlaylists",
+        "creatorDownload",
+        "userOwnedDownload",
+        "groupSync",
+        "eq"
+      ],
+      "additionalProperties": false
+    },
+    "identity": {
+      "type": "object",
+      "properties": {
+        "contentHash": {
+          "default": null,
+          "description": "SHA-256 of the file bytes when known",
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$",
+              "description": "Lower-case hex SHA-256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "quickHash": {
+          "default": null,
+          "description": "Fast size+head+tail hash while full hash pending",
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 80
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "isrc": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Z]{2}[A-Z0-9]{3}[0-9]{7}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "musicbrainzRecordingId": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "musicbrainzReleaseId": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "acoustidId": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 80
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "providerIds": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{1,31}$",
+            "description": "Provider slug, e.g. local, hub, companion, musicbrainz, youtube, soundcloud, bandcamp, spotify, public-domain, external-tool"
+          },
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        }
+      },
+      "required": [
+        "contentHash",
+        "quickHash",
+        "isrc",
+        "musicbrainzRecordingId",
+        "musicbrainzReleaseId",
+        "acoustidId",
+        "providerIds"
+      ],
+      "additionalProperties": false
+    },
+    "attribution": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "string",
+          "maxLength": 200
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "cachedAt": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+          "description": "UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "stale": {
+      "default": false,
+      "type": "boolean"
+    },
+    "accessState": {
+      "type": "string",
+      "enum": [
+        "available",
+        "requires_auth",
+        "restricted",
+        "unsupported",
+        "temporarily_unavailable"
+      ]
+    },
+    "previewUrl": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "uri"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "trackId": {
+      "default": null,
+      "description": "Local/hub track id when the result is a library item",
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "description": "UUID (v7 preferred; stable across sync)"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "variants": {
+      "default": [],
+      "description": "Other sources confidently matched to the same recording",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "description": "Stable id within a response: provider:kind:providerId"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "track",
+              "album",
+              "artist",
+              "playlist"
+            ]
+          },
+          "provider": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{1,31}$",
+            "description": "Provider slug, e.g. local, hub, companion, musicbrainz, youtube, soundcloud, bandcamp, spotify, public-domain, external-tool"
+          },
+          "providerId": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "artistName": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "albumName": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "durationMs": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "artworkUrl": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "canonicalUrl": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "year": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "genre": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "capabilities": {
+            "type": "object",
+            "properties": {
+              "metadata": {
+                "type": "string",
+                "enum": [
+                  "available",
+                  "requires_auth",
+                  "restricted",
+                  "unsupported",
+                  "temporarily_unavailable"
+                ]
+              },
+              "search": {
+                "type": "string",
+                "enum": [
+                  "available",
+                  "requires_auth",
+                  "restricted",
+                  "unsupported",
+                  "temporarily_unavailable"
+                ]
+              },
+              "preview": {
+                "type": "string",
+                "enum": [
+                  "available",
+                  "requires_auth",
+                  "restricted",
+                  "unsupported",
+                  "temporarily_unavailable"
+                ]
+              },
+              "playback": {
+                "type": "string",
+                "enum": [
+                  "available",
+                  "requires_auth",
+                  "restricted",
+                  "unsupported",
+                  "temporarily_unavailable"
+                ]
+              },
+              "importLikes": {
+                "type": "string",
+                "enum": [
+                  "available",
+                  "requires_auth",
+                  "restricted",
+                  "unsupported",
+                  "temporarily_unavailable"
+                ]
+              },
+              "importPlaylists": {
+                "type": "string",
+                "enum": [
+                  "available",
+                  "requires_auth",
+                  "restricted",
+                  "unsupported",
+                  "temporarily_unavailable"
+                ]
+              },
+              "creatorDownload": {
+                "type": "string",
+                "enum": [
+                  "available",
+                  "requires_auth",
+                  "restricted",
+                  "unsupported",
+                  "temporarily_unavailable"
+                ]
+              },
+              "userOwnedDownload": {
+                "type": "string",
+                "enum": [
+                  "available",
+                  "requires_auth",
+                  "restricted",
+                  "unsupported",
+                  "temporarily_unavailable"
+                ]
+              },
+              "groupSync": {
+                "type": "string",
+                "enum": [
+                  "exact",
+                  "near",
+                  "best_effort",
+                  "unsupported"
+                ]
+              },
+              "eq": {
+                "type": "string",
+                "enum": [
+                  "available",
+                  "requires_auth",
+                  "restricted",
+                  "unsupported",
+                  "temporarily_unavailable"
+                ]
+              },
+              "reason": {
+                "description": "Human-readable explanation for \"Why unavailable?\"",
+                "type": "string",
+                "maxLength": 400
+              }
+            },
+            "required": [
+              "metadata",
+              "search",
+              "preview",
+              "playback",
+              "importLikes",
+              "importPlaylists",
+              "creatorDownload",
+              "userOwnedDownload",
+              "groupSync",
+              "eq"
+            ],
+            "additionalProperties": false
+          },
+          "identity": {
+            "type": "object",
+            "properties": {
+              "contentHash": {
+                "default": null,
+                "description": "SHA-256 of the file bytes when known",
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$",
+                    "description": "Lower-case hex SHA-256"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "quickHash": {
+                "default": null,
+                "description": "Fast size+head+tail hash while full hash pending",
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "isrc": {
+                "default": null,
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[A-Z]{2}[A-Z0-9]{3}[0-9]{7}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "musicbrainzRecordingId": {
+                "default": null,
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "musicbrainzReleaseId": {
+                "default": null,
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "acoustidId": {
+                "default": null,
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "providerIds": {
+                "default": {},
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{1,31}$",
+                  "description": "Provider slug, e.g. local, hub, companion, musicbrainz, youtube, soundcloud, bandcamp, spotify, public-domain, external-tool"
+                },
+                "additionalProperties": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                }
+              }
+            },
+            "required": [
+              "contentHash",
+              "quickHash",
+              "isrc",
+              "musicbrainzRecordingId",
+              "musicbrainzReleaseId",
+              "acoustidId",
+              "providerIds"
+            ],
+            "additionalProperties": false
+          },
+          "attribution": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cachedAt": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                "description": "UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stale": {
+            "default": false,
+            "type": "boolean"
+          },
+          "accessState": {
+            "type": "string",
+            "enum": [
+              "available",
+              "requires_auth",
+              "restricted",
+              "unsupported",
+              "temporarily_unavailable"
+            ]
+          },
+          "previewUrl": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trackId": {
+            "default": null,
+            "description": "Local/hub track id when the result is a library item",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                "description": "UUID (v7 preferred; stable across sync)"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "provider",
+          "providerId",
+          "title",
+          "artistName",
+          "albumName",
+          "durationMs",
+          "artworkUrl",
+          "canonicalUrl",
+          "year",
+          "genre",
+          "capabilities",
+          "identity",
+          "attribution",
+          "cachedAt",
+          "stale",
+          "accessState",
+          "previewUrl",
+          "trackId"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "id",
+    "kind",
+    "provider",
+    "providerId",
+    "title",
+    "artistName",
+    "albumName",
+    "durationMs",
+    "artworkUrl",
+    "canonicalUrl",
+    "year",
+    "genre",
+    "capabilities",
+    "identity",
+    "attribution",
+    "cachedAt",
+    "stale",
+    "accessState",
+    "previewUrl",
+    "trackId",
+    "variants"
+  ],
+  "additionalProperties": false
+}

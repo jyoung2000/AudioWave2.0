@@ -1,0 +1,13 @@
+packages:
+  - packages/*
+  - music-player
+  - docker-container
+  - windows-companion
+onlyBuiltDependencies:
+  - better-sqlite3
+  - electron
+  - esbuild
+  - '@node-rs/argon2'
+  - ffmpeg-static
+  - '@discordjs/opus'
+  - sodium-native

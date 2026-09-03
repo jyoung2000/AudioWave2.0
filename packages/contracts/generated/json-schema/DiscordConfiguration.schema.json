@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DiscordConfiguration",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+      "description": "UUID (v7 preferred; stable across sync)"
+    },
+    "enabled": {
+      "default": false,
+      "type": "boolean"
+    },
+    "applicationId": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^\\d{5,25}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "publicKey": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "string",
+          "maxLength": 200
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "tokenSource": {
+      "default": "none",
+      "type": "string",
+      "enum": [
+        "none",
+        "env",
+        "encrypted"
+      ]
+    },
+    "tokenLast4": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "string",
+          "maxLength": 4
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "guildAllowlist": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^\\d{5,25}$"
+      }
+    },
+    "defaultGroupId": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "description": "UUID (v7 preferred; stable across sync)"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "designatedChannels": {
+      "default": {},
+      "description": "guildId -> text channel id",
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "voiceChannelOverrides": {
+      "default": {},
+      "description": "guildId -> voice channel id",
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "djRoleIds": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "adminRoleIds": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "requestPolicy": {
+      "type": "object",
+      "properties": {
+        "maxRequestsPerUser": {
+          "default": 10,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 100
+        },
+        "cooldownSeconds": {
+          "default": 5,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 600
+        },
+        "maxTrackDurationMs": {
+          "default": 1200000,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "maxPlaylistItems": {
+          "default": 50,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 200
+        },
+        "voteSkipThreshold": {
+          "default": 0.5,
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "guestsMayRequest": {
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "maxRequestsPerUser",
+        "cooldownSeconds",
+        "maxTrackDurationMs",
+        "maxPlaylistItems",
+        "voteSkipThreshold",
+        "guestsMayRequest"
+      ],
+      "additionalProperties": false
+    },
+    "autoPostNowPlaying": {
+      "default": true,
+      "type": "boolean"
+    },
+    "updateInsteadOfSpam": {
+      "default": true,
+      "type": "boolean"
+    },
+    "prefixEnabled": {
+      "default": true,
+      "type": "boolean"
+    },
+    "prefix": {
+      "default": "!",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 3
+    },
+    "idleDisconnectSeconds": {
+      "default": 300,
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 86400
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+      "description": "UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z"
+    }
+  },
+  "required": [
+    "id",
+    "enabled",
+    "applicationId",
+    "publicKey",
+    "tokenSource",
+    "tokenLast4",
+    "guildAllowlist",
+    "defaultGroupId",
+    "designatedChannels",
+    "voiceChannelOverrides",
+    "djRoleIds",
+    "adminRoleIds",
+    "requestPolicy",
+    "autoPostNowPlaying",
+    "updateInsteadOfSpam",
+    "prefixEnabled",
+    "prefix",
+    "idleDisconnectSeconds",
+    "updatedAt"
+  ],
+  "additionalProperties": false
+}

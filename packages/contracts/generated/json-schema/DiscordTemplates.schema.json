@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DiscordTemplates",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "default": 1,
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "templates": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "enum": [
+          "success",
+          "queued",
+          "nowPlaying",
+          "skipped",
+          "permissionDenied",
+          "noResults",
+          "unavailableSource",
+          "emptyQueue",
+          "joined",
+          "left",
+          "error",
+          "wrongChannel",
+          "paused",
+          "resumed",
+          "stopped",
+          "shuffled",
+          "cleared"
+        ]
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "default": "",
+            "type": "string",
+            "maxLength": 2000
+          },
+          "embedTitle": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "embedDescription": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4096
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "color": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 16777215
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ephemeral": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "content",
+          "embedTitle",
+          "embedDescription",
+          "color",
+          "ephemeral"
+        ],
+        "additionalProperties": false
+      },
+      "required": [
+        "success",
+        "queued",
+        "nowPlaying",
+        "skipped",
+        "permissionDenied",
+        "noResults",
+        "unavailableSource",
+        "emptyQueue",
+        "joined",
+        "left",
+        "error",
+        "wrongChannel",
+        "paused",
+        "resumed",
+        "stopped",
+        "shuffled",
+        "cleared"
+      ]
+    },
+    "allowedMentionRoleIds": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^\\d{5,25}$"
+      }
+    },
+    "allowEveryone": {
+      "default": false,
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "templates",
+    "allowedMentionRoleIds",
+    "allowEveryone"
+  ],
+  "additionalProperties": false
+}

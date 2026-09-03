@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ProviderAppConfigView",
+  "type": "object",
+  "properties": {
+    "provider": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,31}$",
+      "description": "Provider slug, e.g. local, hub, companion, musicbrainz, youtube, soundcloud, bandcamp, spotify, public-domain, external-tool"
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "configured": {
+      "type": "boolean"
+    },
+    "clientId": {
+      "type": "string"
+    },
+    "clientSecretHint": {
+      "description": "e.g. \"••••1a2b\"",
+      "type": "string"
+    },
+    "apiKeyHint": {
+      "type": "string"
+    },
+    "applicationId": {
+      "type": "string"
+    },
+    "redirectUri": {
+      "type": "string"
+    },
+    "contactEmail": {
+      "type": "string"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+      "description": "UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z"
+    },
+    "missing": {
+      "default": [],
+      "description": "Names of required fields not yet provided",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "provider",
+    "enabled",
+    "configured",
+    "missing"
+  ],
+  "additionalProperties": false
+}

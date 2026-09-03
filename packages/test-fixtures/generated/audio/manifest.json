@@ -1,0 +1,104 @@
+{
+  "generatedBy": "packages/test-fixtures/scripts/generate-audio.ts",
+  "deterministic": true,
+  "files": [
+    {
+      "path": "Fennel Grove/Long Wave Sessions/01 Ember Line.wav",
+      "sha256": "91a7d25f68c207468957c0fc4432174c593dd8b07ee7ee19436540e780f53455",
+      "bytes": 705766,
+      "title": "Ember Line",
+      "artist": "Fennel Grove"
+    },
+    {
+      "path": "Fennel Grove/Long Wave Sessions/02 Slow Carousel.wav",
+      "sha256": "4a04e5d8806e27a0964d1c3e769400f68e193ff9f8b2691b6609b98a05be2f0a",
+      "bytes": 529368,
+      "title": "Slow Carousel",
+      "artist": "Fennel Grove"
+    },
+    {
+      "path": "Fennel Grove/Long Wave Sessions/03 Paper Harbour.wav",
+      "sha256": "ee2e8153ec0051b73c806245a733270a127a7af22bde2ffe06a81ed0947cd2f6",
+      "bytes": 529368,
+      "title": "Paper Harbour",
+      "artist": "Fennel Grove"
+    },
+    {
+      "path": "Cassette Bloom/Live from Pier 9/01 Signal Fade.wav",
+      "sha256": "a3c9e72227cb0df74028c9820854e66525a73a3f736ba5001c86a1b095d52c77",
+      "bytes": 705764,
+      "title": "Signal Fade",
+      "artist": "Cassette Bloom"
+    },
+    {
+      "path": "Cassette Bloom/Live from Pier 9/02 Harbour Lights.wav",
+      "sha256": "357ada1817af33d75461d6892ce8cc9d181fdd3d93699bb3128084d3c4d5e3d2",
+      "bytes": 882168,
+      "title": "Harbour Lights",
+      "artist": "Cassette Bloom"
+    },
+    {
+      "path": "Cassette Bloom/Tideline/01 Nine Below.wav",
+      "sha256": "eebdd19ebb0d25d88e2cdb7666269a022ea9ab262d518553f3752078e3797605",
+      "bytes": 529356,
+      "title": "Nine Below",
+      "artist": "Cassette Bloom"
+    },
+    {
+      "path": "Orbital Cartographers/Copper Meridian/01 Copper Meridian.wav",
+      "sha256": "208e833f11c07bfd94bd5a6d769e243d6f1510c5230d406c70cc9fc66d2b82bf",
+      "bytes": 705778,
+      "title": "Copper Meridian",
+      "artist": "Orbital Cartographers"
+    },
+    {
+      "path": "Orbital Cartographers/Copper Meridian/02 Glass Hour.wav",
+      "sha256": "e700e4d770d2d638000735ba0403614a69a3dcc59877581bfb986c4dbfa6f075",
+      "bytes": 529374,
+      "title": "Glass Hour",
+      "artist": "Orbital Cartographers"
+    },
+    {
+      "path": "Orbital Cartographers/Singles/Copper Meridian (Radio Edit).wav",
+      "sha256": "1bc9a4de771f285c1277cdb2c360bfeb0cf78d6eef5dced822ea948b418ef6e6",
+      "bytes": 529406,
+      "title": "Copper Meridian (Radio Edit)",
+      "artist": "Orbital Cartographers"
+    },
+    {
+      "path": "Marlow & the Tidewater/Quiet Arithmetic/01 Quiet Arithmetic.wav",
+      "sha256": "724c2484e65e37c9aa8e84c7016e31b2e53959abf0746056763fadd5a0797736",
+      "bytes": 529378,
+      "title": "Quiet Arithmetic",
+      "artist": "Marlow & the Tidewater"
+    },
+    {
+      "path": "Marlow & the Tidewater/Quiet Arithmetic/02 Lantern Road.wav",
+      "sha256": "5f77c1f247494620074a40b0f40cfa81f0a8f973dbdbae7a856654ce2d8e5f9a",
+      "bytes": 705774,
+      "title": "Lantern Road",
+      "artist": "Marlow & the Tidewater"
+    },
+    {
+      "path": "Loose Files/Untagged Tone.wav",
+      "sha256": "8fbefb0d9ce8d9ecc2e2ec1007eaf8a1a81175481766c31fff174b1759a1287a",
+      "bytes": 352844,
+      "title": "",
+      "artist": ""
+    },
+    {
+      "path": "Loose Files/Ember Line (copy).wav",
+      "sha256": "91a7d25f68c207468957c0fc4432174c593dd8b07ee7ee19436540e780f53455",
+      "bytes": 705766,
+      "title": "Ember Line",
+      "artist": "Fennel Grove"
+    },
+    {
+      "path": "Loose Files/not-audio.ape",
+      "sha256": "b95eeb6b7a2719dd454316bc0189e366bdf378cf6238c6e4d7adc8ba0a2e9f19",
+      "bytes": 72,
+      "title": "",
+      "artist": ""
+    }
+  ]
+}

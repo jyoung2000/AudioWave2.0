@@ -1,0 +1,22 @@
+{
+  "name": "@now-playing/domain",
+  "version": "1.0.0",
+  "description": "Pure, dependency-light domain logic shared by the player, hub and companion: ids, identity matching, queue reducer, EQ precedence, retune math, CSV, pairing, security helpers, templates, permissions, sync rules, clock offset and metrics aggregation.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --project unit"
+  },
+  "dependencies": {
+    "@now-playing/contracts": "workspace:*",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3"
+  }
+}

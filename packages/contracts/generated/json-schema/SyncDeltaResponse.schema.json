@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SyncDeltaResponse",
+  "type": "object",
+  "properties": {
+    "applied": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "duplicates": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "conflicts": {
+      "maxItems": 2000,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "collection": {
+            "type": "string",
+            "enum": [
+              "tracks",
+              "artists",
+              "albums",
+              "playlists",
+              "playlistItems",
+              "eqPresets",
+              "eqBindings",
+              "listeningEvents",
+              "aggregateProfiles",
+              "transferJobs",
+              "availability"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "UUID (v7 preferred; stable across sync)"
+          },
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "kept-local",
+              "kept-remote",
+              "kept-both",
+              "tombstone-wins"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "collection",
+          "id",
+          "resolution",
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "changes": {
+      "maxItems": 2000,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "collection": {
+            "type": "string",
+            "enum": [
+              "tracks",
+              "artists",
+              "albums",
+              "playlists",
+              "playlistItems",
+              "eqPresets",
+              "eqBindings",
+              "listeningEvents",
+              "aggregateProfiles",
+              "transferJobs",
+              "availability"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "UUID (v7 preferred; stable across sync)"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z"
+          },
+          "deleted": {
+            "default": false,
+            "type": "boolean"
+          },
+          "body": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "changeId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+            "description": "UUID (v7 preferred; stable across sync)"
+          }
+        },
+        "required": [
+          "collection",
+          "id",
+          "updatedAt",
+          "deleted",
+          "body",
+          "changeId"
+        ],
+        "additionalProperties": false
+      },
+      "description": "Remote changes for the requester to apply"
+    },
+    "cursors": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "enum": [
+          "tracks",
+          "artists",
+          "albums",
+          "playlists",
+          "playlistItems",
+          "eqPresets",
+          "eqBindings",
+          "listeningEvents",
+          "aggregateProfiles",
+          "transferJobs",
+          "availability"
+        ]
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+            "description": "UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "required": [
+        "tracks",
+        "artists",
+        "albums",
+        "playlists",
+        "playlistItems",
+        "eqPresets",
+        "eqBindings",
+        "listeningEvents",
+        "aggregateProfiles",
+        "transferJobs",
+        "availability"
+      ]
+    },
+    "more": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "applied",
+    "duplicates",
+    "conflicts",
+    "changes",
+    "cursors",
+    "more"
+  ],
+  "additionalProperties": false
+}

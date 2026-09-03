@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PairingLinkPayload",
+  "type": "object",
+  "properties": {
+    "v": {
+      "type": "number",
+      "const": 1
+    },
+    "code": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 20
+    },
+    "endpoint": {
+      "type": "string",
+      "format": "uri"
+    },
+    "hubId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+      "description": "UUID (v7 preferred; stable across sync)"
+    },
+    "fp": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 128,
+      "description": "Hub public-key fingerprint"
+    },
+    "exp": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991,
+      "description": "Unix seconds expiry"
+    }
+  },
+  "required": [
+    "v",
+    "code",
+    "endpoint",
+    "hubId",
+    "fp",
+    "exp"
+  ],
+  "additionalProperties": false
+}
