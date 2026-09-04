@@ -2,15 +2,29 @@
 
 One HTML file you open by double-clicking. No server, no install, no terminal.
 
-```sh
-pnpm build:local
-# → music-player/dist-local/now-playing.html   (~2.9 MB, and nothing beside it)
-```
+**It is committed at the root of this repository as [`now-playing.html`](../now-playing.html)** —
+about 2.4 MB, with nothing beside it. Download it, or copy it out of a checkout, and open it in a
+browser. There is nothing to build and nothing to run first; a file whose whole point is needing no
+tooling should not need a toolchain to obtain.
 
-Copy that file wherever you like — a USB stick, a Documents folder, a network share — and open it in
-a browser. It is the same application as the served player, built from the same source and covered
+Copy it wherever you like — a USB stick, a Documents folder, a network share — and open it in a
+browser. It is the same application as the served player, built from the same source and covered
 by the same tests, assembled so that a browser opening it from `file://` never has to fetch
 anything.
+
+### Rebuilding it
+
+Only needed if you change the player's source:
+
+```sh
+pnpm build:local     # rebuilds and updates the committed now-playing.html
+```
+
+It is a build output that happens to be checked in, like `packages/contracts/generated` and the icon
+files. The build is deterministic — the same source produces a byte-identical file — so the
+committed copy changes when the app changes and at no other time, and `pnpm verify` fails if the two
+have drifted apart. Committing a 2.4 MB artifact is a real cost in repository size; it is worth it
+here because the artifact *is* the deliverable.
 
 ## Why it has to be one file
 
@@ -80,9 +94,12 @@ permits, not in what the code tries to do.
 ## Testing it
 
 ```sh
-pnpm build:local
-pnpm test:local     # opens dist-local/now-playing.html at file:// in a real browser
+pnpm test:local     # opens the committed now-playing.html at file:// in a real browser
 ```
+
+The suite opens the *committed* file, because that is the one people download. `pnpm verify` checks
+separately that it matches what the source produces, so testing the committed copy can never mean
+testing something stale.
 
 The suite has its own Playwright config with **no `webServer`** — that separation is the point.
 Over http every one of these tests would pass while the file was still broken. Three bugs proved it:

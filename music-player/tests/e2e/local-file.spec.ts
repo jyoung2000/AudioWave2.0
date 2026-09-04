@@ -19,7 +19,14 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type ConsoleMessage, type Page } from '@playwright/test';
 
-const HTML_PATH = fileURLToPath(new URL('../../dist-local/now-playing.html', import.meta.url));
+/**
+ * The *committed* file at the repository root, not the build directory.
+ *
+ * That is the file someone downloads, so it is the file these tests open. `pnpm verify` and CI
+ * separately assert it matches what the source currently produces, so testing the committed copy
+ * cannot mean testing something stale.
+ */
+const HTML_PATH = fileURLToPath(new URL('../../../now-playing.html', import.meta.url));
 const FILE_URL = `file://${HTML_PATH}`;
 
 /** Console errors and anything the page tried to load from outside itself. */

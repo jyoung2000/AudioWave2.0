@@ -52,8 +52,11 @@ run('test:security', 'pnpm', ['test:security']);
 run('build', 'pnpm', ['build']);
 // After the build, because the budgets are measured from the files it produced.
 run('test:perf', 'pnpm', ['test:perf']);
-// The single-file build and the suite that opens it from the filesystem.
+// The single-file build, the check that the committed copy matches it, and the suite that opens
+// it from the filesystem. The build is deterministic, so a diff here means the source moved on
+// without `pnpm build:local` being run.
 run('build:local', 'pnpm', ['build:local']);
+run('local-file-up-to-date', 'git', ['diff', '--exit-code', '--', 'now-playing.html']);
 run('test:local', 'pnpm', ['test:local'], { skipIf: hasChromium });
 run('test:a11y', 'pnpm', ['test:a11y'], { skipIf: hasChromium });
 run('test:e2e', 'pnpm', ['test:e2e'], { skipIf: hasChromium });

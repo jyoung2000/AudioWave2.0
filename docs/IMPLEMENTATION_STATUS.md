@@ -32,7 +32,7 @@ and reports platform-unavailable ones as skipped, never as passed.
 | Listening metrics, CSV/JSON export | **Done** | Computed on device from an append-only log |
 | Constellation view with a full 2D equivalent | **Done** | Three.js code-split; table has the same keyboard model |
 | Installable, offline, Media Session | **Done** | See [PWA_AND_CAR.md](PWA_AND_CAR.md) for what a PWA cannot do in a car |
-| A single-file build you open with no server | **Done** | `pnpm build:local` → one 2.9 MB HTML file; [LOCAL_FILE.md](LOCAL_FILE.md) records what a `file://` origin allows, measured rather than assumed |
+| A single-file build you open with no server | **Done** | Committed as `now-playing.html` at the repository root — 2.4 MB, nothing to build; a gate fails if it drifts from the source. [LOCAL_FILE.md](LOCAL_FILE.md) records what a `file://` origin allows, measured rather than assumed |
 | Hub client: pairing, search, group listening, sync | **Done** |  |
 | A large-target driving view | **Not built** | The Media Session path covers the car; a driving-specific layout was not asked for |
 

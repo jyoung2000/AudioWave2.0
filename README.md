@@ -4,7 +4,7 @@ Three music applications that work on their own and work better together.
 
 |  | What it is | Runs on |
 | --- | --- | --- |
-| [**music-player**](music-player/README.md) | An offline-first player for the music already on your device. A web app you can install — or [one HTML file you double-click](docs/LOCAL_FILE.md), with no server at all. | Any modern browser |
+| [**music-player**](music-player/README.md) | An offline-first player for the music already on your device. A web app you can install — or [`now-playing.html`](now-playing.html), one committed file you double-click with no server at all. | Any modern browser |
 | [**docker-container**](docker-container/README.md) | A self-hosted hub: your library on every device, group listening in sync, pairing, shared links, a Discord bot. | One `docker compose` command |
 | [**windows-companion**](windows-companion/README.md) | A desktop app for the one thing a web page cannot do — read a folder of files off a Windows disk and keep watching it. | Windows 10 1809+ |
 
@@ -14,10 +14,12 @@ it never becomes a requirement.
 
 ## Start with one
 
+Or skip all of that: **[`now-playing.html`](now-playing.html)** in the root of this repository is
+the whole player in one file. Download it and open it — no install, no server, no terminal.
+[What a local file can and cannot do](docs/LOCAL_FILE.md).
+
 ```sh
 pnpm install
-
-pnpm build:local    # one file: music-player/dist-local/now-playing.html — open it, no server needed
 
 pnpm dev:player     # the player, on http://localhost:5173
 pnpm dev:hub        # the hub API plus its admin GUI

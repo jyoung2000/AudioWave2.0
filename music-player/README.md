@@ -17,11 +17,15 @@ pnpm --filter @now-playing/music-player preview   # serve the production build
 
 ### Or with no server at all
 
+**[`now-playing.html`](../now-playing.html)** at the root of the repository is the whole player in
+one committed file — about 2.4 MB, with nothing beside it. Download it and open it; there is nothing
+to build. Rebuild it only if you change the source:
+
 ```sh
-pnpm --filter @now-playing/music-player build:local   # → dist-local/now-playing.html
+pnpm --filter @now-playing/music-player build:local   # updates the committed now-playing.html
 ```
 
-One file, about 2.9 MB, with nothing beside it. Copy it anywhere and open it in a browser. Your
+Copy it anywhere and open it in a browser. Your
 library, playback, the equaliser, retuning, playlists and metrics all work; group listening and
 installing it as an app do not, because a page opened from a file cannot open a WebSocket or
 register a service worker. The app says which is which on its Settings screen, and
