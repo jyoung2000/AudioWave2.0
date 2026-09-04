@@ -3,8 +3,8 @@
 What is built, what is partial, and what is not built. Anything marked **Done** has tests that
 exercise it; anything **Partial** says exactly what is missing.
 
-Current: **430 tests** across 45 files (unit, DOM, contract, integration, security, performance),
-plus **31 end-to-end tests** in real browsers. `pnpm verify` runs every gate available on the machine
+Current: **444 tests** across 46 files (unit, DOM, contract, integration, security, performance),
+plus **46 end-to-end tests** in real browsers — 26 for the player, 20 for the hub. `pnpm verify` runs every gate available on the machine
 and reports platform-unavailable ones as skipped, never as passed.
 
 ## Shared packages

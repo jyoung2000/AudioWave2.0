@@ -19,13 +19,13 @@ never as passed.
 
 | Project | Where | What it covers | Count |
 | --- | --- | --- | --- |
-| `unit` | `packages/*/tests/unit`, `*/src/**/*.test.ts` | Pure logic: ids, the queue reducer, EQ precedence, retune maths, sync rules, CSV, metrics, the recommender, library scanning | ~200 |
-| `dom` | `**/tests/dom`, `*.dom.test.tsx` | Components and app shells rendered in happy-dom, driven with real user events | ~30 |
-| `contracts` | `packages/contracts/tests`, `**/tests/contract` | Every schema round-trips; every route the contracts declare has a handler; the release manifest parses | ~10 |
-| `integration` | `**/tests/integration` | A real hub (real Fastify, real SQLite, real argon2) and, for the companion, its real client against that hub | ~100 |
-| `security` | `**/tests/security` | The controls, as behaviour: the sanitiser, the channel allowlist, CSP, SSRF, rate limits, authorization | ~40 |
-| `perf` | `tests/perf` | Bundle budgets measured from built output | 8 |
-| e2e (Playwright) | `music-player/tests/e2e`, `docker-container/tests/e2e` | Real browsers against real production builds, including axe on every screen of both interfaces | 45 |
+| `unit` | `packages/*/tests/unit`, `*/src/**/*.test.ts` | Pure logic: ids, the queue reducer, EQ precedence, retune maths, sync rules, CSV, metrics, the recommender, library scanning | 244 |
+| `dom` | `**/tests/dom`, `*.dom.test.tsx` | Components and app shells rendered in happy-dom, driven with real user events | 32 |
+| `contracts` | `packages/contracts/tests`, `**/tests/contract` | Every schema round-trips; every route the contracts declare has a handler; the release manifest parses | 12 |
+| `integration` | `**/tests/integration` | A real hub (real Fastify, real SQLite, real argon2) and, for the companion, its real client against that hub | 107 |
+| `security` | `**/tests/security` | The controls, as behaviour: the sanitiser, the channel allowlist, CSP, SSRF, rate limits, authorization | 41 |
+| `perf` | `tests/perf` | Bundle budgets measured from built output | 8 (one skipped: the admin bundle has nothing that must stay split) |
+| e2e (Playwright) | `music-player/tests/e2e`, `docker-container/tests/e2e` | Real browsers against real production builds, including axe on every screen of both interfaces | 46 |
 
 ```sh
 pnpm test               # unit + dom + contracts + integration
