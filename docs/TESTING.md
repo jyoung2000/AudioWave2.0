@@ -25,7 +25,7 @@ never as passed.
 | `integration` | `**/tests/integration` | A real hub (real Fastify, real SQLite, real argon2) and, for the companion, its real client against that hub | 107 |
 | `security` | `**/tests/security` | The controls, as behaviour: the sanitiser, the channel allowlist, CSP, SSRF, rate limits, authorization | 41 |
 | `perf` | `tests/perf` | Bundle budgets measured from built output | 8 (one skipped: the admin bundle has nothing that must stay split) |
-| e2e (Playwright) | `music-player/tests/e2e`, `docker-container/tests/e2e` | Real browsers against real production builds, including axe on every screen of both interfaces | 46 |
+| e2e (Playwright) | `music-player/tests/e2e`, `docker-container/tests/e2e` | Real browsers against real production builds, including axe on every screen of both interfaces | 45 |
 
 ```sh
 pnpm test               # unit + dom + contracts + integration
