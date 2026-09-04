@@ -48,6 +48,17 @@ picked it, one that the explanation returns once the page that held it is gone.
 
 The test that existed asserted the broken behaviour, which is why nothing caught it.
 
+### The download the hub was already serving
+
+Not wrong so much as never finished: `ReleaseService` on the hub, and the route beside it, carry a
+comment saying "the PWA shows a *Get the Windows companion* link, and that link must not be a lie".
+The route was written, the admin page could configure it, and the player never called it — so the
+one product the suite ships as a downloadable binary had no download anywhere in the app.
+
+**Fixed:** Settings asks the hub and renders what comes back. The panel cannot become a dead button:
+no hub says to pair one, a hub with nothing configured says an administrator has to set a release,
+and a real release shows the version, size, SHA-256 and whether it was code-signed.
+
 ### The second song killed the equaliser
 
 Shipped, and wrong: `attachMediaElement` called `createMediaElementSource` on every load. Web Audio

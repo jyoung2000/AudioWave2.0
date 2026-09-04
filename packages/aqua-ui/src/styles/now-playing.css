@@ -478,6 +478,9 @@
 .np-sections__list {
   display: flex;
   max-width: 1120px;
+  /* `safe` so a strip too wide for the screen packs to the start instead of centring its overflow
+     off both edges, which would put the first tab somewhere the scroller cannot reach. */
+  justify-content: safe center;
   margin: 0 auto;
   padding: 0 var(--np-pad);
   gap: 2px;
@@ -543,9 +546,18 @@
   overflow-x: clip;
 }
 
+/*
+ * Wider than the reference's 700 px, because this transport is wider than the reference's.
+ *
+ * The reference carried five keys; this one carries nine — offline, star, shuffle either side of
+ * prev/play/next, then repeat, add and share. At 700 px the volume slider in the right-hand column
+ * has nowhere to go but into the key cluster's share of the row, which shoves the cluster left of
+ * centre. Widening the column until the cluster and the slider both fit is what lets the keys sit
+ * on the centre line, and it puts the rail closer to the width of the list underneath.
+ */
 .np-hero__inner {
   position: relative;
-  max-width: 700px;
+  max-width: 820px;
   margin: 0 auto;
   padding: 30px var(--np-pad) 22px;
 }
@@ -553,6 +565,7 @@
 .np-hero__top {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 26px;
 }
 
@@ -775,17 +788,18 @@
    10. Transport — no chrome behind it: the glyphs sit on the page
    -------------------------------------------------------------------------- */
 
-/* The keys live in the middle column of a three-column grid; the side columns are deliberately
-   unequal (0.78fr / 1fr) so the cluster sits about 24 px left of true centre. The row's right edge
-   is pinned to the right edge of the blue progress rail above it — measured in JS and written to
-   --np-track-inset-r, because the label beside the rail changes width with mode — so the volume
-   slider ends exactly under the bar. */
+/* The keys live in the middle column of a three-column grid with equal sides, so the cluster sits
+   on the centre line of the rail above it rather than beside the volume slider. (The reference used
+   0.78fr / 1fr to nudge its five keys back to optical centre against the slider; with nine keys and
+   a wider column the honest arrangement is symmetry.) The row's right edge is pinned to the right
+   edge of the blue progress rail — measured in JS and written to --np-track-inset-r, because the
+   label beside the rail changes width with mode — so the slider ends exactly under the bar. */
 .np-transport {
   display: grid;
   align-items: center;
   margin-top: 10px;
   margin-right: var(--np-track-inset-r, 0);
-  grid-template-columns: 0.78fr auto 1fr;
+  grid-template-columns: 1fr auto 1fr;
 }
 
 .np-transport__keys {

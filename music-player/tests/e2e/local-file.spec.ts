@@ -68,7 +68,7 @@ test.describe('opened from the filesystem', () => {
 
     await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible();
     const sections = await page.getByRole('option').allTextContents();
-    for (const name of ['Music', 'Now playing', 'Up next', 'Playlists', 'Search', 'Constellation', 'Listening', 'Equaliser', 'Settings']) {
+    for (const name of ['Music Library', 'Queue', 'Playlists', 'Listening history']) {
       expect(sections.some((text) => text.startsWith(name)), `${name} should be in the source list`).toBe(true);
     }
 
@@ -80,7 +80,7 @@ test.describe('opened from the filesystem', () => {
   test('every section renders rather than falling back to an error', async ({ page }) => {
     const seen = watch(page);
     await page.goto(FILE_URL);
-    for (const name of ['Music', 'Now playing', 'Up next', 'Playlists', 'Search', 'Constellation', 'Listening', 'Equaliser', 'Settings']) {
+    for (const name of ['Music Library', 'Queue', 'Playlists', 'Listening history']) {
       await page.getByRole('option', { name: new RegExp(`^${name}`) }).click();
       await expect(page.locator('.aqua-content')).not.toHaveText('');
     }
@@ -145,7 +145,7 @@ test.describe('opened from the filesystem', () => {
 
   test('tells you which features the browser withholds from a local file', async ({ page }) => {
     await page.goto(FILE_URL);
-    await page.getByRole('option', { name: /^Settings/ }).click();
+    await page.getByRole('button', { name: /^Settings —/ }).click();
 
     await expect(page.getByRole('heading', { name: 'Running from a file' })).toBeVisible();
     // The honest half: what it cannot do, and why, rather than a silent absence.
@@ -174,7 +174,7 @@ test.describe('opened from the filesystem', () => {
     try {
       await page.goto(`http://127.0.0.1:${address.port}/`);
       await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible();
-      await page.getByRole('option', { name: /^Settings/ }).click();
+      await page.getByRole('button', { name: /^Settings —/ }).click();
       await expect(page.getByRole('heading', { name: 'Storage' })).toBeVisible();
       await expect(page.getByRole('heading', { name: 'Running from a file' })).toHaveCount(0);
     } finally {

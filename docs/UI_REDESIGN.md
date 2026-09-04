@@ -159,7 +159,62 @@ audio element, with whatever was playing paused for the duration and resumed aft
 
 ---
 
-## 6. The line-by-line audit
+## 6. The strip, and where the rest went
+
+The section strip started as a nine-entry replacement for iTunes' source list. It is four entries
+now when you are listening alone, because a menu you have to *read* is not a menu:
+
+| Solo | What it holds |
+|---|---|
+| **Music Library** | Everything indexed on this device |
+| **Queue** | The song playing now and everything behind it, in order |
+| **Playlists** | Your playlists |
+| **Listening history** | What you played, most recent first |
+
+Shared mode adds the two entries that only mean something in a group — **Now playing**, which is
+where a session is created, joined and invited to, and **Constellation** — and drops them again when
+you leave. Being off the strip does not mean being unreachable: in solo both are links under the
+library, and when one of them is open the strip highlights nothing and keeps its first entry
+tabbable, which is the honest report that you are somewhere it does not list.
+
+Nothing was removed. The five that left the strip went somewhere they belong:
+
+| Was a section | Is now |
+|---|---|
+| Settings | The avatar in the status bar. It is the only thing up there that is *yours*, and this is the one place every OS puts your settings |
+| Equaliser | A panel inside Settings, the iTunes window intact |
+| Search | The field in the bar — the popover for the first few hits, Return for the full section |
+| Now playing (solo) | A link under the library. In solo it is the audio-chain readout; in shared it is the group's home and returns to the strip |
+| Constellation | A link under the library |
+
+The avatar's silhouette is grey. It was tinted by listening mode, which made a portrait in the corner
+read as a status light reporting something the mode switch beside it already says.
+
+### Windows companion
+
+The hub has served `GET /releases/windows-companion/latest` since it was written, with a comment
+saying the PWA would show a download for it. Nothing ever asked. Settings asks now, and the panel is
+built so it can never become a button that downloads nothing: with no hub paired it says to pair
+one, with a hub that has no release configured it says an administrator has to set one, and only
+with real metadata does a download link appear — carrying the version, the size, the SHA-256, and
+whether the build was code-signed, because an unsigned installer will make SmartScreen object and
+that is worth knowing before the click rather than after.
+
+### Centring
+
+Everything on the page shares one centre line. Two things did not:
+
+- The hero's art and title sat flush left in a 700 px column while the rail and transport under them
+  spanned it, so the top of the page leaned left. The pair is centred as a group now.
+- The transport's key cluster sat 34 px left of centre. The reference used unequal grid columns
+  (`0.78fr / 1fr`) to nudge *its* five keys back to optical centre against the volume slider; this
+  transport carries nine, and at 700 px the slider had nowhere to go but into the cluster's share of
+  the row. The column is 820 px now and the grid's sides are equal, so the keys sit on the rail's
+  centre line and the slider still ends under the bar's right edge.
+
+---
+
+## 7. The line-by-line audit
 
 After the port was in, the reference was walked again — its stylesheet class by class, its two
 scripts block by block — against what ships. Almost everything matched, and the gaps that did not

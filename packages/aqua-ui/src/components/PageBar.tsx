@@ -317,21 +317,32 @@ function GroupMark({ maskId }: { maskId: string }) {
 export interface ProfileButtonProps {
   label: string;
   onClick?: () => void;
+  /**
+   * Whether the thing this opens is the one on screen. It is not `aria-haspopup`: this button goes
+   * to a section rather than dropping a menu, and saying otherwise promises a menu that never comes.
+   */
   expanded?: boolean;
-  /** Tints the silhouette; used to distinguish members in a shared session. */
-  hue?: number;
+  /**
+   * Tints the silhouette. Left off, the figure is grey — the reference's own, and the right
+   * treatment for *you*: a saturated portrait in the corner reads as a status light, and the only
+   * status it could report is one the mode switch beside it already shows. A hue belongs on the
+   * other people in a shared session, where telling them apart is the point.
+   */
+  hue?: number | null;
 }
 
 /** The white gel disc with a clipped silhouette, from the reference's right-hand cluster. */
-export function ProfileButton({ label, onClick, expanded, hue = 212 }: ProfileButtonProps) {
+export function ProfileButton({ label, onClick, expanded, hue = null }: ProfileButtonProps) {
   const id = useId().replace(/:/g, '');
+  const top = hue === null ? '#8b8f95' : `hsl(${hue} 42% 62%)`;
+  const bottom = hue === null ? '#5f646b' : `hsl(${hue} 46% 44%)`;
   return (
-    <button type="button" className="np-avatar" aria-label={label} title={label} aria-haspopup="menu" aria-expanded={expanded} onClick={onClick}>
+    <button type="button" className="np-avatar" aria-label={label} title={label} aria-current={expanded ? 'page' : undefined} onClick={onClick}>
       <svg viewBox="0 0 40 40" aria-hidden="true" focusable="false">
         <defs>
           <linearGradient id={`np-av-${id}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor={`hsl(${hue} 42% 62%)`} />
-            <stop offset="1" stopColor={`hsl(${hue} 46% 44%)`} />
+            <stop offset="0" stopColor={top} />
+            <stop offset="1" stopColor={bottom} />
           </linearGradient>
           <clipPath id={`np-avc-${id}`}>
             <circle cx="20" cy="20" r="20" />

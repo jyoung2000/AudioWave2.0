@@ -17,7 +17,7 @@ true if each one maps to something that can fail, so this page is the map. Three
 |---|---|
 | One dominant work window is visually clear | **Reviewer.** Each product renders a single `AquaWindow`; `tests/dom/overlays.test.tsx` asserts sheets and menus are children of it rather than competing windows |
 | Titlebar and toolbar read as one continuous neutral surface | **Test** — `aqua-conformance.test.ts`, chrome ramp is achromatic and continuous |
-| Persistent source list, or a responsive equivalent with current-location context | **Test** — `tests/dom/source-list.test.tsx`; the e2e a11y spec walks all nine sections through it |
+| Persistent source list, or a responsive equivalent with current-location context | **Test** — `tests/dom/source-list.test.tsx`; the e2e a11y spec walks every section in the strip through it |
 | Content region visually dominant and mostly neutral | **Reviewer**, with `windowBody` and `content` tokens pinned by the conformance test |
 | Bottom-bar actions visibly subordinate | **Test** — `aqua-conformance.test.ts`, `bottomBarSmall` and label sizes are below body sizes |
 | *SHOULD:* large/medium/small hierarchy | **Reviewer** |

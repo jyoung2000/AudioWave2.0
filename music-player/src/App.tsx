@@ -44,15 +44,15 @@ import { NowPlayingView } from './views/NowPlaying.js';
 import { QueueView } from './views/Queue.js';
 
 /*
- * The six sections nobody opens first are code-split.
+ * The sections nobody opens first are code-split.
  *
- * Music, Now playing and Up next are the path someone takes to hear something, so they stay in the
- * first load. The equaliser's curve maths, the metrics charts, the constellation, the settings
- * panels, the playlist editor and the provider search are all real code that most sessions never
- * reach — and the bundle budget in tests/perf is what turned that observation into a rule.
+ * Music, Now playing and the queue are the path someone takes to hear something, so they stay in
+ * the first load. The metrics charts, the constellation, the settings panels — which now carry the
+ * equaliser's curve maths with them — the playlist editor and the provider search are all real code
+ * that most sessions never reach, and the bundle budget in tests/perf is what turned that
+ * observation into a rule.
  */
 const PlaylistsView = lazy(async () => ({ default: (await import('./views/Playlists.js')).PlaylistsView }));
-const EqualiserView = lazy(async () => ({ default: (await import('./views/Equaliser.js')).EqualiserView }));
 const MetricsView = lazy(async () => ({ default: (await import('./views/Metrics.js')).MetricsView }));
 const ConstellationView = lazy(async () => ({ default: (await import('./views/Constellation.js')).ConstellationView }));
 const SearchView = lazy(async () => ({ default: (await import('./views/Search.js')).SearchView }));
@@ -67,7 +67,7 @@ import { toTrackRef } from './state/store.js';
 import { offlineOf } from './lib/track-source.js';
 import { uuidv7 } from '@now-playing/domain';
 
-export type ViewId = 'library' | 'now-playing' | 'queue' | 'playlists' | 'search' | 'equaliser' | 'metrics' | 'constellation' | 'settings';
+export type ViewId = 'library' | 'now-playing' | 'queue' | 'playlists' | 'search' | 'metrics' | 'constellation' | 'settings';
 
 export function App() {
   const { store, hubStatus, shared, mode, setMode } = usePlayer();
@@ -131,20 +131,41 @@ export function App() {
     };
   }, [entry?.track.artworkId, store]);
 
-  const sections = useMemo<SectionItem<ViewId>[]>(
-    () => [
-      { id: 'library', label: 'Music', icon: <Glyph name="note" />, count: state.library.tracks.length },
-      { id: 'now-playing', label: 'Now playing', icon: <Glyph name="play" /> },
-      { id: 'queue', label: 'Up next', icon: <Glyph name="sort" />, count: Math.max(0, state.queue.length - state.queueIndex - 1) },
+  /*
+   * The strip is four destinations when you are listening alone: your music, what is queued behind
+   * the song playing now, your playlists, and what you have played before. Everything else it used
+   * to carry either moved somewhere it belongs — search is the field in the bar, the equaliser is
+   * inside Settings, Settings is the avatar — or is group business that only appears when there is
+   * a group. A menu that lists nine things when three of them are for a mode you are not in is a
+   * menu you have to read; this one you can glance at.
+   */
+  const sections = useMemo<SectionItem<ViewId>[]>(() => {
+    const queued = Math.max(0, state.queue.length - state.queueIndex - 1);
+    const solo: SectionItem<ViewId>[] = [
+      { id: 'library', label: 'Music Library', icon: <Glyph name="note" />, count: state.library.tracks.length },
+      { id: 'queue', label: 'Queue', icon: <Glyph name="sort" />, count: queued },
       { id: 'playlists', label: 'Playlists', icon: <Glyph name="folder" />, count: state.playlists.length },
-      { id: 'search', label: 'Search', icon: <Glyph name="search" />, status: hubStatus.connected ? null : 'Searches this device only until a hub is paired' },
+      { id: 'metrics', label: 'Listening history', icon: <Glyph name="history" /> },
+    ];
+    if (mode !== 'shared') return solo;
+    return [
+      // The group's own home comes first in shared mode: it is where a session is created, joined
+      // and invited to, and none of that has anywhere else to live.
+      { id: 'now-playing', label: 'Now playing', icon: <Glyph name="play" /> },
+      ...solo,
       { id: 'constellation', label: 'Constellation', icon: <Glyph name="star" /> },
-      { id: 'metrics', label: 'Listening', icon: <Glyph name="history" /> },
-      { id: 'equaliser', label: 'Equaliser', icon: <Glyph name="eq" />, status: state.resolvedEq.presetName },
-      { id: 'settings', label: 'Settings', icon: <Glyph name="gear" /> },
-    ],
-    [state.library.tracks.length, state.queue.length, state.queueIndex, state.playlists.length, state.resolvedEq.presetName, hubStatus.connected],
-  );
+    ];
+  }, [state.library.tracks.length, state.queue.length, state.queueIndex, state.playlists.length, mode]);
+
+  /*
+   * A view that is not in the strip still shows.
+   *
+   * Settings is the avatar, Search is the field in the bar, and Now playing and Constellation are
+   * links under the library when there is no group — so "not a tab" and "not reachable" are
+   * different things here, and bouncing back to the library when they part company would make those
+   * routes dead ends. The strip simply highlights nothing and keeps its first entry tabbable, which
+   * is the honest report: you are somewhere it does not list.
+   */
 
   // Space toggles playback from anywhere that is not a text field, the way every player behaves.
   useEffect(() => {
@@ -179,8 +200,6 @@ export function App() {
         return <PlaylistsView />;
       case 'search':
         return <SearchView query={query} onQueryChange={setQuery} />;
-      case 'equaliser':
-        return <EqualiserView />;
       case 'metrics':
         return <MetricsView />;
       case 'constellation':
@@ -272,8 +291,8 @@ export function App() {
             />
             <BarClock />
             <ProfileButton
-              label={mode === 'shared' && shared.group ? `You, listening with ${shared.group.name}` : 'You, listening on your own'}
-              hue={mode === 'shared' ? 200 : 28}
+              label={`Settings — ${mode === 'shared' && shared.group ? `listening with ${shared.group.name}` : 'listening on your own'}`}
+              expanded={view === 'settings'}
               onClick={() => setView('settings')}
             />
           </>

@@ -8,6 +8,7 @@
  * The device credential is stored in IndexedDB, never in localStorage: it is a bearer secret, and
  * localStorage is readable by any script that manages to run on the page.
  */
+import { ReleaseMetadata } from '@now-playing/contracts';
 import type { GroupPlaybackState, GroupView, HubIdentity, Queue, QueueCommand, SearchResponse, ShareLinkView, TrackRef } from '@now-playing/contracts';
 import { getSetting, putSetting, type PlayerDatabase } from './db.js';
 
@@ -155,6 +156,23 @@ export class HubClient {
       },
     });
     return { ...result, url: result.share.url ?? (this.credential ? `${this.credential.endpoint}/s/${result.token}` : null) };
+  }
+
+  /**
+   * The Windows companion release this hub is offering, or null when it is offering none.
+   *
+   * A 404 is the documented answer for "no release configured" and is not an error to shout about —
+   * the caller renders nothing rather than a dead download button. The route is unauthenticated, so
+   * it also answers before a pairing is complete.
+   */
+  async windowsCompanionRelease(): Promise<ReleaseMetadata | null> {
+    try {
+      const body = await this.request<unknown>('GET', '/api/v1/releases/windows-companion/latest', { authenticated: false });
+      const parsed = ReleaseMetadata.safeParse(body);
+      return parsed.success ? parsed.data : null;
+    } catch {
+      return null;
+    }
   }
 
   async listShares(): Promise<ShareLinkView[]> {

@@ -25,8 +25,8 @@ export function QueueView() {
   return (
     <>
       <div className="np-section-head">
-        <h2>Up next</h2>
-        <p>What plays after this, in order. Drag or use the arrows to change it.</p>
+        <h2>Queue</h2>
+        <p>The song playing now and everything behind it, in order. Use the arrows to change it.</p>
       </div>
       <Panel>
         <div className="player-toolbar-row">

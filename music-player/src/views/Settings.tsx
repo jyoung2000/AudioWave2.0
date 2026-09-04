@@ -7,10 +7,12 @@
  * exist.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { AquaTable, Button, EmptyState, KeyValueList, Panel, PanelSection, StatusDot, TextField, useToast } from '@now-playing/aqua-ui';
+import { AquaTable, Button, ButtonLink, EmptyState, KeyValueList, Panel, PanelSection, StatusDot, TextField, useToast } from '@now-playing/aqua-ui';
 import { useAppState, usePlayer } from '../state/context.js';
+import { EqualiserView } from './Equaliser.js';
 import { mediaIntegrationReport } from '../lib/media-session.js';
 import { localFileReport } from '../lib/build-flags.js';
+import type { ReleaseMetadata } from '@now-playing/contracts';
 import type { StoredRoot } from '../lib/db.js';
 
 export function SettingsView() {
@@ -95,9 +97,13 @@ export function SettingsView() {
         </PanelSection>
       </Panel>
 
+      <EqualiserView embedded />
+
       <HubPanel />
 
       <SharedListeningPanel />
+
+      <WindowsCompanionPanel key={hubStatus.connected ? 'hub-connected' : 'no-hub'} />
 
       <Panel title="Car, lock screen and headset">
         <PanelSection>
@@ -335,6 +341,88 @@ function HubPanel() {
               {error ? <p className="player-hint player-hint--error">{error}</p> : null}
               {hubStatus.reason && hubStatus.endpoint ? <p className="player-hint player-hint--warning">{hubStatus.reason}</p> : null}
             </div>
+          </>
+        )}
+      </PanelSection>
+    </Panel>
+  );
+}
+
+/**
+ * The Windows companion, offered only when there is something real to offer.
+ *
+ * The hub answers 404 for "no release configured", and that is the common case — an operator has to
+ * point the hub at the CI feed or paste the metadata first. Rather than a button that downloads
+ * nothing, the panel says which of the two things is missing: a hub, or a release on it. The
+ * checksum and the signing state ship with the metadata and are shown, because an unsigned
+ * installer will make Windows SmartScreen object and people should know that before they click,
+ * not after.
+ */
+function WindowsCompanionPanel() {
+  const { hub, hubStatus } = usePlayer();
+  // Remounted when the connection changes (see the `key` where this is rendered), so there is no
+  // stale answer to clear and no state to reset on the way in.
+  const [release, setRelease] = useState<ReleaseMetadata | null>(null);
+  const [asked, setAsked] = useState(false);
+
+  useEffect(() => {
+    if (!hub || !hubStatus.connected) return;
+    let cancelled = false;
+    void hub.windowsCompanionRelease().then((next) => {
+      if (cancelled) return;
+      setRelease(next);
+      setAsked(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [hub, hubStatus.connected]);
+
+  const installers = (release?.artifacts ?? []).filter((artifact) => artifact.kind === 'installer');
+
+  return (
+    <Panel title="Windows companion">
+      <PanelSection>
+        <p className="player-hint">
+          A desktop app that indexes the music on a Windows PC and offers it to this player through the hub. It is optional: everything here works without it.
+        </p>
+        {!hubStatus.connected ? (
+          <p className="player-hint">Pair a hub above to see whether it is offering a build. The installer is served by your hub, not by this page.</p>
+        ) : !asked ? (
+          <p className="player-hint">Asking the hub…</p>
+        ) : !release || installers.length === 0 ? (
+          <p className="player-hint">
+            This hub is not offering a Windows build yet. An administrator sets one on the hub's admin page — either by pointing it at the release feed the Windows CI workflow publishes, or by pasting the
+            details of a build by hand.
+          </p>
+        ) : (
+          <>
+            <KeyValueList
+              items={[
+                { key: 'Version', value: `${release.version} (${release.channel})` },
+                { key: 'Released', value: new Date(release.releasedAt).toLocaleDateString() },
+                { key: 'Needs', value: release.minimumWindows },
+                {
+                  key: 'Code-signed',
+                  value: release.signed ? <StatusDot kind="ok" label="Yes" /> : <StatusDot kind="warning" label="No — Windows will warn before it runs" />,
+                },
+              ]}
+            />
+            <div className="player-toolbar-row">
+              {installers.map((artifact) => (
+                <ButtonLink key={artifact.url} size="small" icon="download" href={artifact.url} download={artifact.filename}>
+                  {`Download for ${artifact.arch === 'arm64' ? 'ARM' : 'Intel/AMD'} · ${formatBytes(artifact.sizeBytes)}`}
+                </ButtonLink>
+              ))}
+              {release.notesUrl ? (
+                <ButtonLink size="small" href={release.notesUrl} target="_blank" rel="noreferrer noopener">
+                  Release notes
+                </ButtonLink>
+              ) : null}
+            </div>
+            <p className="player-hint">
+              {`SHA-256 ${installers[0]!.sha256}. Compare it after downloading with \`Get-FileHash\` in PowerShell if you want to check the file arrived intact.`}
+            </p>
           </>
         )}
       </PanelSection>

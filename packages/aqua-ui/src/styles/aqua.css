@@ -294,6 +294,12 @@
 /* --------------------------------------------------------------------------
    8. Push buttons (spec §9.13, §12.2)
    -------------------------------------------------------------------------- */
+/* The anchor variant: an <a> is inline by default and would ignore the control height. */
+.aqua-button--link {
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
 .aqua-button {
   position: relative;
   isolation: isolate;

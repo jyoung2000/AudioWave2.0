@@ -21,7 +21,15 @@ import { useAppState, usePlayer } from '../state/context.js';
 
 const CURVE_FREQUENCIES = Array.from({ length: 96 }, (_, i) => 20 * (20000 / 20) ** (i / 95));
 
-export function EqualiserView() {
+export interface EqualiserViewProps {
+  /**
+   * Rendered inside another section rather than as one of its own, so it drops its page heading and
+   * begins at the window. Settings owns the heading in that case.
+   */
+  embedded?: boolean;
+}
+
+export function EqualiserView({ embedded = false }: EqualiserViewProps = {}) {
   const { store } = usePlayer();
   const state = useAppState();
   const toast = useToast();
@@ -38,10 +46,12 @@ export function EqualiserView() {
 
   return (
     <>
-      <div className="np-section-head">
-        <h2>Equaliser</h2>
-        <p>Ten bands, a preamp, and an honest account of what each one does to the signal.</p>
-      </div>
+      {embedded ? null : (
+        <div className="np-section-head">
+          <h2>Equaliser</h2>
+          <p>Ten bands, a preamp, and an honest account of what each one does to the signal.</p>
+        </div>
+      )}
       <Panel title="Equaliser">
         <PanelSection>
           {/*

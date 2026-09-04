@@ -20,6 +20,28 @@ import { toTrackRef } from '../state/store.js';
 import { MusicList } from '../components/MusicList.js';
 import { NewPlaylistSheet } from '../components/NewPlaylistSheet.js';
 
+/**
+ * Two destinations the section strip no longer carries when you are listening alone.
+ *
+ * The strip is four entries now and these are not among them — but "what is this song doing to the
+ * audio chain" and "what else might I like" are still real screens, and a screen you cannot reach
+ * may as well not exist. They sit under the library because the library is where a solo session
+ * lives, and in *both* of its states: an empty library is exactly when someone is most likely to go
+ * looking for something else.
+ */
+function MoreDestinations({ onOpenView }: { onOpenView: (view: ViewId) => void }) {
+  return (
+    <p className="player-links">
+      <button type="button" className="player-link" onClick={() => onOpenView('now-playing')}>
+        Now playing
+      </button>
+      <button type="button" className="player-link" onClick={() => onOpenView('constellation')}>
+        Constellation
+      </button>
+    </p>
+  );
+}
+
 export function LibraryView({ onOpenView }: { onOpenView: (view: ViewId) => void }) {
   const { store } = usePlayer();
   const state = useAppState();
@@ -49,6 +71,7 @@ export function LibraryView({ onOpenView }: { onOpenView: (view: ViewId) => void
           ]}
           {...(state.library.directoryHandleReason ? { details: { summary: 'About this browser', text: state.library.directoryHandleReason } } : {})}
         />
+        <MoreDestinations onOpenView={onOpenView} />
       </Panel>
     );
   }
@@ -79,9 +102,6 @@ export function LibraryView({ onOpenView }: { onOpenView: (view: ViewId) => void
         >
           Shuffle all
         </Button>
-        <Button size="small" icon="sort" onClick={() => onOpenView('queue')}>
-          Up next
-        </Button>
         {/* The old shell kept these in a bottom bar. A page has no bottom bar, and "add more music"
             belongs beside the library it adds to. */}
         <Button size="small" icon="add" onClick={() => void store.addDirectory()} ellipsis>
@@ -91,6 +111,8 @@ export function LibraryView({ onOpenView }: { onOpenView: (view: ViewId) => void
           Choose files
         </Button>
       </div>
+
+      <MoreDestinations onOpenView={onOpenView} />
 
       <MusicList
         label="Your music"

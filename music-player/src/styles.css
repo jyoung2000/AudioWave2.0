@@ -73,6 +73,33 @@ body {
   color: var(--aqua-error, #c1392b);
 }
 
+/* A quiet row of destinations under a section, for screens the strip does not carry. */
+.player-links {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 10px 0 0;
+  gap: 16px;
+}
+
+.player-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--aqua-accent, #2c6fb4);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+}
+
+.player-link:hover {
+  text-decoration: underline;
+}
+
+.player-link:focus-visible {
+  outline: 2px solid var(--aqua-accent, #2c6fb4);
+  outline-offset: 2px;
+}
+
 .player-subhead {
   margin: 12px 0 4px;
   font-size: 11px;

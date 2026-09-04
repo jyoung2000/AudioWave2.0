@@ -23,6 +23,11 @@ async function loadFixtures(page: Page): Promise<void> {
   await expect(page.getByRole('row').filter({ hasText: 'Quiet Arithmetic' }).first()).toBeVisible({ timeout: 20_000 });
 }
 
+/** Settings is the avatar in the bar now, not a section in the strip. */
+async function openSettings(page: Page): Promise<void> {
+  await page.getByRole('button', { name: /^Settings —/ }).click();
+}
+
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible();
@@ -80,7 +85,7 @@ test('the status bar carries the listening mode, and says why shared is unavaila
 });
 
 test('settings report the same shared-listening capability the switch does', async ({ page }) => {
-  await page.getByRole('option', { name: /Settings/i }).click();
+  await openSettings(page);
   await expect(page.getByRole('heading', { name: 'Shared listening' })).toBeVisible();
   await expect(page.getByText(/needs a paired hub/i).first()).toBeVisible();
   await expect(page.getByText(/joining a group does not upload your music/i)).toBeVisible();
@@ -93,34 +98,83 @@ test('the hero is on every section, so the song is never more than a glance away
   await expect(page.getByRole('slider', { name: 'Playback position' })).toBeVisible();
   await expect(page.getByRole('slider', { name: 'Volume' })).toBeVisible();
 
-  // Still there four sections later.
-  await page.getByRole('option', { name: /Equaliser/i }).click();
+  // Still there whichever section is open.
+  await openSettings(page);
   await expect(hero).toBeVisible();
   await expect(page.getByRole('group', { name: 'Playback controls' })).toBeVisible();
 });
 
 test('the section strip moves with the arrow keys, like the source list it replaced', async ({ page }) => {
   const strip = page.getByRole('navigation', { name: 'Sections' });
-  await strip.getByRole('option', { name: /^Music/ }).focus();
+  await strip.getByRole('option', { name: /^Music Library/ }).focus();
   await page.keyboard.press('ArrowRight');
-  await expect(strip.getByRole('option', { name: /^Now playing/ })).toBeFocused();
+  await expect(strip.getByRole('option', { name: /^Queue/ })).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(strip.getByRole('option', { name: /^Now playing/ })).toHaveAttribute('aria-selected', 'true');
+  await expect(strip.getByRole('option', { name: /^Queue/ })).toHaveAttribute('aria-selected', 'true');
   await page.keyboard.press('End');
-  await expect(strip.getByRole('option', { name: /^Settings/ })).toBeFocused();
+  await expect(strip.getByRole('option', { name: /^Listening history/ })).toBeFocused();
+});
+
+/**
+ * Listening alone, the strip is four destinations and nothing else.
+ *
+ * The rest did not disappear — search is the field in the bar, Settings is the avatar, the
+ * equaliser is a panel inside Settings — but a menu that lists group business to someone with no
+ * group is a menu you have to read past.
+ */
+test('the solo strip is the four destinations a solo session has', async ({ page }) => {
+  const strip = page.getByRole('navigation', { name: 'Sections' });
+  await expect(strip.getByRole('option')).toHaveCount(4);
+  for (const name of ['Music Library', 'Queue', 'Playlists', 'Listening history']) {
+    await expect(strip.getByRole('option', { name: new RegExp(`^${name}`) })).toBeVisible();
+  }
+  for (const gone of ['Equaliser', 'Settings', 'Search', 'Constellation']) {
+    await expect(strip.getByRole('option', { name: new RegExp(gone, 'i') })).toHaveCount(0);
+  }
 });
 
 test('every section is reachable and renders', async ({ page }) => {
-  for (const name of ['Now playing', 'Up next', 'Playlists', 'Search', 'Constellation', 'Listening', 'Equaliser', 'Settings']) {
-    await page.getByRole('option', { name: new RegExp(name, 'i') }).click();
+  for (const name of ['Queue', 'Playlists', 'Listening history']) {
+    await page.getByRole('option', { name: new RegExp(`^${name}`) }).click();
     await expect(page.locator('.aqua-content')).toBeVisible();
     // Nothing may render a bare error boundary or an empty pane.
     await expect(page.locator('.aqua-content')).not.toHaveText('');
   }
+  // The two the strip no longer carries keep their way in, under the library.
+  await page.getByRole('option', { name: /^Music Library/ }).click();
+  for (const name of ['Now playing', 'Constellation']) {
+    await page.getByRole('button', { name, exact: true }).click();
+    await expect(page.locator('.aqua-content')).not.toHaveText('');
+    await page.getByRole('option', { name: /^Music Library/ }).click();
+  }
+  await openSettings(page);
+  await expect(page.locator('.aqua-content')).not.toHaveText('');
+});
+
+/**
+ * Two things moved into Settings, and Settings moved onto the avatar.
+ *
+ * The equaliser was a section of its own; it is a panel now. The Windows companion download never
+ * had a home at all — the hub has served its release metadata since the beginning and nothing asked
+ * for it. It must never become a button that downloads nothing: with no hub paired there is no
+ * build to offer, and the panel has to say which of the two is missing.
+ */
+test('Settings opens from the avatar and carries the equaliser and the companion download', async ({ page }) => {
+  await openSettings(page);
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+
+  await expect(page.getByRole('checkbox', { name: 'On' })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Equaliser bands' }).getByRole('slider')).toHaveCount(11);
+
+  const companion = page.locator('.aqua-panel').filter({ hasText: 'Windows companion' }).first();
+  await expect(companion).toBeVisible();
+  // No hub in this test run, so there is nothing to download and the panel says so instead.
+  await expect(companion.getByText(/Pair a hub above/i)).toBeVisible();
+  await expect(companion.getByRole('link', { name: /Download for/i })).toHaveCount(0);
 });
 
 test('the equaliser explains level-matched bypass and the headroom it applies', async ({ page }) => {
-  await page.getByRole('option', { name: /Equaliser/i }).click();
+  await openSettings(page);
   // The window's own switch, from the screenshot this equaliser is drawn from.
   await expect(page.getByRole('checkbox', { name: 'On' })).toBeVisible();
   await expect(page.getByText(/is a level-matched bypass/i)).toBeVisible();
@@ -131,7 +185,7 @@ test('the equaliser explains level-matched bypass and the headroom it applies', 
 });
 
 test('the solfeggio presets are filters, and say so where the choice is made', async ({ page }) => {
-  await page.getByRole('option', { name: /Equaliser/i }).click();
+  await openSettings(page);
 
   const presets = page.getByLabel('Preset');
   // All nine, plus the combined one, offered alongside the tone presets rather than instead of them.
@@ -154,13 +208,13 @@ test('the solfeggio presets are filters, and say so where the choice is made', a
 });
 
 test('retuning states how it is applied rather than claiming preserved tempo', async ({ page }) => {
-  await page.getByRole('option', { name: /Equaliser/i }).click();
+  await openSettings(page);
   await expect(page.getByText(/shifts the pitch of an existing recording/i)).toBeVisible();
   await expect(page.getByText(/it does not recreate what the musicians would have played/i)).toBeVisible();
 });
 
 test('settings tell the truth about Android Auto and CarPlay', async ({ page }) => {
-  await page.getByRole('option', { name: /Settings/i }).click();
+  await openSettings(page);
   await expect(page.getByText(/An app tile on the Android Auto or CarPlay home screen/i)).toBeVisible();
   await expect(page.getByText(/no web app of any kind can appear there/i)).toBeVisible();
   // And it must say what does work, not only what does not.
@@ -168,13 +222,13 @@ test('settings tell the truth about Android Auto and CarPlay', async ({ page }) 
 });
 
 test('sharing without a hub explains why rather than failing silently', async ({ page }) => {
-  await page.getByRole('option', { name: /Settings/i }).click();
+  await openSettings(page);
   await expect(page.getByText(/A hub is optional/i)).toBeVisible();
   await expect(page.getByText(/keeps working exactly as it does now without/i)).toBeVisible();
 });
 
 test('privacy claims are stated where a person can check them', async ({ page }) => {
-  await page.getByRole('option', { name: /Settings/i }).click();
+  await openSettings(page);
   await expect(page.getByText(/There is no analytics, no telemetry and no crash reporting/i)).toBeVisible();
   await expect(page.getByText(/Folder paths never leave this device/i)).toBeVisible();
   await expect(page.getByRole('button', { name: /Delete everything stored here/i })).toBeVisible();
@@ -205,10 +259,15 @@ test('loads nothing from outside its own origin', async ({ page }) => {
     if (url.origin !== new URL(page.url()).origin && url.protocol !== 'data:' && url.protocol !== 'blob:') external.push(request.url());
   });
   await page.reload({ waitUntil: 'networkidle' });
-  for (const name of ['Constellation', 'Listening', 'Settings']) {
-    await page.getByRole('option', { name: new RegExp(name, 'i') }).click();
+  for (const name of ['Listening history', 'Playlists']) {
+    await page.getByRole('option', { name: new RegExp(`^${name}`) }).click();
     await page.waitForTimeout(300);
   }
+  await page.getByRole('option', { name: /^Music Library/ }).click();
+  await page.getByRole('button', { name: 'Constellation', exact: true }).click();
+  await page.waitForTimeout(300);
+  await openSettings(page);
+  await page.waitForTimeout(300);
   expect(external, `the player must not fetch anything from another origin: ${external.join(', ')}`).toEqual([]);
 });
 
@@ -302,7 +361,7 @@ test.describe('the search popover', () => {
 });
 
 test('the equaliser is the iTunes window: On, a preset menu, a preamp and ten bands', async ({ page }) => {
-  await page.getByRole('option', { name: /Equaliser/i }).click();
+  await openSettings(page);
   await expect(page.getByRole('checkbox', { name: 'On' })).toBeChecked();
   const bands = page.getByRole('group', { name: 'Equaliser bands' });
   await expect(bands.getByRole('slider', { name: 'Preamp' })).toBeVisible();
