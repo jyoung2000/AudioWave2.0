@@ -1,4 +1,4 @@
-import { HISTORY_CSV_COLUMNS, HISTORY_CSV_SCHEMA_VERSION, HistoryCsvRow as HistoryCsvRowSchema, type GroupHistoryEntry, type HistoryImportReport } from '@now-playing/contracts';
+import { HISTORY_CSV_COLUMNS, HISTORY_CSV_SCHEMA_VERSION, HistoryCsvRow as HistoryCsvRowSchema, type GroupHistoryEntry, type HistoryImportReport, type ListeningEvent } from '@now-playing/contracts';
 
 const FORMULA_PREFIX = /^[=+\-@\t\r]/;
 
@@ -186,4 +186,71 @@ export function planHistoryImport(parsed: HistoryCsvParseResult, existingIds: Re
     toInsert.push(entry);
   }
   return { report: { dryRun, totalRows: parsed.totalRows, accepted: toInsert.length, skipped, errors: errors.slice(0, 500), sanitizedCells: parsed.sanitizedCells }, toInsert };
+}
+
+/**
+ * Column order of the personal listening-history export.
+ *
+ * This is a *different* export from the group history above: it covers one person's own events on
+ * one device, including the reasons and completion figures the metrics are computed from. Keeping
+ * the two separate means neither has to carry the other's columns as blanks.
+ */
+export const LISTENING_CSV_COLUMNS = [
+  'schema_version',
+  'event_id',
+  'occurred_at_utc',
+  'type',
+  'session_id',
+  'device_id',
+  'mode',
+  'track_id',
+  'title',
+  'artist',
+  'album',
+  'genre',
+  'year',
+  'duration_ms',
+  'provider',
+  'position_ms',
+  'seconds_played',
+  'completion_percent',
+  'reason',
+  'playlist_id',
+  'preset_id',
+  'context_kind',
+  'context_id',
+] as const;
+export type ListeningCsvColumn = (typeof LISTENING_CSV_COLUMNS)[number];
+
+export function listeningEventToCsvRow(event: ListeningEvent): Record<string, string | number> {
+  return {
+    schema_version: event.schemaVersion,
+    event_id: event.id,
+    occurred_at_utc: event.occurredAt,
+    type: event.type,
+    session_id: event.sessionId,
+    device_id: event.deviceId,
+    mode: event.mode,
+    track_id: event.trackId ?? '',
+    title: event.track?.title ?? '',
+    artist: event.track?.artistName ?? '',
+    album: event.track?.albumName ?? '',
+    genre: event.track?.genre ?? '',
+    year: event.track?.year ?? '',
+    duration_ms: event.track?.durationMs ?? '',
+    provider: event.track?.provider ?? '',
+    position_ms: event.positionMs ?? '',
+    seconds_played: event.secondsPlayed ?? '',
+    completion_percent: event.completionPercent ?? '',
+    reason: event.reason ?? '',
+    playlist_id: event.playlistId ?? '',
+    preset_id: event.presetId ?? '',
+    context_kind: event.contextKind ?? '',
+    context_id: event.contextId ?? '',
+  };
+}
+
+/** RFC-4180 CSV of a person's own listening events, safe to open in a spreadsheet. */
+export function listeningEventsToCsv(events: readonly ListeningEvent[]): string {
+  return encodeCsv(LISTENING_CSV_COLUMNS, events.map(listeningEventToCsvRow));
 }

@@ -2563,3 +2563,12 @@ a.aqua-badge:focus-visible { outline-offset: 1px; }
 
 /* text that must survive 200% zoom: never clip toolbar labels or buttons */
 @media (min-resolution: 1.5dppx) { .aqua-window { text-rendering: geometricPrecision; } }
+
+/* Vertical fader (spec §9.17): the same recessed channel and silver thumb, rotated. Used by the
+   equaliser, where a column of faders is the shape people expect. */
+.aqua-slider--vertical { flex-direction: column; align-items: center; height: 100%; }
+.aqua-slider--vertical .aqua-slider__track { width: 22px; height: 100%; min-height: 96px; padding: 6px 0; cursor: ns-resize; }
+.aqua-slider--vertical .aqua-slider__channel { width: 4px; height: 100%; margin: 0 auto; }
+.aqua-slider--vertical .aqua-slider__fill { width: 100%; height: var(--aqua-fill, 0%); top: auto; bottom: 0; }
+.aqua-slider--vertical .aqua-slider__thumb { left: 50%; top: auto; bottom: var(--aqua-fill, 0%); transform: translate(-50%, 50%); }
+.aqua-slider--vertical .aqua-slider__value { width: 100%; text-align: center; }

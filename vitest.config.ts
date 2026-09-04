@@ -20,7 +20,7 @@ export default defineConfig({
         test: {
           name: 'unit',
           environment: 'node',
-          include: ['packages/*/src/**/*.test.ts', 'packages/*/tests/unit/**/*.test.ts', 'docker-container/src/**/*.test.ts', 'windows-companion/src/**/*.test.ts', 'music-player/src/**/*.test.ts'],
+          include: ['packages/*/src/**/*.test.ts', 'packages/*/tests/unit/**/*.test.ts', 'docker-container/src/**/*.test.ts', 'docker-container/tests/unit/**/*.test.ts', 'windows-companion/src/**/*.test.ts', 'windows-companion/tests/unit/**/*.test.ts', 'music-player/src/**/*.test.ts', 'music-player/tests/unit/**/*.test.ts'],
           exclude,
         },
       },

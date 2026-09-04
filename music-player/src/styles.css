@@ -1,0 +1,335 @@
+/*
+ * Player layout.
+ *
+ * Aqua tokens, window chrome and controls come from @now-playing/aqua-ui; this file positions the
+ * player-specific pieces and nothing else. No token is redefined here — the design spec is the one
+ * source for those.
+ */
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overscroll-behavior: none;
+}
+
+body {
+  background: var(--aqua-window-bg, #e8e8e8);
+}
+
+/* ---------------------------------------------------------------- notices */
+
+.player-notices {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.player-notices li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 5px;
+  border-left: 3px solid var(--aqua-info, #3b74c8);
+  background: color-mix(in srgb, var(--aqua-info, #3b74c8) 8%, transparent);
+}
+
+.player-notices li[data-kind='warning'] {
+  border-left-color: var(--aqua-warning, #d08700);
+  background: color-mix(in srgb, var(--aqua-warning, #d08700) 10%, transparent);
+}
+
+.player-notices li[data-kind='error'] {
+  border-left-color: var(--aqua-error, #c1392b);
+  background: color-mix(in srgb, var(--aqua-error, #c1392b) 10%, transparent);
+}
+
+.player-notices li span {
+  flex: 1;
+}
+
+/* ------------------------------------------------------------------ common */
+
+.player-hint {
+  margin: 4px 0;
+  color: var(--aqua-text-secondary, #5a6472);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.player-hint--warning {
+  color: var(--aqua-warning-text, #8a5a00);
+}
+
+.player-hint--error {
+  color: var(--aqua-error, #c1392b);
+}
+
+.player-subhead {
+  margin: 12px 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--aqua-text-secondary, #5a6472);
+}
+
+.player-list {
+  margin: 6px 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.player-toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0;
+}
+
+.player-form,
+.player-inline-form {
+  display: flex;
+  gap: 10px;
+  margin: 8px 0;
+}
+
+.player-form {
+  flex-direction: column;
+  max-width: 34rem;
+}
+
+.player-inline-form {
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.player-row-actions,
+.player-reorder {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.player-status-right {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.player-time {
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  color: var(--aqua-text-secondary, #5a6472);
+}
+
+.player-inline-status {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+/* ------------------------------------------------------------- now playing */
+
+.player-now {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.player-now__art img,
+.player-now__art-placeholder {
+  width: 180px;
+  height: 180px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid var(--aqua-border, #b6b6b6);
+  background: linear-gradient(160deg, #c9d0d8, #aab3bd);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 18%);
+}
+
+.player-now__meta {
+  flex: 1;
+  min-width: 16rem;
+}
+
+.player-now__meta h2 {
+  margin: 0 0 2px;
+  font-size: 18px;
+}
+
+.player-now__artist {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--aqua-text-secondary, #5a6472);
+}
+
+.player-now__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 10px 0;
+}
+
+.player-spectrum {
+  display: block;
+  width: 100%;
+  max-width: 480px;
+  height: 72px;
+  margin-top: 10px;
+  border-radius: 4px;
+  background: linear-gradient(#f4f6f9, #e7ebf0);
+  border: 1px solid var(--aqua-border-subtle, #d8dce2);
+}
+
+/* --------------------------------------------------------------- equaliser */
+
+.player-eq-header {
+  display: flex;
+  gap: 14px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.player-eq-curve {
+  display: block;
+  width: 100%;
+  height: 120px;
+  margin: 10px 0;
+  border-radius: 5px;
+  background: linear-gradient(#f7f9fb, #eaeef3);
+  border: 1px solid var(--aqua-border-subtle, #d8dce2);
+}
+
+.player-eq-curve__zero {
+  stroke: var(--aqua-border, #b6b6b6);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.player-eq-curve__line {
+  fill: none;
+  stroke: var(--aqua-accent, #3b74c8);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.player-eq-bands {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+  height: 190px;
+  padding: 8px 4px;
+  overflow-x: auto;
+}
+
+.player-eq-band {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 40px;
+  flex: 1;
+}
+
+.player-eq-band--preamp {
+  border-right: 1px solid var(--aqua-border-subtle, #d8dce2);
+  padding-right: 10px;
+  margin-right: 4px;
+}
+
+.player-eq-band__label {
+  font-size: 10px;
+  color: var(--aqua-text-secondary, #5a6472);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ----------------------------------------------------------------- metrics */
+
+.player-metric-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 16px;
+}
+
+.player-hours,
+.player-trend {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 90px;
+  margin: 10px 0;
+  padding: 4px;
+  border-radius: 5px;
+  background: linear-gradient(#f7f9fb, #eaeef3);
+  border: 1px solid var(--aqua-border-subtle, #d8dce2);
+}
+
+.player-hours__bar,
+.player-trend__bar {
+  flex: 1;
+  min-height: 1px;
+  border-radius: 2px 2px 0 0;
+  background: linear-gradient(#5c93d8, #3b74c8);
+}
+
+/* ----------------------------------------------------------- constellation */
+
+.player-constellation {
+  width: 100%;
+  height: min(60vh, 480px);
+  border-radius: 6px;
+  background: radial-gradient(circle at 50% 40%, #1b2230, #0c1119);
+  border: 1px solid var(--aqua-border, #b6b6b6);
+  overflow: hidden;
+}
+
+/* ------------------------------------------------------------------ sheets */
+
+.player-playlist-picker {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.player-share-result {
+  display: grid;
+  gap: 8px;
+}
+
+.player-fingerprint {
+  margin: 6px 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 26px;
+  letter-spacing: 0.16em;
+}
+
+.player-partials {
+  margin: 6px 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+  display: grid;
+  gap: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

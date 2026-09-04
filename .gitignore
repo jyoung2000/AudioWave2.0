@@ -19,3 +19,6 @@ test-results/
 *.partial
 docker-container/dist/
 docker-container/data/
+music-player/dist/
+music-player/test-results/
+music-player/playwright-report/

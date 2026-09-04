@@ -18,10 +18,15 @@ export interface SliderProps {
   unit?: string;
   className?: string;
   id?: string;
+  /**
+   * Vertical faders are the Aqua idiom for an equaliser (spec §9.17): the same control, rotated,
+   * with drag and arrow keys following the visual direction rather than the horizontal one.
+   */
+  orientation?: 'horizontal' | 'vertical';
 }
 
 /** Generic Aqua slider: narrow recessed track, silver thumb, keyboard steps, editable numeric value (spec §9.17). */
-export function Slider({ label, value, min, max, step = 1, largeStep, onChange, onCommit, disabled, editable, format, unit, className, id: givenId }: SliderProps) {
+export function Slider({ label, value, min, max, step = 1, largeStep, onChange, onCommit, disabled, editable, format, unit, className, id: givenId, orientation = 'horizontal' }: SliderProps) {
   const autoId = useId();
   const id = givenId ?? `slider-${autoId}`;
   const [editing, setEditing] = useState<string | null>(null);
@@ -33,7 +38,7 @@ export function Slider({ label, value, min, max, step = 1, largeStep, onChange, 
       onChange(v);
       if (phase === 'end') onCommit?.(v);
     },
-    { disabled },
+    { disabled, vertical: orientation === 'vertical' },
   );
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (disabled) return;
@@ -59,7 +64,7 @@ export function Slider({ label, value, min, max, step = 1, largeStep, onChange, 
     setEditing(null);
   };
   return (
-    <div className={['aqua-slider', className].filter(Boolean).join(' ')} style={{ '--aqua-fill': `${fraction * 100}%` } as React.CSSProperties}>
+    <div className={['aqua-slider', orientation === 'vertical' && 'aqua-slider--vertical', className].filter(Boolean).join(' ')} data-orientation={orientation} style={{ '--aqua-fill': `${fraction * 100}%` } as React.CSSProperties}>
       <div
         id={id}
         className="aqua-slider__track"
@@ -71,7 +76,7 @@ export function Slider({ label, value, min, max, step = 1, largeStep, onChange, 
         aria-valuenow={value}
         aria-valuetext={text}
         aria-disabled={disabled || undefined}
-        aria-orientation="horizontal"
+        aria-orientation={orientation}
         data-dragging={drag.dragging ? 'true' : undefined}
         onKeyDown={onKeyDown}
         {...drag.handlers}
