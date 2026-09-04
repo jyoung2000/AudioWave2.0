@@ -17,3 +17,5 @@ test-results/
 .playwright-screenshots/
 **/.vite/
 *.partial
+docker-container/dist/
+docker-container/data/

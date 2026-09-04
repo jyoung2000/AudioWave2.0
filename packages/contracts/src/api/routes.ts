@@ -200,8 +200,10 @@ export const DeviceView = Device.extend({
 export type DeviceView = z.infer<typeof DeviceView>;
 
 export const PairingSessionView = PairingSession.omit({ codeHash: true }).extend({ deepLink: z.string().optional() });
+export type PairingSessionView = z.infer<typeof PairingSessionView>;
 
 export const GroupMemberView = GroupMembership.extend({ online: z.boolean(), latencyMs: z.number().nullable().default(null) });
+export type GroupMemberView = z.infer<typeof GroupMemberView>;
 export const GroupView = Group.extend({
   members: z.array(GroupMemberView),
   queueLength: z.number().int().nonnegative(),
@@ -241,6 +243,7 @@ export const GroupAggregateView = z.object({
     .nullable(),
   recommendationAcceptance: z.number().min(0).max(1).nullable(),
 });
+export type GroupAggregateView = z.infer<typeof GroupAggregateView>;
 
 export const NetworkConfig = z.object({
   bindMode: z.enum(['localhost', 'lan', 'remote']),

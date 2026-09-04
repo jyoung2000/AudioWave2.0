@@ -1,0 +1,221 @@
+/*
+ * Admin GUI layout.
+ *
+ * The Aqua design tokens, window chrome and controls all come from @now-playing/aqua-ui; this file
+ * only positions the admin-specific pieces. Nothing here redefines a token or overrides a control's
+ * appearance — the design spec is the single source for those.
+ */
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--aqua-window-bg, #e8e8e8);
+}
+
+.admin-centred {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.admin-login {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: min(28rem, 92vw);
+  padding: 28px 32px;
+  background: var(--aqua-panel-bg, #fff);
+  border: 1px solid var(--aqua-border, #b6b6b6);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 18%);
+}
+
+.admin-login h1 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.admin-login__hint,
+.admin-hint {
+  margin: 0;
+  color: var(--aqua-text-secondary, #5a6472);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.admin-hint--warning {
+  color: var(--aqua-warning-text, #8a5a00);
+}
+
+.admin-toolbar__title {
+  font-weight: 600;
+}
+
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0;
+}
+
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 40rem;
+}
+
+.admin-scopes {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--aqua-border, #b6b6b6);
+  border-radius: 6px;
+}
+
+.admin-scopes legend {
+  padding: 0 4px;
+  font-size: 11px;
+  color: var(--aqua-text-secondary, #5a6472);
+}
+
+.admin-alerts {
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.admin-alerts li {
+  padding: 6px 10px;
+  border-radius: 5px;
+  border-left: 3px solid var(--aqua-info, #3b74c8);
+  background: color-mix(in srgb, var(--aqua-info, #3b74c8) 8%, transparent);
+  font-size: 12px;
+}
+
+.admin-alerts li[data-level='warning'] {
+  border-left-color: var(--aqua-warning, #d08700);
+  background: color-mix(in srgb, var(--aqua-warning, #d08700) 10%, transparent);
+}
+
+.admin-alerts li[data-level='error'] {
+  border-left-color: var(--aqua-error, #c1392b);
+  background: color-mix(in srgb, var(--aqua-error, #c1392b) 10%, transparent);
+}
+
+.admin-list {
+  margin: 6px 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.admin-subhead {
+  margin: 12px 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--aqua-text-secondary, #5a6472);
+}
+
+.admin-capabilities {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 4px 16px;
+  margin: 4px 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+
+.admin-capabilities li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 0;
+  border-bottom: 1px dotted var(--aqua-border-subtle, #d8dce2);
+}
+
+.admin-capabilities li[data-state='available'] span:last-child {
+  color: var(--aqua-ok, #2b7a3d);
+}
+
+.admin-capabilities li[data-state='unsupported'] span:last-child,
+.admin-capabilities li[data-state='blocked'] span:last-child {
+  color: var(--aqua-text-secondary, #5a6472);
+}
+
+.admin-capabilities li[data-state='requires_auth'] span:last-child,
+.admin-capabilities li[data-state='restricted'] span:last-child {
+  color: var(--aqua-warning-text, #8a5a00);
+}
+
+.admin-pairing {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.admin-pairing__qr svg {
+  width: 168px;
+  height: 168px;
+  background: #fff;
+  border: 1px solid var(--aqua-border, #b6b6b6);
+  border-radius: 6px;
+  padding: 6px;
+}
+
+.admin-pairing__code {
+  margin: 0 0 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 22px;
+  letter-spacing: 0.12em;
+}
+
+.admin-inline-error {
+  margin: 4px 0 0;
+  color: var(--aqua-error, #c1392b);
+  font-size: 11px;
+}
+
+.admin-inline-error__id {
+  color: var(--aqua-text-secondary, #5a6472);
+}
+
+.admin-fingerprint {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  color: var(--aqua-text-secondary, #5a6472);
+}
+
+.admin-report {
+  margin-top: 10px;
+}
+
+.aqua-input--number {
+  width: 5.5rem;
+  text-align: right;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

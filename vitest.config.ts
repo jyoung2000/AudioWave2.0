@@ -29,7 +29,7 @@ export default defineConfig({
         test: {
           name: 'dom',
           environment: 'happy-dom',
-          include: ['packages/*/src/**/*.dom.test.{ts,tsx}', 'packages/*/tests/dom/**/*.test.{ts,tsx}', 'music-player/src/**/*.dom.test.{ts,tsx}', 'music-player/tests/dom/**/*.test.{ts,tsx}', 'docker-container/src/web/**/*.dom.test.{ts,tsx}', 'windows-companion/src/renderer/**/*.dom.test.{ts,tsx}'],
+          include: ['packages/*/src/**/*.dom.test.{ts,tsx}', 'packages/*/tests/dom/**/*.test.{ts,tsx}', 'music-player/src/**/*.dom.test.{ts,tsx}', 'music-player/tests/dom/**/*.test.{ts,tsx}', 'docker-container/src/web/**/*.dom.test.{ts,tsx}', 'docker-container/tests/dom/**/*.test.{ts,tsx}', 'windows-companion/src/renderer/**/*.dom.test.{ts,tsx}', 'windows-companion/tests/dom/**/*.test.{ts,tsx}'],
           exclude,
         },
       },
