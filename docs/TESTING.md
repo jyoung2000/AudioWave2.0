@@ -67,6 +67,20 @@ compare against a number. They also check that expensive dependencies stayed out
 because a budget that only counts bytes can be satisfied by moving code around rather than by loading
 less of it.
 
+## The ten acceptance flows
+
+The plan's ten end-to-end flows each have a home, so a flow number resolves to a file rather than to
+a claim:
+
+| Flow | Where |
+|---|---|
+| 1. First run | `docker-container/tests/integration/setup-and-pairing.test.ts`, and in a browser in `tests/e2e/first-run.setup.ts` |
+| 2. Pairing a device | `setup-and-pairing.test.ts`; the pairing screen in `tests/e2e/hub.spec.ts` |
+| 3–5. Group listening, the authoritative queue, Discord parity | `groups-and-queue.test.ts`, `discord-parity.test.ts` |
+| 6–8. Shared links, companion sync, device-to-device transfers | `shares-and-sync.test.ts`, and `windows-companion/tests/integration/companion-and-hub.test.ts` for the companion's half |
+| 9. Discovery and recommendations | `discovery-engine.test.ts` |
+| 10. Requesting a download | `tests/security/ssrf-and-downloads.test.ts` |
+
 ## Writing a test here
 
 - **Assert behaviour, not implementation.** The three defects found while building this — history

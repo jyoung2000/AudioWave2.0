@@ -1,4 +1,6 @@
 /**
+ * Flow 10: requesting a download, and the guards around it.
+ *
  * Outbound-request safety and the download authorization gate.
  *
  * The download tests encode the project's legal posture: a stream is not a download, an

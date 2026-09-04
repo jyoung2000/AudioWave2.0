@@ -1,5 +1,5 @@
 /**
- * The discovery and recommendation pipeline, end to end.
+ * Flow 9: the discovery and recommendation pipeline, end to end.
  *
  * Every stage is the real one: events go in through the API, the canonical catalogue is built from
  * them, the taste profile is derived, the background job queue runs the same handlers the scheduler
