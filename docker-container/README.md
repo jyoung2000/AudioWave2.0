@@ -64,8 +64,8 @@ than throwing your changes away.
 
 ## The rest of the commands
 
-| | |
-|---|---|
+|  |  |
+| --- | --- |
 | `./nowplaying status` | what is running, and whether the hub is answering |
 | `./nowplaying logs -f` | follow the container logs |
 | `./nowplaying start` / `stop` / `restart` | the obvious things |
@@ -91,7 +91,7 @@ Everything is an environment variable in `compose.yaml`, and every one of them i
 The ones worth knowing:
 
 | Variable | Default | What it does |
-|---|---|---|
+| --- | --- | --- |
 | `NP_DATA_DIR` | `/data` | Everything the hub owns. Back this up and the hub is portable. |
 | `NP_PORT` | `4546` | Port inside the container. |
 | `NP_BIND_MODE` | `localhost` | `localhost`, `lan` or `remote`. Anything but `localhost` stays inactive until the admin password is changed. |

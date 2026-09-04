@@ -16,16 +16,16 @@ written for the person reading it rather than as an error code.
 
 ## What is offered, and when
 
-|                                                             | Downloadable?                                  | Why                                                                                                                                                                |
-| ----------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Files you already own — on your device, or on a hub you run | Yes                                            | They are your files. The hub streams them by byte range and the companion transfers them intact.                                                                   |
-| A file another of your devices holds                        | Yes, after that device authorizes the transfer | The owning device decides; the hub relays the bytes and verifies the SHA-256 before accepting them.                                                                |
-| SoundCloud, where the creator enabled downloads             | Yes                                            | SoundCloud exposes this per track. The adapter reads `downloadable` and `has_downloads_left`, and offers the download only when both allow it.                     |
-| SoundCloud, where the creator did not                       | No                                             | The creator chose that. The result says "Streaming allowed; the creator did not enable downloads".                                                                 |
-| Spotify                                                     | No                                             | The Web API offers no audio download. Playback is through the Web Playback SDK, in a browser, for Premium accounts.                                                |
-| YouTube                                                     | No                                             | Downloading is prohibited by the API terms of service. Playback is the embedded player only.                                                                       |
-| Bandcamp                                                    | No, in the app                                 | There is no public API. Bandcamp is a link out; if you buy something there, the file you bought can be imported through the companion like any other file you own. |
-| MusicBrainz                                                 | Not applicable                                 | Metadata only. It is never an audio source.                                                                                                                        |
+|  | Downloadable? | Why |
+| --- | --- | --- |
+| Files you already own — on your device, or on a hub you run | Yes | They are your files. The hub streams them by byte range and the companion transfers them intact. |
+| A file another of your devices holds | Yes, after that device authorizes the transfer | The owning device decides; the hub relays the bytes and verifies the SHA-256 before accepting them. |
+| SoundCloud, where the creator enabled downloads | Yes | SoundCloud exposes this per track. The adapter reads `downloadable` and `has_downloads_left`, and offers the download only when both allow it. |
+| SoundCloud, where the creator did not | No | The creator chose that. The result says "Streaming allowed; the creator did not enable downloads". |
+| Spotify | No | The Web API offers no audio download. Playback is through the Web Playback SDK, in a browser, for Premium accounts. |
+| YouTube | No | Downloading is prohibited by the API terms of service. Playback is the embedded player only. |
+| Bandcamp | No, in the app | There is no public API. Bandcamp is a link out; if you buy something there, the file you bought can be imported through the companion like any other file you own. |
+| MusicBrainz | Not applicable | Metadata only. It is never an audio source. |
 
 ## What this software does not do
 

@@ -17,15 +17,15 @@ never as passed.
 
 ## The suites
 
-| Project          | Where                                                  | What it covers                                                                                                               | Count |
-| ---------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- | ----- |
-| `unit`           | `packages/*/tests/unit`, `*/src/**/*.test.ts`          | Pure logic: ids, the queue reducer, EQ precedence, retune maths, sync rules, CSV, metrics, the recommender, library scanning | ~200  |
-| `dom`            | `**/tests/dom`, `*.dom.test.tsx`                       | Components and app shells rendered in happy-dom, driven with real user events                                                | ~30   |
-| `contracts`      | `packages/contracts/tests`, `**/tests/contract`        | Every schema round-trips; every route the contracts declare has a handler; the release manifest parses                       | ~10   |
-| `integration`    | `**/tests/integration`                                 | A real hub (real Fastify, real SQLite, real argon2) and, for the companion, its real client against that hub                 | ~100  |
-| `security`       | `**/tests/security`                                    | The controls, as behaviour: the sanitiser, the channel allowlist, CSP, SSRF, rate limits, authorization                      | ~40   |
-| `perf`           | `tests/perf`                                           | Bundle budgets measured from built output                                                                                    | 8     |
-| e2e (Playwright) | `music-player/tests/e2e`, `docker-container/tests/e2e` | Real browsers against real production builds                                                                                 | 31    |
+| Project | Where | What it covers | Count |
+| --- | --- | --- | --- |
+| `unit` | `packages/*/tests/unit`, `*/src/**/*.test.ts` | Pure logic: ids, the queue reducer, EQ precedence, retune maths, sync rules, CSV, metrics, the recommender, library scanning | ~200 |
+| `dom` | `**/tests/dom`, `*.dom.test.tsx` | Components and app shells rendered in happy-dom, driven with real user events | ~30 |
+| `contracts` | `packages/contracts/tests`, `**/tests/contract` | Every schema round-trips; every route the contracts declare has a handler; the release manifest parses | ~10 |
+| `integration` | `**/tests/integration` | A real hub (real Fastify, real SQLite, real argon2) and, for the companion, its real client against that hub | ~100 |
+| `security` | `**/tests/security` | The controls, as behaviour: the sanitiser, the channel allowlist, CSP, SSRF, rate limits, authorization | ~40 |
+| `perf` | `tests/perf` | Bundle budgets measured from built output | 8 |
+| e2e (Playwright) | `music-player/tests/e2e`, `docker-container/tests/e2e` | Real browsers against real production builds | 31 |
 
 ```sh
 pnpm test               # unit + dom + contracts + integration
@@ -73,7 +73,7 @@ The plan's ten end-to-end flows each have a home, so a flow number resolves to a
 a claim:
 
 | Flow | Where |
-|---|---|
+| --- | --- |
 | 1. First run | `docker-container/tests/integration/setup-and-pairing.test.ts`, and in a browser in `tests/e2e/first-run.setup.ts` |
 | 2. Pairing a device | `setup-and-pairing.test.ts`; the pairing screen in `tests/e2e/hub.spec.ts` |
 | 3–5. Group listening, the authoritative queue, Discord parity | `groups-and-queue.test.ts`, `discord-parity.test.ts` |

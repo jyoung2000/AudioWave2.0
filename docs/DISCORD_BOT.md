@@ -34,17 +34,17 @@ ignored.
 
 ## The commands
 
-|                             | What it does                                                                 |
-| --------------------------- | ---------------------------------------------------------------------------- |
-| `play <query or url>`       | Search and enqueue, or enqueue a pasted link                                 |
-| `queue [page]`              | Show the queue, paged                                                        |
-| `nowplaying`                | What is playing, with position                                               |
-| `skip [reason]`             | Skip the current track; the reason is recorded in the history                |
-| `pause` / `resume` / `stop` | Transport                                                                    |
-| `shuffle`                   | Shuffle what is queued but not yet played                                    |
-| `clear`                     | Empty the queue                                                              |
-| `join` / `leave`            | Move the bot in and out of your voice channel                                |
-| `settings`                  | The group's current policy: designated channel, DJ role, vote-skip threshold |
+|  | What it does |
+| --- | --- |
+| `play <query or url>` | Search and enqueue, or enqueue a pasted link |
+| `queue [page]` | Show the queue, paged |
+| `nowplaying` | What is playing, with position |
+| `skip [reason]` | Skip the current track; the reason is recorded in the history |
+| `pause` / `resume` / `stop` | Transport |
+| `shuffle` | Shuffle what is queued but not yet played |
+| `clear` | Empty the queue |
+| `join` / `leave` | Move the bot in and out of your voice channel |
+| `settings` | The group's current policy: designated channel, DJ role, vote-skip threshold |
 
 Every one exists as both a slash command and a prefix command.
 

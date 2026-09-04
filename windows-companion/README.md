@@ -56,8 +56,8 @@ Packaging runs on Windows. On Linux or macOS `build` works, `package` does not.
 
 ## The two builds
 
-| | Installer (`Setup … .exe`) | Portable (`Portable … .exe`) |
-|---|---|---|
+|  | Installer (`Setup … .exe`) | Portable (`Portable … .exe`) |
+| --- | --- | --- |
 | Installs to | your user profile (no administrator needed) | nowhere — it runs from where it is |
 | Data lives in | `%APPDATA%\Now Playing Companion` | `NowPlayingCompanion-data` beside the .exe |
 | Start-menu entry | yes | no |

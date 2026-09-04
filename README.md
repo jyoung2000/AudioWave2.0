@@ -2,8 +2,8 @@
 
 Three music applications that work on their own and work better together.
 
-| | What it is | Runs on |
-|---|---|---|
+|  | What it is | Runs on |
+| --- | --- | --- |
 | [**music-player**](music-player/README.md) | An offline-first player for the music already on your device. A web app you can install; everything is bundled, nothing is fetched from a CDN. | Any modern browser |
 | [**docker-container**](docker-container/README.md) | A self-hosted hub: your library on every device, group listening in sync, pairing, shared links, a Discord bot. | One `docker compose` command |
 | [**windows-companion**](windows-companion/README.md) | A desktop app for the one thing a web page cannot do — read a folder of files off a Windows disk and keep watching it. | Windows 10 1809+ |
@@ -61,8 +61,9 @@ packages/
   test-fixtures/     generated audio and library fixtures, shared by every test suite
 ```
 
-One schema is the source of truth for every wire format. Types, JSON Schema and the OpenAPI document
-are generated from it, and a contract test asserts every route the contracts declare has a handler.
+One schema is the source of truth for every wire format. Types, 71 JSON Schema documents and an
+OpenAPI description of 119 operations across 97 paths are generated from it, and a contract test
+asserts every route the contracts declare has a handler.
 
 The interface follows `docs/design/APPLE_AQUA_2009_2010_UI_DESIGN_SPEC.md` under the profile
 `AQUA_PROFILE=snow-leopard-itunes-9`. Its MUST items are release gates; where the implementation

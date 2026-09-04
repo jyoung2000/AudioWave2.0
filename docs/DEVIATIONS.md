@@ -57,15 +57,15 @@ results popover, the scrubber, the transport with its latched states, the stripe
 a marquee on the playing row, and the motion character including the parked marquee. What was not
 carried over:
 
-| In the reference                                           | Why it is not here                                                                                                                                       |
-| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A direct browser call to `api.anthropic.com`               | It requires an API key in the page. No secret may live in a client bundle, so there is nowhere safe to put one. Removed entirely.                        |
-| JSONP fallbacks to `itunes.apple.com` and Deezer           | Script-injection JSONP is arbitrary code execution by design. Search goes through the hub, which is a server that can hold credentials.                  |
-| A `noembed.com` relay                                      | Same reason, plus it sends what a listener is looking at to a third party.                                                                               |
-| `http://127.0.0.1:8642` companion assumption               | The companion is paired explicitly and reached at an address the person chose. A hard-coded loopback port is a hidden dependency and a hijacking target. |
-| A CDN import map for `three`                               | Everything is bundled. The player must work offline, and a CDN is a third party that sees every visit.                                                   |
-| Demo tracks in `window.LIBRARY`                            | Replaced by real indexed data. A demo mode exists behind `VITE_DEMO_MODE=true` and is labelled as one on screen.                                         |
-| iOS-style blurred context menus and sheets, 12–14 px radii | Replaced with Aqua menus and sheets: opaque, 5–8 px radii, one shadow — the spec's material rules.                                                       |
+| In the reference | Why it is not here |
+| --- | --- |
+| A direct browser call to `api.anthropic.com` | It requires an API key in the page. No secret may live in a client bundle, so there is nowhere safe to put one. Removed entirely. |
+| JSONP fallbacks to `itunes.apple.com` and Deezer | Script-injection JSONP is arbitrary code execution by design. Search goes through the hub, which is a server that can hold credentials. |
+| A `noembed.com` relay | Same reason, plus it sends what a listener is looking at to a third party. |
+| `http://127.0.0.1:8642` companion assumption | The companion is paired explicitly and reached at an address the person chose. A hard-coded loopback port is a hidden dependency and a hijacking target. |
+| A CDN import map for `three` | Everything is bundled. The player must work offline, and a CDN is a third party that sees every visit. |
+| Demo tracks in `window.LIBRARY` | Replaced by real indexed data. A demo mode exists behind `VITE_DEMO_MODE=true` and is labelled as one on screen. |
+| iOS-style blurred context menus and sheets, 12–14 px radii | Replaced with Aqua menus and sheets: opaque, 5–8 px radii, one shadow — the spec's material rules. |
 
 ## Honest capability, where it costs a feature
 
@@ -123,9 +123,9 @@ be wanted.
 
 ## Deliberate omissions
 
-| Not built                                               | Why                                                                                                                                                                                                                            |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Not built | Why |
+| --- | --- |
 | Fingerprint-based track matching (AcoustID/Chromaprint) | The identity model has a field for it, and the matching logic accepts one. Computing fingerprints needs a native library in the browser and the companion; content hash, ISRC and MusicBrainz ids cover the cases that matter. |
-| A mobile companion                                      | The PWA covers phones. A native app would exist mainly for the Android Auto tile, which is a large amount of work for one feature.                                                                                             |
-| Multi-user accounts on the hub                          | One administrator, and paired devices with scopes. Adding real multi-tenancy would change the authorization model everywhere and was not asked for.                                                                            |
-| Server-side transcoding on the fly                      | FFmpeg converts a file the owner already has. Transcoding a provider's stream in flight is a different thing legally and was not built.                                                                                        |
+| A mobile companion | The PWA covers phones. A native app would exist mainly for the Android Auto tile, which is a large amount of work for one feature. |
+| Multi-user accounts on the hub | One administrator, and paired devices with scopes. Adding real multi-tenancy would change the authorization model everywhere and was not asked for. |
+| Server-side transcoding on the fly | FFmpeg converts a file the owner already has. Transcoding a provider's stream in flight is a different thing legally and was not built. |
