@@ -16,8 +16,10 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRe
 import type { Track } from '@now-playing/contracts';
 import { sourceOf } from '../lib/track-source.js';
 
-const PAGE = 6;
+const PAGE = 5;
 const AUDITION_MS = 15_000;
+/** Seconds of fade before the cut. A clip that stops mid-note reads as a fault rather than an end. */
+const TAIL_S = 0.7;
 /** The circumference of the r=13.5 ring the reference draws, so the dash offset is a fraction of it. */
 const RING = 84.82;
 
@@ -30,6 +32,7 @@ const RING = 84.82;
  */
 export interface SearchPopoverHandle {
   move: (delta: 1 | -1) => void;
+  turn: (delta: 1 | -1) => void;
   commit: () => void;
 }
 
@@ -72,7 +75,7 @@ export const SearchPopover = forwardRef<SearchPopoverHandle, SearchPopoverProps>
   const [says, setSays] = useState('');
   const player = useRef<HTMLAudioElement | null>(null);
   const url = useRef<string | null>(null);
-  const timer = useRef(0);
+  const frame = useRef(0);
   const resumeAfter = useRef(false);
 
   const needle = query.trim().toLowerCase();
@@ -92,10 +95,21 @@ export const SearchPopover = forwardRef<SearchPopoverHandle, SearchPopoverProps>
   const hot = rawHot >= visible.length ? -1 : rawHot;
 
   const stopAudition = useCallback(() => {
-    window.clearInterval(timer.current);
-    timer.current = 0;
-    player.current?.pause();
+    if (frame.current) cancelAnimationFrame(frame.current);
+    frame.current = 0;
+    const element = player.current;
     player.current = null;
+    if (element) {
+      element.pause();
+      // Dropping the src as well as pausing: a paused element holding a revoked blob URL keeps the
+      // decoder and the buffer alive for as long as the element is reachable.
+      element.removeAttribute('src');
+      try {
+        element.load();
+      } catch {
+        /* a browser that refuses to reload an empty element has already stopped, which is the point */
+      }
+    }
     if (url.current) URL.revokeObjectURL(url.current);
     url.current = null;
     setAudition(null);
@@ -130,43 +144,81 @@ export const SearchPopover = forwardRef<SearchPopoverHandle, SearchPopoverProps>
       player.current = element;
       setAudition({ id: track.id, progress: 0 });
       setSays(`Auditioning ${track.title}`);
-      const started = performance.now();
       void element.play().catch(() => {
         setSays('This browser would not start the audition.');
         stopAudition();
       });
-      timer.current = window.setInterval(() => {
-        const elapsed = performance.now() - started;
-        if (elapsed >= AUDITION_MS) stopAudition();
-        else setAudition({ id: track.id, progress: elapsed / AUDITION_MS });
-      }, 100);
+      element.addEventListener('ended', stopAudition);
+      element.addEventListener('error', stopAudition);
+      /*
+       * The ring follows the audio's own clock, not a wall clock: a file that stalls for a second
+       * should have its ring stall with it rather than run ahead of what is being heard. The last
+       * 0.7 s ramps the level down so the clip ends instead of being cut off.
+       */
+      const tick = (): void => {
+        frame.current = 0;
+        if (player.current !== element) return;
+        const clip = AUDITION_MS / 1000;
+        const left = clip - element.currentTime;
+        element.volume = left < TAIL_S ? Math.max(0, left / TAIL_S) : 1;
+        if (element.currentTime >= clip) {
+          stopAudition();
+          return;
+        }
+        setAudition({ id: track.id, progress: Math.min(1, element.currentTime / clip) });
+        frame.current = requestAnimationFrame(tick);
+      };
+      frame.current = requestAnimationFrame(tick);
     },
     [audition, onAudition, onAuditionPause, stopAudition],
   );
 
+  /*
+   * The arrows walk off the end of a page into the next one rather than wrapping back to the top of
+   * the same five rows. Wrapping inside a page hides the fact that there are more results below;
+   * paging is what the pager in the footer does, and the keyboard should reach the same places.
+   */
   const move = useCallback(
     (delta: 1 | -1): void => {
       if (!visible.length) return;
-      setHot((was) => {
-        const next = (was < 0 ? (delta === 1 ? -1 : 0) : was) + delta;
-        if (next < 0) return visible.length - 1;
-        if (next >= visible.length) return 0;
-        return next;
-      });
+      const at = hot < 0 ? (delta === 1 ? -1 : visible.length) : hot;
+      const next = at + delta;
+      if (next >= 0 && next < visible.length) {
+        setHot(next);
+        return;
+      }
+      if (delta === 1 && page < pages - 1) {
+        setPage(page + 1);
+        setHot(0);
+      } else if (delta === -1 && page > 0) {
+        setPage(page - 1);
+        setHot(PAGE - 1);
+      }
     },
-    [visible.length],
+    [visible.length, hot, page, pages],
+  );
+
+  const turn = useCallback(
+    (delta: 1 | -1): void => {
+      const next = Math.min(pages - 1, Math.max(0, page + delta));
+      if (next === page) return;
+      setPage(next);
+      setHot(-1);
+    },
+    [page, pages],
   );
 
   useImperativeHandle(
     ref,
     () => ({
       move,
+      turn,
       commit: () => {
         const track = visible[hot];
         if (track) onPlay(track);
       },
     }),
-    [move, visible, hot, onPlay],
+    [move, turn, visible, hot, onPlay],
   );
 
   return (

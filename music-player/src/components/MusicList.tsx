@@ -18,7 +18,7 @@
  * - the download key reports whether the track is genuinely available offline rather than toggling
  *   a decoration: a file in a connected folder already is, and says so.
  */
-import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Playlist, PlaylistItem, Track } from '@now-playing/contracts';
 import { RowMenu, useMarquee, useOverlayScroller } from './music-list-behaviours.js';
 import { offlineOf, sourceOf } from '../lib/track-source.js';
@@ -50,7 +50,13 @@ function fmt(ms: number | null | undefined): string {
 
 export function MusicList({ tracks, playingTrackId, onPlay, onToggleStar, playlists, playlistItems, onTogglePlaylist, onNewPlaylist, onSay, ephemeralTrackIds, label = 'Library' }: MusicListProps) {
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'title', dir: 1 });
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [pickedId, setPickedId] = useState<string | null>(null);
+  /*
+   * Until a row is picked, the playing one is the selection — which is also the list's single tab
+   * stop. Landing the focus on the song you are hearing is the reference's behaviour and the useful
+   * one: Tab into a thousand-row list and the arrows start from where you are, not from the top.
+   */
+  const selectedId = pickedId ?? playingTrackId;
   const [menu, setMenu] = useState<{ track: Track; x: number; y: number } | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const barRef = useRef<HTMLDivElement | null>(null);
@@ -84,7 +90,7 @@ export function MusicList({ tracks, playingTrackId, onPlay, onToggleStar, playli
   }, [tracks, sort]);
 
   const select = useCallback((id: string, focus: boolean) => {
-    setSelectedId(id);
+    setPickedId(id);
     if (!focus) return;
     // Focus after the render that moves the roving tabindex, not before it.
     requestAnimationFrame(() => tbodyRef.current?.querySelector<HTMLTableRowElement>(`tr[data-id="${CSS.escape(id)}"]`)?.focus());
@@ -94,6 +100,27 @@ export function MusicList({ tracks, playingTrackId, onPlay, onToggleStar, playli
 
   useOverlayScroller(scrollRef, barRef, thumbRef, listRef, rows.length);
   useMarquee(tbodyRef, playingTrackId, rows);
+
+  /*
+   * Keep the playing row in sight. A song can start from somewhere that is not this list — the
+   * search popover, the transport, a hub — and a list that does not follow leaves the tinted row
+   * somewhere off screen with nothing saying where.
+   *
+   * Scrolled by hand rather than with scrollIntoView: that method walks up the ancestors and would
+   * take the whole page with it, which on this layout means the hero jumping out of view every time
+   * a track changes. Here only the list's own scroller moves, and only when the row is outside it.
+   */
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    if (!playingTrackId || !scroller) return;
+    const row = tbodyRef.current?.querySelector<HTMLTableRowElement>(`tr[data-id="${CSS.escape(playingTrackId)}"]`);
+    if (!row) return;
+    const head = scroller.querySelector('thead')?.getBoundingClientRect().height ?? 0;
+    const box = scroller.getBoundingClientRect();
+    const rowBox = row.getBoundingClientRect();
+    if (rowBox.top < box.top + head) scroller.scrollTop -= box.top + head - rowBox.top;
+    else if (rowBox.bottom > box.bottom) scroller.scrollTop += rowBox.bottom - box.bottom;
+  }, [playingTrackId, rows]);
 
   return (
     <>

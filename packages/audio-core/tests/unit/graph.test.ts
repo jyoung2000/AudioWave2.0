@@ -157,6 +157,26 @@ describe('audio engine graph', () => {
     expect(state.dspUnavailableReason).toContain('CORS');
   });
 
+  /**
+   * The rule that makes a player different from a demo: `createMediaElementSource` may be called
+   * once per element, ever, and the binding survives disconnecting the node. One element plays every
+   * track, so the second song has to reuse the first song's node — otherwise the whole graph throws
+   * on track two and the equaliser dies with it.
+   */
+  it('reuses one source node when the same element is attached for the next track', () => {
+    const { context, engine } = engineWith();
+    const element = new MockMediaElement({ src: 'blob:https://player.test/one' });
+    expect(engine.attachMediaElement(element).ok).toBe(true);
+
+    element.src = 'blob:https://player.test/two';
+    expect(engine.attachMediaElement(element).ok).toBe(true);
+    expect(nodesOfKind(context, 'media-element-source')).toHaveLength(1);
+
+    const source = nodesOfKind(context, 'media-element-source')[0]!;
+    expect(context.reaches(source, context.destination), 'the reused node must still reach the output').toBe(true);
+    expect(engine.getState().dspAvailable).toBe(true);
+  });
+
   it('accepts a same-origin blob element', () => {
     const { engine } = engineWith();
     const result = engine.attachMediaElement(new MockMediaElement({ src: 'blob:https://player.test/abc' }));

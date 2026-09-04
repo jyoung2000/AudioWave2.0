@@ -256,6 +256,9 @@ export function createAudioEngine(context: EngineContext, options: AudioEngineOp
     if (disposed) throw new Error('This audio engine has been disposed');
   }
 
+  /** Every element this engine has ever bound, and the node it was bound to. See attachMediaElement. */
+  const elementSources = new Map<RetunableMediaElement, MediaElementSourceNodeLike>();
+
   function connectSource(node: AudioNodeLike): void {
     node.connect(processedIn);
     node.connect(dryPath);
@@ -263,16 +266,30 @@ export function createAudioEngine(context: EngineContext, options: AudioEngineOp
 
   function attachMediaElement(element: RetunableMediaElement): AttachResult {
     assertLive();
+    // Web Audio binds an element to a source node once and for good: a second
+    // createMediaElementSource for the same element throws InvalidStateError, and disconnecting the
+    // node does not undo the binding. A player reuses one element for every track, so the node has
+    // to be made once here and reused for all of them.
+    const bound = elementSources.get(element) ?? null;
     detach();
     if (isCrossOriginWithoutCors(element, options.pageOrigin === undefined ? currentPageOrigin() : options.pageOrigin)) {
-      // Creating the source node would silence the element; leave it alone and report why.
       dspAvailable = false;
-      dspUnavailableReason = `${DSP_UNAVAILABLE_REASON}: the media is served from another origin without CORS, so the browser would mute it if it entered the graph`;
       mediaElement = element;
+      if (bound) {
+        // Already in the graph from an earlier track, and there is no way back out. Reconnecting
+        // keeps the chain intact; the browser mutes this source itself, which is what to say.
+        sourceNode = bound;
+        connectSource(bound);
+        dspUnavailableReason = `${DSP_UNAVAILABLE_REASON}: the media is served from another origin without CORS, and this player is already in the graph, so the browser mutes it. Play it through the hub instead.`;
+      } else {
+        // Creating the source node would silence the element; leave it alone and report why.
+        dspUnavailableReason = `${DSP_UNAVAILABLE_REASON}: the media is served from another origin without CORS, so the browser would mute it if it entered the graph`;
+      }
       notify();
       return { ok: false, reason: dspUnavailableReason };
     }
-    const node = context.createMediaElementSource(element);
+    const node = bound ?? context.createMediaElementSource(element);
+    if (!bound) elementSources.set(element, node);
     sourceNode = node;
     mediaElement = element;
     connectSource(node);

@@ -9,7 +9,7 @@
  * The grid deliberately gives the two side columns equal minimum widths, so the pill is optically
  * centred *in the bar* rather than centred in whatever space the two ends happen to leave.
  */
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useDismiss } from '../hooks/index.js';
 
 export interface PageBarProps {
@@ -38,9 +38,30 @@ export function BarClock() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     // Tick on the minute rather than the second: a clock that changes 60 times a minute in a corner
-    // is a distraction, and re-rendering for it is waste.
-    const id = window.setInterval(() => setNow(new Date()), 20_000);
-    return () => window.clearInterval(id);
+    // is a distraction, and re-rendering for it is waste. But it has to change *on* the minute, so
+    // the timeout is re-armed to the next boundary each time rather than run at a fixed interval —
+    // a poll lands up to its own period late, and a throttled background tab lands later still.
+    let timer = 0;
+    const sync = (): void => {
+      window.clearTimeout(timer);
+      const at = new Date();
+      setNow(at);
+      const untilNextMinute = 60_000 - (at.getSeconds() * 1000 + at.getMilliseconds());
+      timer = window.setTimeout(sync, untilNextMinute + 20);
+    };
+    sync();
+    // Waking the tab is the case a fixed interval gets wrong: the timer was frozen, so the reading
+    // on screen is stale the instant it comes back.
+    const wake = (): void => {
+      if (!document.hidden) sync();
+    };
+    document.addEventListener('visibilitychange', wake);
+    window.addEventListener('focus', sync);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', wake);
+      window.removeEventListener('focus', sync);
+    };
   }, []);
   const hours = String(now.getHours()).padStart(2, '0');
   const minutes = String(now.getMinutes()).padStart(2, '0');
@@ -69,17 +90,41 @@ export interface BarSearchProps {
    * routed out of here instead of being handled where the rows are.
    */
   onArrow?: (delta: 1 | -1) => void;
+  /** PageDown / PageUp, for a results list that pages. */
+  onPage?: (delta: 1 | -1) => void;
   onCommit?: () => void;
   activeDescendant?: string | null;
   /** The id of the listbox inside `results`, for `aria-controls`. */
   controls?: string;
+  /** The field itself, so whatever closes the popover can put the caret back in it. */
+  inputRef?: RefObject<HTMLInputElement | null>;
 }
 
 /** The recessed pill, with the results popover pinned to its own edges. */
-export function BarSearch({ value, onChange, placeholder = 'Search', label, results, open = false, onOpenChange, onSubmit, onArrow, onCommit, activeDescendant, controls }: BarSearchProps) {
+export function BarSearch({ value, onChange, placeholder = 'Search', label, results, open = false, onOpenChange, onSubmit, onArrow, onPage, onCommit, activeDescendant, controls, inputRef }: BarSearchProps) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
+  const popRef = useRef<HTMLDivElement | null>(null);
   const listId = useId();
   useDismiss(wrapRef, open, () => onOpenChange?.(false));
+  /*
+   * Pressing inside the popover must not pull the focus out of the field: this is a combobox, the
+   * rows are pointed at with aria-activedescendant, and a blur here would both drop that pointer
+   * and close the list out from under the press. Links keep their own behaviour, since following
+   * one is meant to leave.
+   *
+   * Attached to the node rather than written as a JSX handler because the popover is a container,
+   * not a control — it has no role of its own, and giving it one to satisfy a handler would put a
+   * meaningless element in the accessibility tree.
+   */
+  useEffect(() => {
+    const node = popRef.current;
+    if (!open || !node) return;
+    const hold = (event: MouseEvent): void => {
+      if (!(event.target as HTMLElement).closest('a')) event.preventDefault();
+    };
+    node.addEventListener('mousedown', hold);
+    return () => node.removeEventListener('mousedown', hold);
+  }, [open]);
   return (
     <div className="np-search" role="search" ref={wrapRef}>
       <svg className="np-search__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true" focusable="false">
@@ -87,6 +132,7 @@ export function BarSearch({ value, onChange, placeholder = 'Search', label, resu
         <path d="M10.1 10.1 L14 14" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
       </svg>
       <input
+        ref={inputRef}
         className="np-search__input"
         type="search"
         value={value}
@@ -106,16 +152,33 @@ export function BarSearch({ value, onChange, placeholder = 'Search', label, resu
         onFocus={() => {
           if (value.trim()) onOpenChange?.(true);
         }}
+        // Clicking a field that already has the focus fires no focus event, so a popover dismissed
+        // with Escape would have no way back without this.
+        onClick={() => {
+          if (value.trim()) onOpenChange?.(true);
+        }}
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
-            onOpenChange?.(false);
-            onChange('');
-          } else if (event.key === 'ArrowDown' && open) {
+            // Close, but keep what was typed: Escape means "put this list away", and throwing the
+            // query out with it costs a retype for nothing.
+            if (open) {
+              event.preventDefault();
+              onOpenChange?.(false);
+            }
+          } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            if (!open) {
+              // The first arrow after a dismissal brings the list back rather than being swallowed.
+              if (value.trim()) {
+                event.preventDefault();
+                onOpenChange?.(true);
+              }
+              return;
+            }
             event.preventDefault();
-            onArrow?.(1);
-          } else if (event.key === 'ArrowUp' && open) {
+            onArrow?.(event.key === 'ArrowDown' ? 1 : -1);
+          } else if ((event.key === 'PageDown' || event.key === 'PageUp') && open) {
             event.preventDefault();
-            onArrow?.(-1);
+            onPage?.(event.key === 'PageDown' ? 1 : -1);
           } else if (event.key === 'Enter') {
             event.preventDefault();
             // A row under the arrows wins; otherwise Return means "show me everything".
@@ -126,7 +189,7 @@ export function BarSearch({ value, onChange, placeholder = 'Search', label, resu
       />
       {open && results ? (
         // `.srch` is the reference's own popover: its markup, its classes, its stylesheet block.
-        <div id={listId} className="srch">
+        <div id={listId} className="srch" ref={popRef}>
           {results}
         </div>
       ) : (
@@ -164,6 +227,10 @@ export interface ModeSwitchProps {
  */
 export function ModeSwitch({ modes, value, onChange, onBlocked, label = 'Listening mode' }: ModeSwitchProps) {
   const maskId = useId().replace(/:/g, '');
+  // The roving tab stop moves with the selection, so the key that moved it has to carry the focus
+  // ring across too — otherwise the ring is left on a segment that is no longer tabbable and the
+  // next Tab escapes the group from nowhere.
+  const items = useRef<(HTMLButtonElement | null)[]>([]);
   return (
     <div className="np-mode" role="radiogroup" aria-label={label}>
       {modes.map((mode, index) => {
@@ -172,6 +239,9 @@ export function ModeSwitch({ modes, value, onChange, onBlocked, label = 'Listeni
         return (
           <button
             key={mode.id}
+            ref={(node) => {
+              items.current[index] = node;
+            }}
             type="button"
             className="np-mode__item"
             role="radio"
@@ -185,11 +255,22 @@ export function ModeSwitch({ modes, value, onChange, onBlocked, label = 'Listeni
               else onChange(mode.id);
             }}
             onKeyDown={(event) => {
-              if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+              // A native segmented control's key model: one tab stop for the group, the arrows
+              // move between segments in both axes, Home/End jump to the ends, and Space/Return
+              // re-commit the segment already under the focus ring.
+              const last = modes.length - 1;
+              let next: number;
+              if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = (index + 1) % modes.length;
+              else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = (index - 1 + modes.length) % modes.length;
+              else if (event.key === 'Home') next = 0;
+              else if (event.key === 'End') next = last;
+              else if (event.key === ' ' || event.key === 'Enter') next = index;
+              else return;
               event.preventDefault();
-              const other = modes[index === 0 ? 1 : 0]!;
-              if (other.unavailableReason) onBlocked?.(other.unavailableReason);
-              else onChange(other.id);
+              const target = modes[next]!;
+              items.current[next]?.focus();
+              if (target.unavailableReason) onBlocked?.(target.unavailableReason);
+              else onChange(target.id);
             }}
           >
             {index === 0 ? <SoloMark /> : <GroupMark maskId={maskId} />}

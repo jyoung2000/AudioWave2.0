@@ -7,7 +7,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { encodeWav, synthesizePcm16 } from '@now-playing/test-fixtures';
-import { extensionOf, indexPickedFiles, isAudioFile, probeSupport, resolveFile, trackFromFile } from '../../src/lib/library.js';
+import { extensionOf, forgetPickedFiles, indexPickedFiles, isAudioFile, probeSupport, resolveFile, trackFromFile } from '../../src/lib/library.js';
 import { openPlayerDb, resetPlayerDbForTests } from '../../src/lib/db.js';
 
 function wavFile(name: string, tags: { title?: string; artist?: string; album?: string; year?: string } = {}): File {
@@ -102,10 +102,26 @@ describe('indexing picked files', () => {
     expect(seen).toEqual([1, 2]);
   });
 
-  it('marks picked files as unreopenable, and says so when asked for one', async () => {
+  /*
+   * The picker is the only way to add music on a phone, and on the standalone file. If a picked
+   * track could not be played in the very session that picked it, that button would index a library
+   * you can look at and never hear — so this is the test that says the picker works at all.
+   */
+  it('plays a picked file in the session that picked it', async () => {
     const db = await freshDb();
     await indexPickedFiles(db, 'root-1', [wavFile('a.wav', { title: 'A' })], { support: SUPPORT_ALL });
     const track = (await db.getAll('tracks'))[0]!;
+    const resolved = await resolveFile(db, track.id);
+    expect(resolved.file).toBeTruthy();
+    expect(resolved.file?.name).toBe('a.wav');
+  });
+
+  it('says why a picked file is gone once the page that held it is', async () => {
+    const db = await freshDb();
+    await indexPickedFiles(db, 'root-1', [wavFile('a.wav', { title: 'A' })], { support: SUPPORT_ALL });
+    const track = (await db.getAll('tracks'))[0]!;
+    // What a reload does: the index survives in the database, the File objects do not.
+    forgetPickedFiles();
     const resolved = await resolveFile(db, track.id);
     expect(resolved.file).toBeNull();
     expect('reason' in resolved && resolved.reason).toContain('cannot reopen it');

@@ -16,7 +16,7 @@
 import { ALL_BUILTIN_PRESETS, computeListeningMetrics, FLAT_PRESET, isMeaningfulListen, resolveEq, uuidv7 } from '@now-playing/domain';
 import type { EqBinding, EqPreset, ListeningEvent, ListeningEventType, Playlist, PlaylistItem, ResolvedEq, RetuneConfig, Track, TrackRef } from '@now-playing/contracts';
 import { clearEverything, getSetting, openPlayerDb, putSetting, storageReport, type PlayerDatabase, type StoredRoot } from '../lib/db.js';
-import { indexPickedFiles, resolveFile, scanRoot, supportsDirectoryHandles, type ScanProgress, type ScanResult } from '../lib/library.js';
+import { forgetPickedFiles, indexPickedFiles, resolveFile, scanRoot, supportsDirectoryHandles, type ScanProgress, type ScanResult } from '../lib/library.js';
 import type { PlaybackEngine, PlaybackState } from '../lib/playback.js';
 
 export type RepeatMode = 'off' | 'one' | 'all';
@@ -248,6 +248,8 @@ export class PlayerStore {
     }
     await tx.objectStore('roots').delete(rootId);
     await tx.done;
+    // Any picked files this root held are unreachable now; nothing should keep them alive.
+    forgetPickedFiles(refs.map((ref) => ref.trackId));
     await this.reloadLibrary();
   }
 

@@ -78,6 +78,7 @@ export function App() {
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [activeOption, setActiveOption] = useState<string | null>(null);
   const popover = useRef<SearchPopoverHandle | null>(null);
+  const searchField = useRef<HTMLInputElement | null>(null);
   const [addToPlaylistOpen, setAddToPlaylistOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
 
@@ -211,10 +212,12 @@ export function App() {
             placeholder="Search your music"
             value={query}
             onChange={onSearch}
+            inputRef={searchField}
             open={popoverOpen}
             onOpenChange={setPopoverOpen}
             onSubmit={() => setView('search')}
             onArrow={(delta) => popover.current?.move(delta)}
+            onPage={(delta) => popover.current?.turn(delta)}
             onCommit={() => popover.current?.commit()}
             activeDescendant={activeOption}
             controls="np-search-list"
@@ -240,6 +243,9 @@ export function App() {
                 onClear={() => {
                   setQuery('');
                   setPopoverOpen(false);
+                  // Clear empties the field, so the caret belongs back in it — otherwise the button
+                  // that just unmounted takes the focus to the top of the document with it.
+                  searchField.current?.focus();
                 }}
                 onSeeAll={() => {
                   setView('search');
@@ -296,6 +302,7 @@ export function App() {
           positionMs={state.playback.positionMs}
           durationMs={state.playback.durationMs}
           onSeek={(ms) => store.playback.seek(ms)}
+          onTogglePlay={() => void store.playback.toggle()}
           disabled={!entry}
           live={following}
           disabledReason={following ? 'This is a shared broadcast: everyone hears the same position, so it cannot be dragged from here.' : entry ? undefined : 'Nothing is queued yet'}

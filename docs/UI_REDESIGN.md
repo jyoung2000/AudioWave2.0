@@ -156,3 +156,36 @@ audio element, with whatever was playing paused for the duration and resumed aft
   Three.js the player already lazy-loads.
 - Listening events stay append-only; the recommender stays deterministic; the EQ precedence ladder
   is untouched.
+
+---
+
+## 6. The line-by-line audit
+
+After the port was in, the reference was walked again — its stylesheet class by class, its two
+scripts block by block — against what ships. Almost everything matched, and the gaps that did not
+are listed here so the next reader does not have to redo the walk.
+
+**Behaviours that had been reinterpreted, now the reference's:**
+
+| What | Was | Now |
+|---|---|---|
+| The clock | Polled every 20 s, so it could be that late, and a backgrounded tab came back stale | A timeout re-armed to each minute boundary, re-synced on `visibilitychange` and `focus` |
+| The transport row's right edge | Free | Measured against the progress rail and written to `--np-track-inset-r`, so the volume slider ends exactly under the bar |
+| The mode switch | Left/Right only, focus left behind | Both axes, Home/End, Space/Return, and the focus ring travels with the roving tab stop |
+| The scrubber keys | Left/Right, 5 s / 30 s | Both axes, 5 s / 15 s, and Space is play/pause here as everywhere else |
+| The volume keys | 2 % a press | 4 % a press, 10 % with Shift |
+| A live rail | Announced as a slider that refused every change | `role="img"`, no value pair, named "Live broadcast, *mm:ss* elapsed", and the fill sits at the live edge |
+| Search: Escape | Closed the popover *and* emptied the field | Closes the popover, keeps the query |
+| Search: the arrows at a page edge | Wrapped inside the page, hiding the rest of the results | Turn the page, as the pager does. PageDown/PageUp turn it directly |
+| Search: pressing a row | Took the focus out of the combobox, dropping `aria-activedescendant` | Focus stays in the field; links still behave as links |
+| Search: Clear | Left the focus at the top of the document | Puts the caret back in the field |
+| The audition's ring | Ran on a wall clock and cut the clip dead | Follows the audio's own time and fades the last 0.7 s, as the reference does |
+| Page size | Six rows | Five, the reference's |
+| The list's selection | Started on row 1 | Starts on the playing row, and the list scrolls it back into view when a song starts from somewhere else |
+
+**Not ported, and why:** the reference's search reaches four network providers (a local yt-dlp
+helper, the iTunes Search API over JSONP, Deezer for tempo, an Anthropic web search) and resolves
+pasted links through `noembed.com`. Those stay out — the reasons are in
+[DEVIATIONS.md](DEVIATIONS.md), and they are about JSONP being arbitrary code execution and relays
+being telemetry, not about effort. `.player__fill { width: 13% }` and `.volume__knob { left: 72% }`
+are demo values our components set from real state.

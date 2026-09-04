@@ -10,7 +10,7 @@
  * photographs of the hardware. The scrubber in particular is deliberately absent from every media
  * query: identical groove, gel and stamps at each width, as on the device.
  */
-import { useCallback, useRef, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react';
+import { useCallback, useLayoutEffect, useRef, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react';
 
 export interface HeroProps {
   /** Drives the placeholder sleeve wash; 'shared' turns it from amber to deep blue. */
@@ -20,9 +20,57 @@ export interface HeroProps {
 }
 
 export function Hero({ mode = 'solo', children, className }: HeroProps) {
+  const inner = useRef<HTMLDivElement | null>(null);
+  /*
+   * Keep the transport row's right edge under the progress rail's right edge.
+   *
+   * The rail is the element that absorbs whatever the row beside it is doing, so measuring it
+   * catches every case — a mode change swapping the duration stamp for the LIVE marker, a font
+   * arriving late, a width change — where hard-coding a padding would not. A layout effect rather
+   * than a paint-time one: the number is a margin, and reading it after the browser has drawn
+   * would show a frame of the volume slider in the wrong place.
+   */
+  const observer = useRef<ResizeObserver | null>(null);
+  const watched = useRef<Element | null>(null);
+  const align = useCallback((): void => {
+    const host = inner.current;
+    if (!host) return;
+    const rail = host.querySelector('.np-scrub__rail');
+    // The rail comes and goes with the view, so the observer follows whichever one is mounted now.
+    if (rail !== watched.current) {
+      if (watched.current) observer.current?.unobserve(watched.current);
+      if (rail) observer.current?.observe(rail);
+      watched.current = rail;
+    }
+    if (!rail) {
+      host.style.removeProperty('--np-track-inset-r');
+      return;
+    }
+    const box = host.getBoundingClientRect();
+    const railBox = rail.getBoundingClientRect();
+    const pad = Number.parseFloat(getComputedStyle(host).paddingRight) || 0;
+    host.style.setProperty('--np-track-inset-r', `${Math.max(0, box.right - pad - railBox.right).toFixed(1)}px`);
+  }, []);
+  useLayoutEffect(() => {
+    const host = inner.current;
+    if (!host || typeof ResizeObserver === 'undefined') return;
+    const next = new ResizeObserver(() => align());
+    observer.current = next;
+    next.observe(host);
+    align();
+    return () => {
+      next.disconnect();
+      observer.current = null;
+      watched.current = null;
+    };
+  }, [align]);
+  // Every render, because the rail may have just appeared, gone, or changed what sits beside it.
+  useLayoutEffect(align);
   return (
     <section className={['np-hero', className].filter(Boolean).join(' ')} data-mode={mode} aria-label="Now playing">
-      <div className="np-hero__inner">{children}</div>
+      <div ref={inner} className="np-hero__inner">
+        {children}
+      </div>
     </section>
   );
 }
@@ -70,6 +118,8 @@ export interface TrackScrubberProps {
   live?: boolean;
   /** Why seeking is refused, said out loud rather than swallowed. */
   disabledReason?: string;
+  /** Space, while the rail has focus. Optional: without it the key simply does nothing. */
+  onTogglePlay?: () => void;
   label?: string;
 }
 
@@ -77,12 +127,14 @@ export interface TrackScrubberProps {
  * The iPod 5G scrubber: a 12 px well, a fill that brightens downward, stamps beneath the ends, and
  * no knob — the device had none, and a knob on a 12 px bar is a thumb-sized lie about precision.
  */
-export function TrackScrubber({ positionMs, durationMs, onSeek, disabled, live, disabledReason, label = 'Playback position' }: TrackScrubberProps) {
+export function TrackScrubber({ positionMs, durationMs, onSeek, disabled, live, disabledReason, onTogglePlay, label = 'Playback position' }: TrackScrubberProps) {
   const railRef = useRef<HTMLDivElement | null>(null);
   const dragging = useRef(false);
   const length = durationMs ?? 0;
   const inert = Boolean(disabled || live || length <= 0);
-  const fraction = length > 0 ? Math.min(1, Math.max(0, positionMs / length)) : 0;
+  // A broadcast is always at its own live edge: there is no remaining time to draw, so the rail is
+  // full rather than showing a position that would imply somewhere else to drag it to.
+  const fraction = live ? 1 : length > 0 ? Math.min(1, Math.max(0, positionMs / length)) : 0;
 
   const seekTo = useCallback(
     (event: { clientX: number }) => {
@@ -106,14 +158,23 @@ export function TrackScrubber({ positionMs, durationMs, onSeek, disabled, live, 
     <div className="np-scrub">
       <div
         ref={railRef}
-        className="np-scrub__rail"
-        role="slider"
+        className={['np-scrub__rail', live ? 'is-live' : null].filter(Boolean).join(' ')}
+        /*
+         * A rail that cannot be moved is not a slider. Announcing one anyway offers a screen-reader
+         * user a value to change and then refuses every attempt, so a broadcast drops the role and
+         * the value pair and reads as what it is: a picture of how far in the stream has run.
+         */
+        role={live ? 'img' : 'slider'}
         tabIndex={inert ? -1 : 0}
-        aria-label={label}
-        aria-valuemin={0}
-        aria-valuemax={Math.round(length / 1000)}
-        aria-valuenow={Math.round(positionMs / 1000)}
-        aria-valuetext={length > 0 ? `${formatClock(positionMs)} of ${formatClock(length)}` : `${formatClock(positionMs)}, length unknown`}
+        aria-label={live ? `Live broadcast, ${formatClock(positionMs)} elapsed` : label}
+        {...(live
+          ? {}
+          : {
+              'aria-valuemin': 0,
+              'aria-valuemax': Math.round(length / 1000),
+              'aria-valuenow': Math.round(positionMs / 1000),
+              'aria-valuetext': length > 0 ? `${formatClock(positionMs)} of ${formatClock(length)}` : `${formatClock(positionMs)}, length unknown`,
+            })}
         aria-disabled={inert || undefined}
         title={inert ? disabledReason : undefined}
         onPointerDown={onPointerDown}
@@ -128,11 +189,15 @@ export function TrackScrubber({ positionMs, durationMs, onSeek, disabled, live, 
         }}
         onKeyDown={(event) => {
           if (inert) return;
-          const step = event.shiftKey ? 30_000 : 5000;
-          if (event.key === 'ArrowRight') onSeek(Math.min(length, positionMs + step));
-          else if (event.key === 'ArrowLeft') onSeek(Math.max(0, positionMs - step));
+          // 5 s a press, 15 s with Shift; up and down work as well as left and right, because on a
+          // horizontal bar people reach for both. Space is play/pause here as it is everywhere
+          // else, so the focus ring sitting on the rail does not take the shortcut away.
+          const step = event.shiftKey ? 15_000 : 5000;
+          if (event.key === 'ArrowRight' || event.key === 'ArrowUp') onSeek(Math.min(length, positionMs + step));
+          else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') onSeek(Math.max(0, positionMs - step));
           else if (event.key === 'Home') onSeek(0);
           else if (event.key === 'End') onSeek(length);
+          else if (event.key === ' ') onTogglePlay?.();
           else return;
           event.preventDefault();
         }}
@@ -323,7 +388,9 @@ export function LevelSlider({ value, onChange, muted, onToggleMute, label = 'Vol
           dragging.current = false;
         }}
         onKeyDown={(event) => {
-          const step = event.shiftKey ? 0.1 : 0.02;
+          // 4% a press, 10% with Shift — the reference's steps. Small enough to trim a level,
+          // large enough that crossing the whole line is a handful of presses rather than fifty.
+          const step = event.shiftKey ? 0.1 : 0.04;
           if (event.key === 'ArrowRight' || event.key === 'ArrowUp') onChange(Math.min(1, value + step));
           else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') onChange(Math.max(0, value - step));
           else if (event.key === 'Home') onChange(0);

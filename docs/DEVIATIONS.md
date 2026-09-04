@@ -31,6 +31,34 @@ button stays, because §6.5 asks for it; it is the halo that breathes, not the f
 This was a profile-coherence failure (§17.6) that the conformance test could not catch, because it
 checks the tokens and the material rules rather than whether a recipe belongs to the right year.
 
+### Picked files were indexed and then refused
+
+Shipped, and wrong: `resolveFile` refused every file added through "Choose files" on sight, because
+the stored reference is marked `ephemeral` — true of a file that cannot be *reopened after a
+reload*, but not of one whose `File` object the page still holds. The index was built, the row
+appeared in the list with its tags and its artwork, and pressing it produced a warning instead of
+music. On a phone, and in the standalone file, the folder picker does not exist, so that button was
+the only way in and it led nowhere.
+
+**Fixed:** the picked `File` objects are kept for the life of the page and consulted before the
+refusal. Nothing is persisted and `ephemeral` still means what it said: after a reload the files are
+genuinely gone, the message is unchanged, and the offline column still reports these tracks as not
+available offline. Two tests now hold the line — one that a picked file plays in the session that
+picked it, one that the explanation returns once the page that held it is gone.
+
+The test that existed asserted the broken behaviour, which is why nothing caught it.
+
+### The second song killed the equaliser
+
+Shipped, and wrong: `attachMediaElement` called `createMediaElementSource` on every load. Web Audio
+binds an element to its source node permanently — the second call for the same element throws
+`InvalidStateError`, and disconnecting the node does not undo the binding. One element plays every
+track here, so track two threw and took the DSP chain with it.
+
+**Fixed:** the node is created once per element and reused for every track that element goes on to
+play. The mock context already modelled the real rule and threw correctly; no test had ever attached
+the same element twice, so nothing exercised it. One now does.
+
 ## From the Aqua specification
 
 ### The player is a page, not a window

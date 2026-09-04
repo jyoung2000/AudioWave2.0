@@ -298,6 +298,7 @@
   padding: 0 11px 0 28px;
   border: 0;
   border-radius: 999px;
+  -webkit-appearance: none;
   appearance: none;
   background-image: linear-gradient(to bottom, var(--np-field-top) 0%, var(--np-field-mid) 26%, var(--np-field-bottom) 62%);
   box-shadow:
@@ -653,7 +654,7 @@
    -------------------------------------------------------------------------- */
 
 .np-scrub {
-  margin-top: 20px;
+  margin-top: 22px;
 }
 
 .np-scrub__rail {
@@ -677,6 +678,13 @@
 
 .np-scrub__rail[aria-disabled='true'] {
   cursor: default;
+}
+
+/* A broadcast's rail is not a control: it takes no pointer at all, so a drag over it does not even
+   read as something that was tried and refused. */
+.np-scrub__rail.is-live {
+  cursor: default;
+  pointer-events: none;
 }
 
 .np-scrub__fill {
@@ -767,10 +775,16 @@
    10. Transport — no chrome behind it: the glyphs sit on the page
    -------------------------------------------------------------------------- */
 
+/* The keys live in the middle column of a three-column grid; the side columns are deliberately
+   unequal (0.78fr / 1fr) so the cluster sits about 24 px left of true centre. The row's right edge
+   is pinned to the right edge of the blue progress rail above it — measured in JS and written to
+   --np-track-inset-r, because the label beside the rail changes width with mode — so the volume
+   slider ends exactly under the bar. */
 .np-transport {
   display: grid;
   align-items: center;
-  margin-top: 8px;
+  margin-top: 10px;
+  margin-right: var(--np-track-inset-r, 0);
   grid-template-columns: 0.78fr auto 1fr;
 }
 
@@ -1220,9 +1234,12 @@
 
   /* the scrubber is deliberately absent from every media query: identical
      groove, gel and stamps at all widths, as on the device */
+  /* not enough room beside the keys on a phone: volume drops beneath, centred, and the row goes
+     back to full width so the stack is centred on the page */
   .np-transport {
     grid-template-columns: 1fr;
     justify-items: center;
+    margin-right: 0;
     row-gap: 8px;
   }
 

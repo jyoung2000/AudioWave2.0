@@ -287,6 +287,34 @@ export async function scanRoot(db: PlayerDatabase, root: StoredRoot, options: Sc
   return result;
 }
 
+/**
+ * The picked files themselves, for as long as this page lives.
+ *
+ * A file chosen through `<input type="file">` hands over a `File` that can be read now but cannot
+ * be reopened later: there is no handle worth persisting, so after a reload the row is a name with
+ * no source behind it. Holding the objects here is what makes the picker usable in the session that
+ * used it — without this, "Choose files" indexes music that can never be played, on exactly the
+ * platforms (phones, and the standalone file) where the folder picker does not exist.
+ *
+ * Deliberately not persisted, and `ephemeral` on the stored ref stays true: what a reload can no
+ * longer do is unchanged, and so is what the offline column and the message say about it.
+ */
+const pickedFiles = new Map<string, File>();
+
+/**
+ * Drop the held files — what a reload does to them anyway.
+ *
+ * Called when the tracks that referenced them are gone, so a removed root does not leave its files
+ * pinned in memory for the rest of the session.
+ */
+export function forgetPickedFiles(trackIds?: Iterable<string>): void {
+  if (!trackIds) {
+    pickedFiles.clear();
+    return;
+  }
+  for (const id of trackIds) pickedFiles.delete(id);
+}
+
 /** Index files chosen through a plain `<input type="file">`, which cannot be reopened later. */
 export async function indexPickedFiles(db: PlayerDatabase, rootId: string, files: readonly File[], options: ScanOptions = {}): Promise<ScanResult> {
   const support = options.support ?? probeSupport();
@@ -308,6 +336,7 @@ export async function indexPickedFiles(db: PlayerDatabase, rootId: string, files
       await tx.objectStore('tracks').put(track);
       await tx.objectStore('files').put({ trackId: track.id, rootId, relativePath, ephemeral: true, sizeBytes: file.size, lastModified: file.lastModified });
       await tx.done;
+      pickedFiles.set(track.id, file);
       result.added += 1;
       progress.indexed += 1;
     } catch (err) {
@@ -327,7 +356,11 @@ export function supportsDirectoryHandles(): boolean {
 export async function resolveFile(db: PlayerDatabase, trackId: string): Promise<{ file: File } | { file: null; reason: string }> {
   const ref = await db.get('files', trackId);
   if (!ref) return { file: null, reason: 'This track is not linked to a file on this device.' };
-  if (ref.ephemeral) return { file: null, reason: 'This file was added with the file picker, which cannot reopen it after a reload. Add the folder again to keep it available.' };
+  if (ref.ephemeral) {
+    const kept = pickedFiles.get(trackId);
+    if (kept) return { file: kept };
+    return { file: null, reason: 'This file was added with the file picker, which cannot reopen it after a reload. Add the folder again to keep it available.' };
+  }
   const root = await db.get('roots', ref.rootId);
   if (!root?.handle) return { file: null, reason: 'The folder this track came from is no longer connected.' };
 

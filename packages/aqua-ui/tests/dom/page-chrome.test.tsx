@@ -7,9 +7,9 @@
  * person relied on, and this is where it shows.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ModeSwitch, type ListeningMode } from '../../src/components/PageBar.js';
+import { BarClock, BarSearch, ModeSwitch, type ListeningMode } from '../../src/components/PageBar.js';
 import { SectionStrip } from '../../src/components/SectionStrip.js';
 import { KeyButton, KeyTransport, LevelSlider, TrackScrubber } from '../../src/components/Hero.js';
 import './setup.js';
@@ -75,6 +75,38 @@ describe('ModeSwitch', () => {
   });
 
   /**
+   * A native segmented control's whole key model, not just the two arrows: both axes, Home/End, and
+   * Space/Return re-committing the segment under the ring. The focus has to travel with the
+   * selection too — the tab stop roves, so a ring left behind on an untabbable segment would let
+   * the next Tab escape the group from a place the user cannot see.
+   */
+  it('answers both arrow axes, Home, End and Space, and takes the focus with it', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<ModeSwitch modes={modes} value="solo" onChange={onChange} />);
+    const solo = screen.getByRole('radio', { name: 'Solo listening' });
+    const shared = screen.getByRole('radio', { name: 'Shared listening' });
+
+    solo.focus();
+    await user.keyboard('{ArrowDown}');
+    expect(onChange).toHaveBeenLastCalledWith('shared');
+    expect(document.activeElement).toBe(shared);
+
+    await user.keyboard('{ArrowUp}');
+    expect(onChange).toHaveBeenLastCalledWith('solo');
+    expect(document.activeElement).toBe(solo);
+
+    await user.keyboard('{End}');
+    expect(onChange).toHaveBeenLastCalledWith('shared');
+    await user.keyboard('{Home}');
+    expect(onChange).toHaveBeenLastCalledWith('solo');
+
+    onChange.mockClear();
+    await user.keyboard(' ');
+    expect(onChange).toHaveBeenCalledWith('solo');
+  });
+
+  /**
    * The rule the whole capability model rests on: a mode that cannot work stays visible and says
    * why when pressed. It never silently does nothing, and it never disappears.
    */
@@ -112,8 +144,12 @@ describe('TrackScrubber', () => {
 
   it('goes read-only for a live broadcast and says why', () => {
     render(<TrackScrubber positionMs={10_000} durationMs={180_000} onSeek={() => undefined} live disabledReason="A shared broadcast has one position." />);
-    const rail = screen.getByRole('slider', { name: 'Playback position' });
+    // Not a slider any more: a rail that cannot be moved should not offer a screen-reader user a
+    // value to change and then refuse every attempt at changing it.
+    expect(screen.queryByRole('slider')).toBeNull();
+    const rail = screen.getByRole('img', { name: 'Live broadcast, 00:10 elapsed' });
     expect(rail.getAttribute('aria-disabled')).toBe('true');
+    expect(rail.getAttribute('aria-valuenow')).toBeNull();
     expect(rail.getAttribute('title')).toBe('A shared broadcast has one position.');
     // The remaining-time stamp is replaced by the LIVE marker rather than counting down to nothing.
     expect(screen.getByText('LIVE')).toBeTruthy();
@@ -149,5 +185,90 @@ describe('the hero transport', () => {
     const slider = screen.getByRole('slider', { name: 'Volume' });
     expect(slider.getAttribute('aria-valuetext')).toBe('Muted');
     expect(screen.getByRole('button', { name: 'Unmute' }).getAttribute('aria-pressed')).toBe('true');
+  });
+});
+
+/**
+ * The search field is a combobox: the focus never leaves it, and the list beneath is pointed at
+ * with `aria-activedescendant`. Everything below is about that contract holding — a key that gets
+ * swallowed, or a press that steals the focus, breaks the pointer and the popover with it.
+ */
+describe('BarSearch', () => {
+  const rows = <div id="np-search-list" role="listbox" aria-label="Results" />;
+
+  it('closes on Escape but keeps what was typed', async () => {
+    const user = userEvent.setup();
+    const onOpenChange = vi.fn();
+    const onChange = vi.fn();
+    render(<BarSearch label="Search" value="mazzy" onChange={onChange} open onOpenChange={onOpenChange} results={rows} controls="np-search-list" />);
+    screen.getByRole('combobox', { name: 'Search' }).focus();
+    await user.keyboard('{Escape}');
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    // Escape puts the list away. Emptying the field as well would cost a retype for nothing.
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('brings a dismissed list back with the first arrow, and pages with PageDown', async () => {
+    const user = userEvent.setup();
+    const onOpenChange = vi.fn();
+    const onArrow = vi.fn();
+    const onPage = vi.fn();
+    const { rerender } = render(
+      <BarSearch label="Search" value="mazzy" onChange={() => undefined} open={false} onOpenChange={onOpenChange} onArrow={onArrow} onPage={onPage} />,
+    );
+    screen.getByRole('combobox', { name: 'Search' }).focus();
+    await user.keyboard('{ArrowDown}');
+    expect(onOpenChange).toHaveBeenCalledWith(true);
+    expect(onArrow).not.toHaveBeenCalled();
+
+    rerender(<BarSearch label="Search" value="mazzy" onChange={() => undefined} open onOpenChange={onOpenChange} onArrow={onArrow} onPage={onPage} results={rows} controls="np-search-list" />);
+    await user.keyboard('{ArrowDown}');
+    expect(onArrow).toHaveBeenCalledWith(1);
+    await user.keyboard('{PageDown}');
+    expect(onPage).toHaveBeenCalledWith(1);
+    await user.keyboard('{PageUp}');
+    expect(onPage).toHaveBeenLastCalledWith(-1);
+  });
+
+  it('keeps the focus in the field when the popover is pressed', async () => {
+    const user = userEvent.setup();
+    render(
+      <BarSearch
+        label="Search"
+        value="mazzy"
+        onChange={() => undefined}
+        open
+        onOpenChange={() => undefined}
+        controls="np-search-list"
+        results={
+          <div id="np-search-list" role="listbox" aria-label="Results">
+            <button type="button">Fade Into You</button>
+          </div>
+        }
+      />,
+    );
+    const field = screen.getByRole('combobox', { name: 'Search' });
+    field.focus();
+    await user.click(screen.getByRole('button', { name: 'Fade Into You' }));
+    // A blur here would drop aria-activedescendant and close the list out from under the press.
+    expect(document.activeElement).toBe(field);
+  });
+});
+
+describe('BarClock', () => {
+  it('changes on the minute boundary rather than on a fixed poll', () => {
+    vi.useFakeTimers();
+    // 20 seconds past the minute: a naive 20 s poll would next fire at :40, twenty seconds early.
+    vi.setSystemTime(new Date(2026, 0, 1, 11, 35, 20));
+    try {
+      render(<BarClock />);
+      expect(screen.getByText('11:35')).toBeTruthy();
+      act(() => vi.advanceTimersByTime(39_000));
+      expect(screen.getByText('11:35')).toBeTruthy();
+      act(() => vi.advanceTimersByTime(2000));
+      expect(screen.getByText('11:36')).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

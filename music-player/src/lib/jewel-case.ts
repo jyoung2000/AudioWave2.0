@@ -1094,10 +1094,17 @@ export async function mountJewelCase(stage: HTMLElement, album: JewelCaseAlbum, 
   const discShadowPos = new THREE.Vector3(0.06, -0.16, 0.25);
 
   let painted = false;
-  const clock = new THREE.Clock();
+  /*
+   * The frame clock, kept here rather than taken from THREE.Clock: that class is deprecated in this
+   * version of three and warns on every load, and this is all it was doing. The delta is clamped so
+   * a tab that was backgrounded for a minute resumes the animation rather than jumping through it.
+   */
+  let lastFrameAt = performance.now();
 
   function tick(): void {
-    const dt = Math.min(clock.getDelta(), 0.05);
+    const at = performance.now();
+    const dt = Math.min((at - lastFrameAt) / 1000, 0.05);
+    lastFrameAt = at;
     if (!reduceMotion) idleT += dt;
 
     /* --- state edges --- */
