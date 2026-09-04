@@ -52,6 +52,9 @@ run('test:security', 'pnpm', ['test:security']);
 run('build', 'pnpm', ['build']);
 // After the build, because the budgets are measured from the files it produced.
 run('test:perf', 'pnpm', ['test:perf']);
+// The single-file build and the suite that opens it from the filesystem.
+run('build:local', 'pnpm', ['build:local']);
+run('test:local', 'pnpm', ['test:local'], { skipIf: hasChromium });
 run('test:a11y', 'pnpm', ['test:a11y'], { skipIf: hasChromium });
 run('test:e2e', 'pnpm', ['test:e2e'], { skipIf: hasChromium });
 run('docker-build', 'docker', ['build', '-t', 'now-playing-hub:verify', '-f', 'docker-container/Dockerfile', '.'], { skipIf: hasDocker });

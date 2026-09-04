@@ -4,7 +4,7 @@ Three music applications that work on their own and work better together.
 
 |  | What it is | Runs on |
 | --- | --- | --- |
-| [**music-player**](music-player/README.md) | An offline-first player for the music already on your device. A web app you can install; everything is bundled, nothing is fetched from a CDN. | Any modern browser |
+| [**music-player**](music-player/README.md) | An offline-first player for the music already on your device. A web app you can install — or [one HTML file you double-click](docs/LOCAL_FILE.md), with no server at all. | Any modern browser |
 | [**docker-container**](docker-container/README.md) | A self-hosted hub: your library on every device, group listening in sync, pairing, shared links, a Discord bot. | One `docker compose` command |
 | [**windows-companion**](windows-companion/README.md) | A desktop app for the one thing a web page cannot do — read a folder of files off a Windows disk and keep watching it. | Windows 10 1809+ |
 
@@ -16,6 +16,8 @@ it never becomes a requirement.
 
 ```sh
 pnpm install
+
+pnpm build:local    # one file: music-player/dist-local/now-playing.html — open it, no server needed
 
 pnpm dev:player     # the player, on http://localhost:5173
 pnpm dev:hub        # the hub API plus its admin GUI
@@ -84,6 +86,7 @@ from the spec, the reason is written down in [docs/DEVIATIONS.md](docs/DEVIATION
 - [docs/PROVIDER_CAPABILITIES.md](docs/PROVIDER_CAPABILITIES.md) — what each provider actually permits
 - [docs/DOWNLOADS_AND_LEGAL.md](docs/DOWNLOADS_AND_LEGAL.md) — when a download is offered and when it is not
 - [docs/PWA_AND_CAR.md](docs/PWA_AND_CAR.md) — installing, offline, lock screens, and Android Auto
+- [docs/LOCAL_FILE.md](docs/LOCAL_FILE.md) — the single file you open with no server, and what a `file://` page can and cannot do
 - [docs/DISCORD_BOT.md](docs/DISCORD_BOT.md) — the bot, and how slash and prefix commands stay identical
 
 **Detail**

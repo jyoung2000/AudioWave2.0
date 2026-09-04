@@ -34,7 +34,9 @@
     "test:security": "vitest run --project security",
     "verify": "node scripts/verify.mjs",
     "test:dom": "vitest run --project dom",
-    "test:perf": "vitest run --project perf"
+    "test:perf": "vitest run --project perf",
+    "build:local": "pnpm build:packages && pnpm --filter @now-playing/music-player build:local",
+    "test:local": "pnpm --filter @now-playing/music-player test:local"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

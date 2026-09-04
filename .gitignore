@@ -25,3 +25,6 @@ music-player/playwright-report/
 docker-container/backups/
 docker-container/test-results/
 docker-container/playwright-report/
+music-player/dist-local/
+music-player/test-results-local/
+music-player/playwright-report-local/

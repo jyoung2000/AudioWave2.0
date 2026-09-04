@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { AquaTable, Button, EmptyState, KeyValueList, Panel, PanelSection, StatusDot, TextField, useToast } from '@now-playing/aqua-ui';
 import { useAppState, usePlayer } from '../state/context.js';
 import { mediaIntegrationReport } from '../lib/media-session.js';
+import { localFileReport } from '../lib/build-flags.js';
 import type { StoredRoot } from '../lib/db.js';
 
 export function SettingsView() {
@@ -17,9 +18,31 @@ export function SettingsView() {
   const state = useAppState();
   const toast = useToast();
   const media = mediaIntegrationReport();
+  const localFile = localFileReport();
 
   return (
     <>
+      {localFile.active ? (
+        <Panel title="Running from a file">
+          <PanelSection>
+            <p className="player-hint">
+              You opened this from your own disk rather than from a web address, so there is no server involved at all. Most of the player works exactly the same; a few things are decided by the browser
+              rather than by this app, and they are listed here so you are not left guessing which.
+            </p>
+            <AquaTable
+              label="What works when opened from a file"
+              rowKey={(row) => row.name}
+              rows={localFile.features}
+              columns={[
+                { id: 'name', header: 'Feature', primary: true, cell: (row) => row.name },
+                { id: 'available', header: 'Works', width: 96, cell: (row) => <StatusDot kind={row.available ? 'ok' : 'neutral'} label={row.available ? 'Yes' : 'No'} /> },
+                { id: 'note', header: 'Detail', cell: (row) => row.note },
+              ]}
+            />
+          </PanelSection>
+        </Panel>
+      ) : null}
+
       <Panel title="Music folders">
         <PanelSection>
           {state.library.directoryHandleReason ? <p className="player-hint player-hint--warning">{state.library.directoryHandleReason}</p> : null}

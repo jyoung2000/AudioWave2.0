@@ -8,6 +8,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { openPlayerDb } from '../lib/db.js';
 import { HubClient, type HubStatus } from '../lib/hub-client.js';
+import { workletDataUrl } from '../lib/build-flags.js';
 import { installHandlers, publishMetadata, publishPlaybackState, publishPosition } from '../lib/media-session.js';
 import { PlaybackEngine } from '../lib/playback.js';
 import { PlayerStore, type AppState } from './store.js';
@@ -20,8 +21,16 @@ interface PlayerContextValue {
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
 
-/** The pitch-shifter worklet is a separate build entry; Vite resolves it to its hashed URL. */
-const WORKLET_URL = new URL('../worklets/pitch-shifter.ts', import.meta.url).href;
+/**
+ * Where the pitch-shifter worklet comes from.
+ *
+ * In the served build it is a separate entry and Vite resolves it to a hashed URL. In the
+ * single-file build there is no second file to point at — and a page opened from `file://` could
+ * not fetch one anyway — so the compiled worklet travels inside the bundle and is handed to the
+ * audio thread as a `data:` URL. Either way the engine receives a URL and reports honestly if it
+ * cannot load it.
+ */
+const WORKLET_URL = workletDataUrl() ?? new URL('../worklets/pitch-shifter.ts', import.meta.url).href;
 
 export function PlayerProvider({ children, store: injected }: { children: ReactNode; store?: PlayerStore }) {
   const [store] = useState(() => injected ?? new PlayerStore(new PlaybackEngine({ workletModuleUrl: WORKLET_URL })));

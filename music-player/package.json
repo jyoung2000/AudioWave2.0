@@ -14,7 +14,9 @@
     "test:e2e": "playwright test --config tests/e2e/playwright.config.ts",
     "test:a11y": "playwright test --config tests/e2e/playwright.config.ts --grep @a11y",
     "test:visual": "playwright test --config tests/e2e/playwright.config.ts --grep @visual",
-    "icons": "node scripts/icons.mjs"
+    "icons": "node scripts/icons.mjs",
+    "build:local": "tsc -p tsconfig.json --noEmit && vite build --config vite.config.local.ts",
+    "test:local": "playwright test --config tests/e2e/playwright.local.config.ts"
   },
   "dependencies": {
     "@now-playing/aqua-ui": "workspace:*",

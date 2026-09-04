@@ -15,6 +15,18 @@ pnpm --filter @now-playing/music-player build     # dist/, with a service worker
 pnpm --filter @now-playing/music-player preview   # serve the production build
 ```
 
+### Or with no server at all
+
+```sh
+pnpm --filter @now-playing/music-player build:local   # → dist-local/now-playing.html
+```
+
+One file, about 2.9 MB, with nothing beside it. Copy it anywhere and open it in a browser. Your
+library, playback, the equaliser, retuning, playlists and metrics all work; group listening and
+installing it as an app do not, because a page opened from a file cannot open a WebSocket or
+register a service worker. The app says which is which on its Settings screen, and
+[docs/LOCAL_FILE.md](../docs/LOCAL_FILE.md) has the measurements behind that list.
+
 ## Where your music comes from
 
 Two ways in, depending on what the browser supports:

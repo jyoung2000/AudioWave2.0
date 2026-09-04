@@ -7,6 +7,12 @@
     "types": ["node", "vite/client", "vite-plugin-pwa/client"],
     "exactOptionalPropertyTypes": false
   },
-  "include": ["src", "tests", "vite.config.ts", "../packages/aqua-ui/src/declarations.d.ts"],
+  "include": [
+    "src",
+    "tests",
+    "../packages/aqua-ui/src/declarations.d.ts",
+    "vite.config.ts",
+    "vite.config.local.ts"
+  ],
   "exclude": ["tests/e2e"]
 }

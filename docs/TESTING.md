@@ -26,6 +26,7 @@ never as passed.
 | `security` | `**/tests/security` | The controls, as behaviour: the sanitiser, the channel allowlist, CSP, SSRF, rate limits, authorization | 41 |
 | `perf` | `tests/perf` | Bundle budgets measured from built output | 8 (one skipped: the admin bundle has nothing that must stay split) |
 | e2e (Playwright) | `music-player/tests/e2e`, `docker-container/tests/e2e` | Real browsers against real production builds, including axe on every screen of both interfaces | 45 |
+| local file (Playwright) | `music-player/tests/e2e/local-file.spec.ts` | The single-file build opened at a `file://` origin, with no web server — see below | 8 |
 
 ```sh
 pnpm test               # unit + dom + contracts + integration
@@ -61,6 +62,13 @@ API directly is not a gate.
 **The main-process test** boots the companion's Electron main process with Electron itself stubbed
 but everything else real — the database is created on disk, the IPC handlers are the actual ones, and
 requests and responses go through the same validation the packaged app uses.
+
+**The local-file suite** has its own Playwright config with no `webServer`, and that separation is
+the whole point: over http every one of its assertions passes while the file is still broken. Three
+bugs proved it — a `String.replace` that expanded `$&` and spliced the bundle into React's source, a
+build guard that stripped the `src` attribute it was checking for, and a classic script inlined into
+`<head>` that ran before `#root` existed. None is visible in a served build; all three appear in the
+first second of opening the file.
 
 **The performance budgets** parse the built `index.html`, add up what it actually references, and
 compare against a number. They also check that expensive dependencies stayed out of the entry chunk,

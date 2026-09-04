@@ -43,10 +43,19 @@ jobs:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       - name: Performance budgets (measured from the build above)
         run: pnpm test:perf
+      - name: Single-file build (the one you open from your filesystem)
+        run: pnpm build:local
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - name: Accessibility and end-to-end tests
-        run: pnpm test:a11y && pnpm test:e2e
+        run: pnpm test:a11y && pnpm test:e2e && pnpm test:local
+      - name: Upload the single-file player
+        uses: actions/upload-artifact@v4
+        with:
+          # So anyone who wants the file can download it from a run rather than building it.
+          name: now-playing-single-file
+          path: music-player/dist-local/now-playing.html
+          if-no-files-found: error
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
@@ -54,6 +63,7 @@ jobs:
           name: playwright-report
           path: |
             music-player/playwright-report
+            music-player/playwright-report-local
             docker-container/playwright-report
           if-no-files-found: ignore
       - name: Dependency audit (high and critical fail the build)
