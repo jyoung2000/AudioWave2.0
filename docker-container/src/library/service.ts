@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { createReadStream, existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
+import type { Dirent } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
 import { extname, join, relative, resolve, sep } from 'node:path';
 import { parseFile } from 'music-metadata';
@@ -200,7 +201,7 @@ export class LibraryService {
   private async walk(dir: string, rootAbs: string, depth: number): Promise<string[]> {
     if (depth > MAX_DEPTH) return [];
     const out: string[] = [];
-    let entries: import('node:fs').Dirent[];
+    let entries: Dirent[];
     try {
       entries = await readdir(dir, { withFileTypes: true });
     } catch {

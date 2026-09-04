@@ -1,5 +1,5 @@
 import type { ProviderCapabilities, ProviderDescriptor, ProviderHealth, SearchResult, TrackIdentity } from '@now-playing/contracts';
-import type { AuthorizedAccount, CredentialRefreshResult, ImportPage, ProviderAdapter, ProviderRuntimeConfig, ProviderSearchPage, ProviderTestResult } from '../adapter.js';
+import type { AuthorizedAccount, AuthorizedDownload, CredentialRefreshResult, DownloadContext, ImportPage, PlaybackContext, PlayableRef, ProviderAdapter, ProviderRuntimeConfig, ProviderSearchPage, ProviderTestResult } from '../adapter.js';
 
 export const REVIEWED_AT = '2026-09-03';
 
@@ -101,15 +101,15 @@ export abstract class BaseAdapter implements ProviderAdapter {
     return null;
   }
 
-  async getPreview(_id: string): Promise<import('../adapter.js').PlayableRef | null> {
+  async getPreview(_id: string): Promise<PlayableRef | null> {
     return null;
   }
 
-  async getPlayable(_id: string, _context: import('../adapter.js').PlaybackContext): Promise<import('../adapter.js').PlayableRef | null> {
+  async getPlayable(_id: string, _context: PlaybackContext): Promise<PlayableRef | null> {
     return null;
   }
 
-  async getAuthorizedDownload(_id: string, _context: import('../adapter.js').DownloadContext): Promise<import('../adapter.js').AuthorizedDownload | null> {
+  async getAuthorizedDownload(_id: string, _context: DownloadContext): Promise<AuthorizedDownload | null> {
     return null;
   }
 

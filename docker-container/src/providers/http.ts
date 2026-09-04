@@ -55,7 +55,7 @@ export class SafeHttpClient {
       if (!check.ok || !check.url) throw new ProviderHttpError(`Blocked outbound URL: ${check.reason ?? 'not allowed'}`, null);
       const hostname = check.url.hostname;
       if (!/^\d+\.\d+\.\d+\.\d+$/.test(hostname) && !hostname.includes(':')) {
-        let addresses: string[] = [];
+        let addresses: string[];
         try {
           addresses = await this.deps.dnsLookup(hostname);
         } catch {

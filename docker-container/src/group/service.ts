@@ -51,6 +51,12 @@ export interface CommandOutcome {
   effects: QueueEffect[];
 }
 
+/**
+ * Zod's `.partial()` produces properties typed `T | undefined` rather than optional ones, so the
+ * service accepts that shape directly instead of forcing every caller to strip undefined keys.
+ */
+export type GroupSettingsPatch = { [K in keyof GroupSettings]?: GroupSettings[K] | undefined };
+
 export interface GroupViewData {
   group: Group;
   members: Array<MembershipRecord & { online: boolean; latencyMs: number | null }>;
@@ -125,7 +131,7 @@ export class GroupService {
 
   /* ------------------------------------------------------------------ groups */
 
-  create(actor: GroupActor, input: { name: string; settings?: Partial<GroupSettings> | undefined }, meta: { ip: string | null; correlationId: string | null }): GroupViewData {
+  create(actor: GroupActor, input: { name: string; settings?: GroupSettingsPatch | undefined }, meta: { ip: string | null; correlationId: string | null }): GroupViewData {
     const now = this.nowIso();
     const settings = GroupSettingsSchema.parse({ ...input.settings });
     const group: Group = { id: uuidv7(this.nowMs()), schemaVersion: 1, createdAt: now, updatedAt: now, deletedAt: null, hubId: this.hubId, name: input.name, ownerId: actor.id, status: 'active', settings, inviteCodeHash: null };
@@ -180,7 +186,7 @@ export class GroupService {
     return !!m && DJ_ROLES.includes(m.role);
   }
 
-  update(groupId: string, actor: GroupActor, patch: { name?: string | undefined; settings?: Partial<GroupSettings> | undefined }): GroupViewData {
+  update(groupId: string, actor: GroupActor, patch: { name?: string | undefined; settings?: GroupSettingsPatch | undefined }): GroupViewData {
     const group = this.find(groupId);
     this.requireDj(groupId, actor);
     const now = this.nowIso();

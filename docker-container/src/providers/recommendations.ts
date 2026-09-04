@@ -132,7 +132,7 @@ export class RecommendationService {
       // Metadata fallback, guarded by duration so two different recordings of one song stay apart.
       const candidates = this.repo.findTracksByNormalized(normalizedArtist, normalizedTitle);
       existing = candidates.find((c) => {
-        if (input.durationMs == null || c.durationMs == null) return candidates.length === 1;
+        if (input.durationMs === null || input.durationMs === undefined || c.durationMs === null) return candidates.length === 1;
         return Math.abs(c.durationMs - input.durationMs) <= DURATION_TOLERANCE_MS;
       });
     }

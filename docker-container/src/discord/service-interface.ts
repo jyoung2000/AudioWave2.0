@@ -141,8 +141,8 @@ export class DiscordService {
    */
   async setToken(token: string, actor: { id: string; displayName: string }, meta: RequestMeta): Promise<{ valid: boolean; tokenLast4: string; applicationId: string | null; botUsername: string | null; message: string }> {
     const trimmed = token.trim();
-    let applicationId: string | null = null;
-    let botUsername: string | null = null;
+    let applicationId: string | null;
+    let botUsername: string | null;
     try {
       const response = await this.http.request(`${DISCORD_API}/users/@me`, {
         allowedHosts: ['discord.com'],

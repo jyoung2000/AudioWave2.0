@@ -10,6 +10,10 @@
  * same recording found on three services becomes one row with the others as `variants`.
  */
 import type { ProviderId, SearchResponse, SearchResult, SearchScope, TrackRef } from '@now-playing/contracts';
+import type { z } from 'zod';
+import type { LatestReleasesResponse as LatestReleasesResponseSchema } from '@now-playing/contracts';
+
+type LatestReleasesResponse = z.infer<typeof LatestReleasesResponseSchema>;
 import { DomainError, mergeSearchResults, validateOutboundUrl } from '@now-playing/domain';
 import type { Clock } from '../deps.js';
 import type { MetricsRegistry } from '../metrics/registry.js';
@@ -18,6 +22,7 @@ import type { ProviderRegistry } from './registry.js';
 import type { RateLimitManager } from './rate-limit-manager.js';
 import { ProviderHttpError } from './http.js';
 import { parseResultId } from './adapters/base.js';
+import type { MusicBrainzAdapter } from './adapters/musicbrainz.js';
 
 export interface SearchRequest {
   query: string;
@@ -192,9 +197,76 @@ export class SearchService {
     };
   }
 
+  /**
+   * Latest releases for an artist. MusicBrainz supplies the release *list* (it is the only source
+   * here with a curated discography), and each enabled playback provider is then asked whether it
+   * carries that release. A provider that fails contributes a `partialFailure` rather than removing
+   * the release from the list — the record still exists even if one service cannot be reached.
+   *
+   * Reissues and deluxe editions are flagged, not filtered: which of those counts as "latest" is
+   * the listener's judgement, so the UI gets the flag and decides.
+   */
+  async latestReleases(input: { mbid?: string | undefined; name?: string | undefined; refresh: boolean }): Promise<LatestReleasesResponse> {
+    if (!input.mbid && !input.name) throw new DomainError('validation', 'Pass either an artist MusicBrainz id or a name');
+    if (!this.registry.has('musicbrainz') || !this.registry.isEnabled('musicbrainz')) {
+      throw new DomainError('unsupported', 'Release lookup needs the MusicBrainz provider, which is disabled on this hub');
+    }
+    const mb = this.registry.get('musicbrainz') as MusicBrainzAdapter;
+    const cacheKey = `releases:${input.mbid ?? input.name!.toLowerCase().trim()}`;
+    if (!input.refresh) {
+      const cached = this.readCache(cacheKey);
+      if (cached) {
+        const payload = cached as unknown as { payload?: LatestReleasesResponse };
+        if (payload.payload) return { ...payload.payload, fetchedAt: cached.createdAt };
+      }
+    }
+
+    const artist = input.mbid ? { id: input.mbid, name: (await this.rateLimiter.run('musicbrainz', 'P1', () => mb.artistName(input.mbid!), { timeoutMs: 12_000 })) ?? input.name ?? 'Unknown artist' } : await this.rateLimiter.run('musicbrainz', 'P1', () => mb.findArtist(input.name!), { timeoutMs: 12_000 });
+    if (!artist) throw new DomainError('not-found', `MusicBrainz has no artist called "${input.name ?? input.mbid}"`);
+
+    const groups = await this.rateLimiter.run('musicbrainz', 'P1', () => mb.releaseGroups(artist.id, 60), { timeoutMs: 20_000 });
+    const partialFailures: Array<{ provider: ProviderId; error: string }> = [];
+    const fetchedAt = new Date(this.clock.now()).toISOString();
+
+    const items: LatestReleasesResponse['items'] = [];
+    for (const group of groups.slice(0, 25)) {
+      const sources: LatestReleasesResponse['items'][number]['sources'] = [];
+      for (const adapter of this.registry.searchable()) {
+        if (adapter.id === 'musicbrainz') continue;
+        try {
+          const page = await this.rateLimiter.run(adapter.id, 'P3', () => adapter.search(`${group.artistName} ${group.title}`, { scope: 'albums', limit: 3 }, null), { timeoutMs: 12_000, cost: adapter.id === 'youtube' ? 100 : 1 });
+          const hit = page.results.find((r) => normalizeTitle(r.albumName ?? r.title) === normalizeTitle(group.title));
+          if (hit) sources.push({ provider: hit.provider as ProviderId, providerId: hit.providerId, url: hit.canonicalUrl ?? null, capabilities: hit.capabilities });
+        } catch (err) {
+          if (!partialFailures.some((f) => f.provider === adapter.id)) partialFailures.push({ provider: adapter.id as ProviderId, error: err instanceof Error ? err.message : String(err) });
+        }
+      }
+      items.push({ ...group, sources, metadataSource: 'musicbrainz' as const, fetchedAt, stale: false });
+    }
+
+    const response: LatestReleasesResponse = {
+      artist: { name: artist.name, musicbrainzArtistId: artist.id },
+      items,
+      partialFailures,
+      fetchedAt,
+      cacheTtlSeconds: Math.round(CACHE_TTL_MS / 1000),
+    };
+    this.repo.cachePut(cacheKey, 'musicbrainz', JSON.stringify({ payload: response }), fetchedAt, new Date(this.clock.now() + CACHE_TTL_MS).toISOString());
+    return response;
+  }
+
   purgeCache(): number {
     return this.repo.cachePurge(new Date(this.clock.now()).toISOString(), CACHE_TTL_MS);
   }
+}
+
+/** Compare album titles without punctuation, case or edition suffixes getting in the way. */
+function normalizeTitle(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/\((?:deluxe|expanded|remaster(?:ed)?|anniversary)[^)]*\)/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
 }
 
 /**

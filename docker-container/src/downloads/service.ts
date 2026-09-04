@@ -13,7 +13,7 @@
  * recorded on the job.
  */
 import { createHash } from 'node:crypto';
-import { createReadStream, createWriteStream, existsSync, mkdirSync, renameSync, rmSync, statSync } from 'node:fs';
+import { createReadStream, createWriteStream, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
@@ -411,7 +411,7 @@ export class DownloadService {
     let partial = 0;
     if (existsSync(this.partDir())) {
       try {
-        partial = statSync(this.partDir()).isDirectory() ? require('node:fs').readdirSync(this.partDir()).length : 0;
+        partial = statSync(this.partDir()).isDirectory() ? readdirSync(this.partDir()).length : 0;
       } catch {
         partial = 0;
       }
