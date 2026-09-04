@@ -25,6 +25,77 @@ export const BUILTIN_PRESETS: readonly EqPreset[] = [
   builtin('00000000-0000-7000-8000-00000000f1b7', 'Club', 'Punchy lows and crisp highs for dance music.', [4, 5, 3, 0, -1, 0, 1, 3, 4, 3], -4),
 ];
 
+/**
+ * The nine frequencies of the "solfeggio" set, with the Latin syllables traditionally attached to
+ * the middle six.
+ *
+ * They are included because people ask for them and because a music player is the right place to
+ * try a tuning or an emphasis for yourself. What the presets below do is exactly what any other
+ * preset does: a narrow peaking filter at that frequency. They do not synthesise a tone, they do
+ * not "convert" a recording to a frequency, and nothing in this codebase claims a physical or
+ * medical effect for them — see docs/DEVIATIONS.md.
+ */
+export const SOLFEGGIO_FREQUENCIES = [
+  { hz: 174, syllable: null },
+  { hz: 285, syllable: null },
+  { hz: 396, syllable: 'UT' },
+  { hz: 417, syllable: 'RE' },
+  { hz: 528, syllable: 'MI' },
+  { hz: 639, syllable: 'FA' },
+  { hz: 741, syllable: 'SOL' },
+  { hz: 852, syllable: 'LA' },
+  { hz: 963, syllable: null },
+] as const;
+
+/** Emphasis width. Q 4 is roughly a third of an octave: clearly audible, not a whistle. */
+const SOLFEGGIO_Q = 4;
+const SOLFEGGIO_GAIN_DB = 6;
+
+function parametric(id: string, name: string, description: string, bands: readonly Omit<EqBand, 'enabled' | 'type'>[], preampDb: number): EqPreset {
+  return {
+    id,
+    schemaVersion: SCHEMA_VERSIONS.entities,
+    name,
+    kind: 'builtin',
+    mode: 'parametric',
+    preampDb,
+    bands: bands.map((band) => ({ ...band, type: 'peaking' as const, enabled: true })),
+    description,
+    createdAt: BUILTIN_EPOCH,
+    updatedAt: BUILTIN_EPOCH,
+    deletedAt: null,
+  };
+}
+
+/**
+ * One preset per solfeggio frequency, plus one that lifts all nine at once.
+ *
+ * Parametric rather than graphic: the ten graphic bands are at 32 Hz … 16 kHz, and none of them
+ * sits on 528 Hz. Rounding a request for 528 Hz to the 500 Hz slider would be a different filter
+ * wearing the right label.
+ */
+export const SOLFEGGIO_PRESETS: readonly EqPreset[] = [
+  ...SOLFEGGIO_FREQUENCIES.map((entry, index) =>
+    parametric(
+      `00000000-0000-7000-8000-0000000050${String(index + 1).padStart(2, '0')}`,
+      entry.syllable ? `${entry.hz} Hz (${entry.syllable})` : `${entry.hz} Hz`,
+      `A narrow +${SOLFEGGIO_GAIN_DB} dB peak at ${entry.hz} Hz, Q ${SOLFEGGIO_Q}. It emphasises what the recording already has there; it does not add a ${entry.hz} Hz tone.`,
+      [{ frequencyHz: entry.hz, gainDb: SOLFEGGIO_GAIN_DB, q: SOLFEGGIO_Q }],
+      -3,
+    ),
+  ),
+  parametric(
+    '00000000-0000-7000-8000-000000005010',
+    'Solfeggio (all nine)',
+    'A +4 dB peak at each of the nine frequencies, Q 6. Nine narrow boosts at once colour a recording heavily; the headroom trim keeps it from clipping.',
+    SOLFEGGIO_FREQUENCIES.map((entry) => ({ frequencyHz: entry.hz, gainDb: 4, q: 6 })),
+    -6,
+  ),
+];
+
+/** Every preset the app ships with: the tone presets above, then the solfeggio set. */
+export const ALL_BUILTIN_PRESETS: readonly EqPreset[] = [...BUILTIN_PRESETS, ...SOLFEGGIO_PRESETS];
+
 export function clampGain(db: number): number {
   return Math.max(EQ_GAIN_MIN_DB, Math.min(EQ_GAIN_MAX_DB, db));
 }

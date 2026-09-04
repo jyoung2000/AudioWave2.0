@@ -44,6 +44,13 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 # -------------------------------------------------------------- runtime stage
 FROM node:22-bookworm-slim AS runtime
 
+# Standard image labels. `nowplaying update` prunes superseded layers by the title label, so it can
+# reclaim space from its own old builds without touching anything else on the machine.
+LABEL org.opencontainers.image.title="Now Playing Hub" \
+      org.opencontainers.image.description="Self-hosted music hub: library, group listening, pairing, sync and a Discord bot." \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.source="https://github.com/jyoung2000/AudioWave2.0"
+
 # FFmpeg is optional at runtime: without it only byte-for-byte copies are possible, and the API
 # says so. It is included because converting a file the user owns is a normal thing to want.
 RUN apt-get update && \

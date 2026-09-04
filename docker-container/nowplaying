@@ -1,0 +1,334 @@
+#!/usr/bin/env sh
+# shellcheck shell=sh
+#
+# Install, update and run the Now Playing hub.
+#
+# The point of this script is that none of it depends on your terminal staying open. Three separate
+# things have to be true for that, and they are easy to confuse:
+#
+#   1. The containers keep running after you log out. Compose starts them detached and the compose
+#      file sets `restart: unless-stopped`, so Docker restarts them after a crash or a reboot —
+#      provided the Docker daemon itself starts at boot.
+#   2. A long install or update finishes even if the connection drops. `--detach` re-runs the
+#      command under setsid, so it has no controlling terminal and SIGHUP cannot reach it. The log
+#      is written to a file and the path is printed before this script returns.
+#   3. Updates keep happening with nobody logged in. `schedule` installs a systemd timer (or a cron
+#      entry) that runs `update` on its own.
+#
+# It is POSIX sh on purpose: it has to run on a NAS with busybox as readily as on a desktop.
+#
+# Usage:
+#   ./nowplaying install [--detach] [--lan] [--discord]
+#   ./nowplaying update  [--detach]
+#   ./nowplaying schedule [--weekly|--daily|--off]
+#   ./nowplaying start | stop | restart | status | logs [-f] | backup [DIR] | uninstall
+set -eu
+
+SCRIPT="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+HUB_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(cd "$HUB_DIR/.." && pwd)"
+DATA_DIR="$HUB_DIR/data"
+LOG_DIR="$DATA_DIR/logs"
+LOCK_FILE="$DATA_DIR/.nowplaying.lock"
+SERVICE_NAME="now-playing"
+TIMER_NAME="now-playing-update"
+
+say() { printf '%s\n' "$*"; }
+die() {
+  printf 'error: %s\n' "$*" >&2
+  exit 1
+}
+
+# --- docker plumbing ---------------------------------------------------------
+
+compose() {
+  if docker compose version >/dev/null 2>&1; then
+    docker compose -f "$HUB_DIR/compose.yaml" "$@"
+  elif command -v docker-compose >/dev/null 2>&1; then
+    docker-compose -f "$HUB_DIR/compose.yaml" "$@"
+  else
+    die "Docker Compose is not installed. Install Docker Desktop, or the docker-compose-plugin package, then run this again."
+  fi
+}
+
+require_docker() {
+  command -v docker >/dev/null 2>&1 || die "Docker is not installed. See https://docs.docker.com/get-docker/ and run this again."
+  docker info >/dev/null 2>&1 || die "Docker is installed but not running, or this user cannot reach it. Start Docker, or add yourself to the 'docker' group and log in again."
+}
+
+# Which compose profiles to bring up. Recorded in the data directory so `update` and the scheduled
+# timer bring back exactly what you had, rather than quietly dropping the Discord bot.
+profiles_file() { printf '%s\n' "$DATA_DIR/.profiles"; }
+saved_profiles() { [ -f "$(profiles_file)" ] && cat "$(profiles_file)" || printf ''; }
+compose_up() {
+  set -- up -d --remove-orphans "$@"
+  _profiles="$(saved_profiles)"
+  if [ -n "$_profiles" ]; then
+    # shellcheck disable=SC2086 # deliberate word splitting: one --profile per saved name
+    compose $(for p in $_profiles; do printf -- '--profile %s ' "$p"; done) "$@"
+  else
+    compose "$@"
+  fi
+}
+
+# --- detaching ---------------------------------------------------------------
+
+# Re-run this script's command with no controlling terminal, logging to a file. Closing the
+# terminal, or losing an SSH connection, cannot interrupt what it started.
+detach_and_exit() {
+  mkdir -p "$LOG_DIR"
+  _log="$LOG_DIR/$(date -u +%Y%m%dT%H%M%SZ)-$1.log"
+  shift
+  if command -v setsid >/dev/null 2>&1; then
+    setsid sh -c "\"$SCRIPT\" $* >>\"$_log\" 2>&1" </dev/null >/dev/null 2>&1 &
+  else
+    # No setsid (macOS): nohup still detaches from the terminal's SIGHUP.
+    nohup sh -c "\"$SCRIPT\" $* >>\"$_log\" 2>&1" </dev/null >/dev/null 2>&1 &
+  fi
+  say "Started in the background (pid $!). You can close this terminal."
+  say "Log:    $_log"
+  say "Follow: tail -f \"$_log\""
+  exit 0
+}
+
+# One install or update at a time; a scheduled update must not collide with a manual one.
+with_lock() {
+  mkdir -p "$DATA_DIR"
+  if command -v flock >/dev/null 2>&1; then
+    exec 9>"$LOCK_FILE"
+    flock -n 9 || die "Another install or update is already running. Watch it with: tail -f $LOG_DIR/*.log"
+  fi
+}
+
+# --- commands ----------------------------------------------------------------
+
+cmd_install() {
+  lan=0
+  discord=0
+  for arg in "$@"; do
+    case "$arg" in
+      --lan) lan=1 ;;
+      --discord) discord=1 ;;
+      --detach) : ;;
+      *) die "Unknown option for install: $arg" ;;
+    esac
+  done
+
+  require_docker
+  with_lock
+  mkdir -p "$DATA_DIR" "$LOG_DIR"
+
+  if [ "$discord" -eq 1 ]; then printf 'discord\n' >"$(profiles_file)"; else : >"$(profiles_file)"; fi
+
+  say "Building the hub image from $REPO_DIR (this takes a few minutes the first time)…"
+  compose build
+
+  if [ "$lan" -eq 1 ]; then
+    say ""
+    say "--lan was given. The hub still refuses every network feature until the admin password is"
+    say "changed, but the port will be published to your whole network. Edit compose.yaml's ports"
+    say "line to \"4546:4546\" and set NP_BIND_MODE=lan — both, deliberately. This script will not"
+    say "make your hub reachable behind your back."
+  fi
+
+  say "Starting the hub…"
+  NP_BIND_MODE="${NP_BIND_MODE:-localhost}" compose_up
+
+  say ""
+  say "The hub is running and will come back on its own after a reboot or a crash."
+  say "Open http://localhost:4546 and sign in with admin / admin."
+  say "You will be asked to set a real password before anything else is enabled."
+  say ""
+  say "Keep it up to date automatically:  $SCRIPT schedule --weekly"
+  cmd_status
+}
+
+cmd_update() {
+  require_docker
+  with_lock
+  mkdir -p "$LOG_DIR"
+
+  say "Updating at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+  # Only pull when this really is a git checkout with a remote; an unpacked tarball is fine too,
+  # it just rebuilds what is on disk.
+  if [ -d "$REPO_DIR/.git" ] && command -v git >/dev/null 2>&1 && git -C "$REPO_DIR" remote >/dev/null 2>&1; then
+    before="$(git -C "$REPO_DIR" rev-parse HEAD 2>/dev/null || printf 'unknown')"
+    if [ -n "$(git -C "$REPO_DIR" status --porcelain 2>/dev/null)" ]; then
+      say "Local changes are present, so the source is left alone; rebuilding what is on disk."
+    else
+      say "Fetching the latest source…"
+      git -C "$REPO_DIR" pull --ff-only || say "Could not fast-forward (diverged history?); rebuilding what is on disk."
+    fi
+    after="$(git -C "$REPO_DIR" rev-parse HEAD 2>/dev/null || printf 'unknown')"
+    [ "$before" = "$after" ] && say "Source unchanged ($before)." || say "Source updated: $before -> $after"
+  fi
+
+  say "Rebuilding the image…"
+  compose build --pull
+
+  say "Restarting with the new image…"
+  compose_up
+
+  # Old layers pile up over months of updates. Only images this project built and no longer uses.
+  docker image prune --filter "label=org.opencontainers.image.title=Now Playing Hub" --force >/dev/null 2>&1 || true
+
+  say "Update finished at $(date -u +%Y-%m-%dT%H:%M:%SZ)."
+  cmd_status
+}
+
+cmd_schedule() {
+  interval="${1:---weekly}"
+  case "$interval" in
+    --daily) oncal="daily"; cronline="0 4 * * *" ;;
+    --weekly) oncal="weekly"; cronline="0 4 * * 0" ;;
+    --off) oncal=""; cronline="" ;;
+    *) die "Use --daily, --weekly or --off." ;;
+  esac
+
+  if [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1; then
+    unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+    if [ "$(id -u)" = "0" ]; then unit_dir="/etc/systemd/system"; sysctl_scope=""; else sysctl_scope="--user"; fi
+    if [ -z "$oncal" ]; then
+      # shellcheck disable=SC2086
+      systemctl $sysctl_scope disable --now "$TIMER_NAME.timer" >/dev/null 2>&1 || true
+      rm -f "$unit_dir/$TIMER_NAME.timer" "$unit_dir/$TIMER_NAME.service"
+      # shellcheck disable=SC2086
+      systemctl $sysctl_scope daemon-reload || true
+      say "Automatic updates are off."
+      return 0
+    fi
+    mkdir -p "$unit_dir"
+    cat >"$unit_dir/$TIMER_NAME.service" <<UNIT
+[Unit]
+Description=Update the Now Playing hub
+Documentation=file://$REPO_DIR/docker-container/README.md
+
+[Service]
+Type=oneshot
+ExecStart=$SCRIPT update
+# No terminal is involved, so the output goes to the journal and to the hub's own log directory.
+StandardOutput=append:$LOG_DIR/scheduled-update.log
+StandardError=append:$LOG_DIR/scheduled-update.log
+UNIT
+    cat >"$unit_dir/$TIMER_NAME.timer" <<UNIT
+[Unit]
+Description=Update the Now Playing hub on a schedule
+
+[Timer]
+OnCalendar=$oncal
+# Catch up after the machine was off, and stagger so every install does not update at once.
+Persistent=true
+RandomizedDelaySec=1h
+
+[Install]
+WantedBy=timers.target
+UNIT
+    # shellcheck disable=SC2086
+    systemctl $sysctl_scope daemon-reload
+    # shellcheck disable=SC2086
+    systemctl $sysctl_scope enable --now "$TIMER_NAME.timer"
+    if [ -n "$sysctl_scope" ]; then
+      say "Automatic updates are on ($oncal), as a user timer."
+      say "For it to run while you are logged out: sudo loginctl enable-linger \"$(id -un)\""
+    else
+      say "Automatic updates are on ($oncal), as a system timer."
+    fi
+    # shellcheck disable=SC2086
+    systemctl $sysctl_scope list-timers "$TIMER_NAME.timer" --no-pager 2>/dev/null || true
+    return 0
+  fi
+
+  # No systemd: cron is the portable answer. macOS has cron too.
+  command -v crontab >/dev/null 2>&1 || die "No systemd and no crontab here. Schedule '$SCRIPT update' with whatever your system uses (launchd, Task Scheduler, your NAS's task list)."
+  existing="$(crontab -l 2>/dev/null | grep -v "$SCRIPT update" || true)"
+  if [ -z "$cronline" ]; then
+    printf '%s\n' "$existing" | crontab -
+    say "Automatic updates are off."
+    return 0
+  fi
+  { [ -n "$existing" ] && printf '%s\n' "$existing"; printf '%s %s update >> %s 2>&1\n' "$cronline" "$SCRIPT" "$LOG_DIR/scheduled-update.log"; } | crontab -
+  say "Automatic updates are on ($interval), as a cron entry. It runs whether or not you are logged in."
+}
+
+cmd_status() {
+  require_docker
+  say ""
+  compose ps
+  say ""
+  if docker exec now-playing-hub node -e "fetch('http://127.0.0.1:4546/healthz').then(r=>r.json()).then(j=>console.log('healthy, version '+j.version)).catch(e=>{console.log('not answering yet: '+e.message);process.exit(1)})" 2>/dev/null; then
+    say "Open http://localhost:4546"
+  else
+    say "The hub is not answering yet. Give it a few seconds, then: $SCRIPT logs"
+  fi
+}
+
+cmd_backup() {
+  dest="${1:-$HUB_DIR/backups}"
+  mkdir -p "$dest"
+  stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  out="$dest/now-playing-$stamp.tar.gz"
+  say "Pausing the hub so the database is copied at rest…"
+  compose stop hub >/dev/null 2>&1 || true
+  tar -czf "$out" -C "$HUB_DIR" data
+  compose_up >/dev/null 2>&1 || true
+  say "Wrote $out"
+  say "This archive holds the database, your library index, artwork and the installation key —"
+  say "everything needed to restore this hub. Keep it somewhere safe: the key decrypts stored"
+  say "provider credentials."
+}
+
+cmd_uninstall() {
+  require_docker
+  say "This stops and removes the containers. Your data in $DATA_DIR is NOT deleted."
+  printf 'Continue? [y/N] '
+  read -r answer
+  case "$answer" in
+    y | Y) ;;
+    *) say "Nothing was changed."; exit 0 ;;
+  esac
+  compose down --remove-orphans
+  cmd_schedule --off || true
+  say "Removed. Your data is still in $DATA_DIR; delete it yourself if you want it gone."
+}
+
+# The header comment is the documentation; printing it keeps the two from drifting. Reading until
+# the first non-comment line rather than a fixed range means editing the header cannot break --help.
+usage() {
+  awk 'NR<3 {next} /^#/ {sub(/^# ?/, ""); print; next} {exit}' "$SCRIPT"
+}
+
+# --- dispatch ----------------------------------------------------------------
+
+[ $# -gt 0 ] || { usage; exit 1; }
+command="$1"
+shift
+
+# `--detach` applies to the two commands that take minutes; re-run without it in the background.
+case "$command" in
+  install | update)
+    for arg in "$@"; do
+      if [ "$arg" = "--detach" ]; then
+        rest=""
+        for a in "$@"; do [ "$a" = "--detach" ] || rest="$rest $a"; done
+        # shellcheck disable=SC2086
+        detach_and_exit "$command" "$command" $rest
+      fi
+    done
+    ;;
+esac
+
+case "$command" in
+  install) cmd_install "$@" ;;
+  update) cmd_update "$@" ;;
+  schedule) cmd_schedule "$@" ;;
+  start) require_docker; compose_up; cmd_status ;;
+  stop) require_docker; compose stop ;;
+  restart) require_docker; compose restart; cmd_status ;;
+  status) cmd_status ;;
+  logs) require_docker; compose logs "$@" ;;
+  backup) cmd_backup "$@" ;;
+  uninstall) cmd_uninstall ;;
+  -h | --help | help) usage ;;
+  *) die "Unknown command: $command (try --help)" ;;
+esac

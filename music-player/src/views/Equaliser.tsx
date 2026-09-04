@@ -15,7 +15,7 @@
 import { useMemo, useState } from 'react';
 import { Button, Checkbox, KeyValueList, Panel, PanelSection, PopUpMenu, Slider, StatusDot, TextField, useToast } from '@now-playing/aqua-ui';
 import { EQ_BAND_FREQUENCIES_HZ, EQ_GAIN_MAX_DB, EQ_GAIN_MIN_DB } from '@now-playing/contracts';
-import { BUILTIN_PRESETS, eqCurve, exportEqPresets, planEqPresetImport, requiredHeadroomDb, uuidv7 } from '@now-playing/domain';
+import { ALL_BUILTIN_PRESETS, eqCurve, exportEqPresets, planEqPresetImport, requiredHeadroomDb, SOLFEGGIO_PRESETS, uuidv7 } from '@now-playing/domain';
 import type { EqPreset } from '@now-playing/contracts';
 import { useAppState, usePlayer } from '../state/context.js';
 
@@ -28,12 +28,13 @@ export function EqualiserView() {
   const engine = state.playback.engine;
   const [presetName, setPresetName] = useState('');
 
-  const active = state.presets.find((p) => p.id === state.resolvedEq.presetId) ?? BUILTIN_PRESETS[0]!;
+  const active = state.presets.find((p) => p.id === state.resolvedEq.presetId) ?? ALL_BUILTIN_PRESETS[0]!;
   const bands = engine?.bands ?? active.bands;
   const headroom = useMemo(() => requiredHeadroomDb({ ...active, bands: bands as EqPreset['bands'], preampDb: engine?.preampDb ?? active.preampDb }), [active, bands, engine?.preampDb]);
   const curve = useMemo(() => eqCurve({ ...active, bands: bands as EqPreset['bands'], preampDb: engine?.preampDb ?? active.preampDb }, CURVE_FREQUENCIES), [active, bands, engine?.preampDb]);
 
   const entry = state.queue[state.queueIndex] ?? null;
+  const isSolfeggio = SOLFEGGIO_PRESETS.some((p) => p.id === active.id);
 
   return (
     <>
@@ -47,6 +48,12 @@ export function EqualiserView() {
               options={state.presets.map((p) => ({ value: p.id, label: p.kind === 'builtin' ? `${p.name} (built in)` : p.name }))}
             />
             <p className="player-hint">{state.resolvedEq.explanation}</p>
+            {isSolfeggio ? (
+              <p className="player-hint">
+                {active.description} These presets are filters, the same as every other preset here: they change how loud that part of the recording is. They do not generate a tone, they do not retune the
+                music (the Retuning panel below does that), and this app makes no claim that any frequency has a physical or medical effect.
+              </p>
+            ) : null}
           </div>
 
           <EqCurve values={curve} frequencies={CURVE_FREQUENCIES} />
@@ -162,7 +169,7 @@ export function EqualiserView() {
             <Button size="small" onClick={() => importPresets(store, state.presets, toast)} ellipsis>
               Import presets
             </Button>
-            {state.resolvedEq.presetId && !BUILTIN_PRESETS.some((p) => p.id === state.resolvedEq.presetId) ? (
+            {state.resolvedEq.presetId && !ALL_BUILTIN_PRESETS.some((p) => p.id === state.resolvedEq.presetId) ? (
               <Button size="small" variant="destructive" onClick={() => void store.deletePreset(state.resolvedEq.presetId!)}>
                 Delete “{state.resolvedEq.presetName}”
               </Button>

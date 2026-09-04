@@ -13,7 +13,7 @@
  * - **Capability, not assumption.** Anything the player cannot do carries a reason string that the
  *   UI shows. There is no silent failure path.
  */
-import { BUILTIN_PRESETS, computeListeningMetrics, FLAT_PRESET, isMeaningfulListen, resolveEq, uuidv7 } from '@now-playing/domain';
+import { ALL_BUILTIN_PRESETS, computeListeningMetrics, FLAT_PRESET, isMeaningfulListen, resolveEq, uuidv7 } from '@now-playing/domain';
 import type { EqBinding, EqPreset, ListeningEvent, ListeningEventType, Playlist, PlaylistItem, ResolvedEq, RetuneConfig, Track, TrackRef } from '@now-playing/contracts';
 import { clearEverything, getSetting, openPlayerDb, putSetting, storageReport, type PlayerDatabase, type StoredRoot } from '../lib/db.js';
 import { indexPickedFiles, resolveFile, scanRoot, supportsDirectoryHandles, type ScanProgress, type ScanResult } from '../lib/library.js';
@@ -77,7 +77,7 @@ export class PlayerStore {
       library: { tracks: [], roots: [], scanning: null, lastScan: null, directoryHandleReason: null },
       playlists: [],
       playlistItems: [],
-      presets: [...BUILTIN_PRESETS],
+      presets: [...ALL_BUILTIN_PRESETS],
       bindings: [],
       events: [],
       queue: [],
@@ -155,7 +155,7 @@ export class PlayerStore {
       playlists: playlists.filter((p) => !p.deletedAt),
       playlistItems: playlistItems.filter((i) => !i.deletedAt),
       // Built-ins are always present and are not stored, so they cannot be deleted by accident.
-      presets: [...BUILTIN_PRESETS, ...storedPresets.filter((p) => !p.deletedAt)],
+      presets: [...ALL_BUILTIN_PRESETS, ...storedPresets.filter((p) => !p.deletedAt)],
       bindings: bindings.filter((b) => !b.deletedAt),
       events,
       deviceId: resolvedDeviceId,
@@ -491,7 +491,7 @@ export class PlayerStore {
   }
 
   async deletePreset(presetId: string): Promise<void> {
-    if (BUILTIN_PRESETS.some((p) => p.id === presetId)) {
+    if (ALL_BUILTIN_PRESETS.some((p) => p.id === presetId)) {
       this.notice('info', 'Built-in presets cannot be deleted. Duplicate one to make your own.');
       return;
     }
@@ -656,7 +656,7 @@ export class PlayerStore {
       library: { tracks: [], roots: [], scanning: null, lastScan: null, directoryHandleReason: this.state.library.directoryHandleReason },
       playlists: [],
       playlistItems: [],
-      presets: [...BUILTIN_PRESETS],
+      presets: [...ALL_BUILTIN_PRESETS],
       bindings: [],
       events: [],
       queue: [],

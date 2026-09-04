@@ -1,13 +1,25 @@
 import type { RetuneConfig } from '@now-playing/contracts';
 
 export const STANDARD_A4_HZ = 440;
+/**
+ * Tuning references offered in the interface.
+ *
+ * 444 Hz is labelled by what it actually does: at A4 = 444, C5 lands on 444 × 2^(3/12) = 528.0 Hz,
+ * which is why people who want "528 Hz" reach for it. Saying so is more useful than either
+ * repeating the folklore or leaving the number unexplained.
+ */
 export const COMMON_REFERENCES = [
   { hz: 415, label: '415 Hz (baroque)' },
   { hz: 432, label: '432 Hz' },
   { hz: 440, label: '440 Hz (standard)' },
   { hz: 442, label: '442 Hz (orchestral)' },
-  { hz: 444, label: '444 Hz' },
+  { hz: 444, label: '444 Hz (puts C5 at 528 Hz)' },
 ] as const;
+
+/** The C above A4 at a given tuning: A4 × 2^(3/12). */
+export function c5FromA4(a4Hz: number): number {
+  return a4Hz * 2 ** (3 / 12);
+}
 
 export const REFERENCE_MIN_HZ = 400;
 export const REFERENCE_MAX_HZ = 480;
