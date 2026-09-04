@@ -10,8 +10,9 @@ The active profile is declared in [docs/IMPLEMENTATION_PLAN.md](IMPLEMENTATION_P
 AQUA_PROFILE=snow-leopard-itunes-9
 ```
 
-Every MUST item in §17 and §18 of the specification is treated as a release gate. The deviations
-below are all from SHOULD items or from the reference implementation, except where stated.
+Every MUST item in §17 and §18 of the specification is treated as a release gate, each mapped to the
+test that would fail in [AQUA_CONFORMANCE.md](AQUA_CONFORMANCE.md). The deviations below are all from
+SHOULD items or from the reference implementation, except the three noted as unmet MUSTs.
 
 ## From the Aqua specification
 

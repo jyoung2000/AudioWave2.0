@@ -66,8 +66,9 @@ OpenAPI description of 119 operations across 97 paths are generated from it, and
 asserts every route the contracts declare has a handler.
 
 The interface follows `docs/design/APPLE_AQUA_2009_2010_UI_DESIGN_SPEC.md` under the profile
-`AQUA_PROFILE=snow-leopard-itunes-9`. Its MUST items are release gates; where the implementation
-departs from it, the reason is written down in [docs/DEVIATIONS.md](docs/DEVIATIONS.md).
+`AQUA_PROFILE=snow-leopard-itunes-9`. Its MUST items are release gates, each mapped to the test that
+would fail in [docs/AQUA_CONFORMANCE.md](docs/AQUA_CONFORMANCE.md); where the implementation departs
+from the spec, the reason is written down in [docs/DEVIATIONS.md](docs/DEVIATIONS.md).
 
 ## Documentation
 
@@ -89,6 +90,7 @@ departs from it, the reason is written down in [docs/DEVIATIONS.md](docs/DEVIATI
 - [docs/API.md](docs/API.md) · [docs/DATA_MODEL.md](docs/DATA_MODEL.md) ·
   [docs/architecture/](docs/architecture/) · [docs/adr/](docs/adr/) ·
   [docs/TESTING.md](docs/TESTING.md) · [docs/DEVIATIONS.md](docs/DEVIATIONS.md) ·
+  [docs/AQUA_CONFORMANCE.md](docs/AQUA_CONFORMANCE.md) ·
   [LICENSES.md](LICENSES.md)
 
 ## Verifying it
