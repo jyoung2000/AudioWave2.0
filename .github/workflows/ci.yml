@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lint, typecheck, test, build (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Generate contracts + fixtures and check they are committed
+        run: |
+          pnpm generate
+          git diff --exit-code -- packages/contracts/generated packages/test-fixtures/generated/audio/manifest.json
+      - name: Lint
+        run: pnpm lint
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Unit, contract, integration and security tests
+        run: pnpm test && pnpm test:security
+      - name: Build all products
+        run: pnpm build
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Accessibility and end-to-end tests
+        run: pnpm test:a11y && pnpm test:e2e
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            music-player/playwright-report
+            docker-container/playwright-report
+          if-no-files-found: ignore
+      - name: Dependency audit (high and critical fail the build)
+        run: pnpm audit --audit-level=high
+
+  docker:
+    name: Hub image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build hub image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker-container/Dockerfile
+          push: false
+          load: true
+          tags: now-playing-hub:ci
+      - name: Smoke test container (healthz on 4546, bootstrap login forces password change)
+        run: |
+          docker run -d --name hub -p 127.0.0.1:4546:4546 -v "$PWD/.ci-data:/data" now-playing-hub:ci
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4546/healthz && break; sleep 1; done
+          curl -fsS http://127.0.0.1:4546/healthz
+          curl -fsS -c cookies.txt -X POST -H 'Content-Type: application/json' -d '{"username":"admin","password":"admin"}' http://127.0.0.1:4546/api/v1/auth/login | tee login.json
+          grep -q '"mustChangePassword":true' login.json
+          docker logs hub | tail -20
+          docker rm -f hub

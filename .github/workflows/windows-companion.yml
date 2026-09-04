@@ -1,0 +1,64 @@
+name: Windows companion
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'windows-companion/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/windows-companion.yml'
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  package:
+    name: Type-check, test, package (Windows x64)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      # Optional code-signing inputs. When absent the artifacts are unsigned and latest.json says so.
+      CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck and unit tests (companion + shared packages)
+        run: |
+          pnpm -r --filter './packages/*' typecheck
+          pnpm --filter @now-playing/windows-companion typecheck
+          pnpm exec vitest run --project unit --project integration windows-companion packages
+      - name: Package installer and portable build
+        run: pnpm --filter @now-playing/windows-companion package
+      - name: Write checksums and latest.json
+        run: pnpm --filter @now-playing/windows-companion release-metadata
+        env:
+          NP_RELEASE_BASE_URL: ${{ github.event_name == 'release' && format('{0}/releases/download/{1}', github.server_url, github.event.release.tag_name) || '' }}
+          NP_RELEASE_SIGNED: ${{ secrets.WINDOWS_CSC_LINK != '' }}
+          NP_RELEASE_CHANNEL: ${{ github.event_name == 'release' && 'stable' || 'dev' }}
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-companion-${{ github.sha }}
+          path: |
+            windows-companion/release/*.exe
+            windows-companion/release/SHA256SUMS.txt
+            windows-companion/release/latest.json
+          if-no-files-found: error
+      - name: Attach to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            windows-companion/release/*.exe
+            windows-companion/release/SHA256SUMS.txt
+            windows-companion/release/latest.json
