@@ -65,7 +65,7 @@ surprises are both good ones.
 | **Service worker** | **No** | `Failed to register a ServiceWorker: The URL protocol of the current origin ('null') is not supported.` Nothing to solve: the file is already on your disk |
 | **Installing as an app** | **No** | There is no origin to install. Make a shortcut to the file instead |
 | Fetching a sibling file | **No** | The reason this is one file |
-| **WebSocket** | **No** | Which is why group listening is not available |
+| **WebSocket** | **No** | Which is why shared listening is not available |
 | `fetch` to a hub | **Only with permissive CORS** | An `http://` request from a `null` origin needs `Access-Control-Allow-Origin: *` on the hub, and then it still cannot send credentials — `credentials: 'include'` fails against a wildcard origin. The hub does not do this by default, and should not |
 
 The app reports all of this on its own Settings screen under **Running from a file**, computed at
@@ -74,7 +74,7 @@ asserts exactly that, by starting a server and loading the same bytes.
 
 ## What you give up, plainly
 
-- **Group listening**, because it needs a WebSocket.
+- **Shared listening**, because it needs a WebSocket.
 - **Searching providers through a hub**, unless you deliberately configure that hub to accept a null
   origin. The served player is the supported way to use a hub.
 - **Installing it**, and with it the app-window frame and the launcher icon.

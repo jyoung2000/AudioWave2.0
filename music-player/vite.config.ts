@@ -20,6 +20,9 @@ export default defineConfig({
     alias: {
       '@now-playing/contracts': workspace('contracts'),
       '@now-playing/domain': workspace('domain'),
+      // The stylesheet entries must precede the bare package alias: string aliases match by
+      // prefix, so otherwise "…/aqua-ui/now-playing.css" is rewritten to "…/src/index.ts/now-playing.css".
+      '@now-playing/aqua-ui/now-playing.css': fileURLToPath(new URL('../packages/aqua-ui/src/styles/now-playing.css', import.meta.url)),
       '@now-playing/aqua-ui': workspace('aqua-ui'),
       '@now-playing/audio-core': workspace('audio-core'),
       '@now-playing/recommendations': workspace('recommendations'),

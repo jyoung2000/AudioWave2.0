@@ -37,6 +37,64 @@ test('the transport row carries star, add-to-playlist and share beside the play 
   await expect(transport.getByRole('button', { name: /^Shuffle$/i })).toBeVisible();
 });
 
+test('the status bar carries the listening mode, and says why shared is unavailable', async ({ page }) => {
+  /*
+   * The mode switch is the one control on this page that is *usually* half-unavailable: shared
+   * listening needs a hub, and most people opening the player have not paired one. The rule is that
+   * it stays visible and reports the reason rather than vanishing or doing nothing, so this checks
+   * the unavailable half as carefully as the available one.
+   */
+  const modes = page.getByRole('radiogroup', { name: 'Listening mode' });
+  await expect(modes).toBeVisible();
+  await expect(modes.getByRole('radio', { name: 'Solo listening' })).toHaveAttribute('aria-checked', 'true');
+
+  const shared = modes.getByRole('radio', { name: /Shared listening/ });
+  await expect(shared).toHaveAttribute('aria-disabled', 'true');
+  await expect(shared).toHaveAccessibleName(/needs a paired hub/i);
+
+  /*
+   * Reaching for it explains rather than doing nothing. Driven from the keyboard because that is
+   * the path a person actually takes through a radio group — and because `aria-disabled` (which is
+   * the truthful state: you cannot select it) means an automated pointer click is refused, exactly
+   * as it should be.
+   */
+  await modes.getByRole('radio', { name: 'Solo listening' }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByText(/Shared listening needs a paired hub/i).first()).toBeVisible();
+  await expect(modes.getByRole('radio', { name: 'Solo listening' })).toHaveAttribute('aria-checked', 'true');
+});
+
+test('settings report the same shared-listening capability the switch does', async ({ page }) => {
+  await page.getByRole('option', { name: /Settings/i }).click();
+  await expect(page.getByRole('heading', { name: 'Shared listening' })).toBeVisible();
+  await expect(page.getByText(/needs a paired hub/i).first()).toBeVisible();
+  await expect(page.getByText(/joining a group does not upload your music/i)).toBeVisible();
+});
+
+test('the hero is on every section, so the song is never more than a glance away', async ({ page }) => {
+  const hero = page.getByRole('region', { name: 'Now playing' });
+  await expect(hero).toBeVisible();
+  await expect(hero.getByRole('heading', { name: 'Nothing playing' })).toBeVisible();
+  await expect(page.getByRole('slider', { name: 'Playback position' })).toBeVisible();
+  await expect(page.getByRole('slider', { name: 'Volume' })).toBeVisible();
+
+  // Still there four sections later.
+  await page.getByRole('option', { name: /Equaliser/i }).click();
+  await expect(hero).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Playback controls' })).toBeVisible();
+});
+
+test('the section strip moves with the arrow keys, like the source list it replaced', async ({ page }) => {
+  const strip = page.getByRole('navigation', { name: 'Sections' });
+  await strip.getByRole('option', { name: /^Music/ }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(strip.getByRole('option', { name: /^Now playing/ })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(strip.getByRole('option', { name: /^Now playing/ })).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('End');
+  await expect(strip.getByRole('option', { name: /^Settings/ })).toBeFocused();
+});
+
 test('every section is reachable and renders', async ({ page }) => {
   for (const name of ['Now playing', 'Up next', 'Playlists', 'Search', 'Constellation', 'Listening', 'Equaliser', 'Settings']) {
     await page.getByRole('option', { name: new RegExp(name, 'i') }).click();

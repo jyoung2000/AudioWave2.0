@@ -150,7 +150,7 @@ test.describe('opened from the filesystem', () => {
     await expect(page.getByRole('heading', { name: 'Running from a file' })).toBeVisible();
     // The honest half: what it cannot do, and why, rather than a silent absence.
     await expect(page.getByText(/cannot be installed — there is no origin to install/i)).toBeVisible();
-    await expect(page.getByText(/Group listening needs a WebSocket, which a browser refuses to open from a local file/i)).toBeVisible();
+    await expect(page.getByText(/Shared listening needs a WebSocket, which a browser refuses to open from a local file/i)).toBeVisible();
     // And the parts that do work, so the page is not just a list of disappointments.
     await expect(page.getByText(/Files are read from your disk and played directly/i)).toBeVisible();
   });

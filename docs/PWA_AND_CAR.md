@@ -33,7 +33,7 @@ than having the app swap itself out underneath a playing track.
 | Playing your own files | Works |
 | Library, playlists, equaliser, metrics, constellation | Work |
 | Search across providers | Needs the hub, which needs the network |
-| Group listening | Needs the hub |
+| Shared listening | Needs the hub |
 | Sending a file to a hub | Needs the hub |
 
 Each of these says so on screen when it cannot work, rather than failing silently.

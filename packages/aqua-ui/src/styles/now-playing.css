@@ -1,0 +1,1843 @@
+/* ==========================================================================
+   @now-playing/aqua-ui — the 2010 page surfaces
+   AQUA_PROFILE=snow-leopard-itunes-9 (unchanged: same light source, same 1 px
+   rims, same restraint about blue)
+
+   aqua.css builds a *window*: frame, title bar, source list, bottom bar.
+   This file builds the *page* the reference argues for — a sticky status bar,
+   a hero player, and an iTunes 10 list — and it is loaded after aqua.css so
+   the shared primitives (Button, Panel, Sheet, Toast) can be retuned to the
+   flatter 2010 material without forking them.
+
+   Every gradient here is sampled from docs/reference/now-playing-header.html,
+   which sampled it from screenshots of the real thing. Where a value looks
+   oddly specific, that is why. Class prefix: np-
+   ========================================================================== */
+
+:root {
+  /* status bar: seven stops, because four read as a step and the real bar does not */
+  --np-bar-top: #f5f6f7;
+  --np-bar-1: #eef0f1;
+  --np-bar-2: #e8eaea;
+  --np-bar-3: #e2e6e5;
+  --np-bar-4: #dfe4e1;
+  --np-bar-5: #dce2de;
+  --np-bar-bottom: #d9dfe1;
+  --np-bar-edge: rgb(31 41 45 / 22%);
+  --np-bar-emboss: rgb(255 255 255 / 55%);
+
+  --np-page: #fff;
+  --np-ink: #1b1c1f;
+  --np-meta: #575757;
+
+  /* the recessed search well */
+  --np-field-top: #f2f2f2;
+  --np-field-mid: #fbfbfb;
+  --np-field-bottom: #fff;
+  --np-field-ring: rgb(0 0 0 / 20%);
+  --np-field-shadow: rgb(0 0 0 / 32%);
+  --np-field-lip: rgb(255 255 255 / 70%);
+  --np-field-icon: #8e8e91;
+  --np-field-hint: #ababab;
+
+  /* iOS 5 segmented control, used for the listening mode */
+  --np-seg-border: rgb(0 0 0 / 36%);
+  --np-seg-divider: rgb(0 0 0 / 30%);
+  --np-seg-lip: rgb(255 255 255 / 65%);
+  --np-seg-face-top: #fdfdfd;
+  --np-seg-face-mid: #f0f1f2;
+  --np-seg-face-bottom: #dcdee0;
+  --np-seg-on-top: #767c85;
+  --np-seg-on-mid: #939aa3;
+  --np-seg-on-bottom: #a9b0b8;
+  --np-seg-ink: #43464b;
+  --np-seg-ink-on: #fff;
+
+  --np-avatar-face: #f3f3f3;
+  --np-avatar-ring: rgb(0 0 0 / 26%);
+  --np-avatar-lip: rgb(255 255 255 / 70%);
+
+  /* iPod Classic scrubber: sky blue that BRIGHTENS downward, a saturated dip
+     at two-thirds, then a cyan glow along the bottom lip */
+  --np-rail-fill: linear-gradient(
+    to bottom,
+    #8fb9e4 0%,
+    #79b7f2 12%,
+    #62b4f8 30%,
+    #4fa9f2 48%,
+    #2b9bec 62%,
+    #24b4f4 74%,
+    #63d0f8 88%,
+    #a5e9fd 100%
+  );
+  --np-rail-track: linear-gradient(to bottom, #e9ecee 0%, #f7f9fa 14%, #f2f4f5 45%, #e9ebec 62%, #f5f7f8 82%, #feffff 100%);
+  --np-rail-line: rgb(0 0 0 / 16%);
+
+  /* the one place Aqua gel survives at full strength: the overlay scroller */
+  --np-gel: linear-gradient(to right, #16407f 0%, #6ea3ec 12%, #8cb8ea 24%, #458ad8 45%, #5fa8f1 58%, #83c9fd 78%, #9fd2ee 92%, #3f6a86 100%);
+
+  --np-live: #cc1027;
+  --np-live-halo: rgb(204 16 39 / 32%);
+
+  --np-key-ink: #1b1c1f;
+  --np-key-muted: #8b9099;
+  --np-key-on: #2f6ec0;
+  --np-vol-a: #9aa1a9;
+  --np-vol-b: #b7bdc4;
+  --np-vol-face: #fff;
+
+  /* iTunes 10 list: light at the top of the header again, unlike iTunes 11 */
+  --np-list-bg: #fff;
+  --np-list-alt: #f2f5f9;
+  --np-list-border: #ababab;
+  --np-list-head-top: #f8f8f8;
+  --np-list-head-bottom: #dadada;
+  --np-list-head-rule: #adadad;
+  --np-list-head-sep: #ccc;
+  --np-list-head-ink: #3a3d41;
+  --np-list-head-emboss: rgb(255 255 255 / 80%);
+  --np-list-sort-top: #e8eef7;
+  --np-list-sort-bottom: #cfdbeb;
+  --np-list-head-hot-top: #efefef;
+  --np-list-head-hot-bottom: #cfcfcf;
+  --np-list-sort-hot-top: #dde7f4;
+  --np-list-sort-hot-bottom: #c2d2e6;
+  --np-list-ink: #000;
+  --np-list-soft: #222326;
+  --np-list-badge: #dfe3e9;
+  --np-list-badge-ink: #3b3f47;
+  --np-accent: #2b6fd6;
+  --np-list-icon: #8a8f98;
+  --np-star: #f0a422;
+  --np-list-playing: #dde9f8;
+  --np-list-select-top: #5b8dd9;
+  --np-list-select-bottom: #3a6cc4;
+
+  --np-sheet-bg: rgb(247 247 250 / 88%);
+  --np-sheet-ink: #1b1c1f;
+  --np-sheet-sep: rgb(0 0 0 / 12%);
+
+  --np-results-bg: #f9f9f9;
+  --np-results-head-top: #f6f6f6;
+  --np-results-head-bottom: #eee;
+  --np-results-rule: #dedede;
+  --np-results-ink: #2c2c2c;
+  --np-results-soft: #9b9b9b;
+  --np-results-hot: #ececec;
+  --np-results-border: rgb(0 0 0 / 25%);
+  --np-results-lip: rgb(255 255 255 / 60%);
+
+  --np-pad: 14px;
+  --np-bar-type: 13px;
+  --np-field-h: 26px;
+  --np-stage: clamp(150px, 38vw, 232px);
+  --np-ui-font: -apple-system, blinkmacsystemfont, "Segoe UI", roboto, "Helvetica Neue", arial, sans-serif;
+  --np-list-font: "Lucida Grande", "Aqua Fallback", "Lucida Sans Unicode", "Segoe UI", system-ui, sans-serif;
+}
+
+/* The reference ships a dark theme for every one of these surfaces. Keeping it
+   is not scope creep: a music player is a thing people open at night. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-np-theme="light"]) {
+    color-scheme: dark;
+
+    --np-bar-top: #34373d;
+    --np-bar-1: #2f3238;
+    --np-bar-2: #2a2d33;
+    --np-bar-3: #25282e;
+    --np-bar-4: #212429;
+    --np-bar-5: #1e2126;
+    --np-bar-bottom: #1a1d22;
+    --np-bar-edge: rgb(0 0 0 / 60%);
+    --np-bar-emboss: transparent;
+
+    --np-page: #0e0f12;
+    --np-ink: #f1f2f4;
+    --np-meta: #9ba0a8;
+
+    --np-field-top: #141619;
+    --np-field-mid: #1b1e23;
+    --np-field-bottom: #24272d;
+    --np-field-ring: rgb(0 0 0 / 70%);
+    --np-field-shadow: rgb(0 0 0 / 75%);
+    --np-field-lip: rgb(255 255 255 / 8%);
+    --np-field-icon: #85898f;
+    --np-field-hint: #7c8087;
+
+    --np-seg-border: rgb(0 0 0 / 70%);
+    --np-seg-divider: rgb(0 0 0 / 55%);
+    --np-seg-lip: rgb(255 255 255 / 8%);
+    --np-seg-face-top: #3a3d44;
+    --np-seg-face-mid: #33363c;
+    --np-seg-face-bottom: #292c31;
+    --np-seg-on-top: #14161a;
+    --np-seg-on-mid: #1c1f24;
+    --np-seg-on-bottom: #23262c;
+    --np-seg-ink: #c3c7cf;
+
+    --np-avatar-face: #2b2e34;
+    --np-avatar-ring: rgb(0 0 0 / 55%);
+    --np-avatar-lip: rgb(255 255 255 / 10%);
+
+    /* the screen content is unchanged on black hardware; only the well deepens */
+    --np-rail-track: linear-gradient(to bottom, #16181c 0%, #202329 18%, #1c1f24 45%, #171a1f 62%, #22262c 82%, #2e333a 100%);
+    --np-rail-line: rgb(0 0 0 / 72%);
+    --np-live: #ff4d62;
+    --np-live-halo: rgb(255 77 98 / 36%);
+
+    --np-key-ink: #ccd1d8;
+    --np-key-muted: #7f858e;
+    --np-key-on: #5fa0ea;
+    --np-vol-a: #6e747c;
+    --np-vol-b: #878e96;
+    --np-vol-face: #1b1e23;
+
+    --np-list-bg: #16181c;
+    --np-list-alt: #1b1f26;
+    --np-list-border: #08090b;
+    --np-list-head-top: #3a3d44;
+    --np-list-head-bottom: #26292e;
+    --np-list-head-rule: #0f1114;
+    --np-list-head-sep: #17191d;
+    --np-list-head-ink: #c6cbd3;
+    --np-list-head-emboss: rgb(0 0 0 / 55%);
+    --np-list-sort-top: #2c3a4e;
+    --np-list-sort-bottom: #233043;
+    --np-list-head-hot-top: #45484f;
+    --np-list-head-hot-bottom: #303338;
+    --np-list-sort-hot-top: #36485f;
+    --np-list-sort-hot-bottom: #2b3b52;
+    --np-list-ink: #f2f3f5;
+    --np-list-soft: #d4d8df;
+    --np-list-badge: #2f333b;
+    --np-list-badge-ink: #d6dae1;
+    --np-accent: #6aa3f2;
+    --np-list-icon: #8d939c;
+    --np-star: #f4b241;
+    --np-list-playing: #22354f;
+
+    --np-sheet-bg: rgb(40 42 48 / 90%);
+    --np-sheet-ink: #eef0f3;
+    --np-sheet-sep: rgb(255 255 255 / 12%);
+
+    --np-results-bg: #26282e;
+    --np-results-head-top: #2e3138;
+    --np-results-head-bottom: #25272d;
+    --np-results-rule: rgb(0 0 0 / 50%);
+    --np-results-ink: #eef0f3;
+    --np-results-soft: #8d939c;
+    --np-results-hot: #32353c;
+    --np-results-border: rgb(0 0 0 / 65%);
+    --np-results-lip: rgb(255 255 255 / 7%);
+
+    /* aqua.css's own surfaces, so the sections underneath match the chrome */
+    --aqua-content: #16181c;
+    --aqua-content-muted: #1b1f26;
+    --aqua-window-body: #131519;
+    --aqua-stripe: #1b1f26;
+    --aqua-row-divider: #2a2e35;
+    --aqua-text: #f1f2f4;
+    --aqua-text-secondary: #a6abb3;
+    --aqua-text-disabled: #7d828a;
+    --aqua-chrome-top: #3a3d44;
+    --aqua-chrome-upper: #33363c;
+    --aqua-chrome-lower: #2a2d33;
+    --aqua-chrome-bottom: #232529;
+    --aqua-chrome-separator: #0f1114;
+    --aqua-chrome-highlight: rgb(255 255 255 / 8%);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   1. The page
+   -------------------------------------------------------------------------- */
+
+.np-app {
+  display: flex;
+  min-height: 100vh;
+  min-height: 100dvh;
+  flex-direction: column;
+  background: var(--np-page);
+  color: var(--np-ink);
+  font-family: var(--np-ui-font);
+}
+
+.np-app *,
+.np-app *::before,
+.np-app *::after {
+  box-sizing: border-box;
+}
+
+/* --------------------------------------------------------------------------
+   2. Status bar
+   -------------------------------------------------------------------------- */
+
+.np-bar {
+  position: sticky;
+  z-index: 100;
+  top: 0;
+  border-bottom: 1px solid var(--np-bar-edge);
+  background-image: linear-gradient(
+    to bottom,
+    var(--np-bar-top) 0%,
+    var(--np-bar-1) 14%,
+    var(--np-bar-2) 30%,
+    var(--np-bar-3) 46%,
+    var(--np-bar-4) 62%,
+    var(--np-bar-5) 78%,
+    var(--np-bar-bottom) 100%
+  );
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 85%);
+}
+
+/* Equal side columns, so the pill is optically centred in the bar rather than
+   centred in whatever space the two ends happen to leave. */
+.np-bar__inner {
+  display: grid;
+  align-items: center;
+  padding: 7px var(--np-pad);
+  color: var(--np-ink);
+  column-gap: 16px;
+  font: 700 var(--np-bar-type)/1.35 var(--np-ui-font);
+  grid-template-columns: minmax(min-content, 1fr) minmax(0, 380px) minmax(min-content, 1fr);
+  text-shadow: 0 1px 0 var(--np-bar-emboss);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* No overflow clipping, so the descender on "Playing" survives */
+.np-bar__label {
+  padding-right: 1px;
+  grid-area: label;
+  letter-spacing: 0.005em;
+  white-space: nowrap;
+}
+
+.np-bar__status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  grid-area: status;
+  justify-self: end;
+}
+
+.np-bar__clock {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+/* --------------------------------------------------------------------------
+   3. Search pill
+   -------------------------------------------------------------------------- */
+
+.np-search {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  grid-area: search;
+}
+
+.np-search__icon {
+  position: absolute;
+  left: 9px;
+  width: 14px;
+  height: 14px;
+  color: var(--np-field-icon);
+  pointer-events: none;
+}
+
+.np-search__input {
+  width: 100%;
+  height: var(--np-field-h);
+  padding: 0 11px 0 28px;
+  border: 0;
+  border-radius: 999px;
+  appearance: none;
+  background-image: linear-gradient(to bottom, var(--np-field-top) 0%, var(--np-field-mid) 26%, var(--np-field-bottom) 62%);
+  box-shadow:
+    inset 0 0 0 1px var(--np-field-ring),
+    inset 0 2px 3px var(--np-field-shadow),
+    0 1px 0 var(--np-field-lip);
+  color: var(--np-ink);
+  font: 400 12px/1 var(--np-ui-font);
+  text-shadow: none;
+}
+
+.np-search__input::placeholder {
+  color: var(--np-field-hint);
+  opacity: 1;
+}
+
+.np-search__input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
+.np-search__input:focus {
+  outline: none;
+}
+
+.np-search__input:focus-visible {
+  outline: 2px solid rgb(27 28 31 / 50%);
+  outline-offset: 1px;
+}
+
+/* --------------------------------------------------------------------------
+   4. Results popover (iTunes 11 "Up Next")
+   -------------------------------------------------------------------------- */
+
+.np-results {
+  position: absolute;
+  z-index: 900;
+
+  /* pinned to both edges of the pill, so the sheet is always exactly as wide as
+     the field above it at every breakpoint — no measuring, nothing to clamp */
+  right: 0;
+  left: 0;
+  overflow: hidden;
+  border: 1px solid var(--np-results-border);
+  border-radius: 5px;
+  background: var(--np-results-bg);
+  box-shadow:
+    inset 0 1px 0 var(--np-results-lip),
+    0 2px 6px rgb(0 0 0 / 22%),
+    0 14px 32px rgb(0 0 0 / 40%);
+  color: var(--np-results-ink);
+  font-family: var(--np-list-font);
+  font-size: 11px;
+  font-weight: 400;
+  text-shadow: none;
+  top: calc(100% + 9px);
+}
+
+.np-results__head {
+  display: flex;
+  height: 27px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--np-results-rule);
+  background-image: linear-gradient(to bottom, var(--np-results-head-top), var(--np-results-head-bottom));
+}
+
+.np-results__count {
+  margin: 0;
+  color: var(--np-results-soft);
+}
+
+.np-results__count b {
+  color: var(--np-results-ink);
+  font-weight: 700;
+}
+
+.np-results__clear {
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--np-results-soft);
+  cursor: pointer;
+  font: inherit;
+}
+
+.np-results__clear:hover {
+  color: var(--np-results-ink);
+}
+
+.np-results__clear:focus-visible {
+  outline: 2px solid var(--np-accent);
+  outline-offset: 1px;
+}
+
+.np-results__body {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.np-results__row {
+  display: flex;
+  width: 100%;
+  height: 40px;
+  align-items: center;
+  padding: 0 8px 0 9px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: default;
+  font: inherit;
+  gap: 8px;
+  text-align: left;
+}
+
+.np-results__row:hover,
+.np-results__row[data-hot='true'] {
+  background: var(--np-results-hot);
+}
+
+.np-results__row:focus-visible {
+  outline: 2px solid var(--np-accent);
+  outline-offset: -2px;
+}
+
+.np-results__art {
+  display: flex;
+  overflow: hidden;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  background-image: linear-gradient(to bottom, #fbfbfb, #e3e3e3);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 14%);
+  color: #a9a9a9;
+}
+
+.np-results__art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.np-results__art svg {
+  width: 15px;
+  height: 15px;
+  fill: currentcolor;
+}
+
+.np-results__meta {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.np-results__title,
+.np-results__sub {
+  overflow: hidden;
+  line-height: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.np-results__sub {
+  color: var(--np-results-soft);
+}
+
+.np-results__dur {
+  flex: none;
+  margin-right: 2px;
+  color: var(--np-results-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.np-results__go {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--np-results-soft);
+  color: var(--np-results-soft);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 15px;
+  opacity: 0;
+  text-align: center;
+}
+
+.np-results__row:hover .np-results__go,
+.np-results__row[data-hot='true'] .np-results__go {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .np-results__go {
+    opacity: 1;
+  }
+}
+
+.np-results__msg {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  padding: 8px 12px;
+  color: var(--np-results-soft);
+  gap: 9px;
+}
+
+/* --------------------------------------------------------------------------
+   5. Listening mode: the iOS 5 segmented control
+   -------------------------------------------------------------------------- */
+
+.np-mode {
+  display: inline-flex;
+  overflow: hidden;
+  flex: none;
+  border-radius: 999px;
+  box-shadow:
+    inset 0 0 0 1px var(--np-seg-border),
+    0 1px 0 var(--np-seg-lip);
+}
+
+.np-mode__item {
+  position: relative;
+  width: 36px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background-image: linear-gradient(to bottom, var(--np-seg-face-top) 0%, var(--np-seg-face-mid) 48%, var(--np-seg-face-bottom) 100%);
+  color: var(--np-seg-ink);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.np-mode__item + .np-mode__item {
+  box-shadow: inset 1px 0 0 var(--np-seg-divider);
+}
+
+/* pressed in: darker face with the light now coming from below */
+.np-mode__item[aria-checked='true'] {
+  background-image: linear-gradient(to bottom, var(--np-seg-on-top) 0%, var(--np-seg-on-mid) 55%, var(--np-seg-on-bottom) 100%);
+  box-shadow:
+    inset 0 2px 3px rgb(0 0 0 / 42%),
+    inset 1px 0 0 rgb(0 0 0 / 25%);
+  color: var(--np-seg-ink-on);
+}
+
+.np-mode__item[aria-disabled='true'] {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.np-mode__item:active:not([aria-disabled='true']) {
+  filter: brightness(0.94);
+}
+
+.np-mode__item:focus-visible {
+  z-index: 1;
+  outline: 2px solid rgb(27 28 31 / 50%);
+  outline-offset: 2px;
+}
+
+.np-mode__item svg {
+  display: block;
+  width: 21px;
+  height: 14px;
+  margin: 0 auto;
+  fill: currentcolor;
+  filter: drop-shadow(0 1px 0 rgb(255 255 255 / 75%));
+}
+
+.np-mode__item[aria-checked='true'] svg {
+  filter: drop-shadow(0 -1px 0 rgb(0 0 0 / 45%));
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-np-theme='light']) .np-mode__item svg {
+    filter: drop-shadow(0 1px 0 rgb(0 0 0 / 50%));
+  }
+}
+
+/* --------------------------------------------------------------------------
+   6. Avatar
+   -------------------------------------------------------------------------- */
+
+.np-avatar {
+  position: relative;
+  display: block;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background-image: linear-gradient(to bottom, #fff 0%, #fff 58%, var(--np-avatar-face) 100%);
+  box-shadow: 0 1px 0 var(--np-avatar-lip);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.np-avatar svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* the ring sits above the silhouette, so the shoulders can run to the edge */
+.np-avatar::before {
+  position: absolute;
+  border-radius: 50%;
+  box-shadow:
+    inset 0 0 0 1px var(--np-avatar-ring),
+    inset 0 1px 2px rgb(0 0 0 / 16%);
+  content: '';
+  inset: 0;
+  pointer-events: none;
+}
+
+/* invisible padding, so the tap target clears 30 px without growing the bar */
+.np-avatar::after {
+  position: absolute;
+  content: '';
+  inset: -5px;
+}
+
+.np-avatar:active {
+  transform: translateY(0.5px);
+}
+
+.np-avatar:focus-visible {
+  outline: 2px solid rgb(27 28 31 / 50%);
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   7. Section strip — the source list, laid on its side
+   -------------------------------------------------------------------------- */
+
+.np-sections {
+  position: sticky;
+  z-index: 90;
+  top: var(--np-sections-top, 40px);
+  border-bottom: 1px solid var(--np-list-border);
+  background: var(--np-page);
+}
+
+.np-sections__scroll {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.np-sections__scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.np-sections__list {
+  display: flex;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 var(--np-pad);
+  gap: 2px;
+  list-style: none;
+}
+
+.np-sections__item {
+  display: flex;
+  height: 30px;
+  align-items: center;
+  padding: 0 10px;
+
+  /* The selected underline is a shadow, not a border: §17.2 says rims are hairlines, and a 2 px
+     border here would be the only one in the library that is not. A shadow also does not shift the
+     row by a pixel when it appears. */
+  box-shadow: inset 0 -2px 0 transparent;
+  color: var(--np-meta);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.np-sections__item svg {
+  width: 13px;
+  height: 13px;
+  fill: currentcolor;
+}
+
+.np-sections__item:hover {
+  color: var(--np-ink);
+}
+
+.np-sections__item[aria-selected='true'] {
+  box-shadow: inset 0 -2px 0 var(--np-accent);
+  color: var(--np-ink);
+  font-weight: 700;
+}
+
+.np-sections__item:focus-visible {
+  outline: 2px solid var(--np-accent);
+  outline-offset: -2px;
+}
+
+.np-sections__count {
+  padding: 0 5px;
+  border-radius: 7px;
+  background: var(--np-list-badge);
+  color: var(--np-list-badge-ink);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 14px;
+}
+
+/* --------------------------------------------------------------------------
+   8. Hero player
+   -------------------------------------------------------------------------- */
+
+.np-hero {
+  border-bottom: 1px solid var(--np-list-border);
+  background: var(--np-page);
+  overflow-x: clip;
+}
+
+.np-hero__inner {
+  position: relative;
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 30px var(--np-pad) 22px;
+}
+
+.np-hero__top {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+}
+
+.np-hero__art {
+  width: var(--np-stage);
+  flex: none;
+}
+
+.np-hero__stage {
+  position: relative;
+  width: var(--np-stage);
+  height: var(--np-stage);
+  overflow: hidden;
+  border-radius: 3px;
+  background: linear-gradient(to bottom, #fbfbfb, #e3e3e3);
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 14%),
+    0 8px 18px rgb(0 0 0 / 22%),
+    0 1px 3px rgb(0 0 0 / 20%);
+}
+
+.np-hero__stage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/*
+ * No artwork.
+ *
+ * The reference fills the sleeve with a saturated wash, which is lovely and — for a track that
+ * simply has no cover — a small lie: at full strength it reads as "this album's art is orange".
+ * So the wash stays, dimmed, behind a note glyph that says plainly there is no picture. It still
+ * carries the reference's mode signal: amber alone, deep blue together.
+ */
+.np-hero__stage--empty::before {
+  position: absolute;
+  background-image:
+    radial-gradient(circle at 50% 78%, #ffd84d 0%, #ff9d1c 34%, #f4600f 62%, #d9370a 100%),
+    linear-gradient(to bottom, #8fd3f0 0%, rgb(143 211 240 / 0%) 32%);
+  content: '';
+  inset: 0;
+  opacity: 0.22;
+}
+
+.np-hero[data-mode='shared'] .np-hero__stage--empty::before {
+  background-image: radial-gradient(circle at 50% 30%, #7fd8f7 0%, #2f8fdc 34%, #233f97 62%, #0d1338 100%);
+  opacity: 0.3;
+}
+
+.np-hero__placeholder {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 34%;
+  height: 34%;
+  color: var(--np-list-icon);
+  fill: currentcolor;
+  opacity: 0.7;
+  transform: translate(-50%, -50%);
+}
+
+.np-hero__meta {
+  min-width: 0;
+}
+
+.np-hero__title {
+  margin: 0 0 2px;
+  color: var(--np-ink);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.012em;
+  line-height: 1.25;
+}
+
+.np-hero__artist,
+.np-hero__album,
+.np-hero__from {
+  margin: 0;
+  color: var(--np-meta);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.np-hero__from {
+  font-size: 12px;
+}
+
+.np-hero__actions {
+  display: flex;
+  align-items: center;
+  margin-top: 10px;
+  gap: 6px;
+}
+
+/* --------------------------------------------------------------------------
+   9. Scrubber — iPod 5G. Fixed px at every width: identical on phone and desk.
+   -------------------------------------------------------------------------- */
+
+.np-scrub {
+  margin-top: 20px;
+}
+
+.np-scrub__rail {
+  position: relative;
+  height: 12px;
+  border-radius: 2px; /* the Classic's ends are nearly square */
+  background-image: var(--np-rail-track);
+  box-shadow:
+    inset 0 0 0 1px var(--np-rail-line),
+    inset 0 1px 1px rgb(0 0 0 / 12%);
+  cursor: pointer;
+  touch-action: none;
+}
+
+/* expanded invisible hit area, so a thumb can find a 12 px bar */
+.np-scrub__rail::after {
+  position: absolute;
+  content: '';
+  inset: -8px 0;
+}
+
+.np-scrub__rail[aria-disabled='true'] {
+  cursor: default;
+}
+
+.np-scrub__fill {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  left: 1px;
+  border-radius: 1px;
+  background-image:
+    /* a soft triangle wave, not 1 px lines: each rib fades in and out across the
+       full 5 px period, so it reads as sheen rather than stripes */
+    repeating-linear-gradient(to right, rgb(255 255 255 / 0%) 0, rgb(255 255 255 / 10%) 2.5px, rgb(255 255 255 / 0%) 5px),
+    var(--np-rail-fill);
+  box-shadow: inset -1px 0 0 rgb(20 110 180 / 35%);
+}
+
+.np-scrub__rail:focus-visible {
+  outline: 2px solid var(--np-accent);
+  outline-offset: 2px;
+}
+
+.np-scrub__stamps {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+
+.np-scrub__time {
+  flex: none;
+  color: var(--np-ink);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.np-live {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  color: var(--np-live);
+  font-size: 14px;
+  font-weight: 700;
+  gap: 7px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+.np-live__dot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--np-live);
+}
+
+.np-live__dot::after {
+  position: absolute;
+  border-radius: 50%;
+  animation: np-live-pulse 1.9s cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
+  animation-play-state: var(--aqua-anim-state, running);
+  content: '';
+  inset: 0;
+}
+
+@keyframes np-live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--np-live-halo);
+  }
+
+  70% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .np-live__dot::after {
+    animation: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   10. Transport — no chrome behind it: the glyphs sit on the page
+   -------------------------------------------------------------------------- */
+
+.np-transport {
+  display: grid;
+  align-items: center;
+  margin-top: 8px;
+  grid-template-columns: 0.78fr auto 1fr;
+}
+
+.np-transport__keys {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  grid-column: 2;
+}
+
+.np-key {
+  position: relative;
+  width: 48px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--np-key-ink);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.np-key--play {
+  width: 64px;
+  height: 52px;
+}
+
+.np-key--aux {
+  color: var(--np-key-muted);
+}
+
+.np-key svg {
+  display: block;
+  width: 26px;
+  height: 26px;
+  margin: 0 auto;
+  fill: currentcolor;
+}
+
+.np-key--play svg {
+  width: 36px;
+  height: 36px;
+}
+
+.np-key--aux svg {
+  width: 22px;
+  height: 22px;
+}
+
+.np-key:hover:not(:disabled) {
+  background: rgb(0 0 0 / 5%);
+}
+
+/* pressed in — the one bit of depth that survives without a slab */
+.np-key:active:not(:disabled) {
+  background: rgb(0 0 0 / 10%);
+  box-shadow: inset 0 1px 3px rgb(0 0 0 / 28%);
+}
+
+.np-key[aria-pressed='true']:not(.np-key--play) {
+  background: rgb(47 110 192 / 10%);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 14%);
+  color: var(--np-key-on);
+}
+
+.np-key:disabled {
+  cursor: default;
+  opacity: 0.3;
+}
+
+.np-key:focus-visible {
+  outline: 2px solid var(--np-accent);
+  outline-offset: 1px;
+}
+
+.np-vol {
+  display: flex;
+  width: 122px;
+  align-items: center;
+  gap: 7px;
+  grid-column: 3;
+  justify-self: end;
+}
+
+.np-vol__icon {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  color: var(--np-key-muted);
+  fill: currentcolor;
+}
+
+.np-vol__btn {
+  display: flex;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--np-key-muted);
+  cursor: pointer;
+}
+
+.np-vol__btn:focus-visible {
+  outline: 2px solid var(--np-accent);
+  outline-offset: 1px;
+}
+
+.np-vol__track {
+  position: relative;
+  height: 6px;
+  flex: 1 1 auto;
+  border-radius: 3px;
+  background: var(--np-vol-face);
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 36%),
+    inset 0 -1px 0 rgb(255 255 255 / 60%);
+  cursor: pointer;
+  touch-action: none;
+}
+
+.np-vol__fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 3px;
+  background-image: linear-gradient(to bottom, var(--np-vol-a), var(--np-vol-b));
+}
+
+.np-vol__knob {
+  position: absolute;
+  top: 50%;
+  width: 15px;
+  height: 15px;
+  margin-left: -7.5px;
+  border-radius: 50%;
+  background-image: linear-gradient(to bottom, #fff 0%, #f2f3f4 52%, #dfe1e4 100%);
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 34%),
+    inset 0 1px 0 rgb(255 255 255 / 90%),
+    0 1px 2px rgb(0 0 0 / 38%);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.np-vol__track:focus-visible {
+  outline: 2px solid var(--np-accent);
+  outline-offset: 3px;
+}
+
+/* --------------------------------------------------------------------------
+   11. The shared-listening strip
+   -------------------------------------------------------------------------- */
+
+.np-share-strip {
+  display: flex;
+  align-items: center;
+  margin-top: 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--np-list-border);
+  border-radius: 6px;
+  background: var(--np-list-alt);
+  font-size: 12px;
+  gap: 10px;
+}
+
+.np-share-strip__who {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.np-share-strip__name {
+  color: var(--np-ink);
+  font-weight: 700;
+}
+
+.np-share-strip__member {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px 1px 4px;
+  border-radius: 999px;
+  background: var(--np-list-badge);
+  color: var(--np-list-badge-ink);
+  font-size: 11px;
+  gap: 4px;
+}
+
+.np-share-strip__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--np-list-icon);
+}
+
+.np-share-strip__member[data-online='true'] .np-share-strip__dot {
+  background: #4e9d47;
+}
+
+.np-share-strip__note {
+  flex-basis: 100%;
+  color: var(--np-meta);
+  font-size: 11px;
+}
+
+/* --------------------------------------------------------------------------
+   12. The list — iTunes 10. 18 px rows, the stripe alone separates them.
+   -------------------------------------------------------------------------- */
+
+.np-list {
+  position: relative;
+  border-top: 1px solid var(--np-list-border);
+  border-bottom: 1px solid var(--np-list-border);
+  background: var(--np-list-bg);
+  font-family: var(--np-list-font);
+  font-size: 11px;
+}
+
+.np-list__scroll {
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-height: var(--np-list-height, none);
+  scrollbar-width: none; /* the native bar is fully replaced below */
+}
+
+.np-list__scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.np-list table {
+  width: 100%;
+
+  /* separate, not collapse: sticky headers drop their borders mid-scroll under
+     border-collapse in Chromium */
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.np-list th {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  height: 18px;
+  padding: 0 6px;
+  border-right: 1px solid var(--np-list-head-sep);
+  border-bottom: 1px solid var(--np-list-head-rule);
+  background-image: linear-gradient(to bottom, var(--np-list-head-top), var(--np-list-head-bottom));
+  color: var(--np-list-head-ink);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: left;
+  text-shadow: 0 1px 0 var(--np-list-head-emboss);
+  user-select: none;
+  white-space: nowrap;
+}
+
+.np-list th:last-child {
+  border-right: 0;
+}
+
+.np-list th button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: default;
+  font: inherit;
+  gap: 4px;
+  text-shadow: inherit;
+}
+
+.np-list th button:focus-visible {
+  outline: 2px solid var(--np-accent);
+  outline-offset: -2px;
+}
+
+/* Gate the hover on a real pointer: without it a tap leaves the hover stuck on
+   the column it just sorted. */
+@media (hover: hover) and (pointer: fine) {
+  .np-list th[data-sortable='true']:hover {
+    background-image: linear-gradient(to bottom, var(--np-list-head-hot-top), var(--np-list-head-hot-bottom));
+  }
+
+  .np-list th[aria-sort]:not([aria-sort='none']):hover {
+    background-image: linear-gradient(to bottom, var(--np-list-sort-hot-top), var(--np-list-sort-hot-bottom));
+  }
+}
+
+/* iTunes 10 shows where the order comes from: the sorted column goes blue. Only the sorted one —
+   `aria-sort="none"` is present on every sortable header, so a bare [aria-sort] tints them all. */
+.np-list th[aria-sort]:not([aria-sort='none']) {
+  background-image: linear-gradient(to bottom, var(--np-list-sort-top), var(--np-list-sort-bottom));
+  color: var(--np-list-ink);
+}
+
+.np-list__sort {
+  margin-left: auto;
+  font-size: 8px;
+  line-height: 18px;
+  opacity: 0.7;
+}
+
+/* 18 px rows with NO rules: the stripe alone separates them, which is what
+   keeps the list light at this density */
+.np-list td {
+  overflow: hidden;
+  height: 18px;
+  padding: 0 6px;
+  color: var(--np-list-soft);
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.np-list__title {
+  color: var(--np-list-ink);
+  font-weight: 700;
+}
+
+.np-list__num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.np-list th.np-list__num {
+  text-align: right;
+}
+
+.np-list th.np-list__icon,
+.np-list td.np-list__icon {
+  padding: 0;
+  text-align: center;
+}
+
+.np-list th.np-list__icon svg {
+  display: block;
+  width: 13px;
+  height: 13px;
+  margin: 0 auto;
+  fill: currentcolor;
+}
+
+.np-list tbody tr {
+  cursor: default;
+}
+
+.np-list tbody tr:nth-child(even) {
+  background: var(--np-list-alt);
+}
+
+.np-list tbody tr[data-playing='true'],
+.np-list tbody tr[data-playing='true']:nth-child(even) {
+  background: var(--np-list-playing);
+}
+
+.np-list tbody tr:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--np-accent);
+  outline: none;
+}
+
+.np-list tbody tr[aria-selected='true'],
+.np-list tbody tr[aria-selected='true']:nth-child(even),
+.np-list tbody tr[aria-selected='true'][data-playing='true'] {
+  background-image: linear-gradient(to bottom, var(--np-list-select-top), var(--np-list-select-bottom));
+}
+
+.np-list tbody tr[aria-selected='true'] td:first-child {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 30%); /* gel top light */
+}
+
+.np-list tbody tr[aria-selected='true'] td,
+.np-list tbody tr[aria-selected='true'] .np-list__title,
+.np-list tbody tr[aria-selected='true'] .np-list__btn {
+  color: #fff;
+}
+
+.np-list tbody tr[aria-selected='true'] .np-list__badge {
+  background: rgb(255 255 255 / 28%);
+  color: #fff;
+}
+
+.np-list__badge {
+  display: inline-flex;
+  width: 18px;
+  height: 14px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  background: var(--np-list-badge);
+  color: var(--np-list-badge-ink);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+}
+
+.np-list__btn {
+  width: 22px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--np-list-icon);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.np-list__btn svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+  margin: 0 auto;
+  fill: currentcolor;
+}
+
+.np-list__btn:hover {
+  background: rgb(0 0 0 / 6%);
+}
+
+.np-list__btn:focus-visible {
+  outline: 2px solid var(--np-accent);
+  outline-offset: 1px;
+}
+
+.np-list__btn[aria-pressed='true'] {
+  color: var(--np-star);
+}
+
+.np-list__speaker {
+  display: block;
+  width: 11px;
+  height: 11px;
+  margin-left: auto;
+  color: var(--np-accent);
+  fill: currentcolor;
+}
+
+/*
+ * Narrow: the same collapse the window list does.
+ *
+ * Nine columns in 390 px is nine truncated columns — every cell reduced to "Q…", which is not
+ * information. Below 620 px only the primary column and the icon columns survive, and the artist
+ * and album ride under the title on a second line.
+ */
+@media (max-width: 620px) {
+  .np-list th:not(.aqua-table__col--keep):not(.np-list__icon),
+  .np-list td:not(.aqua-table__col--keep):not(.np-list__icon) {
+    display: none;
+  }
+
+  .np-list td.aqua-table__col--keep {
+    height: auto;
+    padding-block: 4px;
+    white-space: normal;
+  }
+
+  /* Fixed layout would keep the hidden columns' widths, leaving most of each row with no cell in
+     it — visually blank, and dead to the pointer, because a click there lands on the table rather
+     than on the row. Auto layout lets the surviving cells fill the row. */
+  .np-list table {
+    table-layout: auto;
+  }
+
+  /* The column widths are inline styles written from the column definitions, so a stylesheet can
+     only take them back with !important. Without this the hidden columns keep their share and the
+     list occupies a third of a phone screen. */
+  .np-list col {
+    width: auto !important;
+  }
+
+
+  .np-list .aqua-table__stack {
+    display: block;
+  }
+}
+
+/* ---------- overlay scroller: Aqua gel, fades when idle ----------
+   Native scrollbar internals cannot animate opacity, which is why this is built
+   from elements. Invisible but still hoverable, so brushing the right gutter
+   reveals it without scrolling. */
+.np-list__bar {
+  position: absolute;
+  z-index: 3;
+  top: 18px; /* clears the sticky header */
+  right: 3px;
+  bottom: 3px;
+  width: 11px;
+  border-radius: 6px;
+  background: rgb(118 128 142 / 16%);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 8%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.np-list[data-scrolling='true'] .np-list__bar,
+.np-list__bar:hover {
+  opacity: 1;
+}
+
+.np-list__thumb {
+  position: absolute;
+  top: 0;
+  right: 2px;
+  left: 2px;
+  height: 40px;
+  border-radius: 4px;
+  background-image: var(--np-gel);
+  box-shadow: inset 0 0 0 1px rgb(16 64 127 / 40%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .np-list__bar {
+    transition: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   13. The section body, and the aqua-ui primitives inside it
+   -------------------------------------------------------------------------- */
+
+.np-body {
+  flex: 1;
+  padding: 0 0 40px;
+  background: var(--aqua-content, #fff);
+
+  /* The bar and the hero are UI type; the section body is app data, and a 2010 Mac set that in
+     Lucida Grande. The reference mixes the two the same way. */
+  font: var(--aqua-weight-regular) var(--aqua-font-system) / var(--aqua-line-body) var(--aqua-font);
+}
+
+.np-body__inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 var(--np-pad);
+}
+
+/* The panels lose their window-era frame: on a page, a card with a heavy border
+   inside a bordered window reads as two frames. One hairline is enough. */
+.np-body .aqua-panel {
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.np-body .aqua-panel + .aqua-panel {
+  margin-top: 14px;
+}
+
+.np-section-head {
+  display: flex;
+  align-items: baseline;
+  padding: 20px 0 10px;
+  gap: 10px;
+}
+
+.np-section-head h2 {
+  margin: 0;
+  color: var(--np-ink);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.008em;
+}
+
+.np-section-head p {
+  margin: 0;
+  color: var(--np-meta);
+  font-size: 12px;
+}
+
+.np-toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  padding-bottom: 10px;
+  gap: 6px;
+}
+
+/* --------------------------------------------------------------------------
+   14. Context menu, sheet and toast — the iOS family from the reference
+   -------------------------------------------------------------------------- */
+
+.np-ctx {
+  position: fixed;
+  z-index: 1000;
+  min-width: 210px;
+  padding: 5px;
+  border-radius: 12px;
+  backdrop-filter: saturate(180%) blur(18px);
+  background: var(--np-sheet-bg);
+  box-shadow:
+    0 12px 32px rgb(0 0 0 / 24%),
+    0 0 0 1px rgb(0 0 0 / 20%);
+  color: var(--np-sheet-ink);
+  font-family: var(--np-ui-font);
+  font-size: 14px;
+  -webkit-backdrop-filter: saturate(180%) blur(18px);
+}
+
+.np-ctx__item {
+  position: relative;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: default;
+  font: inherit;
+  gap: 8px;
+  text-align: left;
+}
+
+.np-ctx__item:hover:not(:disabled),
+.np-ctx__item:focus-visible {
+  background: var(--np-accent);
+  color: #fff;
+  outline: none;
+}
+
+.np-ctx__item:disabled {
+  opacity: 0.5;
+}
+
+.np-ctx__sep {
+  height: 1px;
+  margin: 5px 8px;
+  background: var(--np-sheet-sep);
+}
+
+/* --------------------------------------------------------------------------
+   15. Responsive
+   -------------------------------------------------------------------------- */
+
+@media (min-width: 720px) {
+  .np-bar__inner {
+    grid-template-areas: 'label search status';
+  }
+}
+
+@media (max-width: 719px) {
+  .np-bar__inner {
+    padding-bottom: 9px;
+    column-gap: 10px;
+    grid-template-areas:
+      'label  status'
+      'search search';
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 7px;
+  }
+
+  .np-bar__label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* iOS Safari zooms the page when a focused field is under 16 px, which throws
+     the sticky header off. Size the field up rather than blocking pinch-zoom. */
+  .np-search__input {
+    height: 32px;
+    padding-left: 32px;
+    font-size: 16px;
+  }
+
+  .np-search__icon {
+    left: 11px;
+    width: 15px;
+    height: 15px;
+  }
+}
+
+@media (max-width: 560px) {
+  :root {
+    --np-pad: 11px;
+    --np-bar-type: 12px;
+    --np-field-h: 32px;
+  }
+
+  .np-bar__status {
+    gap: 8px;
+  }
+
+  .np-mode__item {
+    width: 32px;
+  }
+
+  .np-hero__inner {
+    padding: 22px var(--np-pad) 18px;
+  }
+
+  .np-hero__top {
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    text-align: center;
+  }
+
+  .np-hero__meta {
+    width: 100%;
+  }
+
+  .np-hero__actions {
+    justify-content: center;
+  }
+
+  .np-hero__title {
+    font-size: 18px;
+  }
+
+  .np-hero__artist,
+  .np-hero__album {
+    font-size: 13px;
+  }
+
+  /* the scrubber is deliberately absent from every media query: identical
+     groove, gel and stamps at all widths, as on the device */
+  .np-transport {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    row-gap: 8px;
+  }
+
+  .np-transport__keys {
+    gap: 2px;
+    grid-column: 1;
+  }
+
+  .np-key {
+    width: 44px;
+    height: 40px;
+  }
+
+  .np-key--play {
+    width: 56px;
+    height: 48px;
+  }
+
+  .np-key svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .np-key--play svg {
+    width: 32px;
+    height: 32px;
+  }
+
+  .np-key--aux svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .np-vol {
+    grid-column: 1;
+    justify-self: center;
+  }
+}
+
+@media (min-width: 900px) {
+  .np-bar__inner {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding-right: 24px;
+    padding-left: 24px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   16. Aux keys
+   The reference carries two of these (download, repeat). This app has five —
+   favourite, shuffle, repeat, add-to-playlist, share — because acting on the
+   song you are hearing should not mean navigating away from it. They are
+   grouped so that on a narrow screen the two clusters wrap as units and the
+   primary triad stays together and centred, rather than the row breaking
+   wherever it happens to run out of width.
+   -------------------------------------------------------------------------- */
+
+.np-keys__aux {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+@media (max-width: 620px) {
+  .np-transport__keys {
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: 2px;
+  }
+
+  .np-keys__aux {
+    order: 1;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   17. The page's status line, which the bottom bar used to carry
+   -------------------------------------------------------------------------- */
+
+.np-foot {
+  display: flex;
+  max-width: 1120px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px var(--np-pad) 0;
+  margin: 0 auto;
+  color: var(--np-meta);
+  font-size: 11px;
+  gap: 8px;
+}
+
+.np-foot__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

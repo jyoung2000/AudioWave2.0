@@ -1,3 +1,16 @@
+/*
+ * Only the shared half of the stylesheet loads from here: tokens, base, and the controls every
+ * product renders. The three chrome stylesheets are imported by the products that actually draw
+ * that chrome, because CSS does not tree-shake and a product should not carry rules for markup it
+ * never produces:
+ *
+ *   @now-playing/aqua-ui/window.css        window frame, work area, source list, bottom bar
+ *   @now-playing/aqua-ui/media.css         toolbar transport, LCD, scrubber, search, results
+ *   @now-playing/aqua-ui/now-playing.css   the 2010 page: status bar, hero, iTunes 10 list
+ *
+ * The player is a page and loads the third; the hub's admin GUI is a window and loads the first.
+ * The bundle budget in `tests/perf` is what turned this from a preference into a rule.
+ */
 import './styles/aqua.css';
 
 export * from './context.js';
@@ -33,3 +46,6 @@ export * from './components/Menu.js';
 export * from './components/Toast.js';
 export * from './components/States.js';
 export * from './components/Panel.js';
+export * from './components/PageBar.js';
+export * from './components/SectionStrip.js';
+export * from './components/Hero.js';

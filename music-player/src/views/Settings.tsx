@@ -22,6 +22,10 @@ export function SettingsView() {
 
   return (
     <>
+      <div className="np-section-head">
+        <h2>Settings</h2>
+        <p>What this app can do here, and what it cannot — with the reason in each case.</p>
+      </div>
       {localFile.active ? (
         <Panel title="Running from a file">
           <PanelSection>
@@ -92,6 +96,8 @@ export function SettingsView() {
       </Panel>
 
       <HubPanel />
+
+      <SharedListeningPanel />
 
       <Panel title="Car, lock screen and headset">
         <PanelSection>
@@ -173,6 +179,53 @@ export function SettingsView() {
 }
 
 /** Pairing with a hub: enter the code, compare the fingerprint, confirm. */
+/**
+ * Whether shared listening can be used from this device, and why not when it cannot.
+ *
+ * The switch in the status bar reports the same sentence when it is pressed; this panel is where
+ * someone goes to find out *before* pressing it. The two read the same value, so they cannot drift.
+ */
+function SharedListeningPanel() {
+  const { shared, mode, group } = usePlayer();
+  return (
+    <Panel title="Shared listening">
+      <PanelSection>
+        <KeyValueList
+          items={[
+            { key: 'Available here', value: shared.unavailableReason ? <StatusDot kind="neutral" label="No" /> : <StatusDot kind="ok" label="Yes" /> },
+            ...(shared.unavailableReason ? [{ key: 'Why not', value: shared.unavailableReason }] : []),
+            { key: 'Mode', value: mode === 'shared' ? 'Shared — the hub keeps the queue' : 'Solo — everything stays on this device' },
+            { key: 'Group', value: shared.group ? shared.group.name : 'Not in a group' },
+            {
+              key: 'Realtime connection',
+              value:
+                shared.connection === 'connected'
+                  ? 'Connected'
+                  : shared.connection === 'reconnecting'
+                    ? 'Reconnecting — the queue you see may be behind the group'
+                    : shared.connection === 'failed'
+                      ? 'The hub refused the connection'
+                      : 'Not connected',
+            },
+            { key: 'Listening with', value: shared.members.length ? shared.members.map((m) => `${m.displayName}${m.online ? '' : ' (offline)'}`).join(', ') : 'Nobody yet' },
+          ]}
+        />
+        <p className="player-hint">
+          In a group the queue lives on the hub: everyone hears the same order, and skipping is a request the hub grants or refuses rather than something one player does alone. Your library, your
+          equaliser and your listening history stay on this device either way — joining a group does not upload your music.
+        </p>
+        {shared.group && group ? (
+          <div className="player-toolbar-row">
+            <Button size="small" onClick={() => void group.leave()}>
+              Leave {shared.group.name}
+            </Button>
+          </div>
+        ) : null}
+      </PanelSection>
+    </Panel>
+  );
+}
+
 function HubPanel() {
   const { hub, hubStatus } = usePlayer();
   const toast = useToast();

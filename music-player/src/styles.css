@@ -1,24 +1,24 @@
 /*
  * Player layout.
  *
- * Aqua tokens, window chrome and controls come from @now-playing/aqua-ui; this file positions the
- * player-specific pieces and nothing else. No token is redefined here — the design spec is the one
- * source for those.
+ * Aqua tokens, the page chrome and the controls come from @now-playing/aqua-ui; this file positions
+ * the player-specific pieces and nothing else. No token is redefined here — the design spec is the
+ * one source for those.
+ *
+ * The page scrolls as a page now rather than filling a fixed-height window: the shell is a sticky
+ * bar over a document, so pinning `html`/`body` to 100% would trap the content it is meant to let
+ * scroll under the bar.
  */
-:root {
-  color-scheme: light;
-}
-
 html,
 body,
 #root {
-  height: 100%;
   margin: 0;
-  overscroll-behavior: none;
+  min-height: 100%;
+  overscroll-behavior-x: none;
 }
 
 body {
-  background: var(--aqua-window-bg, #e8e8e8);
+  background: var(--np-page, #fff);
 }
 
 /* ---------------------------------------------------------------- notices */
@@ -294,6 +294,21 @@ body {
   overflow: hidden;
 }
 
+/* A bare list of rows with a control and a note, used where a table would be too much. */
+.player-plain-list {
+  display: grid;
+  margin: 8px 0;
+  padding: 0;
+  gap: 6px;
+  list-style: none;
+}
+
+.player-plain-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 /* ------------------------------------------------------------------ sheets */
 
 .player-playlist-picker {
@@ -331,5 +346,22 @@ body {
   * {
     animation-duration: 0.001ms !important;
     transition-duration: 0.001ms !important;
+  }
+}
+
+/* The panels and charts follow the page into dark mode; without this the section
+   body would stay a white sheet under a dark bar. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-np-theme='light']) .player-spectrum,
+  :root:not([data-np-theme='light']) .player-eq-curve,
+  :root:not([data-np-theme='light']) .player-hours,
+  :root:not([data-np-theme='light']) .player-trend {
+    border-color: #2a2e35;
+    background: linear-gradient(#1b1f26, #16181c);
+  }
+
+  :root:not([data-np-theme='light']) .player-now__art img,
+  :root:not([data-np-theme='light']) .player-now__art-placeholder {
+    border-color: #2a2e35;
   }
 }

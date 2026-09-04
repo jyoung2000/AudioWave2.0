@@ -27,13 +27,15 @@ and reports platform-unavailable ones as skipped, never as passed.
 | Equaliser, level-matched bypass, headroom, per-scope binding | **Done** | Precedence: per-track-per-playlist › track › playlist › global › Flat |
 | Solfeggio presets | **Done** | Parametric, one band per named frequency |
 | Retuning with honest reporting of what was applied | **Done** | Including the fallback that changes tempo, and says so |
-| Playlists, star, add to playlist | **Done** | In the transport row |
+| Playlists, star, add to playlist | **Done** | In the transport row, which is now in the hero and therefore on every section |
 | Shareable links (song, album, playlist, library) | **Done** | Requires a paired hub; explains why when there is none |
 | Listening metrics, CSV/JSON export | **Done** | Computed on device from an append-only log |
 | Constellation view with a full 2D equivalent | **Done** | Three.js code-split; table has the same keyboard model |
 | Installable, offline, Media Session | **Done** | See [PWA_AND_CAR.md](PWA_AND_CAR.md) for what a PWA cannot do in a car |
 | A single-file build you open with no server | **Done** | Committed as `now-playing.html` at the repository root — 2.4 MB, nothing to build; a gate fails if it drifts from the source. [LOCAL_FILE.md](LOCAL_FILE.md) records what a `file://` origin allows, measured rather than assumed |
-| Hub client: pairing, search, group listening, sync | **Done** |  |
+| Hub client: pairing, search, shares, sync | **Done** |  |
+| Shared listening: create or join a group, follow its queue over the realtime socket, propose changes | **Done** | The hub always had the group API; the player now uses it. Revisioned, idempotent commands — a refused skip is shown, not swallowed |
+| The 2010 page shell: status bar, section strip, hero, iTunes 10 list, dark scheme | **Done** | [UI_REDESIGN.md](UI_REDESIGN.md) maps every feature from the old window shell; the nine sections kept their names, roles and keyboard model |
 | A large-target driving view | **Not built** | The Media Session path covers the car; a driving-specific layout was not asked for |
 
 ## docker-container (the hub)

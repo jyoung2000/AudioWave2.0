@@ -3,6 +3,7 @@ import {
   AquaProvider, AquaWindow, Toolbar, TrafficLights, Transport, TransportAuxButton, LcdDisplay, Scrubber, VolumeSlider, SearchField, ResultsPopover, SourceList, WorkArea, Content, BottomBar,
   SegmentedControl, Button, IconButton, Checkbox, Radio, TextField, PopUpMenu, Slider, ProgressBar, AquaTable, NowPlayingGlyph, ArtworkGrid, Tabs, Sheet, Menu, useContextMenu, ToastProvider, useToast,
   StatePanel, UnavailableCapabilityState, Panel, PanelSection, FormRow, KeyValueList, Marquee, Avatar, AvatarButton, SourceBadge, Glyph, SourceIcon, GLYPH_NAMES, SOURCE_ICONS, AVATAR_ICON_IDS, AvatarIcon,
+  PageBar, BarSearch, BarClock, ModeSwitch, ProfileButton, SectionStrip, Hero, HeroArt, TrackScrubber, KeyTransport, KeyButton, LevelSlider,
   type AquaProfile, type MenuEntry, type ColumnDef,
 } from '../src/index.js';
 
@@ -238,12 +239,108 @@ function IconsDemo() {
   );
 }
 
+/**
+ * The 2010 page: the arrangement the player uses, beside the window the hub uses.
+ *
+ * Both live in the gallery because both ship. Keeping them on one screen is also the only way to
+ * see that they are the same design system — same light source, same rims, same restraint — rather
+ * than two unrelated skins that happen to be in one repository.
+ */
+function PageDemo() {
+  const [mode, setMode] = useState('solo');
+  const [section, setSection] = useState('library');
+  const [query, setQuery] = useState('');
+  const [position, setPosition] = useState(23_000);
+  const [volume, setVolume] = useState(0.72);
+  const [playing, setPlaying] = useState(true);
+  const [repeat, setRepeat] = useState(false);
+  return (
+    <Card label="Status bar, section strip and hero">
+      <div className="np-app" style={{ minHeight: 0, border: '1px solid rgba(0,0,0,.3)', borderRadius: 6, overflow: 'hidden' }}>
+        <PageBar
+          label="Now Playing"
+          search={<BarSearch label="Search your music" value={query} onChange={setQuery} placeholder="Search your music" />}
+          status={
+            <>
+              <ModeSwitch
+                value={mode}
+                onChange={setMode}
+                modes={[
+                  { id: 'solo', label: 'Solo listening' },
+                  { id: 'shared', label: 'Shared listening' },
+                ]}
+              />
+              <BarClock />
+              <ProfileButton label="You, listening on your own" hue={mode === 'shared' ? 200 : 28} />
+            </>
+          }
+        />
+        <SectionStrip
+          selectedId={section}
+          onSelect={setSection}
+          items={[
+            { id: 'library', label: 'Music', icon: <Glyph name="note" />, count: 412 },
+            { id: 'now', label: 'Now playing', icon: <Glyph name="play" /> },
+            { id: 'queue', label: 'Up next', icon: <Glyph name="sort" />, count: 6 },
+            { id: 'settings', label: 'Settings', icon: <Glyph name="gear" /> },
+          ]}
+        />
+        <Hero mode={mode === 'shared' ? 'shared' : 'solo'}>
+          <div className="np-hero__top">
+            <HeroArt />
+            <div className="np-hero__meta">
+              <h3 className="np-hero__title">Midnight Set, Side B</h3>
+              <p className="np-hero__artist">Fennel Grove</p>
+              <p className="np-hero__album">Long Wave Sessions, Vol. 2</p>
+            </div>
+          </div>
+          <TrackScrubber positionMs={position} durationMs={178_000} onSeek={setPosition} live={mode === 'shared'} disabledReason={mode === 'shared' ? 'A shared broadcast has one position.' : undefined} />
+          <KeyTransport volume={<LevelSlider value={volume} onChange={setVolume} onToggleMute={() => undefined} />}>
+            <span className="np-keys__aux">
+              <KeyButton aux label="Add to favourites" onClick={() => undefined}><Glyph name="star" /></KeyButton>
+              <KeyButton aux label="Shuffle" onClick={() => undefined}><Glyph name="shuffle" /></KeyButton>
+            </span>
+            <KeyButton glyph="previous" label="Previous track" onClick={() => undefined} />
+            <KeyButton primary glyph={playing ? 'pause' : 'play'} label={playing ? 'Pause' : 'Play'} pressed={playing} onClick={() => setPlaying((p) => !p)} />
+            <KeyButton glyph="next" label="Next track" onClick={() => undefined} />
+            <span className="np-keys__aux">
+              <KeyButton aux glyph="repeat" label={repeat ? 'Repeat: all' : 'Repeat: off'} pressed={repeat} onClick={() => setRepeat((r) => !r)} />
+              <KeyButton aux label="Add to a playlist" onClick={() => undefined}><Glyph name="add" /></KeyButton>
+              <KeyButton aux label="Share this song" onClick={() => undefined}><Glyph name="share" /></KeyButton>
+            </span>
+          </KeyTransport>
+        </Hero>
+        <div className="np-body">
+          <AquaTable
+            variant="page"
+            label="Your music"
+            height={180}
+            rows={rows.slice(0, 12)}
+            rowKey={(row: Row) => row.id}
+            currentKey="r2"
+            sort={{ columnId: 'title', direction: 'ascending' }}
+            onSortChange={() => undefined}
+            columns={[
+              { id: 'n', header: '#', align: 'right', width: 34, cell: (row) => row.n },
+              { id: 'title', header: 'Song', primary: true, sortable: true, cell: (row) => row.title, stackText: (row) => row.artist },
+              { id: 'artist', header: 'Artist', sortable: true, cell: (row) => row.artist },
+              { id: 'time', header: 'Time', align: 'right', width: 54, cell: (row) => row.time },
+              { id: 'album', header: 'Album', sortable: true, cell: (row) => row.album },
+            ]}
+          />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 export function Gallery() {
   const width = useMemo(() => (widthParam ? Number(widthParam) : undefined), []);
   return (
     <AquaProvider profile={profile} active={!inactive} reducedMotion={reduced || undefined}>
       <ToastProvider>
         <div style={{ maxWidth: width ?? 1180, margin: '0 auto' }}>
+          <Section id="page" title="Page shell (status bar, section strip, hero, iTunes 10 list)"><PageDemo /></Section>
           <Section id="shell" title="Application shell (window, toolbar, source list, table, bottom bar)"><ShellDemo /></Section>
           <Section id="controls" title="Controls"><ControlsDemo /></Section>
           <Section id="overlays" title="Overlays"><OverlaysDemo /></Section>

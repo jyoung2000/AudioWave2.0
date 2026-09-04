@@ -7,7 +7,7 @@
  * reasonably wary of a web page asking for their music folder.
  */
 import { useMemo, useState } from 'react';
-import { AquaTable, Button, EmptyState, IconButton, Panel, StatusDot, useToast, type SortDirection } from '@now-playing/aqua-ui';
+import { AquaTable, Button, EmptyState, Panel, StatusDot, useToast, type SortDirection } from '@now-playing/aqua-ui';
 import type { Track } from '@now-playing/contracts';
 import { uuidv7 } from '@now-playing/domain';
 import type { ViewId } from '../App.js';
@@ -68,6 +68,12 @@ export function LibraryView({ onOpenView }: { onOpenView: (view: ViewId) => void
 
   return (
     <>
+      <div className="np-section-head">
+        <h2>Music</h2>
+        <p>
+          {rows.length} {rows.length === 1 ? 'track' : 'tracks'} indexed from folders on this device
+        </p>
+      </div>
       <Panel>
         <div className="player-toolbar-row">
           <Button size="small" icon="play" disabled={!rows.length} onClick={() => playFrom(0)}>
@@ -90,9 +96,19 @@ export function LibraryView({ onOpenView }: { onOpenView: (view: ViewId) => void
           <Button size="small" icon="sort" onClick={() => onOpenView('queue')}>
             Up next
           </Button>
+          {/* The old shell kept this in a bottom bar. A page has no bottom bar, and "add more music"
+              belongs beside the library it adds to. */}
+          <Button size="small" icon="add" onClick={() => void store.addDirectory()} ellipsis>
+            Add a folder
+          </Button>
+          <Button size="small" onClick={() => pickFiles(store)} ellipsis>
+            Choose files
+          </Button>
         </div>
 
         <AquaTable
+          variant="page"
+          height="min(58vh, 520px)"
           label="Your music"
           rowKey={(row: Track) => row.id}
           rows={rows}
@@ -105,23 +121,47 @@ export function LibraryView({ onOpenView }: { onOpenView: (view: ViewId) => void
           columns={[
             {
               id: 'like',
-              header: <span className="aqua-visually-hidden">Favourite</span>,
+              header: (
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M12 2.6l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.5 6.1 20.6l1.2-6.5L2.5 9.5l6.6-.9z" />
+                </svg>
+              ),
               headerLabel: 'Favourite',
-              width: 28,
-              cell: (row) => <IconButton icon="star" variant="plain" size="regular" label={row.liked ? `Remove ${row.title} from favourites` : `Add ${row.title} to favourites`} pressed={row.liked} onClick={() => void store.toggleLike(row.id)} />,
+              align: 'center',
+              width: 30,
+              cell: (row) => (
+                <button type="button" className="np-list__btn" aria-pressed={row.liked} aria-label={row.liked ? `Remove ${row.title} from favourites` : `Add ${row.title} to favourites`} onClick={() => void store.toggleLike(row.id)}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d={row.liked ? 'M12 2.6l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.5 6.1 20.6l1.2-6.5L2.5 9.5l6.6-.9z' : 'M12 2.8l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.7l-5.9 3.1 1.2-6.5L2.5 9.7l6.6-.9zm0 4.5-1.7 3.5-3.8.5 2.8 2.7-.7 3.8 3.4-1.8 3.4 1.8-.7-3.8 2.8-2.7-3.8-.5z'} />
+                  </svg>
+                </button>
+              ),
             },
-            { id: 'title', header: 'Title', primary: true, sortable: true, cell: (row) => row.title, stackText: (row) => row.artistName },
+            {
+              id: 'title',
+              header: 'Title',
+              primary: true,
+              sortable: true,
+              /*
+               * The "cannot be decoded here" marker rides in the title cell rather than in a column
+               * of its own. As a column it was ninety pixels of empty space on every row of a
+               * healthy library, which reads as a rendering fault; beside the title it is where the
+               * eye already is on the one row that needs it.
+               */
+              cell: (row) =>
+                row.unsupportedReason ? (
+                  <span className="player-inline-status" title={row.unsupportedReason}>
+                    {row.title} <StatusDot kind="warning" label="Not playable here" />
+                  </span>
+                ) : (
+                  row.title
+                ),
+              stackText: (row) => row.artistName,
+            },
             { id: 'artist', header: 'Artist', sortable: true, cell: (row) => row.artistName },
             { id: 'album', header: 'Album', sortable: true, cell: (row) => row.albumName ?? '' },
             { id: 'year', header: 'Year', align: 'right', width: 56, sortable: true, cell: (row) => row.year ?? '' },
             { id: 'time', header: 'Time', align: 'right', width: 56, cell: (row) => formatDuration(row.durationMs) },
-            {
-              id: 'status',
-              header: <span className="aqua-visually-hidden">Playable</span>,
-              headerLabel: 'Playable',
-              width: 90,
-              cell: (row) => (row.unsupportedReason ? <StatusDot kind="warning" label="Not playable here" /> : null),
-            },
           ]}
           onContextMenu={(row) => {
             if (row.unsupportedReason) toast.show(row.unsupportedReason, { kind: 'warning' });

@@ -16,16 +16,46 @@ SHOULD items or from the reference implementation, except the three noted as unm
 
 ## From the Aqua specification
 
-### No dark colour scheme
+### The player is a page, not a window
+
+§17.1 asks for one framed desktop-style window with a persistent source list, and the hub's admin
+GUI is exactly that. The player is not: it is a sticky status bar over a hero and a list, following
+the arrangement in `docs/reference/now-playing-header.html`. The reasoning is in
+[UI_REDESIGN.md](UI_REDESIGN.md); briefly, a window frame around a browser viewport is a picture of
+a window rather than a window, and a 196 px source list is a fifth of a laptop screen and simply
+unavailable on a phone.
+
+**Instead:** the same landmarks and the same keyboard model in a different shape. The source list
+became a horizontal strip that is still a `navigation` landmark named "Sections" holding `option`s,
+with the same roving tabindex, arrow keys, Home/End and type-ahead — a person who learned the app by
+keyboard did not have to learn it again. Every material rule (1 px rims, light from above, neutral
+chrome, selective blue, visible focus, reduced motion) still applies and is still tested; see the
+"2010 page surfaces" section of [AQUA_CONFORMANCE.md](AQUA_CONFORMANCE.md).
+
+### The player's LCD display became the hero
+
+§17.4 lists a central inset information display as a SHOULD, and the hub GUI keeps one. On a page
+with no toolbar there is nothing for an inset panel to be inset *into*, and the same information —
+title, artist, album, where it is playing from, position — reads better at hero size than engraved
+into a 62 px strip.
+
+**Instead:** the hero states all of it in plain type, and the honest signal-chain detail the LCD
+never had room for lives one click away under **Now playing**.
+
+### A dark colour scheme, for the page only
 
 The specification observes that Snow Leopard permitted a "context-specific dark surface" for
 immersive media (QuickTime X), and warns against making all media interfaces dark. The
-`snow-leopard-itunes-9` profile is a light one; adding a dark variant would mean a second complete
-token set, and it is not part of the profile that was selected. Every product declares
-`color-scheme: light` and paints its own background explicitly.
+`snow-leopard-itunes-9` window profile stays light, and the hub's admin GUI declares
+`color-scheme: light`.
 
-**Instead:** the constellation view, which is the one genuinely immersive surface, uses a dark
-canvas within an otherwise light window — the spec's own recommendation for content context.
+The player does not, because the reference ships a complete dark palette for every one of its
+surfaces and a music player is a thing people open at night. It follows the viewer's system setting
+rather than being dark by default, so it is a context-specific surface rather than a dark interface.
+
+**Instead:** one token layer with a `prefers-color-scheme` override, in `now-playing.css` only. The
+constellation view remains a dark canvas in either scheme — the spec's own recommendation for
+immersive content.
 
 ### Lucida Grande is not shipped
 

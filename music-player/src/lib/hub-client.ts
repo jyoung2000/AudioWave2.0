@@ -8,7 +8,7 @@
  * The device credential is stored in IndexedDB, never in localStorage: it is a bearer secret, and
  * localStorage is readable by any script that manages to run on the page.
  */
-import type { HubIdentity, SearchResponse, ShareLinkView, TrackRef } from '@now-playing/contracts';
+import type { GroupPlaybackState, GroupView, HubIdentity, Queue, QueueCommand, SearchResponse, ShareLinkView, TrackRef } from '@now-playing/contracts';
 import { getSetting, putSetting, type PlayerDatabase } from './db.js';
 
 export interface HubCredential {
@@ -163,6 +163,57 @@ export class HubClient {
 
   async revokeShare(shareId: string): Promise<void> {
     await this.request('DELETE', `/api/v1/shares/${encodeURIComponent(shareId)}`);
+  }
+
+  /* ------------------------------------------------------------- shared listening */
+
+  async listGroups(): Promise<GroupView[]> {
+    return (await this.request<{ items: GroupView[] }>('GET', '/api/v1/groups')).items;
+  }
+
+  async createGroup(name: string): Promise<GroupView> {
+    return this.request<GroupView>('POST', '/api/v1/groups', { body: { name } });
+  }
+
+  async joinGroup(inviteCode: string, displayName: string): Promise<GroupView> {
+    return this.request<GroupView>('POST', '/api/v1/groups/join', { body: { inviteCode, displayName } });
+  }
+
+  async leaveGroup(groupId: string): Promise<void> {
+    await this.request('POST', `/api/v1/groups/${encodeURIComponent(groupId)}/leave`);
+  }
+
+  async createInvite(groupId: string, ttlSeconds = 3600): Promise<{ inviteCode: string; expiresAt: string }> {
+    return this.request('POST', `/api/v1/groups/${encodeURIComponent(groupId)}/invites`, { body: { ttlSeconds, role: 'member' } });
+  }
+
+  async groupQueue(groupId: string): Promise<{ queue: Queue; playback: GroupPlaybackState; serverTime: string }> {
+    return this.request('GET', `/api/v1/groups/${encodeURIComponent(groupId)}/queue`);
+  }
+
+  /**
+   * A revisioned, idempotent queue command.
+   *
+   * `baseRevision` is what makes a shared queue safe: two people pressing skip at the same moment
+   * send the same base, and the hub applies one and rejects the other with `stale-revision` rather
+   * than skipping two songs. The rejection is not an error to hide — it is the answer.
+   */
+  async groupCommand(groupId: string, idempotencyKey: string, baseRevision: number, command: QueueCommand): Promise<unknown> {
+    return this.request('POST', `/api/v1/groups/${encodeURIComponent(groupId)}/queue/commands`, { body: { idempotencyKey, baseRevision, command } });
+  }
+
+  /**
+   * Everything needed to open the realtime socket, or null with the reason.
+   *
+   * The credential is handed out as a *subprotocol token* because that is the only header a browser
+   * WebSocket lets you set, and it is what the hub reads. It stays inside this module otherwise:
+   * the group client is given a URL and a protocol list, never the secret to keep.
+   */
+  realtimeTarget(): { url: string; protocols: string[] } | { url: null; reason: string } {
+    if (!this.credential) return { url: null, reason: 'No hub is paired.' };
+    if (typeof WebSocket === 'undefined') return { url: null, reason: 'This browser has no WebSocket support.' };
+    const base = this.credential.endpoint.replace(/^http/i, 'ws');
+    return { url: `${base}/api/v1/realtime?protocol=1`, protocols: ['np-v1', `np-auth-${this.credential.credentialId}.${this.credential.secret}`] };
   }
 
   async sendEvents(events: readonly unknown[]): Promise<{ accepted: number; duplicates: number }> {

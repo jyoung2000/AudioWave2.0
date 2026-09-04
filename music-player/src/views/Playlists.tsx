@@ -26,6 +26,10 @@ export function PlaylistsView() {
 
   return (
     <>
+      <div className="np-section-head">
+        <h2>Playlists</h2>
+        <p>Lists you made, stored on this device.</p>
+      </div>
       <Panel title="Playlists">
         <form
           className="player-inline-form"
@@ -47,6 +51,7 @@ export function PlaylistsView() {
 
         {state.playlists.length ? (
           <AquaTable
+            variant="page"
             label="Playlists"
             rowKey={(row) => row.id}
             rows={state.playlists}
@@ -123,6 +128,7 @@ export function PlaylistsView() {
 
             {items.length ? (
               <AquaTable
+                variant="page"
                 label={`Songs in ${playlist.name}`}
                 rowKey={(row: PlaylistItem) => row.id}
                 rows={items}

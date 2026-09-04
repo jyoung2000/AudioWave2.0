@@ -1,32 +1,41 @@
 /**
- * The player shell.
+ * The player shell: one page, not one window.
  *
- * One window, a source list, a toolbar carrying the transport and the LCD display, and a status
- * bar — the Aqua/iTunes 9 arrangement the design spec describes (§§9.1–9.12), not a reinterpretation
- * of it.
+ * The old shell was a faithful Aqua desktop window — title bar, source list down the left side, a
+ * chrome toolbar carrying the transport, a status bar along the bottom. It is a good reconstruction
+ * of iTunes 9 and the wrong shape for what this is: an app opened on a phone as often as on a
+ * laptop, mostly to look at one song.
  *
- * The transport row carries the Star, Add-to-Playlist and Share controls beside the play controls,
- * because acting on the song you are listening to should not require navigating away from it.
+ * `docs/reference/now-playing-header.html` shows the other shape and this follows it — a sticky
+ * status bar, a hero player, and an iTunes 10 list underneath. `docs/UI_REDESIGN.md` maps every
+ * feature from the old arrangement to this one, section by section, so "everything transferred" is
+ * checkable rather than asserted.
+ *
+ * Two things deliberately did *not* change. The nine sections keep their names and their
+ * accessible structure — a `navigation` landmark called "Sections" holding `option`s — because a
+ * person who learned the app by keyboard or screen reader should not have to learn it twice; only
+ * the pixels moved. And the transport row still carries Star, Add to playlist and Share beside the
+ * play controls, because acting on the song you are hearing should not mean navigating away
+ * from it.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  AquaWindow,
-  BottomBar,
-  Button,
-  Content,
+  BarClock,
+  BarSearch,
   Glyph,
-  IconButton,
-  LcdDisplay,
-  Scrubber,
-  SearchField,
-  SourceList,
+  Hero,
+  HeroArt,
+  KeyButton,
+  KeyTransport,
+  LevelSlider,
+  ModeSwitch,
+  PageBar,
+  ProfileButton,
+  SectionStrip,
   StatusDot,
-  Toolbar,
-  Transport,
-  VolumeSlider,
-  WorkArea,
+  TrackScrubber,
   useToast,
-  type SourceGroup,
+  type SectionItem,
 } from '@now-playing/aqua-ui';
 import { formatTime, useAppState, usePlayer } from './state/context.js';
 import { LibraryView } from './views/Library.js';
@@ -41,51 +50,63 @@ import { SettingsView } from './views/Settings.js';
 import { AddToPlaylistSheet } from './components/AddToPlaylistSheet.js';
 import { ShareSheet } from './components/ShareSheet.js';
 import { NoticeBar } from './components/NoticeBar.js';
+import { SearchPopover } from './components/SearchPopover.js';
+import { SharedStrip } from './components/Shared.js';
+import { toTrackRef } from './state/store.js';
+import { uuidv7 } from '@now-playing/domain';
 
 export type ViewId = 'library' | 'now-playing' | 'queue' | 'playlists' | 'search' | 'equaliser' | 'metrics' | 'constellation' | 'settings';
 
 export function App() {
-  const { store, hubStatus } = usePlayer();
+  const { store, hubStatus, shared, mode, setMode } = usePlayer();
   const state = useAppState();
   const toast = useToast();
   const [view, setView] = useState<ViewId>('library');
   const [query, setQuery] = useState('');
+  const [popoverOpen, setPopoverOpen] = useState(false);
   const [addToPlaylistOpen, setAddToPlaylistOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
 
   const entry = state.queue[state.queueIndex] ?? null;
-  const currentTrack = entry ? state.library.tracks.find((t) => t.id === entry.track.trackId) ?? null : null;
+  const currentTrack = entry ? (state.library.tracks.find((t) => t.id === entry.track.trackId) ?? null) : null;
   const playing = state.playback.status === 'playing';
+  const [artwork, setArtwork] = useState<string | null>(null);
 
-  const groups = useMemo<SourceGroup<ViewId>[]>(
+  /*
+   * In shared mode the queue belongs to the hub, and following it means not seeking your own copy:
+   * a broadcast has one position and it is not yours to drag. The scrubber says so rather than
+   * silently ignoring the gesture.
+   */
+  const following = mode === 'shared' && shared.group !== null && shared.playback?.status === 'playing';
+
+  useEffect(() => {
+    let url: string | null = null;
+    let cancelled = false;
+    void store.artworkUrl(entry?.track.artworkId ?? null).then((next) => {
+      if (cancelled) {
+        if (next) URL.revokeObjectURL(next);
+        return;
+      }
+      url = next;
+      setArtwork(next);
+    });
+    return () => {
+      cancelled = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [entry?.track.artworkId, store]);
+
+  const sections = useMemo<SectionItem<ViewId>[]>(
     () => [
-      {
-        id: 'library',
-        label: 'Library',
-        items: [
-          { id: 'library', label: 'Music', icon: <Glyph name="note" />, count: state.library.tracks.length },
-          { id: 'now-playing', label: 'Now playing', icon: <Glyph name="play" /> },
-          { id: 'queue', label: 'Up next', icon: <Glyph name="sort" />, count: Math.max(0, state.queue.length - state.queueIndex - 1) },
-          { id: 'playlists', label: 'Playlists', icon: <Glyph name="folder" />, count: state.playlists.length },
-        ],
-      },
-      {
-        id: 'discover',
-        label: 'Discover',
-        items: [
-          { id: 'search', label: 'Search', icon: <Glyph name="search" />, status: hubStatus.connected ? null : 'Searches this device only until a hub is paired' },
-          { id: 'constellation', label: 'Constellation', icon: <Glyph name="star" /> },
-          { id: 'metrics', label: 'Listening', icon: <Glyph name="history" /> },
-        ],
-      },
-      {
-        id: 'sound',
-        label: 'Sound',
-        items: [
-          { id: 'equaliser', label: 'Equaliser', icon: <Glyph name="eq" />, status: state.resolvedEq.presetName },
-          { id: 'settings', label: 'Settings', icon: <Glyph name="gear" /> },
-        ],
-      },
+      { id: 'library', label: 'Music', icon: <Glyph name="note" />, count: state.library.tracks.length },
+      { id: 'now-playing', label: 'Now playing', icon: <Glyph name="play" /> },
+      { id: 'queue', label: 'Up next', icon: <Glyph name="sort" />, count: Math.max(0, state.queue.length - state.queueIndex - 1) },
+      { id: 'playlists', label: 'Playlists', icon: <Glyph name="folder" />, count: state.playlists.length },
+      { id: 'search', label: 'Search', icon: <Glyph name="search" />, status: hubStatus.connected ? null : 'Searches this device only until a hub is paired' },
+      { id: 'constellation', label: 'Constellation', icon: <Glyph name="star" /> },
+      { id: 'metrics', label: 'Listening', icon: <Glyph name="history" /> },
+      { id: 'equaliser', label: 'Equaliser', icon: <Glyph name="eq" />, status: state.resolvedEq.presetName },
+      { id: 'settings', label: 'Settings', icon: <Glyph name="gear" /> },
     ],
     [state.library.tracks.length, state.queue.length, state.queueIndex, state.playlists.length, state.resolvedEq.presetName, hubStatus.connected],
   );
@@ -109,13 +130,7 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [store]);
 
-  const onSearch = useCallback(
-    (value: string) => {
-      setQuery(value);
-      if (value.trim()) setView('search');
-    },
-    [],
-  );
+  const onSearch = useCallback((value: string) => setQuery(value), []);
 
   const body = (() => {
     switch (view) {
@@ -143,112 +158,180 @@ export function App() {
   })();
 
   const liked = currentTrack?.liked ?? false;
+  /*
+   * With nothing queued the hero says so once. It deliberately does not repeat the library's empty
+   * state headline: two identical sentences on one screen read as a rendering bug, and the hero's
+   * job here is to say the transport has nothing to act on, not to re-teach the library.
+   */
+  const heroTitle = entry?.track.title ?? 'Nothing playing';
+  const heroArtist = entry?.track.artistName ?? (state.library.tracks.length ? 'Choose something from your library' : 'Add a folder of music below to begin');
 
   return (
-    <AquaWindow active title="Now Playing" flush>
-      <Toolbar
-        transport={
-          <Transport
-            playing={playing}
-            onPlayPause={() => void store.playback.toggle()}
-            onPrevious={() => void store.previous()}
-            onNext={() => void store.next('user')}
-            canPrevious={state.queueIndex > 0 || state.playback.positionMs > 3000}
-            canNext={state.queueIndex < state.queue.length - 1 || state.repeat === 'all'}
-            disabled={!entry}
-            disabledReason={entry ? undefined : 'Nothing is queued yet'}
-            shuffle={state.shuffle}
-            onShuffle={() => void store.setShuffle(!state.shuffle)}
-            repeat={state.repeat}
-            onRepeat={() => void store.setRepeat(state.repeat === 'off' ? 'all' : state.repeat === 'all' ? 'one' : 'off')}
-            leading={
-              <IconButton
-                icon="star"
-                label={liked ? 'Remove from favourites' : 'Add to favourites'}
-                pressed={liked}
-                disabled={!currentTrack}
-                onClick={() => {
-                  if (currentTrack) void store.toggleLike(currentTrack.id);
+    <div className="np-app">
+      <PageBar
+        label="Now Playing"
+        search={
+          <BarSearch
+            label="Search your music"
+            placeholder="Search your music"
+            value={query}
+            onChange={onSearch}
+            open={popoverOpen}
+            onOpenChange={setPopoverOpen}
+            onSubmit={() => setView('search')}
+            results={
+              <SearchPopover
+                query={query}
+                tracks={state.library.tracks}
+                onPlay={(track) => {
+                  store.setQueue([{ id: uuidv7(), track: toTrackRef(track), context: { kind: 'search', id: null, name: 'a search' } }], 0);
+                  setPopoverOpen(false);
+                }}
+                onClear={() => {
+                  setQuery('');
+                  setPopoverOpen(false);
+                }}
+                onSeeAll={() => {
+                  setView('search');
+                  setPopoverOpen(false);
                 }}
               />
             }
-            trailing={
-              <>
-                <IconButton icon="add" label="Add to a playlist" disabled={!entry} onClick={() => setAddToPlaylistOpen(true)} />
-                <IconButton
-                  icon="share"
-                  label="Share this song"
-                  disabled={!entry}
-                  onClick={() => {
-                    if (!hubStatus.connected) {
-                      toast.show('Sharing needs a paired hub: the link has to be served by something other people can reach.', { kind: 'info' });
-                      return;
-                    }
-                    setShareOpen(true);
-                  }}
-                />
-              </>
-            }
           />
         }
-        display={
-          <LcdDisplay
-            title={entry?.track.title ?? 'Nothing playing'}
-            detail={entry ? `${entry.track.artistName}${entry.track.albumName ? ` — ${entry.track.albumName}` : ''}` : state.library.tracks.length ? 'Choose something from your library' : 'Add a folder of music to begin'}
-            status={
-              state.playback.status === 'loading'
-                ? { text: 'Loading…', percent: state.playback.buffered * 100 }
-                : state.library.scanning
-                  ? { text: `Scanning — ${state.library.scanning.indexed} of ${state.library.scanning.found}`, percent: state.library.scanning.found ? (state.library.scanning.indexed / state.library.scanning.found) * 100 : null }
-                  : null
-            }
-            channel={
-              <Scrubber
-                positionMs={state.playback.positionMs}
-                durationMs={state.playback.durationMs}
-                onSeek={(ms) => store.playback.seek(ms)}
-                disabled={!entry}
-                label="Playback position"
-              />
-            }
-          />
+        status={
+          <>
+            <ModeSwitch
+              value={mode}
+              modes={[
+                { id: 'solo', label: 'Solo listening' },
+                { id: 'shared', label: 'Shared listening', unavailableReason: shared.unavailableReason },
+              ]}
+              onChange={(next) => {
+                const refused = setMode(next as 'solo' | 'shared');
+                if (refused) toast.show(refused, { kind: 'info' });
+                else if (next === 'shared') setView('now-playing');
+              }}
+              onBlocked={(reason) => toast.show(reason, { kind: 'info' })}
+            />
+            <BarClock />
+            <ProfileButton
+              label={mode === 'shared' && shared.group ? `You, listening with ${shared.group.name}` : 'You, listening on your own'}
+              hue={mode === 'shared' ? 200 : 28}
+              onClick={() => setView('settings')}
+            />
+          </>
         }
-        secondary={<VolumeSlider value={state.playback.volume} onChange={(v) => store.playback.setVolume(v)} muted={state.playback.muted} onToggleMute={() => store.playback.setMuted(!state.playback.muted)} />}
-        search={<SearchField label="Search" value={query} onChange={onSearch} onEscape={() => setQuery('')} placeholder="Search your music" />}
       />
 
-      <WorkArea sidebar={<SourceList groups={groups} selectedId={view} onSelect={setView} label="Sections" dimUnfocused />} currentSourceName={groups.flatMap((g) => g.items).find((i) => i.id === view)?.label ?? 'Music'}>
-        <Content>
+      <SectionStrip items={sections} selectedId={view} onSelect={setView} label="Sections" />
+
+      <Hero mode={mode === 'shared' ? 'shared' : 'solo'}>
+        <div className="np-hero__top">
+          <HeroArt src={artwork} alt="" />
+          <div className="np-hero__meta">
+            <h1 className="np-hero__title">{heroTitle}</h1>
+            <p className="np-hero__artist">{heroArtist}</p>
+            {entry?.track.albumName ? (
+              <p className="np-hero__album">
+                {entry.track.albumName}
+                {entry.track.year ? ` · ${entry.track.year}` : ''}
+              </p>
+            ) : null}
+            {entry ? <p className="np-hero__from">Playing from {entry.context.name ?? 'your library'}</p> : null}
+          </div>
+        </div>
+
+        <TrackScrubber
+          positionMs={state.playback.positionMs}
+          durationMs={state.playback.durationMs}
+          onSeek={(ms) => store.playback.seek(ms)}
+          disabled={!entry}
+          live={following}
+          disabledReason={following ? 'This is a shared broadcast: everyone hears the same position, so it cannot be dragged from here.' : entry ? undefined : 'Nothing is queued yet'}
+        />
+
+        <KeyTransport
+          disabledReason={entry ? undefined : 'Nothing is queued yet'}
+          volume={<LevelSlider value={state.playback.volume} muted={state.playback.muted} onChange={(value) => store.playback.setVolume(value)} onToggleMute={() => store.playback.setMuted(!state.playback.muted)} />}
+        >
+          <span className="np-keys__aux">
+            <KeyButton
+              aux
+              label={liked ? 'Remove from favourites' : 'Add to favourites'}
+              pressed={liked}
+              disabled={!currentTrack}
+              onClick={() => {
+                if (currentTrack) void store.toggleLike(currentTrack.id);
+              }}
+            >
+              <Glyph name={liked ? 'star-filled' : 'star'} />
+            </KeyButton>
+            <KeyButton aux label="Shuffle" pressed={state.shuffle} onClick={() => void store.setShuffle(!state.shuffle)}>
+              <Glyph name="shuffle" />
+            </KeyButton>
+          </span>
+
+          <KeyButton glyph="previous" label="Previous track" disabled={!entry || (state.queueIndex <= 0 && state.playback.positionMs <= 3000)} onClick={() => void store.previous()} />
+          <KeyButton primary glyph={playing ? 'pause' : 'play'} label={playing ? 'Pause' : 'Play'} pressed={playing} disabled={!entry} onClick={() => void store.playback.toggle()} />
+          <KeyButton glyph="next" label="Next track" disabled={!entry || (state.queueIndex >= state.queue.length - 1 && state.repeat !== 'all')} onClick={() => void store.next('user')} />
+
+          <span className="np-keys__aux">
+            <KeyButton
+              aux
+              glyph={state.repeat === 'one' ? 'repeat-one' : 'repeat'}
+              label={state.repeat === 'one' ? 'Repeat: one' : state.repeat === 'all' ? 'Repeat: all' : 'Repeat: off'}
+              pressed={state.repeat !== 'off'}
+              onClick={() => void store.setRepeat(state.repeat === 'off' ? 'all' : state.repeat === 'all' ? 'one' : 'off')}
+            />
+            <KeyButton aux label="Add to a playlist" disabled={!entry} onClick={() => setAddToPlaylistOpen(true)}>
+              <Glyph name="add" />
+            </KeyButton>
+            <KeyButton
+              aux
+              label="Share this song"
+              disabled={!entry}
+              onClick={() => {
+                if (!hubStatus.connected) {
+                  toast.show('Sharing needs a paired hub: the link has to be served by something other people can reach.', { kind: 'info' });
+                  return;
+                }
+                setShareOpen(true);
+              }}
+            >
+              <Glyph name="share" />
+            </KeyButton>
+          </span>
+        </KeyTransport>
+
+        {mode === 'shared' ? <SharedStrip /> : null}
+      </Hero>
+
+      <main className="aqua-content np-body" tabIndex={-1}>
+        <div className="np-body__inner">
           <NoticeBar />
           {body}
-        </Content>
-      </WorkArea>
-
-      <BottomBar
-        left={
-          <Button size="mini" icon="add" onClick={() => void store.addDirectory()} ellipsis>
-            Add music
-          </Button>
-        }
-        status={statusLine(state, hubStatus.connected, hubStatus.hubName)}
-        right={
-          <span className="player-status-right">
+        </div>
+        <div className="np-foot">
+          <output aria-live="polite">{statusLine(state, hubStatus.connected, hubStatus.hubName, mode, shared.group?.name ?? null)}</output>
+          <span className="np-foot__right">
             {state.playback.dspUnavailableReason ? <StatusDot kind="warning" label="EQ unavailable" /> : <StatusDot kind="ok" label={state.resolvedEq.presetName} />}
-            <span className="player-time">{`${formatTime(state.playback.positionMs)} / ${formatTime(state.playback.durationMs)}`}</span>
+            <span>{`${formatTime(state.playback.positionMs)} / ${formatTime(state.playback.durationMs)}`}</span>
           </span>
-        }
-      />
+        </div>
+      </main>
 
       <AddToPlaylistSheet open={addToPlaylistOpen} onClose={() => setAddToPlaylistOpen(false)} tracks={entry ? [entry.track] : []} />
       <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} kind="track" track={entry?.track ?? null} />
-    </AquaWindow>
+    </div>
   );
 }
 
-function statusLine(state: ReturnType<typeof useAppState>, hubConnected: boolean, hubName: string | null): string {
+function statusLine(state: ReturnType<typeof useAppState>, hubConnected: boolean, hubName: string | null, mode: 'solo' | 'shared', groupName: string | null): string {
   const parts: string[] = [];
   parts.push(`${state.library.tracks.length} track${state.library.tracks.length === 1 ? '' : 's'}`);
   if (state.queue.length) parts.push(`${state.queue.length} queued`);
-  parts.push(hubConnected ? `connected to ${hubName ?? 'a hub'}` : 'playing from this device');
+  if (mode === 'shared' && groupName) parts.push(`listening with ${groupName}`);
+  else parts.push(hubConnected ? `connected to ${hubName ?? 'a hub'}` : 'playing from this device');
   return parts.join(' · ');
 }

@@ -38,6 +38,10 @@ export function EqualiserView() {
 
   return (
     <>
+      <div className="np-section-head">
+        <h2>Equaliser</h2>
+        <p>Ten bands, a preamp, and an honest account of what each one does to the signal.</p>
+      </div>
       <Panel title="Equaliser">
         <PanelSection>
           <div className="player-eq-header">

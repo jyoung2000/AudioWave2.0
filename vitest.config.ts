@@ -6,6 +6,9 @@ const alias = {
   '@now-playing/audio-core': new URL('./packages/audio-core/src/index.ts', import.meta.url).pathname,
   '@now-playing/recommendations': new URL('./packages/recommendations/src/index.ts', import.meta.url).pathname,
   '@now-playing/test-fixtures': new URL('./packages/test-fixtures/src/index.ts', import.meta.url).pathname,
+  // Listed before the bare package alias: string aliases match by prefix, so without this the
+  // stylesheet path would be rewritten into "…/src/index.ts/now-playing.css".
+  '@now-playing/aqua-ui/now-playing.css': new URL('./packages/aqua-ui/src/styles/now-playing.css', import.meta.url).pathname,
   '@now-playing/aqua-ui': new URL('./packages/aqua-ui/src/index.ts', import.meta.url).pathname,
 };
 

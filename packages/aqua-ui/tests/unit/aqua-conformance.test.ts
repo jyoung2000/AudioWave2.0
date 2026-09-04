@@ -28,7 +28,17 @@ const tokens = JSON.parse(readFileSync(join(here, '..', '..', 'src', 'styles', '
   shadow: Record<string, string>;
   motion: Record<string, string>;
 };
-const css = readFileSync(join(here, '..', '..', 'src', 'styles', 'aqua.css'), 'utf8');
+const styles = (name: string): string => readFileSync(join(here, '..', '..', 'src', 'styles', name), 'utf8');
+/** The base sheet, which carries the tokens, the profiles and the motion switch. */
+const css = styles('aqua.css');
+/**
+ * Every sheet the library ships.
+ *
+ * The stylesheet was one file until the player stopped being a window; the material MUSTs are
+ * about the library's whole surface, so the checks that scan *rules* rather than tokens scan all
+ * four. Splitting a file must not be a way to stop being checked.
+ */
+const allCss = ['aqua.css', 'aqua-window.css', 'aqua-media.css', 'now-playing.css'].map((name) => [name, styles(name)] as const);
 
 describe('§17.6 profile coherence', () => {
   it('MUST: the selected profile is declared', () => {
@@ -47,9 +57,11 @@ describe('§17.6 profile coherence', () => {
 describe('§17.2 material', () => {
   it('MUST: rims are crisp and generally 1 px', () => {
     expect(tokens.size['splitterHairline']).toBe('1px');
-    // Every border declaration in the stylesheet is hairline or a variable resolving to one.
-    const widths = [...css.matchAll(/border(?:-(?:top|right|bottom|left))?:\s*([\d.]+)px/g)].map((m) => Number(m[1]));
-    expect(widths.every((w) => w <= 1)).toBe(true);
+    // Every border declaration in every stylesheet is hairline or a variable resolving to one.
+    for (const [name, sheet] of allCss) {
+      const widths = [...sheet.matchAll(/border(?:-(?:top|right|bottom|left))?:\s*([\d.]+)px/g)].map((m) => Number(m[1]));
+      expect(widths.every((w) => w <= 1), `${name} has a border wider than a hairline`).toBe(true);
+    }
   });
 
   it('MUST: the virtual light source is above each dimensional control', () => {
@@ -89,6 +101,40 @@ describe('§17.2 material', () => {
   });
 });
 
+describe('§17.2 material — the 2010 page surfaces', () => {
+  const page = (tokens as unknown as { page: Record<string, string> }).page;
+
+  it('MUST: the virtual light source is above the status bar as well', () => {
+    // Same rule as the gel ramp: the bar is lit from above, so it darkens downward.
+    expect(luminanceOf(page['barTop']!)).toBeGreaterThan(luminanceOf(page['barBottom']!));
+    expect(luminanceOf(page['listHeaderTop']!)).toBeGreaterThan(luminanceOf(page['listHeaderBottom']!));
+  });
+
+  it('MUST: the page chrome stays near-neutral; saturation is reserved', () => {
+    // The bar is a page header rather than a window frame, so it is allowed the faint coolness the
+    // reference sampled — but nowhere near the accent, and nowhere near the Aqua ramp.
+    for (const key of ['barTop', 'barUpper', 'barLower', 'barBottom', 'listHeaderTop', 'listHeaderBottom']) {
+      expect(chromaOf(page[key]!), `page.${key} is tinted like an accent`).toBeLessThanOrEqual(16);
+    }
+    // And the two accents that do exist are unmistakably accents.
+    expect(chromaOf(page['live']!)).toBeGreaterThan(100);
+    expect(chromaOf(page['railFillMid']!)).toBeGreaterThan(100);
+  });
+
+  it('MUST: the page keeps the focus halo the window has', () => {
+    // The base sheet scopes :focus-visible to the roots; the page is one of them, or the player
+    // would have shipped without a visible focus ring.
+    expect(css).toMatch(/\.np-app :focus-visible/);
+  });
+
+  it('MUST: the page honours reduced motion', () => {
+    const sheet = styles('now-playing.css');
+    expect(sheet).toContain('prefers-reduced-motion');
+    // The one animation on the page — the LIVE pulse — is switchable from the app as well as the OS.
+    expect(sheet).toContain('--aqua-anim-state');
+  });
+});
+
 describe('§17.3 typography and density', () => {
   it('MUST: the font is Lucida Grande or a compact, tuned fallback', () => {
     const family = String(tokens.font['family']);
@@ -117,6 +163,8 @@ describe('§17.3 typography and density', () => {
   it('SHOULD: data rows stay compact in the default profile', () => {
     expect(pxOf(tokens.size['tableRow'])).toBeLessThanOrEqual(20);
     expect(pxOf(tokens.size['sourceRow'])).toBeLessThanOrEqual(21);
+    // The 2010 list is tighter still, which is what iTunes 10 actually did.
+    expect(pxOf(tokens.size['listRow'])).toBeLessThanOrEqual(18);
   });
 });
 

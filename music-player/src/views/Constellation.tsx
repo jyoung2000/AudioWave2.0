@@ -104,7 +104,12 @@ export function ConstellationView() {
   const selected = albums.find((a) => a.id === selectedId) ?? null;
 
   return (
-    <Panel title="Constellation">
+    <>
+      <div className="np-section-head">
+        <h2>Constellation</h2>
+        <p>Every album is a star, grouped by artist. Pick one to play it.</p>
+      </div>
+      <Panel title="Constellation">
       <PanelSection>
         <div className="player-toolbar-row">
           <SegmentedControl
@@ -127,6 +132,7 @@ export function ConstellationView() {
         <div ref={containerRef} className="player-constellation" role="img" aria-label={`A star field of ${albums.length} albums. The table view lists the same albums with keyboard navigation.`} />
       ) : (
         <AquaTable
+          variant="page"
           label="Albums"
           rowKey={(row: AlbumNode) => row.id}
           rows={albums}
@@ -155,7 +161,8 @@ export function ConstellationView() {
           </div>
         </PanelSection>
       ) : null}
-    </Panel>
+      </Panel>
+    </>
   );
 }
 

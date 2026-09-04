@@ -19,6 +19,11 @@ export default defineConfig({
     alias: {
       '@now-playing/contracts': fileURLToPath(new URL('../../../packages/contracts/src/index.ts', import.meta.url)),
       '@now-playing/domain': fileURLToPath(new URL('../../../packages/domain/src/index.ts', import.meta.url)),
+      // The stylesheet entries must precede the bare package alias: string aliases match by
+      // prefix, so otherwise "…/aqua-ui/window.css" is rewritten to "…/src/index.ts/window.css".
+      '@now-playing/aqua-ui/window.css': fileURLToPath(new URL('../../../packages/aqua-ui/src/styles/aqua-window.css', import.meta.url)),
+      '@now-playing/aqua-ui/media.css': fileURLToPath(new URL('../../../packages/aqua-ui/src/styles/aqua-media.css', import.meta.url)),
+      '@now-playing/aqua-ui/now-playing.css': fileURLToPath(new URL('../../../packages/aqua-ui/src/styles/now-playing.css', import.meta.url)),
       '@now-playing/aqua-ui': fileURLToPath(new URL('../../../packages/aqua-ui/src/index.ts', import.meta.url)),
     },
   },

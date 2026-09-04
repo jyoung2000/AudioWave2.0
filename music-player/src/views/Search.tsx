@@ -59,9 +59,14 @@ export function SearchView({ query, onQueryChange }: { query: string; onQueryCha
 
   return (
     <>
+      <div className="np-section-head">
+        <h2>Search</h2>
+        <p>{hubStatus.connected ? `This device and ${hubStatus.hubName ?? 'your hub'}.` : 'This device only, until a hub is paired.'}</p>
+      </div>
       <Panel title={`On this device (${local.length})`}>
         {local.length ? (
           <AquaTable
+            variant="page"
             label="Local results"
             rowKey={(row: Track) => row.id}
             rows={local}
@@ -106,6 +111,7 @@ export function SearchView({ query, onQueryChange }: { query: string; onQueryCha
                 </PanelSection>
               ) : null}
               <AquaTable
+                variant="page"
                 label="Hub results"
                 rowKey={(row: SearchResult) => `${row.provider}:${row.providerId}`}
                 rows={hubResults.results}

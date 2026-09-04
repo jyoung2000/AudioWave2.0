@@ -6,18 +6,29 @@
  * to it through `useSyncExternalStore`, which is what keeps the two in step without a render loop.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { openPlayerDb } from '../lib/db.js';
+import { getSetting, openPlayerDb, putSetting } from '../lib/db.js';
+import { GroupClient, type SharedState } from '../lib/group-client.js';
 import { HubClient, type HubStatus } from '../lib/hub-client.js';
 import { workletDataUrl } from '../lib/build-flags.js';
 import { installHandlers, publishMetadata, publishPlaybackState, publishPosition } from '../lib/media-session.js';
 import { PlaybackEngine } from '../lib/playback.js';
 import { PlayerStore, type AppState } from './store.js';
 
+export type ListeningMode = 'solo' | 'shared';
+
 interface PlayerContextValue {
   store: PlayerStore;
   hub: HubClient | null;
   hubStatus: HubStatus;
+  /** Null until the hub client exists; shared listening is a hub feature. */
+  group: GroupClient | null;
+  shared: SharedState;
+  mode: ListeningMode;
+  /** Returns the reason it refused, or null when the mode changed. */
+  setMode: (mode: ListeningMode) => string | null;
 }
+
+const IDLE_SHARED: SharedState = { unavailableReason: 'No hub is paired.', connection: 'idle', group: null, members: [], queue: null, playback: null, rejection: null, staleSince: null };
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
 
@@ -36,19 +47,33 @@ export function PlayerProvider({ children, store: injected }: { children: ReactN
   const [store] = useState(() => injected ?? new PlayerStore(new PlaybackEngine({ workletModuleUrl: WORKLET_URL })));
   const [hub, setHub] = useState<HubClient | null>(null);
   const [hubStatus, setHubStatus] = useState<HubStatus>({ connected: false, endpoint: null, hubName: null, reason: 'No hub is paired.', identity: null, scopes: [] });
+  const [group, setGroup] = useState<GroupClient | null>(null);
+  const [shared, setShared] = useState<SharedState>(IDLE_SHARED);
+  const [requestedMode, setRequestedMode] = useState<ListeningMode>('solo');
   const [started, setStarted] = useState(false);
+  const dbRef = useRef<Awaited<ReturnType<typeof openPlayerDb>> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       const db = await openPlayerDb();
       if (cancelled) return;
+      dbRef.current = db;
       await store.init(db);
       if (cancelled) return;
       const client = new HubClient(db);
       setHub(client);
       client.subscribe(setHubStatus);
+      const groups = new GroupClient(client, () => 'This device');
+      groups.subscribe(setShared);
+      setGroup(groups);
       await client.load();
+      groups.refreshAvailability(client.getStatus().connected, client.getStatus().reason);
+      // The mode is remembered, but only honoured if it is still possible: coming back to a player
+      // that was in a group, on a laptop that has since left the network, must land in solo rather
+      // than in a shared session that is not there.
+      const remembered = await getSetting<ListeningMode>(db, 'listening.mode', 'solo');
+      if (!cancelled && remembered === 'shared') setRequestedMode('shared');
       setStarted(true);
     })();
     return () => {
@@ -56,7 +81,50 @@ export function PlayerProvider({ children, store: injected }: { children: ReactN
     };
   }, [store]);
 
-  const value = useMemo(() => ({ store, hub, hubStatus }), [store, hub, hubStatus]);
+  // The hub goes up and down independently of anything the person does, and shared listening has to
+  // follow it: a hub that drops takes the mode back to solo rather than leaving a dead switch on.
+  useEffect(() => {
+    if (!group) return;
+    group.refreshAvailability(hubStatus.connected, hubStatus.reason);
+  }, [group, hubStatus.connected, hubStatus.reason]);
+
+  /*
+   * The mode in force is *derived*, not stored twice.
+   *
+   * What a person asked for and what is possible are two different facts, and keeping the second in
+   * its own state would mean writing it from an effect every time the hub came and went — a
+   * cascading render, and a window in which the switch and the reality disagree. Deriving it means
+   * a hub that drops takes the player back to solo in the same render that learns the hub dropped.
+   * The request survives, so the mode comes back on its own when the hub does.
+   */
+  const mode: ListeningMode = requestedMode === 'shared' && !shared.unavailableReason ? 'shared' : 'solo';
+
+  // Saying so, once, when it flips off underneath someone. The store is an external system, which
+  // is exactly what an effect is for.
+  const wasShared = useRef(false);
+  useEffect(() => {
+    if (wasShared.current && mode === 'solo' && requestedMode === 'shared' && shared.unavailableReason) {
+      store.notice('info', `Shared listening stopped: ${shared.unavailableReason}`);
+    }
+    wasShared.current = mode === 'shared';
+  }, [mode, requestedMode, shared.unavailableReason, store]);
+
+  const setMode = useCallback(
+    (next: ListeningMode): string | null => {
+      if (next === 'shared') {
+        const reason = shared.unavailableReason;
+        if (reason) return reason;
+      } else {
+        group?.disconnect();
+      }
+      setRequestedMode(next);
+      if (dbRef.current) void putSetting(dbRef.current, 'listening.mode', next);
+      return null;
+    },
+    [group, shared.unavailableReason],
+  );
+
+  const value = useMemo(() => ({ store, hub, hubStatus, group, shared, mode, setMode }), [store, hub, hubStatus, group, shared, mode, setMode]);
   return (
     <PlayerContext.Provider value={value}>
       {children}

@@ -26,12 +26,25 @@ true if each one maps to something that can fail, so this page is the map. Three
 
 | MUST | How it is checked |
 |---|---|
-| Rims crisp and generally 1 px | **Test** — every border declaration in `aqua.css` is ≤ 1 px |
+| Rims crisp and generally 1 px | **Test** — every border declaration in **all four** stylesheets (`aqua.css`, `aqua-window.css`, `aqua-media.css`, `now-playing.css`) is ≤ 1 px. It has failed once for real: the section strip's selected underline was a 2 px border, and is now an inset shadow |
 | Virtual light source above each dimensional control | **Test** — the gel ramp is monotonically darker downward; both inset shadow tokens exist |
 | Gel has specular top, mid body, darker lower depth | **Test** — five-step luminance ordering |
 | Neutral controls stay neutral; Aqua blue is selective | **Test** — chrome chroma ≤ 2, graphite ≤ 16, accent > 100 |
 | Internal panes do not all cast independent card shadows | **Test** — `tests/dom/overlays.test.tsx` |
 | *SHOULD:* window shadow stronger than any control shadow | **Test** — blur radii compared |
+
+### The 2010 page surfaces
+
+The player renders a page rather than a window (see [UI_REDESIGN.md](UI_REDESIGN.md)). The material
+MUSTs apply to it unchanged, and are checked separately because the tokens are a separate group.
+
+| MUST | How it is checked |
+|---|---|
+| Virtual light source above the status bar and the list header | **Test** — both ramps are monotonically darker downward |
+| Page chrome near-neutral; saturation reserved | **Test** — bar and list-header chroma ≤ 16; the LIVE marker and the scrubber fill > 100 |
+| Focus does not rely on colour alone, on the page as on the window | **Test** — `.np-app :focus-visible` is scoped in the base sheet; the e2e focus-visibility test walks the real page |
+| Reduced motion honoured | **Test** — `now-playing.css` carries both the media query and `--aqua-anim-state`; the page's one animation is the LIVE pulse |
+| *SHOULD:* compact data rows | **Test** — the iTunes 10 list row is ≤ 18 px |
 
 ## §17.3 Typography and density
 
@@ -50,9 +63,9 @@ true if each one maps to something that can fail, so this page is the map. Three
 | Familiar transport symbols, play/pause spatially stable | **Test** — `tests/dom/controls.test.tsx`; the player e2e asserts the transport row's controls are named and reachable |
 | Search is a rounded recessed field with visible focus and clear state | **Test** — `tests/dom/controls.test.tsx`; the e2e focus-visibility test walks ancestors, which is how the search field's `:focus-within` ring is caught |
 | Source and row selection have active and inactive variants | **Test** — `tests/dom/source-list.test.tsx`, `table.test.tsx` |
-| Tables communicate sort state and preserve semantics | **Test** — `tests/dom/table.test.tsx` asserts `aria-sort` and roving tabindex |
+| Tables communicate sort state and preserve semantics | **Test** — `tests/dom/table.test.tsx` asserts `aria-sort` and roving tabindex. The *visual* sort state had a defect the tint outran: `aria-sort="none"` is present on every sortable header, so `th[aria-sort]` painted the whole header row as sorted. Both skins now use `:not([aria-sort='none'])` |
 | Progress communicates status beyond animation | **Test** — `tests/dom/controls.test.tsx` asserts text and `aria-valuenow`, not motion alone |
-| *SHOULD:* central inset information display | Present — the LCD display in the player's toolbar |
+| *SHOULD:* central inset information display | Present — the LCD display in the hub GUI's toolbar. The player replaced it with the hero, which states the same information at reading size rather than in an inset panel; recorded in [DEVIATIONS.md](DEVIATIONS.md) |
 
 ## §17.5 Interaction
 

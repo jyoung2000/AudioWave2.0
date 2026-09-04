@@ -9,7 +9,10 @@
   "exports": {
     ".": "./src/index.ts",
     "./styles.css": "./src/styles/aqua.css",
-    "./tokens.json": "./src/styles/tokens.json"
+    "./tokens.json": "./src/styles/tokens.json",
+    "./now-playing.css": "./src/styles/now-playing.css",
+    "./window.css": "./src/styles/aqua-window.css",
+    "./media.css": "./src/styles/aqua-media.css"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit",

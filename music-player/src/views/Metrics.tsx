@@ -28,6 +28,10 @@ export function MetricsView() {
 
   return (
     <>
+      <div className="np-section-head">
+        <h2>Listening</h2>
+        <p>Worked out on this device from a log that never leaves it.</p>
+      </div>
       <Panel title="Listening">
         <PanelSection>
           <KeyValueList
@@ -104,6 +108,7 @@ function RankedTable({ label, rows }: { label: string; rows: readonly RankedEntr
     <div className="player-metric-column">
       <h3 className="player-subhead">{label}</h3>
       <AquaTable
+        variant="page"
         label={`Most played ${label.toLowerCase()}`}
         rowKey={(row: RankedEntry) => row.key}
         rows={[...rows]}

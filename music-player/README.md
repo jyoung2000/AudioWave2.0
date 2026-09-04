@@ -4,7 +4,32 @@ An offline-first music player for the music already on your device. It is a web 
 everything it needs is in the bundle, and nothing is fetched from anywhere else.
 
 It works entirely on its own. Pairing a [hub](../docker-container/README.md) adds search across
-providers, group listening and sync — it never becomes a requirement.
+providers, shared listening and sync — it never becomes a requirement.
+
+## How it is laid out
+
+A sticky status bar, a hero player, and an iTunes 10 list underneath — the arrangement of
+[`docs/reference/now-playing-header.html`](../docs/reference/now-playing-header.html), rather than
+the desktop window the hub's admin GUI uses. [docs/UI_REDESIGN.md](../docs/UI_REDESIGN.md) maps
+every feature from the old shell to this one and explains what was taken from the reference and
+what was deliberately left out of it.
+
+The controls are always at the top of the page, so the song you are hearing is one glance away from
+whatever section you are in. Nine sections live in a strip under the bar: Music, Now playing, Up
+next, Playlists, Search, Constellation, Listening, Equaliser, Settings.
+
+## Listening alone, or together
+
+The switch in the status bar is the app's one mode:
+
+- **Solo** — your library, your queue, your equaliser, your history. Nothing leaves the device.
+- **Shared** — a hub group. Everyone hears the same queue, the hub keeps the order, and skipping is
+  a request the hub grants or refuses rather than something one player does alone. Your library and
+  your listening history still stay on your own device.
+
+Shared listening needs a paired hub that this device can reach, and a WebSocket — so it is
+unavailable from a `file://` page. When it cannot be used the switch says why, on the bar and again
+under Settings, rather than disappearing.
 
 ## Running it
 
