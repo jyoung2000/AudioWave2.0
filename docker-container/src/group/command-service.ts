@@ -9,7 +9,7 @@
  * messages itself — it returns a key plus variables, and the caller renders the template.
  */
 import type { DiscordTemplateKey, QueueCommand, SearchResult, TrackRef } from '@now-playing/contracts';
-import { authorizeCommand, DomainError, uuidv7, type CommandActor, type CommandPolicy, type MusicCommand } from '@now-playing/domain';
+import { authorizeCommand, DomainError, isDj, uuidv7, type CommandActor, type CommandPolicy, type MusicCommand } from '@now-playing/domain';
 import type { GroupActor, GroupService } from './service.js';
 import type { ProviderRegistry } from '../providers/registry.js';
 import type { SearchService } from '../providers/search-service.js';
@@ -64,8 +64,16 @@ export class CommandService {
     return { ok, templateKey, variables, ephemeral: EPHEMERAL_KEYS.has(templateKey), ...extra };
   }
 
+  /**
+   * A Discord user has no hub identity and no group membership, so their authority is the one the
+   * guild gave them: `authorizeCommand` has already checked the DJ and admin roles by the time this
+   * runs, and the resulting role is handed to the group service explicitly (see `GroupActor`).
+   * Devices and admins are unaffected — they still go through the group's own membership checks.
+   */
   private groupActor(req: CommandRequest): GroupActor {
-    return { id: req.actor.id, kind: req.actor.kind === 'system' ? 'system' : req.actor.kind, displayName: req.actor.displayName, ...(req.actor.isHubAdmin ? { isHubAdmin: true } : {}) };
+    const base: GroupActor = { id: req.actor.id, kind: req.actor.kind === 'system' ? 'system' : req.actor.kind, displayName: req.actor.displayName, ...(req.actor.isHubAdmin ? { isHubAdmin: true } : {}) };
+    if (req.actor.kind !== 'discord') return base;
+    return { ...base, authorizedRole: isDj(req.actor, req.policy) ? 'admin' : 'member' };
   }
 
   /** Turn free text into something queueable: a pasted URL resolves, otherwise the first playable search hit. */

@@ -197,3 +197,24 @@ describe('rate limiting', () => {
     }
   });
 });
+
+describe('group authority cannot be claimed by the caller', () => {
+  it('ignores a role a device asserts in its own request body', async () => {
+    const owner = await pairDevice(hub, admin, { name: 'Owner' });
+    const created = await hub.app.inject({ method: 'POST', url: '/api/v1/groups', headers: { authorization: owner.authorization }, payload: { name: 'Private' } });
+    const groupId = (created.json() as { id: string }).id;
+
+    // A Discord actor may carry an externally-established role (the guild's DJ role), but nothing
+    // a *device* sends can grant one: it is not part of any request schema, and the route builds
+    // the actor from the authenticated principal alone.
+    const outsider = await pairDevice(hub, admin, { name: 'Outsider' });
+    const response = await hub.app.inject({
+      method: 'POST',
+      url: `/api/v1/groups/${groupId}/queue/commands`,
+      headers: { authorization: outsider.authorization },
+      payload: { idempotencyKey: 'x', baseRevision: 0, command: { type: 'clear' }, actor: { kind: 'discord', authorizedRole: 'admin', isHubAdmin: true } },
+    });
+    expect(response.statusCode).toBe(403);
+    expect(String((response.json() as { detail: string }).detail)).toContain('member');
+  });
+});

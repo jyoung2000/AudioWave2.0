@@ -1,0 +1,85 @@
+# One command: `docker compose up -d`.
+#
+# Defaults are the safe ones. The hub binds to localhost inside the container and the port is
+# published to 127.0.0.1 only, so a fresh install is not reachable from the network even before the
+# password is changed. Opening it up is two deliberate edits, described in the comments below.
+
+name: now-playing
+
+services:
+  hub:
+    build:
+      # Built from the repository root: the hub depends on the workspace packages.
+      context: ..
+      dockerfile: docker-container/Dockerfile
+    image: now-playing-hub:latest
+    container_name: now-playing-hub
+    restart: unless-stopped
+    ports:
+      # Loopback-only by default. To reach the hub from other devices on your network, change this
+      # to "4546:4546" AND set NP_BIND_MODE=lan below — both, deliberately.
+      - "127.0.0.1:4546:4546"
+    environment:
+      NP_DATA_DIR: /data
+      NP_PORT: "4546"
+      # localhost | lan | remote. Anything but localhost stays inactive until the admin password
+      # has been changed, no matter what this says.
+      NP_BIND_MODE: "${NP_BIND_MODE:-localhost}"
+      # Absolute https:// URL when the hub is behind a reverse proxy. Pairing links and share links
+      # are unreachable for anyone else until this is set.
+      NP_PUBLIC_ENDPOINT: "${NP_PUBLIC_ENDPOINT:-}"
+      # Comma-separated CIDRs whose X-Forwarded-For header is trusted. Leave empty unless a proxy
+      # you control sits in front of the hub.
+      NP_TRUSTED_PROXY_CIDRS: "${NP_TRUSTED_PROXY_CIDRS:-}"
+      # truncated (default) | hashed | full.
+      NP_IP_LOGGING: "${NP_IP_LOGGING:-truncated}"
+      NP_LOG_LEVEL: "${NP_LOG_LEVEL:-info}"
+      # Optional: the Discord bot token. Prefer setting it in the admin GUI, where it is encrypted
+      # at rest with the installation key rather than sitting in an environment variable.
+      NP_DISCORD_TOKEN: "${NP_DISCORD_TOKEN:-}"
+    volumes:
+      # Everything the hub owns lives here: the database, the library, blobs, artwork, backups,
+      # logs and the installation key. Back this directory up and the hub is portable.
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4546/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    # A self-hosted music hub has no reason to gain privileges or write outside its volume.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: false
+    tmpfs:
+      - /tmp:size=64m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # The Discord bot runs as its own container so a gateway outage cannot take the API down with it.
+  # It shares the data volume to read the same database, and is off unless you enable this profile:
+  #   docker compose --profile discord up -d
+  discord:
+    image: now-playing-hub:latest
+    container_name: now-playing-discord
+    restart: unless-stopped
+    profiles: ["discord"]
+    depends_on:
+      hub:
+        condition: service_healthy
+    command: ["node", "discord-worker.js"]
+    environment:
+      NP_DATA_DIR: /data
+      NP_LOG_LEVEL: "${NP_LOG_LEVEL:-info}"
+      NP_DISCORD_TOKEN: "${NP_DISCORD_TOKEN:-}"
+    volumes:
+      - ./data:/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL

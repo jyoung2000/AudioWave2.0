@@ -23,6 +23,16 @@ export interface GroupActor {
   displayName: string;
   /** Hub admin sessions bypass group roles. */
   isHubAdmin?: boolean;
+  /**
+   * The role an actor was granted by an authority outside this hub — today, a Discord guild's DJ
+   * and admin roles, checked by `authorizeCommand` before the command ever reaches this service.
+   *
+   * Only `kind: 'discord'` may use it, because a Discord user has no hub identity and therefore no
+   * group membership to check: refusing them for "not a member" would make the bot unable to
+   * control any group at all. Everything else still goes through `requireMember`, so a paired
+   * device cannot escape group permissions by claiming a role.
+   */
+  authorizedRole?: GroupRole;
 }
 
 export interface GroupPresence {
@@ -174,14 +184,21 @@ export class GroupService {
     return m;
   }
 
+  /** True when the actor's authority was established outside the hub (see `GroupActor`). */
+  private hasExternalAuthority(actor: GroupActor): boolean {
+    return actor.kind === 'discord' && actor.authorizedRole !== undefined;
+  }
+
   requireDj(groupId: string, actor: GroupActor): void {
     if (actor.isHubAdmin) return;
+    if (this.hasExternalAuthority(actor) && DJ_ROLES.includes(actor.authorizedRole!)) return;
     const m = this.membership(groupId, actor.id);
     if (!m || !DJ_ROLES.includes(m.role)) throw new DomainError('forbidden', 'Owner or admin role required');
   }
 
   isDj(groupId: string, actor: GroupActor): boolean {
     if (actor.isHubAdmin) return true;
+    if (this.hasExternalAuthority(actor)) return DJ_ROLES.includes(actor.authorizedRole!);
     const m = this.membership(groupId, actor.id);
     return !!m && DJ_ROLES.includes(m.role);
   }
@@ -301,13 +318,17 @@ export class GroupService {
 
   /** Permission check per command type; returns a translated command (member skip → voteSkip) or throws. */
   private authorize(group: Group, queue: Queue, playback: GroupPlaybackState, actor: GroupActor, membership: MembershipRecord | null, command: QueueCommand): QueueCommand {
-    const dj = actor.isHubAdmin || actor.kind === 'system' || (membership !== null && DJ_ROLES.includes(membership.role));
+    const external = this.hasExternalAuthority(actor);
+    const dj = actor.isHubAdmin || actor.kind === 'system' || (membership !== null && DJ_ROLES.includes(membership.role)) || (external && DJ_ROLES.includes(actor.authorizedRole!));
+    // A Discord actor was already authorized against the guild's roles, so it counts as present in
+    // the group for the "is a member" checks below; what it may *do* still depends on `dj`.
+    const present = membership !== null || actor.isHubAdmin || actor.kind === 'system' || external;
     const current = currentItem(queue);
     switch (command.type) {
       case 'append':
       case 'insert':
       case 'playNext':
-        if (!membership && !actor.isHubAdmin && actor.kind !== 'system') throw new DomainError('forbidden', 'Not a member');
+        if (!present) throw new DomainError('forbidden', 'Not a member');
         if (command.type !== 'append' && !dj) throw new DomainError('forbidden', 'Only DJs can insert ahead of others');
         return command;
       case 'remove': {
@@ -321,14 +342,14 @@ export class GroupService {
         if (group.settings.voteSkipThreshold > 0) return { type: 'voteSkip' };
         throw new DomainError('forbidden', 'Only DJs or the requester may skip');
       case 'voteSkip':
-        if (!membership && !actor.isHubAdmin) throw new DomainError('forbidden', 'Not a member');
+        if (!present) throw new DomainError('forbidden', 'Not a member');
         return command;
       case 'markUnavailable':
-        if (!membership && !actor.isHubAdmin) throw new DomainError('forbidden', 'Not a member');
+        if (!present) throw new DomainError('forbidden', 'Not a member');
         return command;
       case 'advance': {
         if (dj) return command;
-        if (!membership) throw new DomainError('forbidden', 'Not a member');
+        if (!present) throw new DomainError('forbidden', 'Not a member');
         if (command.reason !== 'ended') throw new DomainError('forbidden', 'Report playback problems through availability reports');
         const duration = current?.track.durationMs ?? null;
         const startAt = playback.startAt ? Date.parse(playback.startAt) : null;
@@ -344,7 +365,7 @@ export class GroupService {
   applyCommand(groupId: string, actor: GroupActor, input: CommandInput): CommandOutcome {
     const group = this.find(groupId);
     if (group.status !== 'active') throw new DomainError('conflict', 'This group is archived');
-    const membership = actor.isHubAdmin || actor.kind === 'system' ? (this.membership(groupId, actor.id) ?? null) : this.requireMember(groupId, actor);
+    const membership = actor.isHubAdmin || actor.kind === 'system' || this.hasExternalAuthority(actor) ? (this.membership(groupId, actor.id) ?? null) : this.requireMember(groupId, actor);
     const replay = this.repo.findCommandResult(groupId, input.idempotencyKey);
     if (replay) {
       if (replay.actorId !== actor.id) throw new DomainError('conflict', 'Idempotency key was used by another actor');
@@ -365,7 +386,7 @@ export class GroupService {
       return outcome;
     }
     const command = this.authorize(group, queue, playback, actor, membership, input.command);
-    const role: QueueActor['role'] = actor.isHubAdmin ? 'admin' : (membership?.role ?? 'guest');
+    const role: QueueActor['role'] = actor.isHubAdmin ? 'admin' : (membership?.role ?? (this.hasExternalAuthority(actor) ? actor.authorizedRole! : 'guest'));
     const ctx = {
       now,
       actor: { id: actor.id, kind: actor.kind, displayName: actor.displayName, role, lastRequestAt: membership?.lastRequestAt ?? null },
