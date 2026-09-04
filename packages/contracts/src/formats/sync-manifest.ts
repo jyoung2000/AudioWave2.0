@@ -50,7 +50,8 @@ export type SyncChange = z.infer<typeof SyncChange>;
 
 export const SyncDeltaRequest = z.object({
   deviceId: Uuid,
-  since: z.record(SyncCollection, IsoDateTime.nullable()).describe('Per-collection cursor of the last change applied from the peer'),
+  /** Partial: a device that syncs only some collections sends cursors only for those. */
+  since: z.partialRecord(SyncCollection, IsoDateTime.nullable()).describe('Per-collection cursor of the last change applied from the peer'),
   changes: z.array(SyncChange).max(2000).describe('Local changes to push'),
   enabledCollections: z.array(SyncCollection),
 });
@@ -70,7 +71,7 @@ export const SyncDeltaResponse = z.object({
   duplicates: z.number().int().nonnegative(),
   conflicts: z.array(SyncConflict).max(2000),
   changes: z.array(SyncChange).max(2000).describe('Remote changes for the requester to apply'),
-  cursors: z.record(SyncCollection, IsoDateTime.nullable()),
+  cursors: z.partialRecord(SyncCollection, IsoDateTime.nullable()),
   more: z.boolean(),
 });
 export type SyncDeltaResponse = z.infer<typeof SyncDeltaResponse>;

@@ -79,7 +79,7 @@ export interface FakeFetch {
 export function fakeFetch(): FakeFetch {
   const handlers: Array<{ match: string; respond: () => { status?: number; body?: unknown; headers?: Record<string, string> } }> = [];
   const calls: FetchCall[] = [];
-  const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  const fetchImpl = (async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
     const headers: Record<string, string> = {};
     for (const [k, v] of Object.entries((init?.headers ?? {}) as Record<string, string>)) headers[k.toLowerCase()] = v;
@@ -107,6 +107,12 @@ export interface TestHub extends HubApp {
   loginAsAdmin(password?: string): Promise<{ cookie: string; csrfToken: string }>;
   /** Complete first-run setup so the setup-gated routes become reachable. */
   completeSetup(newPassword?: string): Promise<{ cookie: string; csrfToken: string }>;
+  /**
+   * Move time forward and run the background work that would have run in that window. Background
+   * jobs are off in tests, so this is how a test reaches a scheduled transition (a group's
+   * preflight lead elapsing, a retry becoming due) without waiting on a real timer.
+   */
+  tick(ms: number): Promise<void>;
   dispose(): Promise<void>;
 }
 
@@ -188,6 +194,11 @@ export async function createTestHub(options: TestHubOptions = {}): Promise<TestH
       const cookie = (Array.isArray(setCookie) ? setCookie[0] : setCookie)?.split(';')[0] ?? '';
       return { cookie, csrfToken: (response.json() as { csrfToken: string }).csrfToken };
     },
+    async tick(ms) {
+      clock.advance(ms);
+      hub.ctx.groups.runDueTimers();
+      await hub.ctx.jobs.runDue();
+    },
     async dispose() {
       await hub.close();
       rmSync(dataDir, { recursive: true, force: true });
@@ -205,7 +216,7 @@ export async function pairDevice(
     method: 'POST',
     url: '/api/v1/pairing/sessions',
     headers: { cookie: admin.cookie, 'x-csrf-token': admin.csrfToken },
-    payload: { deviceKind: options.kind ?? 'player', scopes: options.scopes ?? ['library:read', 'search:use', 'group:member', 'history:events', 'shares:create', 'transfers:receive', 'downloads:request', 'library:share'], ttlSeconds: 600 },
+    payload: { deviceKind: options.kind ?? 'player', scopes: options.scopes ?? ['library:read', 'library:share', 'search:use', 'group:member', 'group:admin', 'history:events', 'history:aggregate', 'shares:create', 'transfers:receive', 'downloads:request', 'playlists:sync', 'eq:sync'], ttlSeconds: 600 },
   });
   if (create.statusCode !== 201) throw new Error(`Pairing create failed: ${create.statusCode} ${create.body}`);
   const session = create.json() as { sessionId: string; code: string };

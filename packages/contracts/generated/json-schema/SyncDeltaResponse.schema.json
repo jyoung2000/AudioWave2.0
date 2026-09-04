@@ -166,20 +166,7 @@
             "type": "null"
           }
         ]
-      },
-      "required": [
-        "tracks",
-        "artists",
-        "albums",
-        "playlists",
-        "playlistItems",
-        "eqPresets",
-        "eqBindings",
-        "listeningEvents",
-        "aggregateProfiles",
-        "transferJobs",
-        "availability"
-      ]
+      }
     },
     "more": {
       "type": "boolean"

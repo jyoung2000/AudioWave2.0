@@ -40,19 +40,6 @@
           }
         ]
       },
-      "required": [
-        "tracks",
-        "artists",
-        "albums",
-        "playlists",
-        "playlistItems",
-        "eqPresets",
-        "eqBindings",
-        "listeningEvents",
-        "aggregateProfiles",
-        "transferJobs",
-        "availability"
-      ],
       "description": "Per-collection cursor of the last change applied from the peer"
     },
     "changes": {
