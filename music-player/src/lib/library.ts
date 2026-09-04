@@ -13,12 +13,26 @@
  * Tags are read with `music-metadata` from the first ~256 KB of each file, which is enough for
  * ID3/Vorbis/MP4 headers and avoids reading a gigabyte to learn a title.
  */
-import { parseBlob } from 'music-metadata';
+import type { parseBlob as ParseBlob } from 'music-metadata';
 import type { AudioFormat, Track, TrackIdentity } from '@now-playing/contracts';
 import { uuidv7 } from '@now-playing/domain';
 import type { PlayerDatabase, StoredFileRef, StoredRoot } from './db.js';
 
 /** Extensions worth trying. The browser decides what it can actually decode; see `probeSupport`. */
+/**
+ * The tag reader, loaded the first time a file is actually read.
+ *
+ * `music-metadata` is around 300 KB of format parsers. Someone who opens the player to listen to a
+ * hub stream, or to a library that is already indexed, never needs it — so it is behind a dynamic
+ * import rather than in the first load. The promise is cached, so a scan of ten thousand files
+ * resolves the module once.
+ */
+let tagReaderPromise: Promise<typeof ParseBlob> | null = null;
+function tagReader(): Promise<typeof ParseBlob> {
+  tagReaderPromise ??= import('music-metadata').then((module) => module.parseBlob);
+  return tagReaderPromise;
+}
+
 export const AUDIO_EXTENSIONS = ['.mp3', '.m4a', '.mp4', '.aac', '.flac', '.ogg', '.oga', '.opus', '.wav', '.wave', '.webm', '.aiff', '.aif', '.alac', '.wma'] as const;
 
 const MIME_BY_EXTENSION: Record<string, string> = {
@@ -138,7 +152,7 @@ export async function trackFromFile(file: File, relativePath: string, rootId: st
   try {
     // A slice is enough for the header; `duration: true` would otherwise decode the whole file.
     const head = file.slice(0, Math.min(TAG_BYTES, file.size));
-    const metadata = await parseBlob(head, { duration: false, skipCovers: false });
+    const metadata = await (await tagReader())(head, { duration: false, skipCovers: false });
     const common = metadata.common;
     if (common.title?.trim()) title = common.title.trim();
     if (common.artist?.trim()) artistName = common.artist.trim();

@@ -64,6 +64,16 @@ export default defineConfig({
           testTimeout: 60_000,
         },
       },
+      {
+        // Budgets measured from built output, so this runs after `pnpm build`, not with the rest.
+        resolve: { alias },
+        test: {
+          name: 'perf',
+          environment: 'node',
+          include: ['tests/perf/**/*.test.ts'],
+          exclude,
+        },
+      },
     ],
   },
 });

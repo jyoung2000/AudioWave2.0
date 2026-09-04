@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Generates LICENSES.md from the installed production dependencies of every workspace package. */
-import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 const root = new URL('..', import.meta.url).pathname;

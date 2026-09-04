@@ -22,3 +22,4 @@ docker-container/data/
 music-player/dist/
 music-player/test-results/
 music-player/playwright-report/
+docker-container/backups/

@@ -431,6 +431,21 @@ export class GroupService {
           closeOpen('skipped', effect.reason);
           break;
         case 'play': {
+          /*
+           * Play on the track that is already playing is not a restart.
+           *
+           * The reducer cannot tell the difference — it knows the queue, not the playback state —
+           * so the decision belongs here. Restarting would yank the song back to the beginning for
+           * everyone in the group, and it would file the abandoned part as a 'stopped' entry in the
+           * history, which is how a queue that was never interrupted ends up looking like one that
+           * was. A paused group resumes; a playing one is left alone.
+           */
+          if (command.type === 'play' && next.currentItemId === effect.item.id && (next.status === 'playing' || next.status === 'preparing' || next.status === 'paused')) {
+            if (next.status === 'paused' && next.startAt !== null) {
+              next = { ...next, status: 'preparing', startAt: new Date(nowMs + RESUME_LEAD_MS - next.positionMs).toISOString(), pausedAt: null, updatedAt: now };
+            }
+            break;
+          }
           if (command.type === 'advance') closeOpen(command.reason === 'ended' ? 'completed' : command.reason === 'error' ? 'failed' : 'unavailable', command.reason === 'ended' ? null : command.reason);
           else if (!effects.some((e) => e.type === 'skipped')) closeOpen('stopped', null);
           const grade = this.syncGradeFor(effect.item.track);

@@ -2,7 +2,7 @@
   "name": "now-playing-suite",
   "version": "0.1.0",
   "private": true,
-  "description": "Now Playing — an offline-first music player PWA, a self-hosted hub, and a Windows companion, sharing versioned contracts.",
+  "description": "Now Playing \u2014 an offline-first music player PWA, a self-hosted hub, and a Windows companion, sharing versioned contracts.",
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@10.33.0",
@@ -25,14 +25,16 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "pnpm -r --workspace-concurrency=4 typecheck",
-    "test": "pnpm test:unit && pnpm test:contracts && pnpm test:integration",
+    "test": "pnpm test:unit && pnpm test:dom && pnpm test:contracts && pnpm test:integration",
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
     "test:contracts": "vitest run --project contracts",
     "test:a11y": "pnpm --filter @now-playing/music-player test:a11y",
     "test:e2e": "pnpm --filter @now-playing/music-player test:e2e && pnpm --filter @now-playing/hub test:e2e",
     "test:security": "vitest run --project security",
-    "verify": "node scripts/verify.mjs"
+    "verify": "node scripts/verify.mjs",
+    "test:dom": "vitest run --project dom",
+    "test:perf": "vitest run --project perf"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

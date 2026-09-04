@@ -148,6 +148,58 @@ describe('queue commands', () => {
     expect(entries.find((e) => e.track.title === 'Skipped')).toMatchObject({ outcome: 'skipped', skipReason: 'not tonight' });
   });
 
+  it('does not restart the current track when play is pressed again', async () => {
+    const groupId = await createGroup();
+    await command(groupId, { idempotencyKey: 'q', baseRevision: 0, command: { type: 'append', items: [track('66666666-6666-7666-8666-666666666666', 'Already playing')] } });
+    // Appending to an empty group queue starts it, so the queue is already playing at this point.
+    await hub.tick(11_000);
+    const before = await hub.app.inject({ method: 'GET', url: `/api/v1/groups/${groupId}/now-playing`, headers: { authorization: device.authorization } });
+    const positionBefore = (before.json() as { positionMs: number }).positionMs;
+    expect(positionBefore).toBeGreaterThan(0);
+
+    await command(groupId, { idempotencyKey: 'p', baseRevision: 1, command: { type: 'play' } });
+    await hub.tick(1_000);
+
+    const after = await hub.app.inject({ method: 'GET', url: `/api/v1/groups/${groupId}/now-playing`, headers: { authorization: device.authorization } });
+    // The song kept playing from where it was rather than jumping back to the start for everyone.
+    expect((after.json() as { positionMs: number }).positionMs).toBeGreaterThanOrEqual(positionBefore);
+
+    const history = await hub.app.inject({ method: 'GET', url: `/api/v1/groups/${groupId}/history`, headers: { authorization: device.authorization } });
+    const entries = (history.json() as { items: Array<{ outcome: string }> }).items;
+    // And no phantom 'stopped' entry was filed for a track nobody stopped.
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ outcome: 'playing' });
+  });
+
+  it('returns history in the order things happened, even within one millisecond', async () => {
+    const groupId = await createGroup();
+    /*
+     * Eight tracks appended and skipped without advancing the clock, so every entry shares a
+     * `startedAt`. The tiebreak used to be the row's UUIDv7, whose low bits are random when the id
+     * is minted from an explicit timestamp — so history came back shuffled, differently on every
+     * run. Eight entries make an accidental pass a one-in-forty-thousand event.
+     */
+    const titles = ['One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight'];
+    await command(groupId, {
+      idempotencyKey: 'q',
+      baseRevision: 0,
+      command: { type: 'append', items: titles.map((title, i) => track(`${String(i + 1).repeat(8)}-1111-7111-8111-111111111111`, title)) },
+    });
+    for (let i = 0; i < titles.length - 1; i += 1) {
+      await command(groupId, { idempotencyKey: `s${i}`, baseRevision: i + 1, command: { type: 'skip' } });
+    }
+
+    const read = async (): Promise<string[]> => {
+      const response = await hub.app.inject({ method: 'GET', url: `/api/v1/groups/${groupId}/history`, headers: { authorization: device.authorization } });
+      return (response.json() as { items: Array<{ track: { title: string } }> }).items.map((e) => e.track.title);
+    };
+
+    const newestFirst = await read();
+    expect(newestFirst).toEqual([...titles].reverse());
+    // And the same order on every subsequent read, not just the first.
+    for (let i = 0; i < 3; i += 1) expect(await read()).toEqual(newestFirst);
+  });
+
   it('exports history as RFC-4180 CSV with a schema version column', async () => {
     const groupId = await createGroup();
     await command(groupId, { idempotencyKey: 'q', baseRevision: 0, command: { type: 'append', items: [track('88888888-8888-7888-8888-888888888888', 'Exported, with comma')] } });

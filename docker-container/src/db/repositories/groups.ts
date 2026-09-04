@@ -322,13 +322,22 @@ export class GroupsRepository {
     return open.map((r) => toHistoryEntry({ ...r, outcome, skip_reason: skipReason, ended_at: endedAt }));
   }
 
+  /*
+   * History is ordered by when a track started, then by insertion order.
+   *
+   * The tiebreak used to be the row id, which is a UUIDv7: two entries created in the same
+   * millisecond share their timestamp bits and differ only in random ones, so history came back in
+   * a *different order on every read*. `rowid` is SQLite's own insertion counter, so entries that
+   * start at the same instant stay in the order they actually happened — which is what the history
+   * screen and the CSV export both assume.
+   */
   listHistory(groupId: string, options: { limit: number; before?: string | null }): GroupHistoryEntry[] {
-    if (options.before) return this.db.prepare<[string, string, number], HistoryRow>('SELECT * FROM group_history WHERE group_id = ? AND started_at < ? ORDER BY started_at DESC, id DESC LIMIT ?').all(groupId, options.before, options.limit).map(toHistoryEntry);
-    return this.db.prepare<[string, number], HistoryRow>('SELECT * FROM group_history WHERE group_id = ? ORDER BY started_at DESC, id DESC LIMIT ?').all(groupId, options.limit).map(toHistoryEntry);
+    if (options.before) return this.db.prepare<[string, string, number], HistoryRow>('SELECT * FROM group_history WHERE group_id = ? AND started_at < ? ORDER BY started_at DESC, rowid DESC LIMIT ?').all(groupId, options.before, options.limit).map(toHistoryEntry);
+    return this.db.prepare<[string, number], HistoryRow>('SELECT * FROM group_history WHERE group_id = ? ORDER BY started_at DESC, rowid DESC LIMIT ?').all(groupId, options.limit).map(toHistoryEntry);
   }
 
   allHistory(groupId: string): GroupHistoryEntry[] {
-    return this.db.prepare<[string], HistoryRow>('SELECT * FROM group_history WHERE group_id = ? ORDER BY started_at ASC, id ASC').all(groupId).map(toHistoryEntry);
+    return this.db.prepare<[string], HistoryRow>('SELECT * FROM group_history WHERE group_id = ? ORDER BY started_at ASC, rowid ASC').all(groupId).map(toHistoryEntry);
   }
 
   historyIds(groupId: string): Set<string> {
@@ -337,7 +346,7 @@ export class GroupsRepository {
 
   recentTrackIds(groupId: string, limit: number): string[] {
     return this.db
-      .prepare<[string, number], { track: string }>('SELECT track FROM group_history WHERE group_id = ? ORDER BY started_at DESC LIMIT ?')
+      .prepare<[string, number], { track: string }>('SELECT track FROM group_history WHERE group_id = ? ORDER BY started_at DESC, rowid DESC LIMIT ?')
       .all(groupId, limit)
       .map((r) => (JSON.parse(r.track) as { trackId: string }).trackId);
   }

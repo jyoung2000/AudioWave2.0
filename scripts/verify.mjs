@@ -45,10 +45,13 @@ run('format', 'pnpm', ['format:check'], { optional: true });
 run('lint', 'pnpm', ['lint']);
 run('typecheck', 'pnpm', ['typecheck']);
 run('test:unit', 'pnpm', ['test:unit']);
+run('test:dom', 'pnpm', ['test:dom']);
 run('test:contracts', 'pnpm', ['test:contracts']);
 run('test:integration', 'pnpm', ['test:integration']);
 run('test:security', 'pnpm', ['test:security']);
 run('build', 'pnpm', ['build']);
+// After the build, because the budgets are measured from the files it produced.
+run('test:perf', 'pnpm', ['test:perf']);
 run('test:a11y', 'pnpm', ['test:a11y'], { skipIf: hasChromium });
 run('test:e2e', 'pnpm', ['test:e2e'], { skipIf: hasChromium });
 run('docker-build', 'docker', ['build', '-t', 'now-playing-hub:verify', '-f', 'docker-container/Dockerfile', '.'], { skipIf: hasDocker });
