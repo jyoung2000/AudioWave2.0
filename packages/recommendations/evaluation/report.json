@@ -1,0 +1,67 @@
+{
+  "generatedAt": "2026-09-01T00:00:00.000Z",
+  "config": {
+    "version": 1,
+    "halfLifeDays": 45,
+    "explorationRate": 0.1,
+    "tiers": {
+      "strong": 0.4,
+      "related": 0.3,
+      "emerging": 0.2,
+      "experimental": 0.1
+    }
+  },
+  "catalogueSize": 240,
+  "users": 12,
+  "k": 20,
+  "trainFraction": 0.7,
+  "modes": [
+    {
+      "mode": "for-you",
+      "users": 12,
+      "hitRate": 1,
+      "ndcg": 0.5131,
+      "artistDiversity": 0.9063,
+      "coverage": 0.2167,
+      "novelty": 0.5333,
+      "skipPrecision": 0.9333,
+      "coldStartUsers": 0,
+      "meanCandidates": 138.75
+    },
+    {
+      "mode": "deep",
+      "users": 12,
+      "hitRate": 0,
+      "ndcg": 0,
+      "artistDiversity": 0.9054,
+      "coverage": 0.3375,
+      "novelty": 1,
+      "skipPrecision": 1,
+      "coldStartUsers": 0,
+      "meanCandidates": 75.6667
+    },
+    {
+      "mode": "recent",
+      "users": 12,
+      "hitRate": 0,
+      "ndcg": 0,
+      "artistDiversity": 0.8743,
+      "coverage": 0.0958,
+      "novelty": 0.5,
+      "skipPrecision": 0.9815,
+      "coldStartUsers": 0,
+      "meanCandidates": 101.5
+    }
+  ],
+  "headline": {
+    "hitRate": 1,
+    "ndcg": 0.5131,
+    "artistDiversity": 0.9063,
+    "novelty": 0.5333
+  },
+  "notes": [
+    "Mode \"deep\" scores hit@k 0 by design: its candidate sources exclude tracks the profile already knows, and the held-out set is drawn from the listener's own history. Judge it on novelty (1), artist diversity (0.9054) and skip precision (1) instead.",
+    "Mode \"recent\" scores hit@k 0 by design: its candidate sources exclude tracks the profile already knows, and the held-out set is drawn from the listener's own history. Judge it on novelty (0.5), artist diversity (0.8743) and skip precision (0.9815) instead.",
+    "Synthetic fixtures, not real listeners: these numbers verify the pipeline behaves as designed and guard against regressions. They are not a claim about real-world quality."
+  ]
+}
