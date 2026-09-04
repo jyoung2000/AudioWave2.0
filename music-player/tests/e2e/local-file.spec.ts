@@ -110,6 +110,32 @@ test.describe('opened from the filesystem', () => {
     expect(result).toBe('ok');
   });
 
+  test('indexes a real audio file picked from the disk, and remembers it', async ({ page }) => {
+    /*
+     * The headline claim of this build is "it plays the music already on your device". Everything
+     * else here checks that the page loads; this checks that it does the thing it is for — reads a
+     * real WAV off the disk, parses its tags with the bundled reader, and keeps it.
+     */
+    const seen = watch(page);
+    await page.goto(FILE_URL);
+    await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible();
+    await page.getByRole('option', { name: /^Music/ }).click();
+
+    const fixture = fileURLToPath(new URL('../../../packages/test-fixtures/generated/audio/Marlow & the Tidewater/Quiet Arithmetic/01 Quiet Arithmetic.wav', import.meta.url));
+    const chooser = page.waitForEvent('filechooser');
+    await page.getByRole('button', { name: /Choose files instead/i }).click();
+    await (await chooser).setFiles([fixture]);
+
+    // The title comes from the file's own tags, read by the reader bundled into this page.
+    await expect(page.getByText('Quiet Arithmetic').first()).toBeVisible({ timeout: 20_000 });
+    expect(seen.errors).toEqual([]);
+    expect(seen.external, 'reading a local file must not cause a request').toEqual([]);
+
+    // And it is in the browser's store, so it is still there after a reload.
+    await page.reload();
+    await expect(page.getByText('Quiet Arithmetic').first()).toBeVisible({ timeout: 20_000 });
+  });
+
   test('tells you which features the browser withholds from a local file', async ({ page }) => {
     await page.goto(FILE_URL);
     await page.getByRole('option', { name: /^Settings/ }).click();
