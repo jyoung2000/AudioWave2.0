@@ -14,6 +14,23 @@ Every MUST item in §17 and §18 of the specification is treated as a release ga
 test that would fail in [AQUA_CONFORMANCE.md](AQUA_CONFORMANCE.md). The deviations below are all from
 SHOULD items or from the reference implementation, except the three noted as unmet MUSTs.
 
+## Corrected after review
+
+### The push buttons were the wrong decade
+
+Shipped, and wrong: the buttons were 10.2-era Aqua — a full pill, a glass lozenge filling the top
+half, a hard gloss step across the middle, and a saturated blue gel for the default action. The
+declared profile is `snow-leopard-itunes-9`, and by 10.6 all of that was gone.
+
+**Fixed:** a rounded rect with a 4 px radius, one quiet vertical gradient, a hairline grey rim that
+darkens along the bottom, and a single pixel of white on the top edge. The default action is a
+*tinted* button — the same face with the hue turned up and dark ink — rather than a lozenge of
+blue. The pop-up menu and the checkbox followed the same correction. The pulse on the default
+button stays, because §6.5 asks for it; it is the halo that breathes, not the face.
+
+This was a profile-coherence failure (§17.6) that the conformance test could not catch, because it
+checks the tokens and the material rules rather than whether a recipe belongs to the right year.
+
 ## From the Aqua specification
 
 ### The player is a page, not a window
@@ -41,15 +58,6 @@ that do nothing — and a control that cannot act is the one thing this app does
 
 **Instead:** the panel carries the same 1 px rim and the same brushed face, and the section it sits
 in is titled where the window's title bar would have been.
-
-### The disc's rainbow is iridescence, not a diffraction shader
-
-The reference computes the disc's spectrum from the grating equation in a custom fragment shader —
-a pressed CD is a 1.6 µm grating, and it argues that properly. This uses the material's own
-iridescence and anisotropy instead.
-
-**Instead:** a hundred lines less GLSL to be wrong about, at a size (232 px, often smaller) where
-the two read the same. Recorded because it is a real reduction in physical fidelity, not a tidy-up.
 
 ### The offline key reports; it does not download
 

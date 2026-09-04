@@ -312,27 +312,28 @@
   white-space: nowrap;
   text-decoration: none;
   vertical-align: middle;
-  background:
-    linear-gradient(to bottom, rgb(255 255 255 / 96%) 0%, rgb(255 255 255 / 64%) 38%, rgb(255 255 255 / 12%) 48%, rgb(0 0 0 / 4%) 52%, rgb(0 0 0 / 12%) 100%),
-    linear-gradient(to bottom, #fefefe 0%, #e4e4e4 48%, #c8c8c8 100%);
-  border: 1px solid #777;
-  border-radius: var(--aqua-pill-radius);
-  box-shadow: var(--aqua-control-inset-top), inset 0 -1px 0 rgb(0 0 0 / 18%), var(--aqua-control-shadow);
+  /*
+   * Snow Leopard, not Aqua Extreme.
+   *
+   * The profile is `snow-leopard-itunes-9`, and by 10.6 the push button had lost the pill and the
+   * glass lozenge it wore in 10.2: what is left is a rounded rect with a quiet vertical gradient,
+   * a hairline grey rim that darkens at the bottom, and one pixel of white along the top edge.
+   * There is no gloss step across the middle, because there is no gel to be lit.
+   */
+  background: linear-gradient(to bottom, #fdfdfd 0%, #f4f4f4 47%, #e6e6e6 53%, #dcdcdc 100%);
+  border: 1px solid #a3a3a3;
+  border-bottom-color: #8d8d8d;
+  border-radius: 4px;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 90%),
+    0 1px 0 rgb(255 255 255 / 55%);
   cursor: default;
   -webkit-font-smoothing: antialiased;
   transition: filter 90ms var(--aqua-ease), transform var(--aqua-motion-press) ease-out, box-shadow var(--aqua-motion-press) ease-out;
   -webkit-tap-highlight-color: transparent;
 }
 
-.aqua-button::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset: 1px 2px 48%;
-  border-radius: 999px 999px 55% 55%;
-  background: linear-gradient(to bottom, rgb(255 255 255 / 82%), rgb(255 255 255 / 18%));
-  pointer-events: none;
-}
+/* The glass lozenge that filled the top half is gone with the gel it belonged to. */
 
 .aqua-button--small { min-width: 56px; min-height: var(--aqua-control-h-small); padding: 0 11px 1px; font-size: var(--aqua-font-small); line-height: 15px; }
 .aqua-button--mini { min-width: 44px; min-height: var(--aqua-control-h-mini); padding: 0 9px; font-size: var(--aqua-font-mini); line-height: 12px; }
@@ -341,61 +342,66 @@
 .aqua-button__label { overflow: hidden; text-overflow: ellipsis; }
 .aqua-button__icon { display: inline-flex; font-size: 12px; }
 
-.aqua-button:hover:not(:disabled):not([aria-disabled="true"]) { filter: brightness(1.035); }
+.aqua-button:hover:not(:disabled):not([aria-disabled="true"]) { background: linear-gradient(to bottom, #fff 0%, #f8f8f8 47%, #ececec 53%, #e3e3e3 100%); }
 
 .aqua-button:active:not(:disabled):not([aria-disabled="true"]),
 .aqua-button[data-pressed="true"],
 .aqua-button[aria-pressed="true"] {
-  transform: translateY(1px);
-  background:
-    linear-gradient(to bottom, rgb(0 0 0 / 12%), transparent 42%, rgb(255 255 255 / 8%)),
-    linear-gradient(to bottom, #bdbdbd, #e4e4e4 58%, #c6c6c6);
-  box-shadow: inset 0 2px 3px rgb(0 0 0 / 25%), inset 0 -1px rgb(255 255 255 / 55%);
+  /* Pressed is a shallower well, not a different object: the same face, darkened, with the light
+     moved to the bottom edge. */
+  background: linear-gradient(to bottom, #c9c9c9 0%, #d6d6d6 50%, #dedede 100%);
+  border-color: #8d8d8d;
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 22%),
+    inset 0 -1px 0 rgb(255 255 255 / 45%);
 }
-
-.aqua-button:active:not(:disabled)::before,
-.aqua-button[aria-pressed="true"]::before { opacity: 0.35; }
 
 .aqua-button:focus-visible {
   outline: 1px solid #0d61a7;
   outline-offset: 2px;
-  box-shadow: var(--aqua-control-inset-top), inset 0 -1px 0 rgb(0 0 0 / 18%), var(--aqua-focus-shadow);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 90%), var(--aqua-focus-shadow);
 }
 
 .aqua-button:disabled,
 .aqua-button[aria-disabled="true"] {
   color: var(--aqua-text-disabled);
-  filter: grayscale(0.8) contrast(0.75) brightness(1.08);
+  background: linear-gradient(to bottom, #fbfbfb, #f1f1f1);
+  border-color: #c9c9c9;
   box-shadow: inset 0 1px rgb(255 255 255 / 70%);
   cursor: not-allowed;
 }
 
-/* Default (safe) action: blue gel, calm pulse (spec §6.5) */
+/*
+ * Default (safe) action: the blue button, calm pulse (spec §6.5).
+ *
+ * Snow Leopard's is a *tinted* button rather than a lozenge of blue gel — the same quiet gradient
+ * as its neighbours with the hue turned up, dark ink, and a soft halo that says "Return does this"
+ * without shouting. The pulse stays because the spec asks for it; it is the halo that breathes,
+ * not the face.
+ */
 .aqua-button[data-default="true"] {
-  color: #071820;
-  background:
-    linear-gradient(to bottom, rgb(255 255 255 / 88%) 0%, rgb(255 255 255 / 48%) 36%, rgb(255 255 255 / 5%) 48%, rgb(0 65 135 / 8%) 52%, rgb(0 45 105 / 24%) 100%),
-    linear-gradient(to bottom, var(--aqua-blue-top) 0%, var(--aqua-blue-mid) 49%, var(--aqua-blue-lower) 72%, var(--aqua-blue-bottom) 100%);
-  border-color: var(--aqua-blue-rim);
+  color: #0d2233;
+  background: linear-gradient(to bottom, #d6e9fb 0%, #b9d8f5 47%, #9cc6ef 53%, #8bbcea 100%);
+  border-color: #6d9cc4;
+  border-bottom-color: #5a88b0;
   box-shadow:
-    inset 0 1px var(--aqua-blue-specular),
-    inset 0 -1px rgb(0 40 95 / 38%),
-    0 1px 1px rgb(0 0 0 / 28%),
-    0 0 0 1px rgb(68 183 247 / 22%),
-    0 0 5px rgb(40 158 229 / 34%);
+    inset 0 1px 0 rgb(255 255 255 / 80%),
+    0 0 0 1px rgb(68 183 247 / 18%),
+    0 0 5px rgb(40 158 229 / 28%);
   animation: aqua-default-pulse var(--aqua-motion-pulse) ease-in-out infinite;
   animation-play-state: var(--aqua-anim-state);
 }
 
-.aqua-button[data-default="true"]::before {
-  background: linear-gradient(to bottom, rgb(255 255 255 / 78%), rgb(255 255 255 / 14%));
+.aqua-button[data-default="true"]:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: linear-gradient(to bottom, #e0efff 0%, #c6e0f8 47%, #a8cef2 53%, #97c4ee 100%);
 }
 
 .aqua-button[data-default="true"]:active:not(:disabled) {
-  background:
-    linear-gradient(to bottom, rgb(0 51 112 / 24%), transparent 50%, rgb(255 255 255 / 10%)),
-    linear-gradient(to bottom, #0b72b8, #37aeea 62%, #0866ad);
-  box-shadow: inset 0 2px 4px rgb(0 30 80 / 46%), inset 0 -1px rgb(255 255 255 / 30%);
+  background: linear-gradient(to bottom, #7fb0dc 0%, #92bfe5 50%, #a3cbeb 100%);
+  border-color: #5a88b0;
+  box-shadow:
+    inset 0 1px 2px rgb(0 30 80 / 28%),
+    inset 0 -1px 0 rgb(255 255 255 / 35%);
   animation: none;
 }
 
@@ -665,8 +671,9 @@
   height: 14px;
   margin-top: 2px;
   color: #1a2733;
-  background: linear-gradient(to bottom, #fdfdfd, #e6e6e6 55%, #d5d5d5);
-  border: 1px solid #6f6f6f;
+  background: linear-gradient(to bottom, #fdfdfd, #f0f0f0 55%, #e4e4e4);
+  border: 1px solid #a0a0a0;
+  border-bottom-color: #8d8d8d;
   border-radius: 3px;
   box-shadow: inset 0 1px rgb(255 255 255 / 90%), 0 1px 0 rgb(255 255 255 / 60%);
   transition: box-shadow var(--aqua-motion-press) ease-out;
@@ -678,12 +685,14 @@
 
 .aqua-check__input:checked + .aqua-check__box,
 .aqua-check__input:indeterminate + .aqua-check__box {
+  /* Checked is a tinted box, not a gel bead: 10.6 fills it with a flat-ish blue and puts a white
+     tick on top. */
   color: #fff;
-  background:
-    linear-gradient(to bottom, rgb(255 255 255 / 70%), rgb(255 255 255 / 10%) 48%, rgb(0 40 95 / 10%) 52%, rgb(0 30 80 / 25%)),
-    linear-gradient(to bottom, var(--aqua-blue-top), var(--aqua-blue-mid) 50%, var(--aqua-blue-bottom));
-  border-color: var(--aqua-blue-rim);
-  box-shadow: inset 0 1px var(--aqua-blue-specular), 0 1px 0 rgb(255 255 255 / 60%);
+  background: linear-gradient(to bottom, #7db4e6 0%, #4f92d6 52%, #3f81c6 100%);
+  border-color: #3d76ad;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 55%),
+    0 1px 0 rgb(255 255 255 / 60%);
 }
 
 .aqua-check__input:checked + .aqua-check__box svg,
@@ -702,7 +711,7 @@
 
 .aqua-check--radio .aqua-check__box svg { display: none; }
 
-.aqua-check:hover .aqua-check__box { filter: brightness(1.03); }
+.aqua-check:hover .aqua-check__box { border-color: #8d8d8d; }
 .aqua-check:active .aqua-check__box { box-shadow: inset 0 2px 3px rgb(0 0 0 / 25%); }
 
 .aqua-check__input:focus-visible + .aqua-check__box {
@@ -816,12 +825,15 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
   min-height: var(--aqua-control-h);
   color: #151515;
   font: var(--aqua-weight-regular) var(--aqua-font-system) / 18px var(--aqua-font);
-  background:
-    linear-gradient(to bottom, rgb(255 255 255 / 92%) 0%, rgb(255 255 255 / 50%) 45%, rgb(0 0 0 / 3%) 50%, rgb(0 0 0 / 11%) 100%),
-    linear-gradient(to bottom, #fefefe, #e2e2e2 50%, #c9c9c9);
-  border: 1px solid #777;
-  border-radius: var(--aqua-pill-radius);
-  box-shadow: var(--aqua-control-inset-top), inset 0 -1px rgb(0 0 0 / 18%), var(--aqua-control-shadow);
+  /* The same face as the push button: 10.6's pop-up is a rounded rect with a blue chevron block
+     at its right end, not a glass pill. */
+  background: linear-gradient(to bottom, #fdfdfd 0%, #f4f4f4 47%, #e6e6e6 53%, #dcdcdc 100%);
+  border: 1px solid #a3a3a3;
+  border-bottom-color: #8d8d8d;
+  border-radius: 4px;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 90%),
+    0 1px 0 rgb(255 255 255 / 55%);
 }
 
 .aqua-popup--small { min-height: var(--aqua-control-h-small); font-size: var(--aqua-font-small); }
@@ -859,14 +871,14 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
   font-size: 8px;
   background: linear-gradient(to bottom, var(--aqua-blue-top), var(--aqua-blue-mid) 50%, var(--aqua-blue-bottom));
   border-left: 1px solid rgb(0 0 0 / 20%);
-  border-radius: 0 var(--aqua-pill-radius) var(--aqua-pill-radius) 0;
+  border-radius: 0 3px 3px 0;
   box-shadow: inset 0 1px rgb(255 255 255 / 60%);
   pointer-events: none;
 }
 
 .aqua-popup__end svg { width: 8px; height: 10px; }
 
-.aqua-popup:hover:not(:has(:disabled)) { filter: brightness(1.035); }
+.aqua-popup:hover:not(:has(:disabled)) { background: linear-gradient(to bottom, #fff 0%, #f8f8f8 47%, #ececec 53%, #e3e3e3 100%); }
 .aqua-popup:has(:disabled) { color: var(--aqua-text-disabled); filter: grayscale(0.8) contrast(0.75) brightness(1.08); }
 .aqua-window[data-active="false"] .aqua-popup__end,
 .aqua-popup[data-tint="graphite"] .aqua-popup__end {

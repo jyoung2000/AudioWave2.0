@@ -273,6 +273,21 @@ export class PlayerStore {
     return { url: URL.createObjectURL(resolved.file), reason: null };
   }
 
+  /**
+   * Where the person left the jewel case and the disc pointing.
+   *
+   * A pose is a preference, not library data: it belongs beside the volume and the repeat mode, so
+   * it lives in the settings store rather than in the 3D module's own corner of storage.
+   */
+  async loadStagePose(): Promise<{ caseY: number; caseX: number; discY: number; discX: number } | null> {
+    if (!this.db) return null;
+    return getSetting<{ caseY: number; caseX: number; discY: number; discX: number } | null>(this.db, 'stage.pose', null);
+  }
+
+  saveStagePose(pose: { caseY: number; caseX: number; discY: number; discX: number }): void {
+    if (this.db) void putSetting(this.db, 'stage.pose', pose);
+  }
+
   async artworkUrl(artworkId: string | null): Promise<string | null> {
     if (!artworkId) return null;
     const row = await this.require().get('artwork', artworkId);

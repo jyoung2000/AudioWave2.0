@@ -372,7 +372,7 @@ export function App() {
           </span>
         </KeyTransport>
 
-        <JewelStage stageRef={stageRef} album={stageAlbum} playing={playing} />
+        <JewelStage stageRef={stageRef} album={stageAlbum} playing={playing} loadPose={() => store.loadStagePose()} savePose={(pose) => store.saveStagePose(pose)} />
 
         {mode === 'shared' ? <SharedStrip /> : null}
       </Hero>

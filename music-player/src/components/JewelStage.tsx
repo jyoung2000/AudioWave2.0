@@ -9,23 +9,30 @@
  * Mounting waits for an idle moment. The case is the nicest thing on the page and the least urgent.
  */
 import { useEffect, useRef } from 'react';
-import type { JewelCaseAlbum, JewelCaseHandle } from '../lib/jewel-case.js';
+import type { JewelCaseAlbum, JewelCaseHandle, JewelCasePose } from '../lib/jewel-case.js';
 
 export interface JewelStageProps {
   stageRef: React.RefObject<HTMLDivElement | null>;
   album: JewelCaseAlbum | null;
   playing: boolean;
+  /** Where the person left the case and the disc pointing, kept between visits. */
+  loadPose: () => Promise<JewelCasePose | null>;
+  savePose: (pose: JewelCasePose) => void;
 }
 
-export function JewelStage({ stageRef, album, playing }: JewelStageProps) {
+export function JewelStage({ stageRef, album, playing, loadPose, savePose }: JewelStageProps) {
   const handle = useRef<JewelCaseHandle | null>(null);
   // The mount is asynchronous, so it reads the latest album and playing state when it lands rather
   // than the ones that were current when it started. Written from an effect, not during render.
   const wanted = useRef<{ album: JewelCaseAlbum | null; playing: boolean }>({ album: null, playing: false });
+  // The pose callbacks go the same way: the scene reads them once at mount, and listing them as
+  // dependencies would tear the whole thing down and rebuild it on every store render.
+  const pose = useRef({ loadPose, savePose });
 
   useEffect(() => {
     wanted.current = { album, playing };
-  }, [album, playing]);
+    pose.current = { loadPose, savePose };
+  }, [album, playing, loadPose, savePose]);
 
   /*
    * Mounting waits for there to be something to show.
@@ -49,7 +56,7 @@ export function JewelStage({ stageRef, album, playing }: JewelStageProps) {
         try {
           const { mountJewelCase } = await import('../lib/jewel-case.js');
           if (cancelled) return;
-          const mounted = await mountJewelCase(stage, first);
+          const mounted = await mountJewelCase(stage, first, { loadPose: () => pose.current.loadPose(), savePose: (next) => pose.current.savePose(next) });
           if (cancelled) {
             mounted?.dispose();
             return;

@@ -1862,6 +1862,28 @@
 .sheet__btn + .sheet__btn { border-left: 1px solid var(--ctx-sep); font-weight: 600; }
 .sheet__btn:active { background: rgba(0, 0, 0, 0.06); }
 
+/*
+ * The reference's toast: a dark pill, centred, no icon.
+ *
+ * The shared `Toast` component wears it here rather than its window-era panel — a page that has
+ * given up its window chrome should not keep the one notification style that only made sense
+ * inside it. The component's roles, live regions and dismiss timing are untouched.
+ */
+.np-app ~ .aqua-toast-region .aqua-toast,
+.aqua-toast-region .aqua-toast {
+  padding: 9px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(28 30 36 / 92%);
+  box-shadow: none;
+  color: #fff;
+  font-size: 13.5px;
+}
+
+.aqua-toast-region .aqua-toast__icon {
+  display: none;
+}
+
 .toast {
   position: fixed;
   left: 50%;
@@ -2502,5 +2524,15 @@ button.srch__art:focus-visible .srch__scrim,
   top: 50%;
   left: 50%;
   z-index: 0;
+  pointer-events: none;
   transform: translate(-50%, -50%);
+}
+
+/*
+ * The canvas is wider than the tile so the case's shadow can fade out instead of being clipped
+ * square at its edge. `clip` on the hero contains that horizontally without creating a scroll
+ * container or clipping the bleed vertically, which `hidden` would.
+ */
+.np-hero {
+  overflow-x: clip;
 }
