@@ -36,6 +36,10 @@ and reports platform-unavailable ones as skipped, never as passed.
 | Hub client: pairing, search, shares, sync | **Done** |  |
 | Shared listening: create or join a group, follow its queue over the realtime socket, propose changes | **Done** | The hub always had the group API; the player now uses it. Revisioned, idempotent commands — a refused skip is shown, not swallowed |
 | The 2010 page shell: status bar, section strip, hero, iTunes 10 list, dark scheme | **Done** | [UI_REDESIGN.md](UI_REDESIGN.md) maps every feature from the old window shell; the nine sections kept their names, roles and keyboard model |
+| The reference's music list, copied rather than reinterpreted: nine columns, marquee on the playing row, gel overlay scroller, context menu, New Playlist sheet | **Done** | Its stylesheet block is the reference's own text; the behaviours are ports of its code |
+| The reference's search popover: count and Clear, fifteen-second audition with a countdown ring, source badges, tempo, pager | **Done** | Auditions pause playback and resume it after |
+| The 3D jewel case: shut and turning while paused, open on play, disc rising and spinning, drag with momentum | **Done** | Sleeve and disc label from the real cover, tray card from the real running order. Lazily mounted at idle, over the flat cover, and left alone where WebGL is unavailable |
+| The equaliser as the iTunes window: On, preset menu, preamp and ten bands on a ±12 dB scale | **Done** | Matches the supplied screenshot; every existing EQ feature kept |
 | A large-target driving view | **Not built** | The Media Session path covers the car; a driving-specific layout was not asked for |
 
 ## docker-container (the hub)

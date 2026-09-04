@@ -10,7 +10,7 @@
  * photographs of the hardware. The scrubber in particular is deliberately absent from every media
  * query: identical groove, gel and stamps at each width, as on the device.
  */
-import { useCallback, useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useCallback, useRef, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react';
 
 export interface HeroProps {
   /** Drives the placeholder sleeve wash; 'shared' turns it from amber to deep blue. */
@@ -31,13 +31,15 @@ export interface HeroArtProps {
   src?: string | null;
   /** Shown to screen readers; artwork is decorative when the title is beside it. */
   alt?: string;
+  /** The stage element, for a 3D renderer to mount into over the flat cover. */
+  stageRef?: RefObject<HTMLDivElement | null>;
   children?: ReactNode;
 }
 
-export function HeroArt({ src, alt = '', children }: HeroArtProps) {
+export function HeroArt({ src, alt = '', stageRef, children }: HeroArtProps) {
   return (
     <div className="np-hero__art">
-      <div className={['np-hero__stage', src ? null : 'np-hero__stage--empty'].filter(Boolean).join(' ')}>
+      <div ref={stageRef} className={['np-hero__stage', src ? null : 'np-hero__stage--empty'].filter(Boolean).join(' ')}>
         {src ? (
           <img src={src} alt={alt} />
         ) : (

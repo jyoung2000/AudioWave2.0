@@ -74,7 +74,6 @@
   --np-rail-line: rgb(0 0 0 / 16%);
 
   /* the one place Aqua gel survives at full strength: the overlay scroller */
-  --np-gel: linear-gradient(to right, #16407f 0%, #6ea3ec 12%, #8cb8ea 24%, #458ad8 45%, #5fa8f1 58%, #83c9fd 78%, #9fd2ee 92%, #3f6a86 100%);
 
   --np-live: #cc1027;
   --np-live-halo: rgb(204 16 39 / 32%);
@@ -87,52 +86,20 @@
   --np-vol-face: #fff;
 
   /* iTunes 10 list: light at the top of the header again, unlike iTunes 11 */
-  --np-list-bg: #fff;
   --np-list-alt: #f2f5f9;
   --np-list-border: #ababab;
-  --np-list-head-top: #f8f8f8;
-  --np-list-head-bottom: #dadada;
-  --np-list-head-rule: #adadad;
-  --np-list-head-sep: #ccc;
-  --np-list-head-ink: #3a3d41;
-  --np-list-head-emboss: rgb(255 255 255 / 80%);
-  --np-list-sort-top: #e8eef7;
-  --np-list-sort-bottom: #cfdbeb;
-  --np-list-head-hot-top: #efefef;
-  --np-list-head-hot-bottom: #cfcfcf;
-  --np-list-sort-hot-top: #dde7f4;
-  --np-list-sort-hot-bottom: #c2d2e6;
-  --np-list-ink: #000;
-  --np-list-soft: #222326;
   --np-list-badge: #dfe3e9;
   --np-list-badge-ink: #3b3f47;
   --np-accent: #2b6fd6;
   --np-list-icon: #8a8f98;
-  --np-star: #f0a422;
-  --np-list-playing: #dde9f8;
-  --np-list-select-top: #5b8dd9;
-  --np-list-select-bottom: #3a6cc4;
 
-  --np-sheet-bg: rgb(247 247 250 / 88%);
-  --np-sheet-ink: #1b1c1f;
-  --np-sheet-sep: rgb(0 0 0 / 12%);
 
-  --np-results-bg: #f9f9f9;
-  --np-results-head-top: #f6f6f6;
-  --np-results-head-bottom: #eee;
-  --np-results-rule: #dedede;
-  --np-results-ink: #2c2c2c;
-  --np-results-soft: #9b9b9b;
-  --np-results-hot: #ececec;
-  --np-results-border: rgb(0 0 0 / 25%);
-  --np-results-lip: rgb(255 255 255 / 60%);
 
   --np-pad: 14px;
   --np-bar-type: 13px;
   --np-field-h: 26px;
   --np-stage: clamp(150px, 38vw, 232px);
   --np-ui-font: -apple-system, blinkmacsystemfont, "Segoe UI", roboto, "Helvetica Neue", arial, sans-serif;
-  --np-list-font: "Lucida Grande", "Aqua Fallback", "Lucida Sans Unicode", "Segoe UI", system-ui, sans-serif;
 }
 
 /* The reference ships a dark theme for every one of these surfaces. Keeping it
@@ -192,43 +159,14 @@
     --np-vol-b: #878e96;
     --np-vol-face: #1b1e23;
 
-    --np-list-bg: #16181c;
     --np-list-alt: #1b1f26;
     --np-list-border: #08090b;
-    --np-list-head-top: #3a3d44;
-    --np-list-head-bottom: #26292e;
-    --np-list-head-rule: #0f1114;
-    --np-list-head-sep: #17191d;
-    --np-list-head-ink: #c6cbd3;
-    --np-list-head-emboss: rgb(0 0 0 / 55%);
-    --np-list-sort-top: #2c3a4e;
-    --np-list-sort-bottom: #233043;
-    --np-list-head-hot-top: #45484f;
-    --np-list-head-hot-bottom: #303338;
-    --np-list-sort-hot-top: #36485f;
-    --np-list-sort-hot-bottom: #2b3b52;
-    --np-list-ink: #f2f3f5;
-    --np-list-soft: #d4d8df;
     --np-list-badge: #2f333b;
     --np-list-badge-ink: #d6dae1;
     --np-accent: #6aa3f2;
     --np-list-icon: #8d939c;
-    --np-star: #f4b241;
-    --np-list-playing: #22354f;
 
-    --np-sheet-bg: rgb(40 42 48 / 90%);
-    --np-sheet-ink: #eef0f3;
-    --np-sheet-sep: rgb(255 255 255 / 12%);
 
-    --np-results-bg: #26282e;
-    --np-results-head-top: #2e3138;
-    --np-results-head-bottom: #25272d;
-    --np-results-rule: rgb(0 0 0 / 50%);
-    --np-results-ink: #eef0f3;
-    --np-results-soft: #8d939c;
-    --np-results-hot: #32353c;
-    --np-results-border: rgb(0 0 0 / 65%);
-    --np-results-lip: rgb(255 255 255 / 7%);
 
     /* aqua.css's own surfaces, so the sections underneath match the chrome */
     --aqua-content: #16181c;
@@ -254,8 +192,16 @@
 
 .np-app {
   display: flex;
-  min-height: 100vh;
-  min-height: 100dvh;
+
+  /*
+   * No viewport height anywhere on this page.
+   *
+   * The shell used to ask for `min-height: 100dvh`, which on Android shrinks as the browser's
+   * toolbars come and go and, once a car head unit or a media notification is in the picture,
+   * changes under you while you are looking at it. A page does not need to be told how tall the
+   * window is: it is as tall as its content, the body paints the ground behind it, and nothing
+   * here may cap or cut it.
+   */
   flex-direction: column;
   background: var(--np-page);
   color: var(--np-ink);
@@ -379,190 +325,6 @@
 .np-search__input:focus-visible {
   outline: 2px solid rgb(27 28 31 / 50%);
   outline-offset: 1px;
-}
-
-/* --------------------------------------------------------------------------
-   4. Results popover (iTunes 11 "Up Next")
-   -------------------------------------------------------------------------- */
-
-.np-results {
-  position: absolute;
-  z-index: 900;
-
-  /* pinned to both edges of the pill, so the sheet is always exactly as wide as
-     the field above it at every breakpoint — no measuring, nothing to clamp */
-  right: 0;
-  left: 0;
-  overflow: hidden;
-  border: 1px solid var(--np-results-border);
-  border-radius: 5px;
-  background: var(--np-results-bg);
-  box-shadow:
-    inset 0 1px 0 var(--np-results-lip),
-    0 2px 6px rgb(0 0 0 / 22%),
-    0 14px 32px rgb(0 0 0 / 40%);
-  color: var(--np-results-ink);
-  font-family: var(--np-list-font);
-  font-size: 11px;
-  font-weight: 400;
-  text-shadow: none;
-  top: calc(100% + 9px);
-}
-
-.np-results__head {
-  display: flex;
-  height: 27px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 10px;
-  border-bottom: 1px solid var(--np-results-rule);
-  background-image: linear-gradient(to bottom, var(--np-results-head-top), var(--np-results-head-bottom));
-}
-
-.np-results__count {
-  margin: 0;
-  color: var(--np-results-soft);
-}
-
-.np-results__count b {
-  color: var(--np-results-ink);
-  font-weight: 700;
-}
-
-.np-results__clear {
-  padding: 2px 4px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--np-results-soft);
-  cursor: pointer;
-  font: inherit;
-}
-
-.np-results__clear:hover {
-  color: var(--np-results-ink);
-}
-
-.np-results__clear:focus-visible {
-  outline: 2px solid var(--np-accent);
-  outline-offset: 1px;
-}
-
-.np-results__body {
-  max-height: 320px;
-  overflow-y: auto;
-}
-
-.np-results__row {
-  display: flex;
-  width: 100%;
-  height: 40px;
-  align-items: center;
-  padding: 0 8px 0 9px;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  cursor: default;
-  font: inherit;
-  gap: 8px;
-  text-align: left;
-}
-
-.np-results__row:hover,
-.np-results__row[data-hot='true'] {
-  background: var(--np-results-hot);
-}
-
-.np-results__row:focus-visible {
-  outline: 2px solid var(--np-accent);
-  outline-offset: -2px;
-}
-
-.np-results__art {
-  display: flex;
-  overflow: hidden;
-  width: 30px;
-  height: 30px;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  border-radius: 2px;
-  background-image: linear-gradient(to bottom, #fbfbfb, #e3e3e3);
-  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 14%);
-  color: #a9a9a9;
-}
-
-.np-results__art img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.np-results__art svg {
-  width: 15px;
-  height: 15px;
-  fill: currentcolor;
-}
-
-.np-results__meta {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.np-results__title,
-.np-results__sub {
-  overflow: hidden;
-  line-height: 13px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.np-results__sub {
-  color: var(--np-results-soft);
-}
-
-.np-results__dur {
-  flex: none;
-  margin-right: 2px;
-  color: var(--np-results-soft);
-  font-variant-numeric: tabular-nums;
-}
-
-.np-results__go {
-  width: 17px;
-  height: 17px;
-  flex: none;
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 1px var(--np-results-soft);
-  color: var(--np-results-soft);
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 15px;
-  opacity: 0;
-  text-align: center;
-}
-
-.np-results__row:hover .np-results__go,
-.np-results__row[data-hot='true'] .np-results__go {
-  opacity: 1;
-}
-
-@media (hover: none) {
-  .np-results__go {
-    opacity: 1;
-  }
-}
-
-.np-results__msg {
-  display: flex;
-  min-height: 40px;
-  align-items: center;
-  padding: 8px 12px;
-  color: var(--np-results-soft);
-  gap: 9px;
 }
 
 /* --------------------------------------------------------------------------
@@ -1224,62 +986,19 @@
 }
 
 /* --------------------------------------------------------------------------
-   12. The list — iTunes 10. 18 px rows, the stripe alone separates them.
+   12. The list
+   --------------------------------------------------------------------------
+   There is one list design in this app and it is the reference's, in §17
+   below. The page tables — the queue, playlists, search results, the metrics
+   — wear its class names too, so the stylesheet describes it once instead of
+   carrying a near-copy that would drift away from it.
+
+   Only the two things the reference's own list does not need live here: the
+   collapse to a single column on a narrow screen, and a sort arrow on a
+   header that is a button rather than a plain cell.
    -------------------------------------------------------------------------- */
 
-.np-list {
-  position: relative;
-  border-top: 1px solid var(--np-list-border);
-  border-bottom: 1px solid var(--np-list-border);
-  background: var(--np-list-bg);
-  font-family: var(--np-list-font);
-  font-size: 11px;
-}
-
-.np-list__scroll {
-  overflow-x: hidden;
-  overflow-y: auto;
-  max-height: var(--np-list-height, none);
-  scrollbar-width: none; /* the native bar is fully replaced below */
-}
-
-.np-list__scroll::-webkit-scrollbar {
-  display: none;
-}
-
-.np-list table {
-  width: 100%;
-
-  /* separate, not collapse: sticky headers drop their borders mid-scroll under
-     border-collapse in Chromium */
-  border-collapse: separate;
-  border-spacing: 0;
-  table-layout: fixed;
-}
-
-.np-list th {
-  position: sticky;
-  z-index: 2;
-  top: 0;
-  height: 18px;
-  padding: 0 6px;
-  border-right: 1px solid var(--np-list-head-sep);
-  border-bottom: 1px solid var(--np-list-head-rule);
-  background-image: linear-gradient(to bottom, var(--np-list-head-top), var(--np-list-head-bottom));
-  color: var(--np-list-head-ink);
-  font-size: 11px;
-  font-weight: 700;
-  text-align: left;
-  text-shadow: 0 1px 0 var(--np-list-head-emboss);
-  user-select: none;
-  white-space: nowrap;
-}
-
-.np-list th:last-child {
-  border-right: 0;
-}
-
-.np-list th button {
+.library th button {
   display: flex;
   width: 100%;
   align-items: center;
@@ -1293,249 +1012,49 @@
   text-shadow: inherit;
 }
 
-.np-list th button:focus-visible {
-  outline: 2px solid var(--np-accent);
+.library th button:focus-visible {
+  outline: 2px solid var(--lib-accent);
   outline-offset: -2px;
 }
 
-/* Gate the hover on a real pointer: without it a tap leaves the hover stuck on
-   the column it just sorted. */
-@media (hover: hover) and (pointer: fine) {
-  .np-list th[data-sortable='true']:hover {
-    background-image: linear-gradient(to bottom, var(--np-list-head-hot-top), var(--np-list-head-hot-bottom));
-  }
-
-  .np-list th[aria-sort]:not([aria-sort='none']):hover {
-    background-image: linear-gradient(to bottom, var(--np-list-sort-hot-top), var(--np-list-sort-hot-bottom));
-  }
-}
-
-/* iTunes 10 shows where the order comes from: the sorted column goes blue. Only the sorted one —
-   `aria-sort="none"` is present on every sortable header, so a bare [aria-sort] tints them all. */
-.np-list th[aria-sort]:not([aria-sort='none']) {
-  background-image: linear-gradient(to bottom, var(--np-list-sort-top), var(--np-list-sort-bottom));
-  color: var(--np-list-ink);
-}
-
-.np-list__sort {
+.library th button .lib-sort {
   margin-left: auto;
-  font-size: 8px;
-  line-height: 18px;
-  opacity: 0.7;
-}
-
-/* 18 px rows with NO rules: the stripe alone separates them, which is what
-   keeps the list light at this density */
-.np-list td {
-  overflow: hidden;
-  height: 18px;
-  padding: 0 6px;
-  color: var(--np-list-soft);
-  text-overflow: ellipsis;
-  vertical-align: middle;
-  white-space: nowrap;
-}
-
-.np-list__title {
-  color: var(--np-list-ink);
-  font-weight: 700;
-}
-
-.np-list__num {
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-}
-
-.np-list th.np-list__num {
-  text-align: right;
-}
-
-.np-list th.np-list__icon,
-.np-list td.np-list__icon {
-  padding: 0;
-  text-align: center;
-}
-
-.np-list th.np-list__icon svg {
-  display: block;
-  width: 13px;
-  height: 13px;
-  margin: 0 auto;
-  fill: currentcolor;
-}
-
-.np-list tbody tr {
-  cursor: default;
-}
-
-.np-list tbody tr:nth-child(even) {
-  background: var(--np-list-alt);
-}
-
-.np-list tbody tr[data-playing='true'],
-.np-list tbody tr[data-playing='true']:nth-child(even) {
-  background: var(--np-list-playing);
-}
-
-.np-list tbody tr:focus-visible {
-  box-shadow: inset 0 0 0 2px var(--np-accent);
-  outline: none;
-}
-
-.np-list tbody tr[aria-selected='true'],
-.np-list tbody tr[aria-selected='true']:nth-child(even),
-.np-list tbody tr[aria-selected='true'][data-playing='true'] {
-  background-image: linear-gradient(to bottom, var(--np-list-select-top), var(--np-list-select-bottom));
-}
-
-.np-list tbody tr[aria-selected='true'] td:first-child {
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 30%); /* gel top light */
-}
-
-.np-list tbody tr[aria-selected='true'] td,
-.np-list tbody tr[aria-selected='true'] .np-list__title,
-.np-list tbody tr[aria-selected='true'] .np-list__btn {
-  color: #fff;
-}
-
-.np-list tbody tr[aria-selected='true'] .np-list__badge {
-  background: rgb(255 255 255 / 28%);
-  color: #fff;
-}
-
-.np-list__badge {
-  display: inline-flex;
-  width: 18px;
-  height: 14px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 3px;
-  background: var(--np-list-badge);
-  color: var(--np-list-badge-ink);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  vertical-align: middle;
-}
-
-.np-list__btn {
-  width: 22px;
-  height: 16px;
-  padding: 0;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--np-list-icon);
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.np-list__btn svg {
-  display: block;
-  width: 12px;
-  height: 12px;
-  margin: 0 auto;
-  fill: currentcolor;
-}
-
-.np-list__btn:hover {
-  background: rgb(0 0 0 / 6%);
-}
-
-.np-list__btn:focus-visible {
-  outline: 2px solid var(--np-accent);
-  outline-offset: 1px;
-}
-
-.np-list__btn[aria-pressed='true'] {
-  color: var(--np-star);
-}
-
-.np-list__speaker {
-  display: block;
-  width: 11px;
-  height: 11px;
-  margin-left: auto;
-  color: var(--np-accent);
-  fill: currentcolor;
+  float: none;
 }
 
 /*
- * Narrow: the same collapse the window list does.
- *
- * Nine columns in 390 px is nine truncated columns — every cell reduced to "Q…", which is not
- * information. Below 620 px only the primary column and the icon columns survive, and the artist
- * and album ride under the title on a second line.
+ * Narrow: nine columns in 390 px is nine truncated columns — every cell
+ * reduced to "Q…", which is not information. Below 620 px only the primary
+ * column and the icon columns survive, and the artist and album ride under
+ * the title on a second line.
  */
 @media (max-width: 620px) {
-  .np-list th:not(.aqua-table__col--keep):not(.np-list__icon),
-  .np-list td:not(.aqua-table__col--keep):not(.np-list__icon) {
+  .library th:not(.aqua-table__col--keep):not(.lib-icon),
+  .library td:not(.aqua-table__col--keep):not(.lib-icon) {
     display: none;
   }
 
-  .np-list td.aqua-table__col--keep {
+  .library td.aqua-table__col--keep {
     height: auto;
     padding-block: 4px;
     white-space: normal;
   }
 
-  /* Fixed layout would keep the hidden columns' widths, leaving most of each row with no cell in
-     it — visually blank, and dead to the pointer, because a click there lands on the table rather
-     than on the row. Auto layout lets the surviving cells fill the row. */
-  .np-list table {
+  .library .aqua-table__stack {
+    display: block;
+  }
+
+  /* Fixed layout would keep the hidden columns' widths, leaving most of each
+     row with no cell in it — visually blank, and dead to the pointer, because
+     a click there lands on the table rather than on the row. */
+  .library table {
     table-layout: auto;
   }
 
-  /* The column widths are inline styles written from the column definitions, so a stylesheet can
-     only take them back with !important. Without this the hidden columns keep their share and the
-     list occupies a third of a phone screen. */
-  .np-list col {
+  /* The widths are inline styles written from the column definitions, so only
+     !important takes them back. */
+  .library col {
     width: auto !important;
-  }
-
-
-  .np-list .aqua-table__stack {
-    display: block;
-  }
-}
-
-/* ---------- overlay scroller: Aqua gel, fades when idle ----------
-   Native scrollbar internals cannot animate opacity, which is why this is built
-   from elements. Invisible but still hoverable, so brushing the right gutter
-   reveals it without scrolling. */
-.np-list__bar {
-  position: absolute;
-  z-index: 3;
-  top: 18px; /* clears the sticky header */
-  right: 3px;
-  bottom: 3px;
-  width: 11px;
-  border-radius: 6px;
-  background: rgb(118 128 142 / 16%);
-  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 8%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.np-list[data-scrolling='true'] .np-list__bar,
-.np-list__bar:hover {
-  opacity: 1;
-}
-
-.np-list__thumb {
-  position: absolute;
-  top: 0;
-  right: 2px;
-  left: 2px;
-  height: 40px;
-  border-radius: 4px;
-  background-image: var(--np-gel);
-  box-shadow: inset 0 0 0 1px rgb(16 64 127 / 40%);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .np-list__bar {
-    transition: none;
   }
 }
 
@@ -1599,58 +1118,19 @@
   gap: 6px;
 }
 
-/* --------------------------------------------------------------------------
-   14. Context menu, sheet and toast — the iOS family from the reference
-   -------------------------------------------------------------------------- */
-
-.np-ctx {
-  position: fixed;
-  z-index: 1000;
-  min-width: 210px;
-  padding: 5px;
-  border-radius: 12px;
-  backdrop-filter: saturate(180%) blur(18px);
-  background: var(--np-sheet-bg);
-  box-shadow:
-    0 12px 32px rgb(0 0 0 / 24%),
-    0 0 0 1px rgb(0 0 0 / 20%);
-  color: var(--np-sheet-ink);
-  font-family: var(--np-ui-font);
-  font-size: 14px;
-  -webkit-backdrop-filter: saturate(180%) blur(18px);
-}
-
-.np-ctx__item {
-  position: relative;
-  display: flex;
-  width: 100%;
-  align-items: center;
-  padding: 8px 12px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: inherit;
-  cursor: default;
-  font: inherit;
-  gap: 8px;
-  text-align: left;
-}
-
-.np-ctx__item:hover:not(:disabled),
-.np-ctx__item:focus-visible {
-  background: var(--np-accent);
-  color: #fff;
-  outline: none;
-}
-
-.np-ctx__item:disabled {
-  opacity: 0.5;
-}
-
-.np-ctx__sep {
-  height: 1px;
-  margin: 5px 8px;
-  background: var(--np-sheet-sep);
+/*
+ * Nothing in the section body gets a height of its own.
+ *
+ * Panels, tables and key-value lists are page content: they end where their content ends. A pane
+ * that scrolls inside a page that also scrolls is two scrollbars arguing, and it hides the bottom
+ * of whatever it holds. The list in `Music` is the one exception, and it is the reference's own
+ * design — an overlay-scrolled region with a sticky header.
+ */
+.np-body .aqua-panel,
+.np-body .aqua-panel__section,
+.np-body .aqua-table-wrap,
+.np-body .aqua-kv {
+  max-height: none;
 }
 
 /* --------------------------------------------------------------------------
@@ -1840,4 +1320,1187 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* ==========================================================================
+   17. The music list — docs/reference/now-playing-header.html, verbatim
+   ==========================================================================
+   This is the reference's own iTunes 10 list view, copied rather than
+   reinterpreted: same nine columns, same 18px rows with the Aqua stripe and no
+   rules between them, same glossy embossed sticky header with the sorted
+   column tinted blue, same monochrome initial badges, same overlay gel
+   scroller, same marquee, same breakpoints. The `--lib-*` custom properties
+   below are the reference's sampled values, so the rules underneath needed no
+   edits at all — the only change in the whole block is the scroll cap, and it
+   says so where it happens.
+   ========================================================================== */
+
+:root {
+  --bar-pad: var(--np-pad);
+
+  --lib-bg: #fff;
+  --lib-alt: #f2f5f9;
+  --lib-border: #ababab;
+  --lib-head-top: #f8f8f8;
+  --lib-head-bot: #dadada;
+  --lib-head-rule: #adadad;
+  --lib-head-sep: #ccc;
+  --lib-head-ink: #3a3d41;
+  --lib-head-emboss: rgb(255 255 255 / 80%);
+  --lib-sort-top: #e8eef7;
+  --lib-sort-bot: #cfdbeb;
+  --lib-head-hot-top: #efefef;
+  --lib-head-hot-bot: #cfcfcf;
+  --lib-sort-hot-top: #dde7f4;
+  --lib-sort-hot-bot: #c2d2e6;
+  --lib-ink: #000;
+  --lib-soft: #222326;
+  --lib-badge: #dfe3e9;
+  --lib-badge-ink: #3b3f47;
+  --lib-accent: #2b6fd6;
+  --lib-icon: #8a8f98;
+  --lib-star: #f0a422;
+  --lib-np: #dde9f8;
+  --lib-sel-top: #5b8dd9;
+  --lib-sel-bot: #3a6cc4;
+  --gel-fill-v: linear-gradient(to right, #16407f 0%, #6ea3ec 12%, #8cb8ea 24%, #458ad8 45%, #5fa8f1 58%, #83c9fd 78%, #9fd2ee 92%, #3f6a86 100%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-np-theme='light']) {
+    --lib-bg: #16181c;
+    --lib-alt: #1b1f26;
+    --lib-border: #08090b;
+    --lib-head-top: #3a3d44;
+    --lib-head-bot: #26292e;
+    --lib-head-rule: #0f1114;
+    --lib-head-sep: #17191d;
+    --lib-head-ink: #c6cbd3;
+    --lib-head-emboss: rgb(0 0 0 / 55%);
+    --lib-sort-top: #2c3a4e;
+    --lib-sort-bot: #233043;
+    --lib-head-hot-top: #45484f;
+    --lib-head-hot-bot: #303338;
+    --lib-sort-hot-top: #36485f;
+    --lib-sort-hot-bot: #2b3b52;
+    --lib-ink: #f2f3f5;
+    --lib-soft: #d4d8df;
+    --lib-badge: #2f333b;
+    --lib-badge-ink: #d6dae1;
+    --lib-accent: #6aa3f2;
+    --lib-icon: #8d939c;
+    --lib-star: #f4b241;
+    --lib-np: #22354f;
+  }
+}
+
+/* ---------- library, iTunes 10 list view ---------- */
+
+.library {
+  position: relative;
+  z-index: 1;
+  margin-top: 28px;
+  /* flush to the section edges: no side borders, and negative margins eat
+     the player's own horizontal padding */
+  margin-left: calc(var(--bar-pad) * -1);
+  margin-right: calc(var(--bar-pad) * -1);
+  border-top: 1px solid var(--lib-border);
+  border-bottom: 1px solid var(--lib-border);
+  background: var(--lib-bg);
+  /* Lucida Grande is the whole flavour of a 2010 Mac list */
+  font-family: "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", "Segoe UI", system-ui, sans-serif;
+  font-size: 11px;
+}
+
+/* The scrolling happens one level in: an overlay scroller cannot live
+   inside the element that scrolls, or it would scroll away with the rows. */
+.library__scroll {
+  /* The reference caps this at 253px — header plus thirteen rows, which is what
+     its sixteen demo songs need to demonstrate scrolling. A real library is
+     larger, so the cap is raised and made overridable; the region still sizes
+     to its content when the list is short. Nothing else here is changed. */
+  max-height: var(--np-list-height, 640px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;          /* the native bars are fully replaced */
+}
+
+.library__scroll::-webkit-scrollbar { display: none; }
+
+/* ---------- overlay scroller: Aqua gel, fades when idle ----------
+   Native scrollbar internals can't animate opacity, which is why this is
+   built from elements. Invisible but still hoverable, so brushing the
+   right gutter reveals it without scrolling. */
+.library__bar {
+  position: absolute;
+  top: 21px;                      /* clears the sticky header */
+  right: 3px;
+  bottom: 3px;
+  width: 11px;
+  z-index: 3;
+  border-radius: 6px;
+  background: rgba(118, 128, 142, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.library.is-scrolling .library__bar,
+.library__bar:hover {
+  opacity: 1;
+}
+
+.library__thumb {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 0;
+  height: 40px;
+  border-radius: 4px;
+  background-image: var(--gel-fill-v);
+  box-shadow: inset 0 0 0 1px rgba(16, 64, 127, 0.4);
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .library__bar { transition: none; }
+}
+
+.library table {
+  width: 100%;
+  /* separate, not collapse: sticky headers drop their borders mid-scroll
+     under border-collapse in Chromium */
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.library th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 18px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: left;
+  color: var(--lib-head-ink);
+  text-shadow: 0 1px 0 var(--lib-head-emboss);
+  background-image: linear-gradient(to bottom, var(--lib-head-top), var(--lib-head-bot));
+  border-bottom: 1px solid var(--lib-head-rule);
+  border-right: 1px solid var(--lib-head-sep);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.library th[data-sort] { cursor: default; }
+
+/* Two bugs lived here. The hover gradient was hardcoded light grey, so it
+   went white over the dark theme; and it was unguarded, so a tap on a
+   touch screen left the hover stuck on the column it sorted. Gating on a
+   real pointer fixes the sticky tap, and [aria-sort] outranks plain hover
+   so the sorted column stays blue while you're over it. */
+@media (hover: hover) and (pointer: fine) {
+  .library th[data-sort]:hover {
+    background-image: linear-gradient(to bottom, var(--lib-head-hot-top), var(--lib-head-hot-bot));
+  }
+
+  .library th[data-sort][aria-sort]:hover {
+    background-image: linear-gradient(to bottom, var(--lib-sort-hot-top), var(--lib-sort-hot-bot));
+  }
+}
+
+/* iTunes 10 shows where the order comes from: the sorted column goes blue */
+.library th[aria-sort] {
+  color: var(--lib-ink);
+  background-image: linear-gradient(to bottom, var(--lib-sort-top), var(--lib-sort-bot));
+}
+
+/* the sort indicator lives in the header's right corner, as in iTunes */
+.lib-sort {
+  float: right;
+  margin: 0 0 0 4px;
+  font-size: 8px;
+  line-height: 18px;
+  opacity: 0.7;
+}
+
+.library th:last-child { border-right: 0; }
+
+/* 18px rows with NO rules and no highlight line — in iTunes 10 the Aqua
+   stripe alone separates rows, which is what keeps the list feeling light
+   at this density */
+.library td {
+  height: 18px;
+  padding: 0 6px;
+  color: var(--lib-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+
+/* period type is uniform 11px; the title keeps its weight so it still
+   anchors the row */
+.lib-title {
+  font-weight: 700;
+  color: var(--lib-ink);
+}
+
+/* row number gutter; the playing row shows the speaker here instead */
+.lib-idx {
+  padding: 0 6px 0 4px;
+  text-align: right;
+  color: var(--lib-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* the # sits over its numbers, not off to the left: .library th's own
+   text-align: left outranks .lib-idx, so it has to be beaten on
+   specificity rather than order. The 5px right padding is 6px less the
+   1px separator border the header carries and the body cells don't —
+   without that trim the # lands a pixel left of every number under it. */
+.library th.lib-idx {
+  text-align: right;
+  padding-right: 5px;
+}
+
+/* Icon columns: header and rows share the same box — zero side padding,
+   centred, identical icon size — so the glyphs sit on one vertical line. */
+.library th.lib-icon,
+.library td.lib-icon {
+  padding: 0;
+  text-align: center;
+}
+
+.library th.lib-icon svg {
+  display: block;
+  width: 13px;
+  height: 13px;
+  margin: 0 auto;
+  fill: currentColor;
+}
+
+.library tbody tr { cursor: default; }
+.library tbody tr:nth-child(even) { background: var(--lib-alt); }
+
+/* the playing song: a steady tint whether or not it's the selection */
+.library tbody tr.is-playing,
+.library tbody tr.is-playing:nth-child(even) { background: var(--lib-np); }
+.library tbody tr.is-playing .lib-title { font-weight: 700; }
+
+/* ---------- marquee, on the playing row only ----------
+   Apple's label marquee doesn't loop like a ticker. It parks, glides far
+   enough left to show the tail, parks again, glides back, and repeats —
+   ease-in-out at both ends so it never snaps. The clipped edge is
+   dissolved by a gradient instead of stamped with an ellipsis, and the
+   gradient grows with the travel, so an edge only goes soft once there is
+   something hidden behind it. Both fades are 0 at rest, which collapses
+   the mask to fully opaque and leaves the cell pixel-identical to a
+   non-playing one. */
+.lib-mq {
+  --mq-fade-l: 0px;
+  --mq-fade-r: 0px;
+  display: block;
+  /* clip, not hidden: hidden on one axis promotes the other to auto and
+     the resulting scroll box shaves descenders in an 18px row */
+  overflow-x: clip;
+  -webkit-mask-image: linear-gradient(to right,
+    transparent 0, #000 var(--mq-fade-l),
+    #000 calc(100% - var(--mq-fade-r)), transparent 100%);
+  mask-image: linear-gradient(to right,
+    transparent 0, #000 var(--mq-fade-l),
+    #000 calc(100% - var(--mq-fade-r)), transparent 100%);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+@supports not (overflow-x: clip) {
+  .lib-mq { overflow: hidden; }
+}
+
+.lib-mq__in {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.library tbody tr:focus { outline: none; }
+.library tbody tr:focus-visible { box-shadow: inset 0 0 0 2px rgba(24, 160, 235, 0.9); }
+
+.library tbody tr[aria-selected="true"],
+.library tbody tr[aria-selected="true"]:nth-child(even),
+.library tbody tr[aria-selected="true"].is-playing {
+  background-image: linear-gradient(to bottom, var(--lib-sel-top), var(--lib-sel-bot));
+}
+
+.library tbody tr[aria-selected="true"] td:first-child {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);   /* gel top light */
+}
+
+.library tbody tr[aria-selected="true"] td,
+.library tbody tr[aria-selected="true"] .lib-title,
+.library tbody tr[aria-selected="true"] .lib-btn,
+.library tbody tr[aria-selected="true"] .lib-np { color: #fff; }
+
+.library tbody tr[aria-selected="true"] .lib-pf {
+  background: rgba(255, 255, 255, 0.28);
+  color: #fff;
+}
+
+.lib-num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* platform: a monochrome initial badge (no logos — those are trademarks),
+   with the platform name in the tooltip and the accessible label */
+.lib-pf {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 14px;
+  border-radius: 3px;
+  background: var(--lib-badge);
+  color: var(--lib-badge-ink);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  vertical-align: middle;
+}
+
+.lib-pf[data-len="2"] { font-size: 8px; letter-spacing: 0; }
+.lib-pf:hover { background: var(--lib-accent); color: #fff; }
+.lib-pf:focus { outline: none; }
+.lib-pf:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
+
+.lib-np {
+  display: block;
+  width: 11px;
+  height: 11px;
+  margin-left: auto;
+  color: var(--lib-accent);
+  fill: currentColor;
+}
+
+.lib-btn {
+  width: 22px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--lib-icon);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.lib-btn svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+  margin: 0 auto;
+  fill: currentColor;
+}
+
+.lib-btn:hover { background: rgba(0, 0, 0, 0.06); }
+.lib-btn:focus { outline: none; }
+.lib-btn:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
+.lib-dl[aria-pressed="true"] { color: var(--lib-accent); }
+.lib-star[aria-pressed="true"] { color: var(--lib-star); }
+.library tbody tr[aria-selected="true"] .lib-star[aria-pressed="true"] { color: #ffd166; }
+
+@media (max-width: 620px) { .lib-col-album { display: none; } }
+@media (max-width: 560px) { .lib-col-bpm { display: none; } }
+/* Artist used to drop at 420px, which took it off every phone. It now
+   holds down to 360px: below ~368px its 22% share would make it wider
+   than the Song column, and above that both columns simply get tight —
+   which the marquee now handles rather than hiding the field. */
+@media (max-width: 360px) { .lib-col-artist { display: none; } }
+
+
+/* ==========================================================================
+   18. Context menu, the New Playlist sheet and the toast — also verbatim
+   ==========================================================================
+   The reference's iOS family, copied for the same reason as the list above.
+   The colours come from the --ctx-* properties it sampled, defined here so
+   the rules themselves needed no edits.
+   ========================================================================== */
+
+:root {
+  --ctx-bg: rgb(247 247 250 / 88%);
+  --ctx-ink: #1b1c1f;
+  --ctx-sep: rgb(0 0 0 / 12%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-np-theme='light']) {
+    --ctx-bg: rgb(40 42 48 / 90%);
+    --ctx-ink: #eef0f3;
+    --ctx-sep: rgb(255 255 255 / 12%);
+  }
+}
+
+/* ---------- context menu, iOS ---------- */
+
+.ctx {
+  position: fixed;
+  z-index: 1000;
+  min-width: 210px;
+  padding: 5px;
+  border-radius: 12px;
+  background: var(--ctx-bg);
+  -webkit-backdrop-filter: saturate(180%) blur(18px);
+  backdrop-filter: saturate(180%) blur(18px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24),
+              0 0 0 0.5px rgba(0, 0, 0, 0.2);
+  font-size: 14px;
+  color: var(--ctx-ink);
+}
+
+.ctx__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: default;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ctx__item:hover:not([disabled]),
+.ctx__item:focus-visible,
+.ctx__item.is-open {
+  background: var(--lib-accent);
+  color: #fff;
+  outline: none;
+}
+
+.ctx__item[disabled] { opacity: 0.5; }
+.ctx__chev { margin-left: auto; opacity: 0.6; font-size: 16px; line-height: 1; }
+.ctx__check { width: 14px; flex: none; font-weight: 700; }
+.ctx__sep { height: 1px; margin: 5px 8px; background: var(--ctx-sep); }
+
+.ctx__sub {
+  position: absolute;
+  top: -5px;
+  left: 100%;
+  margin-left: 2px;
+  min-width: 200px;
+  padding: 5px;
+  border-radius: 12px;
+  background: var(--ctx-bg);
+  -webkit-backdrop-filter: saturate(180%) blur(18px);
+  backdrop-filter: saturate(180%) blur(18px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24), 0 0 0 0.5px rgba(0, 0, 0, 0.2);
+  color: var(--ctx-ink);
+  display: none;
+}
+
+.ctx__sub.is-flip { left: auto; right: 100%; margin-left: 0; margin-right: 2px; }
+.ctx__item--parent:hover > .ctx__sub,
+.ctx__item--parent.is-open > .ctx__sub { display: block; }
+
+/* ---------- new playlist sheet ---------- */
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.sheet {
+  width: 270px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--ctx-bg);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.3);
+  color: var(--ctx-ink);
+  text-align: center;
+}
+
+.sheet__body { padding: 18px 16px 14px; }
+.sheet__title { margin: 0 0 4px; font-size: 17px; font-weight: 600; }
+.sheet__msg { margin: 0 0 12px; font-size: 13px; opacity: 0.7; }
+
+.sheet__input {
+  width: 100%;
+  height: 32px;
+  padding: 0 9px;
+  border: 1px solid rgba(0, 0, 0, 0.22);
+  border-radius: 7px;
+  font: inherit;
+  font-size: 14px;
+  background: var(--lib-bg);
+  color: var(--lib-ink);
+}
+
+.sheet__actions { display: flex; border-top: 1px solid var(--ctx-sep); }
+
+.sheet__btn {
+  flex: 1;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 17px;
+  color: var(--lib-accent);
+  cursor: pointer;
+}
+
+.sheet__btn + .sheet__btn { border-left: 1px solid var(--ctx-sep); font-weight: 600; }
+.sheet__btn:active { background: rgba(0, 0, 0, 0.06); }
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  z-index: 1002;
+  transform: translateX(-50%);
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: rgba(28, 30, 36, 0.92);
+  color: #fff;
+  font-size: 13.5px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+
+.toast.is-on { opacity: 1; }
+
+/* ==========================================================================
+   19. The equaliser window
+   ==========================================================================
+   The iTunes equaliser, from the supplied screenshot: an On checkbox beside
+   the preset pop-up, then a preamp fader and ten band faders on a ±12 dB
+   scale, each rail flanked by tick dashes, each thumb a small lozenge with a
+   pointed right edge.
+
+   The window's own frame and traffic lights are not reproduced. They would be
+   three buttons that do nothing, on a page that is not a window — and the rule
+   this whole app is built on is that a control that cannot act does not get
+   drawn. Everything inside the frame is here.
+   ========================================================================== */
+
+.eqw {
+  --eqw-rail: 168px;
+  --eqw-tick: rgb(0 0 0 / 34%);
+  --eqw-groove-top: #6f757c;
+  --eqw-groove-bot: #b9bfc6;
+
+  padding: 12px 14px 10px;
+  border: 1px solid var(--lib-border);
+  border-radius: 6px;
+  background-image: linear-gradient(to bottom, #f3f4f5, #e2e4e6);
+  color: var(--np-ink);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-np-theme='light']) .eqw {
+    --eqw-tick: rgb(255 255 255 / 26%);
+    --eqw-groove-top: #101216;
+    --eqw-groove-bot: #3a3f46;
+
+    background-image: linear-gradient(to bottom, #2b2e34, #1f2228);
+  }
+}
+
+.eqw__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  padding-bottom: 12px;
+  gap: 14px;
+}
+
+.eqw__bank {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+/* The dB rail labels sit in their own column, aligned with the scale they name. */
+.eqw__scale {
+  display: flex;
+  height: var(--eqw-rail);
+  flex: none;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 0 6px 0 2px;
+  color: var(--np-meta);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.eqw__band {
+  position: relative;
+  display: flex;
+  min-width: 30px;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Nine tick rows, flanking each rail — the same eight steps the ±12 dB scale
+   divides into, drawn on both sides as the equaliser does. */
+.eqw__band::before {
+  position: absolute;
+  top: 0;
+  left: 50%;
+
+  /* flanking the rail, not the cell: the columns are wide and the dashes have
+     to sit beside the groove they measure */
+  width: 34px;
+  height: var(--eqw-rail);
+  margin-left: -17px;
+  background-image:
+    repeating-linear-gradient(to bottom, var(--eqw-tick) 0 1px, transparent 1px 12.5%),
+    repeating-linear-gradient(to bottom, var(--eqw-tick) 0 1px, transparent 1px 12.5%);
+  background-position: left top, right top;
+  background-repeat: no-repeat, no-repeat;
+  background-size: 5px calc(100% - 1px), 5px calc(100% - 1px);
+  content: '';
+  pointer-events: none;
+}
+
+.eqw__band--preamp {
+  min-width: 44px;
+  max-width: 52px;
+  flex: none;
+  margin-right: 10px;
+}
+
+.eqw__label {
+  color: var(--np-meta);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---- the fader itself: the shared Slider, wearing the equaliser's material ----
+   The component keeps its behaviour — drag, arrows, Page keys, Home/End, the
+   accessible name and value — and only its material changes here. */
+
+.eqw .aqua-slider {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.eqw .aqua-slider--vertical {
+  width: 100%;
+  height: var(--eqw-rail);
+}
+
+.eqw .aqua-slider__track {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+}
+
+.eqw .aqua-slider__channel {
+  position: relative;
+
+  /* the base channel is a flex child that grows; here it is a fixed rail */
+  width: 3px;
+  height: 100%;
+  flex: none;
+  margin: 0 auto;
+  border: 0;
+  border-radius: 2px;
+  background-image: linear-gradient(to right, var(--eqw-groove-top), var(--eqw-groove-bot));
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 25%);
+}
+
+/* The channel shows the whole travel; the equaliser does not fill it, because a
+   band cut is as real as a band boost and a fill would draw one as "less". */
+.eqw .aqua-slider__fill {
+  display: none;
+}
+
+.eqw .aqua-slider__thumb {
+  position: absolute;
+
+  /* the vertical rule centres the knob with a transform; this one places it
+     outright, so the pointed edge stays where the value is */
+  top: auto;
+  bottom: calc(var(--aqua-fill, 50%) - 5.5px);
+  left: 50%;
+  width: 19px;
+  height: 11px;
+  margin-left: -9.5px;
+  border-radius: 2px;
+  transform: none;
+
+  /* the pointed right edge of the iTunes fader knob */
+  background-image: linear-gradient(to bottom, #fdfdfd 0%, #f0f1f2 46%, #d7dade 100%);
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 38%),
+    inset 0 1px 0 rgb(255 255 255 / 90%),
+    0 1px 2px rgb(0 0 0 / 34%);
+  clip-path: polygon(0 0, 62% 0, 100% 50%, 62% 100%, 0 100%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-np-theme='light']) .eqw .aqua-slider__thumb {
+    background-image: linear-gradient(to bottom, #6d737b 0%, #565c64 46%, #3d434a 100%);
+  }
+}
+
+.eqw .aqua-slider__track:focus-visible .aqua-slider__thumb {
+  outline: 2px solid var(--np-accent);
+  outline-offset: 1px;
+}
+
+/* The numeric readout is the drag feedback; it would otherwise sit under every
+   fader and turn a row of ten into a wall of figures. */
+.eqw .aqua-slider__readout {
+  position: absolute;
+  top: calc(var(--eqw-rail) + 20px);
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--np-ink);
+  color: var(--np-page);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+  white-space: nowrap;
+}
+
+.eqw .aqua-slider:hover .aqua-slider__readout,
+.eqw .aqua-slider__track[data-dragging='true'] ~ .aqua-slider__readout,
+.eqw .aqua-slider__track:focus-visible ~ .aqua-slider__readout {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eqw .aqua-slider__readout {
+    transition: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .eqw {
+    --eqw-rail: 140px;
+  }
+
+  .eqw__band {
+    min-width: 22px;
+  }
+
+  .eqw__label {
+    font-size: 9px;
+  }
+}
+
+
+/* ==========================================================================
+   20. The search popover — the reference's, verbatim
+   ==========================================================================
+   The iTunes 11 "Up Next" sheet: a gradient header carrying the count and
+   Clear, 40 px rows whose artwork tile doubles as a fifteen-second audition
+   button with a countdown ring, source badges, time over tempo, a circled
+   chevron on the row under the pointer, and a pager in the footer. The
+   --srch-* values below are the reference's own samples.
+   ========================================================================== */
+
+:root {
+  --srch-bg: #f9f9f9;
+  --srch-head-top: #f6f6f6;
+  --srch-head-bot: #eee;
+  --srch-rule: #dedede;
+  --srch-ink: #2c2c2c;
+  --srch-soft: #9b9b9b;
+  --srch-hot: #ececec;
+  --srch-border: rgb(0 0 0 / 25%);
+  --srch-lip: rgb(255 255 255 / 60%);
+  --srch-art-top: #fbfbfb;
+  --srch-art-bot: #e3e3e3;
+  --srch-art-ink: #a9a9a9;
+  --srch-art-ring: rgb(0 0 0 / 14%);
+  --srch-chev: #8f8f8f;
+  --srch-dot: #c9c9c9;
+  --srch-dot-on: #7c7c7c;
+  --srch-pf: #dcdcdc;
+  --srch-pf-ink: #5c5c5c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-np-theme='light']) {
+    --srch-bg: #26282e;
+    --srch-head-top: #2e3138;
+    --srch-head-bot: #25272d;
+    --srch-rule: rgb(0 0 0 / 50%);
+    --srch-ink: #eef0f3;
+    --srch-soft: #8d939c;
+    --srch-hot: #32353c;
+    --srch-border: rgb(0 0 0 / 65%);
+    --srch-lip: rgb(255 255 255 / 7%);
+    --srch-art-top: #33363d;
+    --srch-art-bot: #24262b;
+    --srch-art-ink: #8d939c;
+    --srch-art-ring: rgb(255 255 255 / 10%);
+    --srch-chev: #9aa0a9;
+    --srch-dot: #4a4e56;
+    --srch-dot-on: #b8bdc5;
+    --srch-pf: #3a3e46;
+    --srch-pf-ink: #ccd1d9;
+  }
+}
+
+/* ---------- search results, iTunes 11 Up Next popover ----------
+   Palette sampled from the reference: near-white card (#f9f9f9) with a
+   faint gradient header, #2c2c2c titles over #9b9b9b "Artist — Album"
+   subtitles, hover rows a few points darker than the card. */
+
+.srch {
+  position: absolute;
+  top: calc(100% + 9px);
+  /* pinned to both edges of .search, so the sheet is always exactly as
+     wide as the pill above it at every breakpoint — no measuring, and
+     nothing to clamp against the viewport */
+  left: 0;
+  right: 0;
+  z-index: 900;
+  overflow: hidden;                    /* rounds every child at the corners */
+  border-radius: 5px;
+  border: 1px solid var(--srch-border);
+  background: var(--srch-bg);
+  box-shadow:
+    inset 0 1px 0 var(--srch-lip),
+    0 2px 6px rgba(0, 0, 0, 0.22),
+    0 14px 32px rgba(0, 0, 0, 0.4);
+  font-family: "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", "Segoe UI", system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  text-shadow: none;
+  color: var(--srch-ink);
+}
+
+.srch__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 27px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--srch-rule);
+  background-image: linear-gradient(to bottom, var(--srch-head-top), var(--srch-head-bot));
+}
+
+.srch__count { margin: 0; color: var(--srch-soft); }
+.srch__count b { font-weight: 700; color: var(--srch-ink); }
+
+.srch__clear {
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font: inherit;
+  color: var(--srch-soft);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.srch__clear:hover { color: var(--srch-ink); }
+.srch__clear:focus { outline: none; }
+.srch__clear:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
+
+.srch__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 8px 0 9px;
+  cursor: default;
+}
+
+.srch__row:hover,
+.srch__row.is-hot { background: var(--srch-hot); }
+
+/* the artwork tile: real cover when the track has one, otherwise the grey
+   beamed-note placeholder from the reference's last row. Doubles as the
+   preview button, so it is a real <button> when there is audio to play. */
+.srch__art {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  overflow: hidden;
+  background-image: linear-gradient(to bottom, var(--srch-art-top), var(--srch-art-bot));
+  box-shadow: inset 0 0 0 1px var(--srch-art-ring);
+  color: var(--srch-art-ink);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.srch__art > svg { width: 15px; height: 15px; fill: currentColor; }
+
+.srch__art img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+button.srch__art { cursor: pointer; }
+button.srch__art:focus { outline: none; }
+button.srch__art:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
+
+/* the scrim carries both the play glyph and the countdown ring, so one
+   opacity transition covers the whole affordance */
+.srch__scrim {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.42);
+  opacity: 0;
+  transition: opacity 0.14s ease;
+}
+
+.srch__row:hover button.srch__art .srch__scrim,
+button.srch__art:focus-visible .srch__scrim,
+.srch__art.is-preview .srch__scrim { opacity: 1; }
+
+@media (hover: none) { button.srch__art .srch__scrim { opacity: 1; } }
+
+.srch__scrim svg { width: 30px; height: 30px; overflow: visible; }
+.srch__glyph { fill: #fff; }
+.srch__ring { fill: none; stroke: rgba(255, 255, 255, 0.35); stroke-width: 2; }
+
+/* dasharray is the full circumference; the offset is driven from JS as a
+   fraction of the 15 seconds elapsed */
+.srch__ring--on {
+  stroke: #fff;
+  stroke-linecap: round;
+  stroke-dasharray: 84.82;
+  stroke-dashoffset: calc(84.82px * (1 - var(--p, 0)));
+  transform: rotate(-90deg);
+  transform-origin: 15px 15px;
+}
+
+.srch__art:not(.is-preview) .srch__ring,
+.srch__art:not(.is-preview) .srch__ring--on,
+.srch__art:not(.is-preview) .srch__stop { display: none; }
+.srch__art.is-preview .srch__play { display: none; }
+
+/* one badge per platform, matching the library's monochrome initials —
+   no logos, those are trademarks */
+.srch__links { flex: none; display: flex; gap: 3px; }
+
+.srch__pf {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 16px;
+  border-radius: 3px;
+  background: var(--srch-pf);
+  color: var(--srch-pf-ink);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.srch__pf[data-len="1"] { font-size: 9px; }
+.srch__pf:hover { background: var(--lib-accent); color: #fff; }
+.srch__pf:focus { outline: none; }
+.srch__pf:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
+
+/* time over bpm, right-aligned tabular figures like the library columns */
+.srch__nums {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 34px;
+  font-variant-numeric: tabular-nums;
+  line-height: 13px;
+}
+
+.srch__bpm { color: var(--srch-soft); }
+
+.srch__meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.srch__title,
+.srch__sub {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 13px;
+}
+
+.srch__sub { color: var(--srch-soft); }
+
+.srch__dur {
+  flex: none;
+  margin-right: 2px;
+  color: var(--srch-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.srch__row.is-adding { opacity: 0.55; }
+
+.srch__go {
+  flex: none;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--srch-chev);
+  color: var(--srch-chev);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+  opacity: 0;
+}
+
+.srch__row:hover .srch__go,
+.srch__row.is-hot .srch__go { opacity: 1; }
+@media (hover: none) { .srch__go { opacity: 1; } }
+
+.srch__msg {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+  padding: 8px 12px;
+  color: var(--srch-soft);
+}
+
+/* the 12-spoke fan; each spoke's inline delay staggers one shared fade */
+.srch__spin { position: relative; flex: none; width: 16px; height: 16px; }
+
+.srch__spin i {
+  position: absolute;
+  left: 7px;
+  top: 0;
+  width: 2px;
+  height: 4.5px;
+  border-radius: 1px;
+  background: var(--srch-soft);
+  transform-origin: 1px 8px;
+  opacity: 0.25;
+  animation: srch-spin 1s linear infinite;
+}
+
+@keyframes srch-spin { 0% { opacity: 1; } 100% { opacity: 0.25; } }
+
+.srch__foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 26px;
+  border-top: 1px solid var(--srch-rule);
+  background-image: linear-gradient(to bottom, var(--srch-head-top), var(--srch-head-bot));
+}
+
+.srch__foot[hidden] { display: none; }
+
+.srch__page {
+  width: 22px;
+  height: 18px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--srch-soft);
+  font: 700 13px/17px "Lucida Grande", "Lucida Sans Unicode", "Segoe UI", system-ui, sans-serif;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.srch__page:hover:not(:disabled) { color: var(--srch-ink); }
+.srch__page:disabled { opacity: 0.35; cursor: default; }
+.srch__page:focus { outline: none; }
+
+.srch__dots { display: inline-flex; gap: 5px; }
+.srch__dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--srch-dot); }
+.srch__dots i.is-on { background: var(--srch-dot-on); }
+
+.srch__live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .srch__spin i { animation: none; opacity: 0.6; }
+  .srch__scrim { transition: none; }
+}
+
+/* ==========================================================================
+   21. The jewel case on the stage
+   ==========================================================================
+   Once the 3D stage has painted a frame it takes the tile over, and the tile
+   drops its frame so the case can bleed past the layout box and let its
+   shadow fade into the page — the reference does the same, and clipping the
+   case square at the tile's edge is what it is avoiding.
+   ========================================================================== */
+
+.np-hero__stage {
+  cursor: grab;
+  touch-action: pan-y;
+}
+
+.np-hero__stage.is-3d {
+  overflow: visible;
+  background: none;
+  box-shadow: none;
+}
+
+.np-hero__stage.is-dragging {
+  cursor: grabbing;
+}
+
+.np-hero__stage.is-3d img,
+.np-hero__stage.is-3d .np-hero__placeholder,
+.np-hero__stage.is-3d::before {
+  display: none;
+}
+
+.np-hero__stage canvas {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 0;
+  transform: translate(-50%, -50%);
 }

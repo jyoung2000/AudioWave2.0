@@ -6,7 +6,22 @@
  * and every screen is reachable by keyboard. They deliberately do not stub the app's own modules —
  * a test that passes against a mock of the thing under test proves nothing.
  */
-import { expect, test } from '@playwright/test';
+import { readdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { expect, test, type Page } from '@playwright/test';
+
+const FIXTURES = fileURLToPath(new URL('../../../packages/test-fixtures/generated/audio/Marlow & the Tidewater/Quiet Arithmetic/', import.meta.url));
+
+/** Put real files in the library, so the list has rows made from real tags. */
+async function loadFixtures(page: Page): Promise<void> {
+  const files = readdirSync(FIXTURES)
+    .filter((name) => name.endsWith('.wav'))
+    .map((name) => `${FIXTURES}${name}`);
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: /Choose files/i }).first().click();
+  await (await chooser).setFiles(files);
+  await expect(page.getByRole('row').filter({ hasText: 'Quiet Arithmetic' }).first()).toBeVisible({ timeout: 20_000 });
+}
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
@@ -106,7 +121,9 @@ test('every section is reachable and renders', async ({ page }) => {
 
 test('the equaliser explains level-matched bypass and the headroom it applies', async ({ page }) => {
   await page.getByRole('option', { name: /Equaliser/i }).click();
-  await expect(page.getByText(/Bypass \(level-matched\)/i)).toBeVisible();
+  // The window's own switch, from the screenshot this equaliser is drawn from.
+  await expect(page.getByRole('checkbox', { name: 'On' })).toBeVisible();
+  await expect(page.getByText(/is a level-matched bypass/i)).toBeVisible();
   await expect(page.getByText(/A louder signal always sounds better/i)).toBeVisible();
   await expect(page.getByText('Headroom needed')).toBeVisible();
   // Ten bands plus a preamp, each an accessible slider, inside the band group.
@@ -201,4 +218,98 @@ test('space toggles playback and does not scroll the page', async ({ page }) => 
   const before = await page.evaluate(() => window.scrollY);
   await page.locator('body').press('Space');
   expect(await page.evaluate(() => window.scrollY)).toBe(before);
+});
+
+
+test.describe('the music list', () => {
+  /*
+   * The list is the reference's, not a reinterpretation of it: nine columns in its order, its
+   * sortable headers, its per-row star and offline keys, its source badge. These assertions are
+   * deliberately about the *columns* rather than about styling — a redesign that quietly dropped
+   * BPM or the source badge would still look fine in a screenshot, and would fail here.
+   */
+  test('has the reference\u2019s nine columns, in its order', async ({ page }) => {
+    await loadFixtures(page);
+    const headers = await page.getByRole('columnheader').allTextContents();
+    expect(headers.map((text) => text.replace(/[\u25b2\u25bc]/g, '').trim())).toEqual(['#', '', 'Song', 'Artist', 'Time', 'BPM', '', '', 'Album']);
+  });
+
+  test('sorts on a header, and only the sorted column says so', async ({ page }) => {
+    await loadFixtures(page);
+    // Song is the column the list arrives sorted on, so it starts ascending and a click flips it —
+    // the reference's rule: a new column starts ascending, the same column reverses.
+    const song = page.getByRole('columnheader', { name: /^Song/ });
+    await expect(song).toHaveAttribute('aria-sort', 'ascending');
+    const artist = page.getByRole('columnheader', { name: /^Artist/ });
+    await artist.click();
+    await expect(artist).toHaveAttribute('aria-sort', 'ascending');
+    await artist.click();
+    await expect(artist).toHaveAttribute('aria-sort', 'descending');
+    // And only the sorted column says so.
+    await expect(song).not.toHaveAttribute('aria-sort', /ascending|descending/);
+  });
+
+  test('stars a row, and says where each track lives', async ({ page }) => {
+    await loadFixtures(page);
+    const star = page.getByRole('button', { name: /^Star Quiet Arithmetic$/ });
+    await expect(star).toHaveAttribute('aria-pressed', 'false');
+    await star.click();
+    await expect(page.getByRole('button', { name: /Remove Quiet Arithmetic from favourites/ })).toHaveAttribute('aria-pressed', 'true');
+
+    // The offline key is a report, not a toggle: these files came from the picker, and it says so.
+    const offline = page.getByRole('button', { name: /Quiet Arithmetic was added with the file picker/ }).first();
+    await expect(offline).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  test('right-clicking a row opens the playlist menu', async ({ page }) => {
+    await loadFixtures(page);
+    await page.getByRole('row').filter({ hasText: 'Quiet Arithmetic' }).first().click({ button: 'right' });
+    const menu = page.getByRole('menu', { name: 'Song actions' });
+    await expect(menu).toBeVisible();
+    await expect(menu.getByRole('menuitem', { name: 'Add to Playlist' })).toBeVisible();
+
+    await menu.getByRole('menuitem', { name: 'Add to Playlist' }).click();
+    await expect(menu.getByRole('menuitem', { name: 'No playlists yet' })).toBeVisible();
+    await menu.getByRole('menuitem', { name: 'New Playlist…' }).first().click();
+
+    // The reference's alert sheet, with the song it was opened from named in it.
+    const sheet = page.getByRole('dialog', { name: 'New Playlist' });
+    await expect(sheet).toBeVisible();
+    await sheet.getByLabel('Playlist name').fill('Late night');
+    await sheet.getByRole('button', { name: 'Create' }).click();
+    await expect(sheet).toHaveCount(0);
+
+    await page.getByRole('option', { name: /^Playlists/ }).click();
+    await expect(page.getByText('Late night').first()).toBeVisible();
+  });
+});
+
+test.describe('the search popover', () => {
+  test('counts the matches, offers an audition, and pages', async ({ page }) => {
+    await loadFixtures(page);
+    await page.getByRole('combobox').fill('a');
+    const popover = page.getByRole('listbox', { name: 'Search results' });
+    await expect(popover).toBeVisible();
+    await expect(page.getByText(/results? in your library/)).toBeVisible();
+    // The artwork tile is the fifteen-second audition, exactly as the reference has it.
+    await expect(page.getByRole('button', { name: /Audition .*, 15 seconds/ }).first()).toBeVisible();
+
+    // The arrows walk the rows without taking focus out of the field.
+    await page.keyboard.press('ArrowDown');
+    await expect(page.getByRole('combobox')).toBeFocused();
+    await expect(page.getByRole('combobox')).toHaveAttribute('aria-activedescendant', /np-search-opt-/);
+  });
+});
+
+test('the equaliser is the iTunes window: On, a preset menu, a preamp and ten bands', async ({ page }) => {
+  await page.getByRole('option', { name: /Equaliser/i }).click();
+  await expect(page.getByRole('checkbox', { name: 'On' })).toBeChecked();
+  const bands = page.getByRole('group', { name: 'Equaliser bands' });
+  await expect(bands.getByRole('slider', { name: 'Preamp' })).toBeVisible();
+  for (const hz of [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16_000]) {
+    await expect(bands.getByRole('slider', { name: `${hz} Hz band` })).toBeVisible();
+  }
+  // The scale the screenshot labels, and the caps the band labels use.
+  await expect(page.getByText('+12 dB')).toBeVisible();
+  await expect(page.getByText('16K')).toBeVisible();
 });

@@ -1,54 +1,41 @@
 /**
  * The library: everything indexed from folders on this device.
  *
- * Two things the list is careful about. A track the browser cannot decode is shown, not hidden, with
- * the reason attached — the file exists, and pretending otherwise makes the library look wrong. And
- * the empty state explains what "add a folder" actually does (index, not copy), because people are
+ * The list itself is the reference's, verbatim — see `../components/MusicList.tsx`. This view is
+ * what surrounds it: the ways music gets in, the actions that work on the whole list, and the
+ * empty state.
+ *
+ * Two things it is careful about. A track the browser cannot decode is shown, not hidden, with the
+ * reason attached — the file exists, and pretending otherwise makes the library look wrong. And the
+ * empty state explains what "add a folder" actually does (index, not copy), because people are
  * reasonably wary of a web page asking for their music folder.
  */
-import { useMemo, useState } from 'react';
-import { AquaTable, Button, EmptyState, Panel, StatusDot, useToast, type SortDirection } from '@now-playing/aqua-ui';
+import { useState } from 'react';
+import { Button, EmptyState, Panel, useToast } from '@now-playing/aqua-ui';
 import type { Track } from '@now-playing/contracts';
 import { uuidv7 } from '@now-playing/domain';
 import type { ViewId } from '../App.js';
 import { useAppState, usePlayer } from '../state/context.js';
 import { toTrackRef } from '../state/store.js';
-import { AddToPlaylistSheet } from '../components/AddToPlaylistSheet.js';
+import { MusicList } from '../components/MusicList.js';
+import { NewPlaylistSheet } from '../components/NewPlaylistSheet.js';
 
 export function LibraryView({ onOpenView }: { onOpenView: (view: ViewId) => void }) {
   const { store } = usePlayer();
   const state = useAppState();
   const toast = useToast();
-  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [sort, setSort] = useState<{ columnId: string; direction: SortDirection }>({ columnId: 'artist', direction: 'ascending' });
+  const [newList, setNewList] = useState<{ open: boolean; track: Track | null }>({ open: false, track: null });
 
-  const rows = useMemo(() => {
-    const sorted = [...state.library.tracks];
-    const key = (track: Track): string => {
-      switch (sort.columnId) {
-        case 'title':
-          return track.title.toLowerCase();
-        case 'album':
-          return `${(track.albumName ?? '').toLowerCase()}|${String(track.discNumber ?? 0).padStart(3, '0')}|${String(track.trackNumber ?? 0).padStart(4, '0')}`;
-        case 'year':
-          return String(track.year ?? 0).padStart(6, '0');
-        default:
-          return `${track.artistName.toLowerCase()}|${(track.albumName ?? '').toLowerCase()}|${String(track.trackNumber ?? 0).padStart(4, '0')}`;
-      }
-    };
-    sorted.sort((a, b) => (sort.direction === 'ascending' ? key(a).localeCompare(key(b)) : key(b).localeCompare(key(a))));
-    return sorted;
-  }, [state.library.tracks, sort]);
-
-  const playFrom = (index: number): void => {
+  const playFrom = (track: Track, ordered: readonly Track[]): void => {
+    if (track.unsupportedReason) {
+      toast.show(track.unsupportedReason, { kind: 'warning' });
+      return;
+    }
     store.setQueue(
-      rows.map((track) => ({ id: uuidv7(), track: toTrackRef(track), context: { kind: 'library' as const, id: null, name: 'your library' } })),
-      index,
+      ordered.map((row) => ({ id: uuidv7(), track: toTrackRef(row), context: { kind: 'library' as const, id: null, name: 'your library' } })),
+      ordered.indexOf(track),
     );
   };
-
-  const selectedTracks = rows.filter((t) => selected.has(t.id)).map(toTrackRef);
 
   if (!state.library.tracks.length) {
     return (
@@ -66,109 +53,79 @@ export function LibraryView({ onOpenView }: { onOpenView: (view: ViewId) => void
     );
   }
 
+  const first = state.library.tracks[0];
+
   return (
     <>
       <div className="np-section-head">
         <h2>Music</h2>
         <p>
-          {rows.length} {rows.length === 1 ? 'track' : 'tracks'} indexed from folders on this device
+          {state.library.tracks.length} {state.library.tracks.length === 1 ? 'track' : 'tracks'} indexed from folders on this device
         </p>
       </div>
-      <Panel>
-        <div className="player-toolbar-row">
-          <Button size="small" icon="play" disabled={!rows.length} onClick={() => playFrom(0)}>
-            Play all
-          </Button>
-          <Button
-            size="small"
-            icon="shuffle"
-            disabled={!rows.length}
-            onClick={() => {
-              void store.setShuffle(true);
-              playFrom(Math.floor(Math.random() * rows.length));
-            }}
-          >
-            Shuffle all
-          </Button>
-          <Button size="small" icon="add" disabled={selected.size === 0} onClick={() => setSheetOpen(true)} ellipsis>
-            {selected.size ? `Add ${selected.size} to playlist` : 'Add to playlist'}
-          </Button>
-          <Button size="small" icon="sort" onClick={() => onOpenView('queue')}>
-            Up next
-          </Button>
-          {/* The old shell kept this in a bottom bar. A page has no bottom bar, and "add more music"
-              belongs beside the library it adds to. */}
-          <Button size="small" icon="add" onClick={() => void store.addDirectory()} ellipsis>
-            Add a folder
-          </Button>
-          <Button size="small" onClick={() => pickFiles(store)} ellipsis>
-            Choose files
-          </Button>
-        </div>
 
-        <AquaTable
-          variant="page"
-          height="min(58vh, 520px)"
-          label="Your music"
-          rowKey={(row: Track) => row.id}
-          rows={rows}
-          sort={sort}
-          onSortChange={(columnId, direction) => setSort({ columnId, direction })}
-          selectedKeys={selected}
-          onSelectionChange={(keys) => setSelected(keys)}
-          onActivate={(row) => playFrom(rows.indexOf(row))}
-          currentKey={state.queue[state.queueIndex]?.track.trackId ?? null}
-          columns={[
-            {
-              id: 'like',
-              header: (
-                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <path d="M12 2.6l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.5 6.1 20.6l1.2-6.5L2.5 9.5l6.6-.9z" />
-                </svg>
-              ),
-              headerLabel: 'Favourite',
-              align: 'center',
-              width: 30,
-              cell: (row) => (
-                <button type="button" className="np-list__btn" aria-pressed={row.liked} aria-label={row.liked ? `Remove ${row.title} from favourites` : `Add ${row.title} to favourites`} onClick={() => void store.toggleLike(row.id)}>
-                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <path d={row.liked ? 'M12 2.6l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.5 6.1 20.6l1.2-6.5L2.5 9.5l6.6-.9z' : 'M12 2.8l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.7l-5.9 3.1 1.2-6.5L2.5 9.7l6.6-.9zm0 4.5-1.7 3.5-3.8.5 2.8 2.7-.7 3.8 3.4-1.8 3.4 1.8-.7-3.8 2.8-2.7-3.8-.5z'} />
-                  </svg>
-                </button>
-              ),
-            },
-            {
-              id: 'title',
-              header: 'Title',
-              primary: true,
-              sortable: true,
-              /*
-               * The "cannot be decoded here" marker rides in the title cell rather than in a column
-               * of its own. As a column it was ninety pixels of empty space on every row of a
-               * healthy library, which reads as a rendering fault; beside the title it is where the
-               * eye already is on the one row that needs it.
-               */
-              cell: (row) =>
-                row.unsupportedReason ? (
-                  <span className="player-inline-status" title={row.unsupportedReason}>
-                    {row.title} <StatusDot kind="warning" label="Not playable here" />
-                  </span>
-                ) : (
-                  row.title
-                ),
-              stackText: (row) => row.artistName,
-            },
-            { id: 'artist', header: 'Artist', sortable: true, cell: (row) => row.artistName },
-            { id: 'album', header: 'Album', sortable: true, cell: (row) => row.albumName ?? '' },
-            { id: 'year', header: 'Year', align: 'right', width: 56, sortable: true, cell: (row) => row.year ?? '' },
-            { id: 'time', header: 'Time', align: 'right', width: 56, cell: (row) => formatDuration(row.durationMs) },
-          ]}
-          onContextMenu={(row) => {
-            if (row.unsupportedReason) toast.show(row.unsupportedReason, { kind: 'warning' });
+      <div className="np-toolbar-row">
+        <Button size="small" icon="play" disabled={!first} onClick={() => first && playFrom(first, state.library.tracks)}>
+          Play all
+        </Button>
+        <Button
+          size="small"
+          icon="shuffle"
+          onClick={() => {
+            void store.setShuffle(true);
+            const pick = state.library.tracks[Math.floor(Math.random() * state.library.tracks.length)];
+            if (pick) playFrom(pick, state.library.tracks);
           }}
-        />
-      </Panel>
-      <AddToPlaylistSheet open={sheetOpen} onClose={() => setSheetOpen(false)} tracks={selectedTracks} />
+        >
+          Shuffle all
+        </Button>
+        <Button size="small" icon="sort" onClick={() => onOpenView('queue')}>
+          Up next
+        </Button>
+        {/* The old shell kept these in a bottom bar. A page has no bottom bar, and "add more music"
+            belongs beside the library it adds to. */}
+        <Button size="small" icon="add" onClick={() => void store.addDirectory()} ellipsis>
+          Add a folder
+        </Button>
+        <Button size="small" onClick={() => pickFiles(store)} ellipsis>
+          Choose files
+        </Button>
+      </div>
+
+      <MusicList
+        label="Your music"
+        tracks={state.library.tracks}
+        playingTrackId={state.queue[state.queueIndex]?.track.trackId ?? null}
+        onPlay={playFrom}
+        onToggleStar={(track) => void store.toggleLike(track.id)}
+        playlists={state.playlists}
+        playlistItems={state.playlistItems}
+        onTogglePlaylist={(track, playlistId) => {
+          const existing = state.playlistItems.find((item) => item.playlistId === playlistId && item.track.trackId === track.id);
+          const playlist = state.playlists.find((list) => list.id === playlistId);
+          if (existing) {
+            void store.removeFromPlaylist(existing.id);
+            toast.show(`Removed from “${playlist?.name ?? 'the playlist'}”`);
+          } else {
+            void store.addToPlaylist(playlistId, [toTrackRef(track)]);
+            toast.show(`Added to “${playlist?.name ?? 'the playlist'}”`);
+          }
+        }}
+        onNewPlaylist={(track) => setNewList({ open: true, track })}
+        onSay={(message) => toast.show(message)}
+        ephemeralTrackIds={state.library.ephemeralTrackIds}
+      />
+
+      <NewPlaylistSheet
+        open={newList.open}
+        seedTitle={newList.track?.title ?? null}
+        onCancel={() => setNewList({ open: false, track: null })}
+        onCreate={(name) => {
+          void store.createPlaylist(name, newList.track ? [toTrackRef(newList.track)] : []);
+          toast.show(newList.track ? `Added to “${name}”` : `Created “${name}”`);
+          setNewList({ open: false, track: null });
+        }}
+      />
     </>
   );
 }

@@ -31,6 +31,15 @@ export interface QueueEntry {
 export interface LibraryState {
   tracks: Track[];
   roots: StoredRoot[];
+  /**
+   * Tracks whose file cannot be reopened after a reload.
+   *
+   * A file chosen with the one-shot picker gets the same locator as one scanned from a folder — the
+   * difference lives on its `files` record, not on the track. The list's offline key would
+   * otherwise tell someone a picked file is "already on this device", which is exactly the sort of
+   * claim this app does not make. So the flag is carried here, where the UI can read it.
+   */
+  ephemeralTrackIds: ReadonlySet<string>;
   scanning: ScanProgress | null;
   lastScan: ScanResult | null;
   /** Set when the browser cannot keep folders connected, so the UI can say so once. */
@@ -74,7 +83,7 @@ export class PlayerStore {
   constructor(readonly playback: PlaybackEngine) {
     this.state = {
       ready: false,
-      library: { tracks: [], roots: [], scanning: null, lastScan: null, directoryHandleReason: null },
+      library: { tracks: [], roots: [], ephemeralTrackIds: new Set(), scanning: null, lastScan: null, directoryHandleReason: null },
       playlists: [],
       playlistItems: [],
       presets: [...ALL_BUILTIN_PRESETS],
@@ -125,9 +134,10 @@ export class PlayerStore {
 
   async init(db?: PlayerDatabase): Promise<void> {
     this.db = db ?? (await openPlayerDb());
-    const [tracks, roots, playlists, playlistItems, storedPresets, bindings, events] = await Promise.all([
+    const [tracks, roots, files, playlists, playlistItems, storedPresets, bindings, events] = await Promise.all([
       this.db.getAll('tracks'),
       this.db.getAll('roots'),
+      this.db.getAll('files'),
       this.db.getAll('playlists'),
       this.db.getAll('playlistItems'),
       this.db.getAll('eqPresets'),
@@ -148,6 +158,7 @@ export class PlayerStore {
       library: {
         tracks: tracks.filter((t) => !t.deletedAt),
         roots,
+        ephemeralTrackIds: ephemeralIds(files),
         scanning: null,
         lastScan: null,
         directoryHandleReason: supportsDirectoryHandles() ? null : 'This browser cannot keep a folder connected between visits, so files added here are available only until you reload. Chrome, Edge and Opera can keep folders connected.',
@@ -242,11 +253,24 @@ export class PlayerStore {
 
   private async reloadLibrary(): Promise<void> {
     const db = this.require();
-    const [tracks, roots] = await Promise.all([db.getAll('tracks'), db.getAll('roots')]);
+    const [tracks, roots, files] = await Promise.all([db.getAll('tracks'), db.getAll('roots'), db.getAll('files')]);
     this.patch({
-      library: { ...this.state.library, tracks: tracks.filter((t) => !t.deletedAt), roots },
+      library: { ...this.state.library, tracks: tracks.filter((t) => !t.deletedAt), roots, ephemeralTrackIds: ephemeralIds(files) },
       storage: await storageReport(db),
     });
+  }
+
+  /**
+   * A blob URL for a short audition of a track, or the reason there is not one.
+   *
+   * The caller owns the URL and must revoke it. Kept separate from `loadCurrent` on purpose: an
+   * audition is not playback — it does not touch the queue, it does not file a listening event, and
+   * it must not leave the player pointing at a song nobody asked to hear.
+   */
+  async auditionUrl(trackId: string): Promise<{ url: string; reason: null } | { url: null; reason: string }> {
+    const resolved = await resolveFile(this.require(), trackId);
+    if (!resolved.file) return { url: null, reason: resolved.reason };
+    return { url: URL.createObjectURL(resolved.file), reason: null };
   }
 
   async artworkUrl(artworkId: string | null): Promise<string | null> {
@@ -653,7 +677,7 @@ export class PlayerStore {
     await clearEverything(db);
     this.playback.stop();
     this.patch({
-      library: { tracks: [], roots: [], scanning: null, lastScan: null, directoryHandleReason: this.state.library.directoryHandleReason },
+      library: { tracks: [], roots: [], ephemeralTrackIds: new Set(), scanning: null, lastScan: null, directoryHandleReason: this.state.library.directoryHandleReason },
       playlists: [],
       playlistItems: [],
       presets: [...ALL_BUILTIN_PRESETS],
@@ -665,6 +689,10 @@ export class PlayerStore {
     });
     this.notice('info', 'Everything stored by the player on this device has been deleted. Your music files were not touched.');
   }
+}
+
+function ephemeralIds(files: readonly { trackId: string; ephemeral?: boolean }[]): ReadonlySet<string> {
+  return new Set(files.filter((file) => file.ephemeral).map((file) => file.trackId));
 }
 
 export function toTrackRef(track: Track): TrackRef {

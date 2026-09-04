@@ -176,7 +176,7 @@ export function AquaTable<Row>({ columns, rows, rowKey, label, sort, onSortChang
         data-index={index}
         aria-selected={selected}
         aria-current={current ? 'true' : undefined}
-        data-playing={current ? 'true' : undefined}
+        className={page && current ? 'is-playing' : undefined}
         tabIndex={index === focusIndex ? 0 : -1}
         style={style}
         onClick={(e) => {
@@ -194,7 +194,7 @@ export function AquaTable<Row>({ columns, rows, rowKey, label, sort, onSortChang
         }}
       >
         {columns.map((col) => (
-          <td key={col.id} className={[col.align === 'right' && (page ? 'np-list__num' : 'aqua-table--num'), col.align === 'center' && (page ? 'np-list__icon' : 'aqua-table--center'), col.primary && (page ? 'np-list__title aqua-table__col--keep' : 'aqua-table__col--keep'), col.className].filter(Boolean).join(' ') || undefined}>
+          <td key={col.id} className={[col.align === 'right' && (page ? 'lib-num' : 'aqua-table--num'), col.align === 'center' && (page ? 'lib-icon' : 'aqua-table--center'), col.primary && (page ? 'lib-title aqua-table__col--keep' : 'aqua-table__col--keep'), col.className].filter(Boolean).join(' ') || undefined}>
             {col.cell(row, index)}
             {responsive && col.primary ? <span className="aqua-table__stack">{columns.filter((c) => c.stackText).map((c) => c.stackText!(row)).filter(Boolean).join(' — ')}</span> : null}
           </td>
@@ -223,14 +223,14 @@ export function AquaTable<Row>({ columns, rows, rowKey, label, sort, onSortChang
                   scope="col"
                   aria-sort={col.sortable ? (sorted ?? 'none') : undefined}
                   data-sortable={page && col.sortable ? 'true' : undefined}
-                  className={[col.align === 'right' && (page ? 'np-list__num' : 'aqua-table--num'), col.align === 'center' && (page ? 'np-list__icon' : 'aqua-table--center'), col.primary && 'aqua-table__col--keep'].filter(Boolean).join(' ') || undefined}
+                  className={[col.align === 'right' && (page ? 'lib-num' : 'aqua-table--num'), col.align === 'center' && (page ? 'lib-icon' : 'aqua-table--center'), col.primary && 'aqua-table__col--keep'].filter(Boolean).join(' ') || undefined}
                   aria-label={col.headerLabel}
                 >
                   {col.sortable ? (
                     <button type="button" className={page ? undefined : 'aqua-table__sort'} onClick={() => toggleSort(col)} aria-label={col.headerLabel ? `Sort by ${col.headerLabel}` : undefined}>
                       <span className={page ? undefined : 'aqua-table__header-label'}>{col.header}</span>
                       {sorted ? (
-                        <span className={page ? 'np-list__sort' : 'aqua-table__sort-glyph'} aria-hidden="true">
+                        <span className={page ? 'lib-sort' : 'aqua-table__sort-glyph'} aria-hidden="true">
                           {page ? (sorted === 'ascending' ? '\u25b2' : '\u25bc') : <Glyph name={sorted === 'ascending' ? 'sort-asc' : 'sort-desc'} />}
                         </span>
                       ) : null}
@@ -272,13 +272,13 @@ export function AquaTable<Row>({ columns, rows, rowKey, label, sort, onSortChang
   );
   if (page) {
     return (
-      <div className={['np-list', className].filter(Boolean).join(' ')} data-scrolling={scroller.active ? 'true' : undefined}>
-        <div ref={wrapRef} className="np-list__scroll" style={height !== undefined ? { maxHeight: height } : undefined}>
+      <div className={['library', scroller.active && 'is-scrolling', className].filter(Boolean).join(' ')}>
+        <div ref={wrapRef} className="library__scroll" style={height !== undefined ? { maxHeight: height } : undefined}>
           {table}
         </div>
         {scroller.overflowing ? (
-          <div className="np-list__bar" aria-hidden="true">
-            <div className="np-list__thumb" style={{ height: `${scroller.thumbHeight}px`, top: `${scroller.thumbTop}px` }} />
+          <div className="library__bar" aria-hidden="true">
+            <div className="library__thumb" style={{ height: `${scroller.thumbHeight}px`, transform: `translateY(${scroller.thumbTop}px)` }} />
           </div>
         ) : null}
       </div>

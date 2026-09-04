@@ -32,6 +32,35 @@ keyboard did not have to learn it again. Every material rule (1 px rims, light f
 chrome, selective blue, visible focus, reduced motion) still applies and is still tested; see the
 "2010 page surfaces" section of [AQUA_CONFORMANCE.md](AQUA_CONFORMANCE.md).
 
+### The equaliser window has no frame
+
+The supplied equaliser screenshot is a window: a title bar with three traffic lights over the On
+checkbox, the preset menu and the faders. Everything inside the frame is reproduced. The frame is
+not, because the player is a page rather than a window and the three lights would be three buttons
+that do nothing — and a control that cannot act is the one thing this app does not draw.
+
+**Instead:** the panel carries the same 1 px rim and the same brushed face, and the section it sits
+in is titled where the window's title bar would have been.
+
+### The disc's rainbow is iridescence, not a diffraction shader
+
+The reference computes the disc's spectrum from the grating equation in a custom fragment shader —
+a pressed CD is a 1.6 µm grating, and it argues that properly. This uses the material's own
+iridescence and anisotropy instead.
+
+**Instead:** a hundred lines less GLSL to be wrong about, at a size (232 px, often smaller) where
+the two read the same. Recorded because it is a real reduction in physical fidelity, not a tidy-up.
+
+### The offline key reports; it does not download
+
+The reference's download key is a toggle with nothing behind it — press it and an arrow becomes a
+check. Here the key keeps its place and its morph, and states whether the track can actually play
+with the network off: a file in a connected folder already can, a file from the one-shot picker
+cannot survive a reload, and a hub stream needs the hub.
+
+**Instead:** the state is computed per track and the reason is on the control. Caching hub streams
+into IndexedDB would make it a real download, and is not built — so it is not claimed.
+
 ### The player's LCD display became the hero
 
 §17.4 lists a central inset information display as a SHOULD, and the hub GUI keeps one. On a page

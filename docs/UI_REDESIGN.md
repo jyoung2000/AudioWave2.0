@@ -35,10 +35,12 @@ it is a demo harness that would be a security and privacy defect if it shipped.
 | The LIVE marker with the pulsing halo | Shown when Shared mode is following a host, and only then |
 | The chromeless transport: glyphs on the page, no slab, 48×44 keys, a 64×52 play key, pressed-in state | `.np-keys` |
 | The 122 px volume line with the gel knob | `.np-vol` |
-| The iTunes 10 list: 18 px rows, Aqua stripe and **no rules**, glossy embossed sticky header, sorted column tinted blue, monochrome initial badges, icon columns for download and star | `.np-list` — every list in the app |
-| The overlay Aqua gel scroller that fades when idle | `.np-list__bar` |
-| The parking marquee on the playing row (glide, park, glide back, gradient-dissolved edges) | Reused as-is; the existing `Marquee` component was already this |
-| The iOS context menu, the alert sheet, the toast | `.np-ctx`, restyled `Sheet`, restyled `Toast` |
+| The iTunes 10 list: nine columns, 18 px rows, Aqua stripe and **no rules**, glossy embossed sticky header, sorted column tinted blue, monochrome initial badges, icon columns for offline and star | `.library` — **the reference's own stylesheet block, copied rather than reinterpreted.** Every list in the app wears it |
+| The overlay Aqua gel scroller that fades 900 ms after the last movement, with a draggable thumb and a click-to-page track | `.library__bar`, ported from the reference's own code |
+| The parking marquee on the playing row: measured travel, one shared clock for title and artist, gradient-dissolved edges | `useMarquee`, ported |
+| The desktop context menu — Add to Playlist ▸ with checkmarks, a separator, New Playlist… — with its keyboard model and edge flip | `RowMenu`, ported |
+| The New Playlist alert sheet and the toast | `NewPlaylistSheet`, and the toast the reference's CSS describes |
+| The 3D jewel case on the stage: shut and turning while paused, falling open on play, the disc rising and spinning, drag with momentum | `lib/jewel-case.ts`, lazily mounted over the flat cover |
 | Dark mode for all of the above | Kept; the app had none before |
 
 ### Refused
@@ -76,7 +78,7 @@ does not change, and the existing tests keep testing the same thing.
 | Search | Field + results | The status-bar pill is now the app's only search field; the Search section shows the full results, the pill shows the popover |
 | Constellation | Three.js star field + `SegmentedControl` + 2D table fallback | Unchanged behaviour, reskinned; the stage borrows the hero's art-stage treatment |
 | Listening | Ranked tables and charts | Same data, `np-list` and restyled charts |
-| Equaliser | Preset menu, curve, 11 vertical sliders, bypass/limiter, headroom, retune | Unchanged structurally — this screen is a control panel and a control panel is what it should look like. Restyled to the new material |
+| Equaliser | Preset menu, curve, 11 vertical sliders, bypass/limiter, headroom, retune | Redrawn as the **iTunes equaliser window** from the supplied screenshot: an On checkbox beside the preset pop-up, a preamp and ten bands on a ±12 dB scale with tick dashes flanking each rail and lozenge thumbs. Every existing feature stays — the curve, the headroom figures, the limiter, the retuning panel, the import and export |
 | Settings | Six panels | Same six panels, restyled; the mode switch's capability report joins them |
 
 The hero is **persistent**. In the old shell the transport lived in the toolbar and "Now playing"
@@ -128,7 +130,23 @@ section is longer than the design deserves.
 
 ---
 
-## 4. What this does not change
+## 4. What the reference's columns mean here
+
+The reference's rows are demo data, so its platform badge, its tempo and its download key are
+decorations. These are real files. Each column keeps its place and its look and gains a meaning the
+code can back:
+
+| Column | What it says |
+|---|---|
+| Source badge | `L` for a file on this device, `H` for a hub stream, or the provider's initials. It is a **link** only when a provider gave a canonical URL to link to |
+| BPM | Read from the file's own tags at index time; a dash when the tag is absent. The reference fetched this from a third party over JSONP, which this app will not do |
+| Offline | Whether the track can play with the network off — a check for a file in a connected folder, an arrow with the reason for anything else. It reports rather than toggles, because there is nothing here to download. A file added with the one-shot picker reads as *not* offline, because it cannot be reopened after a reload |
+| Star | The library's own `liked` flag, the same one the transport's star sets |
+
+The audition button on the search rows is real too: fifteen seconds of the track through its own
+audio element, with whatever was playing paused for the duration and resumed after.
+
+## 5. What this does not change
 
 - The Aqua profile is still `snow-leopard-itunes-9`, and every §17 MUST is still a release gate
   (`docs/AQUA_CONFORMANCE.md`). The new surfaces are 2010 Apple rather than 2009 Apple — the same

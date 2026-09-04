@@ -61,10 +61,22 @@ export interface BarSearchProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   onSubmit?: (value: string) => void;
+  /**
+   * The arrow keys and Return, handed to whatever is rendered in `results`.
+   *
+   * Focus stays in the field — this is a combobox, and its listbox is pointed at with
+   * `aria-activedescendant` rather than by moving the focus ring into it. That is why the keys are
+   * routed out of here instead of being handled where the rows are.
+   */
+  onArrow?: (delta: 1 | -1) => void;
+  onCommit?: () => void;
+  activeDescendant?: string | null;
+  /** The id of the listbox inside `results`, for `aria-controls`. */
+  controls?: string;
 }
 
 /** The recessed pill, with the results popover pinned to its own edges. */
-export function BarSearch({ value, onChange, placeholder = 'Search', label, results, open = false, onOpenChange, onSubmit }: BarSearchProps) {
+export function BarSearch({ value, onChange, placeholder = 'Search', label, results, open = false, onOpenChange, onSubmit, onArrow, onCommit, activeDescendant, controls }: BarSearchProps) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const listId = useId();
   useDismiss(wrapRef, open, () => onOpenChange?.(false));
@@ -82,8 +94,9 @@ export function BarSearch({ value, onChange, placeholder = 'Search', label, resu
         placeholder={placeholder}
         role="combobox"
         aria-expanded={open}
-        aria-controls={listId}
+        aria-controls={controls ?? listId}
         aria-autocomplete="list"
+        {...(open && activeDescendant ? { 'aria-activedescendant': activeDescendant } : {})}
         autoComplete="off"
         spellCheck={false}
         onChange={(event) => {
@@ -97,13 +110,23 @@ export function BarSearch({ value, onChange, placeholder = 'Search', label, resu
           if (event.key === 'Escape') {
             onOpenChange?.(false);
             onChange('');
+          } else if (event.key === 'ArrowDown' && open) {
+            event.preventDefault();
+            onArrow?.(1);
+          } else if (event.key === 'ArrowUp' && open) {
+            event.preventDefault();
+            onArrow?.(-1);
           } else if (event.key === 'Enter') {
-            onSubmit?.(value);
+            event.preventDefault();
+            // A row under the arrows wins; otherwise Return means "show me everything".
+            if (open && onCommit) onCommit();
+            else onSubmit?.(value);
           }
         }}
       />
       {open && results ? (
-        <div id={listId} className="np-results">
+        // `.srch` is the reference's own popover: its markup, its classes, its stylesheet block.
+        <div id={listId} className="srch">
           {results}
         </div>
       ) : (

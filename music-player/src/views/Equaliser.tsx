@@ -44,69 +44,83 @@ export function EqualiserView() {
       </div>
       <Panel title="Equaliser">
         <PanelSection>
-          <div className="player-eq-header">
-            <PopUpMenu
-              label="Preset"
-              value={state.resolvedEq.presetId ?? ''}
-              onChange={(e) => void store.bindPreset('global', e.currentTarget.value)}
-              options={state.presets.map((p) => ({ value: p.id, label: p.kind === 'builtin' ? `${p.name} (built in)` : p.name }))}
-            />
-            <p className="player-hint">{state.resolvedEq.explanation}</p>
-            {isSolfeggio ? (
-              <p className="player-hint">
-                {active.description} These presets are filters, the same as every other preset here: they change how loud that part of the recording is. They do not generate a tone, they do not retune the
-                music (the Retuning panel below does that), and this app makes no claim that any frequency has a physical or medical effect.
-              </p>
-            ) : null}
+          {/*
+            * The iTunes equaliser window from the supplied screenshot: On beside the preset menu,
+            * then a preamp and ten bands on a ±12 dB scale. The frequencies are the app's real band
+            * centres — 32 through 16K — because they already were the ones in the picture.
+            */}
+          <div className="eqw">
+            <div className="eqw__head">
+              <Checkbox checked={!(engine?.bypassed ?? false)} onChange={(e) => store.setBypass(!e.currentTarget.checked)}>
+                On
+              </Checkbox>
+              <PopUpMenu
+                label="Preset"
+                hideLabel
+                value={state.resolvedEq.presetId ?? ''}
+                onChange={(e) => void store.bindPreset('global', e.currentTarget.value)}
+                options={state.presets.map((p) => ({ value: p.id, label: p.kind === 'builtin' ? `${p.name} (built in)` : p.name }))}
+              />
+            </div>
+
+            <div className="eqw__bank" role="group" aria-label="Equaliser bands">
+              <div className="eqw__scale" aria-hidden="true">
+                <span>+12 dB</span>
+                <span>0 dB</span>
+                <span>−12 dB</span>
+              </div>
+              <div className="eqw__band eqw__band--preamp">
+                <Slider
+                  label="Preamp"
+                  orientation="vertical"
+                  min={-12}
+                  max={12}
+                  step={0.5}
+                  value={engine?.preampDb ?? active.preampDb}
+                  onChange={(value) => store.playback.setPreamp(value)}
+                  format={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`}
+                />
+                <span className="eqw__label">Preamp</span>
+              </div>
+              {bands.map((band, index) => (
+                <div className="eqw__band" key={band.frequencyHz}>
+                  <Slider
+                    // The visible label is the short EQ convention ("1K"); the accessible name spells
+                    // out the frequency, which matters more once a parametric preset puts a band on
+                    // 528 Hz rather than on one of the familiar graphic centres.
+                    label={`${band.frequencyHz} Hz band`}
+                    orientation="vertical"
+                    min={EQ_GAIN_MIN_DB}
+                    max={EQ_GAIN_MAX_DB}
+                    step={0.5}
+                    value={band.gainDb}
+                    onChange={(value) => store.playback.setBandGain(index, value)}
+                    format={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`}
+                  />
+                  <span className="eqw__label">{formatFrequency(band.frequencyHz)}</span>
+                </div>
+              ))}
+            </div>
           </div>
+
+          <p className="player-hint">{state.resolvedEq.explanation}</p>
+          {isSolfeggio ? (
+            <p className="player-hint">
+              {active.description} These presets are filters, the same as every other preset here: they change how loud that part of the recording is. They do not generate a tone, they do not retune the
+              music (the Retuning panel below does that), and this app makes no claim that any frequency has a physical or medical effect.
+            </p>
+          ) : null}
 
           <EqCurve values={curve} frequencies={CURVE_FREQUENCIES} />
 
-          <div className="player-eq-bands" role="group" aria-label="Equaliser bands">
-            <div className="player-eq-band player-eq-band--preamp">
-              <Slider
-                label="Preamp"
-                orientation="vertical"
-                min={-12}
-                max={12}
-                step={0.5}
-                value={engine?.preampDb ?? active.preampDb}
-                onChange={(value) => store.playback.setPreamp(value)}
-                format={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`}
-              />
-              <span className="player-eq-band__label">Pre</span>
-            </div>
-            {bands.map((band, index) => (
-              <div className="player-eq-band" key={band.frequencyHz}>
-                <Slider
-                  // The visible label is the short EQ convention ("1k"); the accessible name spells
-                  // out the frequency, which matters more once a parametric preset puts a band on
-                  // 528 Hz rather than on one of the familiar graphic centres.
-                  label={`${band.frequencyHz} Hz band`}
-                  orientation="vertical"
-                  min={EQ_GAIN_MIN_DB}
-                  max={EQ_GAIN_MAX_DB}
-                  step={0.5}
-                  value={band.gainDb}
-                  onChange={(value) => store.playback.setBandGain(index, value)}
-                  format={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`}
-                />
-                <span className="player-eq-band__label">{formatFrequency(band.frequencyHz)}</span>
-              </div>
-            ))}
-          </div>
-
           <div className="player-toolbar-row">
-            <Checkbox checked={engine?.bypassed ?? false} onChange={(e) => store.setBypass(e.currentTarget.checked)}>
-              Bypass (level-matched)
-            </Checkbox>
             <Checkbox checked={engine?.limiterEnabled ?? true} onChange={(e) => store.playback.setLimiter(e.currentTarget.checked)}>
               Limiter
             </Checkbox>
           </div>
           <p className="player-hint">
-            Bypass plays the unprocessed signal at the same loudness as the processed one, so switching compares tone rather than volume. A louder signal always sounds better; matching the level is the only
-            way the comparison means anything.
+            Switching <strong>On</strong> off is a level-matched bypass: it plays the unprocessed signal at the same loudness as the processed one, so the switch compares tone rather than volume. A louder
+            signal always sounds better; matching the level is the only way the comparison means anything.
           </p>
         </PanelSection>
 
@@ -270,7 +284,8 @@ function EqCurve({ values, frequencies }: { values: readonly number[]; frequenci
 }
 
 function formatFrequency(hz: number): string {
-  return hz >= 1000 ? `${hz / 1000}k` : String(hz);
+  // "1K", not "1k": the equaliser this is drawn from sets its band labels in caps.
+  return hz >= 1000 ? `${hz / 1000}K` : String(hz);
 }
 
 function downloadJson(payload: unknown, filename: string): void {
