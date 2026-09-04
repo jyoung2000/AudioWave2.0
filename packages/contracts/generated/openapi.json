@@ -1658,7 +1658,8 @@
                         "downloads:request",
                         "transfers:receive",
                         "files:serve",
-                        "search:use"
+                        "search:use",
+                        "shares:create"
                       ]
                     }
                   },
@@ -1744,7 +1745,8 @@
                                 "downloads:request",
                                 "transfers:receive",
                                 "files:serve",
-                                "search:use"
+                                "search:use",
+                                "shares:create"
                               ]
                             }
                           },
@@ -2544,7 +2546,8 @@
                           "downloads:request",
                           "transfers:receive",
                           "files:serve",
-                          "search:use"
+                          "search:use",
+                          "shares:create"
                         ]
                       }
                     },
@@ -2773,7 +2776,8 @@
                                 "downloads:request",
                                 "transfers:receive",
                                 "files:serve",
-                                "search:use"
+                                "search:use",
+                                "shares:create"
                               ]
                             }
                           },
@@ -3167,7 +3171,8 @@
                           "downloads:request",
                           "transfers:receive",
                           "files:serve",
-                          "search:use"
+                          "search:use",
+                          "shares:create"
                         ]
                       }
                     },
@@ -3297,7 +3302,8 @@
                         "downloads:request",
                         "transfers:receive",
                         "files:serve",
-                        "search:use"
+                        "search:use",
+                        "shares:create"
                       ]
                     }
                   }
@@ -3426,7 +3432,8 @@
                               "downloads:request",
                               "transfers:receive",
                               "files:serve",
-                              "search:use"
+                              "search:use",
+                              "shares:create"
                             ]
                           }
                         },
@@ -3486,7 +3493,8 @@
                           "downloads:request",
                           "transfers:receive",
                           "files:serve",
-                          "search:use"
+                          "search:use",
+                          "shares:create"
                         ]
                       }
                     },
@@ -24617,7 +24625,8 @@
                                 "downloads:request",
                                 "transfers:receive",
                                 "files:serve",
-                                "search:use"
+                                "search:use",
+                                "shares:create"
                               ]
                             }
                           },
@@ -24727,7 +24736,8 @@
                                 "downloads:request",
                                 "transfers:receive",
                                 "files:serve",
-                                "search:use"
+                                "search:use",
+                                "shares:create"
                               ]
                             }
                           },
@@ -29525,6 +29535,1091 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/shares": {
+      "post": {
+        "operationId": "createShare",
+        "summary": "Create a shareable link for a track, album, playlist or library",
+        "tags": [
+          "shares"
+        ],
+        "x-route-name": "sharesCreate",
+        "x-auth": "admin-or-device",
+        "x-scopes": [
+          "shares:create"
+        ],
+        "x-setup-required": true,
+        "x-rate-limit": "write",
+        "parameters": [],
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "deviceCredential": [
+              "shares:create"
+            ]
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "share": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                          "description": "UUID (v7 preferred; stable across sync)"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "track",
+                            "album",
+                            "playlist",
+                            "library"
+                          ]
+                        },
+                        "targetId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200,
+                          "description": "Track/album/playlist id, or the owner device id for a library share"
+                        },
+                        "title": {
+                          "type": "string",
+                          "maxLength": 300
+                        },
+                        "ownerId": {
+                          "type": "string",
+                          "maxLength": 200,
+                          "description": "Device id or admin"
+                        },
+                        "tokenHint": {
+                          "type": "string",
+                          "maxLength": 8,
+                          "description": "Last characters shown in lists"
+                        },
+                        "allowStream": {
+                          "default": true,
+                          "type": "boolean"
+                        },
+                        "allowDownload": {
+                          "default": false,
+                          "type": "boolean"
+                        },
+                        "expiresAt": {
+                          "default": null,
+                          "nullable": true,
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                          "description": "UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z"
+                        },
+                        "maxAccesses": {
+                          "default": null,
+                          "nullable": true,
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": true,
+                          "maximum": 9007199254740991
+                        },
+                        "accessCount": {
+                          "default": 0,
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "playCount": {
+                          "default": 0,
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                          "description": "UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z"
+                        },
+                        "revokedAt": {
+                          "default": null,
+                          "nullable": true,
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                          "description": "UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z"
+                        },
+                        "url": {
+                          "nullable": true,
+                          "description": "Absolute URL when the hub has a reachable endpoint; null otherwise",
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "reachable": {
+                          "type": "boolean",
+                          "description": "False when the hub has no public endpoint or LAN bind, so the link only works locally"
+                        },
+                        "warning": {
+                          "nullable": true,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind",
+                        "targetId",
+                        "title",
+                        "ownerId",
+                        "tokenHint",
+                        "allowStream",
+                        "allowDownload",
+                        "expiresAt",
+                        "maxAccesses",
+                        "accessCount",
+                        "playCount",
+                        "createdAt",
+                        "revokedAt",
+                        "url",
+                        "reachable",
+                        "warning"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "token": {
+                      "type": "string",
+                      "description": "Returned exactly once"
+                    }
+                  },
+                  "required": [
+                    "share",
+                    "token"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "default": "about:blank",
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "description": "Machine-readable error code",
+                      "type": "string"
+                    },
+                    "correlationId": {
+                      "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated"
+          },
+          "403": {
+            "description": "Forbidden (scope, CSRF, or setup incomplete)"
+          },
+          "429": {
+            "description": "Rate limited; honours Retry-After"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "track",
+                      "album",
+                      "playlist",
+                      "library"
+                    ]
+                  },
+                  "targetId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "title": {
+                    "type": "string",
+                    "maxLength": 300
+                  },
+                  "allowStream": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "allowDownload": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "expiresInSeconds": {
+                    "default": null,
+                    "nullable": true,
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 31536000
+                  },
+                  "maxAccesses": {
+                    "default": null,
+                    "nullable": true,
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991
+                  },
+                  "items": {
+                    "maxItems": 5000,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "trackId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                          "description": "UUID (v7 preferred; stable across sync)"
+                        },
+                        "title": {
+                          "type": "string",
+                          "maxLength": 300
+                        },
+                        "artistName": {
+                          "type": "string",
+                          "maxLength": 300
+                        },
+                        "albumName": {
+                          "default": null,
+                          "nullable": true,
+                          "type": "string",
+                          "maxLength": 300
+                        },
+                        "durationMs": {
+                          "default": null,
+                          "nullable": true,
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "contentHash": {
+                          "default": null,
+                          "nullable": true,
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        },
+                        "openAtSourceUrl": {
+                          "default": null,
+                          "nullable": true,
+                          "type": "string",
+                          "format": "uri"
+                        }
+                      },
+                      "required": [
+                        "trackId",
+                        "title",
+                        "artistName"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "kind",
+                  "targetId"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listShares",
+        "summary": "Links created by the caller (admin sees all)",
+        "tags": [
+          "shares"
+        ],
+        "x-route-name": "sharesList",
+        "x-auth": "admin-or-device",
+        "x-scopes": [],
+        "x-setup-required": true,
+        "x-rate-limit": "default",
+        "parameters": [],
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "deviceCredential": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                            "description": "UUID (v7 preferred; stable across sync)"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "track",
+                              "album",
+                              "playlist",
+                              "library"
+                            ]
+                          },
+                          "targetId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200,
+                            "description": "Track/album/playlist id, or the owner device id for a library share"
+                          },
+                          "title": {
+                            "type": "string",
+                            "maxLength": 300
+                          },
+                          "ownerId": {
+                            "type": "string",
+                            "maxLength": 200,
+                            "description": "Device id or admin"
+                          },
+                          "tokenHint": {
+                            "type": "string",
+                            "maxLength": 8,
+                            "description": "Last characters shown in lists"
+                          },
+                          "allowStream": {
+                            "default": true,
+                            "type": "boolean"
+                          },
+                          "allowDownload": {
+                            "default": false,
+                            "type": "boolean"
+                          },
+                          "expiresAt": {
+                            "default": null,
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                            "description": "UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z"
+                          },
+                          "maxAccesses": {
+                            "default": null,
+                            "nullable": true,
+                            "type": "integer",
+                            "minimum": 0,
+                            "exclusiveMinimum": true,
+                            "maximum": 9007199254740991
+                          },
+                          "accessCount": {
+                            "default": 0,
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "playCount": {
+                            "default": 0,
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                            "description": "UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z"
+                          },
+                          "revokedAt": {
+                            "default": null,
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                            "description": "UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z"
+                          },
+                          "url": {
+                            "nullable": true,
+                            "description": "Absolute URL when the hub has a reachable endpoint; null otherwise",
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "reachable": {
+                            "type": "boolean",
+                            "description": "False when the hub has no public endpoint or LAN bind, so the link only works locally"
+                          },
+                          "warning": {
+                            "nullable": true,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "targetId",
+                          "title",
+                          "ownerId",
+                          "tokenHint",
+                          "allowStream",
+                          "allowDownload",
+                          "expiresAt",
+                          "maxAccesses",
+                          "accessCount",
+                          "playCount",
+                          "createdAt",
+                          "revokedAt",
+                          "url",
+                          "reachable",
+                          "warning"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "default": "about:blank",
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "description": "Machine-readable error code",
+                      "type": "string"
+                    },
+                    "correlationId": {
+                      "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated"
+          },
+          "403": {
+            "description": "Forbidden (scope, CSRF, or setup incomplete)"
+          },
+          "429": {
+            "description": "Rate limited; honours Retry-After"
+          }
+        }
+      }
+    },
+    "/api/v1/shares/{shareId}": {
+      "delete": {
+        "operationId": "revokeShare",
+        "summary": "Revoke a link",
+        "tags": [
+          "shares"
+        ],
+        "x-route-name": "sharesRevoke",
+        "x-auth": "admin-or-device",
+        "x-scopes": [],
+        "x-setup-required": true,
+        "x-rate-limit": "default",
+        "parameters": [
+          {
+            "name": "shareId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "description": "UUID (v7 preferred; stable across sync)"
+            },
+            "description": "UUID (v7 preferred; stable across sync)"
+          }
+        ],
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "deviceCredential": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "default": "about:blank",
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "description": "Machine-readable error code",
+                      "type": "string"
+                    },
+                    "correlationId": {
+                      "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated"
+          },
+          "403": {
+            "description": "Forbidden (scope, CSRF, or setup incomplete)"
+          },
+          "429": {
+            "description": "Rate limited; honours Retry-After"
+          }
+        }
+      }
+    },
+    "/api/v1/shares/resolve/{token}": {
+      "get": {
+        "operationId": "resolveShare",
+        "summary": "Public: metadata for a shared link (rate limited; counts an access)",
+        "tags": [
+          "shares"
+        ],
+        "x-route-name": "shareResolve",
+        "x-auth": "none",
+        "x-scopes": [],
+        "x-setup-required": false,
+        "x-rate-limit": "search",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 16,
+              "maxLength": 64
+            }
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "track",
+                        "album",
+                        "playlist",
+                        "library"
+                      ]
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "ownerDisplayName": {
+                      "type": "string"
+                    },
+                    "artworkUrl": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "trackId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                            "description": "UUID (v7 preferred; stable across sync)"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "artistName": {
+                            "type": "string"
+                          },
+                          "albumName": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "durationMs": {
+                            "nullable": true,
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "artworkUrl": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "streamable": {
+                            "type": "boolean"
+                          },
+                          "downloadable": {
+                            "type": "boolean"
+                          },
+                          "openAtSourceUrl": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "availabilityNote": {
+                            "nullable": true,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "trackId",
+                          "title",
+                          "artistName",
+                          "albumName",
+                          "durationMs",
+                          "artworkUrl",
+                          "streamable",
+                          "downloadable",
+                          "openAtSourceUrl",
+                          "availabilityNote"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "totalItems": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "expiresAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                      "description": "UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z"
+                    },
+                    "allowStream": {
+                      "type": "boolean"
+                    },
+                    "allowDownload": {
+                      "type": "boolean"
+                    },
+                    "hubName": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "title",
+                    "description",
+                    "ownerDisplayName",
+                    "artworkUrl",
+                    "items",
+                    "totalItems",
+                    "expiresAt",
+                    "allowStream",
+                    "allowDownload",
+                    "hubName"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "default": "about:blank",
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "description": "Machine-readable error code",
+                      "type": "string"
+                    },
+                    "correlationId": {
+                      "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated"
+          },
+          "403": {
+            "description": "Forbidden (scope, CSRF, or setup incomplete)"
+          },
+          "429": {
+            "description": "Rate limited; honours Retry-After"
+          }
+        }
+      }
+    },
+    "/api/v1/shares/stream/{token}/{trackId}": {
+      "get": {
+        "operationId": "streamShared",
+        "summary": "Public: range-capable stream of a shared hub-hosted track when allowStream is set",
+        "tags": [
+          "shares"
+        ],
+        "x-route-name": "shareStream",
+        "x-auth": "none",
+        "x-scopes": [],
+        "x-setup-required": false,
+        "x-rate-limit": "search",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 16,
+              "maxLength": 64
+            }
+          },
+          {
+            "name": "trackId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "description": "UUID (v7 preferred; stable across sync)"
+            },
+            "description": "UUID (v7 preferred; stable across sync)"
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "audio/*": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "default": "about:blank",
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "description": "Machine-readable error code",
+                      "type": "string"
+                    },
+                    "correlationId": {
+                      "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated"
+          },
+          "403": {
+            "description": "Forbidden (scope, CSRF, or setup incomplete)"
+          },
+          "429": {
+            "description": "Rate limited; honours Retry-After"
+          }
+        }
+      }
+    },
+    "/s/{token}": {
+      "get": {
+        "operationId": "sharePage",
+        "summary": "Public: HTML share page (Aqua-styled) with player and open-at-source links",
+        "tags": [
+          "shares"
+        ],
+        "x-route-name": "sharePage",
+        "x-auth": "none",
+        "x-scopes": [],
+        "x-setup-required": false,
+        "x-rate-limit": "search",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 16,
+              "maxLength": 64
+            }
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "default": "about:blank",
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "description": "Machine-readable error code",
+                      "type": "string"
+                    },
+                    "correlationId": {
+                      "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated"
+          },
+          "403": {
+            "description": "Forbidden (scope, CSRF, or setup incomplete)"
+          },
+          "429": {
+            "description": "Rate limited; honours Retry-After"
           }
         }
       }

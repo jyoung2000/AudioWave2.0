@@ -26,7 +26,7 @@ const ENTITY_NAMES = [
   'DownloadJob', 'TransferJob', 'DiscoveryJob', 'PairingSession', 'PairingLinkPayload', 'DiscordConfiguration', 'DiscordTemplates', 'DiscordStatus', 'AuditEvent',
   'CanonicalTrack', 'CanonicalArtist', 'TrackPlatform', 'ArtistRelation', 'DiscoveryCacheEntry',
   'PlaylistJson', 'EqPresetJson', 'HistoryCsvRow', 'HistoryImportReport', 'ReleaseMetadata', 'SyncManifest', 'SyncChange', 'SyncDeltaRequest', 'SyncDeltaResponse', 'SyncStatus',
-  'Envelope', 'ProblemDetails', 'SearchResult', 'SearchResponse', 'HubIdentity',
+  'Envelope', 'ProblemDetails', 'SearchResult', 'SearchResponse', 'HubIdentity', 'ShareLink', 'ShareLinkView', 'SharePayload',
 ] as const;
 
 function toSchema(schema: z.ZodTypeAny, io: 'input' | 'output', title: string): Record<string, unknown> {

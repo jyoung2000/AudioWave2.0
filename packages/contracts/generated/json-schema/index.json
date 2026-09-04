@@ -67,6 +67,9 @@
     "ProblemDetails": "ProblemDetails.schema.json",
     "SearchResult": "SearchResult.schema.json",
     "SearchResponse": "SearchResponse.schema.json",
-    "HubIdentity": "HubIdentity.schema.json"
+    "HubIdentity": "HubIdentity.schema.json",
+    "ShareLink": "ShareLink.schema.json",
+    "ShareLinkView": "ShareLinkView.schema.json",
+    "SharePayload": "SharePayload.schema.json"
   }
 }

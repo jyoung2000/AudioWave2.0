@@ -122,3 +122,11 @@ A second specification was supplied mid-build. It is implemented as follows (no 
 | Discovery cache, background discovery, incremental sync, rate-limit manager, request budgeting | Hub `discovery_cache`, `discovery_jobs`, `user_platform_sync` (cursor/snapshot/etag), `RateLimitManager` with per-platform token buckets, concurrency limits, `Retry-After`, backoff and P0–P4 priority classes with budget-aware shedding. |
 | Storage | SQLite (WAL) in the one-container default; the design keeps a repository layer so PostgreSQL/Redis can be added without weakening the single-container path. |
 | Spotify development-mode limits, YouTube quota, SoundCloud 429 handling, Bandcamp access approval | Documented in `docs/PROVIDER_CAPABILITIES.md`; enforced by adapters and the rate-limit manager; nothing bypasses quotas, rotation or scraping. |
+
+## 8. Addendum — sharing, transport-row actions, Android media integration
+
+| Request | Implementation | Honest limit |
+|---|---|---|
+| Shareable links for songs, albums, libraries, playlists | Hub-served revocable links (`/s/<token>`, token hashed at rest, expiry, access caps, stream/download flags, public Aqua share page, `shares:create` scope). The player creates links for its own library/playlists by uploading item metadata; hub-hosted content streams publicly when allowed. Without a hub, the player offers Web Share API / file export (playlist JSON, M3U) and copy-to-clipboard instead. Admin sees and can revoke every link. | A link is reachable only where the hub is reachable; browser-local files are shared as metadata + open-at-source links unless their bytes were transferred to the hub. |
+| Star / add-to-playlist in the transport row | `Transport` aux slots: Star (toggles like and membership in the built-in "Starred Songs" playlist), "Add to Playlist…" menu, Share. | — |
+| Android Auto | Full Media Session API integration (metadata, artwork, play/pause/prev/next/seek/stop handlers, position state), background audio continuity, a large-control **Car mode** view. Bluetooth/AVRCP head units and the Android media notification control the player. | Android Auto shows only native Android media apps (Media3/MediaBrowserService). A PWA cannot register as an Android Auto app; the UI and docs say so plainly instead of pretending. |
