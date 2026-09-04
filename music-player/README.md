@@ -72,7 +72,7 @@ track and its controls on the car's display, from the steering wheel and from he
 
 ## Accessibility
 
-Every screen passes an axe check in CI, and the keyboard model is tested rather than assumed: every
+Every screen passes an axe check in CI (and so does the hub's admin GUI, in its own suite), and the keyboard model is tested rather than assumed: every
 section reachable with the keyboard alone, every transport control focusable and named, focus visible
 wherever it lands (including where the visible ring is on an ancestor), and reduced motion honoured.
 The interface follows `docs/design/APPLE_AQUA_2009_2010_UI_DESIGN_SPEC.md` under the

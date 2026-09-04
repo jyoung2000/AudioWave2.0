@@ -81,7 +81,7 @@ and reports platform-unavailable ones as skipped, never as passed.
 | Append-only listening events | **Done** |
 | Deterministic recommender | **Done** |
 | Remote-access truth table, including the rows that say "No" | **Done** |
-| Accessibility: axe on every screen, keyboard-only navigation, reduced motion | **Done** |
+| Accessibility: axe on the player's nine screens and the hub's thirteen admin views, keyboard-only navigation, reduced motion | **Done** |
 | Performance budgets measured from built output | **Done** |
 | Documentation set | **Done** |
 | Linux CI (lint, typecheck, every test project, builds, a11y, e2e) | **Done** |

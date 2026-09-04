@@ -80,9 +80,9 @@ true if each one maps to something that can fail, so this page is the map. Three
 |---|---|
 | Loads with no runtime errors or console warnings | **Test** — the first player e2e test fails on any console error |
 | Core workflows still complete | **Test** — the ten acceptance flows, mapped in [TESTING.md](TESTING.md) |
-| Keyboard and screen-reader operability | **Test** — axe on all nine screens plus keyboard-only navigation |
+| Keyboard and screen-reader operability | **Test** — axe on the player's nine screens and the hub's thirteen admin views, plus keyboard-only navigation of both |
 | Reduced motion honoured | **Test** |
-| Colour contrast | **Test** — axe, on every screen |
+| Colour contrast | **Test** — axe, on every screen of both interfaces |
 
 ## What is not met
 

@@ -25,14 +25,14 @@ never as passed.
 | `integration` | `**/tests/integration` | A real hub (real Fastify, real SQLite, real argon2) and, for the companion, its real client against that hub | ~100 |
 | `security` | `**/tests/security` | The controls, as behaviour: the sanitiser, the channel allowlist, CSP, SSRF, rate limits, authorization | ~40 |
 | `perf` | `tests/perf` | Bundle budgets measured from built output | 8 |
-| e2e (Playwright) | `music-player/tests/e2e`, `docker-container/tests/e2e` | Real browsers against real production builds | 31 |
+| e2e (Playwright) | `music-player/tests/e2e`, `docker-container/tests/e2e` | Real browsers against real production builds, including axe on every screen of both interfaces | 45 |
 
 ```sh
 pnpm test               # unit + dom + contracts + integration
 pnpm test:security
 pnpm build && pnpm test:perf      # budgets need the build first
 pnpm test:e2e           # player and hub, both against production builds
-pnpm test:a11y          # the axe pass, on every screen
+pnpm test:a11y          # the axe pass: nine player screens and thirteen admin views
 
 pnpm exec vitest run --project unit windows-companion   # one project, one path
 ```

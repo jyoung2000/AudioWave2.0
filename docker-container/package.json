@@ -15,7 +15,8 @@
     "test": "vitest run --project unit --project integration --project security",
     "test:e2e": "playwright test --config tests/e2e/playwright.config.ts",
     "docker:build": "docker build -t now-playing-hub -f Dockerfile ..",
-    "docker:up": "docker compose -f compose.yaml up --build"
+    "docker:up": "docker compose -f compose.yaml up --build",
+    "test:a11y": "playwright test --config tests/e2e/playwright.config.ts --grep @a11y"
   },
   "dependencies": {
     "@discordjs/voice": "0.19.2",

@@ -35,12 +35,14 @@ jobs:
         run: pnpm lint
       - name: Typecheck
         run: pnpm typecheck
-      - name: Unit, contract, integration and security tests
+      - name: Unit, DOM, contract, integration and security tests
         run: pnpm test && pnpm test:security
       - name: Build all products
         run: pnpm build
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Performance budgets (measured from the build above)
+        run: pnpm test:perf
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - name: Accessibility and end-to-end tests

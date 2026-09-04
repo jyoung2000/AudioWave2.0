@@ -29,7 +29,7 @@
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
     "test:contracts": "vitest run --project contracts",
-    "test:a11y": "pnpm --filter @now-playing/music-player test:a11y",
+    "test:a11y": "pnpm --filter @now-playing/music-player test:a11y && pnpm --filter @now-playing/hub test:a11y",
     "test:e2e": "pnpm --filter @now-playing/music-player test:e2e && pnpm --filter @now-playing/hub test:e2e",
     "test:security": "vitest run --project security",
     "verify": "node scripts/verify.mjs",
