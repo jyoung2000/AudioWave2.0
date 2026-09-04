@@ -9,7 +9,7 @@
     "dev": "vite --host 127.0.0.1 --port 5173",
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4173",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tests/e2e/tsconfig.json --noEmit",
     "test": "vitest run --project unit --project dom",
     "test:e2e": "playwright test --config tests/e2e/playwright.config.ts",
     "test:a11y": "playwright test --config tests/e2e/playwright.config.ts --grep @a11y",

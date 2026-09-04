@@ -10,7 +10,7 @@
     "dev:api": "tsx src/server.ts",
     "build": "pnpm typecheck && node scripts/build.mjs && vite build --config src/web/vite.config.ts",
     "start": "node dist/server.js",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p src/web/tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p src/web/tsconfig.json --noEmit && tsc -p tests/e2e/tsconfig.json --noEmit",
     "migrate": "tsx src/db/migrate-cli.ts",
     "test": "vitest run --project unit --project integration --project security",
     "test:e2e": "playwright test --config tests/e2e/playwright.config.ts",

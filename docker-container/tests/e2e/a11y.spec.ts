@@ -11,13 +11,13 @@
  * keyboard cannot reach.
  */
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 const VIEWS = ['Overview', 'Devices', 'Groups', 'Library', 'Providers', 'Downloads', 'Shared links', 'Recommendations', 'Discord', 'Network', 'Backup', 'Diagnostics'] as const;
 
 /** axe needs a page from a real context, which is why the signed-out test builds one rather than
  * calling `browser.newPage()`. */
-async function analyse(page: import('@playwright/test').Page): Promise<void> {
+async function analyse(page: Page): Promise<void> {
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
   // The message carries the rule and the element, so a failure says what to fix rather than a count.
   const summary = results.violations.map((v) => `${v.id} (${v.impact}): ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`).join('\n');
