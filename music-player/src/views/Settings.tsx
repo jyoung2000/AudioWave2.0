@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AquaTable, Button, ButtonLink, EmptyState, KeyValueList, Panel, PanelSection, StatusDot, TextField, useToast } from '@now-playing/aqua-ui';
 import { useAppState, usePlayer } from '../state/context.js';
-import { EqualiserView } from './Equaliser.js';
+import { EqualizerView } from './Equalizer.js';
 import { mediaIntegrationReport } from '../lib/media-session.js';
 import { localFileReport } from '../lib/build-flags.js';
 import type { ReleaseMetadata } from '@now-playing/contracts';
@@ -97,7 +97,7 @@ export function SettingsView() {
         </PanelSection>
       </Panel>
 
-      <EqualiserView embedded />
+      <EqualizerView embedded />
 
       <HubPanel />
 
@@ -218,7 +218,7 @@ function SharedListeningPanel() {
         />
         <p className="player-hint">
           In a group the queue lives on the hub: everyone hears the same order, and skipping is a request the hub grants or refuses rather than something one player does alone. Your library, your
-          equaliser and your listening history stay on this device either way — joining a group does not upload your music.
+          equalizer and your listening history stay on this device either way — joining a group does not upload your music.
         </p>
         {shared.group && group ? (
           <div className="player-toolbar-row">

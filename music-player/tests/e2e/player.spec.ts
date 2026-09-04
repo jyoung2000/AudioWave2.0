@@ -2,7 +2,7 @@
  * End-to-end flows for the player, against a real production build.
  *
  * These check what a person actually experiences: the app loads with no music and says what to do,
- * the transport row carries Star / Add to playlist / Share, the equaliser explains what it is doing,
+ * the transport row carries Star / Add to playlist / Share, the equalizer explains what it is doing,
  * and every screen is reachable by keyboard. They deliberately do not stub the app's own modules —
  * a test that passes against a mock of the thing under test proves nothing.
  */
@@ -119,7 +119,7 @@ test('the section strip moves with the arrow keys, like the source list it repla
  * Listening alone, the strip is four destinations and nothing else.
  *
  * The rest did not disappear — search is the field in the bar, Settings is the avatar, the
- * equaliser is a panel inside Settings — but a menu that lists group business to someone with no
+ * equalizer is a panel inside Settings — but a menu that lists group business to someone with no
  * group is a menu you have to read past.
  */
 test('the solo strip is the four destinations a solo session has', async ({ page }) => {
@@ -128,7 +128,7 @@ test('the solo strip is the four destinations a solo session has', async ({ page
   for (const name of ['Music Library', 'Queue', 'Playlists', 'Listening history']) {
     await expect(strip.getByRole('option', { name: new RegExp(`^${name}`) })).toBeVisible();
   }
-  for (const gone of ['Equaliser', 'Settings', 'Search', 'Constellation']) {
+  for (const gone of ['Equalizer', 'Settings', 'Search', 'Constellation']) {
     await expect(strip.getByRole('option', { name: new RegExp(gone, 'i') })).toHaveCount(0);
   }
 });
@@ -154,17 +154,17 @@ test('every section is reachable and renders', async ({ page }) => {
 /**
  * Two things moved into Settings, and Settings moved onto the avatar.
  *
- * The equaliser was a section of its own; it is a panel now. The Windows companion download never
+ * The equalizer was a section of its own; it is a panel now. The Windows companion download never
  * had a home at all — the hub has served its release metadata since the beginning and nothing asked
  * for it. It must never become a button that downloads nothing: with no hub paired there is no
  * build to offer, and the panel has to say which of the two is missing.
  */
-test('Settings opens from the avatar and carries the equaliser and the companion download', async ({ page }) => {
+test('Settings opens from the avatar and carries the equalizer and the companion download', async ({ page }) => {
   await openSettings(page);
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
 
   await expect(page.getByRole('checkbox', { name: 'On' })).toBeVisible();
-  await expect(page.getByRole('group', { name: 'Equaliser bands' }).getByRole('slider')).toHaveCount(11);
+  await expect(page.getByRole('group', { name: 'Equalizer bands' }).getByRole('slider')).toHaveCount(11);
 
   const companion = page.locator('.aqua-panel').filter({ hasText: 'Windows companion' }).first();
   await expect(companion).toBeVisible();
@@ -173,15 +173,15 @@ test('Settings opens from the avatar and carries the equaliser and the companion
   await expect(companion.getByRole('link', { name: /Download for/i })).toHaveCount(0);
 });
 
-test('the equaliser explains level-matched bypass and the headroom it applies', async ({ page }) => {
+test('the equalizer explains level-matched bypass and the headroom it applies', async ({ page }) => {
   await openSettings(page);
-  // The window's own switch, from the screenshot this equaliser is drawn from.
+  // The window's own switch, from the screenshot this equalizer is drawn from.
   await expect(page.getByRole('checkbox', { name: 'On' })).toBeVisible();
   await expect(page.getByText(/is a level-matched bypass/i)).toBeVisible();
   await expect(page.getByText(/A louder signal always sounds better/i)).toBeVisible();
   await expect(page.getByText('Headroom needed')).toBeVisible();
   // Ten bands plus a preamp, each an accessible slider, inside the band group.
-  await expect(page.getByRole('group', { name: 'Equaliser bands' }).getByRole('slider')).toHaveCount(11);
+  await expect(page.getByRole('group', { name: 'Equalizer bands' }).getByRole('slider')).toHaveCount(11);
 });
 
 test('the solfeggio presets are filters, and say so where the choice is made', async ({ page }) => {
@@ -201,10 +201,19 @@ test('the solfeggio presets are filters, and say so where the choice is made', a
   await expect(page.getByText(/it does not add a 528 Hz tone/)).toBeVisible();
   await expect(page.getByText(/makes no claim that any frequency has a physical or medical effect/i)).toBeVisible();
 
-  // One band at 528 Hz, not the 500 Hz graphic slider standing in for it.
-  const bands = page.getByRole('group', { name: 'Equaliser bands' });
-  await expect(bands.getByRole('slider')).toHaveCount(2); // preamp + the one band
-  await expect(bands.getByRole('slider', { name: /528 Hz band/ })).toBeVisible();
+  /*
+   * One *live* band at 528 Hz — not the 500 Hz graphic slider standing in for it, and not a window
+   * that has collapsed to two faders. The rail keeps all ten standard centres so you can see where
+   * this preset is silent; they are disabled, because a preset with one band is exactly that and a
+   * fader that moved without changing anything would be a lie.
+   */
+  const bands = page.getByRole('group', { name: 'Equalizer bands' });
+  await expect(bands.getByRole('slider')).toHaveCount(12); // preamp + ten centres + 528
+  await expect(bands.locator('[aria-disabled="true"]')).toHaveCount(10);
+  await expect(bands.getByRole('slider', { name: '528 Hz band' })).toBeVisible();
+  await expect(bands.getByRole('slider', { name: '528 Hz band' })).not.toHaveAttribute('aria-disabled', 'true');
+  // The greyed ones say why rather than just refusing.
+  await expect(bands.getByRole('slider', { name: /500 Hz band, not used by 528 Hz \(MI\)/ })).toHaveAttribute('aria-disabled', 'true');
 });
 
 test('retuning states how it is applied rather than claiming preserved tempo', async ({ page }) => {
@@ -360,10 +369,10 @@ test.describe('the search popover', () => {
   });
 });
 
-test('the equaliser is the iTunes window: On, a preset menu, a preamp and ten bands', async ({ page }) => {
+test('the equalizer is the iTunes window: On, a preset menu, a preamp and ten bands', async ({ page }) => {
   await openSettings(page);
   await expect(page.getByRole('checkbox', { name: 'On' })).toBeChecked();
-  const bands = page.getByRole('group', { name: 'Equaliser bands' });
+  const bands = page.getByRole('group', { name: 'Equalizer bands' });
   await expect(bands.getByRole('slider', { name: 'Preamp' })).toBeVisible();
   for (const hz of [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16_000]) {
     await expect(bands.getByRole('slider', { name: `${hz} Hz band` })).toBeVisible();

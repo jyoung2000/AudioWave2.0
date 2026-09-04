@@ -16,13 +16,13 @@ what was deliberately left out of it.
 
 The controls are always at the top of the page, so the song you are hearing is one glance away from
 whatever section you are in. Nine sections live in a strip under the bar: Music, Now playing, Up
-next, Playlists, Search, Constellation, Listening, Equaliser, Settings.
+next, Playlists, Search, Constellation, Listening, Equalizer, Settings.
 
 ## Listening alone, or together
 
 The switch in the status bar is the app's one mode:
 
-- **Solo** — your library, your queue, your equaliser, your history. Nothing leaves the device.
+- **Solo** — your library, your queue, your equalizer, your history. Nothing leaves the device.
 - **Shared** — a hub group. Everyone hears the same queue, the hub keeps the order, and skipping is
   a request the hub grants or refuses rather than something one player does alone. Your library and
   your listening history still stay on your own device.
@@ -51,7 +51,7 @@ pnpm --filter @now-playing/music-player build:local   # updates the committed no
 ```
 
 Copy it anywhere and open it in a browser. Your
-library, playback, the equaliser, retuning, playlists and metrics all work; group listening and
+library, playback, the equalizer, retuning, playlists and metrics all work; group listening and
 installing it as an app do not, because a page opened from a file cannot open a WebSocket or
 register a service worker. The app says which is which on its Settings screen, and
 [docs/LOCAL_FILE.md](../docs/LOCAL_FILE.md) has the measurements behind that list.
@@ -74,7 +74,7 @@ in IndexedDB. "Space used" in Settings counts that index, not your music.
 
 - **Playback** through one reused `<audio>` element, with a Web Audio graph on top: preamp → retune
   → ten-band EQ → headroom trim → limiter → analyser.
-- **An equaliser** with level-matched bypass, so switching it off compares _tone_ rather than
+- **An equalizer** with level-matched bypass, so switching it off compares _tone_ rather than
   loudness — a louder signal always sounds better, and matching the level is the only way the
   comparison means anything. The headroom trim that stops boosts from clipping is shown with its
   value. Presets bind per track, per playlist, per track-within-a-playlist, or globally, resolved in

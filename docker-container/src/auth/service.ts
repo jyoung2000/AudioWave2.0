@@ -74,7 +74,7 @@ export class AuthService {
         ok = await verifyPassword(user.password_hash, password);
       }
     } else {
-      // Equalise timing with a real verification.
+      // Equalize timing with a real verification.
       await verifyPassword('$argon2id$v=19$m=65536,t=3,p=1$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', password);
     }
     if (!user || !ok) {

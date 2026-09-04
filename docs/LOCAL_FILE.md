@@ -56,7 +56,7 @@ surprises are both good ones.
 | Playing your own audio files | **Works** | `<audio>` with blob URLs, and `createMediaElementSource` for the graph |
 | IndexedDB — library index, playlists, presets, history | **Works** | Opens and writes; your library survives closing the browser |
 | `localStorage` | **Works** | |
-| The equaliser and the whole Web Audio graph | **Works** | |
+| The equalizer and the whole Web Audio graph | **Works** | |
 | **The retune AudioWorklet** | **Works** | Only because the compiled worklet travels inside the bundle and is loaded from a `data:` URL. A worklet module is fetched with CORS, so a file next to the HTML would fail — but `data:` is on the allowed-scheme list above |
 | `showDirectoryPicker` — choosing a folder and keeping it | **Works** | `file://` is a secure context (`isSecureContext === true`), so the File System Access API is available |
 | `crypto.subtle`, Media Session | **Works** | Same reason |
@@ -79,7 +79,7 @@ asserts exactly that, by starting a server and loading the same bytes.
   origin. The served player is the supported way to use a hub.
 - **Installing it**, and with it the app-window frame and the launcher icon.
 
-Everything else — your library, playback, the equaliser, retuning, playlists, listening metrics, the
+Everything else — your library, playback, the equalizer, retuning, playlists, listening metrics, the
 constellation — works exactly as it does when served.
 
 ## Why the served build still exists

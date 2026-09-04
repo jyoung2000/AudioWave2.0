@@ -16,7 +16,7 @@ in the first place.** Your music is read from your own device. There is no serve
 _from_ unless you have paired a hub.
 
 The service worker precaches the application itself — about 1.5 MB across 31 files — so the app
-starts with no network at all. Your library index, playlists, equaliser presets and listening history
+starts with no network at all. Your library index, playlists, equalizer presets and listening history
 live in IndexedDB on the device.
 
 What is _not_ cached is your audio. The player never copies your files; it reads them where they are,
@@ -31,7 +31,7 @@ than having the app swap itself out underneath a playing track.
 |  |  |
 | --- | --- |
 | Playing your own files | Works |
-| Library, playlists, equaliser, metrics, constellation | Work |
+| Library, playlists, equalizer, metrics, constellation | Work |
 | Search across providers | Needs the hub, which needs the network |
 | Shared listening | Needs the hub |
 | Sending a file to a hub | Needs the hub |

@@ -24,7 +24,7 @@ and reports platform-unavailable ones as skipped, never as passed.
 | --- | --- | --- |
 | Library from a directory handle or a file picker | **Done** | Rescans skip unchanged files; unreadable files are reported, not silently dropped |
 | Playback, queue, shuffle, repeat, history | **Done** |  |
-| Equaliser, level-matched bypass, headroom, per-scope binding | **Done** | Precedence: per-track-per-playlist › track › playlist › global › Flat |
+| Equalizer, level-matched bypass, headroom, per-scope binding | **Done** | Precedence: per-track-per-playlist › track › playlist › global › Flat. The rail keeps all ten graphic centres under every preset; ones a preset does not act on are dimmed rather than dropped |
 | Solfeggio presets | **Done** | Parametric, one band per named frequency |
 | Retuning with honest reporting of what was applied | **Done** | Including the fallback that changes tempo, and says so |
 | Playlists, star, add to playlist | **Done** | In the transport row, which is now in the hero and therefore on every section |
@@ -37,12 +37,12 @@ and reports platform-unavailable ones as skipped, never as passed.
 | Shared listening: create or join a group, follow its queue over the realtime socket, propose changes | **Done** | The hub always had the group API; the player now uses it. Revisioned, idempotent commands — a refused skip is shown, not swallowed |
 | The 2010 page shell: status bar, section strip, hero, iTunes 10 list, dark scheme | **Done** | [UI_REDESIGN.md](UI_REDESIGN.md) maps every feature from the old window shell, and §6 records where each one is now |
 | A four-entry strip in solo — Music Library, Queue, Playlists, Listening history | **Done** | Shared mode adds Now playing and Constellation and drops them again on the way out; nothing became unreachable |
-| Settings on the avatar, with the equaliser inside it | **Done** | The silhouette is grey: a tinted portrait read as a status light for something the mode switch already reports |
+| Settings on the avatar, with the equalizer inside it | **Done** | The silhouette is grey: a tinted portrait read as a status light for something the mode switch already reports |
 | Windows companion download | **Done** | Settings asks the hub's release route, which had been served and never consumed. Shows version, size, SHA-256 and signing state, and says which piece is missing rather than offering a dead button |
 | The reference's music list, copied rather than reinterpreted: nine columns, marquee on the playing row, gel overlay scroller, context menu, New Playlist sheet | **Done** | Its stylesheet block is the reference's own text; the behaviours are ports of its code |
 | The reference's search popover: count and Clear, fifteen-second audition with a countdown ring, source badges, tempo, pager | **Done** | Auditions pause playback and resume it after |
 | The 3D jewel case: shut and turning while paused, open on play, disc rising and spinning, drag with momentum | **Done** | Sleeve and disc label from the real cover, tray card from the real running order. Lazily mounted at idle, over the flat cover, and left alone where WebGL is unavailable |
-| The equaliser as the iTunes window: On, preset menu, preamp and ten bands on a ±12 dB scale | **Done** | Matches the supplied screenshot; every existing EQ feature kept |
+| The equalizer as the iTunes window: On, preset menu, preamp and ten bands on a ±12 dB scale | **Done** | Matches the supplied screenshot; every existing EQ feature kept |
 | A large-target driving view | **Not built** | The Media Session path covers the car; a driving-specific layout was not asked for |
 
 ## docker-container (the hub)

@@ -59,7 +59,7 @@ one product the suite ships as a downloadable binary had no download anywhere in
 no hub says to pair one, a hub with nothing configured says an administrator has to set a release,
 and a real release shows the version, size, SHA-256 and whether it was code-signed.
 
-### The second song killed the equaliser
+### The second song killed the equalizer
 
 Shipped, and wrong: `attachMediaElement` called `createMediaElementSource` on every load. Web Audio
 binds an element to its source node permanently — the second call for the same element throws
@@ -88,9 +88,9 @@ keyboard did not have to learn it again. Every material rule (1 px rims, light f
 chrome, selective blue, visible focus, reduced motion) still applies and is still tested; see the
 "2010 page surfaces" section of [AQUA_CONFORMANCE.md](AQUA_CONFORMANCE.md).
 
-### The equaliser window has no frame
+### The equalizer window has no frame
 
-The supplied equaliser screenshot is a window: a title bar with three traffic lights over the On
+The supplied equalizer screenshot is a window: a title bar with three traffic lights over the On
 checkbox, the preset menu and the faders. Everything inside the frame is reproduced. The frame is
 not, because the player is a page rather than a window and the three lights would be three buttons
 that do nothing — and a control that cannot act is the one thing this app does not draw.

@@ -19,7 +19,7 @@ and keep watching it.
   before you pair, and nothing but metadata is sent after.
 - **Sends files, when you ask.** Transfers are chunked, resumable, and verified by hash at the far
   end; a truncated upload is discarded rather than stored as a corrupt file.
-- **Backs up what it knows.** Playlists, equaliser presets and folder names, as a JSON file you can
+- **Backs up what it knows.** Playlists, equalizer presets and folder names, as a JSON file you can
   read. Not your music — the files stay where they are.
 
 ## What it does not do

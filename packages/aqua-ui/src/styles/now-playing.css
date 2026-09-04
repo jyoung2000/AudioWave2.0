@@ -1934,9 +1934,9 @@
 .toast.is-on { opacity: 1; }
 
 /* ==========================================================================
-   19. The equaliser window
+   19. The equalizer window
    ==========================================================================
-   The iTunes equaliser, from the supplied screenshot: an On checkbox beside
+   The iTunes equalizer, from the supplied screenshot: an On checkbox beside
    the preset pop-up, then a preamp fader and ten band faders on a ±12 dB
    scale, each rail flanked by tick dashes, each thumb a small lozenge with a
    pointed right edge.
@@ -2009,7 +2009,7 @@
 }
 
 /* Nine tick rows, flanking each rail — the same eight steps the ±12 dB scale
-   divides into, drawn on both sides as the equaliser does. */
+   divides into, drawn on both sides as the equalizer does. */
 .eqw__band::before {
   position: absolute;
   top: 0;
@@ -2030,6 +2030,17 @@
   pointer-events: none;
 }
 
+/* A band this preset does not act on. Present, so the rail still reads as a ten-band equalizer and
+   you can see where the preset is silent; visibly out of reach, so it never looks like a fader that
+   simply refuses to move. */
+.eqw__band--unused {
+  opacity: 0.42;
+}
+
+.eqw__band--unused .eqw__label {
+  color: var(--np-meta);
+}
+
 .eqw__band--preamp {
   min-width: 44px;
   max-width: 52px;
@@ -2044,7 +2055,7 @@
   white-space: nowrap;
 }
 
-/* ---- the fader itself: the shared Slider, wearing the equaliser's material ----
+/* ---- the fader itself: the shared Slider, wearing the equalizer's material ----
    The component keeps its behaviour — drag, arrows, Page keys, Home/End, the
    accessible name and value — and only its material changes here. */
 
@@ -2080,7 +2091,7 @@
   box-shadow: inset 0 0 0 1px rgb(0 0 0 / 25%);
 }
 
-/* The channel shows the whole travel; the equaliser does not fill it, because a
+/* The channel shows the whole travel; the equalizer does not fill it, because a
    band cut is as real as a band boost and a fill would draw one as "less". */
 .eqw .aqua-slider__fill {
   display: none;

@@ -198,7 +198,7 @@ const SCOPE_LABELS: Partial<Record<Scope, string>> = {
   'library:read': 'Browse and play the hub library',
   'library:share': 'Offer its own library to the hub',
   'playlists:sync': 'Sync playlists',
-  'eq:sync': 'Sync equaliser presets',
+  'eq:sync': 'Sync equalizer presets',
   'history:aggregate': 'Share an aggregate taste profile (never raw history)',
   'history:events': 'Send listening events for personalization',
   'group:member': 'Join group listening',

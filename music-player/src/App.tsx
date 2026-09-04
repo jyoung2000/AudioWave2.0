@@ -48,7 +48,7 @@ import { QueueView } from './views/Queue.js';
  *
  * Music, Now playing and the queue are the path someone takes to hear something, so they stay in
  * the first load. The metrics charts, the constellation, the settings panels — which now carry the
- * equaliser's curve maths with them — the playlist editor and the provider search are all real code
+ * equalizer's curve maths with them — the playlist editor and the provider search are all real code
  * that most sessions never reach, and the bundle budget in tests/perf is what turned that
  * observation into a rule.
  */
@@ -134,7 +134,7 @@ export function App() {
   /*
    * The strip is four destinations when you are listening alone: your music, what is queued behind
    * the song playing now, your playlists, and what you have played before. Everything else it used
-   * to carry either moved somewhere it belongs — search is the field in the bar, the equaliser is
+   * to carry either moved somewhere it belongs — search is the field in the bar, the equalizer is
    * inside Settings, Settings is the avatar — or is group business that only appears when there is
    * a group. A menu that lists nine things when three of them are for a mode you are not in is a
    * menu you have to read; this one you can glance at.

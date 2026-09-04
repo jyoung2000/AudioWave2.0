@@ -4,7 +4,7 @@
  * The record, its artwork and the transport moved to the hero, which is on every screen — so this
  * section is no longer "where the song is". It is where the *answer* is, for the question a person
  * asks when they wonder whether any of this is doing anything: which preset resolved, whether the
- * equaliser is actually applied, how much headroom was taken, whether retuning shifted pitch or
+ * equalizer is actually applied, how much headroom was taken, whether retuning shifted pitch or
  * fell back to changing speed, and how much latency the chain added. Every value is read from the
  * engine's own reported state, including the cases where the answer is "it isn't", and why.
  *
@@ -100,7 +100,7 @@ export function NowPlayingView() {
                 { key: 'Position', value: `${formatTime(state.playback.positionMs)} of ${formatTime(state.playback.durationMs)}` },
                 { key: 'Source', value: entry.track.locators.some((l) => l.kind === 'browser-handle') ? 'A file on this device' : entry.track.locators.some((l) => l.kind === 'hub-blob') ? 'Streamed from your hub' : 'Unknown' },
                 {
-                  key: 'Equaliser',
+                  key: 'Equalizer',
                   value: state.playback.dspUnavailableReason ? (
                     <span className="player-inline-status">
                       <StatusDot kind="warning" label="Not applied" /> {state.playback.dspUnavailableReason}
@@ -109,7 +109,7 @@ export function NowPlayingView() {
                     `${state.resolvedEq.presetName} — ${state.resolvedEq.explanation}`
                   ),
                 },
-                { key: 'Limiter', value: engine?.limiterEnabled ? 'On — prevents clipping when the equaliser adds gain' : 'Off' },
+                { key: 'Limiter', value: engine?.limiterEnabled ? 'On — prevents clipping when the equalizer adds gain' : 'Off' },
                 { key: 'Headroom', value: engine ? `${engine.headroomTrimDb.toFixed(1)} dB trim applied to keep the boosted signal below full scale` : '—' },
                 {
                   key: 'Retuning',

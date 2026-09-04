@@ -1,5 +1,5 @@
 /**
- * Playlists, including their per-playlist equaliser default and per-song override.
+ * Playlists, including their per-playlist equalizer default and per-song override.
  *
  * The EQ precedence is not hidden: the row for a song in a playlist shows which preset actually
  * applies and where it came from, so "why does this sound different here" has a visible answer.
@@ -60,7 +60,7 @@ export function PlaylistsView() {
             columns={[
               { id: 'name', header: 'Name', primary: true, cell: (row) => row.name },
               { id: 'count', header: 'Songs', align: 'right', width: 64, cell: (row) => state.playlistItems.filter((i) => i.playlistId === row.id).length },
-              { id: 'eq', header: 'Equaliser', cell: (row) => state.bindings.find((b) => b.scope === 'playlist' && b.playlistId === row.id)?.presetId ?? '—' },
+              { id: 'eq', header: 'Equalizer', cell: (row) => state.bindings.find((b) => b.scope === 'playlist' && b.playlistId === row.id)?.presetId ?? '—' },
               {
                 id: 'open',
                 header: '',
@@ -100,7 +100,7 @@ export function PlaylistsView() {
                 Share playlist
               </Button>
               <PopUpMenu
-                label="Equaliser for this playlist"
+                label="Equalizer for this playlist"
                 size="small"
                 value={state.bindings.find((b) => b.scope === 'playlist' && b.playlistId === playlist.id)?.presetId ?? ''}
                 onChange={(e) => {
@@ -145,7 +145,7 @@ export function PlaylistsView() {
                   { id: 'time', header: 'Time', align: 'right', width: 56, cell: (row) => formatDuration(row.track.durationMs) },
                   {
                     id: 'eq',
-                    header: 'Equaliser',
+                    header: 'Equalizer',
                     cell: (row) => {
                       const resolved = resolveEq(state.bindings, { playlistId: playlist.id, trackId: row.track.trackId }, state.presets, { playlistName: playlist.name, trackTitle: row.track.title });
                       return <span title={resolved.explanation}>{resolved.presetName}</span>;
@@ -157,7 +157,7 @@ export function PlaylistsView() {
                     width: 160,
                     cell: (row) => (
                       <PopUpMenu
-                        label={`Equaliser override for ${row.track.title} in ${playlist.name}`}
+                        label={`Equalizer override for ${row.track.title} in ${playlist.name}`}
                         hideLabel
                         size="small"
                         value={state.bindings.find((b) => b.scope === 'playlist-track' && b.playlistId === playlist.id && b.trackId === row.track.trackId)?.presetId ?? ''}

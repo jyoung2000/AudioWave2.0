@@ -24,7 +24,7 @@ const CAPABILITY_LABELS: Record<string, string> = {
   creatorDownload: 'Creator downloads',
   userOwnedDownload: 'Your own downloads',
   groupSync: 'Group sync',
-  eq: 'Equaliser',
+  eq: 'Equalizer',
 };
 
 export function ProvidersView() {

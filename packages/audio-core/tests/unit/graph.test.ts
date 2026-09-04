@@ -161,7 +161,7 @@ describe('audio engine graph', () => {
    * The rule that makes a player different from a demo: `createMediaElementSource` may be called
    * once per element, ever, and the binding survives disconnecting the node. One element plays every
    * track, so the second song has to reuse the first song's node — otherwise the whole graph throws
-   * on track two and the equaliser dies with it.
+   * on track two and the equalizer dies with it.
    */
   it('reuses one source node when the same element is attached for the next track', () => {
     const { context, engine } = engineWith();

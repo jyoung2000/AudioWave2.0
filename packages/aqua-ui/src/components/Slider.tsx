@@ -19,7 +19,7 @@ export interface SliderProps {
   className?: string;
   id?: string;
   /**
-   * Vertical faders are the Aqua idiom for an equaliser (spec §9.17): the same control, rotated,
+   * Vertical faders are the Aqua idiom for an equalizer (spec §9.17): the same control, rotated,
    * with drag and arrow keys following the visual direction rather than the horizontal one.
    */
   orientation?: 'horizontal' | 'vertical';

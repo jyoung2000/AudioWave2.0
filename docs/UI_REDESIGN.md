@@ -78,7 +78,7 @@ does not change, and the existing tests keep testing the same thing.
 | Search | Field + results | The status-bar pill is now the app's only search field; the Search section shows the full results, the pill shows the popover |
 | Constellation | Three.js star field + `SegmentedControl` + 2D table fallback | Unchanged behaviour, reskinned; the stage borrows the hero's art-stage treatment |
 | Listening | Ranked tables and charts | Same data, `np-list` and restyled charts |
-| Equaliser | Preset menu, curve, 11 vertical sliders, bypass/limiter, headroom, retune | Redrawn as the **iTunes equaliser window** from the supplied screenshot: an On checkbox beside the preset pop-up, a preamp and ten bands on a ±12 dB scale with tick dashes flanking each rail and lozenge thumbs. Every existing feature stays — the curve, the headroom figures, the limiter, the retuning panel, the import and export |
+| Equalizer | Preset menu, curve, 11 vertical sliders, bypass/limiter, headroom, retune | Redrawn as the **iTunes equalizer window** from the supplied screenshot: an On checkbox beside the preset pop-up, a preamp and ten bands on a ±12 dB scale with tick dashes flanking each rail and lozenge thumbs. Every existing feature stays — the curve, the headroom figures, the limiter, the retuning panel, the import and export |
 | Settings | Six panels | Same six panels, restyled; the mode switch's capability report joins them |
 
 The hero is **persistent**. In the old shell the transport lived in the toolbar and "Now playing"
@@ -95,7 +95,7 @@ listening with is a mode of the app, not a screen inside it.**
 
 ### Solo
 
-What the player has always done. Your library, your queue, your equaliser, your history. Nothing
+What the player has always done. Your library, your queue, your equalizer, your history. Nothing
 leaves the device. This is the default and it is complete on its own.
 
 ### Shared
@@ -182,7 +182,14 @@ Nothing was removed. The five that left the strip went somewhere they belong:
 | Was a section | Is now |
 |---|---|
 | Settings | The avatar in the status bar. It is the only thing up there that is *yours*, and this is the one place every OS puts your settings |
-| Equaliser | A panel inside Settings, the iTunes window intact |
+| Equalizer | A panel inside Settings, the iTunes window intact |
+
+The rail always shows all ten graphic centres, whichever preset is chosen. A preset need not use
+them — a solfeggio preset is one narrow peak at 741 Hz, on none of them — and rendering only the
+bands it declares collapsed the window to a preamp and a single fader, which reads as a broken
+equalizer rather than a narrow one. Centres the preset does not act on are drawn dimmed and cannot
+be dragged, so the row of ten still tells you *where* the preset is silent, and a frequency the
+preset introduces is inserted in order beside them.
 | Search | The field in the bar — the popover for the first few hits, Return for the full section |
 | Now playing (solo) | A link under the library. In solo it is the audio-chain readout; in shared it is the group's home and returns to the strip |
 | Constellation | A link under the library |

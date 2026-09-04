@@ -23,7 +23,7 @@ export interface PlaybackState {
   muted: boolean;
   /** Why playback is not possible, phrased for a person. */
   error: string | null;
-  /** Set when audio plays but the equaliser cannot be applied to it. */
+  /** Set when audio plays but the equalizer cannot be applied to it. */
   dspUnavailableReason: string | null;
   buffered: number;
   engine: AudioEngineState | null;
@@ -167,7 +167,7 @@ export class PlaybackEngine {
   private connectGraph(processable: boolean): string | null {
     if (!processable) return DSP_UNAVAILABLE_REASON;
     const engine = this.ensureEngine();
-    if (!engine) return 'This browser did not allow an audio processing context, so the equaliser is unavailable.';
+    if (!engine) return 'This browser did not allow an audio processing context, so the equalizer is unavailable.';
     const result = engine.attachMediaElement(this.audio as unknown as Parameters<AudioEngine['attachMediaElement']>[0]);
     return result.ok ? null : result.reason;
   }
@@ -181,7 +181,7 @@ export class PlaybackEngine {
     let src: string;
     let processable: boolean;
     if (request.file) {
-      // A blob URL is same-origin by definition, so local files always reach the equaliser.
+      // A blob URL is same-origin by definition, so local files always reach the equalizer.
       this.objectUrl = URL.createObjectURL(request.file);
       src = this.objectUrl;
       processable = true;

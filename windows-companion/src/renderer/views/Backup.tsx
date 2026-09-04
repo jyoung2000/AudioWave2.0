@@ -20,7 +20,7 @@ export function BackupView() {
     <Panel title="Backup">
       <PanelSection>
         <p className="companion-hint">
-          A backup holds your playlists, equaliser presets and a record of which folders you added. It deliberately does <strong>not</strong> hold your music — those files are already on your disk, and
+          A backup holds your playlists, equalizer presets and a record of which folders you added. It deliberately does <strong>not</strong> hold your music — those files are already on your disk, and
           copying tens of gigabytes into a JSON file would help nobody. It also does not hold the folder paths, because a backup restored on another computer would name folders that do not exist there.
         </p>
         <div className="companion-actions">

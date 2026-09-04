@@ -11,7 +11,7 @@ function builtin(id: string, name: string, description: string, gains: readonly 
   return { id, schemaVersion: SCHEMA_VERSIONS.entities, name, kind: 'builtin', mode: 'graphic', preampDb, bands: graphic(gains), description, createdAt: BUILTIN_EPOCH, updatedAt: BUILTIN_EPOCH, deletedAt: null };
 }
 
-export const FLAT_PRESET: EqPreset = builtin(FLAT_PRESET_ID, 'Flat', 'No equalisation; the reference for bypass comparisons.', [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+export const FLAT_PRESET: EqPreset = builtin(FLAT_PRESET_ID, 'Flat', 'No equalization; the reference for bypass comparisons.', [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
 
 /** Original preset names; deliberately not described as therapeutic or scientific. */
 export const BUILTIN_PRESETS: readonly EqPreset[] = [

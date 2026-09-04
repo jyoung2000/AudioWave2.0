@@ -1,5 +1,5 @@
 /**
- * The equaliser.
+ * The equalizer.
  *
  * Three things it insists on, all of them audible rather than cosmetic:
  *
@@ -21,7 +21,7 @@ import { useAppState, usePlayer } from '../state/context.js';
 
 const CURVE_FREQUENCIES = Array.from({ length: 96 }, (_, i) => 20 * (20000 / 20) ** (i / 95));
 
-export interface EqualiserViewProps {
+export interface EqualizerViewProps {
   /**
    * Rendered inside another section rather than as one of its own, so it drops its page heading and
    * begins at the window. Settings owns the heading in that case.
@@ -29,7 +29,7 @@ export interface EqualiserViewProps {
   embedded?: boolean;
 }
 
-export function EqualiserView({ embedded = false }: EqualiserViewProps = {}) {
+export function EqualizerView({ embedded = false }: EqualizerViewProps = {}) {
   const { store } = usePlayer();
   const state = useAppState();
   const toast = useToast();
@@ -44,18 +44,40 @@ export function EqualiserView({ embedded = false }: EqualiserViewProps = {}) {
   const entry = state.queue[state.queueIndex] ?? null;
   const isSolfeggio = SOLFEGGIO_PRESETS.some((p) => p.id === active.id);
 
+  /*
+   * A full rail, always.
+   *
+   * A preset does not have to use all ten graphic centres: a solfeggio preset is a single narrow
+   * peak, and its band sits at 741 Hz rather than on any of them. Rendering only the bands the
+   * preset declares collapsed the window to a preamp and one fader, which reads as a broken
+   * equalizer rather than a narrow one.
+   *
+   * So every standard centre keeps its place. A centre this preset does not touch shows a fader at
+   * 0 dB that cannot be dragged — greyed rather than gone, because the row of ten is what tells you
+   * where the preset is *not* acting. Frequencies the preset introduces are inserted in order, so
+   * nothing it does is hidden either.
+   */
+  const slots = useMemo(() => {
+    const live = new Map(bands.map((band, index) => [band.frequencyHz, { index, gainDb: band.gainDb }]));
+    const frequencies = [...new Set<number>([...EQ_BAND_FREQUENCIES_HZ, ...bands.map((band) => band.frequencyHz)])].sort((a, b) => a - b);
+    return frequencies.map((frequencyHz) => {
+      const band = live.get(frequencyHz);
+      return { frequencyHz, index: band?.index ?? -1, gainDb: band?.gainDb ?? 0, used: band !== undefined };
+    });
+  }, [bands]);
+
   return (
     <>
       {embedded ? null : (
         <div className="np-section-head">
-          <h2>Equaliser</h2>
+          <h2>Equalizer</h2>
           <p>Ten bands, a preamp, and an honest account of what each one does to the signal.</p>
         </div>
       )}
-      <Panel title="Equaliser">
+      <Panel title="Equalizer">
         <PanelSection>
           {/*
-            * The iTunes equaliser window from the supplied screenshot: On beside the preset menu,
+            * The iTunes equalizer window from the supplied screenshot: On beside the preset menu,
             * then a preamp and ten bands on a ±12 dB scale. The frequencies are the app's real band
             * centres — 32 through 16K — because they already were the ones in the picture.
             */}
@@ -73,7 +95,7 @@ export function EqualiserView({ embedded = false }: EqualiserViewProps = {}) {
               />
             </div>
 
-            <div className="eqw__bank" role="group" aria-label="Equaliser bands">
+            <div className="eqw__bank" role="group" aria-label="Equalizer bands">
               <div className="eqw__scale" aria-hidden="true">
                 <span>+12 dB</span>
                 <span>0 dB</span>
@@ -92,22 +114,28 @@ export function EqualiserView({ embedded = false }: EqualiserViewProps = {}) {
                 />
                 <span className="eqw__label">Preamp</span>
               </div>
-              {bands.map((band, index) => (
-                <div className="eqw__band" key={band.frequencyHz}>
+              {slots.map((slot) => (
+                <div
+                  className={['eqw__band', slot.used ? null : 'eqw__band--unused'].filter(Boolean).join(' ')}
+                  key={slot.frequencyHz}
+                  title={slot.used ? undefined : `${active.name} does not use the ${formatFrequency(slot.frequencyHz)} band. Choose a preset that does, or save your own from one that does.`}
+                >
                   <Slider
                     // The visible label is the short EQ convention ("1K"); the accessible name spells
                     // out the frequency, which matters more once a parametric preset puts a band on
-                    // 528 Hz rather than on one of the familiar graphic centres.
-                    label={`${band.frequencyHz} Hz band`}
+                    // 528 Hz rather than on one of the familiar graphic centres — and says outright
+                    // when a fader is there for the shape of the rail rather than to be moved.
+                    label={slot.used ? `${slot.frequencyHz} Hz band` : `${slot.frequencyHz} Hz band, not used by ${active.name}`}
                     orientation="vertical"
                     min={EQ_GAIN_MIN_DB}
                     max={EQ_GAIN_MAX_DB}
                     step={0.5}
-                    value={band.gainDb}
-                    onChange={(value) => store.playback.setBandGain(index, value)}
+                    value={slot.gainDb}
+                    disabled={!slot.used}
+                    onChange={(value) => store.playback.setBandGain(slot.index, value)}
                     format={(v) => `${v > 0 ? '+' : ''}${v.toFixed(1)} dB`}
                   />
-                  <span className="eqw__label">{formatFrequency(band.frequencyHz)}</span>
+                  <span className="eqw__label">{formatFrequency(slot.frequencyHz)}</span>
                 </div>
               ))}
             </div>
@@ -134,7 +162,7 @@ export function EqualiserView({ embedded = false }: EqualiserViewProps = {}) {
           </p>
         </PanelSection>
 
-        <PanelSection title="What the equaliser is doing to the signal">
+        <PanelSection title="What the equalizer is doing to the signal">
           <KeyValueList
             items={[
               { key: 'Headroom needed', value: `${headroom.toFixed(1)} dB` },
@@ -286,7 +314,7 @@ function EqCurve({ values, frequencies }: { values: readonly number[]; frequenci
   const path = values.map((db, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(db).toFixed(1)}`).join(' ');
   const peak = Math.max(...values.map(Math.abs));
   return (
-    <svg className="player-eq-curve" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`Equaliser response curve, peak deviation ${peak.toFixed(1)} decibels`} preserveAspectRatio="none">
+    <svg className="player-eq-curve" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`Equalizer response curve, peak deviation ${peak.toFixed(1)} decibels`} preserveAspectRatio="none">
       <line x1="0" y1={height / 2} x2={width} y2={height / 2} className="player-eq-curve__zero" />
       <path d={path} className="player-eq-curve__line" />
     </svg>
@@ -294,7 +322,7 @@ function EqCurve({ values, frequencies }: { values: readonly number[]; frequenci
 }
 
 function formatFrequency(hz: number): string {
-  // "1K", not "1k": the equaliser this is drawn from sets its band labels in caps.
+  // "1K", not "1k": the equalizer this is drawn from sets its band labels in caps.
   return hz >= 1000 ? `${hz / 1000}K` : String(hz);
 }
 
