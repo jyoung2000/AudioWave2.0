@@ -270,6 +270,7 @@ export const OverviewMetrics = z.object({
   alerts: z.array(z.object({ level: z.enum(['info', 'warning', 'error']), message: z.string() })),
   memoryRssBytes: z.number().int(),
 });
+export type OverviewMetrics = z.infer<typeof OverviewMetrics>;
 
 export const ConnectionView = z.object({
   deviceId: Uuid,
@@ -287,6 +288,7 @@ export const ConnectionView = z.object({
   ipDisplay: z.string().nullable(),
   reconnects: z.number().int(),
 });
+export type ConnectionView = z.infer<typeof ConnectionView>;
 
 export const FormatAvailability = z.object({
   format: OutputFormat,
@@ -295,6 +297,7 @@ export const FormatAvailability = z.object({
   reason: z.string().nullable(),
   qualityNote: z.string(),
 });
+export type FormatAvailability = z.infer<typeof FormatAvailability>;
 
 export const TasteProfileView = z.object({
   ownerId: Uuid,
@@ -306,6 +309,7 @@ export const TasteProfileView = z.object({
   popularityPreference: z.number(),
   coldStart: z.boolean(),
 });
+export type TasteProfileView = z.infer<typeof TasteProfileView>;
 
 /* ---------- route table ---------- */
 

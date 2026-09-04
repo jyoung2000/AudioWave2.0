@@ -122,7 +122,11 @@ export function fromBase64Url(text: string): Uint8Array {
 
 export async function sha256Hex(data: Uint8Array | string): Promise<string> {
   const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data;
-  const digest = await cryptoImpl.subtle.digest('SHA-256', bytes as BufferSource);
+  // Copy into a plain ArrayBuffer: Node's and the DOM's `BufferSource` differ once a Uint8Array
+  // can be backed by a SharedArrayBuffer, and the copy satisfies both without a cast.
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  const digest = await cryptoImpl.subtle.digest('SHA-256', buffer);
   return toHex(new Uint8Array(digest));
 }
 
