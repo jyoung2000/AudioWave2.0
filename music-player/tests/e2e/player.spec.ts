@@ -55,6 +55,29 @@ test('the equaliser explains level-matched bypass and the headroom it applies', 
   await expect(page.getByRole('group', { name: 'Equaliser bands' }).getByRole('slider')).toHaveCount(11);
 });
 
+test('the solfeggio presets are filters, and say so where the choice is made', async ({ page }) => {
+  await page.getByRole('option', { name: /Equaliser/i }).click();
+
+  const presets = page.getByLabel('Preset');
+  // All nine, plus the combined one, offered alongside the tone presets rather than instead of them.
+  for (const hz of [174, 285, 396, 417, 528, 639, 741, 852, 963]) {
+    await expect(presets.getByRole('option', { name: new RegExp(`^${hz} Hz`) })).toHaveCount(1);
+  }
+  await expect(presets.getByRole('option', { name: /Bass Lift/ })).toHaveCount(1);
+
+  await presets.selectOption({ label: '528 Hz (MI) (built in)' });
+
+  // The claim on screen is exactly what the DSP does, and nothing more.
+  await expect(page.getByText(/A narrow \+6 dB peak at 528 Hz/)).toBeVisible();
+  await expect(page.getByText(/it does not add a 528 Hz tone/)).toBeVisible();
+  await expect(page.getByText(/makes no claim that any frequency has a physical or medical effect/i)).toBeVisible();
+
+  // One band at 528 Hz, not the 500 Hz graphic slider standing in for it.
+  const bands = page.getByRole('group', { name: 'Equaliser bands' });
+  await expect(bands.getByRole('slider')).toHaveCount(2); // preamp + the one band
+  await expect(bands.getByRole('slider', { name: /528 Hz band/ })).toBeVisible();
+});
+
 test('retuning states how it is applied rather than claiming preserved tempo', async ({ page }) => {
   await page.getByRole('option', { name: /Equaliser/i }).click();
   await expect(page.getByText(/shifts the pitch of an existing recording/i)).toBeVisible();

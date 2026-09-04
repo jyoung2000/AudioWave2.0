@@ -83,6 +83,15 @@ export class PlatformSyncService {
     let imported = 0;
     let pages = 0;
     let unchanged = false;
+    /*
+     * The digest of the first page from *this* run.
+     *
+     * It has to be carried to the final write. Writing `previous.snapshot` there instead would
+     * restore the value from before the run, so the "nothing changed upstream" comparison could
+     * never match on the next run and every scheduled sync would re-import the whole library —
+     * spending the provider quota this hub exists to conserve.
+     */
+    let snapshot = previous.snapshot;
 
     try {
       const account = await this.accounts.authorize(provider, userId);
@@ -97,6 +106,7 @@ export class PlatformSyncService {
         imported += this.ingest(userId, provider, page.items);
         for (const playlist of page.playlists ?? []) imported += this.ingest(userId, provider, playlist.items);
         if (pages === 0) {
+          snapshot = digest;
           this.accounts.setSyncStatus({ ...previous, status: 'running', snapshot: digest });
         }
         cursor = page.nextCursor;
@@ -108,7 +118,7 @@ export class PlatformSyncService {
         provider,
         lastSyncAt: this.nowIso(),
         cursor,
-        snapshot: previous.snapshot,
+        snapshot,
         etag: previous.etag,
         status: 'idle',
         lastError: null,

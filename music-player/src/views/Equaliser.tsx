@@ -75,7 +75,10 @@ export function EqualiserView() {
             {bands.map((band, index) => (
               <div className="player-eq-band" key={band.frequencyHz}>
                 <Slider
-                  label={`${formatFrequency(band.frequencyHz)} band`}
+                  // The visible label is the short EQ convention ("1k"); the accessible name spells
+                  // out the frequency, which matters more once a parametric preset puts a band on
+                  // 528 Hz rather than on one of the familiar graphic centres.
+                  label={`${band.frequencyHz} Hz band`}
                   orientation="vertical"
                   min={EQ_GAIN_MIN_DB}
                   max={EQ_GAIN_MAX_DB}
