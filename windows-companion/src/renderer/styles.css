@@ -1,0 +1,145 @@
+/*
+ * Companion layout.
+ *
+ * Every token, control and window part comes from @now-playing/aqua-ui; this file only positions
+ * the companion-specific pieces. Nothing here redefines an Aqua token or restyles a control — the
+ * design spec owns those, and a second definition here would be a second source of truth.
+ */
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--aqua-window-bg, #e8e8e8);
+  /* The window chrome is the app's own; a scrollbar on the body would sit outside it. */
+  overflow: hidden;
+}
+
+.companion-title {
+  font-weight: 600;
+}
+
+.companion-version {
+  color: var(--aqua-text-secondary, #5a6472);
+  font-variant-numeric: tabular-nums;
+}
+
+.companion-hint {
+  margin: 0;
+  color: var(--aqua-text-secondary, #5a6472);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.companion-hint--warning {
+  color: var(--aqua-warning-text, #8a5a00);
+}
+
+.companion-hint--error {
+  color: var(--aqua-danger-text, #9b1c1c);
+}
+
+.companion-actions,
+.companion-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.companion-actions {
+  margin: 8px 0;
+}
+
+.companion-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 40rem;
+}
+
+.companion-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--aqua-text-secondary, #5a6472);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.companion-list li + li {
+  margin-top: 2px;
+}
+
+/*
+ * A filesystem path is shown to *this* machine's owner and never sent anywhere. It is monospaced
+ * and allowed to break mid-word because a deep Windows path is otherwise unreadable, and it is
+ * selectable so it can be copied into Explorer.
+ */
+.companion-path {
+  font-family: Consolas, "SF Mono", ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--aqua-text-secondary, #5a6472);
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+/*
+ * The pairing fingerprint. Large, spaced and monospaced because its whole purpose is that a person
+ * compares it character by character against the hub's screen; anything that makes two different
+ * fingerprints look alike defeats the check.
+ */
+.companion-fingerprint {
+  font-family: Consolas, "SF Mono", ui-monospace, monospace;
+  font-size: 18px;
+  letter-spacing: 0.14em;
+  padding: 10px 14px;
+  border: 1px solid var(--aqua-border, #b6b6b6);
+  border-radius: 6px;
+  background: var(--aqua-panel-bg, #fff);
+  user-select: text;
+}
+
+.companion-notices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.companion-notices:not(:empty) {
+  margin-bottom: 10px;
+}
+
+.companion-blocked {
+  max-width: 34rem;
+  margin: 12vh auto 0;
+  text-align: center;
+}
+
+.companion-blocked h1 {
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.companion-blocked p {
+  margin: 0;
+  color: var(--aqua-text-secondary, #5a6472);
+  line-height: 1.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

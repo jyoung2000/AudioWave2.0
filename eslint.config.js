@@ -50,7 +50,14 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/scripts/**', '**/*.config.{ts,js,mjs}', '**/tests/**', '**/*.test.{ts,tsx}', 'scripts/**'],
+    files: ['**/scripts/**', '**/*.config.{ts,js,mjs,cjs}', '**/tests/**', '**/*.test.{ts,tsx}', 'scripts/**'],
     rules: { 'no-console': 'off' },
+  },
+  {
+    // CommonJS build configuration (electron-builder loads these with `require`), where a
+    // `require()` call is the file format rather than a lapse.
+    files: ['**/*.cjs'],
+    languageOptions: { sourceType: 'commonjs' },
+    rules: { '@typescript-eslint/no-require-imports': 'off' },
   },
 );

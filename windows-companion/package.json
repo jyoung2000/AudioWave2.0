@@ -1,19 +1,20 @@
 {
   "name": "@now-playing/windows-companion",
   "version": "0.1.0",
-  "description": "Now Playing Companion for Windows — secure Electron desktop app for filesystem library management, provider connections, authorized downloads, import, backup, sync and remote access.",
+  "description": "Now Playing Companion for Windows \u2014 secure Electron desktop app for filesystem library management, provider connections, authorized downloads, import, backup, sync and remote access.",
   "license": "MIT",
   "type": "module",
   "private": true,
   "main": "dist/main/index.cjs",
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "build": "tsc -p tsconfig.json --noEmit && node scripts/build.mjs && vite build --config src/renderer/vite.config.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "pnpm typecheck && node scripts/build.mjs && vite build --config src/renderer/vite.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.renderer.json --noEmit",
     "package": "pnpm build && electron-builder --win --config electron-builder.config.cjs",
     "package:dir": "pnpm build && electron-builder --dir --config electron-builder.config.cjs",
     "release-metadata": "node scripts/release-metadata.mjs",
-    "test": "vitest run --project unit --project integration"
+    "test": "vitest run --config ../vitest.config.ts --project unit --project integration",
+    "icons": "node scripts/icons.mjs"
   },
   "dependencies": {
     "@now-playing/contracts": "workspace:*",

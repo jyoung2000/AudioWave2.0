@@ -66,6 +66,15 @@ const PATHS = {
 export type GlyphName = keyof typeof PATHS;
 export const GLYPH_NAMES = Object.keys(PATHS) as GlyphName[];
 
+/**
+ * The raw path data, exported so the app icons can be checked against it.
+ *
+ * A PWA manifest and a Windows ICO cannot reference a React component, so those files repeat the
+ * shape — and a repeated shape drifts. `packages/aqua-ui/tests/unit/icon-glyphs.test.ts` compares
+ * them to this map.
+ */
+export const GLYPH_PATHS: Readonly<Record<GlyphName, string>> = PATHS;
+
 export interface GlyphProps extends IconProps {
   name: GlyphName;
 }

@@ -1,7 +1,7 @@
 {
   "name": "@now-playing/music-player",
   "version": "0.1.0",
-  "description": "Now Playing Player — offline-first standalone PWA for local music playback with optional hub and companion connections.",
+  "description": "Now Playing Player \u2014 offline-first standalone PWA for local music playback with optional hub and companion connections.",
   "license": "MIT",
   "type": "module",
   "private": true,
@@ -13,7 +13,8 @@
     "test": "vitest run --project unit --project dom",
     "test:e2e": "playwright test --config tests/e2e/playwright.config.ts",
     "test:a11y": "playwright test --config tests/e2e/playwright.config.ts --grep @a11y",
-    "test:visual": "playwright test --config tests/e2e/playwright.config.ts --grep @visual"
+    "test:visual": "playwright test --config tests/e2e/playwright.config.ts --grep @visual",
+    "icons": "node scripts/icons.mjs"
   },
   "dependencies": {
     "@now-playing/aqua-ui": "workspace:*",

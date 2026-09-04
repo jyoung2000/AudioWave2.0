@@ -12,39 +12,76 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-companion-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   package:
-    name: Type-check, test, package (Windows x64)
+    name: Type-check, test, package (Windows)
     runs-on: windows-latest
     timeout-minutes: 60
     env:
-      # Optional code-signing inputs. When absent the artifacts are unsigned and latest.json says so.
+      # Optional code-signing inputs. When they are absent the build is unsigned, electron-builder
+      # skips signing, and latest.json records `signed: false` — the app's About screen and the
+      # download page both tell people what that means for SmartScreen.
       CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
       CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
+
       - uses: pnpm/action-setup@v4
         with:
           version: 10.33.0
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
+
       - name: Install
         run: pnpm install --frozen-lockfile
-      - name: Typecheck and unit tests (companion + shared packages)
+
+      - name: Generated contracts are committed and current
         run: |
-          pnpm -r --filter './packages/*' typecheck
+          pnpm generate
+          git diff --exit-code -- packages/contracts/generated
+
+      - name: Lint
+        run: pnpm exec eslint windows-companion packages
+
+      - name: Typecheck
+        run: |
+          pnpm --filter "./packages/*" typecheck
           pnpm --filter @now-playing/windows-companion typecheck
-          pnpm exec vitest run --project unit --project integration windows-companion packages
+
+      - name: Tests (unit, contract, integration, security)
+        run: pnpm exec vitest run --project unit --project dom --project contracts --project integration --project security windows-companion packages
+
+      - name: Build main process and renderer
+        run: pnpm --filter @now-playing/windows-companion build
+
       - name: Package installer and portable build
         run: pnpm --filter @now-playing/windows-companion package
+
       - name: Write checksums and latest.json
         run: pnpm --filter @now-playing/windows-companion release-metadata
         env:
-          NP_RELEASE_BASE_URL: ${{ github.event_name == 'release' && format('{0}/releases/download/{1}', github.server_url, github.event.release.tag_name) || '' }}
+          NP_RELEASE_BASE_URL: ${{ github.event_name == 'release' && format('{0}/{1}/releases/download/{2}', github.server_url, github.repository, github.event.release.tag_name) || '' }}
+          # Truthy only when a certificate secret actually exists; never assumed.
           NP_RELEASE_SIGNED: ${{ secrets.WINDOWS_CSC_LINK != '' }}
           NP_RELEASE_CHANNEL: ${{ github.event_name == 'release' && 'stable' || 'dev' }}
+          NP_RELEASE_NOTES_URL: ${{ github.event_name == 'release' && github.event.release.html_url || '' }}
+
+      - name: Show what was produced
+        shell: bash
+        run: |
+          ls -la windows-companion/release
+          cat windows-companion/release/latest.json
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -54,6 +91,7 @@ jobs:
             windows-companion/release/SHA256SUMS.txt
             windows-companion/release/latest.json
           if-no-files-found: error
+
       - name: Attach to release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
