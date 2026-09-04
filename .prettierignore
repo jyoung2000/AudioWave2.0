@@ -6,4 +6,27 @@ generated
 pnpm-lock.yaml
 docs/reference
 docs/design
+# The supplied references, kept byte-identical to what was provided.
+APPLE_AQUA_2009_2010_UI_DESIGN_SPEC.md
 CLAUDE-FABLE-5.md
+
+# Prettier owns JSON only, and `format:check` is a real gate because of it.
+#
+# Source is excluded because the code is written to a wider effective line length than any Prettier
+# setting matches, and ESLint already enforces what matters; reformatting it would churn every file
+# for no gain. Markdown is excluded because Prettier pads every table cell to the column width, so
+# changing one word rewrites the whole table and every future documentation diff becomes unreadable.
+# A gate that always warns is worse than no gate, so the scope is narrowed rather than the gate
+# softened.
+*.ts
+*.tsx
+*.js
+*.mjs
+*.cjs
+*.css
+*.html
+*.md
+# YAML too: Prettier rewrites Compose's double-quoted scalars to single quotes, and compose.yaml is
+# a file people copy and edit against Docker's own documentation.
+*.yaml
+*.yml

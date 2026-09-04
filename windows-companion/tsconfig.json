@@ -2,22 +2,12 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
-    "lib": [
-      "ES2023"
-    ],
-    "types": [
-      "node"
-    ],
+    "lib": ["ES2023"],
+    "types": ["node"],
     "paths": {
-      "@now-playing/contracts": [
-        "../packages/contracts/src/index.ts"
-      ],
-      "@now-playing/domain": [
-        "../packages/domain/src/index.ts"
-      ],
-      "@now-playing/test-fixtures": [
-        "../packages/test-fixtures/src/index.ts"
-      ]
+      "@now-playing/contracts": ["../packages/contracts/src/index.ts"],
+      "@now-playing/domain": ["../packages/domain/src/index.ts"],
+      "@now-playing/test-fixtures": ["../packages/test-fixtures/src/index.ts"]
     }
   },
   "include": [

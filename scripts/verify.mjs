@@ -41,7 +41,7 @@ const hasChromium = () => {
 
 run('generate', 'pnpm', ['generate']);
 run('generated-up-to-date', 'git', ['diff', '--exit-code', '--', 'packages/contracts/generated', 'packages/test-fixtures/generated']);
-run('format', 'pnpm', ['format:check'], { optional: true });
+run('format', 'pnpm', ['format:check']);
 run('lint', 'pnpm', ['lint']);
 run('typecheck', 'pnpm', ['typecheck']);
 run('test:unit', 'pnpm', ['test:unit']);
