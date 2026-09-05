@@ -8,9 +8,9 @@
  */
 import { useMemo, type ReactNode } from 'react';
 import tokens from '../src/styles/tokens.json';
-import { AquaProvider, ToastProvider, Button, Checkbox, PopUpMenu, ProgressBar, SearchField, SegmentedControl, SourceList, SourceIcon, Glyph, TrackScrubber, BarSearch, Slider, StatusDot } from '../src/index.js';
-import { Card, ControlsDemo, IconsDemo, OverlaysDemo, PageDemo, ResultsDemo, ShellDemo, StatesDemo, makeRows } from '../gallery/specimens.js';
-import { ContextMenuSpecimen, EqualizerSpecimen, MusicListSpecimen, PageFurnitureSpecimen, SearchPopoverSpecimen, ShareStripSpecimen, SheetSpecimen, ToastSpecimen } from './page-specimens.js';
+import { AquaProvider, ToastProvider, Button, Checkbox, PopUpMenu, ProgressBar, SearchField, SegmentedControl, SourceList, SourceIcon, Glyph, TrackScrubber, BarSearch, Slider, StatusDot, MusicList } from '../src/index.js';
+import { Card, ControlsDemo, IconsDemo, OverlaysDemo, PageDemo, ResultsDemo, ShellDemo, StatesDemo, makeRows, makeTracks } from '../gallery/specimens.js';
+import { ContextMenuSpecimen, EqualizerSpecimen, PageFurnitureSpecimen, SearchPopoverSpecimen, ShareStripSpecimen, SheetSpecimen, ToastSpecimen } from './page-specimens.js';
 
 /* ------------------------------------------------------------------ data */
 
@@ -42,7 +42,7 @@ const PAGE_GROUPS: Array<{ title: string; keys: string[] }> = [
 
 /** Which product imports which element today, read from each product's imports. */
 const PRODUCT_MAP: Array<{ name: string; player: boolean; hub: boolean; companion: boolean }> = [
-  ...['PageBar', 'BarSearch', 'BarClock', 'ModeSwitch', 'ProfileButton', 'SectionStrip', 'Hero', 'HeroArt', 'TrackScrubber', 'KeyTransport', 'KeyButton', 'LevelSlider', 'ButtonLink', 'IconButton', 'InlineValidation', 'SegmentedControl', 'Sheet', 'Slider'].map((name) => ({ name, player: true, hub: false, companion: false })),
+  ...['PageBar', 'BarSearch', 'BarClock', 'ModeSwitch', 'ProfileButton', 'SectionStrip', 'Hero', 'HeroArt', 'JewelStage', 'TrackScrubber', 'KeyTransport', 'KeyButton', 'LevelSlider', 'MusicList', 'ButtonLink', 'IconButton', 'InlineValidation', 'SegmentedControl', 'Sheet', 'Slider'].map((name) => ({ name, player: true, hub: false, companion: false })),
   ...['AquaTable', 'Button', 'Checkbox', 'EmptyState', 'Glyph', 'KeyValueList', 'Panel', 'PanelSection', 'PopUpMenu', 'ProgressBar', 'SourceBadge', 'StatusDot', 'TextField', 'ToastProvider', 'useToast'].map((name) => ({ name, player: true, hub: true, companion: true })),
   ...['LoadingState'].map((name) => ({ name, player: true, hub: true, companion: false })),
   ...['AquaWindow', 'Toolbar', 'SourceList', 'WorkArea', 'Content', 'BottomBar', 'SearchField'].map((name) => ({ name, player: false, hub: true, companion: true })),
@@ -418,14 +418,14 @@ box-shadow:
 
             <Section id="page" title="The page — what the player is made of">
               <p>
-                The music player's skin: a sticky status bar, a section strip, the hero with the iPod rail and a transport of nine keys, and the iTunes 10 list under it. Everything
-                below is live.
+                The music player's skin: a sticky status bar, a section strip, the hero with the jewel case on its stage, the iPod rail and a transport of nine keys, and the
+                iTunes 10 list under it. Everything below is live — press play and the case opens; pick a row and the stage follows it.
               </p>
-              <PageDemo rows={rows} />
+              <PageDemo />
               <h3 className="sg__h3">The music list</h3>
-              <Bed wide caption="The iTunes 10 list from the reference, verbatim: nine columns, 18 px rows, the stripe, no rules, an embossed header with the sorted column tinted, monochrome source badges, icon columns for offline and star, the playing row in bold with a speaker glyph, and the gel scroller riding the right edge.">
-                <div className="np-app sg-static" style={{ width: '100%' }}>
-                  <MusicListSpecimen />
+              <Bed wide caption="The same component the player renders, with the reference's stylesheet block: nine columns, 18 px rows, the stripe, no rules, an embossed header with the sorted column tinted, monochrome source badges read from each track's locator, icon columns for offline and star, the playing row in bold with a speaker glyph and a marquee, a right-click menu, and the gel scroller that fades in while you scroll.">
+                <div className="np-app" style={{ width: '100%' }}>
+                  <MusicList label="Your music" tracks={makeTracks()} playingTrackId="0192a7c1-2b3d-7e4f-8a9b-000000000003" onPlay={() => undefined} onToggleStar={() => undefined} playlists={[]} playlistItems={[]} onTogglePlaylist={() => undefined} onNewPlaylist={() => undefined} onSay={() => undefined} ephemeralTrackIds={new Set(['0192a7c1-2b3d-7e4f-8a9b-000000000006'])} />
                 </div>
               </Bed>
               <h3 className="sg__h3">The search popover</h3>
@@ -559,8 +559,8 @@ box-shadow:
                 </tbody>
               </table>
               <p className="sg__note">
-                The player also draws the music list, the search popover, the context menu, the New Playlist sheet, the toast and the equalizer window with the page skin's classes
-                (shown above) rather than through a component; their stylesheet block is the reference's own.
+                The player also draws the search popover, the New Playlist sheet, the toast and the equalizer window with the page skin's classes (shown above) rather than through a
+                component; their stylesheet block is the reference's own.
               </p>
             </Section>
 

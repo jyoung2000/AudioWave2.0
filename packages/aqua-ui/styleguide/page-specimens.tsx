@@ -1,7 +1,7 @@
 /**
  * The page skin's own furniture, drawn with its own classes.
  *
- * The music list, the search popover, the context menu, the New Playlist sheet, the toast and the
+ * The search popover, the context menu, the New Playlist sheet, the toast and the
  * equalizer window are styled by `now-playing.css` but assembled by the player, not by a component
  * in this package — so the styleguide renders their markup here, against the real stylesheet, and
  * holds them still with a few overrides in `styleguide.css` (a sheet is `position: fixed` in the
@@ -15,106 +15,6 @@ const NOTE = (
     <path d="M19.6 3 9.8 5.2a1 1 0 0 0-.8 1v9.7a3.1 3.1 0 1 0 1.6 2.7V9.6l7.6-1.7v5.6a3.1 3.1 0 1 0 1.6 2.7V3.8a.8.8 0 0 0-1-.8z" />
   </svg>
 );
-
-const STAR = (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M12 2.6l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.5 6.1 20.6l1.2-6.5L2.5 9.5l6.6-.9z" />
-  </svg>
-);
-
-const DL = (
-  <svg viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M10.8 3h2.4v7.7h4.1L12 17.1 6.7 10.7h4.1z" />
-    <path d="M4.6 19h14.8v2.1H4.6z" />
-  </svg>
-);
-
-interface ListRow {
-  n: number;
-  title: string;
-  artist: string;
-  time: string;
-  bpm: string;
-  album: string;
-  source: string;
-  offline?: boolean;
-  starred?: boolean;
-  playing?: boolean;
-  selected?: boolean;
-}
-
-const LIST_ROWS: ListRow[] = [
-  { n: 1, title: 'Lantern Road', artist: 'Marlow & the Tidewater', time: '3:24', bpm: '118', album: 'Quiet Arithmetic', source: 'L', offline: true, starred: true },
-  { n: 2, title: 'Copper Meridian', artist: 'Orbital Cartographers', time: '5:05', bpm: '—', album: 'Copper Meridian', source: 'H' },
-  { n: 3, title: 'Quiet Arithmetic', artist: 'Marlow & the Tidewater', time: '3:51', bpm: '96', album: 'Quiet Arithmetic', source: 'L', offline: true, playing: true },
-  { n: 4, title: 'Long Wave', artist: 'Fennel Grove', time: '5:16', bpm: '122', album: 'Long Wave Sessions, Vol. 2', source: 'YT', selected: true },
-  { n: 5, title: 'Pier 9 (Live)', artist: 'Cassette Bloom', time: '4:11', bpm: '—', album: 'Live from Pier 9', source: 'SC' },
-];
-
-/** The iTunes 10 list: nine columns, 18 px rows, the stripe, no rules, the sorted column tinted. */
-export function MusicListSpecimen() {
-  return (
-    <div className="library is-scrolling" style={{ width: '100%' }}>
-      <div className="library__scroll" style={{ maxHeight: 'none' }}>
-        <table aria-label="Library">
-          <colgroup>
-            <col style={{ width: 34 }} />
-            <col style={{ width: 38 }} />
-            <col />
-            <col className="lib-col-artist" style={{ width: '22%' }} />
-            <col style={{ width: 54 }} />
-            <col className="lib-col-bpm" style={{ width: 48 }} />
-            <col style={{ width: 40 }} />
-            <col style={{ width: 40 }} />
-            <col className="lib-col-album" style={{ width: '26%' }} />
-          </colgroup>
-          <thead>
-            <tr>
-              <th scope="col" className="lib-idx" aria-label="Track number">#</th>
-              <th scope="col" className="lib-icon" aria-label="Source">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm6.9 9h-3a15.5 15.5 0 0 0-1.3-5.4A8 8 0 0 1 18.9 11zM12 4.1c.9 1.1 1.7 3.4 2 6.9h-4c.3-3.5 1.1-5.8 2-6.9zM5.1 11a8 8 0 0 1 4.3-5.4A15.5 15.5 0 0 0 8.1 11h-3zm0 2h3c.2 2.1.6 3.9 1.3 5.4A8 8 0 0 1 5.1 13zM12 19.9c-.9-1.1-1.7-3.4-2-6.9h4c-.3 3.5-1.1 5.8-2 6.9zm2.6-.5c.7-1.5 1.1-3.3 1.3-5.4h3a8 8 0 0 1-4.3 5.4z" /></svg>
-              </th>
-              <th scope="col" data-sort="title" aria-sort="ascending" role="columnheader">Song<span className="lib-sort" aria-hidden="true">▲</span></th>
-              <th scope="col" className="lib-col-artist" data-sort="artist" role="columnheader">Artist</th>
-              <th scope="col" className="lib-num" data-sort="duration" role="columnheader">Time</th>
-              <th scope="col" className="lib-num lib-col-bpm" data-sort="bpm" role="columnheader">BPM</th>
-              <th scope="col" className="lib-icon" aria-label="Offline">{DL}</th>
-              <th scope="col" className="lib-icon" aria-label="Star">{STAR}</th>
-              <th scope="col" className="lib-col-album" data-sort="album" role="columnheader">Album</th>
-            </tr>
-          </thead>
-          <tbody>
-            {LIST_ROWS.map((row) => (
-              <tr key={row.n} aria-selected={Boolean(row.selected)} tabIndex={-1} className={row.playing ? 'is-playing' : undefined} aria-current={row.playing ? 'true' : undefined}>
-                <td className="lib-idx">
-                  {row.playing ? (
-                    <svg className="lib-np" viewBox="0 0 12 12" role="img" aria-label="Now playing">
-                      <path d="M1 4h2.4L6 1.6v8.8L3.4 8H1z" />
-                      <path d="M8 3.6a3 3 0 0 1 0 4.8" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                    </svg>
-                  ) : (
-                    row.n
-                  )}
-                </td>
-                <td className="lib-icon"><span className="lib-pf" data-len={row.source.length} title={row.source}>{row.source}</span></td>
-                <td className="lib-title">{row.title}</td>
-                <td className="lib-col-artist">{row.artist}</td>
-                <td className="lib-num">{row.time}</td>
-                <td className="lib-num lib-col-bpm">{row.bpm}</td>
-                <td className="lib-icon"><button className="lib-btn lib-dl" type="button" aria-pressed={Boolean(row.offline)} aria-label={row.offline ? 'Available offline' : 'Not available offline'}>{DL}</button></td>
-                <td className="lib-icon"><button className="lib-btn lib-star" type="button" aria-pressed={Boolean(row.starred)} aria-label={`Star ${row.title}`}>{STAR}</button></td>
-                <td className="lib-col-album">{row.album}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="library__bar" aria-hidden="true">
-        <div className="library__thumb" style={{ top: 4, height: 46 }} />
-      </div>
-    </div>
-  );
-}
 
 /** The iTunes 11 results popover: count and Clear, 40 px rows with an audition tile, a pager. */
 export function SearchPopoverSpecimen() {
@@ -273,6 +173,7 @@ export function ShareStripSpecimen() {
           </span>
         ))}
       </div>
+      <span>2 listening</span>
       <p className="np-share-strip__note">The hub keeps the queue; your player follows it. Proposals go to the hub and come back accepted or refused.</p>
     </div>
   );

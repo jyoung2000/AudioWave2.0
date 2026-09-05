@@ -284,7 +284,7 @@ The rendered page maps each element to the product that imports it; the short ve
 | Page shell (`PageBar` … `LevelSlider`) | ● | – | – |
 | Window shell (`AquaWindow` … `BottomBar`, `SearchField`) | – | ● | ● |
 | Controls, structure, states, toasts | ● | ● | ● |
-| The list, popover, menu, sheet, toast, equalizer (page-skin classes) | ● | – | – |
+| The 3D stage, the list, popover, menu, sheet, toast, equalizer (page-skin classes) | ● | – | – |
 
 **Page shell** — `PageBar`, `BarSearch`, `BarClock`, `ModeSwitch`, `ProfileButton`, `SectionStrip`,
 `Hero`, `HeroArt`, `TrackScrubber`, `KeyTransport`, `KeyButton`, `LevelSlider`.
@@ -294,6 +294,10 @@ The rendered page maps each element to the product that imports it; the short ve
 
 **Media** — `Transport`, `TransportAuxButton`, `LcdDisplay`, `Scrubber`, `VolumeSlider`,
 `SearchField`, `ResultsPopover`, `NowPlayingGlyph`, `ArtworkGrid`, `Marquee`.
+
+**Stage and list** — `JewelStage` over `mountJewelCase` (the reference's 3D module, ported), `MusicList`
+with `useMarquee`, `RowMenu` and `NewPlaylistSheet`, and the `sourceOf` / `offlineOf` helpers that name
+where a track lives. Both live here rather than in the player so this page renders the same ones.
 
 **Controls** — `Button`, `ButtonLink`, `IconButton`, `Checkbox`, `Radio`, `TextField`, `PopUpMenu`,
 `Slider`, `SegmentedControl`, `ProgressBar`, `Spinner`, `Tabs`.

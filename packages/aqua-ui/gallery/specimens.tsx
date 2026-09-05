@@ -7,11 +7,12 @@
  * vary, it passes in.
  */
 import { useRef, useState, type ReactNode } from 'react';
+import { Track, type Track as TrackRow } from '@now-playing/contracts';
 import {
   AquaWindow, Toolbar, TrafficLights, Transport, TransportAuxButton, LcdDisplay, Scrubber, VolumeSlider, SearchField, ResultsPopover, SourceList, WorkArea, Content, BottomBar,
   SegmentedControl, Button, ButtonLink, IconButton, Checkbox, Radio, TextField, PopUpMenu, Slider, ProgressBar, AquaTable, NowPlayingGlyph, ArtworkGrid, Tabs, Sheet, Menu, useContextMenu, useToast,
   StatePanel, UnavailableCapabilityState, Panel, PanelSection, FormRow, KeyValueList, ListView, Splitter, Marquee, Avatar, AvatarButton, SourceBadge, Glyph, SourceIcon, GLYPH_NAMES, SOURCE_ICONS, AVATAR_ICON_IDS, AvatarIcon,
-  PageBar, BarSearch, BarClock, ModeSwitch, ProfileButton, SectionStrip, Hero, HeroArt, TrackScrubber, KeyTransport, KeyButton, LevelSlider,
+  PageBar, BarSearch, BarClock, ModeSwitch, ProfileButton, SectionStrip, Hero, HeroArt, TrackScrubber, KeyTransport, KeyButton, LevelSlider, JewelStage, MusicList,
   type MenuEntry, type ColumnDef,
 } from '../src/index.js';
 
@@ -21,6 +22,32 @@ export interface Row { id: string; n: number; title: string; artist: string; alb
 
 export function makeRows(count: number): Row[] {
   return Array.from({ length: count }, (_, i) => ({ id: `r${i}`, n: i + 1, title: i === 3 ? LONG : `Track ${i + 1}`, artist: ['Fennel Grove', 'Cassette Bloom', 'Orbital Cartographers', 'Marlow & the Tidewater'][i % 4]!, album: ['Long Wave Sessions', 'Live from Pier 9', 'Copper Meridian', 'Quiet Arithmetic'][i % 4]!, time: `${3 + (i % 4)}:${String((i * 7) % 60).padStart(2, '0')}`, genre: ['Ambient', 'Indie', 'Electronic', 'Folk'][i % 4]! }));
+}
+
+const DEVICE = '0192a7c1-2b3d-7e4f-8a9b-00000000d0d0';
+const HUB = '0192a7c1-2b3d-7e4f-8a9b-00000000a0a0';
+const STAMP = '2026-09-05T12:00:00.000Z';
+
+/**
+ * Tracks for the page skin's list, run through the contract's own parser.
+ *
+ * A hand-built object would satisfy the type and still lie — a badge that says "L" because the
+ * demo typed "L", not because the locator is a file on this device. These carry real locators of
+ * each kind, so the source badge, the offline column and the star are read from the same fields the
+ * player reads them from.
+ */
+export function makeTracks(): TrackRow[] {
+  const seed: Array<Partial<TrackRow> & { title: string; artistName: string; id: string }> = [
+    { id: '0192a7c1-2b3d-7e4f-8a9b-000000000001', title: 'Lantern Road', artistName: 'Marlow & the Tidewater', albumName: 'Quiet Arithmetic', durationMs: 204_000, bpm: 118, liked: true, locators: [{ kind: 'browser-handle', deviceId: DEVICE, handleId: 'h1' }] },
+    { id: '0192a7c1-2b3d-7e4f-8a9b-000000000002', title: 'Copper Meridian', artistName: 'Orbital Cartographers', albumName: 'Copper Meridian', durationMs: 305_000, locators: [{ kind: 'hub-blob', hubId: HUB, blobId: 'b2' }] },
+    { id: '0192a7c1-2b3d-7e4f-8a9b-000000000003', title: 'Quiet Arithmetic', artistName: 'Marlow & the Tidewater', albumName: 'Quiet Arithmetic', durationMs: 231_000, bpm: 96, locators: [{ kind: 'browser-handle', deviceId: DEVICE, handleId: 'h3' }] },
+    { id: '0192a7c1-2b3d-7e4f-8a9b-000000000004', title: 'Long Wave', artistName: 'Fennel Grove', albumName: 'Long Wave Sessions, Vol. 2', durationMs: 316_000, bpm: 122, locators: [{ kind: 'provider', provider: 'youtube', providerTrackId: 'yt-4', canonicalUrl: 'https://www.youtube.com/watch?v=4' }] },
+    { id: '0192a7c1-2b3d-7e4f-8a9b-000000000005', title: 'Pier 9 (Live)', artistName: 'Cassette Bloom', albumName: 'Live from Pier 9', durationMs: 251_000, locators: [{ kind: 'provider', provider: 'soundcloud', providerTrackId: 'sc-5' }] },
+    { id: '0192a7c1-2b3d-7e4f-8a9b-000000000006', title: LONG, artistName: 'Cassette Bloom', albumName: 'Live from Pier 9', durationMs: 381_000, bpm: 104, locators: [{ kind: 'browser-handle', deviceId: DEVICE, handleId: 'h6' }] },
+    { id: '0192a7c1-2b3d-7e4f-8a9b-000000000007', title: 'Midnight Set, Side B', artistName: 'Fennel Grove', albumName: 'Long Wave Sessions, Vol. 2', durationMs: 178_000, bpm: 110, liked: true, locators: [{ kind: 'browser-handle', deviceId: DEVICE, handleId: 'h7' }] },
+    { id: '0192a7c1-2b3d-7e4f-8a9b-000000000008', title: 'Harbour Lights', artistName: 'Orbital Cartographers', albumName: 'Copper Meridian', durationMs: 264_000, locators: [{ kind: 'hub-blob', hubId: HUB, blobId: 'b8' }] },
+  ];
+  return seed.map((row) => Track.parse({ createdAt: STAMP, updatedAt: STAMP, ...row }));
 }
 
 export function Card({ label, children }: { label: string; children: ReactNode }) {
@@ -258,7 +285,7 @@ export function IconsDemo() {
  * they are the same design system — same light source, same rims, same restraint — rather than two
  * unrelated skins that happen to be in one repository.
  */
-export function PageDemo({ rows }: { rows: Row[] }) {
+export function PageDemo() {
   const [mode, setMode] = useState('solo');
   const [section, setSection] = useState('library');
   const [query, setQuery] = useState('');
@@ -267,6 +294,19 @@ export function PageDemo({ rows }: { rows: Row[] }) {
   const [playing, setPlaying] = useState(true);
   const [repeat, setRepeat] = useState(false);
   const [liked, setLiked] = useState(false);
+  const [tracks, setTracks] = useState(makeTracks);
+  const [playingId, setPlayingId] = useState<string>('0192a7c1-2b3d-7e4f-8a9b-000000000007');
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const toast = useToast();
+  const current = tracks.find((t) => t.id === playingId) ?? tracks[0]!;
+  const album = {
+    title: current.title,
+    artist: current.artistName,
+    album: current.albumName,
+    coverUrl: null,
+    tracks: tracks.filter((t) => t.albumName === current.albumName).map((t) => t.title),
+    mood: mode === 'shared' ? ('shared' as const) : ('solo' as const),
+  };
   return (
     <div className="np-app" style={{ minHeight: 0, border: '1px solid rgba(0,0,0,.3)', borderRadius: 6, overflow: 'hidden' }}>
       <PageBar
@@ -291,7 +331,7 @@ export function PageDemo({ rows }: { rows: Row[] }) {
         selectedId={section}
         onSelect={setSection}
         items={[
-          { id: 'library', label: 'Music Library', icon: <Glyph name="note" />, count: 412 },
+          { id: 'library', label: 'Music Library', icon: <Glyph name="note" />, count: tracks.length },
           { id: 'queue', label: 'Queue', icon: <Glyph name="sort" />, count: 6 },
           { id: 'playlists', label: 'Playlists', icon: <Glyph name="folder" /> },
           { id: 'metrics', label: 'Listening history', icon: <Glyph name="history" /> },
@@ -299,14 +339,14 @@ export function PageDemo({ rows }: { rows: Row[] }) {
       />
       <Hero mode={mode === 'shared' ? 'shared' : 'solo'}>
         <div className="np-hero__top">
-          <HeroArt />
+          <HeroArt stageRef={stageRef} />
           <div className="np-hero__meta">
-            <h3 className="np-hero__title">Midnight Set, Side B</h3>
-            <p className="np-hero__artist">Fennel Grove</p>
-            <p className="np-hero__album">Long Wave Sessions, Vol. 2</p>
+            <h3 className="np-hero__title">{current.title}</h3>
+            <p className="np-hero__artist">{current.artistName}</p>
+            <p className="np-hero__album">{current.albumName}</p>
           </div>
         </div>
-        <TrackScrubber positionMs={position} durationMs={178_000} onSeek={setPosition} onTogglePlay={() => setPlaying((p) => !p)} live={mode === 'shared'} disabledReason={mode === 'shared' ? 'A shared broadcast has one position.' : undefined} />
+        <TrackScrubber positionMs={position} durationMs={current.durationMs} onSeek={setPosition} onTogglePlay={() => setPlaying((p) => !p)} live={mode === 'shared'} disabledReason={mode === 'shared' ? 'A shared broadcast has one position.' : undefined} />
         <KeyTransport volume={<LevelSlider value={volume} onChange={setVolume} onToggleMute={() => undefined} />}>
           <span className="np-keys__aux">
             <KeyButton aux label="Available offline" pressed onClick={() => undefined}>
@@ -324,25 +364,29 @@ export function PageDemo({ rows }: { rows: Row[] }) {
             <KeyButton aux label="Share this song" onClick={() => undefined}><Glyph name="share" /></KeyButton>
           </span>
         </KeyTransport>
+        {/* The jewel case and the disc: the same module the player mounts, over the same flat cover. */}
+        <JewelStage stageRef={stageRef} album={album} playing={playing} loadPose={async () => null} savePose={() => undefined} />
       </Hero>
       <div className="np-body">
-        <AquaTable
-          variant="page"
-          label="Your music"
-          height={180}
-          rows={rows.slice(0, 12)}
-          rowKey={(row: Row) => row.id}
-          currentKey="r2"
-          sort={{ columnId: 'title', direction: 'ascending' }}
-          onSortChange={() => undefined}
-          columns={[
-            { id: 'n', header: '#', align: 'right', width: 34, cell: (row) => row.n },
-            { id: 'title', header: 'Song', primary: true, sortable: true, cell: (row) => row.title, stackText: (row) => row.artist },
-            { id: 'artist', header: 'Artist', sortable: true, cell: (row) => row.artist },
-            { id: 'time', header: 'Time', align: 'right', width: 54, cell: (row) => row.time },
-            { id: 'album', header: 'Album', sortable: true, cell: (row) => row.album },
-          ]}
-        />
+        <div className="np-body__inner">
+          <MusicList
+            label="Your music"
+            tracks={tracks}
+            playingTrackId={playingId}
+            onPlay={(track) => {
+              setPlayingId(track.id);
+              setPosition(0);
+              setPlaying(true);
+            }}
+            onToggleStar={(track) => setTracks((all) => all.map((t) => (t.id === track.id ? { ...t, liked: !t.liked } : t)))}
+            playlists={[]}
+            playlistItems={[]}
+            onTogglePlaylist={() => undefined}
+            onNewPlaylist={() => toast.show('New Playlist… opens the sheet in the player')}
+            onSay={(message) => toast.show(message)}
+            ephemeralTrackIds={new Set()}
+          />
+        </div>
       </div>
     </div>
   );

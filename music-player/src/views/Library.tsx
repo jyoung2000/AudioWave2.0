@@ -1,7 +1,7 @@
 /**
  * The library: everything indexed from folders on this device.
  *
- * The list itself is the reference's, verbatim — see `../components/MusicList.tsx`. This view is
+ * The list itself is the reference's, verbatim — see `MusicList` in @now-playing/aqua-ui. This view is
  * what surrounds it: the ways music gets in, the actions that work on the whole list, and the
  * empty state.
  *
@@ -17,7 +17,7 @@ import { uuidv7 } from '@now-playing/domain';
 import type { ViewId } from '../App.js';
 import { useAppState, usePlayer } from '../state/context.js';
 import { toTrackRef } from '../state/store.js';
-import { MusicList } from '../components/MusicList.js';
+import { MusicList } from '@now-playing/aqua-ui';
 import { NewPlaylistSheet } from '../components/NewPlaylistSheet.js';
 
 /**

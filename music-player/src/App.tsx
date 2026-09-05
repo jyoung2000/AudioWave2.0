@@ -37,6 +37,8 @@ import {
   TrackScrubber,
   useToast,
   type SectionItem,
+  JewelStage,
+  offlineOf,
 } from '@now-playing/aqua-ui';
 import { formatTime, useAppState, usePlayer } from './state/context.js';
 import { LibraryView } from './views/Library.js';
@@ -62,9 +64,7 @@ import { ShareSheet } from './components/ShareSheet.js';
 import { NoticeBar } from './components/NoticeBar.js';
 import { SearchPopover, type SearchPopoverHandle } from './components/SearchPopover.js';
 import { SharedStrip } from './components/Shared.js';
-import { JewelStage } from './components/JewelStage.js';
 import { toTrackRef } from './state/store.js';
-import { offlineOf } from './lib/track-source.js';
 import { uuidv7 } from '@now-playing/domain';
 
 export type ViewId = 'library' | 'now-playing' | 'queue' | 'playlists' | 'search' | 'metrics' | 'constellation' | 'settings';

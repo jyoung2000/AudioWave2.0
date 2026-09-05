@@ -9,7 +9,7 @@
  * Mounting waits for an idle moment. The case is the nicest thing on the page and the least urgent.
  */
 import { useEffect, useRef } from 'react';
-import type { JewelCaseAlbum, JewelCaseHandle, JewelCasePose } from '../lib/jewel-case.js';
+import type { JewelCaseAlbum, JewelCaseHandle, JewelCasePose } from '../stage/jewel-case.js';
 
 export interface JewelStageProps {
   stageRef: React.RefObject<HTMLDivElement | null>;
@@ -54,7 +54,7 @@ export function JewelStage({ stageRef, album, playing, loadPose, savePose }: Jew
       if (!first) return;
       void (async () => {
         try {
-          const { mountJewelCase } = await import('../lib/jewel-case.js');
+          const { mountJewelCase } = await import('../stage/jewel-case.js');
           if (cancelled) return;
           const mounted = await mountJewelCase(stage, first, { loadPose: () => pose.current.loadPose(), savePose: (next) => pose.current.savePose(next) });
           if (cancelled) {

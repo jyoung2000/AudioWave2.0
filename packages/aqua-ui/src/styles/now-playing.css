@@ -963,6 +963,7 @@
 
 .np-share-strip {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   margin-top: 14px;
   padding: 8px 10px;

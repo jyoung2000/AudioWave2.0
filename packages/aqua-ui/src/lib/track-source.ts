@@ -32,7 +32,7 @@ export function sourceOf(track: Locatable): TrackSource {
   return { initials: 'L', name: 'A file on this device', href: null };
 }
 
-export interface OfflineState {
+export interface TrackOfflineState {
   offline: boolean;
   reason: string;
 }
@@ -42,7 +42,7 @@ export interface OfflineState {
  *   not derivable from the track — a picked file carries the same locator as a scanned one — so the
  *   caller passes it from the library's own record of which files those are.
  */
-export function offlineOf(track: Locatable, ephemeral = false): OfflineState {
+export function offlineOf(track: Locatable, ephemeral = false): TrackOfflineState {
   if (ephemeral) {
     return { offline: false, reason: `${track.title} was added with the file picker, so it is gone after a reload. Add its folder to keep it.` };
   }

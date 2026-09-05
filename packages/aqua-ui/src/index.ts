@@ -49,3 +49,10 @@ export * from './components/Panel.js';
 export * from './components/PageBar.js';
 export * from './components/SectionStrip.js';
 export * from './components/Hero.js';
+
+// The page skin's list and stage, shared by the player, the gallery and the styleguide.
+export * from './components/MusicList.js';
+export * from './components/music-list-behaviours.js';
+export * from './components/JewelStage.js';
+export * from './lib/track-source.js';
+export { mountJewelCase, type JewelCaseAlbum, type JewelCaseHandle, type JewelCaseOptions, type JewelCasePose } from './stage/jewel-case.js';

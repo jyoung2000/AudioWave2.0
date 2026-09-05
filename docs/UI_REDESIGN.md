@@ -40,7 +40,7 @@ it is a demo harness that would be a security and privacy defect if it shipped.
 | The parking marquee on the playing row: measured travel, one shared clock for title and artist, gradient-dissolved edges | `useMarquee`, ported |
 | The desktop context menu — Add to Playlist ▸ with checkmarks, a separator, New Playlist… — with its keyboard model and edge flip | `RowMenu`, ported |
 | The New Playlist alert sheet and the toast | `NewPlaylistSheet`, and the toast the reference's CSS describes |
-| The 3D jewel case: every texture generator, the full case (lid, tray, walls, hinge posts and pins, retention nubs, ribbed spine, disc well), the diffraction-grating shader on the data side, the three staggered curves that open it, drag with momentum, double-click to reset, the persisted pose | `lib/jewel-case.ts` — **ported, not reimplemented**: the reference's numbers, its shader and its choreography. Lazily mounted over the flat cover |
+| The 3D jewel case: every texture generator, the full case (lid, tray, walls, hinge posts and pins, retention nubs, ribbed spine, disc well), the diffraction-grating shader on the data side, the three staggered curves that open it, drag with momentum, double-click to reset, the persisted pose | `packages/aqua-ui/src/stage/jewel-case.ts`, moved into the design system so the styleguide mounts the very same module — **ported, not reimplemented**: the reference's numbers, its shader and its choreography. Lazily mounted over the flat cover |
 | Dark mode for all of the above | Kept; the app had none before |
 
 ### Refused

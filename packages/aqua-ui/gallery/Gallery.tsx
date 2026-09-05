@@ -26,7 +26,7 @@ export function Gallery() {
     <AquaProvider profile={profile} active={!inactive} reducedMotion={reduced || undefined}>
       <ToastProvider>
         <div style={{ maxWidth: width ?? 1180, margin: '0 auto' }}>
-          <Section id="page" title="Page shell (status bar, section strip, hero, iTunes 10 list)"><PageDemo rows={rows} /></Section>
+          <Section id="page" title="Page shell (status bar, section strip, hero, iTunes 10 list)"><PageDemo /></Section>
           <Section id="shell" title="Application shell (window, toolbar, source list, table, bottom bar)"><ShellDemo rows={rows} width={width} inactive={inactive} /></Section>
           <Section id="controls" title="Controls"><ControlsDemo /></Section>
           <Section id="overlays" title="Overlays"><OverlaysDemo initiallyOpen={params.get('state') === 'open'} /></Section>

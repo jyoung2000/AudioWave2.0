@@ -14,7 +14,7 @@
  */
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { Track } from '@now-playing/contracts';
-import { sourceOf } from '../lib/track-source.js';
+import { sourceOf } from '@now-playing/aqua-ui';
 
 const PAGE = 5;
 const AUDITION_MS = 15_000;
