@@ -385,26 +385,35 @@
  * without shouting. The pulse stays because the spec asks for it; it is the halo that breathes,
  * not the face.
  */
+/*
+ * The default action is where the Aqua blue lives.
+ *
+ * Same rounded rect as every other button — no pill, no glass lozenge, no gloss step — but the face
+ * is the real Aqua gel: a pale cyan cap, a saturated blue body, a specular hairline at the top and
+ * a dark rim, pulsing. That is what Snow Leopard's default button was, and it is the one place on a
+ * form where the system's blue is allowed to be a highlight rather than a selection.
+ */
 .aqua-button[data-default="true"] {
-  color: #0d2233;
-  background: linear-gradient(to bottom, #d6e9fb 0%, #b9d8f5 47%, #9cc6ef 53%, #8bbcea 100%);
-  border-color: #6d9cc4;
-  border-bottom-color: #5a88b0;
+  color: #06203a;
+  background: linear-gradient(to bottom, #cfeaff 0%, #a3d4fb 44%, #74b9f5 56%, #5aa8ef 100%);
+  border-color: #4684c8;
+  border-bottom-color: #356db0;
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 80%),
-    0 0 0 1px rgb(68 183 247 / 18%),
-    0 0 5px rgb(40 158 229 / 28%);
+    inset 0 1px 0 rgb(255 255 255 / 88%),
+    inset 0 -1px 0 rgb(0 50 110 / 22%),
+    0 0 0 1px rgb(68 183 247 / 22%),
+    0 0 5px rgb(40 158 229 / 34%);
   animation: aqua-default-pulse var(--aqua-motion-pulse) ease-in-out infinite;
   animation-play-state: var(--aqua-anim-state);
 }
 
 .aqua-button[data-default="true"]:hover:not(:disabled):not([aria-disabled="true"]) {
-  background: linear-gradient(to bottom, #e0efff 0%, #c6e0f8 47%, #a8cef2 53%, #97c4ee 100%);
+  background: linear-gradient(to bottom, #dcf0ff 0%, #b3dcfc 44%, #86c3f7 56%, #6cb3f2 100%);
 }
 
 .aqua-button[data-default="true"]:active:not(:disabled) {
-  background: linear-gradient(to bottom, #7fb0dc 0%, #92bfe5 50%, #a3cbeb 100%);
-  border-color: #5a88b0;
+  background: linear-gradient(to bottom, #4f96de 0%, #67a8e8 50%, #86bdf0 100%);
+  border-color: #356db0;
   box-shadow:
     inset 0 1px 2px rgb(0 30 80 / 28%),
     inset 0 -1px 0 rgb(255 255 255 / 35%);

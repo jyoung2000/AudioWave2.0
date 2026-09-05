@@ -36,7 +36,8 @@
     "test:dom": "vitest run --project dom",
     "test:perf": "vitest run --project perf",
     "build:local": "pnpm build:packages && pnpm --filter @now-playing/music-player build:local",
-    "test:local": "pnpm --filter @now-playing/music-player test:local"
+    "test:local": "pnpm --filter @now-playing/music-player test:local",
+    "build:styleguide": "pnpm --filter @now-playing/aqua-ui build:styleguide"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

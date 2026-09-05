@@ -5,7 +5,8 @@
     "exactOptionalPropertyTypes": false,
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
-    "types": ["node"]
+    "types": ["node"],
+    "resolveJsonModule": true
   },
-  "include": ["src", "tests", "scripts", "gallery"]
+  "include": ["src", "tests", "scripts", "gallery", "styleguide"]
 }

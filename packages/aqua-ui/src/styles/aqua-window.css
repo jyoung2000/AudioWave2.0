@@ -56,6 +56,13 @@
   pointer-events: none;
 }
 
+/* iTunes 9 drew no title text beside its LCD: the display *was* the title bar's content, and a
+   caption floating behind it reads as two things fighting for one slot. Only a toolbar that carries
+   a display hides it; the hub's and the companion's windows keep their titles. */
+.aqua-window:has(.aqua-lcd) .aqua-window__title {
+  display: none;
+}
+
 .aqua-window[data-active="false"] .aqua-window__title {
   color: var(--aqua-text-disabled);
 }

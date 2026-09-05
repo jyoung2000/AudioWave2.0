@@ -6,8 +6,11 @@ This is how the suite looks and why. It is written from the code: every value he
 find in [`tokens.json`](../../packages/aqua-ui/src/styles/tokens.json) or in the stylesheets beside
 it, and if the two ever disagree the code is right and this page is stale.
 
-A rendered companion to this page — the swatches, the type scale, the space ruler and the material
-recipes drawn from the real CSS — is [`styleguide.html`](styleguide.html); open it in a browser.
+The rendered companion to this page is [`styleguide.html`](styleguide.html), and it is not a
+drawing of the system: it is **built from the components** — every control on it is the real one
+wearing the real stylesheet, every swatch is read from `tokens.json` at build time, and it covers
+every element the player, the hub's admin GUI and the Windows companion import, mapped to the
+product that uses it. Open it in a browser; regenerate it with `pnpm build:styleguide`.
 
 Three things are *not* here. The component API is in
 [`packages/aqua-ui/README.md`](../../packages/aqua-ui/README.md); the rendered specimen of every
@@ -48,7 +51,7 @@ its accessible name, not only in a tooltip.
 |---|---|---|
 | Token prefix | `--aqua-*` | `--np-*`, `--lib-*` |
 | Stylesheets | `aqua.css`, `aqua-window.css`, `aqua-media.css` | `now-playing.css` |
-| Type | Lucida Grande | the platform UI stack |
+| Type | Lucida Grande | Helvetica — the iPod's face |
 | Used by | hub admin GUI, Windows companion | the music player PWA |
 | Shape | a framed desktop window with a source list | a sticky bar over a hero and a list |
 
@@ -131,9 +134,10 @@ true bold. Line heights are `1.2` compact and `1.35` body.
 Numbers that change in place — timers, dB values, tempo, track times — take
 `font-variant-numeric: tabular-nums`, so a digit changing does not shift the ones beside it.
 
-The window skin sets Lucida Grande. The page skin uses `--np-ui-font`, the platform stack
-(`-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, …`), because the 2010 page it is modelled
-on ran on whatever the OS supplied.
+The window skin sets Lucida Grande, as OS X did. The page skin sets **Helvetica** through
+`--np-ui-font` (`"Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif`) — the face the
+iPod classic drew its Now Playing screen in, which is what the hero is modelled on. Arial is the
+metric-compatible stand-in where Helvetica is absent, so nothing reflows on Windows.
 
 ---
 
@@ -194,8 +198,32 @@ box-shadow:
 
 A rounded rect, one quiet vertical gradient, a hairline rim that darkens along the bottom, one pixel
 of white on top. **No pill, no glass lozenge, no gloss step across the middle** — those are 10.2, and
-this profile is 10.6. The default action is the *same face* with the hue turned up
-(`#d6e9fb → #8bbcea`) and dark ink, not a lozenge of blue.
+this profile is 10.6.
+
+The **default action** is the same shape carrying the Aqua blue: a pale cyan cap (`#cfeaff`) over a
+saturated body (`#5aa8ef`), a specular hairline at the top, a dark rim (`#4684c8`, `#356db0` along
+the bottom), dark ink, and the slow pulse. That is what Snow Leopard's default button was — the gel
+stayed on the default action after it had left every other button — and it is the one place on a
+form where the system's blue is a highlight rather than a selection.
+
+### Where the Aqua blue survives
+
+Snow Leopard flattened most of Aqua's gel; these are the places it kept it, and the places this
+system keeps it:
+
+| Place | What it is |
+|---|---|
+| The default button | The gel face above, pulsing |
+| Source-list selection | `--aqua-selection-*` gradient with white text |
+| Music-list selection, sorted column | `--lib-sel-*`, `--lib-sort-*` |
+| The overlay scroller thumb | The full five-stop `--aqua-blue-*` gel at strength — the only place |
+| The checked box, the pop-up's end cap | `--aqua-blue-*` at control size |
+| The aqua-tinted segmented control | The selected segment |
+| The indeterminate progress bar | The barber pole |
+| The focus ring | `--aqua-focus` with a soft glow, everywhere |
+
+Everything else that is blue on the page is a selection or a link. The iPod rail is the other blue,
+and it is not gel: it is the device's own sky-to-cyan fill.
 
 ### The recessed field
 
@@ -248,6 +276,15 @@ the 3D stage stops its idle drift. Two variables carry most of it — `--aqua-an
 ## 8. The components
 
 Everything is exported from `@now-playing/aqua-ui`. Reach for one of these before writing a `<div>`.
+
+The rendered page maps each element to the product that imports it; the short version:
+
+| | Player (PWA) | Hub admin | Companion |
+|---|---|---|---|
+| Page shell (`PageBar` … `LevelSlider`) | ● | – | – |
+| Window shell (`AquaWindow` … `BottomBar`, `SearchField`) | – | ● | ● |
+| Controls, structure, states, toasts | ● | ● | ● |
+| The list, popover, menu, sheet, toast, equalizer (page-skin classes) | ● | – | – |
 
 **Page shell** — `PageBar`, `BarSearch`, `BarClock`, `ModeSwitch`, `ProfileButton`, `SectionStrip`,
 `Hero`, `HeroArt`, `TrackScrubber`, `KeyTransport`, `KeyButton`, `LevelSlider`.

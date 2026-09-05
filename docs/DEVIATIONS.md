@@ -31,6 +31,27 @@ button stays, because §6.5 asks for it; it is the halo that breathes, not the f
 This was a profile-coherence failure (§17.6) that the conformance test could not catch, because it
 checks the tokens and the material rules rather than whether a recipe belongs to the right year.
 
+### The default button had lost its blue with its gloss
+
+The button correction above took the gel off *every* button, the default action included, leaving
+it a pale tint. That was one step too far: Snow Leopard's push button had lost the pill and the
+lozenge, but its **default** button kept the Aqua blue — a cyan cap, a saturated body, a specular
+hairline, a pulse — on the same rounded rect. The same is true of the places Snow Leopard never
+flattened at all: the source-list selection, the scroller thumb, the checked box, the pop-up's end
+cap, the barber pole.
+
+**Fixed:** the default action carries the Aqua gel again, on the Snow Leopard shape. Nothing else
+got its gloss back, and the styleguide now shows each place the blue is allowed, so the line does
+not drift again in either direction.
+
+### The page skin wore the wrong typeface
+
+The page skin set the platform UI stack — San Francisco on a Mac, Segoe on Windows. The hero is
+modelled on the iPod classic's Now Playing screen, and that screen was set in Helvetica.
+
+**Fixed:** `--np-ui-font` is Helvetica Neue, Helvetica, Arial. The window skin keeps Lucida Grande,
+which is what the windows it reconstructs used.
+
 ### Picked files were indexed and then refused
 
 Shipped, and wrong: `resolveFile` refused every file added through "Choose files" on sight, because

@@ -99,7 +99,9 @@
   --np-bar-type: 13px;
   --np-field-h: 26px;
   --np-stage: clamp(150px, 38vw, 232px);
-  --np-ui-font: -apple-system, blinkmacsystemfont, "Segoe UI", roboto, "Helvetica Neue", arial, sans-serif;
+  /* Helvetica: the face the iPod classic set its Now Playing screen in, which is what this hero
+     is modelled on. Arial is its metric-compatible stand-in where Helvetica is absent. */
+  --np-ui-font: "Helvetica Neue", helvetica, arial, "Liberation Sans", sans-serif;
 }
 
 /* The reference ships a dark theme for every one of these surfaces. Keeping it

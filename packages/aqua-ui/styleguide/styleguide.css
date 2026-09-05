@@ -1,0 +1,637 @@
+/* ------------------------------------------------------------------------
+   The styleguide's own chrome.
+
+   Set in the two faces the system uses — the rail is a source list, so it
+   is in Lucida Grande like every other source list; the prose is in
+   Helvetica, the iPod's face, because that is what the page skin now sets.
+   Everything else on the page is a real component wearing its own styles.
+   ------------------------------------------------------------------------ */
+
+:root {
+  --sg-ground: #e4e4e6;
+  --sg-panel: #fff;
+  --sg-panel-sunk: #f7f7f8;
+  --sg-rim: #a7a7ab;
+  --sg-rim-strong: #747474;
+  --sg-ink: #161616;
+  --sg-ink-2: #565b60;
+  --sg-ink-3: #83878c;
+  --sg-accent: #2b6fd6;
+  --sg-good: #4e9d47;
+  --sg-bad: #d64a44;
+  --sg-rail-top: #dce8f4;
+  --sg-rail-bottom: #becee0;
+  --sg-rail-ink: #2b3138;
+  --sg-rail-group: #536473;
+  --sg-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --sg-ground: #0e0f12;
+    --sg-panel: #1a1d22;
+    --sg-panel-sunk: #141619;
+    --sg-rim: #383c43;
+    --sg-rim-strong: #4a4f57;
+    --sg-ink: #f1f2f4;
+    --sg-ink-2: #9ba0a8;
+    --sg-ink-3: #7c8087;
+    --sg-accent: #6ba6f2;
+    --sg-good: #6fc167;
+    --sg-bad: #f0736c;
+    --sg-rail-top: #2b3038;
+    --sg-rail-bottom: #22262c;
+    --sg-rail-ink: #dfe2e6;
+    --sg-rail-group: #8b939d;
+  }
+}
+
+:root[data-theme='dark'] {
+  --sg-ground: #0e0f12;
+  --sg-panel: #1a1d22;
+  --sg-panel-sunk: #141619;
+  --sg-rim: #383c43;
+  --sg-rim-strong: #4a4f57;
+  --sg-ink: #f1f2f4;
+  --sg-ink-2: #9ba0a8;
+  --sg-ink-3: #7c8087;
+  --sg-accent: #6ba6f2;
+  --sg-good: #6fc167;
+  --sg-bad: #f0736c;
+  --sg-rail-top: #2b3038;
+  --sg-rail-bottom: #22262c;
+  --sg-rail-ink: #dfe2e6;
+  --sg-rail-group: #8b939d;
+}
+
+html,
+body {
+  margin: 0;
+}
+
+body {
+  background: var(--sg-ground);
+  color: var(--sg-ink);
+  font: 400 14px/1.55 var(--np-ui-font);
+  -webkit-font-smoothing: antialiased;
+}
+
+.sg {
+  display: grid;
+  min-height: 100vh;
+  grid-template-columns: 212px minmax(0, 1fr);
+}
+
+.sg__rail {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  padding: 18px 0;
+  border-right: 1px solid var(--sg-rim-strong);
+  background: linear-gradient(to bottom, var(--sg-rail-top), var(--sg-rail-bottom));
+  font-family: var(--aqua-font);
+  overflow-y: auto;
+}
+
+.sg__brand {
+  padding: 0 16px 12px;
+  color: var(--sg-rail-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sg__brand small {
+  display: block;
+  margin-top: 3px;
+  color: var(--sg-rail-group);
+  font-family: var(--sg-mono);
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.sg__group {
+  padding: 12px 16px 4px;
+  color: var(--sg-rail-group);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.sg__rail a {
+  display: block;
+  padding: 4px 16px;
+  color: var(--sg-rail-ink);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.sg__rail a:hover {
+  background: rgb(255 255 255 / 26%);
+}
+
+.sg__rail a:focus-visible {
+  outline: 2px solid var(--sg-accent);
+  outline-offset: -2px;
+}
+
+.sg__work {
+  min-width: 0;
+  padding: 30px 34px 72px;
+}
+
+.sg__h1 {
+  margin: 0 0 6px;
+  font-size: 27px;
+  font-weight: 700;
+  letter-spacing: -0.014em;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.sg__stamp {
+  display: inline-block;
+  margin-bottom: 14px;
+  padding: 2px 8px;
+  border: 1px solid var(--sg-rim);
+  border-radius: 999px;
+  background: var(--sg-panel);
+  color: var(--sg-ink-2);
+  font-family: var(--sg-mono);
+  font-size: 10px;
+}
+
+.sg__h2 {
+  margin: 46px 0 4px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--sg-rim);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.sg__h3 {
+  margin: 26px 0 8px;
+  color: var(--sg-ink-2);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.sg__work > section > p,
+.sg__work > .sg__lede {
+  max-width: 66ch;
+  margin: 10px 0;
+}
+
+.sg__work > section > p > a,
+.sg__plain a {
+  color: var(--sg-accent);
+}
+
+.sg__work > section > p > code,
+.sg__note > code,
+.sg__rule code,
+.sg__plain code {
+  color: var(--sg-ink-2);
+  font-family: var(--sg-mono);
+  font-size: 0.88em;
+}
+
+.sg__note {
+  max-width: 66ch;
+  margin: 10px 0;
+  color: var(--sg-ink-2);
+  font-size: 13px;
+}
+
+/* ----------------------------------------------------------- rule cards */
+
+.sg__rules {
+  display: grid;
+  margin-top: 14px;
+  border: 1px solid var(--sg-rim);
+  border-radius: 5px;
+  background: var(--sg-rim);
+  gap: 1px;
+  overflow: hidden;
+}
+
+.sg__rule {
+  padding: 14px 16px;
+  background: var(--sg-panel);
+}
+
+.sg__rule b {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 14px;
+}
+
+.sg__rule span {
+  display: block;
+  max-width: 76ch;
+  color: var(--sg-ink-2);
+  font-size: 13px;
+}
+
+/* -------------------------------------------------------------- swatches */
+
+.sg__swatches {
+  display: grid;
+  margin-top: 12px;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+.sg__swatch {
+  border: 1px solid var(--sg-rim);
+  border-radius: 5px;
+  background: var(--sg-panel);
+  overflow: hidden;
+}
+
+.sg__chip {
+  height: 42px;
+  border-bottom: 1px solid var(--sg-rim);
+}
+
+.sg__swatch-meta {
+  padding: 6px 8px 7px;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.sg__swatch-meta small {
+  display: block;
+  color: var(--sg-ink-3);
+  font-family: var(--sg-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+/* ------------------------------------------------------------- type scale */
+
+.sg__scale {
+  display: grid;
+  margin-top: 12px;
+  border: 1px solid var(--sg-rim);
+  border-radius: 5px;
+  background: var(--sg-panel);
+  overflow: hidden;
+}
+
+.sg__scale-row {
+  display: grid;
+  align-items: baseline;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--sg-rim);
+  gap: 14px;
+  grid-template-columns: 64px minmax(0, 1fr) 150px;
+}
+
+.sg__scale-row:last-child {
+  border-bottom: 0;
+}
+
+.sg__scale-row:nth-child(even) {
+  background: var(--sg-panel-sunk);
+}
+
+.sg__px,
+.sg__use {
+  color: var(--sg-ink-3);
+  font-family: var(--sg-mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sg__use {
+  text-align: right;
+}
+
+/* ----------------------------------------------------------------- ruler */
+
+.sg__ruler {
+  display: grid;
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid var(--sg-rim);
+  border-radius: 5px;
+  background: var(--sg-panel);
+  gap: 7px;
+}
+
+.sg__ruler-row {
+  display: grid;
+  align-items: center;
+  gap: 12px;
+  grid-template-columns: 190px 46px minmax(0, 1fr);
+}
+
+.sg__bar {
+  height: 10px;
+  border-radius: 2px;
+  background: var(--sg-accent);
+}
+
+/* ------------------------------------------------------------------- beds */
+
+.sg__bed {
+  display: grid;
+  margin-top: 12px;
+  padding: 20px;
+  border: 1px solid var(--sg-rim);
+  border-radius: 5px;
+  background: var(--sg-panel-sunk);
+  gap: 16px;
+  justify-items: start;
+}
+
+.sg__bed--wide {
+  justify-items: stretch;
+}
+
+.sg__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.sg__caption {
+  max-width: 62ch;
+  margin: 0;
+  color: var(--sg-ink-2);
+  font-size: 12px;
+}
+
+.sg__verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--sg-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sg__verdict::before {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentcolor;
+  content: '';
+}
+
+.sg__verdict--yes {
+  color: var(--sg-good);
+}
+
+.sg__verdict--no {
+  color: var(--sg-bad);
+}
+
+/* The 10.2 button this system is often mistaken for: drawn once, here, as the thing not to do. */
+.sg__wrong-button {
+  position: relative;
+  display: inline-flex;
+  min-width: 69px;
+  min-height: 22px;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 16px 2px;
+  border: 1px solid #9a9a9e;
+  border-radius: 999px;
+  background: linear-gradient(to bottom, #fefeff 0%, #f0f0f2 48%, #d4d4d8 50%, #f2f2f4 100%);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    inset 0 -3px 4px rgb(255 255 255 / 90%),
+    0 1px 2px rgb(0 0 0 / 22%);
+  color: #151515;
+  font: 400 13px/18px var(--aqua-font);
+  overflow: hidden;
+}
+
+.sg__wrong-button::before {
+  position: absolute;
+  top: 1px;
+  right: 2px;
+  left: 2px;
+  height: 42%;
+  border-radius: 999px;
+  background: linear-gradient(to bottom, rgb(255 255 255 / 96%), rgb(255 255 255 / 30%));
+  content: '';
+  pointer-events: none;
+}
+
+/* ------------------------------------------------- static page furniture */
+
+/* Things the app positions against the viewport are held still on the bed. */
+.sg-static .sheet-backdrop {
+  position: relative;
+  min-height: 300px;
+  inset: auto;
+  border-radius: 5px;
+}
+
+.sg-static .toast {
+  position: static;
+  display: inline-block;
+  transform: none;
+}
+
+.sg-static .ctx {
+  position: static;
+  display: inline-block;
+}
+
+.sg-static .srch {
+  position: static;
+  width: 100%;
+  max-width: 460px;
+}
+
+.sg-static .library__scroll {
+  overflow: visible;
+}
+
+/* ---------------------------------------------------------- product map */
+
+.sg__map {
+  width: 100%;
+  margin-top: 12px;
+  border: 1px solid var(--sg-rim);
+  border-radius: 5px;
+  background: var(--sg-panel);
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+  overflow: hidden;
+}
+
+.sg__map th,
+.sg__map td {
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--sg-rim);
+  text-align: left;
+}
+
+.sg__map th {
+  background: var(--sg-panel-sunk);
+  color: var(--sg-ink-2);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sg__map th:not(:first-child),
+.sg__map td:not(:first-child) {
+  width: 92px;
+  text-align: center;
+}
+
+.sg__map tr:last-child td {
+  border-bottom: 0;
+}
+
+.sg__map td:first-child {
+  font-family: var(--sg-mono);
+  font-size: 11px;
+}
+
+.sg__tick {
+  color: var(--sg-accent);
+  font-weight: 700;
+}
+
+.sg__dash {
+  color: var(--sg-rim);
+}
+
+/* ------------------------------------------------------------ components */
+
+.sg__groups {
+  display: grid;
+  margin-top: 12px;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(238px, 1fr));
+}
+
+.sg__grp {
+  padding: 12px 14px;
+  border: 1px solid var(--sg-rim);
+  border-radius: 5px;
+  background: var(--sg-panel);
+}
+
+.sg__grp b {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+
+.sg__grp p {
+  margin: 0;
+  color: var(--sg-ink-2);
+  font-family: var(--sg-mono);
+  font-size: 10.5px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.sg__grp--flag {
+  border-color: var(--sg-accent);
+  box-shadow: inset 3px 0 0 var(--sg-accent);
+}
+
+.sg__plain {
+  max-width: 66ch;
+  margin: 10px 0;
+  padding-left: 18px;
+}
+
+.sg__plain li {
+  margin: 5px 0;
+}
+
+.sg__code {
+  max-width: 100%;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--sg-rim);
+  border-radius: 5px;
+  background: var(--sg-panel-sunk);
+  color: var(--sg-ink);
+  font-family: var(--sg-mono);
+  font-size: 11.5px;
+  line-height: 1.6;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.sg__foot {
+  max-width: 66ch;
+  margin-top: 52px;
+  padding-top: 16px;
+  border-top: 1px solid var(--sg-rim);
+  color: var(--sg-ink-3);
+  font-size: 12px;
+}
+
+/* ---------------------------------------------------------------- narrow */
+
+@media (max-width: 900px) {
+  /* The same move the player makes: the source list becomes a strip. */
+  .sg {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sg__rail {
+    position: static;
+    display: flex;
+    height: auto;
+    align-items: center;
+    padding: 8px 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--sg-rim-strong);
+    gap: 2px;
+    overflow-x: auto;
+  }
+
+  .sg__brand,
+  .sg__group {
+    display: none;
+  }
+
+  .sg__rail a {
+    padding: 5px 10px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+
+  .sg__work {
+    padding: 22px 18px 60px;
+  }
+
+  .sg__scale-row {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .sg__use {
+    display: none;
+  }
+
+  .sg__ruler-row {
+    grid-template-columns: 140px 42px minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sg * {
+    transition: none !important;
+  }
+}

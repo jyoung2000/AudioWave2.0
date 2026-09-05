@@ -19,7 +19,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dev": "vite --config gallery/vite.config.ts",
     "build:gallery": "vite build --config gallery/vite.config.ts",
-    "test": "vitest run --project dom --project unit"
+    "test": "vitest run --project dom --project unit",
+    "dev:styleguide": "vite --config styleguide/vite.config.ts",
+    "build:styleguide": "vite build --config styleguide/vite.config.ts"
   },
   "peerDependencies": {
     "react": "^19.0.0",
