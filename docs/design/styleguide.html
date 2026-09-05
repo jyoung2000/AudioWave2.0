@@ -1,0 +1,1094 @@
+<title>Now Playing Styleguide</title>
+<style>
+  /* ------------------------------------------------------------------
+     The page is set in the system it documents: the Aqua stack, the
+     window greys, the source list. A styleguide for a 2009 interface
+     that arrives in a 2025 typeface is describing something it isn't.
+     ------------------------------------------------------------------ */
+  :root {
+    --sg-font: "Lucida Grande", "Lucida Sans Unicode", "Helvetica Neue", Arial, sans-serif;
+    --sg-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+    --sg-ground: #e4e4e6;
+    --sg-panel: #fff;
+    --sg-panel-sunk: #f7f7f8;
+    --sg-rim: #a7a7ab;
+    --sg-rim-strong: #747474;
+    --sg-ink: #161616;
+    --sg-ink-2: #565b60;
+    --sg-ink-3: #83878c;
+    --sg-accent: #2b6fd6;
+    --sg-accent-soft: #e8eef9;
+
+    --sg-rail-top: #dce8f4;
+    --sg-rail-bottom: #becee0;
+    --sg-rail-ink: #2b3138;
+    --sg-rail-group: #536473;
+
+    --sg-chrome-top: #f6f6f6;
+    --sg-chrome-bottom: #cfcfd1;
+
+    --sg-good: #4e9d47;
+    --sg-bad: #d64a44;
+
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --sg-ground: #0e0f12;
+      --sg-panel: #1a1d22;
+      --sg-panel-sunk: #141619;
+      --sg-rim: #383c43;
+      --sg-rim-strong: #4a4f57;
+      --sg-ink: #f1f2f4;
+      --sg-ink-2: #9ba0a8;
+      --sg-ink-3: #7c8087;
+      --sg-accent: #6ba6f2;
+      --sg-accent-soft: #1d2733;
+
+      --sg-rail-top: #2b3038;
+      --sg-rail-bottom: #22262c;
+      --sg-rail-ink: #dfe2e6;
+      --sg-rail-group: #8b939d;
+
+      --sg-chrome-top: #34373d;
+      --sg-chrome-bottom: #1e2126;
+
+      --sg-good: #6fc167;
+      --sg-bad: #f0736c;
+
+      color-scheme: dark;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --sg-ground: #0e0f12;
+    --sg-panel: #1a1d22;
+    --sg-panel-sunk: #141619;
+    --sg-rim: #383c43;
+    --sg-rim-strong: #4a4f57;
+    --sg-ink: #f1f2f4;
+    --sg-ink-2: #9ba0a8;
+    --sg-ink-3: #7c8087;
+    --sg-accent: #6ba6f2;
+    --sg-accent-soft: #1d2733;
+
+    --sg-rail-top: #2b3038;
+    --sg-rail-bottom: #22262c;
+    --sg-rail-ink: #dfe2e6;
+    --sg-rail-group: #8b939d;
+
+    --sg-chrome-top: #34373d;
+    --sg-chrome-bottom: #1e2126;
+
+    --sg-good: #6fc167;
+    --sg-bad: #f0736c;
+
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--sg-ground);
+    color: var(--sg-ink);
+    font: 400 14px/1.55 var(--sg-font);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------------------------------------------------------- shell */
+
+  .shell {
+    display: grid;
+    min-height: 100vh;
+    grid-template-columns: 208px minmax(0, 1fr);
+  }
+
+  /* The source list, which is what this system navigates with. */
+  .rail {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    padding: 20px 0;
+    border-right: 1px solid var(--sg-rim-strong);
+    background: linear-gradient(to bottom, var(--sg-rail-top), var(--sg-rail-bottom));
+    overflow-y: auto;
+  }
+
+  .rail__brand {
+    padding: 0 16px 14px;
+    color: var(--sg-rail-ink);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.25;
+  }
+
+  .rail__brand small {
+    display: block;
+    margin-top: 3px;
+    color: var(--sg-rail-group);
+    font-family: var(--sg-mono);
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+  }
+
+  .rail__group {
+    padding: 12px 16px 4px;
+    color: var(--sg-rail-group);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+
+  .rail a {
+    display: block;
+    padding: 4px 16px;
+    color: var(--sg-rail-ink);
+    font-size: 12px;
+    text-decoration: none;
+  }
+
+  .rail a:hover { background: rgb(255 255 255 / 26%); }
+  .rail a:focus-visible { outline: 2px solid var(--sg-accent); outline-offset: -2px; }
+
+  .work {
+    min-width: 0;
+    padding: 30px 34px 72px;
+  }
+
+  .lede {
+    max-width: 62ch;
+  }
+
+  h1 {
+    margin: 0 0 6px;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.012em;
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+
+  .stamp {
+    display: inline-block;
+    margin-bottom: 16px;
+    padding: 2px 8px;
+    border: 1px solid var(--sg-rim);
+    border-radius: 999px;
+    background: var(--sg-panel);
+    color: var(--sg-ink-2);
+    font-family: var(--sg-mono);
+    font-size: 10px;
+  }
+
+  h2 {
+    margin: 44px 0 4px;
+    padding-bottom: 7px;
+    border-bottom: 1px solid var(--sg-rim);
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.008em;
+    text-wrap: balance;
+  }
+
+  h3 {
+    margin: 26px 0 8px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--sg-ink-2);
+  }
+
+  p { margin: 10px 0; max-width: 66ch; }
+  a { color: var(--sg-accent); }
+  strong { font-weight: 700; }
+
+  code, .mono {
+    font-family: var(--sg-mono);
+    font-size: 0.88em;
+  }
+
+  code { color: var(--sg-ink-2); }
+
+  .note {
+    max-width: 66ch;
+    color: var(--sg-ink-2);
+    font-size: 13px;
+  }
+
+  /* ---------------------------------------------------- rule cards */
+
+  .rules {
+    display: grid;
+    margin-top: 14px;
+    gap: 1px;
+    background: var(--sg-rim);
+    border: 1px solid var(--sg-rim);
+    border-radius: 5px;
+    overflow: hidden;
+  }
+
+  .rule {
+    padding: 14px 16px;
+    background: var(--sg-panel);
+  }
+
+  .rule b {
+    display: block;
+    margin-bottom: 3px;
+    font-size: 14px;
+  }
+
+  .rule span {
+    display: block;
+    max-width: 76ch;
+    color: var(--sg-ink-2);
+    font-size: 13px;
+  }
+
+  /* ------------------------------------------------------- swatches */
+
+  .swatches {
+    display: grid;
+    margin-top: 12px;
+    gap: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  }
+
+  .swatch {
+    border: 1px solid var(--sg-rim);
+    border-radius: 5px;
+    background: var(--sg-panel);
+    overflow: hidden;
+  }
+
+  .swatch__chip {
+    height: 46px;
+    border-bottom: 1px solid var(--sg-rim);
+  }
+
+  .swatch__meta {
+    padding: 7px 9px 8px;
+  }
+
+  .swatch__role {
+    font-size: 12px;
+    line-height: 1.3;
+  }
+
+  .swatch__token {
+    display: block;
+    margin-top: 2px;
+    color: var(--sg-ink-3);
+    font-family: var(--sg-mono);
+    font-size: 10px;
+    word-break: break-all;
+  }
+
+  .swatch__hex {
+    color: var(--sg-ink-2);
+    font-family: var(--sg-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+  }
+
+  /* ----------------------------------------------------- type scale */
+
+  .scale {
+    display: grid;
+    margin-top: 12px;
+    border: 1px solid var(--sg-rim);
+    border-radius: 5px;
+    background: var(--sg-panel);
+    overflow: hidden;
+  }
+
+  .scale__row {
+    display: grid;
+    align-items: baseline;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--sg-rim);
+    gap: 14px;
+    grid-template-columns: 76px minmax(0, 1fr) 118px;
+  }
+
+  .scale__row:last-child { border-bottom: 0; }
+  .scale__row:nth-child(even) { background: var(--sg-panel-sunk); }
+
+  .scale__px {
+    color: var(--sg-ink-2);
+    font-family: var(--sg-mono);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .scale__use {
+    color: var(--sg-ink-3);
+    font-family: var(--sg-mono);
+    font-size: 10px;
+    text-align: right;
+  }
+
+  /* --------------------------------------------------- space ruler */
+
+  .ruler {
+    display: grid;
+    margin-top: 12px;
+    padding: 14px;
+    border: 1px solid var(--sg-rim);
+    border-radius: 5px;
+    background: var(--sg-panel);
+    gap: 7px;
+  }
+
+  .ruler__row {
+    display: grid;
+    align-items: center;
+    gap: 12px;
+    grid-template-columns: 168px 42px minmax(0, 1fr);
+  }
+
+  .ruler__bar {
+    height: 11px;
+    border-radius: 2px;
+    background: var(--sg-accent);
+  }
+
+  .ruler__name {
+    font-family: var(--sg-mono);
+    font-size: 10px;
+    color: var(--sg-ink-2);
+  }
+
+  .ruler__px {
+    font-family: var(--sg-mono);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    color: var(--sg-ink-3);
+    text-align: right;
+  }
+
+  /* -------------------------------------------------- specimen bed */
+
+  .bed {
+    display: grid;
+    margin-top: 12px;
+    padding: 22px;
+    border: 1px solid var(--sg-rim);
+    border-radius: 5px;
+    background: var(--sg-panel-sunk);
+    gap: 20px;
+    justify-items: start;
+  }
+
+  .bed--row {
+    grid-auto-flow: column;
+    justify-content: start;
+    align-items: center;
+  }
+
+  .bed__caption {
+    color: var(--sg-ink-2);
+    font-size: 12px;
+    max-width: 62ch;
+  }
+
+  .verdict {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--sg-mono);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .verdict--yes { color: var(--sg-good); }
+  .verdict--no { color: var(--sg-bad); }
+
+  .verdict::before {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentcolor;
+    content: "";
+  }
+
+  /* --------------------------- the real recipes, rendered for real */
+
+  .btn {
+    display: inline-flex;
+    min-width: 69px;
+    min-height: 22px;
+    align-items: center;
+    justify-content: center;
+    padding: 1px 14px 2px;
+    background: linear-gradient(to bottom, #fdfdfd 0%, #f4f4f4 47%, #e6e6e6 53%, #dcdcdc 100%);
+    border: 1px solid #a3a3a3;
+    border-bottom-color: #8d8d8d;
+    border-radius: 4px;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 90%),
+      0 1px 0 rgb(255 255 255 / 55%);
+    color: #151515;
+    font: 400 13px/18px var(--sg-font);
+    cursor: default;
+    transition: filter 90ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+
+  .btn:hover { filter: brightness(1.03); }
+  .btn:active { filter: brightness(0.95); }
+
+  .btn--default {
+    background: linear-gradient(to bottom, #d6e9fb 0%, #b9d8f5 47%, #9cc6ef 53%, #8bbcea 100%);
+    border-color: #6d9cc4;
+    border-bottom-color: #5a88b0;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 80%),
+      0 0 0 1px rgb(68 183 247 / 18%),
+      0 0 5px rgb(40 158 229 / 28%);
+    color: #0d2233;
+  }
+
+  /* The 10.2 button this system is often mistaken for. Drawn once, here, as
+     the thing not to do. */
+  .btn--wrong {
+    position: relative;
+    padding: 1px 16px 2px;
+    background: linear-gradient(to bottom, #fefeff 0%, #f0f0f2 48%, #d4d4d8 50%, #f2f2f4 100%);
+    border: 1px solid #9a9a9e;
+    border-radius: 999px;
+    box-shadow:
+      inset 0 1px 0 #fff,
+      inset 0 -3px 4px rgb(255 255 255 / 90%),
+      0 1px 2px rgb(0 0 0 / 22%);
+    overflow: hidden;
+  }
+
+  .btn--wrong::before {
+    position: absolute;
+    top: 1px;
+    right: 2px;
+    left: 2px;
+    height: 42%;
+    border-radius: 999px;
+    background: linear-gradient(to bottom, rgb(255 255 255 / 96%), rgb(255 255 255 / 30%));
+    content: "";
+    pointer-events: none;
+  }
+
+  .field {
+    display: flex;
+    width: 240px;
+    height: 26px;
+    align-items: center;
+    padding: 0 11px;
+    border-radius: 999px;
+    background-image: linear-gradient(to bottom, #f2f2f2 0%, #fbfbfb 26%, #fff 62%);
+    box-shadow:
+      inset 0 0 0 1px rgb(0 0 0 / 20%),
+      inset 0 2px 3px rgb(0 0 0 / 32%),
+      0 1px 0 rgb(255 255 255 / 70%);
+    color: #ababab;
+    font: 400 12px/1 var(--sg-font);
+  }
+
+  .rail-demo {
+    position: relative;
+    width: 300px;
+    height: 12px;
+    border-radius: 2px;
+    background-image: linear-gradient(to bottom, #e9ecee 0%, #f7f9fa 14%, #f2f4f5 45%, #e9ebec 62%, #f5f7f8 82%, #feffff 100%);
+    box-shadow:
+      inset 0 0 0 1px rgb(0 0 0 / 16%),
+      inset 0 1px 1px rgb(0 0 0 / 12%);
+  }
+
+  .rail-demo__fill {
+    position: absolute;
+    top: 1px;
+    bottom: 1px;
+    left: 1px;
+    width: 58%;
+    border-radius: 1px;
+    background-image:
+      repeating-linear-gradient(to right, rgb(255 255 255 / 0%) 0, rgb(255 255 255 / 10%) 2.5px, rgb(255 255 255 / 0%) 5px),
+      linear-gradient(to bottom, #8fb9e4 0%, #79b7f2 12%, #62b4f8 30%, #4fa9f2 48%, #2b9bec 62%, #24b4f4 74%, #63d0f8 88%, #a5e9fd 100%);
+    box-shadow: inset -1px 0 0 rgb(20 110 180 / 35%);
+  }
+
+  .listhead {
+    display: grid;
+    width: 100%;
+    max-width: 460px;
+    height: 18px;
+    align-items: center;
+    background-image: linear-gradient(to bottom, #f8f8f8, #dadada);
+    border: 1px solid #ababab;
+    border-radius: 3px 3px 0 0;
+    color: #3a3d41;
+    font: 700 10px/1 var(--sg-font);
+    grid-template-columns: 34px minmax(0, 1fr) 92px 54px;
+    overflow: hidden;
+    text-shadow: 0 1px 0 rgb(255 255 255 / 80%);
+  }
+
+  .listhead span {
+    padding: 0 7px;
+    border-right: 1px solid #ccc;
+  }
+
+  .listhead span:last-child { border-right: 0; }
+
+  .listhead .is-sorted {
+    background-image: linear-gradient(to bottom, #e8eef7, #cfdbeb);
+  }
+
+  .listrow {
+    display: grid;
+    width: 100%;
+    max-width: 460px;
+    height: 18px;
+    align-items: center;
+    background: #fff;
+    border: 1px solid #ababab;
+    border-top: 0;
+    color: #000;
+    font: 400 12px/1 var(--sg-font);
+    grid-template-columns: 34px minmax(0, 1fr) 92px 54px;
+  }
+
+  .listrow span { padding: 0 7px; }
+  .listrow--alt { background: #f2f5f9; }
+  .listrow--playing { background: #dde9f8; font-weight: 700; }
+
+  .listrow--selected {
+    background-image: linear-gradient(to bottom, #5b8dd9, #3a6cc4);
+    border-radius: 0 0 3px 3px;
+    color: #fff;
+  }
+
+  .radii {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .radius {
+    display: grid;
+    gap: 6px;
+    justify-items: center;
+  }
+
+  .radius__box {
+    width: 58px;
+    height: 42px;
+    border: 1px solid var(--sg-rim-strong);
+    background: linear-gradient(to bottom, var(--sg-chrome-top), var(--sg-chrome-bottom));
+  }
+
+  /* ------------------------------------------------------- motion */
+
+  .timings {
+    display: grid;
+    margin-top: 12px;
+    padding: 14px;
+    border: 1px solid var(--sg-rim);
+    border-radius: 5px;
+    background: var(--sg-panel);
+    gap: 8px;
+  }
+
+  .timing {
+    display: grid;
+    align-items: center;
+    gap: 12px;
+    grid-template-columns: 190px 54px minmax(0, 1fr);
+  }
+
+  .timing__bar {
+    height: 9px;
+    border-radius: 2px;
+    background: linear-gradient(to right, var(--sg-accent), var(--sg-accent-soft));
+  }
+
+  /* ------------------------------------------------- component map */
+
+  .groups {
+    display: grid;
+    margin-top: 12px;
+    gap: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(238px, 1fr));
+  }
+
+  .group {
+    padding: 12px 14px;
+    border: 1px solid var(--sg-rim);
+    border-radius: 5px;
+    background: var(--sg-panel);
+  }
+
+  .group b {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+
+  .group p {
+    margin: 0;
+    color: var(--sg-ink-2);
+    font-family: var(--sg-mono);
+    font-size: 10.5px;
+    line-height: 1.6;
+    word-break: break-word;
+  }
+
+  .group--flag {
+    border-color: var(--sg-accent);
+    box-shadow: inset 3px 0 0 var(--sg-accent);
+  }
+
+  /* -------------------------------------------------------- lists */
+
+  ul.plain {
+    max-width: 66ch;
+    margin: 10px 0;
+    padding-left: 18px;
+  }
+
+  ul.plain li { margin: 5px 0; }
+
+  .codeblock {
+    max-width: 100%;
+    margin-top: 10px;
+    padding: 12px 14px;
+    border: 1px solid var(--sg-rim);
+    border-radius: 5px;
+    background: var(--sg-panel-sunk);
+    color: var(--sg-ink);
+    font-family: var(--sg-mono);
+    font-size: 11.5px;
+    line-height: 1.6;
+    overflow-x: auto;
+    white-space: pre;
+  }
+
+  .foot {
+    max-width: 66ch;
+    margin-top: 52px;
+    padding-top: 16px;
+    border-top: 1px solid var(--sg-rim);
+    color: var(--sg-ink-3);
+    font-size: 12px;
+  }
+
+  /* ------------------------------------------------------ narrow */
+
+  @media (max-width: 900px) {
+    /* The same move the player itself makes: the source list becomes a
+       horizontal strip. The page demonstrates what it documents. */
+    .shell { grid-template-columns: minmax(0, 1fr); }
+
+    .rail {
+      position: static;
+      display: flex;
+      height: auto;
+      align-items: center;
+      padding: 8px 12px;
+      border-right: 0;
+      border-bottom: 1px solid var(--sg-rim-strong);
+      gap: 2px;
+      overflow-x: auto;
+    }
+
+    .rail__brand, .rail__group { display: none; }
+    .rail a { padding: 5px 10px; border-radius: 4px; white-space: nowrap; }
+    .work { padding: 22px 18px 60px; }
+    .scale__row { grid-template-columns: 64px minmax(0, 1fr); }
+    .scale__use { display: none; }
+    .ruler__row { grid-template-columns: 130px 40px minmax(0, 1fr); }
+    .timing { grid-template-columns: 150px 50px minmax(0, 1fr); }
+    .bed--row { grid-auto-flow: row; justify-items: start; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="shell">
+  <nav class="rail" aria-label="Sections">
+    <div class="rail__brand">Now Playing<small>AQUA_PROFILE=snow-leopard-itunes-9</small></div>
+
+    <div class="rail__group">Principles</div>
+    <a href="#rules">The four rules</a>
+    <a href="#skins">Two skins</a>
+
+    <div class="rail__group">Foundations</div>
+    <a href="#colour">Colour</a>
+    <a href="#type">Type</a>
+    <a href="#space">Space</a>
+    <a href="#material">Shape &amp; material</a>
+    <a href="#motion">Motion</a>
+
+    <div class="rail__group">Building</div>
+    <a href="#components">Components</a>
+    <a href="#access">Accessibility</a>
+    <a href="#extend">Changing it</a>
+  </nav>
+
+  <main class="work">
+    <div class="lede">
+      <h1>Now Playing styleguide</h1>
+      <div class="stamp">snow-leopard-itunes-9 · 134 tokens · 2 skins</div>
+      <p>
+        A reconstruction of Apple's 2009–2010 interface, built as a real design system and shared by
+        three products: an offline-first music player, a self-hosted hub and a Windows companion.
+        Every value on this page is one you can find in <code>tokens.json</code> or the stylesheets
+        beside it. Where the two disagree, the code is right and this page is stale.
+      </p>
+    </div>
+
+    <h2 id="rules">The rules that outrank the visuals</h2>
+    <p class="note">
+      A styleguide that opens with colour teaches the wrong lesson. These four decide whether a
+      control is drawn at all, and each has overruled the aesthetics at least once here.
+    </p>
+
+    <div class="rules">
+      <div class="rule">
+        <b>A control that cannot act is not drawn.</b>
+        <span>
+          No button that looks live and does nothing; no toggle whose state is decoration. The
+          equalizer window ships without its traffic lights for exactly this reason — three circles
+          that close nothing.
+        </span>
+      </div>
+      <div class="rule">
+        <b>An unavailable capability says so where the choice is made.</b>
+        <span>
+          Not in a tooltip, not in a log, and not by disappearing. The Shared segment of the mode
+          switch stays visible with no hub paired and reports the reason when pressed. A control that
+          vanishes teaches nothing; one that explains itself does.
+        </span>
+      </div>
+      <div class="rule">
+        <b>Say what the code does, not what the feature is called.</b>
+        <span>
+          The solfeggio presets are filters, and the panel says so and claims no physical effect. The
+          retuning panel reports that the fallback changed the tempo rather than claiming "preserve
+          tempo". When a label and the DSP disagree, the label is what changes.
+        </span>
+      </div>
+      <div class="rule">
+        <b>A disabled control is still legible about why.</b>
+        <span>
+          Greyed, not gone. The dimmed faders on the equalizer rail are what tell you where the
+          current preset is silent, and each carries its reason in the accessible name — "500 Hz
+          band, not used by 528 Hz (MI)" — not only in a tooltip.
+        </span>
+      </div>
+    </div>
+
+    <h2 id="skins">Two skins, one system</h2>
+    <p>
+      The same profile in two arrangements. A window frame drawn inside a browser viewport is a
+      picture of a window rather than a window, and a 196&nbsp;px source list is simply unavailable on
+      a phone — so the player is a page while the desktop products stay windows. Controls are shared
+      verbatim between them.
+    </p>
+
+    <div class="groups">
+      <div class="group">
+        <b>Window skin</b>
+        <p>--aqua-*<br>aqua.css · aqua-window.css · aqua-media.css<br>Lucida Grande<br>hub admin GUI, Windows companion</p>
+      </div>
+      <div class="group">
+        <b>Page skin</b>
+        <p>--np-* · --lib-*<br>now-playing.css<br>platform UI stack<br>music player PWA</p>
+      </div>
+    </div>
+
+    <h2 id="colour">Colour</h2>
+    <p>
+      Chosen by role, never by picking a hex. Blue means <em>selected</em>, <em>active</em>, or
+      <em>the default action</em> — it is not a brand colour and it is never decoration.
+    </p>
+
+    <h3>Ink and ground</h3>
+    <div class="swatches">
+      <div class="swatch"><div class="swatch__chip" style="background:#1b1c1f"></div><div class="swatch__meta"><div class="swatch__role">Primary text <span class="swatch__hex">#1b1c1f</span></div><span class="swatch__token">--np-ink</span></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:#575757"></div><div class="swatch__meta"><div class="swatch__role">Secondary text <span class="swatch__hex">#575757</span></div><span class="swatch__token">--np-meta</span></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:#96999c"></div><div class="swatch__meta"><div class="swatch__role">Disabled text <span class="swatch__hex">#96999c</span></div><span class="swatch__token">--aqua-text-disabled</span></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:#ececec"></div><div class="swatch__meta"><div class="swatch__role">Window body <span class="swatch__hex">#ececec</span></div><span class="swatch__token">--aqua-window-body</span></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:#f2f5f9"></div><div class="swatch__meta"><div class="swatch__role">Row stripe <span class="swatch__hex">#f2f5f9</span></div><span class="swatch__token">--np-list-alt</span></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:#ababab"></div><div class="swatch__meta"><div class="swatch__role">Hairline border <span class="swatch__hex">#ababab</span></div><span class="swatch__token">--np-list-border</span></div></div>
+    </div>
+
+    <h3>Blue, and where it is allowed</h3>
+    <div class="swatches">
+      <div class="swatch"><div class="swatch__chip" style="background:#2b6fd6"></div><div class="swatch__meta"><div class="swatch__role">Accent, links <span class="swatch__hex">#2b6fd6</span></div><span class="swatch__token">--np-accent</span></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:linear-gradient(to bottom,#5b8dd9,#3a6cc4)"></div><div class="swatch__meta"><div class="swatch__role">Row selection <span class="swatch__hex">#5b8dd9 → #3a6cc4</span></div><span class="swatch__token">--lib-sel-top / --lib-sel-bot</span></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:#dde9f8"></div><div class="swatch__meta"><div class="swatch__role">Playing row <span class="swatch__hex">#dde9f8</span></div><span class="swatch__token">--lib-np</span></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:linear-gradient(to bottom,#e8eef7,#cfdbeb)"></div><div class="swatch__meta"><div class="swatch__role">Sorted column <span class="swatch__hex">#e8eef7 → #cfdbeb</span></div><span class="swatch__token">--lib-sort-top / -bot</span></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:#3f9fe8"></div><div class="swatch__meta"><div class="swatch__role">Focus ring <span class="swatch__hex">#3f9fe8</span></div><span class="swatch__token">--aqua-focus</span></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:linear-gradient(to bottom,#eafbff,#a9e5ff 18%,#38b6f7 52%,#0d83d6 78%,#075fa6)"></div><div class="swatch__meta"><div class="swatch__role">Aqua gel <span class="swatch__hex">#eafbff → #07558f</span></div><span class="swatch__token">--aqua-blue-*</span></div></div>
+    </div>
+    <p class="note">
+      The full five-stop gel survives in exactly one place — the overlay scroller's thumb. Everywhere
+      else Snow Leopard had already flattened it, and so have we.
+    </p>
+
+    <h3>Status</h3>
+    <div class="swatches">
+      <div class="swatch"><div class="swatch__chip" style="background:#cc1027"></div><div class="swatch__meta"><div class="swatch__role">Live broadcast <span class="swatch__hex">#cc1027</span></div><span class="swatch__token">--np-live</span></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:#f0a422"></div><div class="swatch__meta"><div class="swatch__role">Star <span class="swatch__hex">#f0a422</span></div><span class="swatch__token">--lib-star</span></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:#d64a44"></div><div class="swatch__meta"><div class="swatch__role">Danger <span class="swatch__hex">#d64a44</span></div><span class="swatch__token">--aqua-danger</span></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:#d9a431"></div><div class="swatch__meta"><div class="swatch__role">Warning <span class="swatch__hex">#d9a431</span></div><span class="swatch__token">--aqua-warning</span></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:#4e9d47"></div><div class="swatch__meta"><div class="swatch__role">Success <span class="swatch__hex">#4e9d47</span></div><span class="swatch__token">--aqua-success</span></div></div>
+    </div>
+
+    <h3>Dark</h3>
+    <p class="note">
+      The page skin has a full dark palette, and it is opt-out rather than opt-in — every dark rule is
+      guarded so the system preference wins unless a page pins itself light. Redefine
+      <em>only</em> tokens inside that block; a colour whose sole definition sits there is missing
+      from the light scheme entirely.
+    </p>
+    <div class="codeblock">@media (prefers-color-scheme: dark) {
+  :root:not([data-np-theme='light']) {
+    --np-page: #0e0f12;
+    --np-ink:  #f1f2f4;
+    --np-meta: #9ba0a8;
+  }
+}</div>
+
+    <h2 id="type">Type</h2>
+    <p>
+      Two families, one scale. The window skin sets Lucida Grande; the page skin uses the platform
+      stack, because the 2010 page it is modelled on ran on whatever the OS supplied. Each specimen
+      below is set at its true size.
+    </p>
+
+    <div class="scale">
+      <div class="scale__row"><span class="scale__px">13px</span><span style="font-size:13px">Now playing, from your library</span><span class="scale__use">--aqua-font-system</span></div>
+      <div class="scale__row"><span class="scale__px">12px</span><span style="font-size:12px">Marlow &amp; the Tidewater — Quiet Arithmetic</span><span class="scale__use">--aqua-font-view</span></div>
+      <div class="scale__row"><span class="scale__px">11px</span><span style="font-size:11px">Searches this device only until a hub is paired</span><span class="scale__use">--aqua-font-small</span></div>
+      <div class="scale__row"><span class="scale__px">10px</span><span style="font-size:10px;letter-spacing:.02em">PREAMP · 32 · 64 · 125 · 250 · 500 · 1K · 2K</span><span class="scale__use">--aqua-font-label</span></div>
+      <div class="scale__row"><span class="scale__px">9px</span><span style="font-size:9px">Mini controls only</span><span class="scale__use">--aqua-font-mini</span></div>
+    </div>
+
+    <p class="note">
+      Weights are <strong>400</strong> and <strong>700</strong>. There is no 500 and no 600: the
+      profile predates variable UI fonts, and a half-weight reads as a rendering fault beside a true
+      bold. Numbers that change in place — timers, dB values, tempo, track times — take
+      <code>font-variant-numeric: tabular-nums</code>, so a changing digit does not shift the ones
+      beside it.
+    </p>
+
+    <h2 id="space">Space</h2>
+    <p>One scale, no arbitrary values. Each bar is drawn at its true width.</p>
+
+    <div class="ruler">
+      <div class="ruler__row"><span class="ruler__name">--aqua-space-micro</span><span class="ruler__px">2px</span><span class="ruler__bar" style="width:2px"></span></div>
+      <div class="ruler__row"><span class="ruler__name">--aqua-space-tight</span><span class="ruler__px">4px</span><span class="ruler__bar" style="width:4px"></span></div>
+      <div class="ruler__row"><span class="ruler__name">--aqua-space-inline</span><span class="ruler__px">6px</span><span class="ruler__bar" style="width:6px"></span></div>
+      <div class="ruler__row"><span class="ruler__name">--aqua-space-control</span><span class="ruler__px">8px</span><span class="ruler__bar" style="width:8px"></span></div>
+      <div class="ruler__row"><span class="ruler__name">--aqua-space-small-group</span><span class="ruler__px">10px</span><span class="ruler__bar" style="width:10px"></span></div>
+      <div class="ruler__row"><span class="ruler__name">--aqua-space-group</span><span class="ruler__px">12px</span><span class="ruler__bar" style="width:12px"></span></div>
+      <div class="ruler__row"><span class="ruler__name">--aqua-space-frame-top</span><span class="ruler__px">14px</span><span class="ruler__bar" style="width:14px"></span></div>
+      <div class="ruler__row"><span class="ruler__name">--aqua-space-strong-group</span><span class="ruler__px">16px</span><span class="ruler__bar" style="width:16px"></span></div>
+      <div class="ruler__row"><span class="ruler__name">--aqua-space-window-edge</span><span class="ruler__px">20px</span><span class="ruler__bar" style="width:20px"></span></div>
+      <div class="ruler__row"><span class="ruler__name">--aqua-space-major</span><span class="ruler__px">24px</span><span class="ruler__bar" style="width:24px"></span></div>
+    </div>
+
+    <h3>Control heights</h3>
+    <div class="swatches">
+      <div class="swatch"><div class="swatch__meta"><div class="swatch__role">Control <span class="swatch__hex">22px</span></div><span class="swatch__token">--aqua-control-h</span></div></div>
+      <div class="swatch"><div class="swatch__meta"><div class="swatch__role">Control, small <span class="swatch__hex">19px</span></div><span class="swatch__token">--aqua-control-h-small</span></div></div>
+      <div class="swatch"><div class="swatch__meta"><div class="swatch__role">Page search field <span class="swatch__hex">26px</span></div><span class="swatch__token">--np-field-h</span></div></div>
+      <div class="swatch"><div class="swatch__meta"><div class="swatch__role">Table row <span class="swatch__hex">20px</span></div><span class="swatch__token">--aqua-row-h</span></div></div>
+      <div class="swatch"><div class="swatch__meta"><div class="swatch__role">Music list row <span class="swatch__hex">18px</span></div><span class="swatch__token">.library tbody td</span></div></div>
+      <div class="swatch"><div class="swatch__meta"><div class="swatch__role">Scrubber rail <span class="swatch__hex">12px</span></div><span class="swatch__token">.np-scrub__rail</span></div></div>
+    </div>
+
+    <p class="note">
+      <strong>32&nbsp;px</strong> (<code>--aqua-hit</code>) is the floor for a pointer target. A
+      12&nbsp;px rail and an 18&nbsp;px row are period-correct and stay that size — they get their hit
+      area from an invisible <code>::after</code> that expands past the visual. Never shrink a hit
+      target to match a visual.
+    </p>
+
+    <h2 id="material">Shape and material</h2>
+    <p>
+      One light source, above and slightly forward. Raised things are light at the top and dark at the
+      bottom; recessed things are the reverse. Every shadow follows from that, and a rule that
+      contradicts it looks broken even when the colours are right.
+    </p>
+
+    <h3>Radii</h3>
+    <div class="bed bed--row">
+      <div class="radii">
+        <div class="radius"><div class="radius__box" style="border-radius:7px"></div><span class="ruler__name">window · 7px</span></div>
+        <div class="radius"><div class="radius__box" style="border-radius:5px"></div><span class="ruler__name">panel · 5px</span></div>
+        <div class="radius"><div class="radius__box" style="border-radius:4px"></div><span class="ruler__name">button · 4px</span></div>
+        <div class="radius"><div class="radius__box" style="border-radius:999px"></div><span class="ruler__name">pill · 999px</span></div>
+      </div>
+    </div>
+
+    <h3>The push button</h3>
+    <div class="bed">
+      <div class="bed--row" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+        <button type="button" class="btn">Add a folder…</button>
+        <button type="button" class="btn btn--default">Create group</button>
+        <span class="verdict verdict--yes">Snow Leopard · correct</span>
+      </div>
+      <div class="bed--row" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+        <button type="button" class="btn btn--wrong">Add a folder…</button>
+        <span class="verdict verdict--no">Aqua 10.2 · a decade early</span>
+      </div>
+      <p class="bed__caption">
+        A rounded rect, one quiet vertical gradient, a hairline rim that darkens along the bottom, one
+        pixel of white on top. No pill, no glass lozenge, no gloss step across the middle — those
+        belong to 10.2, and this profile is 10.6. The default action is the <em>same face</em> with
+        the hue turned up, not a lozenge of blue. This page ships the wrong one once, here, because
+        the system shipped it by mistake and the correction is the most useful thing in it.
+      </p>
+    </div>
+
+    <div class="codeblock">background: linear-gradient(to bottom, #fdfdfd 0%, #f4f4f4 47%, #e6e6e6 53%, #dcdcdc 100%);
+border: 1px solid #a3a3a3;
+border-bottom-color: #8d8d8d;
+border-radius: 4px;
+box-shadow:
+  inset 0 1px 0 rgb(255 255 255 / 90%),
+  0 1px 0 rgb(255 255 255 / 55%);</div>
+    <p class="note">
+      The first shadow is the pixel of light on the top edge; the second is the surface underneath
+      catching it.
+    </p>
+
+    <h3>The recessed field</h3>
+    <div class="bed">
+      <div class="field">Search your music</div>
+      <p class="bed__caption">
+        Wells run the other way: the inside is shadowed at the top and the lower lip catches light.
+        Same source, opposite surface.
+      </p>
+    </div>
+
+    <h3>The scrubber rail</h3>
+    <div class="bed">
+      <div class="rail-demo"><div class="rail-demo__fill"></div></div>
+      <p class="bed__caption">
+        12&nbsp;px, near-square ends, and a fill that <em>brightens downward</em> — #8fb9e4 at the top
+        through a saturated #2b9bec dip at 62% to a cyan #a5e9fd glow along the bottom lip. That
+        inversion is the iPod Classic's; running it the usual way round is the fastest way to make
+        this look generic. No knob: the device had none, and a knob on a 12&nbsp;px bar is a
+        thumb-sized lie about precision.
+      </p>
+    </div>
+
+    <h3>The list</h3>
+    <div class="bed">
+      <div>
+        <div class="listhead"><span>#</span><span class="is-sorted">Song ▲</span><span>Artist</span><span>Time</span></div>
+        <div class="listrow"><span>1</span><span>Lantern Road</span><span>Marlow</span><span>3:24</span></div>
+        <div class="listrow listrow--alt"><span>2</span><span>Copper Meridian</span><span>Marlow</span><span>4:02</span></div>
+        <div class="listrow listrow--playing"><span>♪</span><span>Quiet Arithmetic</span><span>Marlow</span><span>3:51</span></div>
+        <div class="listrow listrow--selected"><span>4</span><span>Long Wave</span><span>Marlow</span><span>5:16</span></div>
+      </div>
+      <p class="bed__caption">
+        18&nbsp;px rows, an Aqua stripe and <em>no</em> rules between them, a glossy embossed header,
+        and the sorted column tinted blue. The playing row is bold with a speaker glyph — colour is
+        never the only signal.
+      </p>
+    </div>
+
+    <h2 id="motion">Motion</h2>
+    <p>
+      Confirmation, never decoration: nothing animates that a person did not just cause. Everything
+      eases on <code>cubic-bezier(0.2, 0.7, 0.2, 1)</code>. Bars below are drawn in proportion.
+    </p>
+
+    <div class="timings">
+      <div class="timing"><span class="ruler__name">--aqua-motion-press</span><span class="ruler__px">70ms</span><span class="timing__bar" style="width:4.2%"></span></div>
+      <div class="timing"><span class="ruler__name">--aqua-motion-selection</span><span class="ruler__px">100ms</span><span class="timing__bar" style="width:6.1%"></span></div>
+      <div class="timing"><span class="ruler__name">--aqua-motion-disclosure</span><span class="ruler__px">140ms</span><span class="timing__bar" style="width:8.5%"></span></div>
+      <div class="timing"><span class="ruler__name">--aqua-motion-panel</span><span class="ruler__px">200ms</span><span class="timing__bar" style="width:12.1%"></span></div>
+      <div class="timing"><span class="ruler__name">--aqua-motion-pulse</span><span class="ruler__px">1650ms</span><span class="timing__bar" style="width:100%"></span></div>
+    </div>
+
+    <p class="note">
+      <strong>Reduced motion is a contract, not a courtesy.</strong> Under
+      <code>prefers-reduced-motion: reduce</code> the live dot stops pulsing, the marquee does not
+      scroll (the cell keeps its ellipsis), the sheet's travel drops to zero and it fades only, the
+      constellation opens as a table rather than an animated field, and the 3D stage stops its idle
+      drift. Two variables carry most of it — <code>--aqua-anim-state: paused</code> and
+      <code>--aqua-sheet-travel: 0</code> — so a new animation should read one of them rather than
+      inventing a third.
+    </p>
+
+    <h2 id="components">Components</h2>
+    <p>
+      All exported from <code>@now-playing/aqua-ui</code>. Reach for one of these before writing a
+      <code>&lt;div&gt;</code>.
+    </p>
+
+    <div class="groups">
+      <div class="group"><b>Page shell</b><p>PageBar · BarSearch · BarClock · ModeSwitch · ProfileButton · SectionStrip · Hero · HeroArt · TrackScrubber · KeyTransport · KeyButton · LevelSlider</p></div>
+      <div class="group"><b>Window shell</b><p>AquaWindow · Toolbar · TrafficLights · SourceList · WorkArea · Content · BottomBar · Splitter</p></div>
+      <div class="group"><b>Media</b><p>Transport · TransportAuxButton · LcdDisplay · Scrubber · VolumeSlider · SearchField · ResultsPopover · NowPlayingGlyph · ArtworkGrid · Marquee</p></div>
+      <div class="group"><b>Controls</b><p>Button · ButtonLink · IconButton · Checkbox · Radio · TextField · PopUpMenu · Slider · SegmentedControl · ProgressBar · Spinner · Tabs</p></div>
+      <div class="group"><b>Structure</b><p>Panel · PanelSection · FormRow · KeyValueList · AquaTable · ListView · StatusDot · SourceBadge · Avatar · AvatarButton · Glyph · SourceIcon</p></div>
+      <div class="group"><b>Overlays</b><p>Sheet · Dialog · Menu · useContextMenu · ToastProvider · useToast</p></div>
+      <div class="group group--flag"><b>States — the group people skip</b><p>StatePanel · EmptyState · ErrorState · LoadingState · OfflineState · PartialState · PermissionRequiredState · UnavailableCapabilityState · IncompatibleVersionState · InlineValidation</p></div>
+    </div>
+
+    <p class="note">
+      Every screen owes an answer for empty, loading, offline, partial, refused and out-of-date.
+      <code>UnavailableCapabilityState</code> exists so that "this cannot work here" is a designed
+      state carrying its reason, rather than a blank pane.
+    </p>
+
+    <h3>A download is a link</h3>
+    <p class="note">
+      <code>ButtonLink</code> renders an <code>&lt;a&gt;</code> wearing the button's face. Use it for
+      downloads and for destinations in another tab. A <code>&lt;button&gt;</code> with an onClick
+      that assigns <code>location</code> looks identical and quietly removes the middle click, the
+      context menu and the status-bar preview — which matter most for exactly those two cases.
+    </p>
+
+    <h2 id="access">Accessibility</h2>
+    <p>Not bolted on afterwards. These are parts of the design.</p>
+    <ul class="plain">
+      <li><strong>One tab stop per group, arrows to move.</strong> The section strip, the mode switch, the music list and the context menu all use a roving <code>tabIndex</code>, and the focus ring travels with the selection — a ring left on an element that is no longer tabbable lets the next Tab escape from nowhere.</li>
+      <li><strong>Focus is always visible.</strong> An end-to-end test tabs the whole page and fails on any element that shows no indicator.</li>
+      <li><strong>Roles must be true.</strong> A rail that cannot be dragged is <code>role="img"</code> with no value pair, not a <code>slider</code> that refuses every change. A button that opens a section does not claim <code>aria-haspopup="menu"</code>.</li>
+      <li><strong>Names say what will happen</strong>, including the refusal.</li>
+      <li><strong>Live regions are polite</strong> and carry one sentence.</li>
+      <li><strong>Colour is never the only signal.</strong> The playing row has a glyph as well as a tint; status dots carry text.</li>
+    </ul>
+
+    <h2 id="extend">Changing any of this</h2>
+    <ul class="plain">
+      <li><strong>Tokens first.</strong> A new colour or size goes in <code>tokens.json</code>, then into the stylesheet as a custom property. A literal hex in a component is a bug.</li>
+      <li><strong>Both schemes.</strong> Light on bare <code>:root</code>; redefine only what changes inside the dark guard.</li>
+      <li><strong>Both skins, if it is a control.</strong> Button, Slider and friends are shared by three products.</li>
+      <li><strong>Say why in the CSS.</strong> Every unobvious value carries a comment explaining what it reconstructs — that habit is what made the Snow Leopard button correction findable.</li>
+      <li><strong>The gates.</strong> <code>AQUA_CONFORMANCE.md</code> maps every §17/§18 MUST to a test, a named reviewer check, or a recorded deviation, and <code>pnpm verify</code> runs the lot. A deviation is legitimate; an undocumented one is not.</li>
+    </ul>
+
+    <p class="foot">
+      The correction log in <code>DEVIATIONS.md</code> is worth reading before a large change. It
+      records the mistakes this system has already made — buttons a decade too glossy, a list
+      redesigned instead of expanded, a picker that indexed music it could never play — and every one
+      was found by building the thing and looking at it, not by reading the code.
+    </p>
+  </main>
+</div>
