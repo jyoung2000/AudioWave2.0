@@ -36,8 +36,10 @@ const BUNDLES: Bundle[] = [
     distDir: join(repoRoot, 'music-player', 'dist'),
     html: 'index.html',
     // The player is offline-first: this is what someone downloads on a phone before the first note.
-    // Currently 613KB — the headroom is small on purpose (see the note at the top).
-    entryBudgetKb: 620,
+    // Currently 621KB — the headroom is small on purpose (see the note at the top). It rose from
+    // 613KB with the service worker registration, the two-deck crossfade engine and the module
+    // that keeps copies of chosen files; the worker for that lives inline as a blob.
+    entryBudgetKb: 640,
     /*
      * The total rose from 1600 to 1900 when the hero gained the reference's jewel case.
      *
@@ -47,7 +49,8 @@ const BUNDLES: Bundle[] = [
      * honest is that none of it is in the first load. It arrives at idle, after the page has
      * painted, and only for people whose browser can draw it.
      */
-    totalBudgetKb: 1900,
+    // And from 1900 to 1920 for the same additions, plus workbox-window in its own lazy chunk.
+    totalBudgetKb: 1920,
     // Three.js belongs to the constellation and the jewel case; the tag reader only to a scan.
     mustBeSplit: ['three', 'music-metadata'],
   },

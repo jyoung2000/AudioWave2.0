@@ -161,6 +161,8 @@ export default defineConfig(async (): Promise<UserConfig> => {
     publicDir: false,
     resolve: {
       alias: {
+      // The registration module imports workbox-window lazily; this build must not carry it at all.
+      'workbox-window': here('./src/lib/workbox-window.stub.ts'),
         '@now-playing/contracts': workspace('contracts'),
         '@now-playing/domain': workspace('domain'),
         // Prefix matching again: the specific entry has to come first.
