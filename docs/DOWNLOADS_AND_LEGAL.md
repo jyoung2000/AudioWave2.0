@@ -27,6 +27,46 @@ written for the person reading it rather than as an error code.
 | Bandcamp | No, in the app | There is no public API. Bandcamp is a link out; if you buy something there, the file you bought can be imported through the companion like any other file you own. |
 | MusicBrainz | Not applicable | Metadata only. It is never an audio source. |
 
+## Saving a copy from the player
+
+The player can hand you your own music as a file. Which formats it offers depends on what it can
+honestly produce, and it lists them all either way with the reason attached.
+
+| | What you get |
+| --- | --- |
+| **Original** | A byte-for-byte copy of the file on your device. Nothing is decoded, so nothing can change. Always available for a file the player can reach. |
+| **FLAC** | Lossless, and usually about half the size of a WAV. Encoded on your device by `packages/audio-core`. |
+| **WAV** | Uncompressed and readable by anything. Also encoded on your device. |
+| **MP3** | Only when the file *is already* an MP3, where "convert" means "copy" and is exact. |
+
+**Why MP3 is the odd one.** Making an MP3 means encoding one, and the player carries no MP3
+encoder. It could fetch one, and it will not: a player whose whole premise is that it works with no
+network does not quietly download a codec the first time you press a button. So the option is shown,
+disabled, saying exactly that — and pointing at FLAC, which is lossless, and at a paired hub, whose
+FFmpeg can produce an MP3. An enabled button that silently produced a different format would be the
+dishonest alternative.
+
+**What it will not do.** A provider's track offers nothing here. The player is given a stream and not
+a file to keep, and a stream has never implied a right to the bytes — the same rule as the rest of
+this page. The sheet says so rather than hiding the option.
+
+**Converting is not recovering.** Saving an MP3 as FLAC produces a lossless copy *of the MP3*: it
+cannot put back what the MP3 discarded, and it will be larger than the file you started with. The
+sheet says that too, on the FLAC line, when the source is already compressed.
+
+### The encoder
+
+`packages/audio-core/src/export/flac.ts` is a FLAC encoder written for this project rather than
+imported, because the player's bundle budget is measured in kilobytes and a codec dependency would
+not fit. It implements the stream header and fixed-predictor subframes under Rice coding — no LPC
+analysis, which costs some ratio and saves a great deal of code. Output is ordinary FLAC that any
+decoder reads.
+
+It is verified rather than asserted: `music-player/tests/e2e/features.spec.ts` downloads a FLAC
+through the interface, decodes it with the browser's own decoder, and compares it sample by sample
+against the file that went in. "Lossless" is a claim about a file, and a claim about a file can be
+checked.
+
 ## What this software does not do
 
 - **No DRM circumvention.** Nothing here removes, weakens or works around content protection.

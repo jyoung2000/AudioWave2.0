@@ -43,7 +43,7 @@ function MoreDestinations({ onOpenView }: { onOpenView: (view: ViewId) => void }
   );
 }
 
-export function LibraryView({ onOpenView }: { onOpenView: (view: ViewId) => void }) {
+export function LibraryView({ onOpenView, onDownload }: { onOpenView: (view: ViewId) => void; onDownload: (track: Track) => void }) {
   const { store } = usePlayer();
   const state = useAppState();
   const toast = useToast();
@@ -149,6 +149,13 @@ export function LibraryView({ onOpenView }: { onOpenView: (view: ViewId) => void
         onNewPlaylist={(track) => setNewList({ open: true, track })}
         onSay={(message) => toast.show(message)}
         ephemeralTrackIds={state.library.ephemeralTrackIds}
+        onDownload={(track) => onDownload(track)}
+        onPlaySimilar={(track) => {
+          void (async () => {
+            const result = await store.playSimilarTo(track);
+            toast.show(result.ok ? `Playing music like ${track.title}` : (result.reason ?? 'Nothing similar to play.'), result.ok ? undefined : { kind: 'warning' });
+          })();
+        }}
       />
 
       <NewPlaylistSheet

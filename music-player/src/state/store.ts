@@ -20,6 +20,9 @@ import { forgetPickedFiles, indexPickedFiles, resolveFile, scanRoot, supportsDir
 import type { PlaybackEngine, PlaybackEvent, PlaybackState } from '../lib/playback.js';
 import { DEFAULT_CROSSFADE, crossfadeMsBetween, normalizeCrossfade, type CrossfadeSettings } from '../lib/crossfade.js';
 import { copiesSupported, removeCopy, requestPersistentStorage } from '../lib/copies.js';
+import { jumpInShuffle, makeShuffleOrder, nextInShuffle, previousInShuffle, remainingInShuffle, syncShuffleOrder, type ShuffleOrder } from '../lib/shuffle.js';
+import { AUTOPLAY_BATCH, SIMILAR_BATCH, discover, explain, profileFrom, type Discovery } from '../lib/discover.js';
+import type { TasteProfile } from '@now-playing/recommendations';
 
 export type RepeatMode = 'off' | 'one' | 'all';
 
@@ -69,6 +72,12 @@ export interface AppState {
   queue: QueueEntry[];
   queueIndex: number;
   shuffle: boolean;
+  /** The shuffled pass over the queue while shuffle is on; null when it is off. */
+  shuffleOrder: ShuffleOrder | null;
+  /** Keep playing past the end of the queue, with music the recommender picks. */
+  autoplay: boolean;
+  /** What discover added last, and why, so the interface can say so. */
+  lastDiscovery: { reason: string; count: number } | null;
   repeat: RepeatMode;
   crossfade: CrossfadeSettings;
   playback: PlaybackState;
@@ -105,6 +114,9 @@ export class PlayerStore {
       queue: [],
       queueIndex: -1,
       shuffle: false,
+      shuffleOrder: null,
+      autoplay: false,
+      lastDiscovery: null,
       repeat: 'off',
       crossfade: { ...DEFAULT_CROSSFADE },
       playback: playback.getState(),
@@ -168,6 +180,7 @@ export class PlayerStore {
     const shuffle = await getSetting(this.db, 'shuffle', false);
     const repeat = await getSetting<RepeatMode>(this.db, 'repeat', 'off');
     const crossfade = normalizeCrossfade(await getSetting<unknown>(this.db, 'playback.crossfade', DEFAULT_CROSSFADE));
+    const autoplay = await getSetting(this.db, 'playback.autoplay', false);
     // Copies are the phone's answer to folders: where a folder cannot be kept connected, keeping
     // the files themselves is what makes the library survive a reload, so that is the default there.
     const copies = await copiesSupported();
@@ -200,6 +213,9 @@ export class PlayerStore {
       shuffle,
       repeat,
       crossfade,
+      // The queue is empty on a cold start, so the pass is built when one is set.
+      shuffleOrder: shuffle ? { ids: [], pos: -1 } : null,
+      autoplay,
       storage: await storageReport(this.db),
     });
     this.recomputeEq();
@@ -332,6 +348,16 @@ export class PlayerStore {
     if (this.db) void putSetting(this.db, 'stage.pose', pose);
   }
 
+  /**
+   * The bytes behind a track, when this device can reach them. Null with no
+   * excuse: the caller shows the reason from the locators instead.
+   */
+  async fileFor(trackId: string): Promise<File | null> {
+    if (!this.db) return null;
+    const resolved = await resolveFile(this.db, trackId);
+    return resolved.file;
+  }
+
   async artworkUrl(artworkId: string | null): Promise<string | null> {
     if (!artworkId) return null;
     const row = await this.require().get('artwork', artworkId);
@@ -342,7 +368,10 @@ export class PlayerStore {
 
   setQueue(entries: QueueEntry[], startIndex = 0): void {
     const from = this.current()?.track ?? null;
-    this.patch({ queue: entries, queueIndex: entries.length ? Math.min(Math.max(0, startIndex), entries.length - 1) : -1 });
+    const queueIndex = entries.length ? Math.min(Math.max(0, startIndex), entries.length - 1) : -1;
+    // A new queue is a new pass: the track being started leads it.
+    const order = this.state.shuffle ? makeShuffleOrder(entries.map((e) => e.id), entries[queueIndex]?.id ?? null) : null;
+    this.patch({ queue: entries, queueIndex, shuffleOrder: order });
     void this.loadCurrent(true, from);
   }
 
@@ -350,7 +379,7 @@ export class PlayerStore {
     const queue = [...this.state.queue];
     if (position === 'next' && this.state.queueIndex >= 0) queue.splice(this.state.queueIndex + 1, 0, ...entries);
     else queue.push(...entries);
-    this.patch({ queue });
+    this.patch({ queue, shuffleOrder: this.resyncShuffle(queue) });
     // `library` and `hub` are the player's own context names; the event schema calls both 'manual'.
     for (const entry of entries) this.recordEvent('queued', entry.track, { contextKind: entry.context.kind === 'library' || entry.context.kind === 'hub' ? 'manual' : entry.context.kind, contextId: entry.context.id });
     if (this.state.queueIndex === -1) {
@@ -364,7 +393,7 @@ export class PlayerStore {
     if (index === -1) return;
     const queue = this.state.queue.filter((e) => e.id !== entryId);
     const queueIndex = index < this.state.queueIndex ? this.state.queueIndex - 1 : Math.min(this.state.queueIndex, queue.length - 1);
-    this.patch({ queue, queueIndex });
+    this.patch({ queue, queueIndex, shuffleOrder: this.resyncShuffle(queue) });
   }
 
   moveInQueue(from: number, to: number): void {
@@ -373,12 +402,13 @@ export class PlayerStore {
     if (!moved) return;
     queue.splice(Math.max(0, Math.min(to, queue.length)), 0, moved);
     const current = this.state.queue[this.state.queueIndex];
+    // Reordering the queue is about the queue's own order; the pass is unaffected.
     this.patch({ queue, queueIndex: current ? queue.findIndex((e) => e.id === current.id) : this.state.queueIndex });
   }
 
   clearQueue(): void {
     this.playback.stop();
-    this.patch({ queue: [], queueIndex: -1 });
+    this.patch({ queue: [], queueIndex: -1, shuffleOrder: this.state.shuffle ? { ids: [], pos: -1 } : null });
   }
 
   current(): QueueEntry | null {
@@ -421,11 +451,11 @@ export class PlayerStore {
   async next(reason: 'user' | 'ended' | 'crossfade' = 'user'): Promise<void> {
     const entry = this.current();
     if (reason === 'crossfade') {
-      const target = this.state.repeat === 'one' ? this.state.queueIndex : this.indexAfterCurrent();
+      const step = this.state.repeat === 'one' ? { index: this.state.queueIndex, order: this.state.shuffleOrder } : this.advance();
       // Nothing to fade into: let the track end on its own.
-      if (target === null || !entry) return;
+      if (step === null || !entry) return;
       this.outgoing = entry;
-      this.patch({ queueIndex: target });
+      this.patch({ queueIndex: step.index, ...(step.order ? { shuffleOrder: step.order } : {}) });
       await this.loadCurrent(true, entry.track);
       return;
     }
@@ -435,21 +465,37 @@ export class PlayerStore {
       await this.playback.play();
       return;
     }
-    const nextIndex = this.indexAfterCurrent();
-    if (nextIndex === null) {
+    const step = this.advance();
+    if (step === null) {
+      // The queue is finished. Discover mode, when it is on, keeps the music
+      // going rather than letting the room go quiet.
+      if (await this.extendWithDiscoveries(entry?.track ?? null)) return;
       this.playback.stop();
       this.patch({ queueIndex: this.state.queue.length ? this.state.queue.length - 1 : -1 });
       return;
     }
-    this.patch({ queueIndex: nextIndex });
+    this.patch({ queueIndex: step.index, ...(step.order ? { shuffleOrder: step.order } : {}) });
     await this.loadCurrent(true, entry?.track ?? null);
   }
 
-  /** The index that follows the current one under shuffle and repeat, or null when the queue is done. */
-  private indexAfterCurrent(): number | null {
-    const nextIndex = this.state.shuffle ? this.pickShuffleIndex() : this.state.queueIndex + 1;
-    if (nextIndex < this.state.queue.length) return nextIndex;
-    return this.state.repeat === 'all' && this.state.queue.length ? 0 : null;
+  /**
+   * What plays after this, or null when the queue is finished.
+   *
+   * Under shuffle this walks the pass rather than picking at random, and
+   * returns the advanced pass with it — the caller commits both together, so
+   * a step that is abandoned (nothing to fade into) does not consume a track.
+   */
+  private advance(): { index: number; order: ShuffleOrder | null } | null {
+    const repeatAll = this.state.repeat === 'all' && this.state.queue.length > 0;
+    if (this.state.shuffle && this.state.shuffleOrder) {
+      const step = nextInShuffle(this.state.shuffleOrder, repeatAll);
+      if (!step) return null;
+      const index = this.state.queue.findIndex((e) => e.id === step.id);
+      return index === -1 ? null : { index, order: step.order };
+    }
+    const next = this.state.queueIndex + 1;
+    if (next < this.state.queue.length) return { index: next, order: null };
+    return repeatAll ? { index: 0, order: null } : null;
   }
 
   async previous(): Promise<void> {
@@ -459,11 +505,23 @@ export class PlayerStore {
       this.playback.seek(0);
       return;
     }
+    const from = this.current()?.track ?? null;
+    if (this.state.shuffle && this.state.shuffleOrder) {
+      // Back through what was actually heard, not back through the queue.
+      const step = previousInShuffle(this.state.shuffleOrder);
+      const index = step ? this.state.queue.findIndex((e) => e.id === step.id) : -1;
+      if (!step || index === -1) {
+        this.playback.seek(0);
+        return;
+      }
+      this.patch({ queueIndex: index, shuffleOrder: step.order });
+      await this.loadCurrent(true, from);
+      return;
+    }
     if (this.state.queueIndex <= 0) {
       this.playback.seek(0);
       return;
     }
-    const from = this.current()?.track ?? null;
     this.patch({ queueIndex: this.state.queueIndex - 1 });
     await this.loadCurrent(true, from);
   }
@@ -472,26 +530,134 @@ export class PlayerStore {
     if (index < 0 || index >= this.state.queue.length) return;
     const entry = this.current();
     if (entry) this.recordSkipOrCompletion(entry, 'user');
-    this.patch({ queueIndex: index });
+    const picked = this.state.queue[index];
+    const order = this.state.shuffle && this.state.shuffleOrder && picked ? jumpInShuffle(this.state.shuffleOrder, picked.id) : this.state.shuffleOrder;
+    this.patch({ queueIndex: index, shuffleOrder: order });
     await this.loadCurrent(true, entry?.track ?? null);
   }
 
-  private pickShuffleIndex(): number {
-    if (this.state.queue.length <= 1) return this.state.queueIndex + 1;
-    let index = this.state.queueIndex;
-    // Never repeat the current track immediately; anything else is fair.
-    while (index === this.state.queueIndex) index = Math.floor(Math.random() * this.state.queue.length);
-    return index;
+
+  /**
+   * Turning shuffle on deals a fresh pass over the queue and leaves the song
+   * that is playing exactly where it is — an iPod never cut the track you
+   * were on to start shuffling. Turning it off drops the pass and the queue
+   * carries on in its own order from wherever you are.
+   */
+  async setShuffle(shuffle: boolean): Promise<void> {
+    const order = shuffle ? makeShuffleOrder(this.state.queue.map((e) => e.id), this.current()?.id ?? null) : null;
+    this.patch({ shuffle, shuffleOrder: order });
+    await putSetting(this.require(), 'shuffle', shuffle);
   }
 
-  async setShuffle(shuffle: boolean): Promise<void> {
-    this.patch({ shuffle });
-    await putSetting(this.require(), 'shuffle', shuffle);
+  /** Keep the pass in step after the queue is added to, reordered or trimmed. */
+  private resyncShuffle(queue: readonly QueueEntry[]): ShuffleOrder | null {
+    if (!this.state.shuffle) return null;
+    const ids = queue.map((e) => e.id);
+    const order = this.state.shuffleOrder;
+    return order ? syncShuffleOrder(order, ids) : makeShuffleOrder(ids, this.current()?.id ?? null);
+  }
+
+  /** The entries still to play, in the order they will actually play in. */
+  upNext(): QueueEntry[] {
+    const byId = new Map(this.state.queue.map((e) => [e.id, e]));
+    if (this.state.shuffle && this.state.shuffleOrder) {
+      return remainingInShuffle(this.state.shuffleOrder)
+        .map((id) => byId.get(id))
+        .filter((e): e is QueueEntry => e !== undefined);
+    }
+    return this.state.queue.slice(this.state.queueIndex + 1);
   }
 
   async setRepeat(repeat: RepeatMode): Promise<void> {
     this.patch({ repeat });
     await putSetting(this.require(), 'repeat', repeat);
+  }
+
+  /* --------------------------------------------------------------- discover */
+
+  /**
+   * The taste profile, kept between calls.
+   *
+   * `applyEvents` skips events it has already folded in, so handing it the
+   * whole history each time costs only what is new — but building the profile
+   * from scratch on every track change would not, which is why it is cached.
+   */
+  private tasteProfile: TasteProfile | null = null;
+
+  private profile(): TasteProfile {
+    this.tasteProfile = profileFrom(this.state.deviceId, this.state.events, this.tasteProfile);
+    return this.tasteProfile;
+  }
+
+  async setAutoplay(autoplay: boolean): Promise<void> {
+    this.patch({ autoplay, ...(autoplay ? {} : { lastDiscovery: null }) });
+    await putSetting(this.require(), 'playback.autoplay', autoplay);
+  }
+
+  /** Queue entries for tracks the recommender picked, tagged as recommendations. */
+  private discoveryEntries(picks: readonly Discovery[]): QueueEntry[] {
+    return picks.map((pick) => ({
+      id: uuidv7(),
+      track: toTrackRef(pick.track),
+      context: { kind: 'recommendation' as const, id: pick.track.id, name: explain(pick) },
+    }));
+  }
+
+  /**
+   * The queue has run out. With autoplay on, put more music behind it.
+   *
+   * Returns true when it found something and playback continues. The seed is
+   * the track that just finished, so what follows sounds like where the
+   * listener had got to rather than like their library average.
+   */
+  private async extendWithDiscoveries(from: TrackRef | null): Promise<boolean> {
+    if (!this.state.autoplay || this.state.library.tracks.length === 0) return false;
+    const seed = from ? (this.state.library.tracks.find((t) => t.id === from.trackId) ?? null) : null;
+    const queued = new Set(this.state.queue.map((e) => e.track.trackId));
+    let result;
+    try {
+      result = discover({ userId: this.state.deviceId, profile: this.profile(), library: this.state.library.tracks, seed, exclude: queued, limit: AUTOPLAY_BATCH });
+    } catch (err) {
+      this.notice('warning', `Discover could not pick anything: ${err instanceof Error ? err.message : String(err)}`);
+      return false;
+    }
+    if (result.picks.length === 0) {
+      if (result.shortfall) this.notice('info', `Discover found nothing to add: ${result.shortfall}`);
+      return false;
+    }
+    const entries = this.discoveryEntries(result.picks);
+    const queue = [...this.state.queue, ...entries];
+    const first = entries[0]!;
+    this.patch({
+      queue,
+      shuffleOrder: this.resyncShuffle(queue),
+      lastDiscovery: { reason: explain(result.picks[0]!), count: entries.length },
+    });
+    for (const pick of result.picks) this.recordEvent('recommendation-shown', toTrackRef(pick.track), { contextKind: 'manual' });
+    const index = queue.findIndex((e) => e.id === first.id);
+    const order = this.state.shuffle && this.state.shuffleOrder ? jumpInShuffle(this.state.shuffleOrder, first.id) : this.state.shuffleOrder;
+    this.patch({ queueIndex: index, shuffleOrder: order });
+    await this.loadCurrent(true, from);
+    return true;
+  }
+
+  /**
+   * Play music like this track, now: its own queue, starting with the seed so
+   * the listener hears where it came from.
+   */
+  async playSimilarTo(track: Track): Promise<{ ok: boolean; reason: string | null }> {
+    if (this.state.library.tracks.length < 2) {
+      return { ok: false, reason: 'There is not enough music on this device yet to find something similar.' };
+    }
+    const result = discover({ userId: this.state.deviceId, profile: this.profile(), library: this.state.library.tracks, seed: track, limit: SIMILAR_BATCH });
+    if (result.picks.length === 0) {
+      return { ok: false, reason: result.shortfall ?? 'Nothing on this device came close enough to suggest.' };
+    }
+    const seedEntry: QueueEntry = { id: uuidv7(), track: toTrackRef(track), context: { kind: 'recommendation', id: track.id, name: `Similar to ${track.title}` } };
+    this.setQueue([seedEntry, ...this.discoveryEntries(result.picks)], 0);
+    for (const pick of result.picks) this.recordEvent('recommendation-shown', toTrackRef(pick.track), { contextKind: 'manual' });
+    this.patch({ lastDiscovery: { reason: `Similar to ${track.title}`, count: result.picks.length } });
+    return { ok: true, reason: null };
   }
 
   async setCrossfade(patch: Partial<CrossfadeSettings>): Promise<void> {

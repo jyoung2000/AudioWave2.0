@@ -435,3 +435,35 @@ body {
     gap: 6px;
   }
 }
+
+/* The download sheet: a format, what it costs you, and why. */
+.player-formats {
+  display: grid;
+  gap: 14px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.player-formats__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.player-formats__tag {
+  color: var(--aqua-text-secondary, #5a6472);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.player-formats li[data-available='false'] .player-formats__tag {
+  opacity: 0.6;
+}
+
+@media (pointer: coarse) {
+  .player-formats__tag {
+    font-size: 12px;
+  }
+}

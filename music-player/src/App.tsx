@@ -40,6 +40,7 @@ import {
   JewelStage,
   offlineOf,
 } from '@now-playing/aqua-ui';
+import type { Track } from '@now-playing/contracts';
 import { formatTime, useAppState, usePlayer } from './state/context.js';
 import { LibraryView } from './views/Library.js';
 import { NowPlayingView } from './views/NowPlaying.js';
@@ -60,6 +61,7 @@ const ConstellationView = lazy(async () => ({ default: (await import('./views/Co
 const SearchView = lazy(async () => ({ default: (await import('./views/Search.js')).SearchView }));
 const SettingsView = lazy(async () => ({ default: (await import('./views/Settings.js')).SettingsView }));
 import { AddToPlaylistSheet } from './components/AddToPlaylistSheet.js';
+import { DownloadSheet } from './components/DownloadSheet.js';
 import { ShareSheet } from './components/ShareSheet.js';
 import { NoticeBar } from './components/NoticeBar.js';
 import { SearchPopover, type SearchPopoverHandle } from './components/SearchPopover.js';
@@ -80,6 +82,7 @@ export function App() {
   const popover = useRef<SearchPopoverHandle | null>(null);
   const searchField = useRef<HTMLInputElement | null>(null);
   const [addToPlaylistOpen, setAddToPlaylistOpen] = useState(false);
+  const [downloadTrack, setDownloadTrack] = useState<Track | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
 
   const entry = state.queue[state.queueIndex] ?? null;
@@ -191,7 +194,7 @@ export function App() {
   const body = (() => {
     switch (view) {
       case 'library':
-        return <LibraryView onOpenView={setView} />;
+        return <LibraryView onOpenView={setView} onDownload={setDownloadTrack} />;
       case 'now-playing':
         return <NowPlayingView />;
       case 'queue':
@@ -364,6 +367,14 @@ export function App() {
             <KeyButton aux label="Shuffle" pressed={state.shuffle} onClick={() => void store.setShuffle(!state.shuffle)}>
               <Glyph name="shuffle" />
             </KeyButton>
+            <KeyButton
+              aux
+              label={state.autoplay ? 'Discover: on — keeps playing past the queue' : 'Discover: off'}
+              pressed={state.autoplay}
+              onClick={() => void store.setAutoplay(!state.autoplay)}
+            >
+              <Glyph name="discover" />
+            </KeyButton>
           </span>
 
           <KeyButton glyph="previous" label="Previous track" disabled={!entry || (state.queueIndex <= 0 && state.playback.positionMs <= 3000)} onClick={() => void store.previous()} />
@@ -380,6 +391,16 @@ export function App() {
             />
             <KeyButton aux label="Add to a playlist" disabled={!entry} onClick={() => setAddToPlaylistOpen(true)}>
               <Glyph name="add" />
+            </KeyButton>
+            <KeyButton
+              aux
+              label="Download this song"
+              disabled={!currentTrack}
+              onClick={() => {
+                if (currentTrack) setDownloadTrack(currentTrack);
+              }}
+            >
+              <Glyph name="download" />
             </KeyButton>
             <KeyButton
               aux
@@ -418,6 +439,7 @@ export function App() {
       </main>
 
       <AddToPlaylistSheet open={addToPlaylistOpen} onClose={() => setAddToPlaylistOpen(false)} tracks={entry ? [entry.track] : []} />
+      <DownloadSheet track={downloadTrack} onClose={() => setDownloadTrack(null)} />
       <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} kind="track" track={entry?.track ?? null} />
     </div>
   );

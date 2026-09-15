@@ -260,6 +260,10 @@ export interface RowMenuProps {
   playlistItems: readonly PlaylistItem[];
   onTogglePlaylist: (track: Track, playlistId: string) => void;
   onNewPlaylist: (track: Track | null) => void;
+  /** Build a queue of music like this one. Omitted where the product has no recommender. */
+  onPlaySimilar?: ((track: Track) => void) | undefined;
+  /** Save a copy of this track. Omitted where the product cannot reach its bytes. */
+  onDownload?: ((track: Track) => void) | undefined;
   onClose: () => void;
 }
 
@@ -271,7 +275,7 @@ export interface RowMenuProps {
  * the viewport, and the whole thing is walkable with the arrow keys: Right opens the submenu, Left
  * closes it, Escape dismisses and returns focus to the row it came from.
  */
-export function RowMenu({ track, x, y, playlists, playlistItems, onTogglePlaylist, onNewPlaylist, onClose }: RowMenuProps) {
+export function RowMenu({ track, x, y, playlists, playlistItems, onTogglePlaylist, onNewPlaylist, onPlaySimilar, onDownload, onClose }: RowMenuProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
   const [placement, setPlacement] = useState<{ left: number; top: number; flip: boolean } | null>(null);
@@ -409,6 +413,33 @@ export function RowMenu({ track, x, y, playlists, playlistItems, onTogglePlaylis
       >
         New Playlist…
       </button>
+      {onPlaySimilar || onDownload ? <div className="ctx__sep" role="separator" /> : null}
+      {onPlaySimilar ? (
+        <button
+          className="ctx__item"
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            onClose();
+            onPlaySimilar(track);
+          }}
+        >
+          Play similar to this
+        </button>
+      ) : null}
+      {onDownload ? (
+        <button
+          className="ctx__item"
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            onClose();
+            onDownload(track);
+          }}
+        >
+          Download…
+        </button>
+      ) : null}
     </div>
   );
 }

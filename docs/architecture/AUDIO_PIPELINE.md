@@ -42,3 +42,27 @@ Attaching happens when playback starts, not when the source loads, so the fades 
 A track shorter than two crossfades is never faded into. Where a source cannot enter the graph (a
 cross-origin stream without CORS) the element's own volume carries the fade; where the platform fixes
 that volume, the outgoing track is cut rather than overlapped at full level, and Settings says so.
+
+## Export
+
+Playback is not the only thing that reads audio. `packages/audio-core/src/export/` turns decoded
+float channels back into a file:
+
+```text
+File (any container the browser decodes)
+  → decodeAudioData on the main thread   (native, and the only place an AudioContext exists)
+  → Float32 channels, transferred to a worker
+  → encodeFlac  — fLaC header, STREAMINFO, then frames of fixed-predictor residuals, Rice coded
+    encodeWav   — RIFF header, then interleaved integer PCM
+  → bytes, transferred back
+```
+
+Encoding runs in a worker because it is ours and it is not fast: a five-minute track is thirteen
+million samples, and doing that on the main thread would lock the page for seconds. Decoding stays
+on the main thread because only it has an AudioContext, and the browser's decoder is native.
+
+The FLAC encoder tries all five fixed predictors per block and every Rice partition order that
+divides it, keeping whichever spends the fewest bits, and falls back to a verbatim subframe when no
+predictor beats storing the samples raw. Digital silence collapses to a constant subframe, so a
+silent minute is bytes rather than megabytes. See `docs/DOWNLOADS_AND_LEGAL.md` for what the player
+will and will not produce, and why MP3 is not on that list.

@@ -31,6 +31,17 @@ Max 2 per artist, max 40 % from one genre, tier mix 40 % strong / 30 % related /
 - `discovery_jobs` run in the background (profile refresh, discover seeds, library sync, token refresh, new releases) with P0–P4 priorities; `user_platform_sync` keeps cursors/snapshots/etags for incremental imports.
 - `RateLimitManager`: per-platform queue, concurrency, token bucket, `Retry-After`, backoff, budgets; when constrained P0/P1 continue, P2 slows, P3 queues, P4 stops.
 
+## In the player
+
+The same package runs in the page. `music-player/src/lib/discover.ts` builds a taste profile from
+the listening events in the browser's own database, turns the library into a catalogue, and calls
+`recommend()` with mode `similar` (seeded by a track) or `for-you`. Nothing is sent anywhere and no
+hub is needed; the hub runs the identical code over a larger catalogue when one is paired.
+
+Two entry points: **Discover**, which tops the queue up when it runs out, and **Play similar to
+this** from a row's context menu, which builds a queue of its own. Both surface the reasons the
+engine returned rather than presenting a bare list.
+
 ## Privacy
 Group comparisons use opt-in aggregates (weights only, minimum cohort 3, minimum sample 20); "music they like that is new to me" comes from aggregate differences, never from another person's timeline. Every recommendation carries its reasons and feedback controls.
 

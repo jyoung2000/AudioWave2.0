@@ -39,6 +39,10 @@ export interface MusicListProps {
   onSay: (message: string) => void;
   /** Tracks whose file cannot be reopened after a reload; see `offlineOf`. */
   ephemeralTrackIds: ReadonlySet<string>;
+  /** Queue music like this one, from the row menu. */
+  onPlaySimilar?: ((track: Track) => void) | undefined;
+  /** Save a copy of this track, from the row menu. */
+  onDownload?: ((track: Track) => void) | undefined;
   label?: string;
 }
 
@@ -48,7 +52,7 @@ function fmt(ms: number | null | undefined): string {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
 }
 
-export function MusicList({ tracks, playingTrackId, onPlay, onToggleStar, playlists, playlistItems, onTogglePlaylist, onNewPlaylist, onSay, ephemeralTrackIds, label = 'Library' }: MusicListProps) {
+export function MusicList({ tracks, playingTrackId, onPlay, onToggleStar, playlists, playlistItems, onTogglePlaylist, onNewPlaylist, onSay, ephemeralTrackIds, onPlaySimilar, onDownload, label = 'Library' }: MusicListProps) {
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'title', dir: 1 });
   const [pickedId, setPickedId] = useState<string | null>(null);
   /*
@@ -301,6 +305,8 @@ export function MusicList({ tracks, playingTrackId, onPlay, onToggleStar, playli
           playlistItems={playlistItems}
           onTogglePlaylist={onTogglePlaylist}
           onNewPlaylist={onNewPlaylist}
+          onPlaySimilar={onPlaySimilar}
+          onDownload={onDownload}
           onClose={() => {
             setMenu(null);
             requestAnimationFrame(() => tbodyRef.current?.querySelector<HTMLTableRowElement>(`tr[data-id="${CSS.escape(menu.track.id)}"]`)?.focus());

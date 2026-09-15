@@ -41,6 +41,34 @@ The fades run inside the equalizer path; see
 [docs/architecture/AUDIO_PIPELINE.md](../docs/architecture/AUDIO_PIPELINE.md) for the mechanics
 and what happens where a source cannot enter that path.
 
+## Shuffle, and what comes after the queue
+
+**Shuffle deals a pass.** Turning it on shuffles the order once and plays it: every song comes up
+exactly once before any comes up twice, Previous walks back through what you actually heard, and the
+song already playing keeps playing — an iPod never cut the track you were on to start shuffling.
+With repeat-all the pass is dealt again at the end, reshuffled, and never opens on the song that
+just closed the last one. Adding a song to the queue while shuffle is on deals it somewhere into the
+part that has not played yet, rather than pinning it to the end.
+
+**Discover keeps going.** With it on, a queue that runs out does not stop the room: the last song
+you heard becomes the seed and the player picks more from this device. The picking is done here, by
+the recommender in [`packages/recommendations`](../packages/recommendations) — deterministic,
+CPU-only, no model and no service — reading the listening history that never leaves the device.
+Every pick carries the reason it was made, and the player shows it. **Play similar to this** in a
+row's context menu does the same thing on demand, as its own queue.
+
+With nothing on the device that fits, it says so and stops, rather than playing you what you just
+heard.
+
+## Getting your music back out
+
+**Download…** in a row's context menu, or the download key in the transport, saves your own music as
+a file: the original bytes, a FLAC, or a WAV. FLAC and WAV are encoded on your device — the FLAC
+encoder is part of `audio-core`, not a download — and both are lossless. MP3 is offered only when
+the file already is one, because making an MP3 means encoding one and this player carries no MP3
+encoder; the sheet says that rather than producing something else quietly.
+[docs/DOWNLOADS_AND_LEGAL.md](../docs/DOWNLOADS_AND_LEGAL.md) has the whole matrix.
+
 ## Setting it up, which is to say, not
 
 There is no account, no key and no server in the player. Open it, choose music, play. On a computer

@@ -136,6 +136,16 @@ export function SettingsView() {
               Keep songs from the same album gapless
             </Checkbox>
           </div>
+          <div className="player-crossfade">
+            <Checkbox checked={state.autoplay} onChange={(e) => void store.setAutoplay(e.currentTarget.checked)}>
+              Keep playing when the queue runs out (Discover)
+            </Checkbox>
+          </div>
+          <p className="player-hint">
+            When an album or playlist ends, the player picks more music from this device rather than stopping — the last song you heard is the seed, so what follows sounds like where you had got
+            to. The picking is done here, by the same recommender the hub uses, reading the listening history stored on this device. Nothing is sent anywhere, and every choice carries the reason it
+            was made. With nothing else on the device that fits, it says so and stops rather than repeating what you just heard.
+          </p>
           <p className="player-hint">
             Each song fades out over its last {state.crossfade.seconds} second{state.crossfade.seconds === 1 ? '' : 's'} while the next fades in, the way iTunes did it; skipping fades too. With
             the second box checked, songs from one album follow each other without a fade, so a live recording or a concept album stays in one piece.
