@@ -24,8 +24,8 @@ import { defaultDestination, pickDownloadFolder, supportsDownloadFolder, type Do
 import { jumpInShuffle, makeShuffleOrder, nextInShuffle, previousInShuffle, remainingInShuffle, syncShuffleOrder, type ShuffleOrder } from '../lib/shuffle.js';
 import type * as DiscoverModule from '../lib/discover.js';
 import type { Discovery } from '../lib/discover.js';
-import type * as HelperModule from '../lib/fetch-helper.js';
-import type { HelperConnection, SavedHelper } from '../lib/fetch-helper.js';
+import type * as ToolsModule from '../lib/tool-backend.js';
+import type { SavedHelper, ToolBackend } from '../lib/tool-backend.js';
 import type { DownloadAuthorizationBasis, HelperToolId, OutputFormat } from '@now-playing/contracts';
 import type { TasteProfile } from '@now-playing/recommendations';
 
@@ -41,10 +41,10 @@ import type { TasteProfile } from '@now-playing/recommendations';
 const discoverModule = (): Promise<typeof DiscoverModule> => import('../lib/discover.js');
 
 /**
- * The helper client, on the same terms. Almost nobody runs a helper, and the ones who do can wait
- * the few milliseconds it takes to fetch this after the page has painted.
+ * The tool backends, on the same terms. Most people have neither a helper nor a native shell, and
+ * the ones who do can wait the few milliseconds it takes to fetch this after the page has painted.
  */
-const helperModule = (): Promise<typeof HelperModule> => import('../lib/fetch-helper.js');
+const toolsModule = (): Promise<typeof ToolsModule> => import('../lib/tool-backend.js');
 
 export type RepeatMode = 'off' | 'one' | 'all';
 
@@ -117,20 +117,21 @@ export interface AppState {
    */
   providerArtwork: Readonly<Record<string, string>>;
   /**
-   * A local helper, if one answered just now. Null is the normal state and means the interface
-   * offers nothing that would need one — the player never remembers a helper into existence.
+   * Whatever can run yt-dlp for this device, if anything answered just now — a helper on loopback,
+   * or a native shell carrying the tool. Null is the normal state and means the interface offers
+   * nothing that would need one; the player never remembers a backend into existence.
    */
-  helper: HelperConnection | null;
+  tools: ToolBackend | null;
   /** Where a helper was last saved by hand, for the case where the player is hosted elsewhere. */
   savedHelper: SavedHelper | null;
   /**
-   * False until the first probe has finished. It matters: a `helper: null` that has not been asked
+   * False until the first probe has finished. It matters: a `tools: null` that has not been asked
    * yet and one that has been asked and answered are different facts, and the interface must not
    * report the second while it means the first.
    */
-  helperProbed: boolean;
+  toolsProbed: boolean;
   /** The fetch in flight, if any, so the interface can show what the tool is doing. */
-  helperJob: { url: string; stage: string; percent: number | null; message: string | null } | null;
+  toolJob: { url: string; stage: string; percent: number | null; message: string | null } | null;
   sessionId: string;
   deviceId: string;
 }
@@ -186,10 +187,10 @@ export class PlayerStore {
       notices: [],
       storage: null,
       providerArtwork: {},
-      helper: null,
+      tools: null,
       savedHelper: null,
-      helperProbed: false,
-      helperJob: null,
+      toolsProbed: false,
+      toolJob: null,
     };
     playback.subscribe((playbackState) => {
       this.patch({ playback: playbackState });
@@ -305,9 +306,9 @@ export class PlayerStore {
     });
     this.recomputeEq();
     this.playback.setCrossfade(crossfade.enabled ? crossfade.seconds : 0);
-    // Not awaited: whether a helper is running has nothing to do with whether the player can start,
-    // and the answer arrives in a render or two either way.
-    void this.refreshHelper();
+    // Not awaited: whether anything can run the tools has nothing to do with whether the player can
+    // start, and the answer arrives in a render or two either way.
+    void this.refreshTools();
   }
 
   private require(): PlayerDatabase {
@@ -429,37 +430,36 @@ export class PlayerStore {
   }
 
   /**
-   * Ask whether a local helper is there, right now.
+   * Ask what can run the tools here, right now.
    *
    * Called at startup and whenever the Platforms panel is opened, because a helper can be started
    * or stopped while the page is sitting there. Nothing about the answer is cached beyond the
    * current state: the moment it stops answering, every control it enabled goes away.
    */
-  async refreshHelper(): Promise<void> {
-    const { detectHelper } = await helperModule();
-    const helper = await detectHelper(this.state.savedHelper);
-    this.patch({ helper, helperProbed: true });
+  async refreshTools(): Promise<void> {
+    const { detectBackend } = await toolsModule();
+    const tools = await detectBackend(this.state.savedHelper);
+    this.patch({ tools, toolsProbed: true });
   }
 
   /** Remember a helper that is not serving this page, for a player hosted somewhere else. */
   async saveHelper(saved: SavedHelper | null): Promise<void> {
     this.patch({ savedHelper: saved });
     await putSetting(this.require(), 'helper.saved', saved);
-    await this.refreshHelper();
-    if (saved && !this.state.helper) {
+    await this.refreshTools();
+    if (saved && !this.state.tools) {
       this.notice('warning', `Nothing answered at ${saved.origin}. Check the helper is running, that it was started with --allow-origin ${window.location.origin}, and that the token matches.`);
     }
   }
 
-  /** Ask the helper to fetch a tool for itself. Only yt-dlp; the helper refuses the rest and says why. */
+  /** Ask the backend to fetch a tool for itself. Only yt-dlp; the rest are refused with a reason. */
   async installHelperTool(tool: HelperToolId): Promise<void> {
-    const helper = this.state.helper;
-    if (!helper) return this.notice('warning', 'No helper is running, so there is nothing to install into.');
-    const { installTool } = await helperModule();
+    const backend = this.state.tools;
+    if (!backend) return this.notice('warning', 'Nothing here can run the tools, so there is nothing to install into.');
     try {
-      const result = await installTool(helper, tool);
+      const result = await backend.install(tool);
       if (!result.installed) return this.notice('warning', result.reason ?? `${tool} was not installed.`);
-      await this.refreshHelper();
+      await this.refreshTools();
       this.notice('info', `${tool} ${result.version ?? ''} is ready.`.replace('  ', ' '));
     } catch (error) {
       this.notice('error', error instanceof Error ? error.message : String(error));
@@ -473,19 +473,19 @@ export class PlayerStore {
    * the helper refuses without one, and the person choosing it is the person making the claim.
    */
   async fetchLink(url: string, options: { basis: DownloadAuthorizationBasis; format: OutputFormat; tool?: 'auto' | 'yt-dlp' | 'spotdl' }): Promise<void> {
-    const helper = this.state.helper;
-    if (!helper) return this.notice('warning', 'No helper is running. Start one and it will appear in Settings → Platforms.');
-    const { runFetch } = await helperModule();
-    this.patch({ helperJob: { url, stage: 'preflight', percent: null, message: null } });
+    const backend = this.state.tools;
+    if (!backend) return this.notice('warning', 'Nothing here can run the tools. Settings → Platforms explains what would.');
+    const { runFetch } = await toolsModule();
+    this.patch({ toolJob: { url, stage: 'preflight', percent: null, message: null } });
     try {
-      const { files } = await runFetch(helper, { url, tool: options.tool ?? 'auto', format: options.format, authorization: { basis: options.basis, acknowledged: true } }, (job) =>
-        this.patch({ helperJob: { url, stage: job.stage, percent: job.percent, message: job.message } }),
+      const { files } = await runFetch(backend, { url, tool: options.tool ?? 'auto', format: options.format, authorization: { basis: options.basis, acknowledged: true } }, (job) =>
+        this.patch({ toolJob: { url, stage: job.stage, percent: job.percent, message: job.message } }),
       );
-      this.patch({ helperJob: null });
+      this.patch({ toolJob: null });
       await this.addFiles(files);
       this.notice('info', `${files.length} ${files.length === 1 ? 'track' : 'tracks'} added from ${hostOf(url)}.`);
     } catch (error) {
-      this.patch({ helperJob: null });
+      this.patch({ toolJob: null });
       this.notice('error', error instanceof Error ? error.message : String(error));
       throw error;
     }

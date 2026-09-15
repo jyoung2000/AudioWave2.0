@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="app_name">Now Playing</string>
+  <string name="channel_fetches">Fetching music</string>
+  <string name="channel_fetches_description">Shown while a download you asked for is running.</string>
+  <string name="fetching_title">Fetching music</string>
+  <string name="fetching_text">Working on the link you gave the player.</string>
+</resources>

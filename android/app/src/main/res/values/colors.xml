@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- The mid stop of the app icon's gradient, and the window background the player paints over. -->
+  <color name="brand">#3b74c8</color>
+  <color name="window">#f5f6f7</color>
+</resources>

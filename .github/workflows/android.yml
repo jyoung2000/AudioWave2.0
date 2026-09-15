@@ -1,0 +1,86 @@
+name: Android
+
+# This is where the Android build is actually verified.
+#
+# The development container this was written in cannot reach Google's Maven or the Android SDK, so
+# nothing here was compiled before it was committed. That is recorded rather than hidden: the first
+# real build of this app is the one this workflow runs, and a red badge here means the code was
+# wrong, not that the pipeline is flaky.
+#
+# The runner image already carries the Android SDK, so there is no SDK install step — only the two
+# halves of the build: the player, then the shell that wraps it.
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'android/**'
+      - 'music-player/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    name: Build the APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the player
+        run: pnpm build:player
+
+      # The seam between the two halves is a directory. The Gradle build refuses to assemble
+      # without it rather than producing an app that opens to a blank screen.
+      - name: Put the player in the app
+        run: |
+          rm -rf android/app/src/main/assets/app
+          mkdir -p android/app/src/main/assets
+          cp -R music-player/dist android/app/src/main/assets/app
+          test -f android/app/src/main/assets/app/index.html
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Assemble
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebug
+
+      # One APK per architecture: the tool libraries carry a Python runtime and an FFmpeg build for
+      # each, so a universal APK would be mostly code for a processor the phone does not have.
+      - name: What was built
+        run: ls -lh android/app/build/outputs/apk/debug/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: now-playing-apk-debug
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 30

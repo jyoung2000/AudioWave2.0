@@ -29,10 +29,10 @@ export function PlatformsPanel({ descriptors }: { descriptors: readonly Provider
   // A helper can be started or stopped while this page sits open, so the answer is taken fresh each
   // time someone comes to look rather than remembered from startup.
   useEffect(() => {
-    void store.refreshHelper();
+    void store.refreshTools();
   }, [store]);
 
-  const rows = withHelper(withHubReport(platformsInOrder(), descriptors), state.helper?.health ?? null);
+  const rows = withHelper(withHubReport(platformsInOrder(), descriptors), state.tools?.health ?? null);
   return (
     <Panel title="Platforms">
       <PanelSection>
@@ -77,21 +77,21 @@ function HelperSection() {
   const [busy, setBusy] = useState(false);
   const [origin, setOrigin] = useState('');
   const [token, setToken] = useState('');
-  const helper = state.helper;
+  const backend = state.tools;
 
   // Between "we have not asked" and "there is none" is a real difference, and the second is a
   // claim. Until the first probe comes back, the panel says what it is doing instead.
-  if (!state.helperProbed) {
+  if (!state.toolsProbed) {
     return (
       <PanelSection title="Running the tools yourself">
         <p className="player-hint">
-          <Spinner /> Looking for a local helper…
+          <Spinner /> Looking for something that can run the tools…
         </p>
       </PanelSection>
     );
   }
 
-  if (!helper) {
+  if (!backend) {
     return (
       <PanelSection title="Running the tools yourself">
         <p className="player-hint">
@@ -135,12 +135,12 @@ function HelperSection() {
   }
 
   return (
-    <PanelSection title="Local helper">
+    <PanelSection title={backend.kind === 'built-in' ? 'Tools in this app' : 'Local helper'}>
       <p className="player-hint">
-        <StatusDot kind="ok" label={`Running ${helper.sameOrigin ? 'and serving this page' : `at ${helper.origin}`}`} />
+        <StatusDot kind="ok" label={backend.label} />
       </p>
       <ul className="player-helper-tools">
-        {helper.health.tools.map((tool) => (
+        {backend.health.tools.map((tool) => (
           <li key={tool.id}>
             <StatusDot kind={tool.present ? 'ok' : 'neutral'} label={tool.id} />
             <span>{tool.present ? (tool.version ?? 'present') : 'not installed'}</span>
@@ -166,10 +166,10 @@ function HelperSection() {
         ))}
       </ul>
       <p className="player-hint">
-        The helper will fetch from {helper.health.allowedHosts.length} host{helper.health.allowedHosts.length === 1 ? '' : 's'} and no others, and it refuses any request that does not say what
-        entitles you to the file. It is on your machine, so what it does is yours to answer for.
+        It will fetch from {backend.health.allowedHosts.length} host{backend.health.allowedHosts.length === 1 ? '' : 's'} and no others, and it refuses any request that does not say what entitles you
+        to the file. It runs on your own device, so what it does is yours to answer for.
       </p>
-      {!helper.sameOrigin ? (
+      {backend.kind === 'helper' && backend.origin && !backend.label.includes('serving this page') ? (
         <div className="player-toolbar-row">
           <Button size="small" onClick={() => void store.saveHelper(null)}>
             Forget this helper

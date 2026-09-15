@@ -30,3 +30,9 @@ docker-container/playwright-report/
 music-player/dist-local/
 music-player/test-results-local/
 music-player/playwright-report-local/
+
+# The Android build copies the built player in here; it is output, not source.
+android/app/src/main/assets/app/
+android/.gradle/
+android/app/build/
+android/local.properties

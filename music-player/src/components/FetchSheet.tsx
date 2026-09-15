@@ -37,12 +37,12 @@ export function FetchSheet({ open, onClose }: { open: boolean; onClose: () => vo
   const [format, setFormat] = useState<OutputFormat>('original');
   const [busy, setBusy] = useState(false);
 
-  const helper = state.helper;
-  const formats = helper?.health.formats ?? ['original'];
+  const backend = state.tools;
+  const formats = backend?.health.formats ?? ['original'];
   const target = useMemo(() => describeTarget(url), [url]);
   const tool = target.spotify ? 'spotdl' : 'yt-dlp';
-  const toolState = helper?.health.tools.find((entry) => entry.id === tool);
-  const ready = Boolean(helper && toolState?.present && target.valid && basis && !busy);
+  const toolState = backend?.health.tools.find((entry) => entry.id === tool);
+  const ready = Boolean(backend && toolState?.present && target.valid && basis && !busy);
 
   const go = async (): Promise<void> => {
     if (!basis || !target.valid) return;
@@ -67,13 +67,13 @@ export function FetchSheet({ open, onClose }: { open: boolean; onClose: () => vo
         { id: 'cancel', label: 'Cancel', onSelect: onClose },
       ]}
     >
-      {!helper ? (
-        <p className="player-hint player-hint--warning">No helper is running, so nothing can be fetched. Settings → Platforms explains how to start one.</p>
+      {!backend ? (
+        <p className="player-hint player-hint--warning">Nothing here can run the tools, so nothing can be fetched. Settings → Platforms explains what would.</p>
       ) : null}
 
       <TextField label="Link" value={url} onChange={(event) => setUrl(event.currentTarget.value)} placeholder="https://…" autoComplete="off" spellCheck={false} />
       {url.trim() && !target.valid ? <p className="player-hint player-hint--warning">{target.reason}</p> : null}
-      {target.valid && helper && !toolState?.present ? <p className="player-hint player-hint--warning">{toolState?.installHint ?? `${tool} is not installed where the helper can see it.`}</p> : null}
+      {target.valid && backend && !toolState?.present ? <p className="player-hint player-hint--warning">{toolState?.installHint ?? `${tool} is not installed where this app can see it.`}</p> : null}
       {target.valid && target.spotify ? (
         <p className="player-hint">
           spotDL never takes Spotify’s audio. It reads Spotify for the track list and fetches a match from YouTube Music, so what lands in your library is another recording of the same song.
@@ -105,7 +105,7 @@ export function FetchSheet({ open, onClose }: { open: boolean; onClose: () => vo
         </div>
         <p className="player-hint">
           {formats.length === 1
-            ? 'Your helper found no FFmpeg, so nothing can be converted and you get whichever single audio stream the site offers.'
+            ? 'No FFmpeg was found, so nothing can be converted and you get whichever single audio stream the site offers.'
             : 'Converting re-encodes: choosing MP3 for something that arrived as Opus loses a little on the way. “As it comes” loses nothing.'}
         </p>
       </fieldset>

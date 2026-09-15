@@ -158,6 +158,12 @@ So there is a supported way to use them, and it is deliberately explicit at ever
 - **The hub can do the same thing**, through the external-tool provider that has been there all
   along: off by default, enabled by an administrator who accepts a rights notice, allowlisted hosts,
   no cookies. The image now ships yt-dlp so enabling it is a toggle rather than an install.
+- **The Android app carries it**, and that is a change of posture worth naming rather than sliding
+  past. Until it existed, someone had to go and install yt-dlp themselves, and that was itself a
+  decision; in the app it arrives bundled. What stands in for that decision is the per-fetch rights
+  basis — asked every time, not once — and the host allowlist, which is what stops the app being a
+  general-purpose downloader. It is still against YouTube's terms and that is still between you and
+  them.
 
 ## The optional external tool
 

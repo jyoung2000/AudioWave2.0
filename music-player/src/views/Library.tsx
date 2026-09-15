@@ -54,7 +54,7 @@ export function LibraryView({ onOpenView, onDownload }: { onOpenView: (view: Vie
   const [fetchOpen, setFetchOpen] = useState(false);
   // The button exists only while a helper is actually answering with a tool it can run. An action
   // that would fail is not an action worth drawing.
-  const canFetch = Boolean(state.helper?.health.tools.some((tool) => tool.id !== 'ffmpeg' && tool.present));
+  const canFetch = Boolean(state.tools?.health.tools.some((tool) => tool.id !== 'ffmpeg' && tool.present));
 
   const playFrom = (track: Track, ordered: readonly Track[]): void => {
     if (track.unsupportedReason) {

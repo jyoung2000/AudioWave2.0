@@ -81,3 +81,19 @@ There is no spotDL preset on the hub, and that is a decision rather than an omis
 ### What none of this changes
 
 The three columns in **Settings → Platforms** — play here, keep offline, save a file — answer what the *platform* permits, and a tool on your own machine does not change that answer. So YouTube's "Save a file" stays **No** while a running helper adds a separate line beside it: "Your yt-dlp: can reach it". Two different facts, kept in two different places, because merging them would have the app claim a standing it does not have.
+
+### The Android app
+
+A third place the tools can live, on the device that mostly cannot have them: `android/` is the same web player in a WebView the app owns, with yt-dlp bundled.
+
+The player did not fork to gain it. It already spoke to "something that can run the tools" through one interface, so the shell is a second transport — a JavaScript bridge instead of HTTP — carrying the same shapes from this repository's contracts. The Platforms panel, the fetch sheet, the rights basis and the store are untouched by its existence.
+
+| | |
+| --- | --- |
+| Adds over installing the PWA | yt-dlp, on the phone. That is the entire list: installing a PWA gives an icon and a window, not a different sandbox |
+| spotDL | Not available. A Python application with no Android build, whose Spotify half needs an API key the app has not got. Reported as a named absence |
+| Spotify audio | Still out of reach, as everywhere. Protected |
+| Background playback | **Worse** than the browser, not better — a WebView can be suspended when the app is backgrounded. Stated in `android/README.md` rather than left to be discovered |
+| Play Store | Will not carry it. Sideload or F-Droid |
+
+Two properties carry over unchanged, because they are the ones that matter: the page names a URL, a tool and a format and can name no flag, and every fetch carries a rights basis or is refused. `--ignore-config` is the first argument for the same reason it is on the other two — a configuration file in the app's own directory could otherwise add `--exec`.

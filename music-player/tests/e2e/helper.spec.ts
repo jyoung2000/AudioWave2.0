@@ -89,7 +89,9 @@ test('the player finds the helper that served it, with nothing configured', asyn
   await openSettings(page);
   const platforms = page.locator('.aqua-panel').filter({ has: page.locator('.aqua-panel__title', { hasText: 'Platforms' }) });
   await expect(platforms.getByText('Local helper')).toBeVisible();
-  await expect(platforms.getByText('Running and serving this page')).toBeVisible();
+  // The label comes from the backend rather than from the panel, so this is also the assertion that
+  // the panel is reporting what answered rather than describing what it hoped for.
+  await expect(platforms.getByText('A helper, serving this page')).toBeVisible();
   // The version it reported, not a claim that something called yt-dlp exists somewhere.
   await expect(platforms.locator('.player-helper-tools')).toContainText('2026.09.01');
   // FFmpeg is genuinely absent in this environment, and the panel says so rather than hiding it.

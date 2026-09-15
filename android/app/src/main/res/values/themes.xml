@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!--
+    Deliberately plain. The player draws its own chrome down to the status bar, so an Android theme
+    with opinions about action bars and accents would only be something to fight.
+  -->
+  <style name="Theme.NowPlaying" parent="Theme.AppCompat.DayNight.NoActionBar">
+    <item name="android:windowBackground">@color/window</item>
+  </style>
+</resources>

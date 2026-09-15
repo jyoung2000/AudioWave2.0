@@ -64,6 +64,18 @@ and reports platform-unavailable ones as skipped, never as passed.
 | Downloading audio from Spotify or YouTube | **Not built, and will not be** | There is no permitted route: Spotify's Web API offers no audio download and its playback is protected; YouTube's API terms prohibit downloading and its embed exposes no audio. Either would mean circumventing protection or scraping. [DOWNLOADS_AND_LEGAL.md](DOWNLOADS_AND_LEGAL.md) states this in the app's own words, and Settings → Platforms says it where someone would look for the button |
 | A large-target driving view | **Not built** | The Media Session path covers the car; a driving-specific layout was not asked for |
 
+## android
+
+|  | Status | Notes |
+| --- | --- | --- |
+| The PWA as a standalone Android app | **Written, built in CI, not run on a device** | A plain WebView shell — no Capacitor — serving the player over **https** from `appassets.androidplatform.net`. Not `file://`: that is not a secure context, and without one there is no service worker, no IndexedDB, no origin-private file system and no audio worklet. One class buys the whole application |
+| yt-dlp inside the app | **Written, not run on a device** | `youtubedl-android` carries a Python runtime and FFmpeg per ABI, so the APK is split by architecture. It unpacks itself on first run and the app reports "still setting up" honestly meanwhile rather than offering a button that would fail |
+| One protocol, two transports | **Done and tested** | The player already spoke to "something that can run the tools" through one interface; the shell is a second implementation of it over a JavaScript bridge. The Platforms panel, the fetch sheet and the store did not change to gain an Android build. `music-player/tests/dom/tool-backend.test.ts` drives a fake bridge through the same assertions as the HTTP transport |
+| spotDL on Android | **Not possible** | A Python application with no Android build, whose Spotify half needs an API key the app does not have. Reported as a named absence, not a failing button. A helper on a computer still runs it |
+| Background playback in the app | **Worse than the browser** | In a browser the browser is the foreground app and Media Session keeps audio alive; in a WebView inside this app Android may suspend it. Fixing it properly needs a playback foreground service driven by the page, which is not in this version. Said plainly in `android/README.md` rather than discovered |
+| On the Play Store | **Not going to happen** | Apps that fetch audio from YouTube get removed. Sideload or F-Droid, which also means no store updates |
+| Compiled before it was committed | **No** | The development container cannot reach Google's Maven or the Android SDK. `.github/workflows/android.yml` is where the first real build happens. What *was* verified first: the library's coordinates and API, read out of the actual artifacts on Maven Central, and every XML file parsing |
+
 ## local-helper
 
 |  | Status | Notes |
