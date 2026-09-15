@@ -166,7 +166,9 @@ test('Settings opens from the avatar and carries the equalizer and the companion
   await expect(page.getByRole('checkbox', { name: 'On', exact: true })).toBeVisible();
   await expect(page.getByRole('group', { name: 'Equalizer bands' }).getByRole('slider')).toHaveCount(11);
 
-  const companion = page.locator('.aqua-panel').filter({ hasText: 'Windows companion' }).first();
+  // By its own title, not by its text: Settings → Platforms now names the companion in a row too,
+  // and `hasText` matched that panel first.
+  const companion = page.locator('.aqua-panel').filter({ has: page.locator('.aqua-panel__title', { hasText: 'Windows companion' }) });
   await expect(companion).toBeVisible();
   // No hub in this test run, so there is nothing to download and the panel says so instead.
   await expect(companion.getByText(/Pair a hub above/i)).toBeVisible();

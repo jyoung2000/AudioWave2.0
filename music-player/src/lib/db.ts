@@ -128,7 +128,11 @@ export async function clearEverything(db: PlayerDatabase): Promise<void> {
 
 /** Live counts for the storage panel, so "what is this using?" has a real answer. */
 export async function storageReport(db: PlayerDatabase): Promise<{ tracks: number; playlists: number; events: number; artwork: number; estimateBytes: number | null; quotaBytes: number | null; copies: { count: number; bytes: number } | null; persisted: boolean | null }> {
-  const [tracks, playlists, events, artwork] = await Promise.all([db.count('tracks'), db.count('playlists'), db.count('events'), db.count('artwork')]);
+  // Platform artwork lives in the same store under a `platform:` prefix; it is settings, not album
+  // covers, so it is not counted here — the Storage panel would otherwise read five images high on
+  // an empty library.
+  const [tracks, playlists, events, artworkKeys] = await Promise.all([db.count('tracks'), db.count('playlists'), db.count('events'), db.getAllKeys('artwork')]);
+  const artwork = artworkKeys.filter((key) => !String(key).startsWith('platform:')).length;
   let estimateBytes: number | null = null;
   let quotaBytes: number | null = null;
   if (typeof navigator !== 'undefined' && navigator.storage?.estimate) {

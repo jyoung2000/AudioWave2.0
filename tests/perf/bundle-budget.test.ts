@@ -35,11 +35,20 @@ const BUNDLES: Bundle[] = [
     name: 'music-player',
     distDir: join(repoRoot, 'music-player', 'dist'),
     html: 'index.html',
-    // The player is offline-first: this is what someone downloads on a phone before the first note.
-    // Currently 621KB — the headroom is small on purpose (see the note at the top). It rose from
-    // 613KB with the service worker registration, the two-deck crossfade engine and the module
-    // that keeps copies of chosen files; the worker for that lives inline as a blob.
-    entryBudgetKb: 640,
+    /*
+     * The player is offline-first: this is what someone downloads on a phone before the first note.
+     * The headroom is small on purpose (see the note at the top). It rose from 613KB with the
+     * service worker registration, the two-deck crossfade engine and the module that keeps copies
+     * of chosen files; the worker for that lives inline as a blob.
+     *
+     * Then from 637 to 644KB with the platform marks. Every row in the library draws one, so the
+     * registry and its ten glyphs are in the first load by definition — there is no lazy version of
+     * something on the first painted screen. The capability table and the .zip reader that came
+     * with them are *not*: the table travels with Settings and the unpacker is fetched only when
+     * someone imports an archive, which is why `lib/audio-files.ts` exists — importing one function
+     * from the scanner used to pin the whole scanner into a shared chunk.
+     */
+    entryBudgetKb: 656,
     /*
      * The total rose from 1600 to 1900 when the hero gained the reference's jewel case.
      *

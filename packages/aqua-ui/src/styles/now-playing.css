@@ -1397,8 +1397,6 @@
   --lib-sort-hot-bot: #c2d2e6;
   --lib-ink: #000;
   --lib-soft: #222326;
-  --lib-badge: #dfe3e9;
-  --lib-badge-ink: #3b3f47;
   --lib-accent: #2b6fd6;
   --lib-icon: #8a8f98;
   --lib-star: #f0a422;
@@ -1427,8 +1425,6 @@
     --lib-sort-hot-bot: #2b3b52;
     --lib-ink: #f2f3f5;
     --lib-soft: #d4d8df;
-    --lib-badge: #2f333b;
-    --lib-badge-ink: #d6dae1;
     --lib-accent: #6aa3f2;
     --lib-icon: #8d939c;
     --lib-star: #f4b241;
@@ -1684,33 +1680,28 @@
 .library tbody tr[aria-selected="true"] .lib-btn,
 .library tbody tr[aria-selected="true"] .lib-np { color: #fff; }
 
+/* a mark keeps its own colour on a selected row; the ring below is what changes */
 .library tbody tr[aria-selected="true"] .lib-pf {
-  background: rgba(255, 255, 255, 0.28);
-  color: #fff;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.55);
 }
 
 .lib-num { text-align: right; font-variant-numeric: tabular-nums; }
 
-/* platform: a monochrome initial badge (no logos — those are trademarks),
-   with the platform name in the tooltip and the accessible label */
+/* platform: the mark carries the colour and the glyph, this only gives it a box
+   (aqua-ui/src/icons/provider-marks.tsx says why the mark is not the logo) */
 .lib-pf {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 14px;
-  border-radius: 3px;
-  background: var(--lib-badge);
-  color: var(--lib-badge-ink);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  width: 16px;
+  height: 16px;
+  border-radius: 3.6px;
   text-decoration: none;
   vertical-align: middle;
 }
 
-.lib-pf[data-len="2"] { font-size: 8px; letter-spacing: 0; }
-.lib-pf:hover { background: var(--lib-accent); color: #fff; }
+.lib-pf .aqua-icon--provider { width: 16px; height: 16px; }
+a.lib-pf:hover { filter: brightness(1.12) saturate(1.1); }
 .lib-pf:focus { outline: none; }
 .lib-pf:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
 
@@ -2214,8 +2205,6 @@
   --srch-chev: #8f8f8f;
   --srch-dot: #c9c9c9;
   --srch-dot-on: #7c7c7c;
-  --srch-pf: #dcdcdc;
-  --srch-pf-ink: #5c5c5c;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -2236,8 +2225,6 @@
     --srch-chev: #9aa0a9;
     --srch-dot: #4a4e56;
     --srch-dot-on: #b8bdc5;
-    --srch-pf: #3a3e46;
-    --srch-pf-ink: #ccd1d9;
   }
 }
 
@@ -2392,20 +2379,15 @@ button.srch__art:focus-visible .srch__scrim,
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 16px;
-  border-radius: 3px;
-  background: var(--srch-pf);
-  color: var(--srch-pf-ink);
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
   text-decoration: none;
   -webkit-tap-highlight-color: transparent;
 }
 
-.srch__pf[data-len="1"] { font-size: 9px; }
-.srch__pf:hover { background: var(--lib-accent); color: #fff; }
+.srch__pf .aqua-icon--provider { width: 18px; height: 18px; }
+a.srch__pf:hover { filter: brightness(1.12) saturate(1.1); }
 .srch__pf:focus { outline: none; }
 .srch__pf:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
 
@@ -2692,12 +2674,10 @@ button.srch__art:focus-visible .srch__scrim,
     height: 32px;
   }
 
-  .library .lib-pf {
-    font-size: 11px;
-  }
-
-  .library .lib-pf[data-len='2'] {
-    font-size: 10px;
+  .library .lib-pf,
+  .library .lib-pf .aqua-icon--provider {
+    width: 20px;
+    height: 20px;
   }
 
   .library td .lib-title__artist {
@@ -2844,13 +2824,12 @@ button.srch__art:focus-visible .srch__scrim,
   }
 
   /*
-   * The source badge in a list row: a two-letter pill 18px wide. It cannot
-   * grow — it sits in an icon column beside the star and the offline key —
-   * so it takes its taps from an overlay, like those do.
+   * The source mark in a list row: a 20px tile. It cannot grow past that — it
+   * sits in an icon column beside the star and the offline key — so it takes
+   * its taps from an overlay, like those do.
    */
   .lib-pf {
     position: relative;
-    font-size: 10px;
   }
 
   a.lib-pf::after {

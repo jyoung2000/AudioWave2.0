@@ -55,4 +55,5 @@ export * from './components/MusicList.js';
 export * from './components/music-list-behaviours.js';
 export * from './components/JewelStage.js';
 export * from './lib/track-source.js';
+export * from './lib/provider-artwork.js';
 export { mountJewelCase, type JewelCaseAlbum, type JewelCaseHandle, type JewelCaseOptions, type JewelCasePose } from './stage/jewel-case.js';

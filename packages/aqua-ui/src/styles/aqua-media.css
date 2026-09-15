@@ -557,31 +557,25 @@ button.aqua-results__art:focus-visible .aqua-results__scrim,
 .aqua-results__dots i[data-on="true"] { background: #6a6a6a; }
 .aqua-results__foot-text { color: #6a6a6a; font-size: var(--aqua-font-label); }
 
-/* Source badge: monochrome initials, never a logo */
+/* Source mark: the platform's colour and our glyph, never their logo
+   (aqua-ui/src/icons/provider-marks.tsx says why, and how to supply theirs) */
 .aqua-badge {
   display: inline-flex;
   flex: none;
   align-items: center;
   justify-content: center;
-  min-width: 18px;
-  height: 14px;
-  padding: 0 3px;
-  color: #3b3f47;
-  font-size: var(--aqua-font-mini);
-  font-weight: var(--aqua-weight-emphasized);
-  letter-spacing: 0.02em;
-  line-height: 1;
+  width: 16px;
+  height: 16px;
   text-decoration: none;
-  background: #dfe3e9;
-  border-radius: 3px;
+  border-radius: 3.6px;
   vertical-align: middle;
 }
 
-.aqua-badge[data-len="2"] { font-size: 8px; letter-spacing: 0; }
-a.aqua-badge:hover { color: #fff; background: var(--aqua-selection-mid); }
+.aqua-badge .aqua-icon--provider { width: 16px; height: 16px; }
+a.aqua-badge:hover { filter: brightness(1.12) saturate(1.1); }
 a.aqua-badge:focus-visible { outline-offset: 1px; }
 [aria-selected="true"] .aqua-badge,
-.aqua-results__row[data-selected="true"] .aqua-badge { color: #fff; background: rgb(255 255 255 / 28%); }
+.aqua-results__row[data-selected="true"] .aqua-badge { box-shadow: 0 0 0 1.5px rgb(255 255 255 / 55%); }
 
 /* --------------------------------------------------------------------------
    Touch

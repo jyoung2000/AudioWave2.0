@@ -467,3 +467,110 @@ body {
     font-size: 12px;
   }
 }
+
+/* Platforms: one row per platform, three answers, and the reason behind each.
+   It has to read on a phone, where three status dots and a sentence will not
+   sit on one line, so the head wraps and the answers drop underneath. */
+.player-platforms {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.player-platform {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--aqua-row-divider, rgb(0 0 0 / 8%));
+}
+
+.player-platform:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.player-platform__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  width: 100%;
+}
+
+.player-platform__mark {
+  display: inline-flex;
+  flex: none;
+  /* Beside the name, not beside the middle of the block: on a phone the summary
+     runs to three lines and a centred mark ends up next to the wrong one. */
+  align-self: flex-start;
+  margin-top: 1px;
+  font-size: 18px;
+}
+
+.player-platform__name {
+  display: flex;
+  flex: 1 1 200px;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.player-platform__summary {
+  color: var(--aqua-text-secondary, #5a6472);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.player-platform__routes {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-self: center;
+  font-size: 11px;
+}
+
+.player-platform__detail {
+  width: 100%;
+  font-size: 11px;
+}
+
+.player-platform__detail dl {
+  display: grid;
+  grid-template-columns: minmax(96px, max-content) 1fr;
+  gap: 4px 12px;
+  margin: 0 0 8px;
+}
+
+.player-platform__detail dt {
+  color: var(--aqua-text-secondary, #5a6472);
+  font-weight: 600;
+}
+
+.player-platform__detail dd {
+  margin: 0;
+  line-height: 1.45;
+}
+
+/* Touch last, so these win over the rules above at equal specificity. */
+@media (pointer: coarse) {
+  .player-platform__summary,
+  .player-platform__routes,
+  .player-platform__detail,
+  .player-platform__detail dl {
+    font-size: 13px;
+  }
+
+  /* Label over value: at 320px a 96px term column leaves nothing for the sentence. */
+  .player-platform__detail dl {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .player-platform__detail dd {
+    margin-bottom: 8px;
+  }
+}

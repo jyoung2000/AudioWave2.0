@@ -14,7 +14,7 @@
  */
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { Track } from '@now-playing/contracts';
-import { sourceOf } from '@now-playing/aqua-ui';
+import { ProviderMark, sourceOf } from '@now-playing/aqua-ui';
 
 const PAGE = 5;
 const AUDITION_MS = 15_000;
@@ -295,12 +295,12 @@ export const SearchPopover = forwardRef<SearchPopoverHandle, SearchPopoverProps>
 
                 <span className="srch__links">
                   {badge.href ? (
-                    <a className="srch__pf" data-len={badge.initials.length} href={badge.href} target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-label={`Open ${track.title} on ${badge.name}`}>
-                      {badge.initials}
+                    <a className="srch__pf" href={badge.href} target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-label={`Open ${track.title} on ${badge.name}`}>
+                      <ProviderMark provider={badge.provider} />
                     </a>
                   ) : (
-                    <span className="srch__pf" data-len={badge.initials.length} title={badge.name}>
-                      {badge.initials}
+                    <span className="srch__pf" title={badge.name} aria-label={badge.name} role="img">
+                      <ProviderMark provider={badge.provider} />
                     </span>
                   )}
                 </span>

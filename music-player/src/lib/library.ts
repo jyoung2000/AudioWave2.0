@@ -18,8 +18,11 @@ import type { AudioFormat, Track, TrackIdentity } from '@now-playing/contracts';
 import { uuidv7 } from '@now-playing/domain';
 import type { PlayerDatabase, StoredFileRef, StoredRoot } from './db.js';
 import { keepCopy, readCopy } from './copies.js';
+import { MIME_BY_EXTENSION, extensionOf, isAudioFile } from './audio-files.js';
 
-/** Extensions worth trying. The browser decides what it can actually decode; see `probeSupport`. */
+/** Extensions worth trying, and the names a browser knows them by. The browser decides what it can
+ * actually decode; see `probeSupport`. Re-exported so the scanner stays the one import anyone needs. */
+export { AUDIO_EXTENSIONS, extensionOf, isAudioFile } from './audio-files.js';
 /**
  * The tag reader, loaded the first time a file is actually read.
  *
@@ -34,38 +37,9 @@ function tagReader(): Promise<typeof ParseBlob> {
   return tagReaderPromise;
 }
 
-export const AUDIO_EXTENSIONS = ['.mp3', '.m4a', '.mp4', '.aac', '.flac', '.ogg', '.oga', '.opus', '.wav', '.wave', '.webm', '.aiff', '.aif', '.alac', '.wma'] as const;
-
-const MIME_BY_EXTENSION: Record<string, string> = {
-  '.mp3': 'audio/mpeg',
-  '.m4a': 'audio/mp4',
-  '.mp4': 'audio/mp4',
-  '.aac': 'audio/aac',
-  '.flac': 'audio/flac',
-  '.ogg': 'audio/ogg',
-  '.oga': 'audio/ogg',
-  '.opus': 'audio/ogg; codecs=opus',
-  '.wav': 'audio/wav',
-  '.wave': 'audio/wav',
-  '.webm': 'audio/webm',
-  '.aiff': 'audio/aiff',
-  '.aif': 'audio/aiff',
-  '.alac': 'audio/mp4; codecs=alac',
-  '.wma': 'audio/x-ms-wma',
-};
-
 /** Enough bytes for a tag header plus embedded art, without reading the whole file. */
 const TAG_BYTES = 512 * 1024;
 const MAX_DEPTH = 12;
-
-export function extensionOf(name: string): string {
-  const dot = name.lastIndexOf('.');
-  return dot === -1 ? '' : name.slice(dot).toLowerCase();
-}
-
-export function isAudioFile(name: string): boolean {
-  return (AUDIO_EXTENSIONS as readonly string[]).includes(extensionOf(name));
-}
 
 /**
  * What this browser can decode, asked once. A format the browser refuses is still listed in the

@@ -9,7 +9,7 @@
  * localStorage is readable by any script that manages to run on the page.
  */
 import { ReleaseMetadata } from '@now-playing/contracts';
-import type { GroupPlaybackState, GroupView, HubIdentity, Queue, QueueCommand, SearchResponse, ShareLinkView, TrackRef } from '@now-playing/contracts';
+import type { GroupPlaybackState, GroupView, HubIdentity, ProviderDescriptor, Queue, QueueCommand, SearchResponse, ShareLinkView, TrackRef } from '@now-playing/contracts';
 import { getSetting, putSetting, type PlayerDatabase } from './db.js';
 
 export interface HubCredential {
@@ -137,6 +137,16 @@ export class HubClient {
   }
 
   /* --------------------------------------------------------------- features */
+
+  /**
+   * What the hub's administrator actually enabled, and how each provider is faring right now. The
+   * player carries its own reviewed table of what the platforms permit; this narrows it to what is
+   * configured and reachable today.
+   */
+  async providers(): Promise<ProviderDescriptor[]> {
+    const result = await this.request<{ items: ProviderDescriptor[] }>('GET', '/api/v1/providers');
+    return result.items;
+  }
 
   async search(query: string, scope = 'all'): Promise<SearchResponse> {
     return this.request<SearchResponse>('GET', `/api/v1/search?q=${encodeURIComponent(query)}&scope=${encodeURIComponent(scope)}`);

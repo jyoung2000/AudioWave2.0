@@ -24,7 +24,7 @@ written for the person reading it rather than as an error code.
 | SoundCloud, where the creator did not | No | The creator chose that. The result says "Streaming allowed; the creator did not enable downloads". |
 | Spotify | No | The Web API offers no audio download. Playback is through the Web Playback SDK, in a browser, for Premium accounts. |
 | YouTube | No | Downloading is prohibited by the API terms of service. Playback is the embedded player only. |
-| Bandcamp | No, in the app | There is no public API. Bandcamp is a link out; if you buy something there, the file you bought can be imported through the companion like any other file you own. |
+| Bandcamp | No, in the app | There is no public API. Bandcamp is a link out; what you buy there, Bandcamp gives you, and the player imports the `.zip` it arrives in directly. |
 | MusicBrainz | Not applicable | Metadata only. It is never an audio source. |
 
 ## Saving a copy from the player
@@ -106,6 +106,32 @@ checked.
   borrow an authenticated session.
 - **No terms bypass.** Where an API's terms forbid something — reusing YouTube data outside permitted
   purposes, for instance — the adapter does not do it, and the capability matrix records why.
+
+## "Download from every streaming platform"
+
+This is asked for often enough to deserve a straight answer: **it cannot be built, by anyone,
+legitimately.** Not because the app is cautious, but because there is no permitted route.
+
+- **Spotify.** The Web API offers no audio download endpoint at all. Playback exists only through
+  the Web Playback SDK, which plays protected audio into its own output and hands the page nothing.
+  Getting a file out would mean circumventing that protection.
+- **YouTube / YouTube Music.** The API Services Terms of Service prohibit downloading content. The
+  only sanctioned playback is the IFrame embed, whose audio is not exposed to the page. Getting a
+  file out would mean scraping or signature-solving.
+- **SoundCloud.** Downloads exist, but per track, and only where the creator turned them on. That
+  flag is the creator's decision and the app honours it.
+- **Bandcamp.** No public API to search or stream. Purchases are downloaded from Bandcamp itself.
+
+So the app does not offer a download button that would have to lie. What it offers instead is the
+route that does work and needs no key, no hub and no account here: **the export each platform gives
+you of the music that is already yours.** A Bandcamp purchase, a Google Takeout of your own YouTube
+Music uploads, a set of downloadable SoundCloud tracks — all arrive as a `.zip`, and the player
+unpacks one directly (`music-player/src/lib/zip.ts`), so a purchase made on a phone becomes library
+tracks on that phone without a desktop in between. Password-protected archives are skipped rather
+than attacked; non-audio entries are left where they are.
+
+Settings → Platforms states all of this per platform, in the app, with the reason attached to every
+"no". `docs/PROVIDER_CAPABILITIES.md` records the sources.
 
 ## The optional external tool
 

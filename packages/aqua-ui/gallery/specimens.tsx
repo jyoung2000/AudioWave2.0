@@ -11,7 +11,7 @@ import { Track, type Track as TrackRow } from '@now-playing/contracts';
 import {
   AquaWindow, Toolbar, TrafficLights, Transport, TransportAuxButton, LcdDisplay, Scrubber, VolumeSlider, SearchField, ResultsPopover, SourceList, WorkArea, Content, BottomBar,
   SegmentedControl, Button, ButtonLink, IconButton, Checkbox, Radio, TextField, PopUpMenu, Slider, ProgressBar, AquaTable, NowPlayingGlyph, ArtworkGrid, Tabs, Sheet, Menu, useContextMenu, useToast,
-  StatePanel, UnavailableCapabilityState, Panel, PanelSection, FormRow, KeyValueList, ListView, Splitter, Marquee, Avatar, AvatarButton, SourceBadge, Glyph, SourceIcon, GLYPH_NAMES, SOURCE_ICONS, AVATAR_ICON_IDS, AvatarIcon,
+  StatePanel, UnavailableCapabilityState, Panel, PanelSection, FormRow, KeyValueList, ListView, Splitter, Marquee, Avatar, AvatarButton, SourceBadge, ProviderMark, PROVIDER_MARKS, Glyph, SourceIcon, GLYPH_NAMES, SOURCE_ICONS, AVATAR_ICON_IDS, AvatarIcon,
   PageBar, BarSearch, BarClock, ModeSwitch, ProfileButton, SectionStrip, Hero, HeroArt, TrackScrubber, KeyTransport, KeyButton, LevelSlider, JewelStage, MusicList,
   type MenuEntry, type ColumnDef,
 } from '../src/index.js';
@@ -269,11 +269,13 @@ export function ResultsDemo() {
 
 export function IconsDemo() {
   return (
-    <Card label="Icon families: source (16px colour), glyphs (single colour), avatars, source badges">
+    <Card label="Icon families: source (16px colour), glyphs (single colour), avatars, platform marks">
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 16 }}>{(Object.keys(SOURCE_ICONS) as Array<keyof typeof SOURCE_ICONS>).map((n) => <span key={n} title={n}><SourceIcon name={n} title={n} /></span>)}</div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 14, color: '#1c1c1c' }}>{GLYPH_NAMES.map((n) => <Glyph key={n} name={n} title={n} />)}</div>
       <div style={{ display: 'flex', gap: 6 }}>{AVATAR_ICON_IDS.map((id) => <Avatar key={id} source={{ kind: 'builtin', iconId: id }} size={28} alt={id} />)}<AvatarIcon id="vinyl" width={0} height={0} style={{ display: 'none' }} /></div>
-      <div style={{ display: 'flex', gap: 6 }}>{['local', 'hub', 'youtube', 'soundcloud', 'bandcamp', 'spotify', 'musicbrainz', 'public-domain'].map((p) => <SourceBadge key={p} provider={p} />)}</div>
+      {/* every mark in the registry, plus an unknown slug to show the initials fallback */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{[...Object.keys(PROVIDER_MARKS), 'some-new-service'].map((p) => <SourceBadge key={p} provider={p} />)}</div>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 22 }}>{['youtube', 'soundcloud', 'spotify', 'bandcamp'].map((p) => <ProviderMark key={p} provider={p} title={p} />)}</div>
     </Card>
   );
 }

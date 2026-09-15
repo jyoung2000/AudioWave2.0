@@ -13,11 +13,42 @@ import { EqualizerView } from './Equalizer.js';
 import { mediaIntegrationReport } from '../lib/media-session.js';
 import { localFileReport } from '../lib/build-flags.js';
 import { MAX_CROSSFADE_SECONDS } from '../lib/playback.js';
-import type { ReleaseMetadata } from '@now-playing/contracts';
+import type { ProviderDescriptor, ReleaseMetadata } from '@now-playing/contracts';
+import { PlatformsPanel } from '../components/PlatformsPanel.js';
 import type { StoredRoot } from '../lib/db.js';
 import { supportsDirectoryHandles } from '../lib/library.js';
 import { describeDestination, supportsDownloadFolder, supportsSavePicker } from '../lib/download-folder.js';
 import { pickFiles } from './Library.js';
+
+/**
+ * What a paired hub reports about its providers, or null when there is none. The platform table
+ * stands on its own without this; the hub only ever narrows it.
+ */
+function useHubProviders(hub: ReturnType<typeof usePlayer>['hub'], connected: boolean): ProviderDescriptor[] | null {
+  const [descriptors, setDescriptors] = useState<ProviderDescriptor[] | null>(null);
+  useEffect(() => {
+    // Cleared in a timer rather than in the effect body: a synchronous setState here costs an extra
+    // render pass on every reconnect, and the settings view is not cheap to render.
+    if (!hub || !connected) {
+      const clear = setTimeout(() => setDescriptors(null), 0);
+      return () => clearTimeout(clear);
+    }
+    let live = true;
+    hub
+      .providers()
+      .then((items) => {
+        if (live) setDescriptors(items);
+      })
+      .catch(() => {
+        // A hub that will not answer is the same as no hub for this table's purposes.
+        if (live) setDescriptors(null);
+      });
+    return () => {
+      live = false;
+    };
+  }, [hub, connected]);
+  return descriptors;
+}
 
 export function SettingsView() {
   const { store, hub, hubStatus } = usePlayer();
@@ -25,6 +56,7 @@ export function SettingsView() {
   const toast = useToast();
   const media = mediaIntegrationReport({ volumeControllable: store.playback.canSetVolume() });
   const localFile = localFileReport();
+  const descriptors = useHubProviders(hub, hubStatus.connected);
 
   return (
     <>
@@ -116,6 +148,8 @@ export function SettingsView() {
           )}
         </PanelSection>
       </Panel>
+
+      <PlatformsPanel descriptors={descriptors} />
 
       <Panel title="Playback">
         <PanelSection>

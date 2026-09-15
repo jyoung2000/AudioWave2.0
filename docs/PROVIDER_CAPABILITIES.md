@@ -25,3 +25,30 @@ Legend: ✔ available · 🔑 requires credentials/user auth · ⛔ unsupported 
 
 ## How the UI uses this
 Every result carries `ProviderCapabilities`; actions (Preview, Play, Add to queue, Add to playlist, Open at source, Download, Import) are enabled from that structure only, with a "Why unavailable?" explanation from `reason`. A stream URL never implies download permission.
+
+## What the player itself says, with no hub
+
+The matrix above is the hub's. The player carries its own reviewed copy in `music-player/src/lib/platforms.ts` and shows it in **Settings → Platforms**, because the question "can I get my Spotify library in here?" is asked before anyone pairs anything. It answers three questions per platform — *play here*, *keep offline*, *save a file* — each with its reason, and it never leaves a "no" unexplained.
+
+A paired hub can only **narrow** that table, never widen it (`withHubReport`): a hub reporting `creatorDownload: available` for Spotify changes nothing, because Spotify's terms decide that and not a hub's configuration. A unit test pins this, and pins that every provider in `KNOWN_PROVIDERS` has a row here, a row in the player's table, and a mark.
+
+## Getting your own music in: the archive route
+
+No platform lets an application take audio out of its stream, and this project does not try. What every one of them does offer is an export of the music that is already yours, and those arrive as a `.zip`:
+
+| Platform | What it hands you | How it gets here |
+|---|---|---|
+| Bandcamp | Your purchase, in the format you chose at checkout, FLAC included | Import a .zip |
+| YouTube Music | Google Takeout of the tracks *you* uploaded | Import a .zip |
+| SoundCloud | Tracks whose creator turned on Download | Add the folder, or import the .zip |
+| Spotify | Nothing — the Web API offers no audio download | Playlists import as *lists*, matched to copies you own |
+
+`music-player/src/lib/zip.ts` reads these with the browser's own inflater (`DecompressionStream('deflate-raw')`) and no dependency: the central directory is parsed, audio entries are decompressed one at a time, non-audio entries are left in the archive, and password-protected entries are skipped by name with the reason. Nothing is written outside the library.
+
+## Marks and artwork
+
+Each platform gets a 16 px Aqua tile in **its own published colour** carrying a plain glyph for what it is to this app — a play triangle for video, a cloud for SoundCloud's namesake, a tag for buying from an artist. None of them is a redrawn logo. Colour is not what a trademark protects; the logo is, and every one of these platforms publishes brand terms asking that only their official, unmodified file be used. So none is shipped in this repository.
+
+The glyph rather than the colour carries the distinction, so the set still reads in greyscale (the `itunes-10-transition` profile desaturates the source list; colour-blind readers get the same treatment for free), and the platform's name is always in the accessible name and the tooltip.
+
+Anyone who holds a platform's official asset under that platform's terms can supply it in **Settings → Platforms → Use official artwork**. It is stored on that device, used whole — no tile behind it, no crop, no recolour — and replaces the built-in mark everywhere in the app at once.

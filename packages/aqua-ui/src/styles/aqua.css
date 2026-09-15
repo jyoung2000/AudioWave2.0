@@ -1671,11 +1671,15 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
 
   /* Mini is the one size that stays visibly small — it exists for a row of
      actions inside a table cell, where 44px would double the row. It gets the
-     target without the height, from the overlay below. */
+     target without the height, from the overlay below. Its *label* is still
+     something someone has to read, so it goes up to the readable minimum with
+     everything else; the button keeps its drawn size either way. */
   .aqua-button--mini {
     position: relative;
     min-height: 32px;
     padding-inline: 12px;
+    font-size: 12px;
+    line-height: 14px;
   }
 
   /*

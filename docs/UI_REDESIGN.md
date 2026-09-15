@@ -35,7 +35,7 @@ it is a demo harness that would be a security and privacy defect if it shipped.
 | The LIVE marker with the pulsing halo | Shown when Shared mode is following a host, and only then |
 | The chromeless transport: glyphs on the page, no slab, 48×44 keys, a 64×52 play key, pressed-in state | `.np-keys` |
 | The 122 px volume line with the gel knob | `.np-vol` |
-| The iTunes 10 list: nine columns, 18 px rows, Aqua stripe and **no rules**, glossy embossed sticky header, sorted column tinted blue, monochrome initial badges, icon columns for offline and star | `.library` — **the reference's own stylesheet block, copied rather than reinterpreted.** Every list in the app wears it |
+| The iTunes 10 list: nine columns, 18 px rows, Aqua stripe and **no rules**, glossy embossed sticky header, sorted column tinted blue, a platform mark per row, icon columns for offline and star | `.library` — **the reference's own stylesheet block, copied rather than reinterpreted.** Every list in the app wears it |
 | The overlay Aqua gel scroller that fades 900 ms after the last movement, with a draggable thumb and a click-to-page track | `.library__bar`, ported from the reference's own code |
 | The parking marquee on the playing row: measured travel, one shared clock for title and artist, gradient-dissolved edges | `useMarquee`, ported |
 | The desktop context menu — Add to Playlist ▸ with checkmarks, a separator, New Playlist… — with its keyboard model and edge flip | `RowMenu`, ported |
@@ -138,7 +138,7 @@ code can back:
 
 | Column | What it says |
 |---|---|
-| Source badge | `L` for a file on this device, `H` for a hub stream, or the provider's initials. It is a **link** only when a provider gave a canonical URL to link to |
+| Source mark | A 16 px tile in the platform's own colour carrying a plain glyph — never that platform's logo, which is theirs (`aqua-ui/src/icons/provider-marks.tsx`). An operator holding a platform's official asset can supply it in Settings → Platforms and it replaces the mark everywhere. The mark is a **link** only when a provider gave a canonical URL to link to |
 | BPM | Read from the file's own tags at index time; a dash when the tag is absent. The reference fetched this from a third party over JSONP, which this app will not do |
 | Offline | Whether the track can play with the network off — a check for a file in a connected folder, an arrow with the reason for anything else. It reports rather than toggles, because there is nothing here to download. A file added with the one-shot picker reads as *not* offline, because it cannot be reopened after a reload |
 | Star | The library's own `liked` flag, the same one the transport's star sets |

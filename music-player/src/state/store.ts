@@ -102,11 +102,20 @@ export interface AppState {
   /** Errors worth showing once, newest first. */
   notices: Array<{ id: string; kind: 'info' | 'warning' | 'error'; message: string; action?: NoticeAction }>;
   storage: Awaited<ReturnType<typeof storageReport>> | null;
+  /**
+   * Official platform artwork the listener supplied, as object URLs keyed by provider slug. Empty
+   * by default: the built-in marks are ours, and nobody's logo ships in this bundle.
+   */
+  providerArtwork: Readonly<Record<string, string>>;
   sessionId: string;
   deviceId: string;
 }
 
 const DEFAULT_RETUNE: RetuneConfig = { referenceHz: 440, pitchOffsetCents: 0, mode: 'off', updatedAt: new Date(0).toISOString() };
+
+/** Platform artwork shares the artwork store; the prefix keeps it apart from album covers. */
+const ARTWORK_PREFIX = 'platform:';
+const artworkKey = (provider: string): string => `${ARTWORK_PREFIX}${provider}`;
 
 export type Listener = () => void;
 
@@ -143,6 +152,7 @@ export class PlayerStore {
       deviceId: '00000000-0000-7000-8000-000000000000',
       notices: [],
       storage: null,
+      providerArtwork: {},
     };
     playback.subscribe((playbackState) => {
       this.patch({ playback: playbackState });
@@ -218,6 +228,8 @@ export class PlayerStore {
     const copies = await copiesSupported();
     const keepCopies = copies.ok ? await getSetting(this.db, 'library.keepCopies', !supportsDirectoryHandles()) : false;
 
+    const providerArtwork = await this.loadProviderArtwork();
+
     this.patch({
       ready: true,
       library: {
@@ -248,6 +260,7 @@ export class PlayerStore {
       // The queue is empty on a cold start, so the pass is built when one is set.
       shuffleOrder: shuffle ? { ids: [], pos: -1 } : null,
       downloads: { destination, organise },
+      providerArtwork,
       autoplay,
       storage: await storageReport(this.db),
     });
@@ -303,6 +316,85 @@ export class PlayerStore {
       const first = result.notCopied[0]!;
       this.notice('warning', `${result.notCopied.length === 1 ? `A copy of ${first.path}` : `Copies of ${result.notCopied.length} files`} could not be kept (${first.reason}). ${result.notCopied.length === 1 ? 'It plays' : 'They play'} until you reload.`);
     }
+  }
+
+  /**
+   * Import a .zip — a Bandcamp purchase, a Google Takeout of your YouTube Music uploads, a set of
+   * downloadable SoundCloud tracks. Everything audio inside becomes a library track; everything
+   * else is left in the archive. See `lib/zip.ts`.
+   */
+  async importArchives(archives: readonly File[]): Promise<void> {
+    const { looksLikeZip, readZip, zipSupported } = await import('../lib/zip.js');
+    if (!zipSupported()) {
+      this.notice('warning', 'This browser cannot unpack a .zip on its own. Unzip it first, then add the folder or choose the files.');
+      return;
+    }
+    const zips = archives.filter(looksLikeZip);
+    const notZips = archives.filter((file) => !looksLikeZip(file));
+    if (notZips.length) {
+      // Someone picked a mix. Take the audio straight through rather than refusing the lot.
+      await this.addFiles(notZips);
+    }
+    if (!zips.length) return;
+
+    const extracted: File[] = [];
+    const skipped: { name: string; reason: string }[] = [];
+    for (const zip of zips) {
+      this.patch({ library: { ...this.state.library, scanning: { found: 0, indexed: 0, skipped: 0, currentPath: `Unpacking ${zip.name}` } } });
+      try {
+        const result = await readZip(zip, (done, total) => this.patch({ library: { ...this.state.library, scanning: { found: total, indexed: done, skipped: 0, currentPath: `Unpacking ${zip.name}` } } }));
+        extracted.push(...result.files);
+        skipped.push(...result.skipped.filter((entry) => entry.reason !== 'not an audio file'));
+      } catch (error) {
+        this.patch({ library: { ...this.state.library, scanning: null } });
+        this.notice('error', `${zip.name} could not be opened: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    this.patch({ library: { ...this.state.library, scanning: null } });
+    if (!extracted.length) {
+      if (zips.length) this.notice('warning', `No audio was found inside ${zips.length === 1 ? zips[0]!.name : `${zips.length} archives`}.`);
+      return;
+    }
+    await this.addFiles(extracted);
+    if (skipped.length) {
+      const first = skipped[0]!;
+      this.notice('warning', `${skipped.length} track${skipped.length === 1 ? '' : 's'} in the archive could not be read — ${first.name}: ${first.reason}.`);
+    }
+  }
+
+  /**
+   * Put a platform's official artwork in place of the built-in mark, or clear it. The file is kept
+   * in this device's own database and never leaves it; nothing is fetched and nothing is shipped.
+   */
+  async setPlatformArtwork(provider: string, file: File | null): Promise<void> {
+    const db = this.require();
+    const id = artworkKey(provider);
+    const previous = this.state.providerArtwork[provider];
+    if (!file) {
+      await db.delete('artwork', id);
+      if (previous) URL.revokeObjectURL(previous);
+      const { [provider]: _removed, ...rest } = this.state.providerArtwork;
+      this.patch({ providerArtwork: rest });
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      this.notice('warning', `${file.name} is not an image.`);
+      return;
+    }
+    await db.put('artwork', { id, blob: file, mime: file.type });
+    if (previous) URL.revokeObjectURL(previous);
+    this.patch({ providerArtwork: { ...this.state.providerArtwork, [provider]: URL.createObjectURL(file) } });
+  }
+
+  private async loadProviderArtwork(): Promise<Record<string, string>> {
+    const db = this.require();
+    const stored = await db.getAll('artwork');
+    const artwork: Record<string, string> = {};
+    for (const item of stored) {
+      if (!item.id.startsWith(ARTWORK_PREFIX)) continue;
+      artwork[item.id.slice(ARTWORK_PREFIX.length)] = URL.createObjectURL(item.blob);
+    }
+    return artwork;
   }
 
   async rescan(rootId: string): Promise<void> {

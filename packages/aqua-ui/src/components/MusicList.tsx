@@ -22,6 +22,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import type { Playlist, PlaylistItem, Track } from '@now-playing/contracts';
 import { RowMenu, useMarquee, useOverlayScroller } from './music-list-behaviours.js';
 import { offlineOf, sourceOf } from '../lib/track-source.js';
+import { ProviderMark } from '../icons/provider-marks.js';
 
 export type SortKey = 'title' | 'artist' | 'duration' | 'bpm' | 'album';
 
@@ -233,12 +234,12 @@ export function MusicList({ tracks, playingTrackId, onPlay, onToggleStar, playli
                     </td>
                     <td className="lib-icon">
                       {source.href ? (
-                        <a className="lib-pf" data-len={source.initials.length} href={source.href} target="_blank" rel="noopener noreferrer" title={source.name} aria-label={`Open ${track.title} on ${source.name} in a new tab`}>
-                          {source.initials}
+                        <a className="lib-pf" href={source.href} target="_blank" rel="noopener noreferrer" title={source.name} aria-label={`Open ${track.title} on ${source.name} in a new tab`}>
+                          <ProviderMark provider={source.provider} />
                         </a>
                       ) : (
-                        <span className="lib-pf" data-len={source.initials.length} title={source.name} aria-label={source.name}>
-                          {source.initials}
+                        <span className="lib-pf" title={source.name} aria-label={source.name} role="img">
+                          <ProviderMark provider={source.provider} />
                         </span>
                       )}
                     </td>

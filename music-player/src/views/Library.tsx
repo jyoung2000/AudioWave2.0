@@ -65,20 +65,24 @@ export function LibraryView({ onOpenView, onDownload }: { onOpenView: (view: Vie
       <Panel>
         <EmptyState
           title="No music yet"
-          text={
+          text={`${
             supportsDirectoryHandles()
               ? 'Add a folder of music from this device. The player reads the files where they are — nothing is copied, uploaded or moved, and your folders are never sent anywhere.'
               : state.library.keepCopies && !state.library.copiesReason
                 ? 'Choose music from this device. The player keeps a copy of each file inside the app, so your music plays offline and is still here after a reload. Nothing is uploaded anywhere.'
                 : 'Choose music from this device. The files play until you reload; nothing is uploaded anywhere.'
-          }
+          } Music bought or exported from a platform — a Bandcamp purchase, a Google Takeout of your YouTube Music uploads — arrives as a .zip, and the player unpacks it for you.`}
           actions={
             supportsDirectoryHandles()
               ? [
                   { id: 'add', label: 'Add a folder', variant: 'default', onSelect: () => void store.addDirectory() },
                   { id: 'files', label: 'Choose files instead', onSelect: () => pickFiles(store) },
+                  { id: 'zip', label: 'Import a .zip', onSelect: () => pickFiles(store, 'archives') },
                 ]
-              : [{ id: 'files', label: 'Choose files', variant: 'default', onSelect: () => pickFiles(store) }]
+              : [
+                  { id: 'files', label: 'Choose files', variant: 'default', onSelect: () => pickFiles(store) },
+                  { id: 'zip', label: 'Import a .zip', onSelect: () => pickFiles(store, 'archives') },
+                ]
           }
           {...(state.library.directoryHandleReason ? { details: { summary: 'About this browser', text: state.library.directoryHandleReason } } : {})}
         />
@@ -122,6 +126,9 @@ export function LibraryView({ onOpenView, onDownload }: { onOpenView: (view: Vie
         ) : null}
         <Button size="small" icon={supportsDirectoryHandles() ? undefined : 'add'} onClick={() => pickFiles(store)} ellipsis>
           Choose files
+        </Button>
+        <Button size="small" onClick={() => pickFiles(store, 'archives')} ellipsis>
+          Import a .zip
         </Button>
       </div>
 
@@ -172,14 +179,25 @@ export function LibraryView({ onOpenView, onDownload }: { onOpenView: (view: Vie
   );
 }
 
-export function pickFiles(store: ReturnType<typeof usePlayer>["store"]): void {
+/**
+ * The file picker. It takes archives as well as audio, because that is how music arrives from every
+ * platform that will legitimately give you your own: a Bandcamp purchase, a Google Takeout of your
+ * YouTube Music uploads, a set of downloadable SoundCloud tracks. Unzipping first is a chore on a
+ * desktop and close to impossible on a phone, which is exactly where those downloads land.
+ *
+ * @param only Restricts the picker to archives, for the button that says it takes one.
+ */
+export function pickFiles(store: ReturnType<typeof usePlayer>['store'], only?: 'archives'): void {
   const input = document.createElement('input');
   input.type = 'file';
   input.multiple = true;
-  input.accept = 'audio/*';
+  input.accept = only === 'archives' ? '.zip,application/zip' : 'audio/*,.zip,application/zip';
   input.onchange = () => {
     const files = Array.from(input.files ?? []);
-    if (files.length) void store.addFiles(files);
+    if (!files.length) return;
+    // Only pay for the unpacker when there is something to unpack.
+    if (files.some((file) => file.name.toLowerCase().endsWith('.zip'))) void store.importArchives(files);
+    else void store.addFiles(files);
   };
   input.click();
 }

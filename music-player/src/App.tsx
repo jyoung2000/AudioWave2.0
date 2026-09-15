@@ -32,6 +32,7 @@ import {
   ModeSwitch,
   PageBar,
   ProfileButton,
+  ProviderArtworkProvider,
   SectionStrip,
   StatusDot,
   TrackScrubber,
@@ -227,6 +228,9 @@ export function App() {
   const heroArtist = entry?.track.artistName ?? (state.library.tracks.length ? 'Choose something from your library' : 'Add a folder of music below to begin');
 
   return (
+    // Every platform mark in the app reads from here, so supplying a platform's official artwork in
+    // Settings replaces it everywhere at once.
+    <ProviderArtworkProvider artwork={state.providerArtwork}>
     <div className="np-app">
       <PageBar
         label="Now Playing"
@@ -448,6 +452,7 @@ export function App() {
       ) : null}
       <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} kind="track" track={entry?.track ?? null} />
     </div>
+    </ProviderArtworkProvider>
   );
 }
 
