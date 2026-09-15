@@ -128,7 +128,7 @@ export function MusicList({ tracks, playingTrackId, onPlay, onToggleStar, playli
         <div className="library__scroll" ref={scrollRef}>
           <table aria-label={label}>
             <colgroup>
-              <col style={{ width: '34px' }} />
+              <col className="lib-idx" style={{ width: '34px' }} />
               <col style={{ width: '38px' }} />
               <col />
               <col className="lib-col-artist" style={{ width: '22%' }} />
@@ -238,7 +238,11 @@ export function MusicList({ tracks, playingTrackId, onPlay, onToggleStar, playli
                         </span>
                       )}
                     </td>
-                    <td className="lib-title">{playing ? <Marquee>{track.title}</Marquee> : track.title}</td>
+                    <td className="lib-title">
+                      {playing ? <Marquee>{track.title}</Marquee> : track.title}
+                      {/* Phones hide the artist column and show this line instead; see the stylesheet. */}
+                      <span className="lib-title__artist">{track.artistName}</span>
+                    </td>
                     <td className="lib-col-artist">{playing ? <Marquee>{track.artistName}</Marquee> : track.artistName}</td>
                     <td className="lib-num">{fmt(track.durationMs)}</td>
                     <td className="lib-num lib-col-bpm">{track.bpm ? Math.round(track.bpm) : '—'}</td>

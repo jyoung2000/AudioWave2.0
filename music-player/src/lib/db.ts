@@ -11,6 +11,7 @@
  */
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { EqBinding, EqPreset, ListeningEvent, Playlist, PlaylistItem, Track } from '@now-playing/contracts';
+import { copiesReport, storagePersisted } from './copies.js';
 
 export const DB_NAME = 'now-playing';
 export const DB_VERSION = 1;
@@ -21,6 +22,8 @@ export interface StoredRoot {
   displayName: string;
   /** A FileSystemDirectoryHandle when the browser supports it; absent for one-off file pickers. */
   handle: FileSystemDirectoryHandle | null;
+  /** For chosen files: whether copies were kept inside the app, so they outlive the session. */
+  copied?: boolean;
   trackCount: number;
   addedAt: string;
   lastScanAt: string | null;
@@ -35,6 +38,8 @@ export interface StoredFileRef {
   relativePath: string;
   /** Kept only when the browser has no directory handles: the file must be re-picked each session. */
   ephemeral: boolean;
+  /** Set when a copy of the file is kept in the app's private storage, under this object id. */
+  copyId?: string;
   sizeBytes: number;
   lastModified: number;
 }
@@ -122,7 +127,7 @@ export async function clearEverything(db: PlayerDatabase): Promise<void> {
 }
 
 /** Live counts for the storage panel, so "what is this using?" has a real answer. */
-export async function storageReport(db: PlayerDatabase): Promise<{ tracks: number; playlists: number; events: number; artwork: number; estimateBytes: number | null; quotaBytes: number | null }> {
+export async function storageReport(db: PlayerDatabase): Promise<{ tracks: number; playlists: number; events: number; artwork: number; estimateBytes: number | null; quotaBytes: number | null; copies: { count: number; bytes: number } | null; persisted: boolean | null }> {
   const [tracks, playlists, events, artwork] = await Promise.all([db.count('tracks'), db.count('playlists'), db.count('events'), db.count('artwork')]);
   let estimateBytes: number | null = null;
   let quotaBytes: number | null = null;
@@ -135,5 +140,6 @@ export async function storageReport(db: PlayerDatabase): Promise<{ tracks: numbe
       // Firefox in private mode refuses; report unknown rather than guessing.
     }
   }
-  return { tracks, playlists, events, artwork, estimateBytes, quotaBytes };
+  const [copies, persisted] = await Promise.all([copiesReport(), storagePersisted()]);
+  return { tracks, playlists, events, artwork, estimateBytes, quotaBytes, copies, persisted };
 }

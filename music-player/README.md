@@ -31,6 +31,28 @@ Shared listening needs a paired hub that this device can reach, and a WebSocket 
 unavailable from a `file://` page. When it cannot be used the switch says why, on the bar and again
 under Settings, rather than disappearing.
 
+## Playback
+
+Songs follow each other with a plain cut unless you turn on **Crossfade songs** under Settings →
+Playback: a checkbox and a one-to-twelve-second slider, as iTunes had it. The song on its way out
+fades along an equal-power curve while the next fades in, skips fade too, and songs from one album
+follow each other without a fade unless you switch that rule off, so a live recording stays whole.
+The fades run inside the equalizer path; see
+[docs/architecture/AUDIO_PIPELINE.md](../docs/architecture/AUDIO_PIPELINE.md) for the mechanics
+and what happens where a source cannot enter that path.
+
+## Setting it up, which is to say, not
+
+There is no account, no key and no server in the player. Open it, choose music, play. On a computer
+with Chrome or Edge, connect a folder and it is read in place; anywhere else — every phone included —
+choose files and the player keeps its own copies inside the app, so they play offline and are still
+there after a reload. Everything the hub adds is optional and stays optional.
+
+To get it onto a phone it needs an address, and the repository's Pages workflow gives it one:
+enable GitHub Pages with the **GitHub Actions** source and the player is served from
+`https://<owner>.github.io/<repository>/`, ready to add to a home screen.
+[docs/PWA_AND_CAR.md](../docs/PWA_AND_CAR.md) has the phone-by-phone details.
+
 ## Running it
 
 ```sh

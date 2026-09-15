@@ -11,6 +11,7 @@ import { GroupClient, type SharedState } from '../lib/group-client.js';
 import { HubClient, type HubStatus } from '../lib/hub-client.js';
 import { workletDataUrl } from '../lib/build-flags.js';
 import { installHandlers, publishMetadata, publishPlaybackState, publishPosition } from '../lib/media-session.js';
+import { registerServiceWorker } from '../lib/pwa.js';
 import { PlaybackEngine } from '../lib/playback.js';
 import { PlayerStore, type AppState } from './store.js';
 
@@ -61,6 +62,8 @@ export function PlayerProvider({ children, store: injected }: { children: ReactN
       dbRef.current = db;
       await store.init(db);
       if (cancelled) return;
+      // Registered after the store is up so the "new version" notice has somewhere to go.
+      void registerServiceWorker((update) => store.notice('info', 'A new version of Now Playing is ready.', { label: 'Reload', run: update.reload }));
       const client = new HubClient(db);
       setHub(client);
       client.subscribe(setHubStatus);

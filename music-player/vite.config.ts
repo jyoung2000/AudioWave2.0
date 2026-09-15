@@ -15,7 +15,11 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 const workspace = (name: string): string => fileURLToPath(new URL(`../packages/${name}/src/index.ts`, import.meta.url));
 
+/** Where the app is served from: "/" on its own host, "/<repo>/" on a GitHub project page. */
+const base = process.env['NP_BASE_PATH'] ?? '/';
+
 export default defineConfig({
+  base,
   resolve: {
     alias: {
       '@now-playing/contracts': workspace('contracts'),
@@ -38,21 +42,27 @@ export default defineConfig({
         name: 'Now Playing',
         short_name: 'Now Playing',
         description: 'An offline-first music player for the music already on your device.',
-        start_url: '/',
-        scope: '/',
+        id: base,
+        start_url: base,
+        scope: base,
+        lang: 'en',
+        dir: 'ltr',
+        display_override: ['standalone', 'minimal-ui'],
+        launch_handler: { client_mode: 'focus-existing' },
+        prefer_related_applications: false,
         display: 'standalone',
         orientation: 'any',
         background_color: '#dfe4ea',
         theme_color: '#dfe4ea',
         categories: ['music', 'entertainment'],
         icons: [
-          { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-          { src: '/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: 'icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
         shortcuts: [
-          { name: 'Library', url: '/?view=library' },
-          { name: 'Now playing', url: '/?view=now-playing' },
+          { name: 'Library', url: `${base}?view=library` },
+          { name: 'Now playing', url: `${base}?view=now-playing` },
         ],
       },
       workbox: {
@@ -60,7 +70,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         // Audio never enters the service worker cache: files can be hundreds of megabytes and are
         // already on the device or streamed from a hub the user chose.
-        navigateFallback: '/index.html',
+        navigateFallback: `${base}index.html`,
         cleanupOutdatedCaches: true,
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         runtimeCaching: [

@@ -55,3 +55,38 @@ export function glideParam(param: AudioParamLike, target: number, now: number, r
 export function initParam(param: AudioParamLike, value: number, now: number): void {
   param.setValueAtTime(value, now);
 }
+
+/** Straight segments used to draw the equal-power crossfade curves. */
+export const CROSSFADE_SEGMENTS = 8;
+
+/**
+ * Equal-power fade for a crossfade: the outgoing leg follows a quarter cosine and the incoming leg
+ * a quarter sine, so the summed loudness stays level through the overlap instead of dipping in the
+ * middle the way two linear ramps do. Only linear ramps are available on every param we accept, so
+ * each curve is drawn as eight straight segments, which stays within 0.6 % of the ideal.
+ *
+ * The fade starts from the param's current value, so a fade-out that interrupts a fade-in begins
+ * wherever that fade-in had reached rather than jumping to full level first.
+ */
+export function fadeParam(param: AudioParamLike, direction: 'in' | 'out', now: number, durationMs: number, options: { peak?: number; from?: number } = {}): void {
+  // Read the level before cancelling: once the pending ramp is gone the param reports the last
+  // scheduled point instead of where the ramp had actually reached.
+  const current = param.value;
+  param.cancelScheduledValues(now);
+  const peak = options.peak ?? 1;
+  // An incoming source starts from silence unless told otherwise; an outgoing one leaves from wherever it is.
+  const start = options.from ?? (direction === 'in' ? 0 : current);
+  const end = direction === 'in' ? peak : 0;
+  if (durationMs <= 0) {
+    param.setValueAtTime(end, now);
+    return;
+  }
+  param.setValueAtTime(start, now);
+  const seconds = durationMs / 1000;
+  for (let i = 1; i <= CROSSFADE_SEGMENTS; i += 1) {
+    const x = i / CROSSFADE_SEGMENTS;
+    const shape = direction === 'in' ? Math.sin((x * Math.PI) / 2) : Math.cos((x * Math.PI) / 2);
+    const value = direction === 'in' ? start + (end - start) * shape : start * shape;
+    param.linearRampToValueAtTime(i === CROSSFADE_SEGMENTS ? end : value, now + seconds * x);
+  }
+}

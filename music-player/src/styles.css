@@ -392,3 +392,11 @@ body {
     border-color: #2a2e35;
   }
 }
+
+/* The Playback panel: a checkbox, the slider it governs, and the album rule beneath. */
+.player-crossfade {
+  display: grid;
+  gap: 10px;
+  max-width: 440px;
+  margin-bottom: 10px;
+}

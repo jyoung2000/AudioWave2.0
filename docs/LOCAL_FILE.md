@@ -64,6 +64,7 @@ surprises are both good ones.
 | Dynamic `import()` of `data:` and `blob:` URLs | **Works** | Not needed here, but it is why the worklet approach works |
 | **Service worker** | **No** | `Failed to register a ServiceWorker: The URL protocol of the current origin ('null') is not supported.` Nothing to solve: the file is already on your disk |
 | **Installing as an app** | **No** | There is no origin to install. Make a shortcut to the file instead |
+| **Keeping copies of chosen files** | **No** | The origin-private file system belongs to an origin, and `null` has none; chosen files play until you reload, and the picker says so |
 | Fetching a sibling file | **No** | The reason this is one file |
 | **WebSocket** | **No** | Which is why shared listening is not available |
 | `fetch` to a hub | **Only with permissive CORS** | An `http://` request from a `null` origin needs `Access-Control-Allow-Origin: *` on the hub, and then it still cannot send credentials — `credentials: 'include'` fails against a wildcard origin. The hub does not do this by default, and should not |

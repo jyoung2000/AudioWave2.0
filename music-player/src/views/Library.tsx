@@ -17,6 +17,7 @@ import { uuidv7 } from '@now-playing/domain';
 import type { ViewId } from '../App.js';
 import { useAppState, usePlayer } from '../state/context.js';
 import { toTrackRef } from '../state/store.js';
+import { supportsDirectoryHandles } from '../lib/library.js';
 import { MusicList } from '@now-playing/aqua-ui';
 import { NewPlaylistSheet } from '../components/NewPlaylistSheet.js';
 
@@ -64,11 +65,21 @@ export function LibraryView({ onOpenView }: { onOpenView: (view: ViewId) => void
       <Panel>
         <EmptyState
           title="No music yet"
-          text="Add a folder of music from this device. The player reads the files where they are — nothing is copied, uploaded or moved, and your folders are never sent anywhere."
-          actions={[
-            { id: 'add', label: 'Add a folder', variant: 'default', onSelect: () => void store.addDirectory() },
-            { id: 'files', label: 'Choose files instead', onSelect: () => pickFiles(store) },
-          ]}
+          text={
+            supportsDirectoryHandles()
+              ? 'Add a folder of music from this device. The player reads the files where they are — nothing is copied, uploaded or moved, and your folders are never sent anywhere.'
+              : state.library.keepCopies && !state.library.copiesReason
+                ? 'Choose music from this device. The player keeps a copy of each file inside the app, so your music plays offline and is still here after a reload. Nothing is uploaded anywhere.'
+                : 'Choose music from this device. The files play until you reload; nothing is uploaded anywhere.'
+          }
+          actions={
+            supportsDirectoryHandles()
+              ? [
+                  { id: 'add', label: 'Add a folder', variant: 'default', onSelect: () => void store.addDirectory() },
+                  { id: 'files', label: 'Choose files instead', onSelect: () => pickFiles(store) },
+                ]
+              : [{ id: 'files', label: 'Choose files', variant: 'default', onSelect: () => pickFiles(store) }]
+          }
           {...(state.library.directoryHandleReason ? { details: { summary: 'About this browser', text: state.library.directoryHandleReason } } : {})}
         />
         <MoreDestinations onOpenView={onOpenView} />
@@ -104,10 +115,12 @@ export function LibraryView({ onOpenView }: { onOpenView: (view: ViewId) => void
         </Button>
         {/* The old shell kept these in a bottom bar. A page has no bottom bar, and "add more music"
             belongs beside the library it adds to. */}
-        <Button size="small" icon="add" onClick={() => void store.addDirectory()} ellipsis>
-          Add a folder
-        </Button>
-        <Button size="small" onClick={() => pickFiles(store)} ellipsis>
+        {supportsDirectoryHandles() ? (
+          <Button size="small" icon="add" onClick={() => void store.addDirectory()} ellipsis>
+            Add a folder
+          </Button>
+        ) : null}
+        <Button size="small" icon={supportsDirectoryHandles() ? undefined : 'add'} onClick={() => pickFiles(store)} ellipsis>
           Choose files
         </Button>
       </div>
@@ -152,7 +165,7 @@ export function LibraryView({ onOpenView }: { onOpenView: (view: ViewId) => void
   );
 }
 
-function pickFiles(store: ReturnType<typeof usePlayer>['store']): void {
+export function pickFiles(store: ReturnType<typeof usePlayer>["store"]): void {
   const input = document.createElement('input');
   input.type = 'file';
   input.multiple = true;

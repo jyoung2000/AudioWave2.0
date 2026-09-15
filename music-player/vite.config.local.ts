@@ -124,7 +124,7 @@ function inlineEverything(): Plugin {
 }
 
 /** Copied verbatim by Vite, so they have to be folded in by hand. */
-const PUBLIC_ICONS: Record<string, string> = { 'icon.svg': 'image/svg+xml', 'icon-192.png': 'image/png' };
+const PUBLIC_ICONS: Record<string, string> = { 'icon.svg': 'image/svg+xml', 'icon-192.png': 'image/png', 'apple-touch-icon.png': 'image/png' };
 
 function escapeForRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

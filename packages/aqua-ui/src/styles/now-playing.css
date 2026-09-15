@@ -1059,33 +1059,41 @@
  * column and the icon columns survive, and the artist and album ride under
  * the title on a second line.
  */
-@media (max-width: 620px) {
-  .library th:not(.aqua-table__col--keep):not(.lib-icon),
-  .library td:not(.aqua-table__col--keep):not(.lib-icon) {
+
+/* A phone: the number and the artist column go, and the artist rides under the
+   title instead, the way every phone's music app shows a song. The icon columns
+   keep their widths; the title takes whatever is left. */
+@media (max-width: 480px) {
+  .library .lib-idx,
+  .library .lib-col-artist {
     display: none;
   }
 
-  .library td.aqua-table__col--keep {
+  .library col.lib-idx,
+  .library col.lib-col-artist {
+    width: 0 !important;
+  }
+
+  .library td {
     height: auto;
-    padding-block: 4px;
-    white-space: normal;
+    padding-top: 3px;
+    padding-bottom: 3px;
+    vertical-align: middle;
   }
 
-  .library .aqua-table__stack {
+  /* One selector more than the base rule at the end of the sheet, so this one wins here. */
+  .library td .lib-title__artist {
     display: block;
+    overflow: hidden;
+    font-size: 10px;
+    font-weight: 400;
+    line-height: 12px;
+    color: var(--np-meta);
+    text-overflow: ellipsis;
   }
 
-  /* Fixed layout would keep the hidden columns' widths, leaving most of each
-     row with no cell in it — visually blank, and dead to the pointer, because
-     a click there lands on the table rather than on the row. */
-  .library table {
-    table-layout: auto;
-  }
-
-  /* The widths are inline styles written from the column definitions, so only
-     !important takes them back. */
-  .library col {
-    width: auto !important;
+  .library tbody tr[aria-selected='true'] .lib-title__artist {
+    color: #fff;
   }
 }
 
@@ -1742,13 +1750,14 @@
 .lib-star[aria-pressed="true"] { color: var(--lib-star); }
 .library tbody tr[aria-selected="true"] .lib-star[aria-pressed="true"] { color: #ffd166; }
 
-@media (max-width: 620px) { .lib-col-album { display: none; } }
-@media (max-width: 560px) { .lib-col-bpm { display: none; } }
+/* Hidden columns must also surrender their track: a fixed-layout table keeps the width of a col
+   whose cells are gone, and the blank shows up as dead space inside the row. */
+@media (max-width: 620px) { .lib-col-album { display: none; } .library col.lib-col-album { width: 0 !important; } }
+@media (max-width: 560px) { .lib-col-bpm { display: none; } .library col.lib-col-bpm { width: 0 !important; } }
 /* Artist used to drop at 420px, which took it off every phone. It now
    holds down to 360px: below ~368px its 22% share would make it wider
    than the Song column, and above that both columns simply get tight —
    which the marquee now handles rather than hiding the field. */
-@media (max-width: 360px) { .lib-col-artist { display: none; } }
 
 
 /* ==========================================================================
@@ -2580,4 +2589,22 @@ button.srch__art:focus-visible .srch__scrim,
  */
 .np-hero {
   overflow-x: clip;
+}
+
+/* --------------------------------------------------------------------------
+   Phones with a notch or a home indicator. `viewport-fit=cover` lets the page
+   run under them; these insets keep the bar and the body out from under. */
+.np-bar {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.np-app {
+  padding-right: env(safe-area-inset-right, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+}
+
+/* The artist line inside the title cell exists for phones only; see the 480 px rules. */
+.library .lib-title__artist {
+  display: none;
 }

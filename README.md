@@ -87,7 +87,7 @@ from the spec, the reason is written down in [docs/DEVIATIONS.md](docs/DEVIATION
 - [docs/REMOTE_ACCESS.md](docs/REMOTE_ACCESS.md) — the truth table for reaching a hub
 - [docs/PROVIDER_CAPABILITIES.md](docs/PROVIDER_CAPABILITIES.md) — what each provider actually permits
 - [docs/DOWNLOADS_AND_LEGAL.md](docs/DOWNLOADS_AND_LEGAL.md) — when a download is offered and when it is not
-- [docs/PWA_AND_CAR.md](docs/PWA_AND_CAR.md) — installing, offline, lock screens, and Android Auto
+- [docs/PWA_AND_CAR.md](docs/PWA_AND_CAR.md) — installing on Android and iPhone, offline copies, lock screens, Android Auto, and the Pages workflow that gives the player an address with no server
 - [docs/LOCAL_FILE.md](docs/LOCAL_FILE.md) — the single file you open with no server, and what a `file://` page can and cannot do
 - [docs/DISCORD_BOT.md](docs/DISCORD_BOT.md) — the bot, and how slash and prefix commands stay identical
 

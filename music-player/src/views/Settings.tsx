@@ -7,19 +7,22 @@
  * exist.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { AquaTable, Button, ButtonLink, EmptyState, KeyValueList, Panel, PanelSection, StatusDot, TextField, useToast } from '@now-playing/aqua-ui';
+import { AquaTable, Button, ButtonLink, Checkbox, EmptyState, KeyValueList, Panel, PanelSection, Slider, StatusDot, TextField, useToast } from '@now-playing/aqua-ui';
 import { useAppState, usePlayer } from '../state/context.js';
 import { EqualizerView } from './Equalizer.js';
 import { mediaIntegrationReport } from '../lib/media-session.js';
 import { localFileReport } from '../lib/build-flags.js';
+import { MAX_CROSSFADE_SECONDS } from '../lib/playback.js';
 import type { ReleaseMetadata } from '@now-playing/contracts';
 import type { StoredRoot } from '../lib/db.js';
+import { supportsDirectoryHandles } from '../lib/library.js';
+import { pickFiles } from './Library.js';
 
 export function SettingsView() {
   const { store, hub, hubStatus } = usePlayer();
   const state = useAppState();
   const toast = useToast();
-  const media = mediaIntegrationReport();
+  const media = mediaIntegrationReport({ volumeControllable: store.playback.canSetVolume() });
   const localFile = localFileReport();
 
   return (
@@ -53,10 +56,26 @@ export function SettingsView() {
         <PanelSection>
           {state.library.directoryHandleReason ? <p className="player-hint player-hint--warning">{state.library.directoryHandleReason}</p> : null}
           <div className="player-toolbar-row">
-            <Button size="small" icon="add" onClick={() => void store.addDirectory()} ellipsis>
-              Add a folder
+            {supportsDirectoryHandles() ? (
+              <Button size="small" icon="add" onClick={() => void store.addDirectory()} ellipsis>
+                Add a folder
+              </Button>
+            ) : null}
+            <Button size="small" icon={supportsDirectoryHandles() ? undefined : 'add'} onClick={() => pickFiles(store)} ellipsis>
+              Choose files
             </Button>
           </div>
+          <Checkbox
+            checked={state.library.keepCopies && state.library.copiesReason === null}
+            disabled={state.library.copiesReason !== null}
+            onChange={(e) => void store.setKeepCopies(e.currentTarget.checked)}
+          >
+            Keep a copy of chosen files inside the app, so they play offline and after a reload
+          </Checkbox>
+          <p className="player-hint">
+            {state.library.copiesReason ??
+              'Copies live in storage that belongs to this app alone. Nothing is uploaded, and removing the files here removes the copies. Folders you connect are never copied — they are read where they are.'}
+          </p>
           {state.library.roots.length ? (
             <AquaTable
               label="Music folders"
@@ -64,7 +83,7 @@ export function SettingsView() {
               rows={state.library.roots}
               columns={[
                 { id: 'name', header: 'Folder', primary: true, cell: (row) => row.displayName },
-                { id: 'kind', header: 'Kind', cell: (row) => (row.kind === 'directory' ? 'Connected folder' : 'Files chosen once') },
+                { id: 'kind', header: 'Kind', cell: (row) => (row.kind === 'directory' ? 'Connected folder' : row.copied ? 'Files copied into the app' : 'Files chosen once') },
                 { id: 'tracks', header: 'Songs', align: 'right', width: 64, cell: (row) => row.trackCount },
                 { id: 'scanned', header: 'Last scanned', cell: (row) => (row.lastScanError ? row.lastScanError : row.lastScanAt ? new Date(row.lastScanAt).toLocaleString() : 'never') },
                 {
@@ -94,6 +113,36 @@ export function SettingsView() {
           ) : (
             <EmptyState title="No folders yet" text="The player reads files where they already are. Nothing is copied, uploaded or moved." inline />
           )}
+        </PanelSection>
+      </Panel>
+
+      <Panel title="Playback">
+        <PanelSection>
+          <div className="player-crossfade">
+            <Checkbox checked={state.crossfade.enabled} onChange={(e) => void store.setCrossfade({ enabled: e.currentTarget.checked })}>
+              Crossfade songs
+            </Checkbox>
+            <Slider
+              label="Crossfade length"
+              min={1}
+              max={MAX_CROSSFADE_SECONDS}
+              step={1}
+              value={state.crossfade.seconds}
+              disabled={!state.crossfade.enabled}
+              format={(v) => `${v} second${v === 1 ? '' : 's'}`}
+              onChange={(v) => void store.setCrossfade({ seconds: v })}
+            />
+            <Checkbox checked={state.crossfade.sameAlbumGapless} onChange={(e) => void store.setCrossfade({ sameAlbumGapless: e.currentTarget.checked })}>
+              Keep songs from the same album gapless
+            </Checkbox>
+          </div>
+          <p className="player-hint">
+            Each song fades out over its last {state.crossfade.seconds} second{state.crossfade.seconds === 1 ? '' : 's'} while the next fades in, the way iTunes did it; skipping fades too. With
+            the second box checked, songs from one album follow each other without a fade, so a live recording or a concept album stays in one piece.
+            {store.playback.canSetVolume()
+              ? ''
+              : ' On this device the fade runs inside the equalizer path; a stream the equalizer cannot process is cut rather than faded.'}
+          </p>
         </PanelSection>
       </Panel>
 
@@ -142,6 +191,14 @@ export function SettingsView() {
               { key: 'Listening events', value: state.storage?.events ?? 0 },
               { key: 'Artwork cached', value: state.storage?.artwork ?? 0 },
               {
+                key: 'Copies kept in the app',
+                value: state.storage?.copies ? `${state.storage.copies.count} (${formatBytes(state.storage.copies.bytes)})` : 'Not available here',
+              },
+              {
+                key: 'Protected from automatic cleanup',
+                value: state.storage?.persisted === true ? 'Yes' : state.storage?.persisted === false ? 'No — the browser may clear this data if it runs short of space' : 'This browser will not say',
+              },
+              {
                 key: 'Space used',
                 value:
                   state.storage?.estimateBytes === null || state.storage?.estimateBytes === undefined
@@ -151,7 +208,7 @@ export function SettingsView() {
             ]}
           />
           <p className="player-hint">
-            Your audio files are not counted here: the player never copies them. What it stores is the index — titles, artists, durations, artwork thumbnails, your playlists and your listening history.
+            Files read from a connected folder are not counted here: the player never copies those. Copies of chosen files are, and so is the index — titles, artists, durations, artwork thumbnails, your playlists and your listening history.
           </p>
         </PanelSection>
       </Panel>

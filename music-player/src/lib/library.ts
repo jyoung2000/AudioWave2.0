@@ -17,6 +17,7 @@ import type { parseBlob as ParseBlob } from 'music-metadata';
 import type { AudioFormat, Track, TrackIdentity } from '@now-playing/contracts';
 import { uuidv7 } from '@now-playing/domain';
 import type { PlayerDatabase, StoredFileRef, StoredRoot } from './db.js';
+import { keepCopy, readCopy } from './copies.js';
 
 /** Extensions worth trying. The browser decides what it can actually decode; see `probeSupport`. */
 /**
@@ -88,6 +89,8 @@ export interface ScanProgress {
 }
 
 export interface ScanResult {
+  /** Files that were indexed but whose copy could not be kept, with the reason. */
+  notCopied: Array<{ path: string; reason: string }>;
   rootId: string;
   added: number;
   updated: number;
@@ -96,6 +99,8 @@ export interface ScanResult {
 }
 
 export interface ScanOptions {
+  /** Keep a copy of each chosen file in the app's private storage, so it plays after a reload. */
+  keepCopies?: boolean;
   signal?: AbortSignal;
   onProgress?: (progress: ScanProgress) => void;
   /** Overrides the format probe (tests). */
@@ -229,7 +234,7 @@ export async function trackFromFile(file: File, relativePath: string, rootId: st
 export async function scanRoot(db: PlayerDatabase, root: StoredRoot, options: ScanOptions = {}): Promise<ScanResult> {
   if (!root.handle) throw new Error('This folder was added without a persistent handle; pick it again to rescan.');
   const support = options.support ?? probeSupport();
-  const result: ScanResult = { rootId: root.id, added: 0, updated: 0, removed: 0, unreadable: [] };
+  const result: ScanResult = { rootId: root.id, added: 0, updated: 0, removed: 0, unreadable: [], notCopied: [] };
   const progress: ScanProgress = { found: 0, indexed: 0, skipped: 0, currentPath: null };
 
   const existingFiles = await db.getAllFromIndex('files', 'by-root', root.id);
@@ -318,7 +323,7 @@ export function forgetPickedFiles(trackIds?: Iterable<string>): void {
 /** Index files chosen through a plain `<input type="file">`, which cannot be reopened later. */
 export async function indexPickedFiles(db: PlayerDatabase, rootId: string, files: readonly File[], options: ScanOptions = {}): Promise<ScanResult> {
   const support = options.support ?? probeSupport();
-  const result: ScanResult = { rootId, added: 0, updated: 0, removed: 0, unreadable: [] };
+  const result: ScanResult = { rootId, added: 0, updated: 0, removed: 0, unreadable: [], notCopied: [] };
   const progress: ScanProgress = { found: files.length, indexed: 0, skipped: 0, currentPath: null };
   for (const file of files) {
     if (options.signal?.aborted) break;
@@ -327,6 +332,18 @@ export async function indexPickedFiles(db: PlayerDatabase, rootId: string, files
     try {
       const relativePath = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
       const { track, artwork } = await trackFromFile(file, relativePath, rootId, support);
+      // A kept copy outlives the session; a file merely picked does not, and its record says so.
+      let copyId: string | null = null;
+      if (options.keepCopies) {
+        copyId = uuidv7();
+        try {
+          await keepCopy(copyId, file);
+        } catch (err) {
+          copyId = null;
+          result.notCopied.push({ path: file.name, reason: err instanceof Error ? err.message : String(err) });
+        }
+      }
+      if (copyId) track.locators.push({ kind: 'opfs', deviceId: rootId, objectId: copyId });
       const tx = db.transaction(['tracks', 'files', 'artwork'], 'readwrite');
       if (artwork) {
         const artworkId = `art_${track.id}`;
@@ -334,7 +351,7 @@ export async function indexPickedFiles(db: PlayerDatabase, rootId: string, files
         await tx.objectStore('artwork').put({ id: artworkId, blob: artwork.blob, mime: artwork.mime });
       }
       await tx.objectStore('tracks').put(track);
-      await tx.objectStore('files').put({ trackId: track.id, rootId, relativePath, ephemeral: true, sizeBytes: file.size, lastModified: file.lastModified });
+      await tx.objectStore('files').put({ trackId: track.id, rootId, relativePath, ephemeral: copyId === null, ...(copyId ? { copyId } : {}), sizeBytes: file.size, lastModified: file.lastModified });
       await tx.done;
       pickedFiles.set(track.id, file);
       result.added += 1;
@@ -356,6 +373,11 @@ export function supportsDirectoryHandles(): boolean {
 export async function resolveFile(db: PlayerDatabase, trackId: string): Promise<{ file: File } | { file: null; reason: string }> {
   const ref = await db.get('files', trackId);
   if (!ref) return { file: null, reason: 'This track is not linked to a file on this device.' };
+  if (ref.copyId) {
+    const kept = pickedFiles.get(trackId) ?? (await readCopy(ref.copyId, ref.relativePath.split('/').pop()));
+    if (kept) return { file: kept };
+    return { file: null, reason: 'The copy of this file kept inside the app is gone — the browser has cleared its storage. Add the file again to keep playing it.' };
+  }
   if (ref.ephemeral) {
     const kept = pickedFiles.get(trackId);
     if (kept) return { file: kept };

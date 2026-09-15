@@ -341,3 +341,94 @@ describe('retune semantics', () => {
     expect(element.preservesPitch).toBe(true);
   });
 });
+
+describe('crossfade', () => {
+  /** The gain node a media-element source feeds first: its fader. */
+  function faderOf(context: MockAudioContext, source: MockAudioNode): MockAudioNode & { gain: { valueAt(t: number): number } } {
+    const fader = [...source.outputs][0];
+    if (!fader || fader.kind !== 'gain') throw new Error('expected the source to feed a fader');
+    void context;
+    return fader as MockAudioNode & { gain: { valueAt(t: number): number } };
+  }
+
+  it('fades the outgoing element out and the incoming one in along equal-power curves, both audible meanwhile', () => {
+    const { context, engine } = engineWith();
+    const a = new MockMediaElement({ src: 'blob:https://player.test/a' });
+    const b = new MockMediaElement({ src: 'blob:https://player.test/b' });
+    expect(engine.attachMediaElement(a).ok).toBe(true);
+    const t0 = context.currentTime;
+    expect(engine.attachMediaElement(b, { crossfadeMs: 1000 }).ok).toBe(true);
+
+    const [sourceA, sourceB] = nodesOfKind(context, 'media-element-source');
+    const faderA = faderOf(context, sourceA!);
+    const faderB = faderOf(context, sourceB!);
+    expect(context.reaches(sourceA!, context.destination), 'the outgoing track keeps playing through the chain').toBe(true);
+    expect(context.reaches(sourceB!, context.destination)).toBe(true);
+
+    expect(faderA.gain.valueAt(t0)).toBeCloseTo(1, 5);
+    expect(faderA.gain.valueAt(t0 + 0.5)).toBeCloseTo(Math.cos(Math.PI / 4), 3);
+    expect(faderA.gain.valueAt(t0 + 1)).toBeCloseTo(0, 5);
+    expect(faderB.gain.valueAt(t0)).toBeCloseTo(0, 5);
+    expect(faderB.gain.valueAt(t0 + 0.5)).toBeCloseTo(Math.sin(Math.PI / 4), 3);
+    expect(faderB.gain.valueAt(t0 + 1)).toBeCloseTo(1, 5);
+    // Equal power: the two contributions sum to unity power at every knot of the curve.
+    for (let i = 0; i <= 8; i += 1) {
+      const t = t0 + i / 8;
+      expect(faderA.gain.valueAt(t) ** 2 + faderB.gain.valueAt(t) ** 2).toBeCloseTo(1, 2);
+    }
+    expect(engine.getState().dspAvailable).toBe(true);
+  });
+
+  it('drops the faded element from the chain once its fade is over, and a plain attach cuts at once', () => {
+    const { context, engine } = engineWith();
+    const a = new MockMediaElement({ src: 'blob:https://player.test/a' });
+    const b = new MockMediaElement({ src: 'blob:https://player.test/b' });
+    const c = new MockMediaElement({ src: 'blob:https://player.test/c' });
+    engine.attachMediaElement(a);
+    engine.attachMediaElement(b, { crossfadeMs: 1000 });
+    const [sourceA, sourceB] = nodesOfKind(context, 'media-element-source');
+    expect(context.reaches(sourceA!, context.destination)).toBe(true);
+
+    context.advance(1.1);
+    engine.attachMediaElement(c);
+    const sourceC = nodesOfKind(context, 'media-element-source')[2]!;
+    expect(context.reaches(sourceA!, context.destination), 'the finished fade is swept out').toBe(false);
+    expect(context.reaches(sourceB!, context.destination), 'no crossfade was asked for, so B is cut').toBe(false);
+    expect(context.reaches(sourceC!, context.destination)).toBe(true);
+    expect(nodesOfKind(context, 'media-element-source'), 'one source node per element, ever').toHaveLength(3);
+  });
+
+  it('brings a deck back in from silence when it is reused while still fading out', () => {
+    const { context, engine } = engineWith();
+    const a = new MockMediaElement({ src: 'blob:https://player.test/a' });
+    const b = new MockMediaElement({ src: 'blob:https://player.test/b' });
+    engine.attachMediaElement(a);
+    engine.attachMediaElement(b, { crossfadeMs: 1000 });
+    context.advance(0.3);
+    const t1 = context.currentTime;
+    a.src = 'blob:https://player.test/a2';
+    expect(engine.attachMediaElement(a, { crossfadeMs: 1000 }).ok).toBe(true);
+
+    const [sourceA, sourceB] = nodesOfKind(context, 'media-element-source');
+    const faderA = faderOf(context, sourceA!);
+    const faderB = faderOf(context, sourceB!);
+    expect(faderA.gain.valueAt(t1)).toBeCloseTo(0, 5);
+    expect(faderA.gain.valueAt(t1 + 1)).toBeCloseTo(1, 5);
+    // B leaves from where its fade-in had reached, not from full level.
+    expect(faderB.gain.valueAt(t1)).toBeCloseTo(Math.sin((0.3 * Math.PI) / 2), 2);
+    expect(faderB.gain.valueAt(t1 + 1)).toBeCloseTo(0, 5);
+    expect(context.reaches(sourceA!, context.destination)).toBe(true);
+    expect(context.reaches(sourceB!, context.destination)).toBe(true);
+  });
+
+  it('does nothing special when the same element is attached again with a crossfade', () => {
+    const { context, engine } = engineWith();
+    const a = new MockMediaElement({ src: 'blob:https://player.test/a' });
+    engine.attachMediaElement(a);
+    a.src = 'blob:https://player.test/a2';
+    expect(engine.attachMediaElement(a, { crossfadeMs: 1000 }).ok).toBe(true);
+    const source = nodesOfKind(context, 'media-element-source')[0]!;
+    expect(faderOf(context, source).gain.valueAt(context.currentTime + 0.5)).toBeCloseTo(1, 5);
+    expect(context.reaches(source, context.destination)).toBe(true);
+  });
+});

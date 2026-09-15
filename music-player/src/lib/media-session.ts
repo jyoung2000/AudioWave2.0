@@ -18,6 +18,7 @@
  * and nothing breaks.
  */
 import type { TrackRef } from '@now-playing/contracts';
+import { audioSessionSupported } from './playback.js';
 
 export interface MediaSessionHandlers {
   play(): void | Promise<void>;
@@ -38,7 +39,7 @@ export function mediaSessionSupported(): boolean {
  * Describe what the car, lock screen and headset can do here, honestly. Used by the settings screen
  * so someone can see why their steering-wheel button does or does not work before getting in a car.
  */
-export function mediaIntegrationReport(): { supported: boolean; features: Array<{ name: string; available: boolean; note: string }> } {
+export function mediaIntegrationReport(options: { volumeControllable?: boolean } = {}): { supported: boolean; features: Array<{ name: string; available: boolean; note: string }> } {
   const supported = mediaSessionSupported();
   const hasHandler = (action: string): boolean => {
     if (!supported) return false;
@@ -57,8 +58,28 @@ export function mediaIntegrationReport(): { supported: boolean; features: Array<
       { name: 'Play, pause, next and previous from car and headset buttons', available: hasHandler('play'), note: hasHandler('play') ? 'Handled by the player.' : 'Not available in this browser.' },
       { name: 'Scrubbing from the car display', available: hasHandler('seekto'), note: hasHandler('seekto') ? 'The car can seek within the current track.' : 'This browser does not support seeking from the media controls.' },
       { name: 'An app tile on the Android Auto or CarPlay home screen', available: false, note: 'Not possible for any web app. Those launchers list only native apps built with the car app libraries. Start playback on your phone and the car will control it, the same as any other Bluetooth audio source.' },
+      {
+        name: 'Keeps playing when the screen locks',
+        available: audioSessionSupported() || !isApplePhone(),
+        note: audioSessionSupported()
+          ? 'The audio session is declared as playback, so the equalizer path keeps running when the screen locks and the silent switch is ignored.'
+          : isApplePhone()
+            ? 'This version of iOS has no audio session API, so processed audio can stop when the screen locks. iOS 17 or later fixes this; until then, resume from the lock screen.'
+            : 'Playback continues in the background, and the lock screen shows the track.',
+      },
+      {
+        name: "Volume from the app's own slider",
+        available: options.volumeControllable ?? true,
+        note: (options.volumeControllable ?? true) ? 'The slider sets the playback volume.' : 'This platform fixes the media volume; use the hardware buttons. Crossfades still run inside the equalizer path.',
+      },
     ],
   };
+}
+
+/** iPhones and iPads, including the ones that call themselves a Mac. */
+export function isApplePhone(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
 /**

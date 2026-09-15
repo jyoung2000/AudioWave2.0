@@ -163,7 +163,7 @@ test('Settings opens from the avatar and carries the equalizer and the companion
   await openSettings(page);
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
 
-  await expect(page.getByRole('checkbox', { name: 'On' })).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: 'On', exact: true })).toBeVisible();
   await expect(page.getByRole('group', { name: 'Equalizer bands' }).getByRole('slider')).toHaveCount(11);
 
   const companion = page.locator('.aqua-panel').filter({ hasText: 'Windows companion' }).first();
@@ -173,10 +173,60 @@ test('Settings opens from the avatar and carries the equalizer and the companion
   await expect(companion.getByRole('link', { name: /Download for/i })).toHaveCount(0);
 });
 
+test('keeps copies of chosen files inside the app, so they are still playable after a reload', async ({ page }) => {
+  /*
+   * On a phone there is no folder to connect, only files to choose, and a chosen file is gone when
+   * the page reloads. Keeping a copy in the app's private storage is what makes those files a
+   * library. Desktop Chromium has both, so the option is off by default here and switched on for
+   * the test; the storage itself is the same one a phone uses.
+   */
+  await openSettings(page);
+  await page.getByText(/^Keep a copy of chosen files inside the app/).click();
+  await expect(page.getByRole('checkbox', { name: /Keep a copy of chosen files/ })).toBeChecked();
+  await page.getByRole('option', { name: /^Music Library/ }).click();
+  await loadFixtures(page);
+
+  // Not the picker's session-only file any more: the key reports the copy as being on this device.
+  const offline = page.getByRole('button', { name: /Quiet Arithmetic is already on this device/ }).first();
+  await expect(offline).toHaveAttribute('aria-pressed', 'true');
+
+  await page.reload();
+  await expect(page.getByRole('row').filter({ hasText: 'Quiet Arithmetic' }).first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('button', { name: /Quiet Arithmetic is already on this device/ }).first()).toHaveAttribute('aria-pressed', 'true');
+  await openSettings(page);
+  await expect(page.getByRole('cell', { name: 'Files copied into the app' }).first()).toBeVisible();
+  await expect(page.getByText(/^Copies kept in the app$/)).toBeVisible();
+});
+
+test('crossfade is a checkbox and a one-to-twelve-second slider, remembered across reloads', async ({ page }) => {
+  await openSettings(page);
+  const crossfade = page.getByRole('checkbox', { name: 'Crossfade songs' });
+  const length = page.getByRole('slider', { name: 'Crossfade length' });
+  await expect(crossfade).not.toBeChecked();
+  await expect(length).toBeDisabled();
+
+  // The Aqua checkbox draws its box on the label, so the label is what a person clicks.
+  await page.getByText('Crossfade songs', { exact: true }).click();
+  await expect(crossfade).toBeChecked();
+  await expect(length).toBeEnabled();
+  await expect(length).toHaveAttribute('aria-valuemin', '1');
+  await expect(length).toHaveAttribute('aria-valuemax', '12');
+  await expect(length).toHaveAttribute('aria-valuetext', '5 seconds');
+  await length.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(length).toHaveAttribute('aria-valuetext', '6 seconds');
+  await expect(page.getByRole('checkbox', { name: /same album gapless/ })).toBeChecked();
+
+  await page.reload();
+  await openSettings(page);
+  await expect(page.getByRole('checkbox', { name: 'Crossfade songs' })).toBeChecked();
+  await expect(page.getByRole('slider', { name: 'Crossfade length' })).toHaveAttribute('aria-valuetext', '6 seconds');
+});
+
 test('the equalizer explains level-matched bypass and the headroom it applies', async ({ page }) => {
   await openSettings(page);
   // The window's own switch, from the screenshot this equalizer is drawn from.
-  await expect(page.getByRole('checkbox', { name: 'On' })).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: 'On', exact: true })).toBeVisible();
   await expect(page.getByText(/is a level-matched bypass/i)).toBeVisible();
   await expect(page.getByText(/A louder signal always sounds better/i)).toBeVisible();
   await expect(page.getByText('Headroom needed')).toBeVisible();
@@ -254,11 +304,26 @@ test('the app is installable: manifest, icons and a service worker', async ({ pa
   for (const icon of manifest.icons) {
     expect((await page.request.get(icon.src)).status(), `${icon.src} should exist`).toBe(200);
   }
+  // The app registers its own worker; a worker that merely exists on the server is not enough.
   const registered = await page.evaluate(async () => {
-    const registration = await navigator.serviceWorker.getRegistration();
-    return Boolean(registration) || (await fetch('/sw.js')).ok;
+    const ready = navigator.serviceWorker.ready.then(() => true);
+    const timeout = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 15_000));
+    return Promise.race([ready, timeout]);
   });
-  expect(registered).toBe(true);
+  expect(registered, 'the app must register its service worker').toBe(true);
+});
+
+test('starts with the network off, once it has been opened online', async ({ page, context }) => {
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  // `ready` resolves once the worker is active, and the app shell is precached during its install.
+  await context.setOffline(true);
+  try {
+    await page.reload();
+    await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Settings —/ })).toBeVisible();
+  } finally {
+    await context.setOffline(false);
+  }
 });
 
 test('loads nothing from outside its own origin', async ({ page }) => {
@@ -371,7 +436,7 @@ test.describe('the search popover', () => {
 
 test('the equalizer is the iTunes window: On, a preset menu, a preamp and ten bands', async ({ page }) => {
   await openSettings(page);
-  await expect(page.getByRole('checkbox', { name: 'On' })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: 'On', exact: true })).toBeChecked();
   const bands = page.getByRole('group', { name: 'Equalizer bands' });
   await expect(bands.getByRole('slider', { name: 'Preamp' })).toBeVisible();
   for (const hz of [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16_000]) {

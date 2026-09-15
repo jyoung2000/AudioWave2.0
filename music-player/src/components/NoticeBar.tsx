@@ -16,6 +16,11 @@ export function NoticeBar() {
         <li key={notice.id} data-kind={notice.kind} role={notice.kind === 'error' ? 'alert' : 'status'}>
           <Glyph name={notice.kind === 'error' ? 'error' : notice.kind === 'warning' ? 'warning' : 'info'} />
           <span>{notice.message}</span>
+          {notice.action ? (
+            <Button size="mini" variant="default" onClick={notice.action.run}>
+              {notice.action.label}
+            </Button>
+          ) : null}
           <Button size="mini" onClick={() => store.dismissNotice(notice.id)}>
             Dismiss
           </Button>

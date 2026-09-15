@@ -257,3 +257,9 @@ be wanted.
 | A mobile companion | The PWA covers phones. A native app would exist mainly for the Android Auto tile, which is a large amount of work for one feature. |
 | Multi-user accounts on the hub | One administrator, and paired devices with scopes. Adding real multi-tenancy would change the authorization model everywhere and was not asked for. |
 | Server-side transcoding on the fly | FFmpeg converts a file the owner already has. Transcoding a provider's stream in flight is a different thing legally and was not built. |
+
+## Corrections
+
+| Claim | What was true | What changed |
+| --- | --- | --- |
+| "Updates use `registerType: 'prompt'`: when a new version is available you are told" (PWA_AND_CAR.md) | The service worker was generated at build time and never registered by the app, so nothing was precached, the app did not start offline, and no update prompt could appear. The e2e test accepted the worker merely being served. | The app registers the worker after the store is up and shows a notice with a Reload button when a new version is waiting; the test requires a real registration and reloads with the network off. |

@@ -17,9 +17,17 @@ import { ALL_BUILTIN_PRESETS, computeListeningMetrics, FLAT_PRESET, isMeaningful
 import type { EqBinding, EqPreset, ListeningEvent, ListeningEventType, Playlist, PlaylistItem, ResolvedEq, RetuneConfig, Track, TrackRef } from '@now-playing/contracts';
 import { clearEverything, getSetting, openPlayerDb, putSetting, storageReport, type PlayerDatabase, type StoredRoot } from '../lib/db.js';
 import { forgetPickedFiles, indexPickedFiles, resolveFile, scanRoot, supportsDirectoryHandles, type ScanProgress, type ScanResult } from '../lib/library.js';
-import type { PlaybackEngine, PlaybackState } from '../lib/playback.js';
+import type { PlaybackEngine, PlaybackEvent, PlaybackState } from '../lib/playback.js';
+import { DEFAULT_CROSSFADE, crossfadeMsBetween, normalizeCrossfade, type CrossfadeSettings } from '../lib/crossfade.js';
+import { copiesSupported, removeCopy, requestPersistentStorage } from '../lib/copies.js';
 
 export type RepeatMode = 'off' | 'one' | 'all';
+
+/** A single thing the listener can do about a notice, such as reloading into a new version. */
+export interface NoticeAction {
+  label: string;
+  run: () => void;
+}
 
 export interface QueueEntry {
   id: string;
@@ -44,6 +52,10 @@ export interface LibraryState {
   lastScan: ScanResult | null;
   /** Set when the browser cannot keep folders connected, so the UI can say so once. */
   directoryHandleReason: string | null;
+  /** Keep a copy of each chosen file inside the app. On by default where folders cannot be kept. */
+  keepCopies: boolean;
+  /** Why copies cannot be kept here, or null when they can. */
+  copiesReason: string | null;
 }
 
 export interface AppState {
@@ -58,12 +70,13 @@ export interface AppState {
   queueIndex: number;
   shuffle: boolean;
   repeat: RepeatMode;
+  crossfade: CrossfadeSettings;
   playback: PlaybackState;
   resolvedEq: ResolvedEq;
   retune: RetuneConfig;
   retuneNote: string | null;
   /** Errors worth showing once, newest first. */
-  notices: Array<{ id: string; kind: 'info' | 'warning' | 'error'; message: string }>;
+  notices: Array<{ id: string; kind: 'info' | 'warning' | 'error'; message: string; action?: NoticeAction }>;
   storage: Awaited<ReturnType<typeof storageReport>> | null;
   sessionId: string;
   deviceId: string;
@@ -83,7 +96,7 @@ export class PlayerStore {
   constructor(readonly playback: PlaybackEngine) {
     this.state = {
       ready: false,
-      library: { tracks: [], roots: [], ephemeralTrackIds: new Set(), scanning: null, lastScan: null, directoryHandleReason: null },
+      library: { tracks: [], roots: [], ephemeralTrackIds: new Set(), scanning: null, lastScan: null, directoryHandleReason: null, keepCopies: false, copiesReason: null },
       playlists: [],
       playlistItems: [],
       presets: [...ALL_BUILTIN_PRESETS],
@@ -93,6 +106,7 @@ export class PlayerStore {
       queueIndex: -1,
       shuffle: false,
       repeat: 'off',
+      crossfade: { ...DEFAULT_CROSSFADE },
       playback: playback.getState(),
       resolvedEq: { presetId: FLAT_PRESET.id, presetName: 'Flat', source: 'flat', explanation: 'Flat — no preset selected' },
       retune: DEFAULT_RETUNE,
@@ -106,6 +120,7 @@ export class PlayerStore {
       this.patch({ playback: playbackState });
       this.trackProgress(playbackState);
     });
+    playback.onEvent((event) => this.onPlaybackEvent(event));
   }
 
   /* ------------------------------------------------------------ subscription */
@@ -122,8 +137,8 @@ export class PlayerStore {
     for (const listener of this.listeners) listener();
   }
 
-  notice(kind: 'info' | 'warning' | 'error', message: string): void {
-    this.patch({ notices: [{ id: uuidv7(), kind, message }, ...this.state.notices].slice(0, 20) });
+  notice(kind: 'info' | 'warning' | 'error', message: string, action?: NoticeAction): void {
+    this.patch({ notices: [{ id: uuidv7(), kind, message, ...(action ? { action } : {}) }, ...this.state.notices].slice(0, 20) });
   }
 
   dismissNotice(id: string): void {
@@ -152,6 +167,11 @@ export class PlayerStore {
     const retune = await getSetting<RetuneConfig>(this.db, 'retune', DEFAULT_RETUNE);
     const shuffle = await getSetting(this.db, 'shuffle', false);
     const repeat = await getSetting<RepeatMode>(this.db, 'repeat', 'off');
+    const crossfade = normalizeCrossfade(await getSetting<unknown>(this.db, 'playback.crossfade', DEFAULT_CROSSFADE));
+    // Copies are the phone's answer to folders: where a folder cannot be kept connected, keeping
+    // the files themselves is what makes the library survive a reload, so that is the default there.
+    const copies = await copiesSupported();
+    const keepCopies = copies.ok ? await getSetting(this.db, 'library.keepCopies', !supportsDirectoryHandles()) : false;
 
     this.patch({
       ready: true,
@@ -161,7 +181,13 @@ export class PlayerStore {
         ephemeralTrackIds: ephemeralIds(files),
         scanning: null,
         lastScan: null,
-        directoryHandleReason: supportsDirectoryHandles() ? null : 'This browser cannot keep a folder connected between visits, so files added here are available only until you reload. Chrome, Edge and Opera can keep folders connected.',
+        directoryHandleReason: supportsDirectoryHandles()
+          ? null
+          : copies.ok
+            ? 'This browser cannot keep a folder connected between visits, so choose files instead: the player keeps a copy of each inside the app, and they play offline and after a reload.'
+            : 'This browser cannot keep a folder connected between visits, so files added here are available only until you reload. Chrome, Edge and Opera can keep folders connected.',
+        keepCopies,
+        copiesReason: copies.ok ? null : copies.reason,
       },
       playlists: playlists.filter((p) => !p.deletedAt),
       playlistItems: playlistItems.filter((i) => !i.deletedAt),
@@ -173,9 +199,11 @@ export class PlayerStore {
       retune,
       shuffle,
       repeat,
+      crossfade,
       storage: await storageReport(this.db),
     });
     this.recomputeEq();
+    this.playback.setCrossfade(crossfade.enabled ? crossfade.seconds : 0);
   }
 
   private require(): PlayerDatabase {
@@ -206,14 +234,26 @@ export class PlayerStore {
     await this.rescan(root.id);
   }
 
+  async setKeepCopies(keepCopies: boolean): Promise<void> {
+    this.patch({ library: { ...this.state.library, keepCopies } });
+    await putSetting(this.require(), 'library.keepCopies', keepCopies);
+  }
+
   async addFiles(files: readonly File[]): Promise<void> {
     const db = this.require();
-    const root: StoredRoot = { id: uuidv7(), kind: 'files', displayName: `${files.length} file${files.length === 1 ? '' : 's'}`, handle: null, trackCount: files.length, addedAt: new Date().toISOString(), lastScanAt: new Date().toISOString(), lastScanError: null };
+    const keepCopies = this.state.library.keepCopies && this.state.library.copiesReason === null;
+    // The first music someone keeps is the moment to ask the browser to keep it too.
+    if (keepCopies) void requestPersistentStorage();
+    const root: StoredRoot = { id: uuidv7(), kind: 'files', displayName: `${files.length} file${files.length === 1 ? '' : 's'}`, handle: null, copied: keepCopies, trackCount: files.length, addedAt: new Date().toISOString(), lastScanAt: new Date().toISOString(), lastScanError: null };
     await db.put('roots', root);
-    const result = await indexPickedFiles(db, root.id, files, { onProgress: (progress) => this.patch({ library: { ...this.state.library, scanning: progress } }) });
+    const result = await indexPickedFiles(db, root.id, files, { keepCopies, onProgress: (progress) => this.patch({ library: { ...this.state.library, scanning: progress } }) });
     await this.reloadLibrary();
     this.patch({ library: { ...this.state.library, scanning: null, lastScan: result } });
     if (result.unreadable.length) this.notice('warning', `${result.unreadable.length} file${result.unreadable.length === 1 ? '' : 's'} could not be read.`);
+    if (result.notCopied.length) {
+      const first = result.notCopied[0]!;
+      this.notice('warning', `${result.notCopied.length === 1 ? `A copy of ${first.path}` : `Copies of ${result.notCopied.length} files`} could not be kept (${first.reason}). ${result.notCopied.length === 1 ? 'It plays' : 'They play'} until you reload.`);
+    }
   }
 
   async rescan(rootId: string): Promise<void> {
@@ -248,6 +288,8 @@ export class PlayerStore {
     }
     await tx.objectStore('roots').delete(rootId);
     await tx.done;
+    // The copies were the player's own; removing the root is the request to let them go.
+    await Promise.all(refs.filter((ref) => ref.copyId).map((ref) => removeCopy(ref.copyId!)));
     // Any picked files this root held are unreachable now; nothing should keep them alive.
     forgetPickedFiles(refs.map((ref) => ref.trackId));
     await this.reloadLibrary();
@@ -299,8 +341,9 @@ export class PlayerStore {
   /* ------------------------------------------------------------------- queue */
 
   setQueue(entries: QueueEntry[], startIndex = 0): void {
+    const from = this.current()?.track ?? null;
     this.patch({ queue: entries, queueIndex: entries.length ? Math.min(Math.max(0, startIndex), entries.length - 1) : -1 });
-    void this.loadCurrent(true);
+    void this.loadCurrent(true, from);
   }
 
   enqueue(entries: QueueEntry[], position: 'end' | 'next' = 'end'): void {
@@ -342,17 +385,22 @@ export class PlayerStore {
     return this.state.queue[this.state.queueIndex] ?? null;
   }
 
-  async loadCurrent(autoplay: boolean): Promise<void> {
+  /**
+   * Load the entry at the queue index. `from` is the track that was playing before the index
+   * moved, which is what decides whether the handover is a crossfade or a cut.
+   */
+  async loadCurrent(autoplay: boolean, from: TrackRef | null = null): Promise<void> {
     const entry = this.current();
     if (!entry) return;
     this.recomputeEq();
+    const crossfadeMs = crossfadeMsBetween(this.state.crossfade, from, entry.track);
     const resolved = await resolveFile(this.require(), entry.track.trackId);
     if (resolved.file) {
-      await this.playback.load({ track: entry.track, file: resolved.file });
+      await this.playback.load({ track: entry.track, file: resolved.file, crossfadeMs });
     } else {
       const hubLocator = entry.track.locators.find((l) => l.kind === 'hub-blob');
       if (hubLocator) {
-        await this.playback.load({ track: entry.track, url: `/api/v1/library/stream/${entry.track.trackId}`, processable: true });
+        await this.playback.load({ track: entry.track, url: `/api/v1/library/stream/${entry.track.trackId}`, processable: true, crossfadeMs });
       } else {
         this.notice('warning', resolved.reason);
         this.patch({ playback: { ...this.state.playback, status: 'error', error: resolved.reason } });
@@ -365,27 +413,43 @@ export class PlayerStore {
     }
   }
 
-  async next(reason: 'user' | 'ended' = 'user'): Promise<void> {
+  /**
+   * Move on. `user` is a skip, `ended` the natural end of the track, and `crossfade` the point
+   * one crossfade before that end: the next track starts now, over this one, and this one's
+   * completion is recorded when its deck actually finishes.
+   */
+  async next(reason: 'user' | 'ended' | 'crossfade' = 'user'): Promise<void> {
     const entry = this.current();
+    if (reason === 'crossfade') {
+      const target = this.state.repeat === 'one' ? this.state.queueIndex : this.indexAfterCurrent();
+      // Nothing to fade into: let the track end on its own.
+      if (target === null || !entry) return;
+      this.outgoing = entry;
+      this.patch({ queueIndex: target });
+      await this.loadCurrent(true, entry.track);
+      return;
+    }
     if (entry) this.recordSkipOrCompletion(entry, reason);
     if (this.state.repeat === 'one' && reason === 'ended') {
       this.playback.seek(0);
       await this.playback.play();
       return;
     }
-    const nextIndex = this.state.shuffle ? this.pickShuffleIndex() : this.state.queueIndex + 1;
-    if (nextIndex >= this.state.queue.length) {
-      if (this.state.repeat === 'all' && this.state.queue.length) {
-        this.patch({ queueIndex: 0 });
-        await this.loadCurrent(true);
-      } else {
-        this.playback.stop();
-        this.patch({ queueIndex: this.state.queue.length ? this.state.queue.length - 1 : -1 });
-      }
+    const nextIndex = this.indexAfterCurrent();
+    if (nextIndex === null) {
+      this.playback.stop();
+      this.patch({ queueIndex: this.state.queue.length ? this.state.queue.length - 1 : -1 });
       return;
     }
     this.patch({ queueIndex: nextIndex });
-    await this.loadCurrent(true);
+    await this.loadCurrent(true, entry?.track ?? null);
+  }
+
+  /** The index that follows the current one under shuffle and repeat, or null when the queue is done. */
+  private indexAfterCurrent(): number | null {
+    const nextIndex = this.state.shuffle ? this.pickShuffleIndex() : this.state.queueIndex + 1;
+    if (nextIndex < this.state.queue.length) return nextIndex;
+    return this.state.repeat === 'all' && this.state.queue.length ? 0 : null;
   }
 
   async previous(): Promise<void> {
@@ -399,8 +463,9 @@ export class PlayerStore {
       this.playback.seek(0);
       return;
     }
+    const from = this.current()?.track ?? null;
     this.patch({ queueIndex: this.state.queueIndex - 1 });
-    await this.loadCurrent(true);
+    await this.loadCurrent(true, from);
   }
 
   async jumpTo(index: number): Promise<void> {
@@ -408,7 +473,7 @@ export class PlayerStore {
     const entry = this.current();
     if (entry) this.recordSkipOrCompletion(entry, 'user');
     this.patch({ queueIndex: index });
-    await this.loadCurrent(true);
+    await this.loadCurrent(true, entry?.track ?? null);
   }
 
   private pickShuffleIndex(): number {
@@ -427,6 +492,13 @@ export class PlayerStore {
   async setRepeat(repeat: RepeatMode): Promise<void> {
     this.patch({ repeat });
     await putSetting(this.require(), 'repeat', repeat);
+  }
+
+  async setCrossfade(patch: Partial<CrossfadeSettings>): Promise<void> {
+    const crossfade = normalizeCrossfade({ ...this.state.crossfade, ...patch });
+    this.patch({ crossfade });
+    this.playback.setCrossfade(crossfade.enabled ? crossfade.seconds : 0);
+    await putSetting(this.require(), 'playback.crossfade', crossfade);
   }
 
   /* ------------------------------------------------------------------ events */
@@ -452,12 +524,28 @@ export class PlayerStore {
 
   private readonly meaningfulRecorded = new Set<string>();
 
-  private recordSkipOrCompletion(entry: QueueEntry, reason: 'user' | 'ended'): void {
-    const seconds = this.state.playback.positionMs / 1000;
+  /** The entry a crossfade handed over, whose completion is still to be recorded. */
+  private outgoing: QueueEntry | null = null;
+
+  private onPlaybackEvent(event: PlaybackEvent): void {
+    if (event.type === 'crossfade-due') {
+      void this.next('crossfade');
+      return;
+    }
+    if (event.type === 'outgoing-finished') {
+      const entry = this.outgoing;
+      if (!entry || entry.track.trackId !== event.trackId) return;
+      this.outgoing = null;
+      this.recordSkipOrCompletion(entry, event.ended ? 'ended' : 'user', event.positionMs);
+    }
+  }
+
+  private recordSkipOrCompletion(entry: QueueEntry, reason: 'user' | 'ended', positionMs = this.state.playback.positionMs): void {
+    const seconds = positionMs / 1000;
     const duration = entry.track.durationMs;
-    const completion = duration ? Math.min(100, (this.state.playback.positionMs / duration) * 100) : null;
+    const completion = duration ? Math.min(100, (positionMs / duration) * 100) : null;
     const type: ListeningEventType = reason === 'ended' || (completion !== null && completion >= 90) ? 'completed' : 'skipped';
-    this.recordEvent(type, entry.track, { secondsPlayed: seconds, completionPercent: completion, positionMs: this.state.playback.positionMs, reason: reason === 'user' ? 'user' : 'ended' });
+    this.recordEvent(type, entry.track, { secondsPlayed: seconds, completionPercent: completion, positionMs, reason: reason === 'user' ? 'user' : 'ended' });
     this.meaningfulRecorded.delete(entry.track.trackId);
   }
 
@@ -694,7 +782,7 @@ export class PlayerStore {
     await clearEverything(db);
     this.playback.stop();
     this.patch({
-      library: { tracks: [], roots: [], ephemeralTrackIds: new Set(), scanning: null, lastScan: null, directoryHandleReason: this.state.library.directoryHandleReason },
+      library: { tracks: [], roots: [], ephemeralTrackIds: new Set(), scanning: null, lastScan: null, directoryHandleReason: this.state.library.directoryHandleReason, keepCopies: this.state.library.keepCopies, copiesReason: this.state.library.copiesReason },
       playlists: [],
       playlistItems: [],
       presets: [...ALL_BUILTIN_PRESETS],

@@ -1,7 +1,7 @@
 /**
  * The DSP chain (docs/architecture/AUDIO_PIPELINE.md):
  *
- *   source → preamp → [retune worklet] → EQ bands → headroom trim → limiter → analyser → output → destination
+ *   source → fader → preamp → [retune worklet] → EQ bands → headroom trim → limiter → analyser → output → destination
  *                  ↘─────────────── bypass (matched gain) ───────────────↗
  *
  * Every audible parameter is ramped, never jumped: `setPreamp`, `setBandGain`, the headroom trim
@@ -18,7 +18,7 @@
 import { EQ_BAND_FREQUENCIES_HZ, type EqPreset, type RetuneConfig } from '@now-playing/contracts';
 import { describeRetune, FLAT_PRESET, requiredHeadroomDb, type RetuneDescription } from '@now-playing/domain';
 import { DSP_UNAVAILABLE_REASON, currentPageOrigin, isCrossOriginWithoutCors, setPlaybackRate, setPreservesPitch } from './media-source.js';
-import { BYPASS_CROSSFADE_MS, DEFAULT_RAMP_MS, clamp, dbToGain, glideParam, initParam, rampParam } from './params.js';
+import { BYPASS_CROSSFADE_MS, DEFAULT_RAMP_MS, clamp, dbToGain, fadeParam, glideParam, initParam, rampParam } from './params.js';
 import { GRAPHIC_BAND_Q, MAX_BANDS, headroomTrimDb, liveEqPreset, matchedBypassLevelDb, maxFilterFrequencyHz, presetToBandParams, type BandParams } from './presets.js';
 import type {
   AnalyserNodeLike,
@@ -71,9 +71,24 @@ export interface AttachResult {
   reason: string | null;
 }
 
+export interface AttachOptions {
+  /**
+   * Fade the previously attached element out over this many milliseconds while the new one fades
+   * in, both along equal-power curves, instead of cutting from one to the other. The outgoing
+   * element stays in the chain until its fade is done.
+   */
+  crossfadeMs?: number;
+}
+
 export interface AudioEngine {
   readonly context: EngineContext;
-  attachMediaElement(element: RetunableMediaElement): AttachResult;
+  attachMediaElement(element: RetunableMediaElement, options?: AttachOptions): AttachResult;
+  /**
+   * Fade the attached element out over `durationMs` and release it, leaving nothing attached.
+   * For the case where the next source cannot enter the graph at all but the current one should
+   * still leave gracefully.
+   */
+  fadeOutPrimary(durationMs: number): void;
   attachBufferSource(node: BufferSourceNodeLike): AttachResult;
   detach(): void;
   applyPreset(preset: EqPreset, options?: { rampMs?: number }): void;
@@ -167,7 +182,7 @@ export function createAudioEngine(context: EngineContext, options: AudioEngineOp
   }
 
   /* ---- source ---- */
-  let sourceNode: MediaElementSourceNodeLike | BufferSourceNodeLike | null = null;
+  let sourceNode: AudioNodeLike | null = null;
   let mediaElement: RetunableMediaElement | null = null;
   let dspAvailable = false;
   let dspUnavailableReason: string | null = 'No source is attached';
@@ -256,30 +271,98 @@ export function createAudioEngine(context: EngineContext, options: AudioEngineOp
     if (disposed) throw new Error('This audio engine has been disposed');
   }
 
-  /** Every element this engine has ever bound, and the node it was bound to. See attachMediaElement. */
-  const elementSources = new Map<RetunableMediaElement, MediaElementSourceNodeLike>();
+  /**
+   * Every element this engine has ever bound: the source node Web Audio made for it, and the fader
+   * that stands between that node and the chain. See attachMediaElement for why the node is kept
+   * for good; the fader is what a crossfade moves, so each element needs its own.
+   */
+  interface ElementSource {
+    node: MediaElementSourceNodeLike;
+    fader: GainNodeLike;
+    connected: boolean;
+  }
+  const elementSources = new Map<RetunableMediaElement, ElementSource>();
+  /** Sources still audible on their way out, with the context time at which their fade completes. */
+  const fading = new Map<RetunableMediaElement, { source: ElementSource; endsAt: number }>();
 
   function connectSource(node: AudioNodeLike): void {
     node.connect(processedIn);
     node.connect(dryPath);
   }
 
-  function attachMediaElement(element: RetunableMediaElement): AttachResult {
+  function connectElementSource(source: ElementSource): void {
+    if (source.connected) return;
+    connectSource(source.fader);
+    source.connected = true;
+  }
+
+  function disconnectElementSource(source: ElementSource): void {
+    if (!source.connected) return;
+    source.fader.disconnect();
+    source.connected = false;
+  }
+
+  /** Drop fading sources whose fade has run its course, and never keep more than two in flight. */
+  function sweepFades(): void {
+    const t = now();
+    for (const [element, entry] of fading) {
+      if (entry.endsAt <= t) {
+        disconnectElementSource(entry.source);
+        fading.delete(element);
+      }
+    }
+    while (fading.size > 2) {
+      const oldest = fading.keys().next();
+      if (oldest.done) break;
+      disconnectElementSource(fading.get(oldest.value)!.source);
+      fading.delete(oldest.value);
+    }
+  }
+
+  /**
+   * Let the current element fade out over `durationMs` instead of cutting it: its fader ramps to
+   * silence along the equal-power curve and the source stays in the chain until the ramp is done,
+   * so the next track can come in over it. The element keeps whatever playback rate it had; a
+   * change mid-fade would be audible.
+   */
+  function releasePrimaryWithFade(durationMs: number): void {
+    const element = mediaElement;
+    const source = element ? elementSources.get(element) : undefined;
+    if (!element || !source || !source.connected) {
+      detach();
+      return;
+    }
+    const t = now();
+    fadeParam(source.fader.gain, 'out', t, durationMs);
+    fading.set(element, { source, endsAt: t + durationMs / 1000 });
+    sourceNode = null;
+    mediaElement = null;
+    dspAvailable = false;
+    dspUnavailableReason = 'No source is attached';
+    retuneApplied = retuneApplied === 'playback-rate' ? 'none' : retuneApplied;
+  }
+
+  function attachMediaElement(element: RetunableMediaElement, attachOptions: AttachOptions = {}): AttachResult {
     assertLive();
+    sweepFades();
+    const crossfadeMs = Math.max(0, attachOptions.crossfadeMs ?? 0);
+    const crossfade = crossfadeMs > 0 && mediaElement !== null && mediaElement !== element;
     // Web Audio binds an element to a source node once and for good: a second
     // createMediaElementSource for the same element throws InvalidStateError, and disconnecting the
-    // node does not undo the binding. A player reuses one element for every track, so the node has
+    // node does not undo the binding. A player reuses its elements for every track, so the node has
     // to be made once here and reused for all of them.
     const bound = elementSources.get(element) ?? null;
-    detach();
+    if (crossfade) releasePrimaryWithFade(crossfadeMs);
+    else detach();
     if (isCrossOriginWithoutCors(element, options.pageOrigin === undefined ? currentPageOrigin() : options.pageOrigin)) {
       dspAvailable = false;
       mediaElement = element;
       if (bound) {
         // Already in the graph from an earlier track, and there is no way back out. Reconnecting
         // keeps the chain intact; the browser mutes this source itself, which is what to say.
-        sourceNode = bound;
-        connectSource(bound);
+        fading.delete(element);
+        sourceNode = bound.fader;
+        connectElementSource(bound);
         dspUnavailableReason = `${DSP_UNAVAILABLE_REASON}: the media is served from another origin without CORS, and this player is already in the graph, so the browser mutes it. Play it through the hub instead.`;
       } else {
         // Creating the source node would silence the element; leave it alone and report why.
@@ -288,11 +371,23 @@ export function createAudioEngine(context: EngineContext, options: AudioEngineOp
       notify();
       return { ok: false, reason: dspUnavailableReason };
     }
-    const node = bound ?? context.createMediaElementSource(element);
-    if (!bound) elementSources.set(element, node);
-    sourceNode = node;
+    let source = bound;
+    if (!source) {
+      const node = context.createMediaElementSource(element);
+      const fader = context.createGain();
+      initParam(fader.gain, 1, now());
+      node.connect(fader);
+      source = { node, fader, connected: false };
+      elementSources.set(element, source);
+    }
+    // A deck that was on its way out is being reused for the next track: it is the incoming one now.
+    fading.delete(element);
+    const t = now();
+    if (crossfade) fadeParam(source.fader.gain, 'in', t, crossfadeMs);
+    else rampParam(source.fader.gain, 1, t, 0);
+    sourceNode = source.fader;
     mediaElement = element;
-    connectSource(node);
+    connectElementSource(source);
     dspAvailable = true;
     dspUnavailableReason = null;
     applyRetuneToElement();
@@ -300,8 +395,16 @@ export function createAudioEngine(context: EngineContext, options: AudioEngineOp
     return { ok: true, reason: null };
   }
 
+  function fadeOutPrimary(durationMs: number): void {
+    assertLive();
+    sweepFades();
+    releasePrimaryWithFade(Math.max(0, durationMs));
+    notify();
+  }
+
   function attachBufferSource(node: BufferSourceNodeLike): AttachResult {
     assertLive();
+    sweepFades();
     detach();
     sourceNode = node;
     mediaElement = null;
@@ -313,16 +416,18 @@ export function createAudioEngine(context: EngineContext, options: AudioEngineOp
   }
 
   function detach(): void {
-    if (sourceNode) {
-      sourceNode.disconnect();
-      sourceNode = null;
-    }
     if (mediaElement) {
+      const source = elementSources.get(mediaElement);
+      if (source) disconnectElementSource(source);
+      else sourceNode?.disconnect();
       // Leave the element as we found it: normal rate, pitch preserved.
       setPlaybackRate(mediaElement, 1);
       setPreservesPitch(mediaElement, true);
       mediaElement = null;
+    } else if (sourceNode) {
+      sourceNode.disconnect();
     }
+    sourceNode = null;
     dspAvailable = false;
     dspUnavailableReason = 'No source is attached';
     retuneApplied = retuneApplied === 'playback-rate' ? 'none' : retuneApplied;
@@ -558,6 +663,12 @@ export function createAudioEngine(context: EngineContext, options: AudioEngineOp
     detach();
     context.removeEventListener?.('statechange', onStateChange);
     removeRetuneNode();
+    for (const source of elementSources.values()) {
+      source.fader.disconnect();
+      source.node.disconnect();
+      source.connected = false;
+    }
+    fading.clear();
     for (const node of [processedIn, dryPath, preamp, ...bands, trim, limiter, limiterBypass, analyser, output]) node.disconnect();
     listeners.clear();
     disposed = true;
@@ -566,6 +677,7 @@ export function createAudioEngine(context: EngineContext, options: AudioEngineOp
   return {
     context,
     attachMediaElement,
+    fadeOutPrimary,
     attachBufferSource,
     detach,
     applyPreset,
