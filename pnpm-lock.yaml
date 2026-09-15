@@ -175,6 +175,25 @@ importers:
         specifier: 8.2.2
         version: 8.2.2(@types/node@26.4.1)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)
 
+  local-helper:
+    dependencies:
+      '@now-playing/contracts':
+        specifier: workspace:*
+        version: link:../packages/contracts
+      '@now-playing/domain':
+        specifier: workspace:*
+        version: link:../packages/domain
+      zod:
+        specifier: 4.5.4
+        version: 4.5.4
+    devDependencies:
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+
   music-player:
     dependencies:
       '@now-playing/aqua-ui':

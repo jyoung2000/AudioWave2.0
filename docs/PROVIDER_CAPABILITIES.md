@@ -52,3 +52,32 @@ Each platform gets a 16 px Aqua tile in **its own published colour** carrying a 
 The glyph rather than the colour carries the distinction, so the set still reads in greyscale (the `itunes-10-transition` profile desaturates the source list; colour-blind readers get the same treatment for free), and the platform's name is always in the accessible name and the tooltip.
 
 Anyone who holds a platform's official asset under that platform's terms can supply it in **Settings → Platforms → Use official artwork**. It is stored on that device, used whole — no tile behind it, no crop, no recolour — and replaces the built-in mark everywhere in the app at once.
+
+## Running the tools yourself
+
+A browser page cannot start a program, so yt-dlp and spotDL need something outside it. There are two supported somethings, and both are off until someone deliberately turns them on.
+
+### The local helper
+
+`local-helper/` builds to one file, `now-playing-helper.mjs`. Put it beside `now-playing.html`, run it with `node`, and it serves the player on `http://127.0.0.1:17342` and runs the tools for it. Because it serves the page, the two share an origin: no CORS to configure, no origin to allowlist, and the per-run token travels in the document rather than through a terminal. Its own README covers the options; the constraints are:
+
+| | |
+| --- | --- |
+| Reachable from | 127.0.0.1 only, and not configurable |
+| Tools | Found on PATH or configured. yt-dlp can be fetched on request, verified against the `SHA2-256SUMS` published in the same release. spotDL is not fetched — its releases cannot be verified the same way — and reports the line that installs it |
+| Arguments | Built in `src/jobs.ts` and nowhere else. The page names a URL, a tool and a format; it can name no flag. `--ignore-config` is always first, because a `yt-dlp.conf` could otherwise add `--exec` |
+| Authorisation | Every fetch carries a `DownloadAuthorizationBasis`; without one the helper refuses |
+| Hosts | An allowlist, and never a private address |
+| Credentials | None. No cookies are passed, no browser profile is read, and the subprocess gets a minimal environment |
+
+**yt-dlp is deliberately not pinned.** Pinning is usually the careful choice and here it is the opposite: the tool works by keeping up with sites that change, so an old copy does not age into something safer, it ages into something that fails confusingly. What is kept is integrity — the bytes are checked against that release's own checksums — rather than a frozen version.
+
+### The hub's external-tool provider
+
+The same capability for people running the container, through the provider that was always there. It stays **off by default**; an administrator enables it and accepts the rights notice. What is new is that `extra.preset: yt-dlp` fills in the command line and the hosts from `TOOL_PRESETS`, so the arguments are written in the repository and reviewed rather than typed into a web form, and the image now ships a verified yt-dlp so enabling it is a toggle rather than an install. `test()` reports the tool's real version, because an old yt-dlp is the failure mode that wastes the most time.
+
+There is no spotDL preset on the hub, and that is a decision rather than an omission: a hub download job is one track to one path, while spotDL turns one link into a set of tracks and wants a directory. That shape fits the local helper, which gives every job its own directory, so spotDL is supported there and honestly absent here rather than shipped broken.
+
+### What none of this changes
+
+The three columns in **Settings → Platforms** — play here, keep offline, save a file — answer what the *platform* permits, and a tool on your own machine does not change that answer. So YouTube's "Save a file" stays **No** while a running helper adds a separate line beside it: "Your yt-dlp: can reach it". Two different facts, kept in two different places, because merging them would have the app claim a standing it does not have.

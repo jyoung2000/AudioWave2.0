@@ -3,6 +3,7 @@ packages:
   - music-player
   - docker-container
   - windows-companion
+  - local-helper
 onlyBuiltDependencies:
   - better-sqlite3
   - electron

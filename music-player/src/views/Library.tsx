@@ -10,7 +10,7 @@
  * empty state explains what "add a folder" actually does (index, not copy), because people are
  * reasonably wary of a web page asking for their music folder.
  */
-import { useState } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { Button, EmptyState, Panel, useToast } from '@now-playing/aqua-ui';
 import type { Track } from '@now-playing/contracts';
 import { uuidv7 } from '@now-playing/domain';
@@ -20,6 +20,9 @@ import { toTrackRef } from '../state/store.js';
 import { supportsDirectoryHandles } from '../lib/library.js';
 import { MusicList } from '@now-playing/aqua-ui';
 import { NewPlaylistSheet } from '../components/NewPlaylistSheet.js';
+
+/** Only ever opened by someone running a helper, so it travels separately from the first load. */
+const FetchSheet = lazy(() => import('../components/FetchSheet.js').then((m) => ({ default: m.FetchSheet })));
 
 /**
  * Two destinations the section strip no longer carries when you are listening alone.
@@ -48,6 +51,10 @@ export function LibraryView({ onOpenView, onDownload }: { onOpenView: (view: Vie
   const state = useAppState();
   const toast = useToast();
   const [newList, setNewList] = useState<{ open: boolean; track: Track | null }>({ open: false, track: null });
+  const [fetchOpen, setFetchOpen] = useState(false);
+  // The button exists only while a helper is actually answering with a tool it can run. An action
+  // that would fail is not an action worth drawing.
+  const canFetch = Boolean(state.helper?.health.tools.some((tool) => tool.id !== 'ffmpeg' && tool.present));
 
   const playFrom = (track: Track, ordered: readonly Track[]): void => {
     if (track.unsupportedReason) {
@@ -78,15 +85,18 @@ export function LibraryView({ onOpenView, onDownload }: { onOpenView: (view: Vie
                   { id: 'add', label: 'Add a folder', variant: 'default', onSelect: () => void store.addDirectory() },
                   { id: 'files', label: 'Choose files instead', onSelect: () => pickFiles(store) },
                   { id: 'zip', label: 'Import a .zip', onSelect: () => pickFiles(store, 'archives') },
+                  ...(canFetch ? [{ id: 'link', label: 'Add from a link', onSelect: () => setFetchOpen(true) }] : []),
                 ]
               : [
                   { id: 'files', label: 'Choose files', variant: 'default', onSelect: () => pickFiles(store) },
                   { id: 'zip', label: 'Import a .zip', onSelect: () => pickFiles(store, 'archives') },
+                  ...(canFetch ? [{ id: 'link', label: 'Add from a link', onSelect: () => setFetchOpen(true) }] : []),
                 ]
           }
           {...(state.library.directoryHandleReason ? { details: { summary: 'About this browser', text: state.library.directoryHandleReason } } : {})}
         />
         <MoreDestinations onOpenView={onOpenView} />
+        <Suspense fallback={null}>{fetchOpen ? <FetchSheet open onClose={() => setFetchOpen(false)} /> : null}</Suspense>
       </Panel>
     );
   }
@@ -130,6 +140,11 @@ export function LibraryView({ onOpenView, onDownload }: { onOpenView: (view: Vie
         <Button size="small" onClick={() => pickFiles(store, 'archives')} ellipsis>
           Import a .zip
         </Button>
+        {canFetch ? (
+          <Button size="small" onClick={() => setFetchOpen(true)} ellipsis>
+            Add from a link
+          </Button>
+        ) : null}
       </div>
 
       <MoreDestinations onOpenView={onOpenView} />
@@ -164,6 +179,8 @@ export function LibraryView({ onOpenView, onDownload }: { onOpenView: (view: Vie
           })();
         }}
       />
+
+      <Suspense fallback={null}>{fetchOpen ? <FetchSheet open onClose={() => setFetchOpen(false)} /> : null}</Suspense>
 
       <NewPlaylistSheet
         open={newList.open}

@@ -69,8 +69,12 @@ const BUNDLES: Bundle[] = [
      * player and presses play downloads neither. That is the line worth
      * defending, and the entry budget above is what defends it — this number
      * only records what the app weighs in total.
+     *
+     * And from 2150 to 2180 for the local helper's client and the sheet that asks what entitles you
+     * to a file. Both are behind a dynamic import and neither is reachable without a helper running,
+     * so the entry above is unmoved — which is the number that was defended, and still is.
      */
-    totalBudgetKb: 2150,
+    totalBudgetKb: 2180,
     // Three.js belongs to the constellation and the jewel case; the tag reader only to a scan.
     mustBeSplit: ['three', 'music-metadata'],
   },

@@ -24,6 +24,9 @@ import { defaultDestination, pickDownloadFolder, supportsDownloadFolder, type Do
 import { jumpInShuffle, makeShuffleOrder, nextInShuffle, previousInShuffle, remainingInShuffle, syncShuffleOrder, type ShuffleOrder } from '../lib/shuffle.js';
 import type * as DiscoverModule from '../lib/discover.js';
 import type { Discovery } from '../lib/discover.js';
+import type * as HelperModule from '../lib/fetch-helper.js';
+import type { HelperConnection, SavedHelper } from '../lib/fetch-helper.js';
+import type { DownloadAuthorizationBasis, HelperToolId, OutputFormat } from '@now-playing/contracts';
 import type { TasteProfile } from '@now-playing/recommendations';
 
 /**
@@ -36,6 +39,12 @@ import type { TasteProfile } from '@now-playing/recommendations';
  * of an album.
  */
 const discoverModule = (): Promise<typeof DiscoverModule> => import('../lib/discover.js');
+
+/**
+ * The helper client, on the same terms. Almost nobody runs a helper, and the ones who do can wait
+ * the few milliseconds it takes to fetch this after the page has painted.
+ */
+const helperModule = (): Promise<typeof HelperModule> => import('../lib/fetch-helper.js');
 
 export type RepeatMode = 'off' | 'one' | 'all';
 
@@ -107,6 +116,21 @@ export interface AppState {
    * by default: the built-in marks are ours, and nobody's logo ships in this bundle.
    */
   providerArtwork: Readonly<Record<string, string>>;
+  /**
+   * A local helper, if one answered just now. Null is the normal state and means the interface
+   * offers nothing that would need one — the player never remembers a helper into existence.
+   */
+  helper: HelperConnection | null;
+  /** Where a helper was last saved by hand, for the case where the player is hosted elsewhere. */
+  savedHelper: SavedHelper | null;
+  /**
+   * False until the first probe has finished. It matters: a `helper: null` that has not been asked
+   * yet and one that has been asked and answered are different facts, and the interface must not
+   * report the second while it means the first.
+   */
+  helperProbed: boolean;
+  /** The fetch in flight, if any, so the interface can show what the tool is doing. */
+  helperJob: { url: string; stage: string; percent: number | null; message: string | null } | null;
   sessionId: string;
   deviceId: string;
 }
@@ -115,6 +139,15 @@ const DEFAULT_RETUNE: RetuneConfig = { referenceHz: 440, pitchOffsetCents: 0, mo
 
 /** Platform artwork shares the artwork store; the prefix keeps it apart from album covers. */
 const ARTWORK_PREFIX = 'platform:';
+
+/** A URL reduced to the bit worth showing someone. Never throws: it is only ever used in a sentence. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return 'that link';
+  }
+}
 const artworkKey = (provider: string): string => `${ARTWORK_PREFIX}${provider}`;
 
 export type Listener = () => void;
@@ -153,6 +186,10 @@ export class PlayerStore {
       notices: [],
       storage: null,
       providerArtwork: {},
+      helper: null,
+      savedHelper: null,
+      helperProbed: false,
+      helperJob: null,
     };
     playback.subscribe((playbackState) => {
       this.patch({ playback: playbackState });
@@ -229,6 +266,7 @@ export class PlayerStore {
     const keepCopies = copies.ok ? await getSetting(this.db, 'library.keepCopies', !supportsDirectoryHandles()) : false;
 
     const providerArtwork = await this.loadProviderArtwork();
+    const savedHelper = await getSetting<SavedHelper | null>(this.db, 'helper.saved', null);
 
     this.patch({
       ready: true,
@@ -261,11 +299,15 @@ export class PlayerStore {
       shuffleOrder: shuffle ? { ids: [], pos: -1 } : null,
       downloads: { destination, organise },
       providerArtwork,
+      savedHelper,
       autoplay,
       storage: await storageReport(this.db),
     });
     this.recomputeEq();
     this.playback.setCrossfade(crossfade.enabled ? crossfade.seconds : 0);
+    // Not awaited: whether a helper is running has nothing to do with whether the player can start,
+    // and the answer arrives in a render or two either way.
+    void this.refreshHelper();
   }
 
   private require(): PlayerDatabase {
@@ -384,6 +426,69 @@ export class PlayerStore {
     await db.put('artwork', { id, blob: file, mime: file.type });
     if (previous) URL.revokeObjectURL(previous);
     this.patch({ providerArtwork: { ...this.state.providerArtwork, [provider]: URL.createObjectURL(file) } });
+  }
+
+  /**
+   * Ask whether a local helper is there, right now.
+   *
+   * Called at startup and whenever the Platforms panel is opened, because a helper can be started
+   * or stopped while the page is sitting there. Nothing about the answer is cached beyond the
+   * current state: the moment it stops answering, every control it enabled goes away.
+   */
+  async refreshHelper(): Promise<void> {
+    const { detectHelper } = await helperModule();
+    const helper = await detectHelper(this.state.savedHelper);
+    this.patch({ helper, helperProbed: true });
+  }
+
+  /** Remember a helper that is not serving this page, for a player hosted somewhere else. */
+  async saveHelper(saved: SavedHelper | null): Promise<void> {
+    this.patch({ savedHelper: saved });
+    await putSetting(this.require(), 'helper.saved', saved);
+    await this.refreshHelper();
+    if (saved && !this.state.helper) {
+      this.notice('warning', `Nothing answered at ${saved.origin}. Check the helper is running, that it was started with --allow-origin ${window.location.origin}, and that the token matches.`);
+    }
+  }
+
+  /** Ask the helper to fetch a tool for itself. Only yt-dlp; the helper refuses the rest and says why. */
+  async installHelperTool(tool: HelperToolId): Promise<void> {
+    const helper = this.state.helper;
+    if (!helper) return this.notice('warning', 'No helper is running, so there is nothing to install into.');
+    const { installTool } = await helperModule();
+    try {
+      const result = await installTool(helper, tool);
+      if (!result.installed) return this.notice('warning', result.reason ?? `${tool} was not installed.`);
+      await this.refreshHelper();
+      this.notice('info', `${tool} ${result.version ?? ''} is ready.`.replace('  ', ' '));
+    } catch (error) {
+      this.notice('error', error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  /**
+   * Fetch a link through the helper and put what comes back in the library.
+   *
+   * The rights basis is a required argument rather than a default, because it is the whole point:
+   * the helper refuses without one, and the person choosing it is the person making the claim.
+   */
+  async fetchLink(url: string, options: { basis: DownloadAuthorizationBasis; format: OutputFormat; tool?: 'auto' | 'yt-dlp' | 'spotdl' }): Promise<void> {
+    const helper = this.state.helper;
+    if (!helper) return this.notice('warning', 'No helper is running. Start one and it will appear in Settings → Platforms.');
+    const { runFetch } = await helperModule();
+    this.patch({ helperJob: { url, stage: 'preflight', percent: null, message: null } });
+    try {
+      const { files } = await runFetch(helper, { url, tool: options.tool ?? 'auto', format: options.format, authorization: { basis: options.basis, acknowledged: true } }, (job) =>
+        this.patch({ helperJob: { url, stage: job.stage, percent: job.percent, message: job.message } }),
+      );
+      this.patch({ helperJob: null });
+      await this.addFiles(files);
+      this.notice('info', `${files.length} ${files.length === 1 ? 'track' : 'tracks'} added from ${hostOf(url)}.`);
+    } catch (error) {
+      this.patch({ helperJob: null });
+      this.notice('error', error instanceof Error ? error.message : String(error));
+      throw error;
+    }
   }
 
   private async loadProviderArtwork(): Promise<Record<string, string>> {

@@ -24,13 +24,25 @@
  * Keep in step with docs/PROVIDER_CAPABILITIES.md and with `PROVIDER_MARKS`; a unit test fails if a
  * platform appears in one and not the others.
  */
-import type { CapabilityState, KnownProvider, ProviderDescriptor } from '@now-playing/contracts';
+import type { CapabilityState, HelperHealth, HelperToolId, KnownProvider, ProviderDescriptor } from '@now-playing/contracts';
 import { KNOWN_PROVIDERS } from '@now-playing/contracts';
 import { markFor } from '@now-playing/aqua-ui';
 
 export interface PlatformRoute {
   state: CapabilityState;
   /** Why it is what it is. Shown next to it, always — a state with no reason is a shrug. */
+  detail: string;
+}
+
+/**
+ * What a tool running beside the player can do — which is a different question from what the
+ * platform permits, and is kept in a different field for that reason. A local yt-dlp does not
+ * change YouTube's terms; it changes what is technically possible on this machine. Collapsing the
+ * two would turn an honest "No" into a "Yes" the app has no standing to say.
+ */
+export interface ToolNote {
+  tool: HelperToolId;
+  available: boolean;
   detail: string;
 }
 
@@ -49,7 +61,22 @@ export interface Platform {
   home: string | null;
   /** The document that decides the answers above. */
   terms: string | null;
+  /** Set only while a helper is actually answering. Absent means nobody asked and nothing is claimed. */
+  viaTool?: ToolNote;
 }
+
+/**
+ * Which hosts belong to which platform, for matching against a helper's allowlist. Kept beside the
+ * table rather than inside each row: it is a fact about addresses, not about permissions, and every
+ * row that does not appear here simply has no tool route.
+ */
+const PLATFORM_HOSTS: Partial<Record<KnownProvider, readonly string[]>> = {
+  youtube: ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be'],
+  soundcloud: ['soundcloud.com', 'api.soundcloud.com', 'on.soundcloud.com'],
+  spotify: ['open.spotify.com'],
+  bandcamp: ['bandcamp.com'],
+  'public-domain': ['archive.org'],
+};
 
 const YES = (detail: string): PlatformRoute => ({ state: 'available', detail });
 const AUTH = (detail: string): PlatformRoute => ({ state: 'requires_auth', detail });
@@ -223,6 +250,37 @@ const SEVERITY: Record<CapabilityState, number> = { unsupported: 0, temporarily_
 
 function worse(a: PlatformRoute, b: PlatformRoute): PlatformRoute {
   return SEVERITY[b.state] < SEVERITY[a.state] ? b : a;
+}
+
+/**
+ * Fold in what a running helper can do.
+ *
+ * Note what this does *not* touch: `play`, `keep` and `save` come back exactly as they were. Those
+ * three answer "what does this platform allow", and no amount of software on your own machine
+ * changes that answer. The helper adds a fourth statement — "a tool you installed can reach this,
+ * and you are the one saying you are entitled to" — which is true, and is different.
+ */
+export function withHelper(platforms: readonly Platform[], health: HelperHealth | null): Platform[] {
+  if (!health) return [...platforms];
+  return platforms.map((platform) => {
+    const hosts = PLATFORM_HOSTS[platform.provider];
+    if (!hosts?.some((host) => health.allowedHosts.includes(host))) return platform;
+    const tool: HelperToolId = platform.provider === 'spotify' ? 'spotdl' : 'yt-dlp';
+    const found = health.tools.find((entry) => entry.id === tool);
+    if (!found?.present) {
+      return { ...platform, viaTool: { tool, available: false, detail: found?.installHint ?? `${tool} is not installed where your helper can see it.` } };
+    }
+    return { ...platform, viaTool: { tool, available: true, detail: toolDetail(platform.provider, tool) } };
+  });
+}
+
+function toolDetail(provider: KnownProvider, tool: HelperToolId): string {
+  if (provider === 'spotify') {
+    // The thing people most often have backwards, and the one place it would be easy to imply
+    // something untrue by saying nothing.
+    return 'spotDL is running beside the player. It never takes Spotify’s audio — it reads Spotify for the track list and fetches a match from YouTube Music, so what you get is a re-recording of the same song, not Spotify’s file.';
+  }
+  return `${tool} is running beside the player and can fetch from here. Whether you may is between you and this platform: the player asks what entitles you to each file and sends that with the request.`;
 }
 
 export const ROUTE_LABELS: Record<CapabilityState, string> = {

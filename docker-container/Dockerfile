@@ -41,6 +41,14 @@ WORKDIR /repo/docker-container/dist
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --prod --no-frozen-lockfile
 
+# yt-dlp for the optional external-tool provider, which is off by default and stays off until an
+# administrator enables it and accepts the rights notice (docs/DOWNLOADS_AND_LEGAL.md). Fetched with
+# Node rather than curl so the runtime image needs no download tooling, verified against the
+# checksums published in the same release, and skipped without failing the build when there is no
+# network. The script explains why it is not pinned.
+WORKDIR /repo/docker-container
+RUN node scripts/fetch-yt-dlp.mjs /repo/tools
+
 # -------------------------------------------------------------- runtime stage
 FROM node:22-bookworm-slim AS runtime
 
@@ -64,6 +72,8 @@ ENV NODE_ENV=production \
 
 WORKDIR /app
 COPY --from=build /repo/docker-container/dist ./
+# Empty when the build could not reach the release, which the provider's own test() reports plainly.
+COPY --from=build /repo/tools/ /usr/local/bin/
 
 # The `node` user ships with the base image; /data is created and owned before dropping to it.
 RUN mkdir -p /data && chown -R node:node /data /app

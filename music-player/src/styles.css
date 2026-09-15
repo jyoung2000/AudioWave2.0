@@ -574,3 +574,109 @@ body {
     margin-bottom: 8px;
   }
 }
+
+/* The helper, and the sheet that asks what entitles you to a file.
+   Both are lists of a choice plus a sentence, so they share a shape. */
+.player-helper-tools {
+  display: grid;
+  gap: 6px;
+  margin: 6px 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+}
+
+.player-helper-tools li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.player-helper-tools__hint {
+  flex: 1 1 100%;
+  color: var(--aqua-text-secondary, #5a6472);
+  line-height: 1.45;
+}
+
+.player-details {
+  margin: 8px 0 0;
+  font-size: 11px;
+}
+
+.player-details summary {
+  color: var(--np-accent, #2b6fd6);
+  cursor: default;
+}
+
+.player-details summary:focus-visible {
+  outline-offset: 2px;
+}
+
+.player-fieldset {
+  margin: 12px 0;
+  padding: 0;
+  border: none;
+}
+
+.player-fieldset legend {
+  padding: 0;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.player-choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 2px 8px;
+  margin: 6px 0;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.player-choice input {
+  flex: none;
+  margin-top: 2px;
+}
+
+/* The sentence goes under the name, on its own row, rather than inside it: a nested span would put
+   the label's text two levels down, which is far enough that it stops counting as the label's. */
+.player-choice__detail {
+  flex: 1 1 100%;
+  padding-left: 22px;
+  color: var(--aqua-text-secondary, #5a6472);
+}
+
+/* Touch last, so these win over the rules above at equal specificity. */
+@media (pointer: coarse) {
+  .player-helper-tools,
+  .player-details,
+  .player-fieldset legend,
+  .player-choice {
+    font-size: 13px;
+  }
+
+  /* A radio is the target here, and a 13px one is not a target. */
+  .player-choice {
+    min-height: 44px;
+    align-items: center;
+    gap: 4px 12px;
+  }
+
+  .player-choice input {
+    width: 22px;
+    height: 22px;
+    margin-top: 0;
+  }
+
+  .player-choice__detail {
+    padding-left: 34px;
+  }
+
+  .player-details summary {
+    display: block;
+    min-height: 44px;
+    line-height: 44px;
+  }
+}

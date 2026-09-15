@@ -109,8 +109,10 @@ checked.
 
 ## "Download from every streaming platform"
 
-This is asked for often enough to deserve a straight answer: **it cannot be built, by anyone,
-legitimately.** Not because the app is cautious, but because there is no permitted route.
+This is asked for often enough to deserve a straight answer, and the answer has two halves.
+
+**No platform permits it.** Not one of them offers a route an application may use, so nothing in
+this project's own code fetches audio from any of them.
 
 - **Spotify.** The Web API offers no audio download endpoint at all. Playback exists only through
   the Web Playback SDK, which plays protected audio into its own output and hands the page nothing.
@@ -132,6 +134,30 @@ than attacked; non-audio entries are left where they are.
 
 Settings → Platforms states all of this per platform, in the app, with the reason attached to every
 "no". `docs/PROVIDER_CAPABILITIES.md` records the sources.
+
+**The other half: tools you run yourself.** yt-dlp and spotDL exist, they are widely used, and
+whether you may point one at a given site is a question between you and that site — not one this
+project can answer for you, and not one it will pretend does not exist.
+
+So there is a supported way to use them, and it is deliberately explicit at every step:
+
+- **Nothing runs unless you start it.** `local-helper/` is a separate program you download and run.
+  The player alone cannot start a process — no browser page can, installed or not — and this project
+  does not ship a background service that quietly can.
+- **Every fetch records why you are entitled to the file.** Five options, in plain words: it is
+  mine, the creator offers it, public domain, licensed to me, I bought it. The helper refuses a
+  request without one. The app cannot tell whether what you chose is true; you can.
+- **The platform table does not change.** A yt-dlp on your machine does not alter what YouTube
+  permits, so YouTube's "Save a file: No" stays **No**. What appears instead is a separate line —
+  "Your yt-dlp: can reach it" — because those are two different facts and merging them would be the
+  app claiming a standing it has not got.
+- **Still no DRM circumvention.** Spotify's protected audio is out of reach of these tools as well;
+  spotDL does not touch it. It reads Spotify for the track list and fetches a match from YouTube
+  Music, so what you get is another recording of the same song. The app says so on the sheet, in
+  those words, because assuming otherwise is the single most common misunderstanding about it.
+- **The hub can do the same thing**, through the external-tool provider that has been there all
+  along: off by default, enabled by an administrator who accepts a rights notice, allowlisted hosts,
+  no cookies. The image now ships yt-dlp so enabling it is a toggle rather than an install.
 
 ## The optional external tool
 
