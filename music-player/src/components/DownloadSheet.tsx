@@ -9,12 +9,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Sheet, Spinner, useToast } from '@now-playing/aqua-ui';
 import type { Track } from '@now-playing/contracts';
-import { usePlayer } from '../state/context.js';
+import { useAppState, usePlayer } from '../state/context.js';
 import { toTrackRef } from '../state/store.js';
 import { exportOptionsFor, exportTrack, saveFile, type ExportFormat, type ExportOption } from '../lib/export.js';
+import { describeDestination } from '../lib/download-folder.js';
 
 export function DownloadSheet({ track, onClose }: { track: Track | null; onClose: () => void }) {
   const { store } = usePlayer();
+  const state = useAppState();
   const toast = useToast();
   /**
    * The lookup is keyed by track id, so a sheet opened on a different song
@@ -43,9 +45,20 @@ export function DownloadSheet({ track, onClose }: { track: Track | null; onClose
     setBusy(option.format);
     try {
       const result = await exportTrack(track, file, option.format);
-      const outcome = await saveFile(result);
-      if (outcome === 'cancelled') return;
-      toast.show(`Saved ${result.filename}`, { kind: 'success' });
+      const outcome = await saveFile(result, {
+        destination: state.downloads.destination,
+        organise: state.downloads.organise,
+        artistName: track.artistName,
+        albumName: track.albumName,
+      });
+      if (outcome.kind === 'cancelled') return;
+      // A folder that could not be written to did not lose the file, but the
+      // listener still has to be told it did not land where they asked.
+      if (outcome.fellBackBecause) {
+        toast.show(`${outcome.fellBackBecause} It went to your browser's downloads instead.`, { kind: 'warning' });
+      } else {
+        toast.show(outcome.where ? `Saved to ${outcome.where}` : `Saved ${result.filename}`, { kind: 'success' });
+      }
       store.recordEvent('download-completed', toTrackRef(track), { contextKind: 'manual' });
       onClose();
     } catch (error) {
@@ -81,6 +94,10 @@ export function DownloadSheet({ track, onClose }: { track: Track | null; onClose
           ))}
         </ul>
       )}
+      <p className="player-hint">
+        {describeDestination(state.downloads.destination)}
+        {state.downloads.organise && state.downloads.destination.kind === 'folder' ? ' Filed under the artist and album.' : ''} Change that under Settings, Downloads.
+      </p>
       <p className="player-hint">
         These are your own files, copied or re-encoded on this device. Nothing is uploaded and nothing is fetched to do it.
       </p>

@@ -54,6 +54,36 @@ this page. The sheet says so rather than hiding the option.
 cannot put back what the MP3 discarded, and it will be larger than the file you started with. The
 sheet says that too, on the FLAC line, when the source is already compressed.
 
+### Where the file lands
+
+By default a browser drops a download wherever it drops everything else. That is right for a
+spreadsheet and wrong for music, so the player can be given a folder once and write into it from
+then on. **Settings → Downloads** offers whichever of these the browser can honour:
+
+| | |
+| --- | --- |
+| **A folder you choose** | Written into directly, with no dialog after the first. Chrome, Edge and Opera on a desktop. |
+| **Ask every time** | The system save dialog, per file. Anywhere with a save picker. |
+| **The browser's downloads folder** | What every browser does by default, and the only option on Firefox, Safari and phones. |
+
+A chosen folder can also **file tracks under the artist and album**, creating those folders as
+needed, which is how a music library is usually arranged.
+
+Three things are worth stating plainly.
+
+**It is a permission, not a path.** The browser hands the app an opaque handle to the folder. The
+player can write through it and cannot learn where the folder is on disk — so there is nothing to
+log and nothing to leak, and `docs/PRIVACY.md`'s rule that filesystem paths never leave the owning
+device holds without an exception.
+
+**Nothing is overwritten.** A file already holding the name is left alone and the new one is
+numbered beside it. The file in the way belongs to you and you did not ask for it to be replaced.
+
+**A folder that stops working does not lose the file.** Permission lapses between sessions, drives
+get unplugged. When the chosen folder cannot be written to, the download goes to the browser instead
+and the player says which happened — a file that silently lands somewhere else is worse than one
+that explains itself.
+
 ### The encoder
 
 `packages/audio-core/src/export/flac.ts` is a FLAC encoder written for this project rather than

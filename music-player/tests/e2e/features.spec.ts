@@ -48,20 +48,25 @@ test('shuffle deals a pass over the queue rather than picking at random', async 
   await shuffle.click();
   await expect(shuffle).toHaveAttribute('aria-pressed', 'true');
 
-  // Turning it on mid-song must not change the song: an iPod never did.
+  /*
+   * What the pass actually does — every track once, the playing song
+   * surviving a toggle, Previous walking back through what was heard — is
+   * asserted in music-player/tests/unit/shuffle.test.ts, against a pinned
+   * random sequence. It belongs there: the fixtures are a few seconds long,
+   * so proving it through real playback here would mean racing a track that
+   * ends mid-assertion, which fails for reasons that have nothing to do with
+   * shuffling. What this test owns is the wiring.
+   */
   await songRow(page, 'Lantern Road').focus();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Lantern Road');
-  // The fixtures are a few seconds long; pause so the track cannot end while
-  // the test is toggling and turn a timing race into a false failure.
-  await page.getByRole('button', { name: 'Pause' }).click();
-  await shuffle.click();
-  await shuffle.click();
-  await expect(page.getByRole('heading', { level: 1 }), 'the playing song survives the toggle').toContainText('Lantern Road');
 
-  // And the pass covers the other track rather than repeating this one.
+  // The pass reaches the other track rather than repeating this one.
   await page.getByRole('button', { name: 'Next track' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Quiet Arithmetic');
+
+  await shuffle.click();
+  await expect(shuffle, 'and it turns back off').toHaveAttribute('aria-pressed', 'false');
 });
 
 test('discover keeps playing past the end of the queue, and says why it chose what it did', async ({ page }) => {
@@ -165,5 +170,51 @@ test.describe('download', () => {
     // A 24-bit quantisation step is 2^-23; anything at or under it is the
     // rounding the format itself implies, not loss in the encoder.
     expect(comparison.worst!).toBeLessThanOrEqual(2 ** -23);
+  });
+});
+
+test.describe('where downloads go', () => {
+  /*
+   * The folder picker itself is a native dialog and cannot be driven from
+   * here, so what is checked is everything around it: the choices offered,
+   * that a choice sticks across a reload, and that the download sheet tells
+   * the listener where the file is about to land.
+   */
+  test('offers the choices this browser can actually honour, and remembers one', async ({ page }) => {
+    await page.getByRole('button', { name: /^Settings —/ }).click();
+    const panel = page.locator('.aqua-panel').filter({ hasText: 'Downloads' }).first();
+    await expect(panel).toBeVisible();
+
+    /*
+     * Chromium has a save dialog, so the default is to ask each time — and
+     * the button offering that is therefore absent, because it is what you
+     * already have. The two on offer are the ones that would change something.
+     */
+    await expect(panel.getByText(/asked where to put each file/i)).toBeVisible();
+    await expect(panel.getByRole('button', { name: /Choose a folder/ })).toBeVisible();
+    await expect(panel.getByRole('button', { name: /Ask every time/ }), 'already the current choice').toHaveCount(0);
+
+    await panel.getByRole('button', { name: /Use the browser/ }).click();
+    await expect(panel.getByText(/wherever your downloads go/i)).toBeVisible();
+
+    await page.reload();
+    await page.getByRole('button', { name: /^Settings —/ }).click();
+    const again = page.locator('.aqua-panel').filter({ hasText: 'Downloads' }).first();
+    await expect(again.getByText(/wherever your downloads go/i), 'the choice survives a reload').toBeVisible();
+
+    await again.getByRole('button', { name: /Ask every time/ }).click();
+    await expect(again.getByText(/asked where to put each file/i)).toBeVisible();
+  });
+
+  test('the download sheet says where the file will land', async ({ page }) => {
+    await page.getByRole('button', { name: /^Settings —/ }).click();
+    const panel = page.locator('.aqua-panel').filter({ hasText: 'Downloads' }).first();
+    await panel.getByRole('button', { name: /Use the browser/ }).click();
+
+    await page.getByRole('option', { name: /^Music Library/ }).click();
+    await loadFixtures(page);
+    await songRow(page, 'Quiet Arithmetic').click({ button: 'right' });
+    await page.getByRole('menu', { name: 'Song actions' }).getByRole('menuitem', { name: 'Download…' }).click();
+    await expect(page.getByRole('dialog').getByText(/wherever your downloads go/i)).toBeVisible();
   });
 });

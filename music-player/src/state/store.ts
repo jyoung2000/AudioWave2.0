@@ -20,6 +20,7 @@ import { forgetPickedFiles, indexPickedFiles, resolveFile, scanRoot, supportsDir
 import type { PlaybackEngine, PlaybackEvent, PlaybackState } from '../lib/playback.js';
 import { DEFAULT_CROSSFADE, crossfadeMsBetween, normalizeCrossfade, type CrossfadeSettings } from '../lib/crossfade.js';
 import { copiesSupported, removeCopy, requestPersistentStorage } from '../lib/copies.js';
+import { defaultDestination, pickDownloadFolder, supportsDownloadFolder, type DownloadDestination } from '../lib/download-folder.js';
 import { jumpInShuffle, makeShuffleOrder, nextInShuffle, previousInShuffle, remainingInShuffle, syncShuffleOrder, type ShuffleOrder } from '../lib/shuffle.js';
 import type * as DiscoverModule from '../lib/discover.js';
 import type { Discovery } from '../lib/discover.js';
@@ -86,6 +87,8 @@ export interface AppState {
   shuffle: boolean;
   /** The shuffled pass over the queue while shuffle is on; null when it is off. */
   shuffleOrder: ShuffleOrder | null;
+  /** Where a saved copy is written, and whether it is filed under Artist/Album. */
+  downloads: { destination: DownloadDestination; organise: boolean };
   /** Keep playing past the end of the queue, with music the recommender picks. */
   autoplay: boolean;
   /** What discover added last, and why, so the interface can say so. */
@@ -127,6 +130,7 @@ export class PlayerStore {
       queueIndex: -1,
       shuffle: false,
       shuffleOrder: null,
+      downloads: { destination: { kind: 'browser' }, organise: false },
       autoplay: false,
       lastDiscovery: null,
       repeat: 'off',
@@ -193,6 +197,22 @@ export class PlayerStore {
     const repeat = await getSetting<RepeatMode>(this.db, 'repeat', 'off');
     const crossfade = normalizeCrossfade(await getSetting<unknown>(this.db, 'playback.crossfade', DEFAULT_CROSSFADE));
     const autoplay = await getSetting(this.db, 'playback.autoplay', false);
+
+    /*
+     * The download folder. The handle is stored as the browser gave it to us
+     * and comes back usable; whether we are still *allowed* to write to it is
+     * a separate question, asked at the moment of saving because only a click
+     * can answer it.
+     */
+    const downloadMode = await getSetting<'folder' | 'ask' | 'browser' | null>(this.db, 'downloads.mode', null);
+    const downloadFolder = await getSetting<FileSystemDirectoryHandle | null>(this.db, 'downloads.folder', null);
+    const organise = await getSetting(this.db, 'downloads.organise', false);
+    const destination: DownloadDestination =
+      downloadMode === 'folder' && downloadFolder
+        ? { kind: 'folder', handle: downloadFolder, name: downloadFolder.name }
+        : downloadMode === 'ask' || downloadMode === 'browser'
+          ? { kind: downloadMode }
+          : defaultDestination();
     // Copies are the phone's answer to folders: where a folder cannot be kept connected, keeping
     // the files themselves is what makes the library survive a reload, so that is the default there.
     const copies = await copiesSupported();
@@ -227,6 +247,7 @@ export class PlayerStore {
       crossfade,
       // The queue is empty on a cold start, so the pass is built when one is set.
       shuffleOrder: shuffle ? { ids: [], pos: -1 } : null,
+      downloads: { destination, organise },
       autoplay,
       storage: await storageReport(this.db),
     });
@@ -600,6 +621,46 @@ export class PlayerStore {
     const { profileFrom } = await discoverModule();
     this.tasteProfile = profileFrom(this.state.deviceId, this.state.events, this.tasteProfile);
     return this.tasteProfile;
+  }
+
+  /* -------------------------------------------------------------- downloads */
+
+  /**
+   * Point the player at a folder. Returns the reason it could not, or null.
+   *
+   * The handle is kept, not the path: the player has no way to learn where
+   * the folder is on disk and nothing it could log if it did.
+   */
+  async chooseDownloadFolder(): Promise<string | null> {
+    if (!supportsDownloadFolder()) {
+      return 'This browser will not hand a folder to a web app, so downloads go wherever it puts them.';
+    }
+    let handle: FileSystemDirectoryHandle | null;
+    try {
+      handle = await pickDownloadFolder();
+    } catch (err) {
+      return `That folder could not be opened: ${err instanceof Error ? err.message : String(err)}`;
+    }
+    // The picker was closed: nothing chosen, nothing to report.
+    if (!handle) return null;
+    const db = this.require();
+    await putSetting(db, 'downloads.folder', handle);
+    await putSetting(db, 'downloads.mode', 'folder');
+    this.patch({ downloads: { ...this.state.downloads, destination: { kind: 'folder', handle, name: handle.name } } });
+    return null;
+  }
+
+  /** Go back to being asked each time, or to the browser's own downloads folder. */
+  async setDownloadMode(mode: 'ask' | 'browser'): Promise<void> {
+    const db = this.require();
+    await putSetting(db, 'downloads.mode', mode);
+    await putSetting(db, 'downloads.folder', null);
+    this.patch({ downloads: { ...this.state.downloads, destination: { kind: mode } } });
+  }
+
+  async setOrganiseDownloads(organise: boolean): Promise<void> {
+    this.patch({ downloads: { ...this.state.downloads, organise } });
+    await putSetting(this.require(), 'downloads.organise', organise);
   }
 
   async setAutoplay(autoplay: boolean): Promise<void> {

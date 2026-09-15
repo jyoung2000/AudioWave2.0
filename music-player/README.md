@@ -69,6 +69,12 @@ the file already is one, because making an MP3 means encoding one and this playe
 encoder; the sheet says that rather than producing something else quietly.
 [docs/DOWNLOADS_AND_LEGAL.md](../docs/DOWNLOADS_AND_LEGAL.md) has the whole matrix.
 
+**Settings → Downloads** decides where they go: a folder you pick once and are never asked about
+again, the system save dialog each time, or the browser's own downloads folder. A chosen folder can
+file tracks under the artist and album. The player holds a permission rather than a path — it is
+never told where the folder is — it never overwrites a file already using the name, and if the
+folder stops working the download falls back to the browser rather than vanishing.
+
 ## Setting it up, which is to say, not
 
 There is no account, no key and no server in the player. Open it, choose music, play. On a computer

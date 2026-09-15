@@ -16,6 +16,7 @@ import { MAX_CROSSFADE_SECONDS } from '../lib/playback.js';
 import type { ReleaseMetadata } from '@now-playing/contracts';
 import type { StoredRoot } from '../lib/db.js';
 import { supportsDirectoryHandles } from '../lib/library.js';
+import { describeDestination, supportsDownloadFolder, supportsSavePicker } from '../lib/download-folder.js';
 import { pickFiles } from './Library.js';
 
 export function SettingsView() {
@@ -153,6 +154,55 @@ export function SettingsView() {
               ? ''
               : ' On this device the fade runs inside the equalizer path; a stream the equalizer cannot process is cut rather than faded.'}
           </p>
+        </PanelSection>
+      </Panel>
+
+      <Panel title="Downloads">
+        <PanelSection>
+          <p className="player-hint">{describeDestination(state.downloads.destination)}</p>
+          <div className="player-toolbar-row">
+            {supportsDownloadFolder() ? (
+              <Button
+                size="small"
+                icon="folder"
+                ellipsis
+                onClick={() => {
+                  void (async () => {
+                    const reason = await store.chooseDownloadFolder();
+                    if (reason) toast.show(reason, { kind: 'warning' });
+                  })();
+                }}
+              >
+                {state.downloads.destination.kind === 'folder' ? 'Choose a different folder' : 'Choose a folder'}
+              </Button>
+            ) : null}
+            {supportsSavePicker() && state.downloads.destination.kind !== 'ask' ? (
+              <Button size="small" onClick={() => void store.setDownloadMode('ask')}>
+                Ask every time
+              </Button>
+            ) : null}
+            {state.downloads.destination.kind !== 'browser' ? (
+              <Button size="small" onClick={() => void store.setDownloadMode('browser')}>
+                Use the browser&rsquo;s downloads folder
+              </Button>
+            ) : null}
+          </div>
+          {state.downloads.destination.kind === 'folder' ? (
+            <Checkbox checked={state.downloads.organise} onChange={(e) => void store.setOrganiseDownloads(e.currentTarget.checked)}>
+              File them under the artist and album
+            </Checkbox>
+          ) : null}
+          <p className="player-hint">
+            {supportsDownloadFolder()
+              ? 'A folder you choose is remembered, and the player writes into it without asking again. It holds a permission, not a path: the app is never told where the folder is on your disk, and a name that is already taken is never overwritten — the new file gets a number instead.'
+              : 'This browser will not hand a folder to a web app, so downloads go wherever it puts them. Chrome, Edge and Opera on a desktop can do it.'}
+          </p>
+          {state.downloads.destination.kind === 'folder' ? (
+            <p className="player-hint">
+              If the permission lapses or the folder goes away, the file is not lost: it goes to your browser&rsquo;s downloads instead and the player says so rather than letting it land somewhere
+              you did not expect.
+            </p>
+          ) : null}
         </PanelSection>
       </Panel>
 

@@ -24,6 +24,7 @@
 import type { Track } from '@now-playing/contracts';
 import type { BitDepth } from '@now-playing/audio-core';
 import EncoderWorker from '../workers/encoder.ts?worker&inline';
+import { defaultDestination, ensureWritable, writeIntoFolder, type DownloadDestination } from './download-folder.js';
 
 export type ExportFormat = 'original' | 'mp3' | 'flac' | 'wav';
 
@@ -179,29 +180,74 @@ function encodeInWorker(request: { format: 'flac' | 'wav'; channels: Float32Arra
   });
 }
 
+export interface SaveOutcome {
+  /** cancelled: the person closed the dialog. Not a failure and not reported as one. */
+  kind: 'saved' | 'downloaded' | 'cancelled';
+  /** Where it went, when that can be said. A folder name, never a path. */
+  where: string | null;
+  /** Set when the chosen folder could not be used and the browser took over. */
+  fellBackBecause: string | null;
+}
+
+export interface SaveOptions {
+  destination?: DownloadDestination;
+  organise?: boolean;
+  artistName?: string;
+  albumName?: string | null;
+}
+
 /**
- * Hand the file to the person.
+ * Hand the file to the person, where they asked for it.
  *
- * Where the browser has a save dialog it is used, so the file lands where
- * they chose. Otherwise a link click sends it to the downloads folder, which
- * is every other browser's answer.
+ * A folder they chose is written into directly. Otherwise the system save
+ * dialog asks, and where there is no dialog the browser takes it. A folder
+ * that has become unusable — permission withdrawn, the disk unplugged — does
+ * not lose the file: it falls back, and says which happened, because a
+ * download that silently lands somewhere else is worse than one that
+ * explains itself.
  */
-export async function saveFile(result: ExportResult): Promise<'saved' | 'downloaded' | 'cancelled'> {
-  const picker = (window as unknown as { showSaveFilePicker?: (options: unknown) => Promise<FileSystemFileHandle> }).showSaveFilePicker;
-  if (picker) {
-    try {
-      const handle = await picker.call(window, {
-        suggestedName: result.filename,
-        types: [{ description: 'Audio', accept: { [result.blob.type || 'application/octet-stream']: [`.${result.filename.split('.').pop()}`] } }],
-      });
-      const writable = await (handle as FileSystemFileHandle & { createWritable(): Promise<WritableStream<BlobPart>> }).createWritable();
-      await result.blob.stream().pipeTo(writable);
-      return 'saved';
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return 'cancelled';
-      // Fall through: a picker that refused is not a reason to lose the file.
+export async function saveFile(result: ExportResult, options: SaveOptions = {}): Promise<SaveOutcome> {
+  const destination = options.destination ?? defaultDestination();
+
+  if (destination.kind === 'folder') {
+    const permitted = await ensureWritable(destination.handle);
+    if (permitted.ok) {
+      try {
+        const written = await writeIntoFolder(destination.handle, result.filename, result.blob, {
+          organise: options.organise ?? false,
+          artistName: options.artistName ?? 'Unknown Artist',
+          albumName: options.albumName ?? null,
+        });
+        return { kind: 'saved', where: written.path, fellBackBecause: null };
+      } catch (error) {
+        return browserDownload(result, `“${destination.name}” could not be written to: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    return browserDownload(result, permitted.reason);
+  }
+
+  if (destination.kind === 'ask') {
+    const picker = (window as unknown as { showSaveFilePicker?: (options: unknown) => Promise<FileSystemFileHandle> }).showSaveFilePicker;
+    if (picker) {
+      try {
+        const handle = await picker.call(window, {
+          suggestedName: result.filename,
+          types: [{ description: 'Audio', accept: { [result.blob.type || 'application/octet-stream']: [`.${result.filename.split('.').pop()}`] } }],
+        });
+        const writable = await (handle as FileSystemFileHandle & { createWritable(): Promise<WritableStream<BlobPart>> }).createWritable();
+        await result.blob.stream().pipeTo(writable);
+        return { kind: 'saved', where: handle.name, fellBackBecause: null };
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return { kind: 'cancelled', where: null, fellBackBecause: null };
+        // A dialog that refused is not a reason to lose the file.
+      }
     }
   }
+
+  return browserDownload(result, null);
+}
+
+function browserDownload(result: ExportResult, fellBackBecause: string | null): SaveOutcome {
   const url = URL.createObjectURL(result.blob);
   const link = document.createElement('a');
   link.href = url;
@@ -211,5 +257,5 @@ export async function saveFile(result: ExportResult): Promise<'saved' | 'downloa
   link.remove();
   // Revoked late: revoking immediately can cancel the download in some browsers.
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
-  return 'downloaded';
+  return { kind: 'downloaded', where: null, fellBackBecause };
 }

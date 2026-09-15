@@ -53,6 +53,7 @@ and reports platform-unavailable ones as skipped, never as passed.
 | Shuffle as a dealt pass, not a random pick | **Done** | Every track plays once before any repeats; the playing song survives the toggle; Previous walks the order actually heard; repeat-all reshuffles and avoids opening on the song that just closed. The old implementation picked a fresh random index each time, so it repeated songs while others never played |
 | Discover: keep playing past the end of the queue, and "play similar to this" | **Done** | The recommender runs in the page over the local library, seeded by the last track. Every pick carries its reason. Nothing is sent anywhere; with nothing suitable it says so and stops |
 | Download your own music as FLAC, WAV or the original | **Done** | FLAC and WAV encoded on the device by `audio-core`; MP3 only where the file already is one, with the reason shown otherwise. Verified by decoding a downloaded FLAC in the browser and comparing it to the source |
+| Choosing where downloads are saved | **Done** | A folder handle kept in the same database as the music folders, with write permission re-checked at each save; optional Artist/Album filing; collision-safe names; falls back to the browser and says so when the folder cannot be written to. Where a browser has no directory picker the panel says that rather than offering a control that cannot work |
 | A large-target driving view | **Not built** | The Media Session path covers the car; a driving-specific layout was not asked for |
 
 ## docker-container (the hub)
