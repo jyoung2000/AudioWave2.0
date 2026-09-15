@@ -18,6 +18,9 @@ export default tseslint.config(
       '**/coverage/**',
       '**/playwright-report/**',
       '**/test-results/**',
+      // The single-file suite writes its own report and results beside the served one.
+      '**/playwright-report-local/**',
+      '**/test-results-local/**',
       'docs/reference/**',
       '**/*.d.ts',
       'CLAUDE-FABLE-5.md',

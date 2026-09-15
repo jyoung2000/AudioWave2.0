@@ -30,3 +30,5 @@ CLAUDE-FABLE-5.md
 # a file people copy and edit against Docker's own documentation.
 *.yaml
 *.yml
+playwright-report-local/
+test-results-local/
