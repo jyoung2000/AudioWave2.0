@@ -582,3 +582,47 @@ a.aqua-badge:hover { color: #fff; background: var(--aqua-selection-mid); }
 a.aqua-badge:focus-visible { outline-offset: 1px; }
 [aria-selected="true"] .aqua-badge,
 .aqua-results__row[data-selected="true"] .aqua-badge { color: #fff; background: rgb(255 255 255 / 28%); }
+
+/* --------------------------------------------------------------------------
+   Touch
+   --------------------------------------------------------------------------
+   The media controls are the densest thing in the system: a results row packs
+   artwork, two lines of text, a duration and two icon buttons into 40px, and
+   growing any of it would turn a list of ten results into a list of four.
+   So these keep the size they are drawn at and take their taps from a
+   transparent overlay, centred on the control. See aqua.css §3b.
+   -------------------------------------------------------------------------- */
+@media (pointer: coarse) {
+  .aqua-results__actions .aqua-icon-button,
+  .aqua-results__clear,
+  .aqua-results__page,
+  .aqua-scrubber__track {
+    position: relative;
+  }
+
+  .aqua-results__actions .aqua-icon-button::after,
+  .aqua-results__clear::after,
+  .aqua-results__page::after,
+  .aqua-scrubber__track::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, var(--aqua-hit));
+    height: var(--aqua-hit);
+    content: '';
+    transform: translate(-50%, -50%);
+  }
+
+  /* A results row is read before it is tapped; its two lines carry the title
+     and the artist, and 11px is not enough for either. */
+  .aqua-results__row {
+    min-height: var(--aqua-hit);
+  }
+
+  .aqua-results__title,
+  .aqua-results__sub,
+  .aqua-results__dur,
+  .aqua-results__msg {
+    font-size: var(--aqua-font-small);
+  }
+}

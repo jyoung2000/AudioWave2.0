@@ -49,6 +49,7 @@ and reports platform-unavailable ones as skipped, never as passed.
 | Copies of chosen files kept in the app's private storage, so phones have an offline library | **Done** | On by default where folders cannot be connected; a writable stream where the browser has one, a worker with a sync access handle where it does not. Persistent storage is requested with the first copy |
 | Phone readiness: iOS head and touch icon, safe-area insets, audio session, interruption recovery, honest lock-screen and volume rows | **Done** | The list drops the number and artist columns under 480 px and shows the artist under the title; a stale rule from the old table had been hiding every text column on phones |
 | A GitHub Pages workflow, so the player has an https address with no server | **Done** | `pages.yml`; enable Pages with the GitHub Actions source once. `NP_BASE_PATH` rebases the app, manifest and worker for a project page |
+| Readable and tappable on a phone: a touch layer for both skins | **Done** | On a coarse pointer the type steps up two points, controls and rows grow, and nothing interactive is under 44px — compact controls keep their drawn size and take taps from a transparent overlay. The desktop is untouched, including a narrow window. Measured at 320/390/768px by `responsive.spec.ts`, which also asserts the desktop still renders its 18px row of 11px text |
 | A large-target driving view | **Not built** | The Media Session path covers the car; a driving-specific layout was not asked for |
 
 ## docker-container (the hub)
@@ -57,6 +58,7 @@ and reports platform-unavailable ones as skipped, never as passed.
 | --- | --- | --- |
 | First-run gate: `admin`/`admin`, forced change before anything else | **Done** | Enforced at the API, not only in the interface; e2e proves it with direct API calls |
 | Auth: argon2id, HttpOnly SameSite cookie, CSRF double-submit, CSP | **Done** | Weak-password denylist added after a test accepted `password1234` |
+| The GUI is readable on a phone or tablet | **Done** | It wears the shared window skin, so the touch layer covers its controls; its own hint, legend and fingerprint classes step up beside them. The sign-in and first-run screens had been rendering outside any `aqua-root`, in the browser's default serif — see DEVIATIONS.md |
 | All 119 API operations | **Done** | A contract test asserts every declared route has a handler |
 | Device pairing: short-lived single-use codes, fingerprint confirmation | **Done** | 50-bit Crockford base32, no ambiguous characters |
 | Group listening: authoritative queue, revisions, drift, vote-skip | **Done** | Two defects found and fixed by tests: non-deterministic history order, and play restarting the current track |

@@ -2608,3 +2608,303 @@ button.srch__art:focus-visible .srch__scrim,
 .library .lib-title__artist {
   display: none;
 }
+
+/* --------------------------------------------------------------------------
+   Touch
+   --------------------------------------------------------------------------
+
+   The window skin's touch layer (aqua.css §3b) explains the reasoning: on a
+   coarse pointer the type steps up and every target grows to 44px, while the
+   drawing stays exactly as it is. This is the same layer for the page skin,
+   which carries its own metrics rather than the --aqua-* ones.
+
+   The list is the interesting case. It is the reference's iTunes 10 table,
+   18px rows of 11px text, and on a phone that is both unreadable and
+   untappable — so rows grow, the type grows, and the artist moves under the
+   title (the rule above at 480px), which is how a phone has shown a song list
+   since the first iPod. It stays the same list, with the same columns and the
+   same behaviours; only the scale changes.
+   -------------------------------------------------------------------------- */
+@media (pointer: coarse) {
+  :root {
+    --np-bar-type: 15px;
+    --np-field-h: 36px;
+  }
+
+  /* The status bar and its contents. */
+  .np-mode__item {
+    height: 34px;
+    padding: 0 12px;
+  }
+
+  .np-avatar {
+    width: 34px;
+    height: 34px;
+  }
+
+  .np-bar__clock {
+    font-size: 14px;
+  }
+
+  /* The section strip: a row of tabs, and the primary way around the app. */
+  .np-sections__item {
+    height: 44px;
+    padding: 0 14px;
+    font-size: 14px;
+  }
+
+  /* The scrubber. The rail is dragged, so it needs depth as well as width;
+     the visible groove keeps its height and the rail grows around it. */
+  .np-scrub__rail {
+    height: 22px;
+  }
+
+  .np-scrub__time {
+    font-size: 13px;
+  }
+
+  /* Transport and volume. */
+  .np-vol__btn {
+    width: 34px;
+    height: 34px;
+  }
+
+  .np-vol__track {
+    height: 12px;
+  }
+
+  /* The music list. */
+  .library {
+    font-size: 13px;
+  }
+
+  .library th {
+    height: 34px;
+    font-size: 13px;
+  }
+
+  .library td {
+    height: 44px;
+  }
+
+  .library .lib-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .library .lib-pf {
+    font-size: 11px;
+  }
+
+  .library .lib-pf[data-len='2'] {
+    font-size: 10px;
+  }
+
+  .library td .lib-title__artist {
+    font-size: 12px;
+    line-height: 15px;
+  }
+
+  /* The page's own furniture. */
+  .np-section-head p,
+  .np-share-strip,
+  .np-status {
+    font-size: 13px;
+  }
+
+  .np-share-strip__note {
+    font-size: 12px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Touch, part two: the page skin's components
+   --------------------------------------------------------------------------
+   As in the window skin, these sit at the end so a component's own rule does
+   not outrank them on source order.
+   -------------------------------------------------------------------------- */
+@media (pointer: coarse) {
+  /* 16px is not a style choice: iOS zooms the page when a field under 16px
+     takes focus, which throws the sticky bar off and leaves the reader
+     somewhere they did not ask to be. */
+  .np-search__input {
+    height: 40px;
+    font-size: 16px;
+  }
+
+  /* The bar: a phone's navigation bar is 44pt, and this is that bar. */
+  .np-mode__item {
+    height: 44px;
+  }
+
+  .np-avatar {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* The transport. The keys were 44 wide and 40 tall — square them off. */
+  .np-key {
+    height: 44px;
+  }
+
+  /*
+   * Sliders keep the size they are drawn at and take their taps from an
+   * overlay, because a 44px-tall groove would not read as a groove. The rail
+   * spans the page and the volume track sits in its own group, so neither
+   * overlay can steal a tap from a control beside it.
+   */
+  .np-scrub,
+  .np-vol__track {
+    position: relative;
+  }
+
+  .np-scrub__rail::after,
+  .np-vol__track::after {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 100%;
+    height: 44px;
+    content: '';
+    transform: translateY(-50%);
+  }
+
+  .np-scrub__rail {
+    position: relative;
+  }
+
+  /* The status line under the page. */
+  .np-foot {
+    font-size: 13px;
+  }
+}
+
+@media (pointer: coarse) {
+  .np-search__input {
+    height: 44px;
+  }
+
+  /* Two segments, so each gets a finger's width rather than a label's. */
+  .np-mode__item {
+    min-width: 44px;
+  }
+
+  .np-vol__btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* The icons in a list row keep their size — a 44px icon would swamp the row
+     it sits in — and take their taps from the same kind of overlay as the
+     sliders above. The row is 44px tall, so the overlay stays inside it. */
+  .library .lib-btn {
+    position: relative;
+  }
+
+  .library .lib-btn::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    content: '';
+    transform: translate(-50%, -50%);
+  }
+}
+
+@media (pointer: coarse) {
+  /*
+   * The search popover. Its rows were 40px of 11px text — close enough on a
+   * desktop, under the line on a phone. The row grows, its two lines of text
+   * grow with it, and Clear becomes a target rather than a word.
+   */
+  .srch__row {
+    height: 52px;
+  }
+
+  .srch__title,
+  .srch__sub {
+    line-height: 16px;
+  }
+
+  .srch__title {
+    font-size: 14px;
+  }
+
+  .srch__sub,
+  .srch__dur,
+  .srch__count,
+  .srch__meta {
+    font-size: 12px;
+  }
+
+  .srch__clear {
+    min-height: 44px;
+    padding: 2px 10px;
+  }
+
+  /*
+   * The source badge in a list row: a two-letter pill 18px wide. It cannot
+   * grow — it sits in an icon column beside the star and the offline key —
+   * so it takes its taps from an overlay, like those do.
+   */
+  .lib-pf {
+    position: relative;
+    font-size: 10px;
+  }
+
+  a.lib-pf::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    content: '';
+    transform: translate(-50%, -50%);
+  }
+}
+
+@media (pointer: coarse) {
+  /* A context menu item and a sheet's field both have room to grow. */
+  .ctx__item {
+    min-height: 44px;
+  }
+
+  .sheet__input {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  /* Artwork in a result row doubles as the audition button, and the pager
+     dots are 18px by design. Both take an overlay rather than growing. */
+  .srch__art,
+  .srch__page {
+    position: relative;
+  }
+
+  .srch__art::after,
+  .srch__page::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    content: '';
+    transform: translate(-50%, -50%);
+  }
+}
+
+@media (pointer: coarse) {
+  /*
+   * The equalizer. Its band labels are the frequencies — 32, 64, 125 and so
+   * on — and a narrow-width rule above takes them down to 9px, which is the
+   * right instinct (ten columns in a small space) and the wrong result on the
+   * device most likely to be narrow. They step back up here, and the rail
+   * gets the width to keep ten of them legible.
+   */
+  .eqw__label,
+  .eqw__scale,
+  .eqw .aqua-slider__readout {
+    font-size: 12px;
+  }
+}

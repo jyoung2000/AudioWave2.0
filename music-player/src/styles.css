@@ -400,3 +400,38 @@ body {
   max-width: 440px;
   margin-bottom: 10px;
 }
+
+/* The hints under each panel are the player's explanations of what it can and
+   cannot do — the last thing that should be unreadable on the device asking
+   the question. See the touch layer in aqua-ui's stylesheets. */
+@media (pointer: coarse) {
+  .player-hint {
+    font-size: 13px;
+  }
+
+  .player-subhead {
+    font-size: 14px;
+  }
+
+  .player-list,
+  .player-notices li {
+    font-size: 13px;
+  }
+}
+
+/* A text link is still a target: it needs the height and the size, and it is
+   inline, so the height has to come from a box it does not otherwise have. */
+@media (pointer: coarse) {
+  .player-link {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    font-size: 13px;
+  }
+
+  .player-row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+}

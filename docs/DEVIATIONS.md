@@ -263,3 +263,5 @@ be wanted.
 | Claim | What was true | What changed |
 | --- | --- | --- |
 | "Updates use `registerType: 'prompt'`: when a new version is available you are told" (PWA_AND_CAR.md) | The service worker was generated at build time and never registered by the app, so nothing was precached, the app did not start offline, and no update prompt could appear. The e2e test accepted the worker merely being served. | The app registers the worker after the store is up and shows a notice with a Reload button when a new version is waiting; the test requires a real registration and reloads with the network off. |
+
+| The hub's admin GUI "uses the shared Aqua design system" | Its sign-in and first-run password screens were rendered in a bare `div`, outside any `aqua-root` — so the first screen anyone sees on a new hub had none of the system's typography, and fell back to the browser's default serif at its default size. | The wrapper is an `aqua-root`. Found by screenshotting the hub on a tablet rather than by reading the code. |

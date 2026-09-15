@@ -219,3 +219,22 @@ body {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* The admin GUI is a window skin, and aqua-ui's stylesheet steps its controls
+   and type up on a coarse pointer. These are the GUI's own small classes,
+   which that sheet does not know about: the hint under a panel, the legend on
+   a scope group, a subheading, an inline error, and a key fingerprint — all
+   things an administrator reads on a phone while standing next to a machine. */
+@media (pointer: coarse) {
+  .admin-login__hint,
+  .admin-hint,
+  .admin-scopes legend,
+  .admin-subhead,
+  .admin-inline-error {
+    font-size: 13px;
+  }
+
+  .admin-fingerprint {
+    font-size: 12px;
+  }
+}

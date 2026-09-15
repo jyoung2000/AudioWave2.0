@@ -143,3 +143,17 @@ body {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* As in the hub's GUI: aqua-ui steps the shared controls up on a coarse
+   pointer, and these are the companion's own small classes. The window runs
+   on a desktop, so this is reached on a touchscreen laptop or a tablet. */
+@media (pointer: coarse) {
+  .companion-hint,
+  .companion-list {
+    font-size: 13px;
+  }
+
+  .companion-path {
+    font-size: 12px;
+  }
+}

@@ -177,6 +177,46 @@ past the visual, not from growing the visual. Never shrink a hit target to match
 
 ---
 
+## 5b. Touch
+
+Everything above was drawn for a mouse on a 2010 desktop: 13 px system text, 11 px in a table, a
+22 px control, an 18 px row. At arm's length with a cursor that lands on one pixel, all of it is
+right, and on a desktop it is left exactly as it is — **including a desktop window dragged narrow**,
+because the pointer is still precise and the reader is still close.
+
+A finger is about 9 mm across and a phone is held further away than it looks. So the whole system
+steps up on `(pointer: coarse)`, and only the numbers change: every gradient, bevel, radius and
+border is the same, so it still reads as this interface rather than a separate mobile theme.
+
+| | Desktop | Coarse pointer |
+|---|---|---|
+| System / view / small / label / mini text | 13 / 12 / 11 / 10 / 9 px | 15 / 14 / 13 / 12 / 11 px |
+| Control, small, mini | 22 / 19 / 15 px | 34 / 30 / 26 px |
+| Table header, row, source row | 20 / 20 / 21 px | 32 / 36 / 44 px |
+| `--aqua-hit` | 32 px | 44 px |
+| The player's list row, and its text | 18 px, 11 px | 44 px, 13 px |
+| A field's text | 11–13 px | 16 px |
+
+Three rules hold the layer together.
+
+**Nothing interactive is under 44 px.** Where a control has room, it grows. Where it cannot — a
+14 px traffic light, a 22 px vertical fader, the icons inside a list row — it keeps the size it is
+drawn at and takes its taps from a transparent `::after` centred on it. The visual and the target
+are different things, and only one of them is allowed to be small.
+
+**No text is under 12 px.** A hint explaining what the app cannot do is the last thing that should
+be unreadable on the device asking the question.
+
+**A field's text is 16 px.** Not a style choice: iOS zooms the page when a field under 16 px takes
+focus, which throws a sticky header off and leaves the reader somewhere they did not ask to be.
+
+The layer lives at the end of each stylesheet, after the components. Written at the top it loses to
+a component's own rule on source order — which is exactly what happened the first time, leaving
+every small button 30 px tall inside a block that asked for 44.
+
+`music-player/tests/e2e/responsive.spec.ts` measures all of this at 320, 390 and 768 px, and
+asserts the desktop still gets its 18 px row of 11 px text. A screenshot would catch none of it.
+
 ## 6. Shape and material
 
 Radii: `--aqua-window-radius` 7px, `--aqua-panel-radius` 5px, `--aqua-control-radius` 5px,

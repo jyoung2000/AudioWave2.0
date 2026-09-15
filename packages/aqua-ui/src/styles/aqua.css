@@ -205,11 +205,61 @@
   --aqua-motion-press: 0ms;
 }
 
-/* Touch: keep visuals compact, expand the hit target (spec §14.2) */
+/* --------------------------------------------------------------------------
+   3b. Touch
+   --------------------------------------------------------------------------
+
+   Aqua was drawn for a mouse on a 2010 desktop: 13px system text, 11px in a
+   table, controls 22px tall. At arm's length with a cursor that lands on a
+   single pixel, all of that is right, and on a desktop it is left exactly as
+   it was — including a desktop window dragged narrow, because the pointer is
+   still precise and the reader is still close.
+
+   A finger is about 9 mm across and a phone is held further away than it
+   looks. So on a coarse pointer the whole system steps up: type by two
+   points, controls and rows to something a thumb can hit, and the hit target
+   to the 44px both platform guidelines ask for. Only the numbers change —
+   every gradient, bevel, radius and border is the same, so it still reads as
+   the same interface rather than a separate mobile theme.
+
+   It is one block because the system is token-driven; the components below
+   read these variables and need no rules of their own. The selector carries
+   both `:root` and `[data-aqua-profile]` so it outranks the profile overrides
+   above whichever profile is active.
+   -------------------------------------------------------------------------- */
 @media (pointer: coarse) {
-  :root {
+  :root,
+  [data-aqua-profile] {
+    /* Both Apple and Google ask for 44px; nothing interactive goes below it. */
     --aqua-hit: 44px;
+
+    /* Type: +2px across the scale, so the hierarchy between steps survives. */
+    --aqua-font-system: 15px;
+    --aqua-font-view: 14px;
+    --aqua-font-small: 13px;
+    --aqua-font-label: 12px;
+    --aqua-font-mini: 11px;
+
+    /* Controls: a finger, not a cursor. */
+    --aqua-control-h: 34px;
+    --aqua-control-h-small: 30px;
+    --aqua-control-h-mini: 26px;
+    --aqua-search-h: 34px;
+    --aqua-search-h-small: 30px;
+
+    /* Rows: tall enough to hit, and to read two lines where a table stacks. */
+    --aqua-table-header-h: 32px;
+    --aqua-row-h: 36px;
+    --aqua-source-row-h: 44px;
+
+    /* Chrome. The toolbar shrinks: its icons grow, but 62px of it on a phone
+       is a third of the screen before any content. */
+    --aqua-toolbar-h: 52px;
+    --aqua-bottom-bar-small: 34px;
+    --aqua-bottom-bar-regular: 40px;
+    --aqua-traffic-size: 14px;
   }
+
 }
 
 /* --------------------------------------------------------------------------
@@ -1575,3 +1625,167 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
 .aqua-slider--vertical .aqua-slider__fill { width: 100%; height: var(--aqua-fill, 0%); top: auto; bottom: 0; }
 .aqua-slider--vertical .aqua-slider__thumb { left: 50%; top: auto; bottom: var(--aqua-fill, 0%); transform: translate(-50%, 50%); }
 .aqua-slider--vertical .aqua-slider__value { width: 100%; text-align: center; }
+
+/* --------------------------------------------------------------------------
+   Touch, part two: the components
+   --------------------------------------------------------------------------
+
+   The tokens are set in §3b; these are the controls whose size is drawn
+   rather than read from one. They live at the end of the sheet because a
+   component's own rule (`.aqua-button--small { min-height: … }`) would
+   otherwise win on source order — which it did, the first time this was
+   written, leaving every small button 30px tall in a block that asked for 44.
+   -------------------------------------------------------------------------- */
+@media (pointer: coarse) {
+  .aqua-check__box,
+  .aqua-radio__dot {
+    width: 20px;
+    height: 20px;
+  }
+
+  .aqua-check,
+  .aqua-radio {
+    gap: 10px;
+    min-height: var(--aqua-hit);
+  }
+
+  .aqua-button,
+  .aqua-button--small,
+  .aqua-tab,
+  .aqua-segmented__item,
+  .aqua-popup,
+  .aqua-select,
+  .aqua-menu__item,
+  .aqua-source-list__item,
+  .aqua-icon-button {
+    min-height: var(--aqua-hit);
+  }
+
+  .aqua-button {
+    padding-inline: 18px;
+  }
+
+  .aqua-button--small {
+    padding-inline: 14px;
+  }
+
+  /* Mini is the one size that stays visibly small — it exists for a row of
+     actions inside a table cell, where 44px would double the row. It gets the
+     target without the height, from the overlay below. */
+  .aqua-button--mini {
+    position: relative;
+    min-height: 32px;
+    padding-inline: 12px;
+  }
+
+  /*
+   * Where a control has to keep its drawn size, the target grows around it
+   * instead: a transparent overlay, centred, that takes the taps without
+   * moving anything. Nothing else can sit on top of these, so there is no
+   * ambiguity about which one a tap reaches.
+   */
+  .aqua-button--mini::after,
+  .aqua-work-area__splitter::after,
+  .aqua-traffic-light::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, var(--aqua-hit));
+    height: max(100%, var(--aqua-hit));
+    content: '';
+    transform: translate(-50%, -50%);
+  }
+
+  .aqua-work-area__splitter,
+  .aqua-traffic-light {
+    position: relative;
+  }
+
+  /* A splitter is dragged rather than tapped: it needs width, not squareness. */
+  .aqua-work-area__splitter::after {
+    width: 24px;
+    height: 100%;
+  }
+}
+
+@media (pointer: coarse) {
+  /* A field is typed into as well as tapped, and its padding puts it just
+     under the line the rest of the controls clear. */
+  .aqua-field__input,
+  .aqua-search__input {
+    min-height: var(--aqua-hit);
+  }
+
+  /* iOS zooms the page when a field under 16px takes focus. */
+  .aqua-field__input,
+  .aqua-search__input,
+  .aqua-select,
+  textarea.aqua-field__input {
+    font-size: 16px;
+  }
+}
+
+@media (pointer: coarse) {
+  /* A collapsible group heading in the source list is a real button — it is
+     what opens and closes the group — and it was drawn as a 16px label. */
+  .aqua-source-list__heading[role='button'] {
+    min-height: var(--aqua-hit);
+  }
+
+  /* The editable number beside a slider is typed into as well as tapped. */
+  .aqua-slider__value {
+    min-height: var(--aqua-hit);
+    font-size: 16px;
+  }
+}
+
+@media (pointer: coarse) {
+  /* A table's sort header is a button spanning the column. */
+  .aqua-table__sort {
+    min-height: var(--aqua-hit);
+  }
+
+  /* Two segments or three tabs: each gets a finger's width, not a word's. */
+  .aqua-segmented__item,
+  .aqua-tab {
+    min-width: var(--aqua-hit);
+  }
+
+  /*
+   * The window's traffic lights are 14px by design and cannot be anything
+   * else — they are the one shape in the system everybody recognises at a
+   * glance. The span around each is spacing rather than a target, so the
+   * overlay goes on the button itself.
+   *
+   * A vertical fader is the same case in the other axis: 22px wide is the
+   * groove, and the overlay gives the thumb somewhere to be caught.
+   */
+  .aqua-traffic__light,
+  .aqua-slider--vertical .aqua-slider__track,
+  .aqua-volume > .aqua-icon-button,
+  .aqua-badge {
+    position: relative;
+  }
+
+  .aqua-traffic__light::after,
+  .aqua-volume > .aqua-icon-button::after,
+  .aqua-badge::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--aqua-hit);
+    height: var(--aqua-hit);
+    content: '';
+    transform: translate(-50%, -50%);
+  }
+
+  .aqua-slider--vertical .aqua-slider__track::after {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: var(--aqua-hit);
+    height: 100%;
+    content: '';
+    transform: translateX(-50%);
+  }
+}

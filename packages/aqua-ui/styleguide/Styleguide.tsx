@@ -330,8 +330,9 @@ export function Styleguide() {
                 ))}
               </div>
               <p className="sg__note">
-                <strong>32 px</strong> (<code>--aqua-hit</code>) is the floor for a pointer target. A 12 px rail and an 18 px row are period-correct and stay that size — they get their hit area from an
-                invisible <code>::after</code> that expands past the visual. Never shrink a hit target to match a visual.
+                <strong>32 px</strong> (<code>--aqua-hit</code>) is the floor for a pointer target, and <strong>44 px</strong> on a coarse pointer, which is what both platform guidelines ask for. A 12 px
+                rail and an 18 px row are period-correct and stay that size — they get their hit area from an invisible <code>::after</code> that expands past the visual. Never shrink a hit target to
+                match a visual.
               </p>
             </Section>
 

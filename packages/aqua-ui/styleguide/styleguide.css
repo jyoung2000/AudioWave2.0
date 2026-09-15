@@ -635,3 +635,35 @@ body {
     transition: none !important;
   }
 }
+
+/* --------------------------------------------------------------------------
+   Touch
+   --------------------------------------------------------------------------
+   The specimens carry the design system's own touch layer. This is the page
+   around them — its annotations, captions and the rail of links — which is
+   documentation rather than product, and is read on a phone by whoever is
+   checking a screen against it.
+   -------------------------------------------------------------------------- */
+@media (pointer: coarse) {
+  .sg__h3 {
+    font-size: 14px;
+  }
+
+  .sg small,
+  .sg__swatch-meta,
+  .sg__group,
+  .sg__stamp,
+  .sg__verdict {
+    font-size: 12px;
+  }
+
+  .sg code {
+    font-size: 13px;
+  }
+
+  .sg__rail a {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+  }
+}

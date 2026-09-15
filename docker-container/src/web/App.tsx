@@ -86,7 +86,9 @@ export function App() {
 }
 
 function Centred({ children }: { children: React.ReactNode }) {
-  return <div className="admin-centred">{children}</div>;
+  // aqua-root is what carries the design system's typography; without it this screen
+  // renders in whatever the browser considers a default, which is a serif at 16px.
+  return <div className="aqua-root admin-centred">{children}</div>;
 }
 
 function LoginScreen({ onSignedIn, setupComplete }: { onSignedIn: () => void; setupComplete: boolean }) {
