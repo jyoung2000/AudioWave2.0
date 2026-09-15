@@ -21,8 +21,20 @@ import type { PlaybackEngine, PlaybackEvent, PlaybackState } from '../lib/playba
 import { DEFAULT_CROSSFADE, crossfadeMsBetween, normalizeCrossfade, type CrossfadeSettings } from '../lib/crossfade.js';
 import { copiesSupported, removeCopy, requestPersistentStorage } from '../lib/copies.js';
 import { jumpInShuffle, makeShuffleOrder, nextInShuffle, previousInShuffle, remainingInShuffle, syncShuffleOrder, type ShuffleOrder } from '../lib/shuffle.js';
-import { AUTOPLAY_BATCH, SIMILAR_BATCH, discover, explain, profileFrom, type Discovery } from '../lib/discover.js';
+import type * as DiscoverModule from '../lib/discover.js';
+import type { Discovery } from '../lib/discover.js';
 import type { TasteProfile } from '@now-playing/recommendations';
+
+/**
+ * The recommender, fetched the first time something needs it.
+ *
+ * It is a substantial piece of code and nothing before the first note wants
+ * it: a queue only runs out after a track has played, and "play similar to
+ * this" is a deliberate act. Loading it eagerly put 150 KB in front of
+ * everyone who opens the player, including the ones who never reach the end
+ * of an album.
+ */
+const discoverModule = (): Promise<typeof DiscoverModule> => import('../lib/discover.js');
 
 export type RepeatMode = 'off' | 'one' | 'all';
 
@@ -584,7 +596,8 @@ export class PlayerStore {
    */
   private tasteProfile: TasteProfile | null = null;
 
-  private profile(): TasteProfile {
+  private async profile(): Promise<TasteProfile> {
+    const { profileFrom } = await discoverModule();
     this.tasteProfile = profileFrom(this.state.deviceId, this.state.events, this.tasteProfile);
     return this.tasteProfile;
   }
@@ -595,7 +608,7 @@ export class PlayerStore {
   }
 
   /** Queue entries for tracks the recommender picked, tagged as recommendations. */
-  private discoveryEntries(picks: readonly Discovery[]): QueueEntry[] {
+  private discoveryEntries(picks: readonly Discovery[], explain: (pick: Discovery) => string): QueueEntry[] {
     return picks.map((pick) => ({
       id: uuidv7(),
       track: toTrackRef(pick.track),
@@ -616,7 +629,8 @@ export class PlayerStore {
     const queued = new Set(this.state.queue.map((e) => e.track.trackId));
     let result;
     try {
-      result = discover({ userId: this.state.deviceId, profile: this.profile(), library: this.state.library.tracks, seed, exclude: queued, limit: AUTOPLAY_BATCH });
+      const { discover, AUTOPLAY_BATCH } = await discoverModule();
+      result = discover({ userId: this.state.deviceId, profile: await this.profile(), library: this.state.library.tracks, seed, exclude: queued, limit: AUTOPLAY_BATCH });
     } catch (err) {
       this.notice('warning', `Discover could not pick anything: ${err instanceof Error ? err.message : String(err)}`);
       return false;
@@ -625,7 +639,8 @@ export class PlayerStore {
       if (result.shortfall) this.notice('info', `Discover found nothing to add: ${result.shortfall}`);
       return false;
     }
-    const entries = this.discoveryEntries(result.picks);
+    const { explain } = await discoverModule();
+    const entries = this.discoveryEntries(result.picks, explain);
     const queue = [...this.state.queue, ...entries];
     const first = entries[0]!;
     this.patch({
@@ -649,12 +664,13 @@ export class PlayerStore {
     if (this.state.library.tracks.length < 2) {
       return { ok: false, reason: 'There is not enough music on this device yet to find something similar.' };
     }
-    const result = discover({ userId: this.state.deviceId, profile: this.profile(), library: this.state.library.tracks, seed: track, limit: SIMILAR_BATCH });
+    const { discover, explain, SIMILAR_BATCH } = await discoverModule();
+    const result = discover({ userId: this.state.deviceId, profile: await this.profile(), library: this.state.library.tracks, seed: track, limit: SIMILAR_BATCH });
     if (result.picks.length === 0) {
       return { ok: false, reason: result.shortfall ?? 'Nothing on this device came close enough to suggest.' };
     }
     const seedEntry: QueueEntry = { id: uuidv7(), track: toTrackRef(track), context: { kind: 'recommendation', id: track.id, name: `Similar to ${track.title}` } };
-    this.setQueue([seedEntry, ...this.discoveryEntries(result.picks)], 0);
+    this.setQueue([seedEntry, ...this.discoveryEntries(result.picks, explain)], 0);
     for (const pick of result.picks) this.recordEvent('recommendation-shown', toTrackRef(pick.track), { contextKind: 'manual' });
     this.patch({ lastDiscovery: { reason: `Similar to ${track.title}`, count: result.picks.length } });
     return { ok: true, reason: null };

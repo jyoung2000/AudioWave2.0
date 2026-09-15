@@ -49,8 +49,19 @@ const BUNDLES: Bundle[] = [
      * honest is that none of it is in the first load. It arrives at idle, after the page has
      * painted, and only for people whose browser can draw it.
      */
-    // And from 1900 to 1920 for the same additions, plus workbox-window in its own lazy chunk.
-    totalBudgetKb: 1920,
+    /*
+     * And from 1920 to 2150 when the player learned to recommend and to
+     * export. The recommender is about 145 KB and the FLAC and WAV encoders
+     * about 150 KB with the worker they are inlined into.
+     *
+     * Both are deliberately outside the first load: the recommender is
+     * fetched when a queue runs out or someone asks for something similar,
+     * and the encoders travel with the download sheet. Someone who opens the
+     * player and presses play downloads neither. That is the line worth
+     * defending, and the entry budget above is what defends it — this number
+     * only records what the app weighs in total.
+     */
+    totalBudgetKb: 2150,
     // Three.js belongs to the constellation and the jewel case; the tag reader only to a scan.
     mustBeSplit: ['three', 'music-metadata'],
   },

@@ -60,8 +60,10 @@ const MetricsView = lazy(async () => ({ default: (await import('./views/Metrics.
 const ConstellationView = lazy(async () => ({ default: (await import('./views/Constellation.js')).ConstellationView }));
 const SearchView = lazy(async () => ({ default: (await import('./views/Search.js')).SearchView }));
 const SettingsView = lazy(async () => ({ default: (await import('./views/Settings.js')).SettingsView }));
+// The sheet carries the FLAC and WAV encoders with it; nobody needs those to press play.
+const DownloadSheet = lazy(async () => ({ default: (await import('./components/DownloadSheet.js')).DownloadSheet }));
 import { AddToPlaylistSheet } from './components/AddToPlaylistSheet.js';
-import { DownloadSheet } from './components/DownloadSheet.js';
+
 import { ShareSheet } from './components/ShareSheet.js';
 import { NoticeBar } from './components/NoticeBar.js';
 import { SearchPopover, type SearchPopoverHandle } from './components/SearchPopover.js';
@@ -439,7 +441,11 @@ export function App() {
       </main>
 
       <AddToPlaylistSheet open={addToPlaylistOpen} onClose={() => setAddToPlaylistOpen(false)} tracks={entry ? [entry.track] : []} />
-      <DownloadSheet track={downloadTrack} onClose={() => setDownloadTrack(null)} />
+      {downloadTrack ? (
+        <Suspense fallback={null}>
+          <DownloadSheet track={downloadTrack} onClose={() => setDownloadTrack(null)} />
+        </Suspense>
+      ) : null}
       <ShareSheet open={shareOpen} onClose={() => setShareOpen(false)} kind="track" track={entry?.track ?? null} />
     </div>
   );
