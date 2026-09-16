@@ -249,6 +249,33 @@ browser rather than assumed, and gives the three steps to use it in a car.
 the interface is used through the phone, and adding one is the obvious next step if it turns out to
 be wanted.
 
+### Five things the 1:1 mockups found that reading the CSS had not
+
+The styleguide grew a section that renders each product at each screen size in a real viewport and
+measures what it gets — see [§10 of the styleguide](design/STYLEGUIDE.md#10-the-mockups). The first
+run failed on all three products, and none of it was visible in the source:
+
+- **The hub's toolbar lost its search field below about 600 px.** Five grid columns in one row do not
+  shrink below their content, so the last two ran off the side — and because a window clips rather
+  than scrolls, the field was not cramped, it was gone. The narrow layout now gives the search a row
+  of its own, truncates the display column instead of letting it push, and wraps a secondary group
+  that will not fit.
+- **A table row was a 36 px tap target.** The row carries the selection and the roving tabindex, so
+  the row *is* the target; 36 px only looked generous next to a 20 px desktop row. Now 44, and a
+  stacked row on a narrow screen keeps 44 as a floor while still growing to two lines.
+- **The player's sortable column header was 34 px**, for the same reason, under the same rule.
+- **A section-strip count badge was 9 px** — a number somebody is meant to read, sized like an
+  ornament. Now 10 px, and 12 px on touch.
+- **A flush window did not fill the page.** All three products mount `AquaWindow --flush` into a
+  full-height `#root`, and it sat at its content height with the page background showing below the
+  bottom bar. Beside it, `.aqua-window` was excluded from its own `box-sizing: border-box` reset,
+  which only applied to its descendants — so a window with a 1 px border and `width: 100%` was 2 px
+  wider than whatever held it.
+
+The check that found them is a release gate now. It is the same lesson as the buttons that were a
+decade too glossy and the sign-in screen that fell back to a serif: these were all found by building
+the thing, putting it at the size somebody would hold it at, and measuring.
+
 ## Deliberate omissions
 
 | Not built | Why |

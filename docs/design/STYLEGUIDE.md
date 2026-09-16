@@ -12,6 +12,9 @@ wearing the real stylesheet, every swatch is read from `tokens.json` at build ti
 every element the player, the hub's admin GUI and the Windows companion import, mapped to the
 product that uses it. Open it in a browser; regenerate it with `pnpm build:styleguide`.
 
+It also carries a **mockup of each product at each screen size, at 1:1, that you can edit** —
+[§10](#10-the-mockups) explains what that means and where it stops being true.
+
 Three things are *not* here. The component API is in
 [`packages/aqua-ui/README.md`](../../packages/aqua-ui/README.md); the rendered specimen of every
 component is the gallery (`pnpm --filter @now-playing/aqua-ui dev`); and the reasoning behind the
@@ -192,7 +195,7 @@ border is the same, so it still reads as this interface rather than a separate m
 |---|---|---|
 | System / view / small / label / mini text | 13 / 12 / 11 / 10 / 9 px | 15 / 14 / 13 / 12 / 11 px |
 | Control, small, mini | 22 / 19 / 15 px | 34 / 30 / 26 px |
-| Table header, row, source row | 20 / 20 / 21 px | 32 / 36 / 44 px |
+| Table header, row, source row | 20 / 20 / 21 px | 32 / 44 / 44 px |
 | `--aqua-hit` | 32 px | 44 px |
 | The player's list row, and its text | 18 px, 11 px | 44 px, 13 px |
 | A field's text | 11–13 px | 16 px |
@@ -203,6 +206,12 @@ Three rules hold the layer together.
 14 px traffic light, a 22 px vertical fader, the icons inside a list row — it keeps the size it is
 drawn at and takes its taps from a transparent `::after` centred on it. The visual and the target
 are different things, and only one of them is allowed to be small.
+
+*Including the things that are targets without looking like controls.* A table row carries the
+selection and the roving tabindex, so the row is the target and it takes the full 44 px — it sat at
+36 for a while because 36 looks generous beside a 20 px desktop row, which is the wrong comparison.
+The player's sortable column header was 34 for the same reason. Neither was found by reading the
+CSS; both came out of the fit check in [§10](#10-the-mockups).
 
 **No text is under 12 px.** A hint explaining what the app cannot do is the last thing that should
 be unreadable on the device asking the question.
@@ -216,6 +225,8 @@ every small button 30 px tall inside a block that asked for 44.
 
 `music-player/tests/e2e/responsive.spec.ts` measures all of this at 320, 390 and 768 px, and
 asserts the desktop still gets its 18 px row of 11 px text. A screenshot would catch none of it.
+`packages/aqua-ui/tests/e2e/styleguide.spec.ts` then measures every screen of all three products at
+all five sizes, and fails on the first thing that is too small or cut off.
 
 ## 6. Shape and material
 
@@ -383,7 +394,80 @@ Not a checklist bolted on afterwards; these are the parts of the design.
 
 ---
 
-## 10. Changing any of this
+## 10. The mockups
+
+The last section of [`styleguide.html`](styleguide.html) is a working mockup of all three products:
+pick a product, pick a screen, tick the sizes you care about, and each one renders in its own frame
+with a measurement of how well it fits underneath.
+
+**A frame is an iframe, and that is the whole point.** The obvious way to draw a phone is a 390 px
+`div`, and it is a lie: a media query asks the *viewport*, not the box, so every
+`@media (max-width: 480px)` rule in this system stays switched off and you get a desktop layout in a
+phone-shaped hole. An iframe is the one thing in a browser with a viewport of its own, so a 390 px
+frame really is a 390 px viewport and the layout inside it is the layout a phone gets.
+
+**What is in the frame is the product, not a copy of it.** The host page's stylesheets are cloned
+in, the product's own stylesheet is appended after them — including the `body` and `#root` rules a
+component library cannot carry — and the real component tree is portalled into the frame's `#root`.
+So the `MusicList` in the mockup is the `MusicList` the player renders, wearing the same CSS. It is
+1:1 because it is the same thing, not because somebody kept two drawings in step.
+
+**Where that stops.** The screens are assembled from each product's real navigation, panels and
+furniture, but they are not the product's own view files executed verbatim — those are wired to a
+database, a playback engine and, for the companion, Electron's IPC. The data is fixture data. So the
+*visual and responsive* behaviour is exact and the *content* is representative, which is the trade
+that keeps the page from breaking whenever a store changes.
+
+**Touch is emulated, and the emulation is derived.** An iframe inherits the host's pointer, so on a
+desktop `@media (pointer: coarse)` never matches however narrow the frame is — and this system keeps
+its whole touch layer behind exactly that query. So the frame reads those rules back out of the real
+stylesheets and re-applies them with the pointer clause stripped and any width clause left intact.
+Derived from the shipped CSS, never written twice. A frame that silently failed to do this would
+show desktop sizes in a phone and report them as passing, so there is a test that asserts a 44 px
+column header inside the phone frame and something smaller inside the laptop one.
+
+### The line under each frame
+
+| It says | It means |
+| --- | --- |
+| `nothing off the side` | The document does not scroll past its own viewport. |
+| `smallest text` | The smallest font size on any leaf of text. The floor is 12 px on touch, 10 px otherwise. Glyphs marked `aria-hidden` are excluded: the list's 8 px sort triangle is an icon that happens to be a character, and the sort it indicates is on the header as `aria-sort`. |
+| `smallest target` | The smallest interactive thing, counting a transparent `::after` overlay and, for a control inside a `<label>`, the label. The floor is 44 px. Shown only where touch applies. |
+| `… runs *n* px past the edge` | Something extends past the viewport. Not reported for anything inside a horizontal scroller — the section strip scrolls on purpose — nor inside a mask-faded marquee, which is that fade's job. |
+| `… is cut off *n* px short of its end` | Something extends past a container that **clips**. This is the serious one: the content is not off the side of the screen, it is gone, and there is nothing to scroll to reach it. |
+
+That last row is not hypothetical. At 390 px the hub's toolbar ran its last two columns off the
+side, and because a window clips, the search field was not merely cramped — it did not exist, while
+the page reported itself as fitting perfectly. The toolbar now gives the search a row of its own
+below 600 px, the display column truncates instead of pushing, and a secondary group that will not
+fit wraps.
+
+### Editing it
+
+The token editor at the bottom lists every custom property the stylesheets define on `:root` — read
+from the stylesheets themselves rather than from `tokens.json`, so it can never offer a name the
+page does not actually use. Type part of a property name, change the value, and every open frame
+repaints as you type, at every size at once.
+
+**Copy the CSS** gives you a `:root:root { … }` block. Save it over
+[`packages/aqua-ui/src/styles/overrides.css`](../../packages/aqua-ui/src/styles/overrides.css) and
+run `pnpm build`: every product reads it, because every product imports the component library and
+that file is imported last. The doubled `:root:root` selects the same element and carries one more
+point of specificity, so the block wins regardless of which stylesheet a given product happens to
+load last — an override that only works in some import orders is worse than none.
+
+That file is empty in the repository, and should usually stay that way: an override is a way to try
+something on all three products in one go, and the place for a value you have decided to keep is
+`tokens.json` and the stylesheet, per [§11](#11-changing-any-of-this).
+
+### The gates
+
+`pnpm verify` rebuilds the page (`build:styleguide`), checks that the committed copy matches
+(`styleguide-up-to-date`, the same arrangement as the single-file player), and runs
+`packages/aqua-ui/tests/e2e/styleguide.spec.ts` — which walks every product, every screen and all
+five sizes and fails with the full list of anything too small or cut off.
+
+## 11. Changing any of this
 
 1. **Tokens first.** A new colour or size goes in `tokens.json` and then into the stylesheet as a
    custom property. A literal hex in a component is a bug.

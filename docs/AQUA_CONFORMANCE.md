@@ -96,6 +96,7 @@ MUSTs apply to it unchanged, and are checked separately because the tokens are a
 | Keyboard and screen-reader operability | **Test** — axe on the player's nine screens and the hub's thirteen admin views, plus keyboard-only navigation of both |
 | Reduced motion honoured | **Test** |
 | Colour contrast | **Test** — axe, on every screen of both interfaces |
+| Readable at any size, with nothing cut off | **Test** — `packages/aqua-ui/tests/e2e/styleguide.spec.ts` renders every screen of all three products in a real viewport at 320, 390, 768, 1280 and 1680 px and fails on text under the floor, a tap target under 44 px, anything past the page edge, or anything a container has clipped. It has failed for real five times; see [DEVIATIONS.md](DEVIATIONS.md) |
 
 ## What is not met
 

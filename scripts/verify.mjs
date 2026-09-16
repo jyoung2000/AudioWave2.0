@@ -58,6 +58,11 @@ run('test:perf', 'pnpm', ['test:perf']);
 run('build:local', 'pnpm', ['build:local']);
 run('local-file-up-to-date', 'git', ['diff', '--exit-code', '--', 'now-playing.html']);
 run('test:local', 'pnpm', ['test:local'], { skipIf: hasChromium });
+// The styleguide is built from the products' own components and stylesheets, so the committed copy
+// goes stale the moment either moves — same shape as the single-file player above, and the same
+// reason: it is opened straight from the repository, by people who are not running a toolchain.
+run('build:styleguide', 'pnpm', ['build:styleguide']);
+run('styleguide-up-to-date', 'git', ['diff', '--exit-code', '--', 'docs/design/styleguide.html']);
 run('test:a11y', 'pnpm', ['test:a11y'], { skipIf: hasChromium });
 run('test:e2e', 'pnpm', ['test:e2e'], { skipIf: hasChromium });
 run('docker-build', 'docker', ['build', '-t', 'now-playing-hub:verify', '-f', 'docker-container/Dockerfile', '.'], { skipIf: hasDocker });

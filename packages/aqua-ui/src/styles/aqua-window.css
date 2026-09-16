@@ -30,9 +30,14 @@
   box-shadow: var(--aqua-window-shadow-inactive);
 }
 
+/* A flush window is the app filling the page rather than a window drawn on a
+   desktop, which is how all three products mount it. Without the height it sat
+   at whatever its content came to and left the page's background showing below
+   the bottom bar. */
 .aqua-window--flush {
   min-width: 0;
   min-height: 0;
+  height: 100%;
   border-radius: 0;
   border: 0;
   box-shadow: none;
@@ -99,6 +104,42 @@
 .aqua-toolbar__secondary { grid-area: secondary; display: flex; align-items: center; gap: var(--aqua-space-control); }
 .aqua-toolbar__search { grid-area: search; display: flex; align-items: center; min-width: 8rem; }
 .aqua-toolbar__extra { grid-column: 1 / -1; display: flex; align-items: center; gap: var(--aqua-space-control); padding-bottom: 6px; }
+
+/*
+ * Narrow: five columns across one row is a desktop toolbar.
+ *
+ * At phone width the last two ran off the side — and because a window clips, the
+ * search field was not merely cramped, it was gone, with nothing to scroll to
+ * reach it. So the search takes a row of its own (which is what the `extra` slot
+ * was always modelling), the display column gives up its 10rem minimum and
+ * truncates instead of pushing, and a secondary group with more in it than will
+ * fit wraps rather than overflowing.
+ *
+ * The search row is placed rather than named, so a toolbar without a search —
+ * the hub's, for one — creates no second row and no gap where one would be.
+ */
+@media (max-width: 599px) {
+  .aqua-toolbar {
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    grid-template-areas: "controls transport display secondary";
+    row-gap: var(--aqua-space-control);
+    padding-block: var(--aqua-space-control);
+  }
+
+  .aqua-toolbar__display { overflow: hidden; }
+  .aqua-toolbar__display > * { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+  .aqua-toolbar__secondary { flex-wrap: wrap; justify-content: flex-end; }
+
+  .aqua-toolbar__search {
+    grid-row: auto;
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  .aqua-toolbar__search:empty { display: none; }
+  .aqua-toolbar__search > * { width: 100%; }
+}
 
 /* Traffic lights (spec §9.3) */
 .aqua-traffic {

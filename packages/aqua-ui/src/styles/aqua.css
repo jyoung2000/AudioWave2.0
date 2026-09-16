@@ -247,9 +247,11 @@
     --aqua-search-h: 34px;
     --aqua-search-h-small: 30px;
 
-    /* Rows: tall enough to hit, and to read two lines where a table stacks. */
+    /* Rows: a row *is* the target — it carries the roving tabindex and the
+       selection — so it gets the same 44px as everything else rather than the
+       36px that merely looked generous next to a 20px desktop row. */
     --aqua-table-header-h: 32px;
-    --aqua-row-h: 36px;
+    --aqua-row-h: 44px;
     --aqua-source-row-h: 44px;
 
     /* Chrome. The toolbar shrinks: its icons grow, but 62px of it on a phone
@@ -274,12 +276,19 @@
   text-rendering: optimizeLegibility;
 }
 
+/* The roots are in this list as well as their descendants: `.aqua-window` has a
+   1px border, and a window given `width: 100%` would otherwise be 2px wider
+   than what contains it — the sort of overflow that only shows up at one
+   size. */
+.aqua-window,
 .aqua-window *,
 .aqua-window *::before,
 .aqua-window *::after,
+.np-app,
 .np-app *,
 .np-app *::before,
 .np-app *::after,
+.aqua-layer,
 .aqua-layer *,
 .aqua-layer *::before,
 .aqua-layer *::after {
@@ -1236,7 +1245,9 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
 @media (max-width: 479px) {
   .aqua-table--responsive th:not(.aqua-table__col--keep),
   .aqua-table--responsive td:not(.aqua-table__col--keep) { display: none; }
-  .aqua-table--responsive td.aqua-table__col--keep { white-space: normal; height: auto; padding-block: 3px; }
+  /* `height` on a cell is a minimum, not a fixed size, so the row still grows
+     to fit two lines — while keeping the floor that `height: auto` gave away. */
+  .aqua-table--responsive td.aqua-table__col--keep { white-space: normal; padding-block: 3px; }
   .aqua-table--responsive .aqua-table__stack { display: block; }
   /* Fixed layout would hold the hidden columns' widths open, leaving most of each row without a
      cell: blank, and dead to the pointer, since a click there lands on the table rather than the

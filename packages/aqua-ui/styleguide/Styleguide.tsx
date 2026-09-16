@@ -11,6 +11,7 @@ import tokens from '../src/styles/tokens.json';
 import { AquaProvider, ToastProvider, Button, Checkbox, PopUpMenu, ProgressBar, SearchField, SegmentedControl, SourceList, SourceIcon, Glyph, TrackScrubber, BarSearch, Slider, StatusDot, MusicList } from '../src/index.js';
 import { Card, ControlsDemo, IconsDemo, OverlaysDemo, PageDemo, ResultsDemo, ShellDemo, StatesDemo, makeRows, makeTracks } from '../gallery/specimens.js';
 import { ContextMenuSpecimen, EqualizerSpecimen, PageFurnitureSpecimen, SearchPopoverSpecimen, ShareStripSpecimen, SheetSpecimen, ToastSpecimen } from './page-specimens.js';
+import { Mockups } from './Mockups.js';
 
 /* ------------------------------------------------------------------ data */
 
@@ -116,6 +117,8 @@ export function Styleguide() {
               Now Playing
               <small>AQUA_PROFILE={tokens.profile}</small>
             </div>
+            <div className="sg__group">Mockups</div>
+            <a href="#mockups">Every product, every size</a>
             <div className="sg__group">Principles</div>
             <a href="#rules">The four rules</a>
             <a href="#skins">Two skins</a>
@@ -150,6 +153,20 @@ export function Styleguide() {
               Windows companion (both windows). Every value here is read from <code>tokens.json</code> as this page is built, and every control on it is the real component
               wearing the real stylesheet — so the page cannot describe one thing and show another.
             </p>
+
+            <Section id="mockups" title="Every product, every size — and editable">
+              <p className="sg__note">
+                Each frame below is an iframe with its own viewport, so a 320px column is a real 320px viewport and this system's media queries behave exactly as they do on a
+                phone. The screens inside are built from the components on this page, so they are 1:1 with the products by construction rather than by somebody keeping two
+                drawings in step. Under each one is a measurement taken <em>inside</em> that frame: what runs off the side, the smallest text, the smallest thing you could tap.
+              </p>
+              <p className="sg__note">
+                A frame marked <em>touch layer emulated</em> has this system's <code>(pointer: coarse)</code> rules re-applied inside it, read back out of the real stylesheets —
+                an iframe inherits the desktop's pointer, so without that a phone frame would quietly show desktop sizes. At the bottom you can edit any custom property the
+                stylesheets define and watch every frame repaint at once; what you copy out is a block the three products already read.
+              </p>
+              <Mockups />
+            </Section>
 
             <Section id="rules" title="The rules that outrank the visuals">
               <p className="sg__note">A styleguide that opens with colour teaches the wrong lesson. These four decide whether a control is drawn at all, and each has overruled the aesthetics here at least once.</p>

@@ -1,0 +1,21 @@
+/*
+ * Design overrides, written by hand or pasted from the styleguide's token editor.
+ *
+ * Every product — the player, the hub's admin GUI and the Windows companion — reads this file,
+ * because every product imports the component library and the library imports it. That is what makes
+ * the styleguide a way into the apps rather than a drawing of them: change a value there, copy the
+ * block, save it here, rebuild, and all three change together.
+ *
+ * `:root:root` rather than `:root` is deliberate. It selects the same element, so it changes nothing
+ * about what is matched, but it carries one more point of specificity — which matters because the
+ * products load `aqua-window.css` and `now-playing.css` after this file, and a plain `:root` here
+ * would lose to theirs on source order. An override that only works in some import orders is worse
+ * than none.
+ *
+ * The same specificity outranks the dark-scheme block, so a colour set here is that colour in both
+ * schemes. If you want a value to keep following the scheme, set it in the stylesheet that defines
+ * it instead.
+ *
+ * Empty is the correct state. Anything in here is a decision that has drifted from tokens.json, so a
+ * value that settles belongs back in the token file and the stylesheet that mirrors it.
+ */

@@ -667,3 +667,269 @@ body {
     align-items: center;
   }
 }
+
+/* ==========================================================================
+   Mockups
+   ==========================================================================
+   The frames are iframes, so anything here styles the outside of them only —
+   what is inside wears the product stylesheets and must not be reached into
+   from this file. That separation is the point: if this sheet could restyle a
+   frame, the mockup would stop being 1:1 the moment somebody used it.
+   ========================================================================== */
+
+.sg-mockups {
+  display: grid;
+  gap: 18px;
+}
+
+.sg-mockups__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 18px;
+}
+
+.sg-mockups__screens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sg-mockups__devices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.sg-mockups__devices legend {
+  padding: 0;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.sg-mockups__note {
+  max-width: 70ch;
+}
+
+/* Frames sit in a row that wraps and scrolls rather than squashing: a frame that
+   was allowed to shrink would be measuring the wrong width. */
+.sg-mockups__frames {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.sg-mockups__frame {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  max-width: 100%;
+}
+
+.sg-mockups__frame figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.sg-mockups__why {
+  max-width: 44ch;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.sg-frame {
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid rgb(0 0 0 / 28%);
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 12%);
+}
+
+.sg-frame__glass {
+  display: block;
+  border: 0;
+}
+
+.sg-fit {
+  max-width: 44ch;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.sg-fit__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: center;
+}
+
+.sg-fit__list {
+  margin: 4px 0 0;
+  padding-left: 16px;
+  color: #8a3b1e;
+}
+
+.sg-tag {
+  padding: 1px 6px;
+  font-size: 10px;
+  background: rgb(0 0 0 / 7%);
+  border-radius: 8px;
+}
+
+.sg-dim {
+  color: #5a6472;
+}
+
+.sg-note {
+  max-width: 72ch;
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.sg-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.sg-stack {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sg-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sg-platforms {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sg-platforms li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+}
+
+.sg-platforms__head {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sg-platforms__routes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 11px;
+}
+
+/* A screen rendered inside a frame fills it; the styleguide's own page padding
+   has no business in there. */
+.sg-screen-page {
+  min-height: 100%;
+}
+
+/* The editor */
+
+.sg-editor {
+  padding: 16px;
+  background: rgb(0 0 0 / 3%);
+  border: 1px solid rgb(0 0 0 / 10%);
+  border-radius: 8px;
+}
+
+.sg-editor h4 {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+
+.sg-editor__list {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sg-editor__list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.sg-editor__list code {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sg-editor__text {
+  flex: 1 1 160px;
+  min-width: 0;
+  padding: 3px 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  border: 1px solid rgb(0 0 0 / 25%);
+  border-radius: 4px;
+}
+
+.sg-editor__out {
+  max-height: 260px;
+  margin: 10px 0 0;
+  padding: 10px;
+  overflow: auto;
+  font-size: 11px;
+  line-height: 1.5;
+  background: #fff;
+  border: 1px solid rgb(0 0 0 / 15%);
+  border-radius: 6px;
+}
+
+/* The styleguide is a page about responsiveness, so it had better be one. */
+@media (max-width: 720px) {
+  .sg-mockups__controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sg-editor {
+    padding: 12px;
+  }
+}
+
+@media (pointer: coarse) {
+  .sg-mockups__frame figcaption,
+  .sg-fit,
+  .sg-mockups__why,
+  .sg-note,
+  .sg-editor__list li {
+    font-size: 13px;
+  }
+
+  .sg-editor__text {
+    min-height: 34px;
+    font-size: 13px;
+  }
+}

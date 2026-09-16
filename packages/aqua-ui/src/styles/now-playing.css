@@ -528,14 +528,16 @@
   outline-offset: -2px;
 }
 
+/* A count somebody is meant to read, so it is sized to be read: 9px was a
+   decoration with digits in it. */
 .np-sections__count {
   padding: 0 5px;
-  border-radius: 7px;
+  border-radius: 8px;
   background: var(--np-list-badge);
   color: var(--np-list-badge-ink);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
-  line-height: 14px;
+  line-height: 15px;
 }
 
 /* --------------------------------------------------------------------------
@@ -2635,6 +2637,13 @@ a.srch__pf:hover { filter: brightness(1.12) saturate(1.1); }
     font-size: 14px;
   }
 
+  .np-sections__count {
+    padding: 0 7px;
+    border-radius: 9px;
+    font-size: 12px;
+    line-height: 18px;
+  }
+
   /* The scrubber. The rail is dragged, so it needs depth as well as width;
      the visible groove keeps its height and the rail grows around it. */
   .np-scrub__rail {
@@ -2660,8 +2669,11 @@ a.srch__pf:hover { filter: brightness(1.12) saturate(1.1); }
     font-size: 13px;
   }
 
+  /* A column header sorts the list when it is tapped, so it is a control and
+     gets a control's height. It matches the row height below it, which is the
+     other reason 34 looked wrong here. */
   .library th {
-    height: 34px;
+    height: 44px;
     font-size: 13px;
   }
 

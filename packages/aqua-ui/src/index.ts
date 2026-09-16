@@ -12,6 +12,9 @@
  * The bundle budget in `tests/perf` is what turned this from a preference into a rule.
  */
 import './styles/aqua.css';
+// Design overrides, on top of everything the library ships. Empty by default; see the file's note
+// for why its selector is doubled rather than relying on where a product loads it.
+import './styles/overrides.css';
 
 export * from './context.js';
 export * from './hooks/index.js';
