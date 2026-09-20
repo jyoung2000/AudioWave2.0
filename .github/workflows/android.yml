@@ -50,7 +50,13 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # The app serves the player from https://appassets.androidplatform.net/assets/app/, so every
+      # URL Vite writes (scripts, the service worker, its scope and navigate fallback) must carry that
+      # prefix. Built with the default base of "/", index.html asks for /assets/index-*.js, which
+      # resolves to the APK's asset root rather than assets/app/assets/, and the app opens blank.
       - name: Build the player
+        env:
+          NP_BASE_PATH: /assets/app/
         run: pnpm build:player
 
       # The seam between the two halves is a directory. The Gradle build refuses to assemble
@@ -68,6 +74,12 @@ jobs:
           java-version: 17
 
       - uses: gradle/actions/setup-gradle@v4
+
+      # Before assembling: these are seconds, they need no SDK image beyond what is already here,
+      # and a failure in them is about the app's own logic rather than about packaging.
+      - name: Unit tests (JVM, no device)
+        working-directory: android
+        run: ./gradlew --no-daemon testDebugUnitTest
 
       - name: Assemble
         working-directory: android

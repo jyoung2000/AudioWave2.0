@@ -3,7 +3,7 @@
 What is built, what is partial, and what is not built. Anything marked **Done** has tests that
 exercise it; anything **Partial** says exactly what is missing.
 
-Current: **444 tests** across 46 files (unit, DOM, contract, integration, security, performance),
+Current: **958 tests** across 80 files (unit, DOM, contract, integration, security, performance),
 plus **45 end-to-end tests** in real browsers — 26 for the player, 19 for the hub. `pnpm verify` runs every gate available on the machine
 and reports platform-unavailable ones as skipped, never as passed.
 
@@ -11,7 +11,7 @@ and reports platform-unavailable ones as skipped, never as passed.
 
 |  | Status | Notes |
 | --- | --- | --- |
-| `contracts` — one canonical Zod schema per concept | **Done** | 71 generated JSON Schema documents; 119 operations across 97 OpenAPI paths; CI fails if the generated files are stale |
+| `contracts` — one canonical Zod schema per concept | **Done** | 70 generated JSON Schema documents; 121 operations across 99 OpenAPI paths; CI fails if the generated files are stale |
 | `domain` — ids, queue reducer, EQ precedence, retune maths, sync, CSV, metrics, pairing, permissions | **Done** | 75 tests |
 | `aqua-ui` — the component library | **Done** | Built to the design spec; state ladder and a11y tested |
 | `audio-core` — DSP graph, EQ, level-matched bypass, retune worklet | **Done** | 44 tests, including offline renders that measure the actual response |
@@ -32,7 +32,7 @@ and reports platform-unavailable ones as skipped, never as passed.
 | Listening metrics, CSV/JSON export | **Done** | Computed on device from an append-only log |
 | Constellation view with a full 2D equivalent | **Done** | Three.js code-split; table has the same keyboard model |
 | Installable, offline, Media Session | **Done** | See [PWA_AND_CAR.md](PWA_AND_CAR.md) for what a PWA cannot do in a car |
-| A single-file build you open with no server | **Done** | Committed as `now-playing.html` at the repository root — 2.4 MB, nothing to build; a gate fails if it drifts from the source. [LOCAL_FILE.md](LOCAL_FILE.md) records what a `file://` origin allows, measured rather than assumed |
+| A single-file build you open with no server | **Done** | Committed as `now-playing.html` at the repository root — 2.1 MB, nothing to build; a gate fails if it drifts from the source. [LOCAL_FILE.md](LOCAL_FILE.md) records what a `file://` origin allows, measured rather than assumed |
 | Hub client: pairing, search, shares, sync | **Done** |  |
 | Shared listening: create or join a group, follow its queue over the realtime socket, propose changes | **Done** | The hub always had the group API; the player now uses it. Revisioned, idempotent commands — a refused skip is shown, not swallowed |
 | The 2010 page shell: status bar, section strip, hero, iTunes 10 list, dark scheme | **Done** | [UI_REDESIGN.md](UI_REDESIGN.md) maps every feature from the old window shell, and §6 records where each one is now |
@@ -96,7 +96,7 @@ and reports platform-unavailable ones as skipped, never as passed.
 | First-run gate: `admin`/`admin`, forced change before anything else | **Done** | Enforced at the API, not only in the interface; e2e proves it with direct API calls |
 | Auth: argon2id, HttpOnly SameSite cookie, CSRF double-submit, CSP | **Done** | Weak-password denylist added after a test accepted `password1234` |
 | The GUI is readable on a phone or tablet | **Done** | It wears the shared window skin, so the touch layer covers its controls; its own hint, legend and fingerprint classes step up beside them. The sign-in and first-run screens had been rendering outside any `aqua-root`, in the browser's default serif — see DEVIATIONS.md |
-| All 119 API operations | **Done** | A contract test asserts every declared route has a handler |
+| All 121 API operations | **Done** | A contract test asserts every declared route has a handler |
 | Device pairing: short-lived single-use codes, fingerprint confirmation | **Done** | 50-bit Crockford base32, no ambiguous characters |
 | Group listening: authoritative queue, revisions, drift, vote-skip | **Done** | Two defects found and fixed by tests: non-deterministic history order, and play restarting the current track |
 | Sync: manifests, deltas, tombstones, conflict resolution | **Done** | Partial cursors fixed (`z.record` over an enum is exhaustive in Zod 4) |
@@ -116,7 +116,7 @@ and reports platform-unavailable ones as skipped, never as passed.
 
 |  | Status | Notes |
 | --- | --- | --- |
-| Folder watching, indexing, quick and full hashing | **Done** | Rescan skips unchanged files; deletions become tombstones |
+| Folder watching, indexing, quick and full hashing | **Done** | A chokidar watcher per enabled root, debounced 2 s, then the same incremental scan the Scan button runs; rescan skips unchanged files by size and mtime; deletions become tombstones |
 | Full-text search | **Done** | An FTS5 defect meant _nothing_ was ever indexed; found by the first test written against it |
 | Hub pairing, sync, chunked transfers | **Done** | Integration tests run the real client against the real hub |
 | Path containment | **Done** | Segment-wise; a `startsWith` check had accepted `C:\MusicSecret` as inside `C:\Music` |

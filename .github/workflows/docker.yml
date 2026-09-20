@@ -12,10 +12,37 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
+
+      # Build the native-arch image first and prove it starts before anything is pushed.
+      - name: Build for smoke test
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker-container/Dockerfile
+          load: true
+          push: false
+          tags: now-playing-hub:smoke
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test (healthz on the published port)
+        run: |
+          # No bind mount: the image's anonymous /data volume is already owned by the `node` user.
+          docker run -d --name hub -p 127.0.0.1:4546:4546 now-playing-hub:smoke
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4546/healthz && break; sleep 1; done
+          curl -fsS http://127.0.0.1:4546/healthz
+
+      - name: Container logs
+        if: always()
+        run: |
+          docker logs hub 2>&1 | tail -50 || true
+          docker rm -f hub || true
+
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -25,9 +52,12 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository }}/hub
+          # `latest` only for a hub-v* release tag or a manual run on the default branch — never for a
+          # workflow_dispatch from some feature branch.
           tags: |
             type=ref,event=tag
-            type=raw,value=latest
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/hub-v') || github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+            type=sha,enable=${{ !startsWith(github.ref, 'refs/tags/') }}
       - uses: docker/build-push-action@v6
         with:
           context: .
@@ -36,3 +66,5 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

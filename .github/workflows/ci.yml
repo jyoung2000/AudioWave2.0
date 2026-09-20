@@ -5,6 +5,9 @@ on:
     branches: ['**']
   pull_request:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -33,6 +36,8 @@ jobs:
           git diff --exit-code -- packages/contracts/generated packages/test-fixtures/generated/audio/manifest.json
       - name: Lint
         run: pnpm lint
+      - name: Formatting (same gate as scripts/verify.mjs)
+        run: pnpm format:check
       - name: Typecheck
         run: pnpm typecheck
       - name: Unit, DOM, contract, integration and security tests
@@ -47,8 +52,23 @@ jobs:
         run: |
           pnpm build:local
           git diff --exit-code -- now-playing.html
+      - name: Styleguide build, and check its sources, coverage, tokens and committed copy
+        run: |
+          pnpm styleguide:build
+          pnpm styleguide:check
+          git diff --exit-code -- docs/design/styleguide.html
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
+      - name: Styleguide PDF
+        run: pnpm styleguide:pdf
+      - name: Upload the styleguide
+        uses: actions/upload-artifact@v4
+        with:
+          name: styleguide
+          path: |
+            docs/design/styleguide.html
+            docs/design/styleguide.pdf
+          if-no-files-found: error
       - name: Accessibility and end-to-end tests
         run: pnpm test:a11y && pnpm test:e2e && pnpm test:local
       - name: Upload the single-file player
@@ -89,10 +109,19 @@ jobs:
           tags: now-playing-hub:ci
       - name: Smoke test container (healthz on 4546, bootstrap login forces password change)
         run: |
+          # The image runs as `node` (uid 1000). A bind-mount directory Docker creates itself is owned
+          # by root, and the hub could not write its database there.
+          mkdir -p .ci-data
+          sudo chown 1000:1000 .ci-data
+          # NP_CONTAINER=1 (set by the image) makes the hub listen on 0.0.0.0 inside the container, so
+          # the loopback-only published port reaches it.
           docker run -d --name hub -p 127.0.0.1:4546:4546 -v "$PWD/.ci-data:/data" now-playing-hub:ci
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4546/healthz && break; sleep 1; done
           curl -fsS http://127.0.0.1:4546/healthz
           curl -fsS -c cookies.txt -X POST -H 'Content-Type: application/json' -d '{"username":"admin","password":"admin"}' http://127.0.0.1:4546/api/v1/auth/login | tee login.json
           grep -q '"mustChangePassword":true' login.json
-          docker logs hub | tail -20
-          docker rm -f hub
+      - name: Container logs
+        if: always()
+        run: |
+          docker logs hub 2>&1 | tail -50 || true
+          docker rm -f hub || true

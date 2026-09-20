@@ -42,3 +42,5 @@ android/local.properties
 /.playwright-mcp/
 *.tgz
 /team-clone-*.png
+# Bytecode from Python one-offs run against the repository during maintenance passes.
+__pycache__/

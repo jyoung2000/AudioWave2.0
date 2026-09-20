@@ -10,8 +10,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -22,6 +20,10 @@ jobs:
     name: Build the player for a project page
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # configure-pages only reads the site settings; the build itself needs no write access.
+    permissions:
+      contents: read
+      pages: read
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -49,6 +51,11 @@ jobs:
     name: Deploy
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+      # deploy-pages fetches the build's artifact (needed explicitly in private repositories).
+      actions: read
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

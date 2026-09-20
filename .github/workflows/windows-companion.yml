@@ -12,8 +12,9 @@ on:
   release:
     types: [published]
 
+# Read-only by default; only the release job below can write (to attach the installer to a release).
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: windows-companion-${{ github.ref }}
@@ -45,7 +46,10 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # Multi-line steps run under bash (with -e): pwsh would only report the last command's exit
+      # code, so a failing first command would pass silently.
       - name: Generated contracts are committed and current
+        shell: bash
         run: |
           pnpm generate
           git diff --exit-code -- packages/contracts/generated
@@ -54,6 +58,7 @@ jobs:
         run: pnpm exec eslint windows-companion packages
 
       - name: Typecheck
+        shell: bash
         run: |
           pnpm --filter "./packages/*" typecheck
           pnpm --filter @now-playing/windows-companion typecheck
@@ -63,6 +68,10 @@ jobs:
 
       - name: Build main process and renderer
         run: pnpm --filter @now-playing/windows-companion build
+        env:
+          # Baked into the bundle, so the About screen states what this build actually is rather
+          # than reading a variable on the user's machine. Same source as the release metadata.
+          NP_RELEASE_SIGNED: ${{ secrets.WINDOWS_CSC_LINK != '' }}
 
       - name: Package installer and portable build
         run: pnpm --filter @now-playing/windows-companion package
@@ -92,11 +101,33 @@ jobs:
             windows-companion/release/latest.json
           if-no-files-found: error
 
-      - name: Attach to release
-        if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v2
+  release:
+    name: Attach to release
+    needs: package
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # The only job with write access; it runs no project code, just uploads what `package` built.
+    permissions:
+      contents: write
+    steps:
+      # First, because `checkout` cleans the workspace and would take the downloaded artifact with
+      # it. Only the helper is needed: it is committed, so the release attaches it without a build.
+      - uses: actions/checkout@v4
         with:
+          sparse-checkout: local-helper/now-playing-helper.mjs
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-companion-${{ github.sha }}
+          path: release
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          fail_on_unmatched_files: true
           files: |
-            windows-companion/release/*.exe
-            windows-companion/release/SHA256SUMS.txt
-            windows-companion/release/latest.json
+            release/*.exe
+            release/SHA256SUMS.txt
+            release/latest.json
+            local-helper/now-playing-helper.mjs

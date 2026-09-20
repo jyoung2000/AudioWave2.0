@@ -154,6 +154,15 @@ rather than being dark by default, so it is a context-specific surface rather th
 constellation view remains a dark canvas in either scheme — the spec's own recommendation for
 immersive content.
 
+That override covers the page *and* the shared controls. It did not at first: `aqua.css` drew the
+button, text field and checkbox from bare hex literals, so on a dark page every one of them kept a
+white face and a light grey rim — the only part of the player that never turned the lights off.
+Those literals are now `--aqua-ctl-*` tokens with their original values in `aqua.css`, and
+`now-playing.css` gives them dark values in the same block as the rest of the dark palette. The
+placement matters: the hub's admin GUI and the Windows companion wear the same controls and declare
+`color-scheme: light`, so the dark half lives with the player, which is the only surface that
+follows the viewer's setting.
+
 ### Lucida Grande is not shipped
 
 §17.3 requires "Lucida Grande or a compact, tuned fallback". Lucida Grande is not redistributable and

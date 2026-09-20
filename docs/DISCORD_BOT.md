@@ -82,6 +82,36 @@ providers whose terms allow a server-side stream. Where a provider offers playba
 rather than joining the channel and going silent. See
 [PROVIDER_CAPABILITIES.md](PROVIDER_CAPABILITIES.md) for the per-provider picture.
 
+## How the audio gets there
+
+`play` and `join` move the bot into a voice channel: the one named in `join <channel>`, else the
+guild's voice-channel override, else the channel the person asking is in. `play` does not move a bot
+that is already in voice. `leave` disconnects it, and so does the idle timeout
+(`idleDisconnectSeconds`, default five minutes; `0` never leaves).
+
+The worker's voice player follows the group's hub timeline once a second rather than keeping a queue
+of its own. It reads hub-hosted files straight from the data volume and pipes them through FFmpeg as
+Opus (or PCM, encoded by opusscript, when FFmpeg lacks libopus). A pause, seek or skip from any
+device is heard in Discord within about a second. When a track finishes, the bot advances the shared
+queue with the same idempotency key as the hub's own end-of-track timer, so the two never skip twice.
+A track it cannot play is skipped with a reason, not played as silence.
+
+The two containers talk only through the shared database: the worker publishes its status every five
+seconds (that is what the admin panel shows) and picks up the panel's Start, Stop, Reconnect and
+Register buttons from there. Queue changes made from Discord reach phones and the player through the
+hub, which relays the worker's group events to its realtime clients.
+
+### If the bot joins but you hear nothing
+
+- **Admin → Discord** shows the voice state, the current track and the last error.
+- `docker compose logs discord` prints `audio pipeline ready` at startup, with the FFmpeg version and
+  whether Opus encoding is available. `FFmpeg was not found` means nothing can be decoded.
+- The bot needs **Connect** and **Speak** in the channel. It says so in its reply when they are missing.
+- Voice uses outbound UDP. A firewall that allows only TCP lets the bot join but carries no audio; the
+  reply then says it could not connect to the voice channel.
+- Only hub-hosted files, public-domain fixtures and providers with a server-side stream can play;
+  YouTube and Spotify links are refused with the reason.
+
 ## The queue is shared
 
 The bot is one participant in the hub's group queue, not a separate player. A track queued from

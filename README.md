@@ -66,7 +66,7 @@ packages/
 ```
 
 One schema is the source of truth for every wire format. Types, 71 JSON Schema documents and an
-OpenAPI description of 119 operations across 97 paths are generated from it, and a contract test
+OpenAPI description of 120 operations across 98 paths are generated from it, and a contract test
 asserts every route the contracts declare has a handler.
 
 The interface follows `docs/design/APPLE_AQUA_2009_2010_UI_DESIGN_SPEC.md` under the profile
