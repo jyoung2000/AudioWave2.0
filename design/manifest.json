@@ -1,0 +1,179 @@
+{
+  "schemaVersion": 1,
+  "name": "Now Playing styleguide",
+  "profile": "snow-leopard-itunes-9",
+  "about": "Where the design authority for the Now Playing suite lives, what is generated from it, and how to check it. Read this before changing any UI or UX.",
+  "sources": {
+    "tokens": {
+      "path": "packages/aqua-ui/src/styles/tokens.json",
+      "owns": "Documented values: colour, type, space, size, shadow, motion, page skin."
+    },
+    "stylesheets": {
+      "paths": [
+        "packages/aqua-ui/src/styles/aqua.css",
+        "packages/aqua-ui/src/styles/aqua-window.css",
+        "packages/aqua-ui/src/styles/aqua-media.css",
+        "packages/aqua-ui/src/styles/now-playing.css"
+      ],
+      "owns": "The custom properties every product reads (light scheme on :root, dark and touch layers after it). Mirrors tokens.json by hand; see tokenMap."
+    },
+    "tokenMap": {
+      "path": "design/token-map.json",
+      "owns": "Which custom property carries each token, and recorded exceptions."
+    },
+    "overrides": {
+      "path": "packages/aqua-ui/src/styles/overrides.css",
+      "owns": "Temporary cross-product trials written by the styleguide's token editor. Empty in the repository."
+    },
+    "components": {
+      "path": "packages/aqua-ui/src",
+      "owns": "Every shared control, shell, overlay and state. Imported by the player, the hub admin GUI and the Windows companion."
+    },
+    "rules": {
+      "path": "design/ux-rules.json",
+      "owns": "Interaction and content rules with stable IDs, their owning code and their tests."
+    },
+    "coverage": {
+      "path": "design/coverage.json",
+      "owns": "Every surface, state and journey, with discovery sources."
+    },
+    "decisions": {
+      "path": "design/decisions.md",
+      "owns": "Adopted, proposed and unresolved decisions and exceptions (DEC-###)."
+    },
+    "prose": {
+      "path": "docs/design/STYLEGUIDE.md",
+      "owns": "The reasoning behind the visuals, in long form."
+    },
+    "conformance": {
+      "path": "docs/AQUA_CONFORMANCE.md",
+      "owns": "Spec §17/§18 MUSTs mapped to tests, reviewer checks or deviations."
+    },
+    "specification": {
+      "path": "docs/design/APPLE_AQUA_2009_2010_UI_DESIGN_SPEC.md",
+      "owns": "The reconstruction target (Snow Leopard / iTunes 9)."
+    },
+    "brand": {
+      "name": "packages/contracts/src/branding.ts",
+      "icons": [
+        "music-player/public/icon.svg",
+        "music-player/public/icon-maskable.svg",
+        "windows-companion/resources/icon.svg",
+        "windows-companion/resources/tray.svg",
+        "android/app/src/main/res/drawable/ic_launcher_foreground.xml"
+      ],
+      "glyphs": "packages/aqua-ui/src/icons/glyphs.tsx",
+      "nativeStrings": "android/app/src/main/res/values/strings.xml",
+      "nativeColours": "android/app/src/main/res/values/colors.xml",
+      "discordTemplates": "packages/domain/src/templates.ts"
+    }
+  },
+  "guide": {
+    "source": "packages/aqua-ui/styleguide",
+    "entry": "packages/aqua-ui/styleguide/Styleguide.tsx",
+    "html": "docs/design/styleguide.html",
+    "pdf": "docs/design/styleguide.pdf",
+    "fingerprintInputs": [
+      "packages/aqua-ui/src",
+      "packages/aqua-ui/styleguide",
+      "packages/aqua-ui/gallery/specimens.tsx",
+      "packages/domain/src/templates.ts",
+      "packages/contracts/src/entities/discord.ts",
+      "packages/contracts/src/branding.ts",
+      "design/ux-rules.json",
+      "design/coverage.json",
+      "design/token-map.json",
+      "design/manifest.json",
+      "design/decisions.md",
+      "music-player/public/icon.svg",
+      "windows-companion/resources/icon.svg",
+      "music-player/src/styles.css",
+      "packages/domain/src/visualisers/spectrum.ts",
+      "packages/domain/src/visualisers/constellation-layout.ts",
+      "docker-container/src/web/styles.css",
+      "windows-companion/src/renderer/styles.css"
+    ]
+  },
+  "consumers": [
+    {
+      "product": "player",
+      "path": "music-player",
+      "imports": ["@now-playing/aqua-ui", "@now-playing/aqua-ui/now-playing.css"],
+      "skin": "page"
+    },
+    {
+      "product": "hub",
+      "path": "docker-container/src/web",
+      "imports": ["@now-playing/aqua-ui"],
+      "skin": "window"
+    },
+    {
+      "product": "companion",
+      "path": "windows-companion/src/renderer",
+      "imports": ["@now-playing/aqua-ui"],
+      "skin": "window"
+    },
+    {
+      "product": "android",
+      "path": "android",
+      "imports": ["music-player build copied to app/src/main/assets/app"],
+      "skin": "page (through the player)"
+    },
+    {
+      "product": "local-helper",
+      "path": "local-helper",
+      "imports": ["serves the player build"],
+      "skin": "page (through the player)"
+    },
+    {
+      "product": "discord",
+      "path": "docker-container/src/discord",
+      "imports": ["@now-playing/domain templates"],
+      "skin": "Discord messages"
+    }
+  ],
+  "commands": {
+    "styleguide:build": "pnpm styleguide:build — rebuilds docs/design/styleguide.html from the sources above (same as pnpm build:styleguide).",
+    "styleguide:check": "pnpm styleguide:check — sources and evidence exist, rule IDs are unique, every discovered screen is in the ledger, tokens.json matches the stylesheets, and the committed HTML was built from the current sources.",
+    "styleguide:pdf": "pnpm styleguide:pdf — prints the committed HTML to docs/design/styleguide.pdf with Playwright's Chromium (set NP_STYLEGUIDE_BROWSER to use another Chromium).",
+    "e2e": "pnpm --filter @now-playing/aqua-ui test:e2e — measures every mockup at every size.",
+    "conformance": "pnpm test:unit — includes packages/aqua-ui/tests/unit/aqua-conformance.test.ts and design-sources.test.ts."
+  },
+  "verification": {
+    "note": "Filled in by whoever last verified the guide at runtime. Source checks are automatic (styleguide:check); these entries record what was seen in a running product.",
+    "runtime": [
+      {
+        "date": "2026-09-16",
+        "scenario": "Player dev server, empty library, no hub: each section, Settings, search with no match, the Shared segment (toast by pointer and keyboard), and one token change (--np-accent) seen in the player and the rebuilt guide, then reverted.",
+        "platform": "web (Chromium, Windows)",
+        "viewports": ["1024×768", "375×812 touch"],
+        "theme": "light",
+        "method": "Claude browser pane with DOM measurement",
+        "surfaces": [
+          "player-shell",
+          "player-library",
+          "player-queue",
+          "player-metrics",
+          "player-settings",
+          "player-search-popover",
+          "player-notice-bar"
+        ]
+      },
+      {
+        "date": "2026-09-16",
+        "scenario": "Hub admin dev server against a fresh data folder: the first-run sign-in screen. Signing in was not attempted; it needs a person to enter the password.",
+        "platform": "web (Chromium, Windows)",
+        "viewports": ["1024×768"],
+        "theme": "light",
+        "method": "Claude browser pane",
+        "surfaces": ["hub-login"]
+      }
+    ],
+    "blocked": {
+      "companion": "Electron-only; its renderer needs the preload bridge. Covered by DOM tests and the mockups.",
+      "android": "No Android SDK or JDK 17 on the machine that built this revision.",
+      "discord": "Needs a bot token and a Discord server; covered by the voice and parity tests.",
+      "local-helper": "Console output was not captured for this revision; covered by its integration tests."
+    }
+  }
+}

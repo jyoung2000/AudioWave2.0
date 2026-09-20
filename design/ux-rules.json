@@ -1,0 +1,551 @@
+{
+  "schemaVersion": 1,
+  "about": "Interaction and content rules with stable IDs. The styleguide renders this file; scripts/styleguide-check.mjs verifies every owner and evidence path exists. Change a rule here, in the owning code, and in its test together.",
+  "authorityValues": ["adopted", "observed", "proposed", "unresolved"],
+  "groups": [
+    {
+      "id": "principles",
+      "title": "Principles that outrank the visuals"
+    },
+    {
+      "id": "input",
+      "title": "Keyboard, focus and touch"
+    },
+    {
+      "id": "feedback",
+      "title": "States, feedback and motion"
+    },
+    {
+      "id": "safety",
+      "title": "Trust, safety and destructive actions"
+    },
+    {
+      "id": "shared",
+      "title": "Shared listening and the Discord bot"
+    },
+    {
+      "id": "voice",
+      "title": "Words"
+    }
+  ],
+  "rules": [
+    {
+      "id": "UX-PRIN-001",
+      "group": "principles",
+      "title": "A control that cannot act is not drawn",
+      "contract": "No button that looks live and does nothing, no toggle whose state is decoration. If an action is impossible in this context the control is omitted or replaced by an explained state.",
+      "example": "The equalizer window ships without traffic lights: three circles that close nothing would be decoration.",
+      "authority": "adopted",
+      "owners": ["music-player/src/views/Equalizer.tsx"],
+      "evidence": [
+        {
+          "type": "reviewer",
+          "note": "Judgement call, checked in review (docs/AQUA_CONFORMANCE.md)."
+        },
+        {
+          "type": "doc",
+          "path": "docs/DEVIATIONS.md"
+        }
+      ]
+    },
+    {
+      "id": "UX-PRIN-002",
+      "group": "principles",
+      "title": "An unavailable capability says so where the choice is made",
+      "contract": "Not in a tooltip, not in a log, not by disappearing. The control stays visible and, when chosen, reports the reason instead of acting.",
+      "example": "The Shared segment of the mode switch stays visible with no hub paired and reports why when pressed.",
+      "authority": "adopted",
+      "owners": [
+        "packages/aqua-ui/src/components/PageBar.tsx",
+        "packages/aqua-ui/src/components/States.tsx"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "packages/aqua-ui/tests/dom/page-chrome.test.tsx",
+          "name": "reports the reason instead of switching when a mode is unavailable"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/player.spec.ts",
+          "name": "the status bar carries the listening mode, and says why shared is unavailable"
+        }
+      ]
+    },
+    {
+      "id": "UX-PRIN-003",
+      "group": "principles",
+      "title": "Say what the code does, not what the feature is called",
+      "contract": "Labels describe the implemented behaviour. When a label and the DSP (or the network, or the provider) disagree, the label changes.",
+      "example": "Solfeggio presets are described as filters with no claimed physical effect; retuning states that the fallback changes tempo.",
+      "authority": "adopted",
+      "owners": ["music-player/src/views/Equalizer.tsx", "music-player/src/views/Settings.tsx"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/player.spec.ts",
+          "name": "the solfeggio presets are filters, and say so where the choice is made"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/player.spec.ts",
+          "name": "retuning states how it is applied rather than claiming preserved tempo"
+        }
+      ]
+    },
+    {
+      "id": "UX-PRIN-004",
+      "group": "principles",
+      "title": "A disabled control is still legible about why",
+      "contract": "Greyed, not gone. The reason is part of the accessible name, not only a tooltip.",
+      "example": "“500 Hz band, not used by 528 Hz (MI)”.",
+      "authority": "adopted",
+      "owners": ["music-player/src/views/Equalizer.tsx"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/player.spec.ts",
+          "name": "the solfeggio presets are filters, and say so where the choice is made"
+        }
+      ]
+    },
+    {
+      "id": "UX-KEY-001",
+      "group": "input",
+      "title": "One tab stop per group; arrows move inside it",
+      "contract": "Source lists, the section strip, the mode switch, tables and menus use a roving tabIndex. Home/End jump, Enter activates, type-ahead selects. Focus travels with the selection.",
+      "authority": "adopted",
+      "owners": [
+        "packages/aqua-ui/src/components/SourceList.tsx",
+        "packages/aqua-ui/src/components/SectionStrip.tsx",
+        "packages/aqua-ui/src/components/AquaTable.tsx",
+        "packages/aqua-ui/src/components/MusicList.tsx"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "packages/aqua-ui/tests/dom/source-list.test.tsx",
+          "name": "has one tab stop, moves with arrows, Home/End, selects with Enter and supports type-ahead"
+        },
+        {
+          "type": "test",
+          "path": "packages/aqua-ui/tests/dom/table.test.tsx",
+          "name": "uses a roving tabindex, arrow navigation, Space selection and Enter activation"
+        },
+        {
+          "type": "test",
+          "path": "packages/aqua-ui/tests/dom/page-chrome.test.tsx",
+          "name": "has one tab stop, moves with arrows and Home/End, chooses with Enter, and answers type-ahead"
+        }
+      ]
+    },
+    {
+      "id": "UX-FOCUS-001",
+      "group": "input",
+      "title": "Focus is always visible",
+      "contract": "Every focusable element shows --aqua-focus-shadow or a 2px --np-accent outline at 2px offset, including when the ring is drawn on an ancestor via :focus-within.",
+      "authority": "adopted",
+      "owners": [
+        "packages/aqua-ui/src/styles/aqua.css",
+        "packages/aqua-ui/src/styles/now-playing.css"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/a11y.spec.ts",
+          "name": "@a11y focus is visible wherever it lands"
+        }
+      ]
+    },
+    {
+      "id": "UX-KEY-002",
+      "group": "input",
+      "title": "Every action is reachable with the keyboard alone",
+      "contract": "Every section and every transport control can be reached and operated without a pointer. Space toggles playback without scrolling the page.",
+      "authority": "adopted",
+      "owners": ["music-player/src/App.tsx", "docker-container/src/web/App.tsx"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/a11y.spec.ts",
+          "name": "@a11y every section is reachable with the keyboard alone"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/player.spec.ts",
+          "name": "space toggles playback and does not scroll the page"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/e2e/a11y.spec.ts",
+          "name": "@a11y the source list is navigable with the keyboard alone"
+        }
+      ]
+    },
+    {
+      "id": "UX-TOUCH-001",
+      "group": "input",
+      "title": "Nothing interactive is under 44px on a coarse pointer",
+      "contract": "Under (pointer: coarse) controls grow; where the visual cannot grow, a transparent ::after takes the taps. Desktop keeps its 18px rows. Hit targets are never shrunk to match a visual; --aqua-hit is 32px on desktop, 44px on touch.",
+      "authority": "adopted",
+      "owners": [
+        "packages/aqua-ui/src/styles/aqua.css",
+        "packages/aqua-ui/src/styles/now-playing.css"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/responsive.spec.ts",
+          "name": "nothing overflows, no text under 12px, no target under 44px"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/responsive.spec.ts",
+          "name": "the desktop keeps the design it was drawn with"
+        },
+        {
+          "type": "test",
+          "path": "packages/aqua-ui/tests/e2e/styleguide.spec.ts",
+          "name": "every screen of every product fits at every size"
+        }
+      ]
+    },
+    {
+      "id": "UX-TOUCH-002",
+      "group": "input",
+      "title": "No text under 12px on touch; field text is 16px",
+      "contract": "The touch layer steps the scale up (15/14/13/12/11px). A field's text is 16px because iOS zooms the page when a smaller field takes focus.",
+      "authority": "adopted",
+      "owners": [
+        "packages/aqua-ui/src/styles/aqua.css",
+        "packages/aqua-ui/src/styles/now-playing.css"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/responsive.spec.ts",
+          "name": "settings, where every panel of explanatory text lives"
+        }
+      ]
+    },
+    {
+      "id": "UX-STATE-001",
+      "group": "feedback",
+      "title": "Every data view answers empty, loading and error",
+      "contract": "A view that fetches renders LoadingState while waiting, ErrorState with a retry when it fails, and an EmptyState that says what to do next. Blank panes are defects.",
+      "authority": "adopted",
+      "owners": [
+        "docker-container/src/web/views/common.tsx",
+        "docker-container/src/web/ViewBoundary.tsx",
+        "packages/aqua-ui/src/components/States.tsx"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/a11y.spec.ts",
+          "name": "@a11y the empty library state is announced as a group with a name"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/player.spec.ts",
+          "name": "loads with no console errors and an honest empty state"
+        }
+      ]
+    },
+    {
+      "id": "UX-MOTION-001",
+      "group": "feedback",
+      "title": "Motion confirms; reduced motion is a contract",
+      "contract": "Nothing animates that a person did not just cause. Under prefers-reduced-motion the live dot stops, marquees hold their ellipsis, sheets fade without travel, and the 3D stage stops drifting. New animations read --aqua-anim-state or --aqua-sheet-travel.",
+      "authority": "adopted",
+      "owners": [
+        "packages/aqua-ui/src/styles/aqua.css",
+        "packages/aqua-ui/src/styles/now-playing.css",
+        "packages/aqua-ui/src/components/Marquee.tsx"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/a11y.spec.ts",
+          "name": "@a11y respects reduced motion"
+        },
+        {
+          "type": "test",
+          "path": "packages/aqua-ui/tests/unit/aqua-conformance.test.ts",
+          "name": "§17.5"
+        }
+      ]
+    },
+    {
+      "id": "UX-FEED-001",
+      "group": "feedback",
+      "title": "Progress says what is happening in words",
+      "contract": "Progress bars carry a name and a value; an indeterminate bar is aria-busy and has text. Live regions are polite and carry one sentence.",
+      "authority": "adopted",
+      "owners": [
+        "packages/aqua-ui/src/components/ProgressBar.tsx",
+        "packages/aqua-ui/src/components/Toast.tsx"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "packages/aqua-ui/tests/dom/controls.test.tsx",
+          "name": "progress has a name and value; indeterminate is busy with text"
+        }
+      ]
+    },
+    {
+      "id": "UX-A11Y-001",
+      "group": "feedback",
+      "title": "Roles are true and colour is never the only signal",
+      "contract": "A rail that cannot be dragged is role=img, not a slider that refuses changes. Icon buttons have names. The playing row has a glyph as well as a tint; status dots carry text.",
+      "authority": "adopted",
+      "owners": [
+        "packages/aqua-ui/src/components/Scrubber.tsx",
+        "packages/aqua-ui/src/components/IconButton.tsx",
+        "packages/aqua-ui/src/components/Badge.tsx"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "packages/aqua-ui/tests/dom/controls.test.tsx",
+          "name": "live scrubber is not a slider and shows the LIVE marker"
+        },
+        {
+          "type": "test",
+          "path": "packages/aqua-ui/tests/dom/controls.test.tsx",
+          "name": "icon buttons require names; menu affordance sets aria-haspopup"
+        }
+      ]
+    },
+    {
+      "id": "UX-LINK-001",
+      "group": "feedback",
+      "title": "A download is a link",
+      "contract": "Downloads and destinations in another tab use ButtonLink (an <a> wearing the button face), never a <button> that assigns location.",
+      "authority": "adopted",
+      "owners": ["packages/aqua-ui/src/components/Button.tsx"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/player.spec.ts",
+          "name": "Settings opens from the avatar and carries the equalizer and the companion download"
+        }
+      ]
+    },
+    {
+      "id": "UX-SAFE-001",
+      "group": "safety",
+      "title": "Destructive actions are worded plainly and confirmed",
+      "contract": "The button names the consequence (“Forget this hub”, “Remove folder”), sits apart from the default action, and the hub and companion ask before doing it.",
+      "authority": "adopted",
+      "owners": [
+        "packages/aqua-ui/src/components/Sheet.tsx",
+        "docker-container/src/web/views/Devices.tsx",
+        "windows-companion/src/renderer/views/Folders.tsx"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "packages/aqua-ui/tests/dom/controls.test.tsx",
+          "title": "marks the destructive item, separates it, and never puts it first"
+        },
+        {
+          "type": "doc",
+          "path": "docs/AQUA_CONFORMANCE.md"
+        },
+        {
+          "type": "reviewer",
+          "note": "Each new destructive action is reviewed for wording and confirmation."
+        }
+      ]
+    },
+    {
+      "id": "UX-SAFE-002",
+      "group": "safety",
+      "title": "The bootstrap password must be replaced before anything else",
+      "contract": "admin/admin signs in once, straight into Change password. Every setup-gated screen refuses until then, and the hub stays on loopback outside a container.",
+      "authority": "adopted",
+      "owners": ["docker-container/src/web/App.tsx", "docker-container/src/auth/service.ts"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "docker-container/tests/integration/setup-and-pairing.test.ts",
+          "name": "refuses every setup-gated route until the password is changed"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/e2e/a11y.spec.ts",
+          "name": "@a11y the sign-in screen has no detectable violations"
+        }
+      ]
+    },
+    {
+      "id": "UX-SAFE-003",
+      "group": "safety",
+      "title": "Pairing is confirmed by comparing a fingerprint",
+      "contract": "A device receives a scoped credential only after the administrator confirms the fingerprint shown on both screens. Codes are never listed again after they are issued.",
+      "authority": "adopted",
+      "owners": [
+        "docker-container/src/web/views/Devices.tsx",
+        "docker-container/src/pairing/service.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "docker-container/tests/integration/setup-and-pairing.test.ts",
+          "name": "issues a scoped credential only after the fingerprint is confirmed"
+        }
+      ]
+    },
+    {
+      "id": "UX-SAFE-004",
+      "group": "safety",
+      "title": "Privacy claims are stated where they can be checked",
+      "contract": "Copy that says nothing is uploaded, copied or moved must be true of the code path beside it, and the player loads nothing from outside its own origin.",
+      "authority": "adopted",
+      "owners": ["music-player/src/views/Settings.tsx", "music-player/src/views/Metrics.tsx"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/player.spec.ts",
+          "name": "privacy claims are stated where a person can check them"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/player.spec.ts",
+          "name": "loads nothing from outside its own origin"
+        }
+      ]
+    },
+    {
+      "id": "UX-SHARED-001",
+      "group": "shared",
+      "title": "The shared queue rejects stale commands and says so",
+      "contract": "Every queue command carries the revision it was based on. A stale command is refused with the current revision, never applied over someone else's change.",
+      "authority": "adopted",
+      "owners": ["docker-container/src/group/service.ts", "packages/domain/src/queue.ts"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "docker-container/tests/integration/groups-and-queue.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "UX-DISCORD-001",
+      "group": "shared",
+      "title": "Slash and prefix commands behave identically",
+      "contract": "Both transports run through one CommandService and render the same templates; the only difference is how the reply is delivered.",
+      "authority": "adopted",
+      "owners": [
+        "docker-container/src/group/command-service.ts",
+        "docker-container/src/discord/gateway.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "docker-container/tests/integration/discord-parity.test.ts",
+          "name": "produces identical outcomes for every command"
+        }
+      ]
+    },
+    {
+      "id": "UX-DISCORD-002",
+      "group": "shared",
+      "title": "Refusals are private and say what was needed",
+      "contract": "permissionDenied, noResults, unavailableSource, emptyQueue, wrongChannel and error replies are ephemeral and name the reason or the channel to use.",
+      "authority": "adopted",
+      "owners": [
+        "packages/domain/src/templates.ts",
+        "docker-container/src/group/command-service.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "docker-container/tests/integration/discord-parity.test.ts",
+          "name": "applies the same permission decision on both transports"
+        }
+      ]
+    },
+    {
+      "id": "UX-DISCORD-003",
+      "group": "shared",
+      "title": "The bot never goes silent without a reason",
+      "contract": "A track the bot cannot play is skipped with the reason recorded; a failed decode advances as an error; the admin panel shows the voice state and last error.",
+      "authority": "adopted",
+      "owners": ["docker-container/src/discord/voice.ts", "docker-container/src/discord/worker.ts"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "docker-container/tests/unit/discord-voice.test.ts",
+          "name": "skips a track it cannot play instead of going silent"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/integration/discord-worker.test.ts",
+          "name": "shows the worker’s live status in the hub"
+        }
+      ]
+    },
+    {
+      "id": "VOICE-001",
+      "group": "voice",
+      "title": "Empty states say what to do next",
+      "contract": "Title names the situation in a few plain words (“Nothing queued”); text gives the next action or the reason. No apologies, no exclamation marks.",
+      "example": "“Nothing queued — Play something from your library and it will appear here.”",
+      "authority": "observed",
+      "owners": [
+        "music-player/src/views/Queue.tsx",
+        "windows-companion/src/renderer/views/Transfers.tsx"
+      ],
+      "evidence": [
+        {
+          "type": "source",
+          "path": "music-player/src/views/Queue.tsx"
+        }
+      ]
+    },
+    {
+      "id": "VOICE-002",
+      "group": "voice",
+      "title": "Errors explain the problem and the way out",
+      "contract": "Name what failed in the person's terms and what fixes it (“Add a bot token first (Admin → Discord → Token)”). Never show a stack trace or an internal identifier; a 500 carries a correlation id instead.",
+      "authority": "adopted",
+      "owners": [
+        "docker-container/src/app.ts",
+        "docker-container/src/discord/service-interface.ts"
+      ],
+      "evidence": [
+        {
+          "type": "source",
+          "path": "docker-container/src/discord/service-interface.ts"
+        }
+      ]
+    },
+    {
+      "id": "VOICE-003",
+      "group": "voice",
+      "title": "One product name, set in one place",
+      "contract": "“Now Playing” and the product names come from BRANDING in TypeScript. Native resources that cannot import it (Android strings.xml, the SVG icons' aria-labels, the Electron builder config) repeat it and must be changed together.",
+      "authority": "adopted",
+      "owners": [
+        "packages/contracts/src/branding.ts",
+        "android/app/src/main/res/values/strings.xml",
+        "music-player/public/icon.svg",
+        "windows-companion/resources/icon.svg"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "packages/contracts/tests/branding.test.ts",
+          "title": "VOICE-003: the product name is set once"
+        },
+        {
+          "type": "source",
+          "path": "packages/contracts/src/branding.ts"
+        }
+      ]
+    }
+  ]
+}

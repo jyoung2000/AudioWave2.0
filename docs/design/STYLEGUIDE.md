@@ -485,3 +485,23 @@ The correction log in [DEVIATIONS.md](../DEVIATIONS.md) is worth reading before 
 records the mistakes this system has already made — the buttons that were a decade too glossy, the
 list that got redesigned instead of expanded — and each one was found by building the thing and
 looking at it, not by reading the code.
+
+## 12. Rules, screens and upkeep
+
+The visual system above is one half of the design authority. The other half lives in
+[`design/`](../../design/) and is rendered into the same page:
+
+- [`design/ux-rules.json`](../../design/ux-rules.json) — interaction and content rules with stable
+  IDs (`UX-PRIN-001` … `VOICE-003`), the code that owns each one and the test that proves it.
+- [`design/coverage.json`](../../design/coverage.json) — every screen, overlay and journey of the
+  player, the hub, the companion, the Android shell, the local helper and the Discord bot.
+- [`design/token-map.json`](../../design/token-map.json) — which custom property carries each value
+  in `tokens.json`.
+- [`design/decisions.md`](../../design/decisions.md) — adopted, proposed and unresolved decisions.
+- [`design/manifest.json`](../../design/manifest.json) — where everything is, and what was seen in
+  a running product.
+
+`pnpm styleguide:check` fails when a rule's evidence is missing, when a product declares a screen
+the ledger does not know, when `tokens.json` and the stylesheets disagree outside a recorded
+exception, or when `styleguide.html` was built from older sources. `pnpm styleguide:pdf` prints the
+page to [`styleguide.pdf`](styleguide.pdf): cover, contents, chapters, and every mockup screen.

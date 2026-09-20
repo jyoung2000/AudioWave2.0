@@ -1,0 +1,342 @@
+{
+  "schemaVersion": 1,
+  "about": "How each value in packages/aqua-ui/src/styles/tokens.json reaches the stylesheets. tokens.json documents the values; the four stylesheets mirror them by hand. scripts/styleguide-check.mjs compares every token with the light-scheme :root value of its custom property. A token not listed here uses the default name (see defaults). `literal` entries have no custom property and are checked for presence in the named file only, which is weaker. `exception` entries are known differences, recorded rather than hidden; adding one needs a reason and a decision in design/decisions.md.",
+  "stylesheets": [
+    "packages/aqua-ui/src/styles/aqua.css",
+    "packages/aqua-ui/src/styles/aqua-window.css",
+    "packages/aqua-ui/src/styles/aqua-media.css",
+    "packages/aqua-ui/src/styles/now-playing.css"
+  ],
+  "defaults": {
+    "color": ["--aqua-"],
+    "page": ["--np-", "--lib-"],
+    "space": ["--aqua-space-"],
+    "size": ["--aqua-"],
+    "motion": ["--aqua-motion-"],
+    "font": ["--aqua-font-"]
+  },
+  "map": {
+    "color.rowStripe": {
+      "var": "--aqua-stripe"
+    },
+    "color.aquaSpecular": {
+      "var": "--aqua-blue-specular"
+    },
+    "color.aquaTop": {
+      "var": "--aqua-blue-top"
+    },
+    "color.aquaMid": {
+      "var": "--aqua-blue-mid"
+    },
+    "color.aquaLower": {
+      "var": "--aqua-blue-lower"
+    },
+    "color.aquaBottom": {
+      "var": "--aqua-blue-bottom"
+    },
+    "color.aquaRim": {
+      "var": "--aqua-blue-rim"
+    },
+    "page.font": {
+      "var": "--np-ui-font"
+    },
+    "page.barUpper": {
+      "var": "--np-bar-2"
+    },
+    "page.barLower": {
+      "var": "--np-bar-5"
+    },
+    "page.barEdge": {
+      "var": "--np-bar-edge"
+    },
+    "page.modeFaceTop": {
+      "var": "--np-seg-face-top"
+    },
+    "page.modeFaceBottom": {
+      "var": "--np-seg-face-bottom"
+    },
+    "page.modeOnTop": {
+      "var": "--np-seg-on-top"
+    },
+    "page.modeOnBottom": {
+      "var": "--np-seg-on-bottom"
+    },
+    "page.railTop": {
+      "literal": "#e9ecee",
+      "file": "packages/aqua-ui/src/styles/now-playing.css",
+      "note": "first stop of --np-rail-track"
+    },
+    "page.railBottom": {
+      "literal": "#feffff",
+      "file": "packages/aqua-ui/src/styles/now-playing.css",
+      "note": "last stop of --np-rail-track"
+    },
+    "page.railFillTop": {
+      "literal": "#8fb9e4",
+      "file": "packages/aqua-ui/src/styles/now-playing.css",
+      "note": "first stop of --np-rail-fill"
+    },
+    "page.railFillMid": {
+      "literal": "#2b9bec",
+      "file": "packages/aqua-ui/src/styles/now-playing.css",
+      "note": "saturated dip of --np-rail-fill"
+    },
+    "page.railFillBottom": {
+      "literal": "#a5e9fd",
+      "file": "packages/aqua-ui/src/styles/now-playing.css",
+      "note": "bottom glow of --np-rail-fill"
+    },
+    "page.listHeaderTop": {
+      "var": "--lib-head-top"
+    },
+    "page.listHeaderBottom": {
+      "var": "--lib-head-bot"
+    },
+    "page.listSortTop": {
+      "var": "--lib-sort-top"
+    },
+    "page.listSortBottom": {
+      "var": "--lib-sort-bot"
+    },
+    "page.listStripe": {
+      "var": "--lib-alt"
+    },
+    "page.listPlaying": {
+      "var": "--lib-np"
+    },
+    "page.listSelectTop": {
+      "var": "--lib-sel-top"
+    },
+    "page.listSelectBottom": {
+      "var": "--lib-sel-bot"
+    },
+    "space.bottomBarRegular": {
+      "var": "--aqua-bottom-bar-regular"
+    },
+    "size.visualControlRegular": {
+      "var": "--aqua-control-h"
+    },
+    "size.visualControlSmall": {
+      "var": "--aqua-control-h-small"
+    },
+    "size.searchRegular": {
+      "var": "--aqua-search-h"
+    },
+    "size.searchSmall": {
+      "var": "--aqua-search-h-small"
+    },
+    "size.trafficLight": {
+      "var": "--aqua-traffic-size"
+    },
+    "size.toolbarMedia": {
+      "var": "--aqua-toolbar-h"
+    },
+    "size.tableHeader": {
+      "var": "--aqua-table-header-h"
+    },
+    "size.tableRow": {
+      "var": "--aqua-row-h"
+    },
+    "size.sourceRow": {
+      "var": "--aqua-source-row-h"
+    },
+    "size.barHeight": {
+      "literal": "40px",
+      "file": "packages/aqua-ui/src/styles/now-playing.css",
+      "note": "the page status bar"
+    },
+    "size.listRow": {
+      "literal": "18px",
+      "file": "packages/aqua-ui/src/styles/now-playing.css",
+      "note": ".library tbody td"
+    },
+    "size.listHeader": {
+      "literal": "18px",
+      "file": "packages/aqua-ui/src/styles/now-playing.css",
+      "note": ".library th"
+    },
+    "size.railHeight": {
+      "literal": "12px",
+      "file": "packages/aqua-ui/src/styles/now-playing.css",
+      "note": ".np-scrub__rail"
+    },
+    "size.playKey": {
+      "literal": "64px",
+      "file": "packages/aqua-ui/src/styles/now-playing.css",
+      "note": ".np-key--play"
+    },
+    "size.transportKey": {
+      "literal": "48px",
+      "file": "packages/aqua-ui/src/styles/now-playing.css",
+      "note": ".np-key"
+    },
+    "motion.defaultPulse": {
+      "var": "--aqua-motion-pulse"
+    },
+    "motion.easeStandard": {
+      "var": "--aqua-ease"
+    },
+    "motion.scrollerFade": {
+      "literal": "opacity 0.3s",
+      "file": "packages/aqua-ui/src/styles/now-playing.css",
+      "note": ".library__bar transition"
+    },
+    "font.family": {
+      "var": "--aqua-font",
+      "exception": "DEC-002"
+    },
+    "font.weightRegular": {
+      "var": "--aqua-weight-regular"
+    },
+    "font.weightEmphasized": {
+      "var": "--aqua-weight-emphasized"
+    },
+    "font.lineHeightCompact": {
+      "var": "--aqua-line-compact"
+    },
+    "font.lineHeightBody": {
+      "var": "--aqua-line-body"
+    },
+    "shadow.window": {
+      "var": "--aqua-window-shadow"
+    },
+    "shadow.panel": {
+      "var": "--aqua-panel-shadow"
+    },
+    "shadow.control": {
+      "var": "--aqua-control-shadow"
+    },
+    "shadow.controlInsetTop": {
+      "var": "--aqua-control-inset-top"
+    },
+    "shadow.controlInsetBottom": {
+      "var": "--aqua-control-inset-bottom"
+    },
+    "shadow.focus": {
+      "var": "--aqua-focus-shadow"
+    },
+    "color.ctlInk": {
+      "var": "--aqua-ctl-ink"
+    },
+    "color.ctlFace1": {
+      "var": "--aqua-ctl-face-1"
+    },
+    "color.ctlFace2": {
+      "var": "--aqua-ctl-face-2"
+    },
+    "color.ctlFace3": {
+      "var": "--aqua-ctl-face-3"
+    },
+    "color.ctlFace4": {
+      "var": "--aqua-ctl-face-4"
+    },
+    "color.ctlFaceHover1": {
+      "var": "--aqua-ctl-face-hover-1"
+    },
+    "color.ctlFaceHover2": {
+      "var": "--aqua-ctl-face-hover-2"
+    },
+    "color.ctlFaceHover3": {
+      "var": "--aqua-ctl-face-hover-3"
+    },
+    "color.ctlFaceHover4": {
+      "var": "--aqua-ctl-face-hover-4"
+    },
+    "color.ctlFaceActive1": {
+      "var": "--aqua-ctl-face-active-1"
+    },
+    "color.ctlFaceActive2": {
+      "var": "--aqua-ctl-face-active-2"
+    },
+    "color.ctlFaceActive3": {
+      "var": "--aqua-ctl-face-active-3"
+    },
+    "color.ctlFaceDisabled1": {
+      "var": "--aqua-ctl-face-disabled-1"
+    },
+    "color.ctlFaceDisabled2": {
+      "var": "--aqua-ctl-face-disabled-2"
+    },
+    "color.ctlBorder": {
+      "var": "--aqua-ctl-border"
+    },
+    "color.ctlBorderBottom": {
+      "var": "--aqua-ctl-border-bottom"
+    },
+    "color.ctlBorderDisabled": {
+      "var": "--aqua-ctl-border-disabled"
+    },
+    "color.ctlFocusRing": {
+      "var": "--aqua-ctl-focus-ring"
+    },
+    "color.ctlDefaultInk": {
+      "var": "--aqua-ctl-default-ink"
+    },
+    "color.ctlDefault1": {
+      "var": "--aqua-ctl-default-1"
+    },
+    "color.ctlDefault2": {
+      "var": "--aqua-ctl-default-2"
+    },
+    "color.ctlDefault3": {
+      "var": "--aqua-ctl-default-3"
+    },
+    "color.ctlDefault4": {
+      "var": "--aqua-ctl-default-4"
+    },
+    "color.ctlDefaultBorder": {
+      "var": "--aqua-ctl-default-border"
+    },
+    "color.ctlDefaultBorderBottom": {
+      "var": "--aqua-ctl-default-border-bottom"
+    },
+    "color.ctlBoxInk": {
+      "var": "--aqua-ctl-box-ink"
+    },
+    "color.ctlBox1": {
+      "var": "--aqua-ctl-box-1"
+    },
+    "color.ctlBox2": {
+      "var": "--aqua-ctl-box-2"
+    },
+    "color.ctlBox3": {
+      "var": "--aqua-ctl-box-3"
+    },
+    "color.ctlBoxBorder": {
+      "var": "--aqua-ctl-box-border"
+    },
+    "color.ctlBoxOn1": {
+      "var": "--aqua-ctl-box-on-1"
+    },
+    "color.ctlBoxOn2": {
+      "var": "--aqua-ctl-box-on-2"
+    },
+    "color.ctlBoxOn3": {
+      "var": "--aqua-ctl-box-on-3"
+    },
+    "color.ctlBoxOnBorder": {
+      "var": "--aqua-ctl-box-on-border"
+    },
+    "color.ctlFieldBg": {
+      "var": "--aqua-ctl-field-bg"
+    },
+    "color.ctlFieldBorder": {
+      "var": "--aqua-ctl-field-border"
+    },
+    "color.ctlFieldBorderTop": {
+      "var": "--aqua-ctl-field-border-top"
+    },
+    "color.ctlFieldFocusBorder": {
+      "var": "--aqua-ctl-field-focus-border"
+    },
+    "color.ctlFieldInvalidBorder": {
+      "var": "--aqua-ctl-field-invalid-border"
+    },
+    "color.ctlPlaceholder": {
+      "var": "--aqua-ctl-placeholder"
+    },
+    "color.dangerInk": {
+      "var": "--aqua-danger-ink"
+    }
+  }
+}

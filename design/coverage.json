@@ -1,0 +1,1089 @@
+{
+  "schemaVersion": 1,
+  "about": "Every user-facing surface of the suite, where it lives, what states it has, which rules govern it, and how it was verified. scripts/styleguide-check.mjs rebuilds the list of screens from the products' own navigation declarations (discovery) and fails when a screen exists that is not recorded here.",
+  "verificationValues": ["verified", "not-run", "blocked", "not-applicable"],
+  "discovery": [
+    {
+      "product": "player",
+      "kind": "view-union",
+      "file": "music-player/src/App.tsx",
+      "type": "ViewId",
+      "prefix": "player-"
+    },
+    {
+      "product": "hub",
+      "kind": "view-union",
+      "file": "docker-container/src/web/App.tsx",
+      "type": "ViewId",
+      "prefix": "hub-"
+    },
+    {
+      "product": "companion",
+      "kind": "view-union",
+      "file": "windows-companion/src/renderer/App.tsx",
+      "type": "ViewId",
+      "prefix": "companion-"
+    },
+    {
+      "product": "player",
+      "kind": "files",
+      "dir": "music-player/src/components",
+      "suffix": "Sheet.tsx",
+      "prefix": "player-sheet-"
+    },
+    {
+      "product": "discord",
+      "kind": "discord-commands",
+      "file": "docker-container/src/discord/gateway.ts",
+      "surface": "discord-replies"
+    },
+    {
+      "product": "discord",
+      "kind": "discord-templates",
+      "file": "packages/contracts/src/entities/discord.ts",
+      "surface": "discord-replies"
+    }
+  ],
+  "surfaces": [
+    {
+      "id": "player-shell",
+      "kind": "chrome",
+      "product": "player",
+      "platform": "web",
+      "title": "Status bar, mode switch, hero and section strip",
+      "entry": "every section",
+      "sourcePaths": [
+        "music-player/src/App.tsx",
+        "packages/aqua-ui/src/components/PageBar.tsx",
+        "packages/aqua-ui/src/components/Hero.tsx",
+        "packages/aqua-ui/src/components/SectionStrip.tsx"
+      ],
+      "components": [
+        "PageBar",
+        "BarSearch",
+        "BarClock",
+        "ModeSwitch",
+        "ProfileButton",
+        "Hero",
+        "HeroArt",
+        "JewelStage",
+        "TrackScrubber",
+        "KeyTransport",
+        "LevelSlider",
+        "SectionStrip"
+      ],
+      "states": [
+        "nothing playing",
+        "playing",
+        "paused",
+        "live stream (read-only scrubber)",
+        "unknown duration",
+        "shared unavailable (reason shown)",
+        "narrow (strip scrolls)",
+        "transport: volume beneath when it cannot flank the keys (DEC-016)",
+        "transport: keys wrapped, previous/play/next alone on the first line (DEC-016)"
+      ],
+      "rules": ["UX-PRIN-002", "UX-KEY-001", "UX-KEY-002", "UX-TOUCH-001"],
+      "guideAnchor": "page",
+      "mockup": "player-now-playing",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-library",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Music Library",
+      "entry": "section strip → Music Library",
+      "sourcePaths": [
+        "music-player/src/views/Library.tsx",
+        "packages/aqua-ui/src/components/MusicList.tsx"
+      ],
+      "components": ["MusicList", "RowMenu", "EmptyState", "SourceBadge"],
+      "states": [
+        "empty (how to add music)",
+        "scanning",
+        "loaded",
+        "sorted",
+        "selected row",
+        "playing row",
+        "unplayable format"
+      ],
+      "rules": ["UX-KEY-001", "UX-STATE-001", "UX-A11Y-001", "VOICE-001"],
+      "guideAnchor": "screens",
+      "mockup": "player-now-playing",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-now-playing",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Now playing",
+      "entry": "section strip → Now playing",
+      "sourcePaths": [
+        "music-player/src/views/NowPlaying.tsx",
+        "packages/domain/src/visualisers/spectrum.ts"
+      ],
+      "components": ["Panel", "KeyValueList", "EmptyState"],
+      "states": [
+        "nothing playing",
+        "playing (spectrum moving)",
+        "paused (spectrum stopped)",
+        "reduced motion (spectrum at 4 per second)",
+        "equalizer not applied (reason shown)",
+        "shared (group queue)"
+      ],
+      "rules": ["UX-STATE-001", "UX-MOTION-001"],
+      "guideAnchor": "page",
+      "mockup": "player-engine",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-queue",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Queue",
+      "entry": "section strip → Queue",
+      "sourcePaths": ["music-player/src/views/Queue.tsx"],
+      "components": ["Panel", "EmptyState"],
+      "states": ["nothing queued", "queued", "shuffled", "shared (hub revision)"],
+      "rules": ["UX-STATE-001", "UX-SHARED-001", "VOICE-001"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-playlists",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Playlists",
+      "entry": "section strip → Playlists",
+      "sourcePaths": ["music-player/src/views/Playlists.tsx"],
+      "components": ["Panel", "EmptyState", "ShareSheet"],
+      "states": ["no playlists", "list", "playlist open", "empty playlist"],
+      "rules": ["UX-STATE-001", "VOICE-001"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-search",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Search",
+      "entry": "status-bar search → Enter",
+      "sourcePaths": [
+        "music-player/src/views/Search.tsx",
+        "music-player/src/components/SearchPopover.tsx"
+      ],
+      "components": ["BarSearch", "ResultsPopover", "EmptyState", "LoadingState"],
+      "states": [
+        "prompt (device only / with hub)",
+        "searching hub",
+        "no local matches",
+        "results",
+        "hub unreachable"
+      ],
+      "rules": ["UX-STATE-001", "UX-PRIN-002"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-metrics",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Listening history",
+      "entry": "section strip → Listening history",
+      "sourcePaths": ["music-player/src/views/Metrics.tsx"],
+      "components": ["Panel", "EmptyState"],
+      "states": ["nothing yet", "history"],
+      "rules": ["UX-STATE-001", "UX-SAFE-004"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-constellation",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Constellation",
+      "entry": "section strip → Constellation",
+      "sourcePaths": [
+        "music-player/src/views/Constellation.tsx",
+        "packages/domain/src/visualisers/constellation-layout.ts"
+      ],
+      "components": ["Panel", "EmptyState", "SegmentedControl", "AquaTable"],
+      "states": [
+        "nothing to map",
+        "field",
+        "table (equivalent view)",
+        "reduced motion (table)",
+        "WebGL unavailable"
+      ],
+      "rules": ["UX-MOTION-001", "UX-STATE-001"],
+      "guideAnchor": "page",
+      "mockup": "player-constellation",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-settings",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Settings and equalizer",
+      "entry": "profile button in the status bar",
+      "sourcePaths": [
+        "music-player/src/views/Settings.tsx",
+        "music-player/src/views/Equalizer.tsx",
+        "music-player/src/components/PlatformsPanel.tsx"
+      ],
+      "components": [
+        "Panel",
+        "PanelSection",
+        "Checkbox",
+        "Slider",
+        "PopUpMenu",
+        "ButtonLink",
+        "TextField",
+        "EmptyState"
+      ],
+      "states": [
+        "no folders",
+        "folders",
+        "hub paired",
+        "hub not paired",
+        "equalizer on/off",
+        "solfeggio preset (dimmed bands)",
+        "crossfade",
+        "car/lock-screen report"
+      ],
+      "rules": [
+        "UX-PRIN-001",
+        "UX-PRIN-003",
+        "UX-PRIN-004",
+        "UX-LINK-001",
+        "UX-TOUCH-002",
+        "UX-SAFE-004"
+      ],
+      "guideAnchor": "screens",
+      "mockup": "player-settings",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-sheet-add-to-playlist",
+      "kind": "overlay",
+      "product": "player",
+      "platform": "web",
+      "title": "Add to playlist",
+      "entry": "✚ beside the transport, or row menu",
+      "sourcePaths": ["music-player/src/components/AddToPlaylistSheet.tsx"],
+      "components": ["Sheet"],
+      "states": ["open", "no playlists"],
+      "rules": ["UX-KEY-001"],
+      "guideAnchor": "overlays",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-sheet-new-playlist",
+      "kind": "overlay",
+      "product": "player",
+      "platform": "web",
+      "title": "New playlist",
+      "entry": "Playlists → New, or row menu",
+      "sourcePaths": [
+        "music-player/src/components/NewPlaylistSheet.tsx",
+        "packages/aqua-ui/src/components/music-list-behaviours.tsx"
+      ],
+      "components": ["Sheet", "TextField", "InlineValidation"],
+      "states": ["empty name (validation)", "valid"],
+      "rules": ["VOICE-002"],
+      "guideAnchor": "overlays",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-sheet-download",
+      "kind": "overlay",
+      "product": "player",
+      "platform": "web",
+      "title": "Download from the hub",
+      "entry": "row menu → Download",
+      "sourcePaths": ["music-player/src/components/DownloadSheet.tsx"],
+      "components": ["Sheet", "PopUpMenu", "ProgressBar"],
+      "states": ["choose format", "basis required", "in progress", "failed with reason"],
+      "rules": ["UX-FEED-001", "UX-PRIN-002"],
+      "guideAnchor": "overlays",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-sheet-fetch",
+      "kind": "overlay",
+      "product": "player",
+      "platform": "web",
+      "title": "Fetch with a local tool",
+      "entry": "Library → Fetch (when a helper or the Android tools are present)",
+      "sourcePaths": [
+        "music-player/src/components/FetchSheet.tsx",
+        "music-player/src/lib/fetch-helper.ts",
+        "music-player/src/lib/android-bridge.ts"
+      ],
+      "components": ["Sheet", "TextField", "ProgressBar"],
+      "states": [
+        "no tool (control hidden)",
+        "url entry",
+        "running",
+        "finished (files)",
+        "failed (tool's own reason)"
+      ],
+      "rules": ["UX-PRIN-001", "UX-FEED-001", "VOICE-002"],
+      "guideAnchor": "overlays",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-sheet-share",
+      "kind": "overlay",
+      "product": "player",
+      "platform": "web",
+      "title": "Share",
+      "entry": "share button beside the transport, or a playlist",
+      "sourcePaths": ["music-player/src/components/ShareSheet.tsx"],
+      "components": ["Sheet", "Checkbox", "TextField"],
+      "states": ["no hub (explains why)", "link created", "copied"],
+      "rules": ["UX-PRIN-002"],
+      "guideAnchor": "overlays",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-search-popover",
+      "kind": "overlay",
+      "product": "player",
+      "platform": "web",
+      "title": "Search popover",
+      "entry": "typing in the status-bar search",
+      "sourcePaths": ["music-player/src/components/SearchPopover.tsx"],
+      "components": ["ResultsPopover"],
+      "states": ["counting", "results", "none", "dismissed (arrow brings back)"],
+      "rules": ["UX-FEED-001", "UX-KEY-001"],
+      "guideAnchor": "overlays",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-notice-bar",
+      "kind": "feedback",
+      "product": "player",
+      "platform": "web",
+      "title": "Notice bar and toasts",
+      "entry": "any warning the store raises",
+      "sourcePaths": [
+        "music-player/src/components/NoticeBar.tsx",
+        "packages/aqua-ui/src/components/Toast.tsx"
+      ],
+      "components": ["ToastProvider"],
+      "states": ["info", "warning", "dismissed"],
+      "rules": ["UX-FEED-001", "VOICE-002"],
+      "guideAnchor": "overlays",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-row-menu",
+      "kind": "overlay",
+      "product": "player",
+      "platform": "web",
+      "title": "Row context menu",
+      "entry": "right-click or the row's menu key",
+      "sourcePaths": ["packages/aqua-ui/src/components/music-list-behaviours.tsx"],
+      "components": ["RowMenu", "Menu"],
+      "states": ["open", "disabled items with reason"],
+      "rules": ["UX-KEY-001", "UX-PRIN-004"],
+      "guideAnchor": "overlays",
+      "authority": "adopted"
+    },
+
+    {
+      "id": "hub-login",
+      "kind": "screen",
+      "product": "hub",
+      "platform": "web",
+      "title": "Sign in",
+      "entry": "any admin URL without a session",
+      "sourcePaths": ["docker-container/src/web/App.tsx"],
+      "symbols": ["LoginScreen"],
+      "components": ["TextField", "Button", "InlineValidation"],
+      "states": ["first run (admin/admin hint)", "wrong password", "rate limited"],
+      "rules": ["UX-SAFE-002", "VOICE-002"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "hub-change-password",
+      "kind": "screen",
+      "product": "hub",
+      "platform": "web",
+      "title": "Change the bootstrap password",
+      "entry": "first sign-in",
+      "sourcePaths": ["docker-container/src/web/App.tsx"],
+      "symbols": ["ChangePasswordScreen"],
+      "components": ["TextField", "Button", "InlineValidation"],
+      "states": ["weak password refused", "saved"],
+      "rules": ["UX-SAFE-002"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "hub-view-error",
+      "kind": "feedback",
+      "product": "hub",
+      "platform": "web",
+      "title": "View error boundary",
+      "entry": "any admin view that throws",
+      "sourcePaths": ["docker-container/src/web/ViewBoundary.tsx"],
+      "components": ["ErrorState"],
+      "states": ["error with retry"],
+      "rules": ["UX-STATE-001"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "hub-overview",
+      "kind": "screen",
+      "product": "hub",
+      "platform": "web",
+      "title": "Overview",
+      "entry": "source list → Hub → Overview",
+      "sourcePaths": [
+        "docker-container/src/web/views/Overview.tsx",
+        "docker-container/src/web/views/common.tsx"
+      ],
+      "components": ["AquaWindow", "SourceList", "Panel", "KeyValueList", "StatusDot"],
+      "states": ["loading", "loaded", "error"],
+      "rules": ["UX-STATE-001"],
+      "guideAnchor": "screens",
+      "mockup": "hub-overview",
+      "authority": "adopted"
+    },
+    {
+      "id": "hub-devices",
+      "kind": "screen",
+      "product": "hub",
+      "platform": "web",
+      "title": "Devices and pairing",
+      "entry": "source list → Devices",
+      "sourcePaths": ["docker-container/src/web/views/Devices.tsx"],
+      "components": ["AquaTable", "Button", "Panel", "StatusDot"],
+      "states": [
+        "no devices",
+        "pairing code shown",
+        "claim waiting for fingerprint",
+        "revoke (confirm)"
+      ],
+      "rules": ["UX-SAFE-001", "UX-SAFE-003", "UX-STATE-001"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "hub-groups",
+      "kind": "screen",
+      "product": "hub",
+      "platform": "web",
+      "title": "Groups",
+      "entry": "source list → Groups",
+      "sourcePaths": ["docker-container/src/web/views/Groups.tsx"],
+      "components": ["AquaTable", "Panel"],
+      "states": ["no groups", "group with queue", "archived"],
+      "rules": ["UX-SHARED-001", "UX-STATE-001"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "hub-providers",
+      "kind": "screen",
+      "product": "hub",
+      "platform": "web",
+      "title": "Providers",
+      "entry": "source list → Providers",
+      "sourcePaths": ["docker-container/src/web/views/Providers.tsx"],
+      "components": ["AquaTable", "SourceBadge", "StatusDot", "TextField"],
+      "states": ["available", "sign in needed", "not configured", "off", "test result"],
+      "rules": ["UX-PRIN-002", "UX-A11Y-001"],
+      "guideAnchor": "screens",
+      "mockup": "hub-providers",
+      "authority": "adopted"
+    },
+    {
+      "id": "hub-library",
+      "kind": "screen",
+      "product": "hub",
+      "platform": "web",
+      "title": "Library",
+      "entry": "source list → Library",
+      "sourcePaths": ["docker-container/src/web/views/Library.tsx"],
+      "components": ["AquaTable", "Button", "EmptyState"],
+      "states": ["no roots", "scanning", "tracks"],
+      "rules": ["UX-STATE-001"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "hub-downloads",
+      "kind": "screen",
+      "product": "hub",
+      "platform": "web",
+      "title": "Downloads",
+      "entry": "source list → Downloads",
+      "sourcePaths": ["docker-container/src/web/views/Downloads.tsx"],
+      "components": ["AquaTable", "ProgressBar", "KeyValueList"],
+      "states": [
+        "queued",
+        "running",
+        "paused",
+        "failed with reason",
+        "completed",
+        "formats unavailable without FFmpeg"
+      ],
+      "rules": ["UX-FEED-001", "UX-PRIN-002"],
+      "guideAnchor": "screens",
+      "mockup": "hub-downloads",
+      "authority": "adopted"
+    },
+    {
+      "id": "hub-shares",
+      "kind": "screen",
+      "product": "hub",
+      "platform": "web",
+      "title": "Shared links",
+      "entry": "source list → Shared links",
+      "sourcePaths": ["docker-container/src/web/views/Shares.tsx"],
+      "components": ["AquaTable", "Button"],
+      "states": ["none", "active", "revoked (confirm)"],
+      "rules": ["UX-SAFE-001"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "hub-recommendations",
+      "kind": "screen",
+      "product": "hub",
+      "platform": "web",
+      "title": "Recommendations",
+      "entry": "source list → Recommendations",
+      "sourcePaths": ["docker-container/src/web/views/Recommendations.tsx"],
+      "components": ["Panel", "Slider"],
+      "states": ["defaults", "edited"],
+      "rules": ["UX-PRIN-003"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "hub-discord",
+      "kind": "screen",
+      "product": "hub",
+      "platform": "web",
+      "title": "Discord",
+      "entry": "source list → Integrations → Discord",
+      "sourcePaths": [
+        "docker-container/src/web/views/Discord.tsx",
+        "docker-container/src/discord/service-interface.ts"
+      ],
+      "components": ["Panel", "TextField", "Button", "StatusDot"],
+      "states": [
+        "no token",
+        "configured but disabled",
+        "worker not running",
+        "connected",
+        "voice playing",
+        "last error",
+        "template preview"
+      ],
+      "rules": ["UX-PRIN-002", "UX-DISCORD-003", "VOICE-002"],
+      "guideAnchor": "discord",
+      "authority": "adopted"
+    },
+    {
+      "id": "hub-network",
+      "kind": "screen",
+      "product": "hub",
+      "platform": "web",
+      "title": "Network",
+      "entry": "source list → System → Network",
+      "sourcePaths": ["docker-container/src/web/views/Network.tsx"],
+      "components": ["Panel", "KeyValueList", "PopUpMenu"],
+      "states": ["localhost", "lan", "remote (restart required)"],
+      "rules": ["UX-SAFE-002"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "hub-backup",
+      "kind": "screen",
+      "product": "hub",
+      "platform": "web",
+      "title": "Backup",
+      "entry": "source list → System → Backup",
+      "sourcePaths": ["docker-container/src/web/views/Backup.tsx"],
+      "components": ["AquaTable", "Button"],
+      "states": ["no backups", "list", "restore (confirm)", "restore failed with reason"],
+      "rules": ["UX-SAFE-001", "UX-STATE-001"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "hub-diagnostics",
+      "kind": "screen",
+      "product": "hub",
+      "platform": "web",
+      "title": "Diagnostics",
+      "entry": "source list → System → Diagnostics",
+      "sourcePaths": ["docker-container/src/web/views/Diagnostics.tsx"],
+      "components": ["Panel", "KeyValueList"],
+      "states": ["loaded"],
+      "rules": ["UX-STATE-001"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "share-page",
+      "kind": "screen",
+      "product": "hub",
+      "platform": "web",
+      "title": "Public share page",
+      "entry": "/s/<token>",
+      "sourcePaths": ["docker-container/src/api/routes/shares.ts"],
+      "symbols": ["errorPage", "PAGE_STYLE"],
+      "components": [],
+      "states": ["track or playlist", "stream allowed", "link unavailable"],
+      "rules": ["UX-SAFE-004"],
+      "guideAnchor": "screens",
+      "authority": "unresolved",
+      "decision": "DEC-008"
+    },
+
+    {
+      "id": "companion-folders",
+      "kind": "screen",
+      "product": "companion",
+      "platform": "windows",
+      "title": "Folders",
+      "entry": "source list → Library → Folders",
+      "sourcePaths": ["windows-companion/src/renderer/views/Folders.tsx"],
+      "components": ["AquaWindow", "AquaTable", "StatusDot", "EmptyState"],
+      "states": ["no folders", "watching", "drive not connected", "remove (confirm)"],
+      "rules": ["UX-SAFE-001", "VOICE-001"],
+      "guideAnchor": "screens",
+      "mockup": "companion-folders",
+      "authority": "adopted"
+    },
+    {
+      "id": "companion-library",
+      "kind": "screen",
+      "product": "companion",
+      "platform": "windows",
+      "title": "Music",
+      "entry": "source list → Library → Music",
+      "sourcePaths": ["windows-companion/src/renderer/views/Library.tsx"],
+      "components": ["AquaTable", "SearchField", "EmptyState"],
+      "states": ["nothing indexed", "no matches", "tracks"],
+      "rules": ["UX-STATE-001", "VOICE-001"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "companion-hub",
+      "kind": "screen",
+      "product": "companion",
+      "platform": "windows",
+      "title": "Connection",
+      "entry": "source list → Hub → Connection",
+      "sourcePaths": ["windows-companion/src/renderer/views/Hub.tsx"],
+      "components": ["Panel", "TextField", "Button", "KeyValueList"],
+      "states": [
+        "not paired",
+        "pairing (fingerprint)",
+        "connected",
+        "plain-http warning",
+        "forget (confirm)"
+      ],
+      "rules": ["UX-SAFE-001", "UX-SAFE-003"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "companion-transfers",
+      "kind": "screen",
+      "product": "companion",
+      "platform": "windows",
+      "title": "Transfers",
+      "entry": "source list → Hub → Transfers",
+      "sourcePaths": ["windows-companion/src/renderer/views/Transfers.tsx"],
+      "components": ["AquaTable", "ProgressBar", "EmptyState"],
+      "states": ["nothing transferring (paired / not paired)", "uploading", "cancelled", "failed"],
+      "rules": ["UX-FEED-001", "VOICE-001"],
+      "guideAnchor": "screens",
+      "mockup": "companion-transfers",
+      "authority": "adopted"
+    },
+    {
+      "id": "companion-backup",
+      "kind": "screen",
+      "product": "companion",
+      "platform": "windows",
+      "title": "Backup",
+      "entry": "source list → This computer → Backup",
+      "sourcePaths": ["windows-companion/src/renderer/views/Backup.tsx"],
+      "components": ["Panel", "Button"],
+      "states": ["export", "import (validated)", "invalid backup refused"],
+      "rules": ["UX-SAFE-001", "VOICE-002"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "companion-about",
+      "kind": "screen",
+      "product": "companion",
+      "platform": "windows",
+      "title": "About",
+      "entry": "source list → This computer → About",
+      "sourcePaths": ["windows-companion/src/renderer/views/About.tsx"],
+      "components": ["Panel", "KeyValueList"],
+      "states": ["loaded"],
+      "rules": ["VOICE-003"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "companion-notice-bar",
+      "kind": "feedback",
+      "product": "companion",
+      "platform": "windows",
+      "title": "Notice bar",
+      "entry": "any main-process notice",
+      "sourcePaths": ["windows-companion/src/renderer/views/NoticeBar.tsx"],
+      "components": [],
+      "states": ["info", "warning"],
+      "rules": ["VOICE-002"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+
+    {
+      "id": "discord-replies",
+      "kind": "conversation",
+      "product": "discord",
+      "platform": "discord",
+      "title": "Bot replies",
+      "entry": "/play, /queue, /skip … or the prefix form",
+      "commands": [
+        "play",
+        "nowplaying",
+        "queue",
+        "skip",
+        "pause",
+        "resume",
+        "stop",
+        "shuffle",
+        "clear",
+        "join",
+        "leave",
+        "settings"
+      ],
+      "sourcePaths": [
+        "docker-container/src/discord/gateway.ts",
+        "packages/domain/src/templates.ts",
+        "docker-container/src/group/command-service.ts"
+      ],
+      "components": [],
+      "states": [
+        "queued",
+        "now playing",
+        "skipped / vote counted",
+        "refused (ephemeral)",
+        "no results",
+        "cannot be played here",
+        "joined / left voice",
+        "not in a voice channel",
+        "missing Connect/Speak"
+      ],
+      "rules": ["UX-DISCORD-001", "UX-DISCORD-002", "UX-DISCORD-003"],
+      "guideAnchor": "discord",
+      "authority": "adopted",
+      "decision": "DEC-005"
+    },
+
+    {
+      "id": "android-shell",
+      "kind": "shell",
+      "product": "android",
+      "platform": "android",
+      "title": "WebView shell",
+      "entry": "launcher icon",
+      "sourcePaths": [
+        "android/app/src/main/java/com/nowplaying/player/MainActivity.kt",
+        "android/app/src/main/res/values/strings.xml"
+      ],
+      "components": [],
+      "states": [
+        "player loaded from assets",
+        "renderer crashed (reloads)",
+        "back = history, else background",
+        "hub over http refused"
+      ],
+      "rules": ["UX-SAFE-004"],
+      "guideAnchor": "platforms",
+      "authority": "adopted",
+      "decision": "DEC-012"
+    },
+    {
+      "id": "android-system-ui",
+      "kind": "system",
+      "product": "android",
+      "platform": "android",
+      "title": "Notification, picker and save dialog",
+      "entry": "a fetch starts; a file input opens; an export is saved",
+      "sourcePaths": [
+        "android/app/src/main/java/com/nowplaying/player/FetchService.kt",
+        "android/app/src/main/java/com/nowplaying/player/BlobDownloads.kt",
+        "android/app/src/main/res/values/strings.xml"
+      ],
+      "components": [],
+      "states": [
+        "fetching (foreground notification)",
+        "permission prompt (API 33+)",
+        "saved",
+        "could not save"
+      ],
+      "rules": ["VOICE-002"],
+      "guideAnchor": "platforms",
+      "authority": "adopted",
+      "decision": "DEC-010"
+    },
+    {
+      "id": "local-helper-cli",
+      "kind": "cli",
+      "product": "local-helper",
+      "platform": "terminal",
+      "title": "Local helper console",
+      "entry": "now-playing-helper",
+      "sourcePaths": ["local-helper/src/cli.ts", "local-helper/src/options.ts"],
+      "components": [],
+      "states": ["tools found / missing with install hint", "token shown", "stopping"],
+      "rules": ["VOICE-002"],
+      "guideAnchor": "platforms",
+      "authority": "observed"
+    }
+  ],
+  "flows": [
+    {
+      "id": "flow-first-run",
+      "title": "First run of the hub",
+      "preconditions": "A fresh data volume; the container is up on 127.0.0.1:4546.",
+      "steps": [
+        "Open the admin page",
+        "Sign in with admin / admin",
+        "Choose a real password",
+        "Every section unlocks"
+      ],
+      "failures": [
+        "Weak password refused with the reason",
+        "Login rate-limited after repeated failures"
+      ],
+      "surfaces": ["hub-login", "hub-change-password", "hub-overview"],
+      "rules": ["UX-SAFE-002"],
+      "evidence": [
+        "docker-container/tests/integration/setup-and-pairing.test.ts",
+        "docker-container/tests/e2e/first-run.setup.ts"
+      ]
+    },
+    {
+      "id": "flow-pairing",
+      "title": "Pair a player or the companion",
+      "preconditions": "Setup complete; the device can reach the hub.",
+      "steps": [
+        "Admin creates a pairing code (Devices)",
+        "Device enters the code",
+        "Both screens show the same fingerprint",
+        "Admin confirms",
+        "Device receives a scoped credential"
+      ],
+      "failures": [
+        "Code expired",
+        "Fingerprint differs: do not confirm",
+        "Wrong codes lock out that address for a while"
+      ],
+      "surfaces": ["hub-devices", "player-settings", "companion-hub"],
+      "rules": ["UX-SAFE-003"],
+      "evidence": ["docker-container/tests/integration/setup-and-pairing.test.ts"]
+    },
+    {
+      "id": "flow-local-music",
+      "title": "Add music on this device and play it",
+      "preconditions": "The player is open (installed or not).",
+      "steps": [
+        "Library shows how to add music",
+        "Choose a folder or files",
+        "Tracks appear; unplayable formats say so",
+        "Play; the hero and the list mark the playing row"
+      ],
+      "failures": [
+        "Browser without folder access falls back to file choice",
+        "A file that disappeared says it cannot be found"
+      ],
+      "surfaces": ["player-library", "player-settings", "player-shell"],
+      "rules": ["UX-STATE-001", "UX-A11Y-001"],
+      "evidence": [
+        "music-player/tests/e2e/local-file.spec.ts",
+        "music-player/tests/e2e/player.spec.ts"
+      ]
+    },
+    {
+      "id": "flow-shared-listening",
+      "title": "Listen together",
+      "preconditions": "Player paired with a hub; a group exists.",
+      "steps": [
+        "Switch the mode to Shared",
+        "Join or create a group",
+        "Anyone queues; everyone hears it at the same point",
+        "Skips and pauses apply to the group"
+      ],
+      "failures": [
+        "No hub: the switch explains why",
+        "Stale command: refused with the current revision",
+        "Member without the DJ role: vote-skip instead of skip"
+      ],
+      "surfaces": ["player-shell", "player-queue", "hub-groups"],
+      "rules": ["UX-PRIN-002", "UX-SHARED-001"],
+      "evidence": ["docker-container/tests/integration/groups-and-queue.test.ts"]
+    },
+    {
+      "id": "flow-discord-play",
+      "title": "Play music into a Discord voice channel",
+      "preconditions": "Bot token installed, bot enabled, default group chosen, worker container running.",
+      "steps": [
+        "Join a voice channel",
+        "/play <search or link>",
+        "The bot joins your channel and replies Queued",
+        "Audio follows the group timeline; pause, skip and seek from any device apply"
+      ],
+      "failures": [
+        "Not in a voice channel: the reply says so",
+        "Missing Connect/Speak: the reply names them",
+        "Source that cannot stream in Discord: skipped with the reason",
+        "Worker not running: the admin panel says so"
+      ],
+      "surfaces": ["discord-replies", "hub-discord"],
+      "rules": ["UX-DISCORD-001", "UX-DISCORD-002", "UX-DISCORD-003"],
+      "evidence": [
+        "docker-container/tests/integration/discord-worker.test.ts",
+        "docker-container/tests/unit/discord-voice.test.ts",
+        "docker-container/tests/integration/discord-parity.test.ts"
+      ]
+    },
+    {
+      "id": "flow-download",
+      "title": "Download a track the hub may give you",
+      "preconditions": "Paired player; the provider allows it.",
+      "steps": [
+        "Row menu → Download",
+        "Choose format and the basis (e.g. content I own)",
+        "Progress in words",
+        "The file saves as a link download"
+      ],
+      "failures": [
+        "Format unavailable without FFmpeg",
+        "Provider refuses the basis",
+        "Cancelled: the partial file is removed"
+      ],
+      "surfaces": ["player-sheet-download", "hub-downloads"],
+      "rules": ["UX-FEED-001", "UX-LINK-001"],
+      "evidence": [
+        "docker-container/tests/security/ssrf-and-downloads.test.ts",
+        "docker-container/tests/integration/downloads-queue.test.ts"
+      ]
+    },
+    {
+      "id": "flow-share",
+      "title": "Share a track or playlist",
+      "preconditions": "Paired player.",
+      "steps": [
+        "Share",
+        "Choose whether streaming is allowed",
+        "Copy the link",
+        "The recipient opens the public page"
+      ],
+      "failures": [
+        "No hub: the sheet explains why",
+        "Link revoked or used up: the page says it is unavailable"
+      ],
+      "surfaces": ["player-sheet-share", "hub-shares", "share-page"],
+      "rules": ["UX-PRIN-002"],
+      "evidence": [
+        "docker-container/tests/integration/shares-and-sync.test.ts",
+        "docker-container/tests/security/share-limits.test.ts"
+      ]
+    },
+    {
+      "id": "flow-companion-transfer",
+      "title": "Send files from Windows to the hub",
+      "preconditions": "Companion paired; a folder indexed.",
+      "steps": [
+        "Add a folder",
+        "Select tracks in Music",
+        "Send to the hub",
+        "Transfers shows progress; cancel stops it"
+      ],
+      "failures": ["Drive not connected", "Hub unreachable: upload fails with the reason"],
+      "surfaces": ["companion-folders", "companion-library", "companion-transfers"],
+      "rules": ["UX-FEED-001"],
+      "evidence": ["windows-companion/tests/integration/companion-and-hub.test.ts"]
+    },
+    {
+      "id": "flow-backup",
+      "title": "Back up and restore",
+      "preconditions": "Setup complete.",
+      "steps": [
+        "Backup → Create",
+        "Restore → confirm",
+        "The hub reports success or the reason it failed"
+      ],
+      "failures": ["Invalid backup refused", "Swap failed: previous database put back"],
+      "surfaces": ["hub-backup", "companion-backup"],
+      "rules": ["UX-SAFE-001"],
+      "evidence": ["docker-container/tests/integration/backup-and-search-cursor.test.ts"]
+    },
+    {
+      "id": "flow-fetch",
+      "title": "Fetch with yt-dlp or spotDL",
+      "preconditions": "The local helper is running, or the Android app has unpacked its tools.",
+      "steps": [
+        "Library → Fetch",
+        "Paste a link and pick a format",
+        "Progress",
+        "Files are added to the library"
+      ],
+      "failures": [
+        "Tool missing: the control is not shown",
+        "Tool error: its own message, without paths"
+      ],
+      "surfaces": ["player-sheet-fetch", "local-helper-cli", "android-system-ui"],
+      "rules": ["UX-PRIN-001", "VOICE-002"],
+      "evidence": [
+        "music-player/tests/e2e/helper.spec.ts",
+        "local-helper/tests/integration/helper-server.test.ts"
+      ]
+    }
+  ],
+  "exclusions": [
+    {
+      "id": "docker-deployment",
+      "reason": "Docker is delivery, not a visual surface. Its ports, health check and how rebuilt assets reach users are in the engineering appendix of the styleguide."
+    },
+    {
+      "id": "styleguide",
+      "reason": "The styleguide documents the products; it is not one of them."
+    },
+    {
+      "id": "aqua-ui-gallery",
+      "reason": "Developer specimen page (pnpm --filter @now-playing/aqua-ui dev); its specimens are rendered in the styleguide."
+    }
+  ]
+}
