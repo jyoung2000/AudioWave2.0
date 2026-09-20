@@ -356,6 +356,7 @@ export function PageDemo() {
             </KeyButton>
             <KeyButton aux label={liked ? 'Remove from favourites' : 'Add to favourites'} pressed={liked} onClick={() => setLiked((l) => !l)}><Glyph name={liked ? 'star-filled' : 'star'} /></KeyButton>
             <KeyButton aux label="Shuffle" onClick={() => undefined}><Glyph name="shuffle" /></KeyButton>
+            <KeyButton aux label="Discover: off" onClick={() => undefined}><Glyph name="discover" /></KeyButton>
           </span>
           <KeyButton glyph="previous" label="Previous track" onClick={() => undefined} />
           <KeyButton primary glyph={playing ? 'pause' : 'play'} label={playing ? 'Pause' : 'Play'} pressed={playing} onClick={() => setPlaying((p) => !p)} />
@@ -363,6 +364,7 @@ export function PageDemo() {
           <span className="np-keys__aux">
             <KeyButton aux glyph="repeat" label={repeat ? 'Repeat: all' : 'Repeat: off'} pressed={repeat} onClick={() => setRepeat((r) => !r)} />
             <KeyButton aux label="Add to a playlist" onClick={() => undefined}><Glyph name="add" /></KeyButton>
+            <KeyButton aux label="Download this song" onClick={() => undefined}><Glyph name="download" /></KeyButton>
             <KeyButton aux label="Share this song" onClick={() => undefined}><Glyph name="share" /></KeyButton>
           </span>
         </KeyTransport>

@@ -6,12 +6,14 @@
  * real one wearing the real stylesheet, and the page's own chrome is a source list and a work area
  * because that is how this system navigates.
  */
-import { useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
 import tokens from '../src/styles/tokens.json';
 import { AquaProvider, ToastProvider, Button, Checkbox, PopUpMenu, ProgressBar, SearchField, SegmentedControl, SourceList, SourceIcon, Glyph, TrackScrubber, BarSearch, Slider, StatusDot, MusicList } from '../src/index.js';
 import { Card, ControlsDemo, IconsDemo, OverlaysDemo, PageDemo, ResultsDemo, ShellDemo, StatesDemo, makeRows, makeTracks } from '../gallery/specimens.js';
 import { ContextMenuSpecimen, EqualizerSpecimen, PageFurnitureSpecimen, SearchPopoverSpecimen, ShareStripSpecimen, SheetSpecimen, ToastSpecimen } from './page-specimens.js';
+import { ConstellationField, SpectrumSpecimen } from './visualisers.js';
 import { Mockups } from './Mockups.js';
+import { Brand, Coverage, DarkScheme, Discord, Governance, Interaction, Journeys, Platforms, Principles, PrintContents, PrintCover, Screens, type NavGroup } from './Governance.js';
 
 /* ------------------------------------------------------------------ data */
 
@@ -91,14 +93,64 @@ function Bed({ children, caption, wide = false }: { children: ReactNode; caption
   );
 }
 
-function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+/** `chapter` starts a new page in print; everything else flows. */
+function Section({ id, title, chapter = false, children }: { id: string; title: string; chapter?: boolean; children: ReactNode }) {
   return (
-    <section id={id}>
+    <section id={id} className={chapter ? 'sg-chapter' : undefined}>
       <h2 className="sg__h2">{title}</h2>
       {children}
     </section>
   );
 }
+
+/** One list for the rail on screen and the contents page in print. */
+const NAV: NavGroup[] = [
+  { group: 'Principles', items: [{ href: '#rules', label: 'The four rules' }, { href: '#brand', label: 'Brand and voice' }, { href: '#skins', label: 'Two skins' }] },
+  {
+    group: 'Foundations',
+    items: [
+      { href: '#colour', label: 'Colour' },
+      { href: '#highlights', label: 'Aqua highlights' },
+      { href: '#type', label: 'Type' },
+      { href: '#space', label: 'Space' },
+      { href: '#material', label: 'Shape and material' },
+      { href: '#motion', label: 'Motion' },
+    ],
+  },
+  {
+    group: 'Elements',
+    items: [
+      { href: '#page', label: 'The page (player)' },
+      { href: '#window', label: 'The window (hub, companion)' },
+      { href: '#controls', label: 'Controls' },
+      { href: '#overlays', label: 'Overlays' },
+      { href: '#states', label: 'States' },
+      { href: '#results', label: 'Results and grid' },
+      { href: '#icons', label: 'Icons' },
+      { href: '#products', label: 'By product' },
+    ],
+  },
+  {
+    group: 'Behaviour',
+    items: [
+      { href: '#interaction', label: 'Interaction rules' },
+      { href: '#access', label: 'Accessibility' },
+      { href: '#screens', label: 'Every screen' },
+      { href: '#journeys', label: 'Journeys' },
+      { href: '#discord', label: 'The Discord bot' },
+      { href: '#platforms', label: 'Platforms' },
+    ],
+  },
+  { group: 'Mockups', items: [{ href: '#mockups', label: 'Every product, every size' }] },
+  {
+    group: 'Upkeep',
+    items: [
+      { href: '#governance', label: 'Sources and commands' },
+      { href: '#extend', label: 'Changing it' },
+      { href: '#coverage', label: 'Coverage and decisions' },
+    ],
+  },
+];
 
 /* ------------------------------------------------------------ the page */
 
@@ -107,6 +159,11 @@ export function Styleguide() {
   const motion = useMemo(() => Object.entries(tokens.motion as Record<string, string>).filter(([, v]) => v.endsWith('ms')), []);
   const fontSteps = useMemo(() => (['system', 'view', 'small', 'label', 'mini'] as const).map((k) => ({ key: k, px: tokens.font[k] })), []);
   const pulseMs = Number.parseInt((tokens.motion as Record<string, string>).defaultPulse ?? '1650', 10);
+
+  // Tells automation (the PDF export, the e2e suite) that the page has rendered.
+  useEffect(() => {
+    document.documentElement.dataset['styleguideReady'] = 'true';
+  }, []);
 
   return (
     <AquaProvider active reducedMotion={undefined}>
@@ -117,77 +174,42 @@ export function Styleguide() {
               Now Playing
               <small>AQUA_PROFILE={tokens.profile}</small>
             </div>
-            <div className="sg__group">Mockups</div>
-            <a href="#mockups">Every product, every size</a>
-            <div className="sg__group">Principles</div>
-            <a href="#rules">The four rules</a>
-            <a href="#skins">Two skins</a>
-            <div className="sg__group">Foundations</div>
-            <a href="#colour">Colour</a>
-            <a href="#highlights">Aqua highlights</a>
-            <a href="#type">Type</a>
-            <a href="#space">Space</a>
-            <a href="#material">Shape &amp; material</a>
-            <a href="#motion">Motion</a>
-            <div className="sg__group">Elements</div>
-            <a href="#page">The page (player)</a>
-            <a href="#window">The window (hub, companion)</a>
-            <a href="#controls">Controls</a>
-            <a href="#overlays">Overlays</a>
-            <a href="#states">States</a>
-            <a href="#results">Results &amp; grid</a>
-            <a href="#icons">Icons</a>
-            <a href="#products">By product</a>
-            <div className="sg__group">Building</div>
-            <a href="#access">Accessibility</a>
-            <a href="#extend">Changing it</a>
+            {NAV.map((group) => (
+              <div key={group.group} className="sg__navgroup">
+                <div className="sg__group">{group.group}</div>
+                {group.items.map((item) => (
+                  <a key={item.href} href={item.href}>
+                    {item.label}
+                  </a>
+                ))}
+              </div>
+            ))}
           </nav>
 
           <main className="sg__work">
-            <h1 className="sg__h1">Now Playing styleguide</h1>
-            <div className="sg__stamp">
-              {tokens.profile} · {Object.keys(colour).length + Object.keys(page).length} colours · two skins · three products
-            </div>
-            <p className="sg__lede">
-              A reconstruction of Apple's 2009–2010 interface, built as one design system and shared by three products: the music player (a page), the hub's admin GUI and the
-              Windows companion (both windows). Every value here is read from <code>tokens.json</code> as this page is built, and every control on it is the real component
-              wearing the real stylesheet — so the page cannot describe one thing and show another.
-            </p>
-
-            <Section id="mockups" title="Every product, every size — and editable">
-              <p className="sg__note">
-                Each frame below is an iframe with its own viewport, so a 320px column is a real 320px viewport and this system's media queries behave exactly as they do on a
-                phone. The screens inside are built from the components on this page, so they are 1:1 with the products by construction rather than by somebody keeping two
-                drawings in step. Under each one is a measurement taken <em>inside</em> that frame: what runs off the side, the smallest text, the smallest thing you could tap.
+            <PrintCover />
+            <PrintContents nav={NAV} />
+            <header className="sg__opening">
+              <h1 className="sg__h1">Now Playing styleguide</h1>
+              <div className="sg__stamp">
+                {tokens.profile} · {Object.keys(colour).length + Object.keys(page).length} colours · two skins · {__STYLEGUIDE_BUILD__.summary.surfaces} surfaces · source{' '}
+                {__STYLEGUIDE_BUILD__.fingerprint}
+              </div>
+              <p className="sg__lede">
+                A reconstruction of Apple's 2009–2010 interface, built as one design system and shared by every part of Now Playing: the music player (a page, also inside the
+                Android app), the hub's admin GUI and the Windows companion (both windows), and the words the Discord bot uses. Every value here is read from{' '}
+                <code>tokens.json</code> as this page is built, every control on it is the real component wearing the real stylesheet, and every rule, screen and journey is read
+                from <code>design/</code> — so the page cannot describe one thing and show another.
               </p>
-              <p className="sg__note">
-                A frame marked <em>touch layer emulated</em> has this system's <code>(pointer: coarse)</code> rules re-applied inside it, read back out of the real stylesheets —
-                an iframe inherits the desktop's pointer, so without that a phone frame would quietly show desktop sizes. At the bottom you can edit any custom property the
-                stylesheets define and watch every frame repaint at once; what you copy out is a block the three products already read.
-              </p>
-              <Mockups />
-            </Section>
+            </header>
 
             <Section id="rules" title="The rules that outrank the visuals">
               <p className="sg__note">A styleguide that opens with colour teaches the wrong lesson. These four decide whether a control is drawn at all, and each has overruled the aesthetics here at least once.</p>
-              <div className="sg__rules">
-                <div className="sg__rule">
-                  <b>A control that cannot act is not drawn.</b>
-                  <span>No button that looks live and does nothing; no toggle whose state is decoration. The equalizer window ships without its traffic lights for exactly this reason — three circles that close nothing.</span>
-                </div>
-                <div className="sg__rule">
-                  <b>An unavailable capability says so where the choice is made.</b>
-                  <span>Not in a tooltip, not in a log, and not by disappearing. The Shared segment of the mode switch stays visible with no hub paired and reports the reason when pressed. A control that vanishes teaches nothing; one that explains itself does.</span>
-                </div>
-                <div className="sg__rule">
-                  <b>Say what the code does, not what the feature is called.</b>
-                  <span>The solfeggio presets are filters, and the panel says so and claims no physical effect. The retuning panel reports that the fallback changed the tempo rather than claiming “preserve tempo”. When a label and the DSP disagree, the label is what changes.</span>
-                </div>
-                <div className="sg__rule">
-                  <b>A disabled control is still legible about why.</b>
-                  <span>Greyed, not gone. The dimmed faders on the equalizer rail are what tell you where the current preset is silent, and each carries its reason in the accessible name — “500 Hz band, not used by 528 Hz (MI)” — not only in a tooltip.</span>
-                </div>
-              </div>
+              <Principles />
+            </Section>
+
+            <Section id="brand" title="Brand and voice">
+              <Brand />
             </Section>
 
             <Section id="skins" title="Two skins, one system">
@@ -207,7 +229,7 @@ export function Styleguide() {
               </div>
             </Section>
 
-            <Section id="colour" title="Colour">
+            <Section id="colour" title="Colour" chapter>
               <p>
                 Chosen by role, never by picking a hex. Blue means <em>selected</em>, <em>active</em>, or <em>the default action</em> — it is not a brand colour and it is never
                 decoration. Two palettes follow, straight from the token file: the window skin's, then the page skin's.
@@ -220,6 +242,7 @@ export function Styleguide() {
               <p className="sg__note">
                 The page skin has a full dark palette and it is opt-out: every dark rule is guarded <code>@media (prefers-color-scheme: dark) {'{'} :root:not([data-np-theme='light']) {'{'} … {'}'} {'}'}</code>, so the system preference wins unless a page pins itself light. Redefine <em>only</em> tokens inside that block. The window skin has no dark palette, because Snow Leopard had none.
               </p>
+              <DarkScheme />
             </Section>
 
             <Section id="highlights" title="Aqua highlights — where the blue is allowed to shine">
@@ -434,12 +457,18 @@ box-shadow:
               </p>
             </Section>
 
-            <Section id="page" title="The page — what the player is made of">
+            <Section id="page" title="The page — what the player is made of" chapter>
               <p>
-                The music player's skin: a sticky status bar, a section strip, the hero with the jewel case on its stage, the iPod rail and a transport of nine keys, and the
+                The music player's skin: a sticky status bar, a section strip, the hero with the jewel case on its stage, the iPod rail and a transport of eleven keys, and the
                 iTunes 10 list under it. Everything below is live — press play and the case opens; pick a row and the stage follows it.
               </p>
               <PageDemo />
+              <p className="sg__note">
+                <strong>The transport is centred on the rail.</strong> Play sits on the progress rail's centre line at every width, with previous and next either side of it on the
+                same line, and the keys never run past the rail's ends. The volume line sits beside the keys only when it fits on both sides; otherwise it goes beneath, centred, as
+                it does here. When the keys do not fit on one line, previous, play and next take the first line on their own and the other eight keys share the line below. The
+                row measures itself to decide this, because the room it needs depends on how many keys a product carries (DEC-016).
+              </p>
               <h3 className="sg__h3">The music list</h3>
               <Bed wide caption="The same component the player renders, with the reference's stylesheet block: nine columns, 18 px rows, the stripe, no rules, an embossed header with the sorted column tinted, monochrome source badges read from each track's locator, icon columns for offline and star, the playing row in bold with a speaker glyph and a marquee, a right-click menu, and the gel scroller that fades in while you scroll.">
                 <div className="np-app" style={{ width: '100%' }}>
@@ -463,8 +492,8 @@ box-shadow:
                 </div>
               </Bed>
               <h3 className="sg__h3">The equalizer window</h3>
-              <Bed wide caption="The iTunes equalizer: On beside the preset pop-up, then a preamp and the ten graphic centres on a ±12 dB scale with tick dashes flanking each rail. A one-band preset is chosen here so the greyed rail is visible — those faders name the preset that is not using them.">
-                <div className="np-app" style={{ width: '100%' }}>
+              <Bed caption="The iTunes equalizer: On beside the preset pop-up, then a preamp and the ten graphic centres on a ±12 dB scale with tick dashes flanking each rail. The window hugs its rails at 600 px (DEC-014) rather than stretching to the page. A one-band preset is chosen here so the greyed rail is visible — those faders name the preset that is not using them.">
+                <div className="np-app" style={{ width: '100%', maxWidth: 600 }}>
                   <EqualizerSpecimen />
                 </div>
               </Bed>
@@ -483,6 +512,33 @@ box-shadow:
                   <TrackScrubber positionMs={754_000} durationMs={null} onSeek={() => undefined} live disabledReason="A shared broadcast has one position." />
                 </div>
               </Bed>
+              <h3 className="sg__h3">The visualisers — spectrum, stage and constellation</h3>
+              <p>
+                The player draws three visualisers, and all three follow one rule: a visualiser must carry the data, not hide it. The two below are drawn here by the player's own
+                code — <code>drawSpectrum</code> and <code>layoutStars</code> in <code>music-player/src/lib/</code>, the functions the views call — in the player's own
+                <code> .player-spectrum</code> and <code>.player-constellation</code> styles. The third, the <strong>jewel case</strong>, is live on the hero at the top of this chapter.
+              </p>
+              <Bed caption="The spectrum, under “How this is being played” in the Now playing section. Each analyser frame is averaged into 64 bars; a bar's hue and lightness rise with its level, so a loud band reads brighter as well as taller. It draws only while a song plays — paused, the loop stops rather than repaint a still picture — and under reduced motion it redraws four times a second instead of every frame. There is no audio here, so the specimen is fed a generated frame; print shows one fixed frame.">
+                <div className="np-app" style={{ width: '100%', maxWidth: 480, background: 'transparent' }}>
+                  <SpectrumSpecimen />
+                </div>
+              </Bed>
+              <Bed
+                wide
+                caption="The constellation: the library as a star field, one star per album. Albums by one artist share an angular sector, a star's size is the album's length, and its colour is the artist's hue, so the layout is information, never scatter. The app renders it with WebGL and a slow rotation; this is the same placement projected through the same camera (55°, z = 42), as SVG so it also prints. Hover a star for its album."
+              >
+                <div className="np-app" style={{ width: '100%' }}>
+                  <ConstellationField />
+                </div>
+              </Bed>
+              <p className="sg__note">
+                The <strong>jewel case</strong> is <code>packages/aqua-ui/src/stage/jewel-case.ts</code>: the case and disc built from primitives, sleeve and tray-card textures generated
+                from the track's real cover and running order, a drag with momentum, and a pose remembered per device. It stands in for Cover Flow (DEC-006). The stage and the
+                constellation load Three.js lazily and share the chunk, so a listener who opens neither never downloads it. All three keep their meaning without motion: the spectrum
+                slows to a level, the stage stops its idle drift and keeps the CSS cover, and the constellation opens as the same albums in a table, with identical selection and
+                keyboard behaviour (<code>UX-MOTION-001</code>, <code>UX-STATE-001</code>). Both sections also appear whole in the mockups: <em>Now playing (audio chain)</em> and{' '}
+                <em>Constellation</em>.
+              </p>
             </Section>
 
             <Section id="window" title="The window — what the hub and the companion are made of">
@@ -537,7 +593,8 @@ box-shadow:
               <p>Three families: sixteen-pixel colour source icons for the sidebar, single-colour glyphs for everything else, and the avatar set.</p>
               <IconsDemo />
               <Card label="A page-skin glyph, at the transport's size">
-                <div className="np-app" style={{ display: 'flex', gap: 14, fontSize: 24, color: '#1b1c1f' }}>
+                {/* .np-app is a flex column, so the row direction has to be said out loud here. */}
+                <div className="np-app" style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 14, padding: '12px 14px', fontSize: 24, color: '#1b1c1f' }}>
                   <Glyph name="play" />
                   <Glyph name="pause" />
                   <Glyph name="star" />
@@ -582,6 +639,10 @@ box-shadow:
               </p>
             </Section>
 
+            <Section id="interaction" title="Interaction and content rules" chapter>
+              <Interaction />
+            </Section>
+
             <Section id="access" title="Accessibility">
               <p>Not bolted on afterwards. These are parts of the design.</p>
               <ul className="sg__plain">
@@ -605,6 +666,40 @@ box-shadow:
               </ul>
             </Section>
 
+            <Section id="screens" title="Every screen" chapter>
+              <Screens />
+            </Section>
+
+            <Section id="journeys" title="Journeys">
+              <Journeys />
+            </Section>
+
+            <Section id="discord" title="The Discord bot" chapter>
+              <Discord />
+            </Section>
+
+            <Section id="platforms" title="Platforms" chapter>
+              <Platforms />
+            </Section>
+
+            <Section id="mockups" title="Every product, every size — and editable" chapter>
+              <p className="sg__note">
+                Each frame below is an iframe with its own viewport, so a 320px column is a real 320px viewport and this system's media queries behave exactly as they do on a
+                phone. The screens inside are built from the components on this page, so they are 1:1 with the products by construction rather than by somebody keeping two
+                drawings in step. Under each one is a measurement taken <em>inside</em> that frame: what runs off the side, the smallest text, the smallest thing you could tap.
+              </p>
+              <p className="sg__note">
+                A frame marked <em>touch layer emulated</em> has this system's <code>(pointer: coarse)</code> rules re-applied inside it, read back out of the real stylesheets —
+                an iframe inherits the desktop's pointer, so without that a phone frame would quietly show desktop sizes. At the bottom you can edit any custom property the
+                stylesheets define and watch every frame repaint at once; what you copy out is a block the three products already read.
+              </p>
+              <Mockups />
+            </Section>
+
+            <Section id="governance" title="Sources and commands" chapter>
+              <Governance />
+            </Section>
+
             <Section id="extend" title="Changing any of this">
               <ul className="sg__plain">
                 <li>
@@ -624,13 +719,18 @@ box-shadow:
                   lot. A deviation is legitimate; an undocumented one is not.
                 </li>
                 <li>
-                  <strong>Rebuild this page.</strong> <code>pnpm build:styleguide</code> regenerates <code>docs/design/styleguide.html</code> from the same source the products use.
+                  <strong>Rebuild this page.</strong> <code>pnpm styleguide:build</code> regenerates <code>docs/design/styleguide.html</code> from the same source the products use,{' '}
+                  <code>pnpm styleguide:check</code> fails if it no longer matches its sources, and <code>pnpm styleguide:pdf</code> prints it.
                 </li>
               </ul>
               <p className="sg__foot">
                 The correction log in <code>DEVIATIONS.md</code> is worth reading before a large change. It records the mistakes this system has already made — buttons a decade too glossy, a
                 list redesigned instead of expanded, a picker that indexed music it could never play — and every one was found by building the thing and looking at it.
               </p>
+            </Section>
+
+            <Section id="coverage" title="Coverage and decisions" chapter>
+              <Coverage />
             </Section>
           </main>
         </div>

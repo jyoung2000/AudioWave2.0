@@ -14,9 +14,38 @@ import { copyFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import { darkProperties, rootProperties, runChecks, sourceFingerprint } from '../../../scripts/styleguide-lib.mjs';
 
 const here = (path: string): string => fileURLToPath(new URL(path, import.meta.url));
 const workspace = (name: string): string => fileURLToPath(new URL(`../../${name}/src/index.ts`, import.meta.url));
+const repoRoot = here('../../../');
+
+/**
+ * What the page says about itself: the fingerprint of the sources it was built from (which
+ * `pnpm styleguide:check` compares with the sources as they are now), the same counts the check
+ * prints, and the dark palette read out of the shipped stylesheet. Computed here, in Node, so the
+ * page never claims a number nobody measured.
+ */
+function buildInfo() {
+  const check = runChecks(repoRoot, { freshness: false });
+  const pageCss = readFileSync(here('../src/styles/now-playing.css'), 'utf8');
+  const light = rootProperties(pageCss);
+  const dark = darkProperties(pageCss);
+  const scheme = Object.keys(dark)
+    .filter((name) => name in light && /^(#|rgb)/i.test(light[name]!.trim()))
+    .sort()
+    .map((name) => ({ name, light: light[name]!, dark: dark[name]! }));
+  return { fingerprint: sourceFingerprint(repoRoot), summary: check.summary, notes: check.notes, problems: check.errors.length, scheme };
+}
+
+const BUILD = buildInfo();
+
+function stampFingerprint(): Plugin {
+  return {
+    name: 'styleguide:fingerprint',
+    transformIndexHtml: (html) => html.replace('</head>', `  <meta name="styleguide-fingerprint" content="${BUILD.fingerprint}" />\n  </head>`),
+  };
+}
 
 function escapeForRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -80,7 +109,8 @@ export default defineConfig({
   root: here('.'),
   base: './',
   publicDir: false,
-  plugins: [react(), inlineEverything(), publish()],
+  plugins: [react(), stampFingerprint(), inlineEverything(), publish()],
+  define: { __STYLEGUIDE_BUILD__: JSON.stringify(BUILD) },
   resolve: {
     alias: {
       '@now-playing/contracts': workspace('contracts'),

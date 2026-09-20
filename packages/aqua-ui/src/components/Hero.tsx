@@ -10,7 +10,7 @@
  * photographs of the hardware. The scrubber in particular is deliberately absent from every media
  * query: identical groove, gel and stamps at each width, as on the device.
  */
-import { useCallback, useLayoutEffect, useRef, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from 'react';
 
 export interface HeroProps {
   /** Drives the placeholder sleeve wash; 'shared' turns it from amber to deep blue. */
@@ -325,11 +325,61 @@ export interface KeyTransportProps {
   disabledReason?: string;
 }
 
-/** The chromeless key row: no slab behind the glyphs, and the volume line pinned right. */
+interface TransportFit {
+  /** No room for the volume line on both sides of the keys, so it goes beneath them. */
+  stacked: boolean;
+  /** The keys do not fit on one line: previous, play and next take the first line on their own. */
+  wrapped: boolean;
+}
+
+/**
+ * Whether the row has room for its layout, measured rather than guessed.
+ *
+ * Play has to sit on the progress rail's centre line. The keys are centred in a grid with equal side
+ * columns, which only holds while both sides can take the volume line's width; below that the grid
+ * gives the left side less and the whole cluster slides off centre. How much room that needs depends
+ * on how many keys a product puts in the row (the player carries eight aux keys), so a breakpoint in
+ * the stylesheet is always wrong for somebody. The row's width, the keys' natural width and the
+ * volume's width are all known after layout, so the decision is made from them. Neither answer
+ * changes the row's own width, so the measurement cannot feed back into itself.
+ */
+function useTransportFit(row: RefObject<HTMLDivElement | null>, keys: RefObject<HTMLDivElement | null>): TransportFit {
+  const [fit, setFit] = useState<TransportFit>({ stacked: false, wrapped: false });
+  useLayoutEffect(() => {
+    const host = row.current;
+    const cluster = keys.current;
+    if (!host || !cluster || typeof ResizeObserver === 'undefined') return;
+    const measure = (): void => {
+      const items = [...cluster.children];
+      const keyGap = Number.parseFloat(getComputedStyle(cluster).columnGap) || 0;
+      const natural = items.reduce((sum, item) => sum + item.getBoundingClientRect().width, 0) + keyGap * Math.max(0, items.length - 1);
+      const volume = host.querySelector('.np-vol');
+      const side = volume ? volume.getBoundingClientRect().width + (Number.parseFloat(getComputedStyle(host).columnGap) || 0) : 0;
+      const width = host.clientWidth;
+      const next = { stacked: width < natural + 2 * side, wrapped: width < natural };
+      setFit((prev) => (prev.stacked === next.stacked && prev.wrapped === next.wrapped ? prev : next));
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(host);
+    measure();
+    return () => observer.disconnect();
+  }, [row, keys]);
+  return fit;
+}
+
+/**
+ * The chromeless key row: no slab behind the glyphs, play on the rail's centre line, and the volume
+ * line pinned right when there is room for it on both sides — beneath the keys when there is not.
+ */
 export function KeyTransport({ children, volume, label = 'Playback controls', disabledReason }: KeyTransportProps) {
+  const row = useRef<HTMLDivElement | null>(null);
+  const keys = useRef<HTMLDivElement | null>(null);
+  const fit = useTransportFit(row, keys);
   return (
-    <div className="np-transport" role="group" aria-label={label} title={disabledReason}>
-      <div className="np-transport__keys">{children}</div>
+    <div ref={row} className="np-transport" role="group" aria-label={label} title={disabledReason} data-stacked={fit.stacked ? 'true' : undefined} data-wrapped={fit.wrapped ? 'true' : undefined}>
+      <div ref={keys} className="np-transport__keys">
+        {children}
+      </div>
       {volume}
     </div>
   );

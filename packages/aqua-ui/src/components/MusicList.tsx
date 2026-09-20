@@ -20,6 +20,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Playlist, PlaylistItem, Track } from '@now-playing/contracts';
+import { Marquee } from './Marquee.js';
 import { RowMenu, useMarquee, useOverlayScroller } from './music-list-behaviours.js';
 import { offlineOf, sourceOf } from '../lib/track-source.js';
 import { ProviderMark } from '../icons/provider-marks.js';
@@ -244,11 +245,11 @@ export function MusicList({ tracks, playingTrackId, onPlay, onToggleStar, playli
                       )}
                     </td>
                     <td className="lib-title">
-                      {playing ? <Marquee>{track.title}</Marquee> : track.title}
+                      {playing ? <Marquee active={false}>{track.title}</Marquee> : track.title}
                       {/* Phones hide the artist column and show this line instead; see the stylesheet. */}
                       <span className="lib-title__artist">{track.artistName}</span>
                     </td>
-                    <td className="lib-col-artist">{playing ? <Marquee>{track.artistName}</Marquee> : track.artistName}</td>
+                    <td className="lib-col-artist">{playing ? <Marquee active={false}>{track.artistName}</Marquee> : track.artistName}</td>
                     <td className="lib-num">{fmt(track.durationMs)}</td>
                     <td className="lib-num lib-col-bpm">{track.bpm ? Math.round(track.bpm) : '—'}</td>
                     <td className="lib-icon">
@@ -345,10 +346,4 @@ function SortHeader({ id, sort, onSort, className, children }: { id: SortKey; so
   );
 }
 
-function Marquee({ children }: { children: ReactNode }) {
-  return (
-    <span className="lib-mq">
-      <span className="lib-mq__in">{children}</span>
-    </span>
-  );
-}
+

@@ -180,6 +180,81 @@ describe('the hero transport', () => {
     expect(screen.getByRole('slider', { name: 'Volume' }).getAttribute('aria-valuenow')).toBe('50');
   });
 
+  /*
+   * Play sits on the rail's centre line only while the volume line fits on both sides of the keys.
+   * jsdom has no layout, so the widths are supplied: four aux keys a side at 48 (2 px apart), the
+   * previous and next keys at 48, play at 64 and a 122 px volume line, as the player renders them.
+   */
+  describe('keeps play on the centre line', () => {
+    function renderAt(rowWidth: number) {
+      const widths: Record<string, number> = { 'np-keys__aux': 4 * 48 + 3 * 2, 'np-key': 48, 'np-key np-key--play': 64, 'np-vol': 122 };
+      const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+        const width = widths[this.className] ?? 0;
+        return { width, height: 0, top: 0, left: 0, right: width, bottom: 0, x: 0, y: 0, toJSON: () => ({}) };
+      });
+      const client = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (this: HTMLElement) {
+        return this.classList.contains('np-transport') ? rowWidth : 0;
+      });
+      const observe = vi.fn();
+      vi.stubGlobal(
+        'ResizeObserver',
+        class {
+          observe = observe;
+          disconnect = vi.fn();
+          unobserve = vi.fn();
+        },
+      );
+      const view = render(
+        <KeyTransport volume={<LevelSlider value={0.5} onChange={() => undefined} />}>
+          <span className="np-keys__aux" />
+          <KeyButton glyph="previous" label="Previous track" onClick={() => undefined} />
+          <KeyButton primary glyph="play" label="Play" onClick={() => undefined} />
+          <KeyButton glyph="next" label="Next track" onClick={() => undefined} />
+          <span className="np-keys__aux" />
+        </KeyTransport>,
+      );
+      const row = screen.getByRole('group', { name: 'Playback controls' });
+      return {
+        row,
+        observe,
+        cleanup: () => {
+          view.unmount();
+          rect.mockRestore();
+          client.mockRestore();
+          vi.unstubAllGlobals();
+        },
+      };
+    }
+
+    // the keys' natural width (jsdom computes no gap between them)
+    const natural = 2 * 198 + 48 + 64 + 48;
+
+    it('keeps the volume beside the keys only when it fits on both sides', () => {
+      const wide = renderAt(natural + 2 * 122);
+      expect(wide.row.dataset['stacked']).toBeUndefined();
+      expect(wide.row.dataset['wrapped']).toBeUndefined();
+      expect(wide.observe).toHaveBeenCalledWith(wide.row);
+      wide.cleanup();
+
+      // one pixel short of symmetry: the volume goes beneath rather than pushing play off centre
+      const short = renderAt(natural + 2 * 122 - 1);
+      expect(short.row.dataset['stacked']).toBe('true');
+      expect(short.row.dataset['wrapped']).toBeUndefined();
+      short.cleanup();
+    });
+
+    it('wraps the keys, with previous, play and next together, only when they do not fit', () => {
+      const fits = renderAt(natural);
+      expect(fits.row.dataset['wrapped']).toBeUndefined();
+      fits.cleanup();
+
+      const narrow = renderAt(natural - 1);
+      expect(narrow.row.dataset['stacked']).toBe('true');
+      expect(narrow.row.dataset['wrapped']).toBe('true');
+      narrow.cleanup();
+    });
+  });
+
   it('reads muted as muted rather than as zero', () => {
     render(<LevelSlider value={0.8} muted onChange={() => undefined} onToggleMute={() => undefined} />);
     const slider = screen.getByRole('slider', { name: 'Volume' });

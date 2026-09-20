@@ -16,7 +16,7 @@
  * once. What you get out is the CSS the products already read, so the round trip from "that blue is
  * wrong" to "the apps have a different blue" is paste one block and rebuild.
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Checkbox, SegmentedControl, StatusDot, TextField } from '../src/index.js';
 import { DEVICES, DeviceFrame, EMPTY_FIT, type FitReport } from './DeviceFrame.js';
 import { PRODUCTS, PRODUCT_CSS, SCREENS, type ProductId } from './screens.js';
@@ -152,8 +152,21 @@ export function Mockups() {
     setFit({});
   };
 
+  // The PDF export asks for every screen at once; see PrintMatrix.
+  const [printing, setPrinting] = useState(false);
+  useEffect(() => {
+    const start = (): void => setPrinting(true);
+    window.addEventListener('sg:print', start);
+    return () => window.removeEventListener('sg:print', start);
+  }, []);
+
   return (
     <div className="sg-mockups">
+      <p className="sg-print-only sg-note">
+        In print, every screen is shown at the laptop and phone sizes with the fit measured inside each frame. The interactive version — every size, the product switch and the
+        token editor — is <code>docs/design/styleguide.html</code>.
+      </p>
+      {printing ? <PrintMatrix /> : null}
       <div className="sg-mockups__controls">
         <SegmentedControl label="Product" value={product} onChange={chooseProduct} segments={PRODUCTS.map((item) => ({ value: item.id, label: item.label, showLabel: true }))} />
 
@@ -266,9 +279,74 @@ export function Mockups() {
   );
 }
 
+/**
+ * Every screen, for the PDF.
+ *
+ * Paper cannot hold a picker, so print gets the whole matrix instead: each screen on its own page,
+ * the laptop frame across the top and the phone frame under it, both measured the same way as on
+ * screen. The page is marked ready only when every frame has reported, so the export never prints
+ * a frame that has not laid out yet.
+ */
+const PRINT_SIZES = [
+  { deviceId: 'laptop', scale: 0.53 },
+  { deviceId: 'phone', scale: 0.56 },
+] as const;
+
+function PrintMatrix() {
+  const [reports, setReports] = useState<Record<string, FitReport>>({});
+  const expected = SCREENS.length * PRINT_SIZES.length;
+  const report = useCallback((key: string) => (next: FitReport) => setReports((all) => (sameFit(all[key], next) ? all : { ...all, [key]: next })), []);
+
+  useEffect(() => {
+    if (Object.keys(reports).length >= expected) document.documentElement.dataset['styleguidePrintReady'] = 'true';
+  }, [reports, expected]);
+
+  return (
+    <div className="sg-print-matrix">
+      {SCREENS.map((screen) => {
+        const product = PRODUCTS.find((item) => item.id === screen.product);
+        return (
+          <figure key={screen.id} className="sg-print-screen">
+            <figcaption>
+              <span className="sg-dim">
+                {product?.label} · {product?.skin}
+              </span>
+              <b>{screen.label}</b>
+              <span>{screen.note}</span>
+            </figcaption>
+            <div className="sg-print-screen__frames">
+              {PRINT_SIZES.map(({ deviceId, scale }) => {
+                const device = DEVICES.find((item) => item.id === deviceId)!;
+                const key = `${screen.id}-${device.id}`;
+                return (
+                  <div key={key} className={`sg-print-screen__frame sg-print-screen__frame--${device.id}`}>
+                    <DeviceFrame device={device} scale={scale} tokens={{}} css={PRODUCT_CSS[screen.product]} onFit={report(key)}>
+                      {screen.render()}
+                    </DeviceFrame>
+                    <div className="sg-print-screen__meta">
+                      <b>{device.label}</b>{' '}
+                      <span className="sg-dim">
+                        {device.width} × {device.height}, shown at {Math.round(scale * 100)}%
+                      </span>
+                      {device.touch ? <span className="sg-tag">touch layer emulated</span> : null}
+                      <FitLine report={reports[key] ?? EMPTY_FIT} touch={device.touch} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </figure>
+        );
+      })}
+    </div>
+  );
+}
+
 /** Frames wider than the column get shrunk to fit; the viewport inside is untouched. */
 function scaleFor(width: number): number {
-  const room = typeof window === 'undefined' ? 1400 : Math.min(window.innerWidth - 120, 1400);
+  // The work column, not the window: the rail and the page padding take their share first.
+  const chrome = typeof window !== 'undefined' && window.innerWidth > 900 ? 212 + 68 + 8 : 36 + 8;
+  const room = typeof window === 'undefined' ? 1100 : Math.min(window.innerWidth - chrome, 1400);
   return width > room ? Math.max(0.35, room / width) : 1;
 }
 

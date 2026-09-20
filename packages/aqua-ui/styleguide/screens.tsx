@@ -29,6 +29,7 @@ import {
   PanelSection,
   ProgressBar,
   SearchField,
+  SegmentedControl,
   SourceBadge,
   SourceIcon,
   SourceList,
@@ -40,6 +41,7 @@ import {
   type ColumnDef,
 } from '../src/index.js';
 import { PageDemo, makeRows } from '../gallery/specimens.js';
+import { CONSTELLATION_ALBUMS, ConstellationField, SpectrumSpecimen, type FixtureAlbum } from './visualisers.js';
 /*
  * Each product's own stylesheet, as a string rather than as a page style.
  *
@@ -376,6 +378,20 @@ export const SCREENS: readonly Screen[] = [
     render: () => <PlayerSettings />,
   },
   {
+    id: 'player-engine',
+    product: 'player',
+    label: 'Now playing (audio chain)',
+    note: 'What the audio chain is doing to the song, and the spectrum visualiser under it — drawn by the player’s own spectrum code from a generated analyser frame.',
+    render: () => <EngineScreen />,
+  },
+  {
+    id: 'player-constellation',
+    product: 'player',
+    label: 'Constellation',
+    note: 'The library as a star field, placed by the player’s own layout code. The table beside it is the same information, not a fallback.',
+    render: () => <ConstellationScreen />,
+  },
+  {
     id: 'hub-overview',
     product: 'hub',
     label: 'Overview',
@@ -411,6 +427,112 @@ export const SCREENS: readonly Screen[] = [
     render: () => <CompanionScreen initial="transfers" />,
   },
 ];
+
+/* ------------------------------------------------------------ visualisers */
+
+/**
+ * The Constellation section. The field is `ConstellationField` from ./visualisers.tsx, which places
+ * every star with the player's own `layoutStars`; only the renderer differs (SVG in a frame, WebGL
+ * in the app), which is the boundary DEC-009 draws for every mockup.
+ */
+function ConstellationScreen() {
+  const [mode, setMode] = useState<'stars' | 'table'>('stars');
+  const [selected, setSelected] = useState<FixtureAlbum | undefined>(CONSTELLATION_ALBUMS[2]);
+  const artists = new Set(CONSTELLATION_ALBUMS.map((a) => a.artist)).size;
+  return (
+    <div className="np-app sg-screen-page">
+      <div className="np-body">
+        <div className="np-body__inner">
+          <div className="np-section-head">
+            <h2>Constellation</h2>
+            <p>Every album is a star, grouped by artist. Pick one to play it.</p>
+          </div>
+          <Panel title="Constellation">
+            <PanelSection>
+              <div className="player-toolbar-row">
+                <SegmentedControl
+                  label="View"
+                  value={mode}
+                  onChange={setMode}
+                  segments={[
+                    { value: 'stars', label: 'Stars' },
+                    { value: 'table', label: 'Table' },
+                  ]}
+                />
+                <span className="player-hint">
+                  {CONSTELLATION_ALBUMS.length} albums from {artists} artists. Both views show the same thing; the table is not a fallback.
+                </span>
+              </div>
+            </PanelSection>
+            {mode === 'stars' ? (
+              <ConstellationField selected={selected?.album} onSelect={setSelected} />
+            ) : (
+              <AquaTable
+                variant="page"
+                label="Albums"
+                rowKey={(row: FixtureAlbum) => row.album}
+                rows={[...CONSTELLATION_ALBUMS]}
+                columns={
+                  [
+                    { id: 'album', header: 'Album', primary: true, cell: (row) => row.album, stackText: (row) => row.artist },
+                    { id: 'artist', header: 'Artist', cell: (row) => row.artist },
+                    { id: 'tracks', header: 'Songs', align: 'right', width: 56, cell: (row) => row.trackCount },
+                  ] as ColumnDef<FixtureAlbum>[]
+                }
+              />
+            )}
+            {selected ? (
+              <PanelSection title={`${selected.album} — ${selected.artist}`}>
+                <div className="player-toolbar-row">
+                  <Button size="small" icon="play">
+                    Play album
+                  </Button>
+                  <span className="player-hint">{selected.trackCount} songs</span>
+                </div>
+              </PanelSection>
+            ) : null}
+          </Panel>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The Now playing section: what the audio chain is doing to the song, with the spectrum under it.
+ * The rows are `NowPlaying.tsx`'s own keys with fixture values; the spectrum is `SpectrumSpecimen`.
+ */
+function EngineScreen() {
+  return (
+    <div className="np-app sg-screen-page">
+      <div className="np-body">
+        <div className="np-body__inner">
+          <div className="np-section-head">
+            <h2>Now playing</h2>
+            <p>What the audio chain is doing to this song, measured rather than assumed.</p>
+          </div>
+          <Panel title="How this is being played">
+            <PanelSection>
+              <KeyValueList
+                items={[
+                  { key: 'Song', value: 'Midnight Set, Side B — Fennel Grove' },
+                  { key: 'Position', value: '0:23 of 2:58' },
+                  { key: 'Source', value: 'A file on this device' },
+                  { key: 'Equalizer', value: 'Bass Lift — the preset chosen for this album' },
+                  { key: 'Limiter', value: 'On — prevents clipping when the equalizer adds gain' },
+                  { key: 'Headroom', value: '3.0 dB trim applied to keep the boosted signal below full scale' },
+                  { key: 'Retuning', value: 'Off — playing at the original pitch' },
+                  { key: 'Added latency', value: '11.6 ms' },
+                ]}
+              />
+              <SpectrumSpecimen />
+            </PanelSection>
+          </Panel>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function HubScreen({ initial }: { initial: string }) {
   const [selected, setSelected] = useState(initial);

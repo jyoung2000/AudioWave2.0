@@ -123,7 +123,7 @@ export function Menu({ open, entries, anchor, onClose, label, returnFocusTo }: M
         }
         return (
           <li key={entry.id} role="none">
-            <button type="button" role="menuitem" className="aqua-menu__item" data-index={index} aria-disabled={entry.disabled || undefined} onClick={() => { if (entry.disabled) return; entry.onSelect(); close(); }} style={entry.destructive ? { color: '#7a1712' } : undefined}>
+            <button type="button" role="menuitem" className={entry.destructive ? 'aqua-menu__item aqua-menu__item--destructive' : 'aqua-menu__item'} data-index={index} aria-disabled={entry.disabled || undefined} onClick={() => { if (entry.disabled) return; entry.onSelect(); close(); }}>
               <span className="aqua-menu__check" aria-hidden="true">{entry.checked ? <Glyph name="check" /> : entry.icon}</span>
               <span className="aqua-menu__label">{entry.label}</span>
               <span className="aqua-menu__shortcut">{entry.shortcut}</span>

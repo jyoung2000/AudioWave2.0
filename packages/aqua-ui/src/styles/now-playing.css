@@ -102,13 +102,145 @@
   /* Helvetica: the face the iPod classic set its Now Playing screen in, which is what this hero
      is modelled on. Arial is its metric-compatible stand-in where Helvetica is absent. */
   --np-ui-font: "Helvetica Neue", helvetica, arial, "Liberation Sans", sans-serif;
-}
+
+/* ==========================================================================
+   17. The music list — docs/reference/now-playing-header.html, verbatim
+   ==========================================================================
+   This is the reference's own iTunes 10 list view, copied rather than
+   reinterpreted: same nine columns, same 18px rows with the Aqua stripe and no
+   rules between them, same glossy embossed sticky header with the sorted
+   column tinted blue, same monochrome initial badges, same overlay gel
+   scroller, same marquee, same breakpoints. The `--lib-*` custom properties
+   below are the reference's sampled values, so the rules underneath needed no
+   edits at all — the only change in the whole block is the scroll cap, and it
+   says so where it happens.
+   ========================================================================== */
+
+  --bar-pad: var(--np-pad);
+
+  --lib-bg: #fff;
+  --lib-alt: #f2f5f9;
+  --lib-border: #ababab;
+  --lib-head-top: #f8f8f8;
+  --lib-head-bot: #dadada;
+  --lib-head-rule: #adadad;
+  --lib-head-sep: #ccc;
+  --lib-head-ink: #3a3d41;
+  --lib-head-emboss: rgb(255 255 255 / 80%);
+  --lib-sort-top: #e8eef7;
+  --lib-sort-bot: #cfdbeb;
+  --lib-head-hot-top: #efefef;
+  --lib-head-hot-bot: #cfcfcf;
+  --lib-sort-hot-top: #dde7f4;
+  --lib-sort-hot-bot: #c2d2e6;
+  --lib-ink: #000;
+  --lib-soft: #222326;
+  --lib-accent: #2b6fd6;
+  --lib-icon: #8a8f98;
+  --lib-star: #f0a422;
+  --lib-np: #dde9f8;
+  --lib-sel-top: #5b8dd9;
+  --lib-sel-bot: #3a6cc4;
+  --gel-fill-v: linear-gradient(to right, #16407f 0%, #6ea3ec 12%, #8cb8ea 24%, #458ad8 45%, #5fa8f1 58%, #83c9fd 78%, #9fd2ee 92%, #3f6a86 100%);
+
+/* Artist used to drop at 420px, which took it off every phone. It now
+   holds down to 360px: below ~368px its 22% share would make it wider
+   than the Song column, and above that both columns simply get tight —
+   which the marquee now handles rather than hiding the field. */
+
+
+/* ==========================================================================
+   18. Context menu, the New Playlist sheet and the toast — also verbatim
+   ==========================================================================
+   The reference's iOS family, copied for the same reason as the list above.
+   The colours come from the --ctx-* properties it sampled, defined here so
+   the rules themselves needed no edits.
+   ========================================================================== */
+
+  --ctx-bg: rgb(247 247 250 / 88%);
+  --ctx-ink: #1b1c1f;
+  --ctx-sep: rgb(0 0 0 / 12%);
+
+/* ==========================================================================
+   20. The search popover — the reference's, verbatim
+   ==========================================================================
+   The iTunes 11 "Up Next" sheet: a gradient header carrying the count and
+   Clear, 40 px rows whose artwork tile doubles as a fifteen-second audition
+   button with a countdown ring, source badges, time over tempo, a circled
+   chevron on the row under the pointer, and a pager in the footer. The
+   --srch-* values below are the reference's own samples.
+   ========================================================================== */
+
+  --srch-bg: #f9f9f9;
+  --srch-head-top: #f6f6f6;
+  --srch-head-bot: #eee;
+  --srch-rule: #dedede;
+  --srch-ink: #2c2c2c;
+  --srch-soft: #9b9b9b;
+  --srch-hot: #ececec;
+  --srch-border: rgb(0 0 0 / 25%);
+  --srch-lip: rgb(255 255 255 / 60%);
+  --srch-art-top: #fbfbfb;
+  --srch-art-bot: #e3e3e3;
+  --srch-art-ink: #a9a9a9;
+  --srch-art-ring: rgb(0 0 0 / 14%);
+  --srch-chev: #8f8f8f;
+  --srch-dot: #c9c9c9;
+  --srch-dot-on: #7c7c7c;}
 
 /* The reference ships a dark theme for every one of these surfaces. Keeping it
    is not scope creep: a music player is a thing people open at night. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-np-theme="light"]) {
     color-scheme: dark;
+
+    /*
+     * The shared controls, which `aqua.css` declares light because the hub and the
+     * companion stay light. The player is the one surface that follows the system, so the
+     * dark half of those tokens belongs here rather than there: a button on a dark page
+     * used to keep a white face and a grey rim, which is the one thing in the player that
+     * never turned the lights off.
+     */
+    --aqua-ctl-ink: #eef0f3;
+    --aqua-ctl-face-1: #3d4149;
+    --aqua-ctl-face-2: #363a41;
+    --aqua-ctl-face-3: #2e323a;
+    --aqua-ctl-face-4: #292c33;
+    --aqua-ctl-face-hover-1: #474c55;
+    --aqua-ctl-face-hover-2: #3f444c;
+    --aqua-ctl-face-hover-3: #373c44;
+    --aqua-ctl-face-hover-4: #31353d;
+    --aqua-ctl-face-active-1: #1f2227;
+    --aqua-ctl-face-active-2: #262a30;
+    --aqua-ctl-face-active-3: #2c3036;
+    --aqua-ctl-face-disabled-1: #2c3036;
+    --aqua-ctl-face-disabled-2: #282b31;
+    --aqua-ctl-border: #15181c;
+    --aqua-ctl-border-bottom: #0d0f12;
+    --aqua-ctl-border-disabled: #2a2d33;
+    --aqua-ctl-focus-ring: #5aa8ef;
+    --aqua-ctl-default-ink: #04182c;
+    --aqua-ctl-default-1: #a9d6f7;
+    --aqua-ctl-default-2: #79b6ef;
+    --aqua-ctl-default-3: #4f93dd;
+    --aqua-ctl-default-4: #3d80cb;
+    --aqua-ctl-default-border: #2c5f96;
+    --aqua-ctl-default-border-bottom: #204a76;
+    --aqua-ctl-box-ink: #eef0f3;
+    --aqua-ctl-box-1: #3d4149;
+    --aqua-ctl-box-2: #343840;
+    --aqua-ctl-box-3: #2c3037;
+    --aqua-ctl-box-border: #15181c;
+    --aqua-ctl-box-on-1: #6ba2d8;
+    --aqua-ctl-box-on-2: #4480c4;
+    --aqua-ctl-box-on-3: #366fae;
+    --aqua-ctl-box-on-border: #274f79;
+    --aqua-ctl-field-bg: #141619;
+    --aqua-ctl-field-border: #0b0d10;
+    --aqua-ctl-field-border-top: #000;
+    --aqua-ctl-field-focus-border: #5aa8ef;
+    --aqua-ctl-field-invalid-border: #d9736c;
+    --aqua-ctl-placeholder: #7b818a;
 
     --np-bar-top: #34373d;
     --np-bar-1: #2f3238;
@@ -184,9 +316,64 @@
     --aqua-chrome-lower: #2a2d33;
     --aqua-chrome-bottom: #232529;
     --aqua-chrome-separator: #0f1114;
-    --aqua-chrome-highlight: rgb(255 255 255 / 8%);
-  }
-}
+    --aqua-chrome-highlight: rgb(255 255 255 / 8%);}
+
+  :root:not([data-np-theme='light']) .np-mode__item svg {
+    filter: drop-shadow(0 1px 0 rgb(0 0 0 / 50%));}
+
+  :root:not([data-np-theme='light']) {
+    --lib-bg: #16181c;
+    --lib-alt: #1b1f26;
+    --lib-border: #08090b;
+    --lib-head-top: #3a3d44;
+    --lib-head-bot: #26292e;
+    --lib-head-rule: #0f1114;
+    --lib-head-sep: #17191d;
+    --lib-head-ink: #c6cbd3;
+    --lib-head-emboss: rgb(0 0 0 / 55%);
+    --lib-sort-top: #2c3a4e;
+    --lib-sort-bot: #233043;
+    --lib-head-hot-top: #45484f;
+    --lib-head-hot-bot: #303338;
+    --lib-sort-hot-top: #36485f;
+    --lib-sort-hot-bot: #2b3b52;
+    --lib-ink: #f2f3f5;
+    --lib-soft: #d4d8df;
+    --lib-accent: #6aa3f2;
+    --lib-icon: #8d939c;
+    --lib-star: #f4b241;
+    --lib-np: #22354f;
+  
+    --ctx-bg: rgb(40 42 48 / 90%);
+    --ctx-ink: #eef0f3;
+    --ctx-sep: rgb(255 255 255 / 12%);
+  
+    --srch-bg: #26282e;
+    --srch-head-top: #2e3138;
+    --srch-head-bot: #25272d;
+    --srch-rule: rgb(0 0 0 / 50%);
+    --srch-ink: #eef0f3;
+    --srch-soft: #8d939c;
+    --srch-hot: #32353c;
+    --srch-border: rgb(0 0 0 / 65%);
+    --srch-lip: rgb(255 255 255 / 7%);
+    --srch-art-top: #33363d;
+    --srch-art-bot: #24262b;
+    --srch-art-ink: #8d939c;
+    --srch-art-ring: rgb(255 255 255 / 10%);
+    --srch-chev: #9aa0a9;
+    --srch-dot: #4a4e56;
+    --srch-dot-on: #b8bdc5;}
+
+  :root:not([data-np-theme='light']) .eqw {
+    --eqw-tick: rgb(255 255 255 / 26%);
+    --eqw-groove-top: #101216;
+    --eqw-groove-bot: #3a3f46;
+
+    background-image: linear-gradient(to bottom, #2b2e34, #1f2228);}
+
+  :root:not([data-np-theme='light']) .eqw .aqua-slider__thumb {
+    background-image: linear-gradient(to bottom, #6d737b 0%, #565c64 46%, #3d434a 100%);}}
 
 /* --------------------------------------------------------------------------
    1. The page
@@ -208,7 +395,10 @@
   background: var(--np-page);
   color: var(--np-ink);
   font-family: var(--np-ui-font);
-}
+
+  padding-right: env(safe-area-inset-right, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);}
 
 .np-app *,
 .np-app *::before,
@@ -236,7 +426,12 @@
     var(--np-bar-bottom) 100%
   );
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 85%);
-}
+
+/* --------------------------------------------------------------------------
+   Phones with a notch or a home indicator. `viewport-fit=cover` lets the page
+   run under them; these insets keep the bar and the body out from under. */
+
+  padding-top: env(safe-area-inset-top, 0px);}
 
 /* Equal side columns, so the pill is optically centred in the bar rather than
    centred in whatever space the two ends happen to leave. */
@@ -397,12 +592,6 @@
   filter: drop-shadow(0 -1px 0 rgb(0 0 0 / 45%));
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-np-theme='light']) .np-mode__item svg {
-    filter: drop-shadow(0 1px 0 rgb(0 0 0 / 50%));
-  }
-}
-
 /* --------------------------------------------------------------------------
    6. Avatar
    -------------------------------------------------------------------------- */
@@ -547,17 +736,23 @@
 .np-hero {
   border-bottom: 1px solid var(--np-list-border);
   background: var(--np-page);
-  overflow-x: clip;
-}
+
+/*
+ * The canvas is wider than the tile so the case's shadow can fade out instead of being clipped
+ * square at its edge. `clip` on the hero contains that horizontally without creating a scroll
+ * container or clipping the bleed vertically, which `hidden` would.
+ */
+
+  overflow-x: clip;}
 
 /*
  * Wider than the reference's 700 px, because this transport is wider than the reference's.
  *
- * The reference carried five keys; this one carries nine — offline, star, shuffle either side of
- * prev/play/next, then repeat, add and share. At 700 px the volume slider in the right-hand column
- * has nowhere to go but into the key cluster's share of the row, which shoves the cluster left of
- * centre. Widening the column until the cluster and the slider both fit is what lets the keys sit
- * on the centre line, and it puts the rail closer to the width of the list underneath.
+ * The reference carried five keys; this one carries eleven — offline, star, shuffle and discover,
+ * then prev/play/next, then repeat, add, download and share. The wider column puts the rail closer
+ * to the width of the list underneath. It is still not wide enough for the volume line to sit on
+ * both sides of that cluster, so the transport measures itself and puts the volume beneath rather
+ * than let it push play off the rail's centre line (section 10, DEC-016).
  */
 .np-hero__inner {
   position: relative;
@@ -589,7 +784,18 @@
     inset 0 0 0 1px rgb(0 0 0 / 14%),
     0 8px 18px rgb(0 0 0 / 22%),
     0 1px 3px rgb(0 0 0 / 20%);
-}
+
+/* ==========================================================================
+   21. The jewel case on the stage
+   ==========================================================================
+   Once the 3D stage has painted a frame it takes the tile over, and the tile
+   drops its frame so the case can bleed past the layout box and let its
+   shadow fade into the page — the reference does the same, and clipping the
+   case square at the tile's edge is what it is avoiding.
+   ========================================================================== */
+
+  cursor: grab;
+  touch-action: pan-y;}
 
 .np-hero__stage img {
   width: 100%;
@@ -784,9 +990,15 @@
 
 @media (prefers-reduced-motion: reduce) {
   .np-live__dot::after {
-    animation: none;
-  }
-}
+    animation: none;}
+
+  .library__bar { transition: none;}
+
+  .eqw .aqua-slider__readout {
+    transition: none;}
+
+  .srch__spin i { animation: none; opacity: 0.6;}
+  .srch__scrim { transition: none;}}
 
 /* --------------------------------------------------------------------------
    10. Transport — no chrome behind it: the glyphs sit on the page
@@ -801,9 +1013,45 @@
 .np-transport {
   display: grid;
   align-items: center;
-  margin-top: 10px;
+  margin-top: 2px;
   margin-right: var(--np-track-inset-r, 0);
+  column-gap: 12px;
   grid-template-columns: 1fr auto 1fr;
+}
+
+/* Symmetry needs room for the volume line on both sides of the keys. KeyTransport measures that
+   (the room needed depends on how many keys a product carries) and says so with data-stacked; the
+   volume then drops beneath and the keys keep the rail's centre line (DEC-016). The attribute
+   selectors also outrank the base .np-transport__keys and .np-vol rules further down. */
+.np-transport[data-stacked='true'] {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  row-gap: 8px;
+}
+
+.np-transport[data-stacked='true'] .np-transport__keys,
+.np-transport[data-stacked='true'] .np-vol {
+  grid-column: 1;
+  justify-self: center;
+}
+
+/* Too narrow for one line: previous, play and next take the first line on their own, centred, and
+   the two aux clusters share the line beneath. The ::after is a zero-height line break that sits
+   after the triad, because the aux groups are ordered behind it. */
+.np-transport[data-wrapped='true'] .np-transport__keys {
+  flex-wrap: wrap;
+  justify-content: center;
+  row-gap: 4px;
+}
+
+.np-transport[data-wrapped='true'] .np-transport__keys::after {
+  flex-basis: 100%;
+  height: 0;
+  content: '';
+}
+
+.np-transport[data-wrapped='true'] .np-keys__aux {
+  order: 1;
 }
 
 .np-transport__keys {
@@ -1220,44 +1468,35 @@
   :root {
     --np-pad: 11px;
     --np-bar-type: 12px;
-    --np-field-h: 32px;
-  }
+    --np-field-h: 32px;}
 
   .np-bar__status {
-    gap: 8px;
-  }
+    gap: 8px;}
 
   .np-mode__item {
-    width: 32px;
-  }
+    width: 32px;}
 
   .np-hero__inner {
-    padding: 22px var(--np-pad) 18px;
-  }
+    padding: 22px var(--np-pad) 18px;}
 
   .np-hero__top {
     flex-direction: column;
     align-items: center;
     gap: 14px;
-    text-align: center;
-  }
+    text-align: center;}
 
   .np-hero__meta {
-    width: 100%;
-  }
+    width: 100%;}
 
   .np-hero__actions {
-    justify-content: center;
-  }
+    justify-content: center;}
 
   .np-hero__title {
-    font-size: 18px;
-  }
+    font-size: 18px;}
 
   .np-hero__artist,
   .np-hero__album {
-    font-size: 13px;
-  }
+    font-size: 13px;}
 
   /* the scrubber is deliberately absent from every media query: identical
      groove, gel and stamps at all widths, as on the device */
@@ -1267,44 +1506,44 @@
     grid-template-columns: 1fr;
     justify-items: center;
     margin-right: 0;
-    row-gap: 8px;
-  }
+    row-gap: 8px;}
 
   .np-transport__keys {
     gap: 2px;
-    grid-column: 1;
-  }
+    grid-column: 1;}
 
   .np-key {
     width: 44px;
-    height: 40px;
-  }
+    height: 40px;}
 
   .np-key--play {
     width: 56px;
-    height: 48px;
-  }
+    height: 48px;}
 
   .np-key svg {
     width: 24px;
-    height: 24px;
-  }
+    height: 24px;}
 
   .np-key--play svg {
     width: 32px;
-    height: 32px;
-  }
+    height: 32px;}
 
   .np-key--aux svg {
     width: 20px;
-    height: 20px;
-  }
+    height: 20px;}
 
   .np-vol {
     grid-column: 1;
-    justify-self: center;
-  }
-}
+    justify-self: center;}
+ .lib-col-bpm { display: none;} .library col.lib-col-bpm { width: 0 !important;} 
+  .eqw {
+    --eqw-rail: 140px;}
+
+  .eqw__band {
+    min-width: 22px;}
+
+  .eqw__label {
+    font-size: 9px;}}
 
 @media (min-width: 900px) {
   .np-bar__inner {
@@ -1331,17 +1570,9 @@
   gap: 2px;
 }
 
-@media (max-width: 620px) {
-  .np-transport__keys {
-    flex-wrap: wrap;
-    justify-content: center;
-    row-gap: 2px;
-  }
-
-  .np-keys__aux {
-    order: 1;
-  }
-}
+/* The wrap itself is in section 10, decided by KeyTransport's measurement: a viewport rule here used
+   to move the aux clusters behind the triad even when the row did not wrap, which put play off
+   centre. */
 
 /* --------------------------------------------------------------------------
    17. The page's status line, which the bottom bar used to carry
@@ -1364,74 +1595,6 @@
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-/* ==========================================================================
-   17. The music list — docs/reference/now-playing-header.html, verbatim
-   ==========================================================================
-   This is the reference's own iTunes 10 list view, copied rather than
-   reinterpreted: same nine columns, same 18px rows with the Aqua stripe and no
-   rules between them, same glossy embossed sticky header with the sorted
-   column tinted blue, same monochrome initial badges, same overlay gel
-   scroller, same marquee, same breakpoints. The `--lib-*` custom properties
-   below are the reference's sampled values, so the rules underneath needed no
-   edits at all — the only change in the whole block is the scroll cap, and it
-   says so where it happens.
-   ========================================================================== */
-
-:root {
-  --bar-pad: var(--np-pad);
-
-  --lib-bg: #fff;
-  --lib-alt: #f2f5f9;
-  --lib-border: #ababab;
-  --lib-head-top: #f8f8f8;
-  --lib-head-bot: #dadada;
-  --lib-head-rule: #adadad;
-  --lib-head-sep: #ccc;
-  --lib-head-ink: #3a3d41;
-  --lib-head-emboss: rgb(255 255 255 / 80%);
-  --lib-sort-top: #e8eef7;
-  --lib-sort-bot: #cfdbeb;
-  --lib-head-hot-top: #efefef;
-  --lib-head-hot-bot: #cfcfcf;
-  --lib-sort-hot-top: #dde7f4;
-  --lib-sort-hot-bot: #c2d2e6;
-  --lib-ink: #000;
-  --lib-soft: #222326;
-  --lib-accent: #2b6fd6;
-  --lib-icon: #8a8f98;
-  --lib-star: #f0a422;
-  --lib-np: #dde9f8;
-  --lib-sel-top: #5b8dd9;
-  --lib-sel-bot: #3a6cc4;
-  --gel-fill-v: linear-gradient(to right, #16407f 0%, #6ea3ec 12%, #8cb8ea 24%, #458ad8 45%, #5fa8f1 58%, #83c9fd 78%, #9fd2ee 92%, #3f6a86 100%);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-np-theme='light']) {
-    --lib-bg: #16181c;
-    --lib-alt: #1b1f26;
-    --lib-border: #08090b;
-    --lib-head-top: #3a3d44;
-    --lib-head-bot: #26292e;
-    --lib-head-rule: #0f1114;
-    --lib-head-sep: #17191d;
-    --lib-head-ink: #c6cbd3;
-    --lib-head-emboss: rgb(0 0 0 / 55%);
-    --lib-sort-top: #2c3a4e;
-    --lib-sort-bot: #233043;
-    --lib-head-hot-top: #45484f;
-    --lib-head-hot-bot: #303338;
-    --lib-sort-hot-top: #36485f;
-    --lib-sort-hot-bot: #2b3b52;
-    --lib-ink: #f2f3f5;
-    --lib-soft: #d4d8df;
-    --lib-accent: #6aa3f2;
-    --lib-icon: #8d939c;
-    --lib-star: #f4b241;
-    --lib-np: #22354f;
-  }
 }
 
 /* ---------- library, iTunes 10 list view ---------- */
@@ -1500,10 +1663,6 @@
   background-image: var(--gel-fill-v);
   box-shadow: inset 0 0 0 1px rgba(16, 64, 127, 0.4);
   cursor: default;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .library__bar { transition: none; }
 }
 
 .library table {
@@ -1638,31 +1797,8 @@
    something hidden behind it. Both fades are 0 at rest, which collapses
    the mask to fully opaque and leaves the cell pixel-identical to a
    non-playing one. */
-.lib-mq {
-  --mq-fade-l: 0px;
-  --mq-fade-r: 0px;
-  display: block;
-  /* clip, not hidden: hidden on one axis promotes the other to auto and
-     the resulting scroll box shaves descenders in an 18px row */
-  overflow-x: clip;
-  -webkit-mask-image: linear-gradient(to right,
-    transparent 0, #000 var(--mq-fade-l),
-    #000 calc(100% - var(--mq-fade-r)), transparent 100%);
-  mask-image: linear-gradient(to right,
-    transparent 0, #000 var(--mq-fade-l),
-    #000 calc(100% - var(--mq-fade-r)), transparent 100%);
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-}
-
-@supports not (overflow-x: clip) {
-  .lib-mq { overflow: hidden; }
-}
-
-.lib-mq__in {
-  display: inline-block;
-  white-space: nowrap;
-}
+/* The playing row's labels use the shared `.aqua-marquee`, which is the same clip-and-mask
+   with the same `--mq-fade-*` properties. There used to be a `.lib-mq` here saying it again. */
 
 .library tbody tr:focus { outline: none; }
 .library tbody tr:focus-visible { box-shadow: inset 0 0 0 2px rgba(24, 160, 235, 0.9); }
@@ -1746,34 +1882,6 @@ a.lib-pf:hover { filter: brightness(1.12) saturate(1.1); }
 /* Hidden columns must also surrender their track: a fixed-layout table keeps the width of a col
    whose cells are gone, and the blank shows up as dead space inside the row. */
 @media (max-width: 620px) { .lib-col-album { display: none; } .library col.lib-col-album { width: 0 !important; } }
-@media (max-width: 560px) { .lib-col-bpm { display: none; } .library col.lib-col-bpm { width: 0 !important; } }
-/* Artist used to drop at 420px, which took it off every phone. It now
-   holds down to 360px: below ~368px its 22% share would make it wider
-   than the Song column, and above that both columns simply get tight —
-   which the marquee now handles rather than hiding the field. */
-
-
-/* ==========================================================================
-   18. Context menu, the New Playlist sheet and the toast — also verbatim
-   ==========================================================================
-   The reference's iOS family, copied for the same reason as the list above.
-   The colours come from the --ctx-* properties it sampled, defined here so
-   the rules themselves needed no edits.
-   ========================================================================== */
-
-:root {
-  --ctx-bg: rgb(247 247 250 / 88%);
-  --ctx-ink: #1b1c1f;
-  --ctx-sep: rgb(0 0 0 / 12%);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-np-theme='light']) {
-    --ctx-bg: rgb(40 42 48 / 90%);
-    --ctx-ink: #eef0f3;
-    --ctx-sep: rgb(255 255 255 / 12%);
-  }
-}
 
 /* ---------- context menu, iOS ---------- */
 
@@ -1958,21 +2066,15 @@ a.lib-pf:hover { filter: brightness(1.12) saturate(1.1); }
   --eqw-groove-top: #6f757c;
   --eqw-groove-bot: #b9bfc6;
 
+  /* A window, not a strip: the iTunes equalizer holds its rails about 36 px apart in a
+     frame that hugs them, whatever the page around it is doing. 600 px is that geometry
+     for a preamp and eleven bands; the bands flex only inside it (DEC-014). */
+  max-width: 600px;
   padding: 12px 14px 10px;
   border: 1px solid var(--lib-border);
   border-radius: 6px;
   background-image: linear-gradient(to bottom, #f3f4f5, #e2e4e6);
   color: var(--np-ink);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-np-theme='light']) .eqw {
-    --eqw-tick: rgb(255 255 255 / 26%);
-    --eqw-groove-top: #101216;
-    --eqw-groove-bot: #3a3f46;
-
-    background-image: linear-gradient(to bottom, #2b2e34, #1f2228);
-  }
 }
 
 .eqw__head {
@@ -2125,12 +2227,6 @@ a.lib-pf:hover { filter: brightness(1.12) saturate(1.1); }
   clip-path: polygon(0 0, 62% 0, 100% 50%, 62% 100%, 0 100%);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-np-theme='light']) .eqw .aqua-slider__thumb {
-    background-image: linear-gradient(to bottom, #6d737b 0%, #565c64 46%, #3d434a 100%);
-  }
-}
-
 .eqw .aqua-slider__track:focus-visible .aqua-slider__thumb {
   outline: 2px solid var(--np-accent);
   outline-offset: 1px;
@@ -2157,77 +2253,6 @@ a.lib-pf:hover { filter: brightness(1.12) saturate(1.1); }
 .eqw .aqua-slider__track[data-dragging='true'] ~ .aqua-slider__readout,
 .eqw .aqua-slider__track:focus-visible ~ .aqua-slider__readout {
   opacity: 1;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .eqw .aqua-slider__readout {
-    transition: none;
-  }
-}
-
-@media (max-width: 560px) {
-  .eqw {
-    --eqw-rail: 140px;
-  }
-
-  .eqw__band {
-    min-width: 22px;
-  }
-
-  .eqw__label {
-    font-size: 9px;
-  }
-}
-
-
-/* ==========================================================================
-   20. The search popover — the reference's, verbatim
-   ==========================================================================
-   The iTunes 11 "Up Next" sheet: a gradient header carrying the count and
-   Clear, 40 px rows whose artwork tile doubles as a fifteen-second audition
-   button with a countdown ring, source badges, time over tempo, a circled
-   chevron on the row under the pointer, and a pager in the footer. The
-   --srch-* values below are the reference's own samples.
-   ========================================================================== */
-
-:root {
-  --srch-bg: #f9f9f9;
-  --srch-head-top: #f6f6f6;
-  --srch-head-bot: #eee;
-  --srch-rule: #dedede;
-  --srch-ink: #2c2c2c;
-  --srch-soft: #9b9b9b;
-  --srch-hot: #ececec;
-  --srch-border: rgb(0 0 0 / 25%);
-  --srch-lip: rgb(255 255 255 / 60%);
-  --srch-art-top: #fbfbfb;
-  --srch-art-bot: #e3e3e3;
-  --srch-art-ink: #a9a9a9;
-  --srch-art-ring: rgb(0 0 0 / 14%);
-  --srch-chev: #8f8f8f;
-  --srch-dot: #c9c9c9;
-  --srch-dot-on: #7c7c7c;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-np-theme='light']) {
-    --srch-bg: #26282e;
-    --srch-head-top: #2e3138;
-    --srch-head-bot: #25272d;
-    --srch-rule: rgb(0 0 0 / 50%);
-    --srch-ink: #eef0f3;
-    --srch-soft: #8d939c;
-    --srch-hot: #32353c;
-    --srch-border: rgb(0 0 0 / 65%);
-    --srch-lip: rgb(255 255 255 / 7%);
-    --srch-art-top: #33363d;
-    --srch-art-bot: #24262b;
-    --srch-art-ink: #8d939c;
-    --srch-art-ring: rgb(255 255 255 / 10%);
-    --srch-chev: #9aa0a9;
-    --srch-dot: #4a4e56;
-    --srch-dot-on: #b8bdc5;
-  }
 }
 
 /* ---------- search results, iTunes 11 Up Next popover ----------
@@ -2351,7 +2376,7 @@ button.srch__art:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); out
 button.srch__art:focus-visible .srch__scrim,
 .srch__art.is-preview .srch__scrim { opacity: 1; }
 
-@media (hover: none) { button.srch__art .srch__scrim { opacity: 1; } }
+@media (hover: none) { button.srch__art .srch__scrim { opacity: 1;}  .srch__go { opacity: 1;}}
 
 .srch__scrim svg { width: 30px; height: 30px; overflow: visible; }
 .srch__glyph { fill: #fff; }
@@ -2450,7 +2475,6 @@ a.srch__pf:hover { filter: brightness(1.12) saturate(1.1); }
 
 .srch__row:hover .srch__go,
 .srch__row.is-hot .srch__go { opacity: 1; }
-@media (hover: none) { .srch__go { opacity: 1; } }
 
 .srch__msg {
   display: flex;
@@ -2522,25 +2546,6 @@ a.srch__pf:hover { filter: brightness(1.12) saturate(1.1); }
   white-space: nowrap;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .srch__spin i { animation: none; opacity: 0.6; }
-  .srch__scrim { transition: none; }
-}
-
-/* ==========================================================================
-   21. The jewel case on the stage
-   ==========================================================================
-   Once the 3D stage has painted a frame it takes the tile over, and the tile
-   drops its frame so the case can bleed past the layout box and let its
-   shadow fade into the page — the reference does the same, and clipping the
-   case square at the tile's edge is what it is avoiding.
-   ========================================================================== */
-
-.np-hero__stage {
-  cursor: grab;
-  touch-action: pan-y;
-}
-
 .np-hero__stage.is-3d {
   overflow: visible;
   background: none;
@@ -2564,28 +2569,6 @@ a.srch__pf:hover { filter: brightness(1.12) saturate(1.1); }
   z-index: 0;
   pointer-events: none;
   transform: translate(-50%, -50%);
-}
-
-/*
- * The canvas is wider than the tile so the case's shadow can fade out instead of being clipped
- * square at its edge. `clip` on the hero contains that horizontally without creating a scroll
- * container or clipping the bleed vertically, which `hidden` would.
- */
-.np-hero {
-  overflow-x: clip;
-}
-
-/* --------------------------------------------------------------------------
-   Phones with a notch or a home indicator. `viewport-fit=cover` lets the page
-   run under them; these insets keep the bar and the body out from under. */
-.np-bar {
-  padding-top: env(safe-area-inset-top, 0px);
-}
-
-.np-app {
-  padding-right: env(safe-area-inset-right, 0px);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  padding-left: env(safe-area-inset-left, 0px);
 }
 
 /* The artist line inside the title cell exists for phones only; see the 480 px rules. */
@@ -2612,102 +2595,89 @@ a.srch__pf:hover { filter: brightness(1.12) saturate(1.1); }
 @media (pointer: coarse) {
   :root {
     --np-bar-type: 15px;
-    --np-field-h: 36px;
-  }
+    --np-field-h: 36px;}
 
   /* The status bar and its contents. */
   .np-mode__item {
-    height: 34px;
     padding: 0 12px;
-  }
+  
+    height: 44px;
+  
+    min-width: 44px;}
 
   .np-avatar {
-    width: 34px;
-    height: 34px;
-  }
+  
+    width: 44px;
+    height: 44px;}
 
   .np-bar__clock {
-    font-size: 14px;
-  }
+    font-size: 14px;}
 
   /* The section strip: a row of tabs, and the primary way around the app. */
   .np-sections__item {
     height: 44px;
     padding: 0 14px;
-    font-size: 14px;
-  }
+    font-size: 14px;}
 
   .np-sections__count {
     padding: 0 7px;
     border-radius: 9px;
     font-size: 12px;
-    line-height: 18px;
-  }
-
+    line-height: 18px;}
   /* The scrubber. The rail is dragged, so it needs depth as well as width;
      the visible groove keeps its height and the rail grows around it. */
   .np-scrub__rail {
-    height: 22px;
-  }
+    height: 22px;}
 
   .np-scrub__time {
-    font-size: 13px;
-  }
+    font-size: 13px;}
 
   /* Transport and volume. */
   .np-vol__btn {
-    width: 34px;
-    height: 34px;
-  }
+  
+    width: 44px;
+    height: 44px;}
 
   .np-vol__track {
-    height: 12px;
-  }
+    height: 12px;}
 
   /* The music list. */
   .library {
-    font-size: 13px;
-  }
+    font-size: 13px;}
 
   /* A column header sorts the list when it is tapped, so it is a control and
      gets a control's height. It matches the row height below it, which is the
      other reason 34 looked wrong here. */
   .library th {
     height: 44px;
-    font-size: 13px;
-  }
+    font-size: 13px;}
 
   .library td {
-    height: 44px;
-  }
+    height: 44px;}
 
   .library .lib-btn {
     width: 32px;
     height: 32px;
-  }
+  
+    position: relative;}
 
   .library .lib-pf,
   .library .lib-pf .aqua-icon--provider {
     width: 20px;
-    height: 20px;
-  }
+    height: 20px;}
 
   .library td .lib-title__artist {
     font-size: 12px;
-    line-height: 15px;
-  }
+    line-height: 15px;}
 
   /* The page's own furniture. */
   .np-section-head p,
   .np-share-strip,
   .np-status {
-    font-size: 13px;
-  }
+    font-size: 13px;}
 
   .np-share-strip__note {
-    font-size: 12px;
-  }
-}
+    font-size: 12px;}
 
 /* --------------------------------------------------------------------------
    Touch, part two: the page skin's components
@@ -2715,29 +2685,18 @@ a.srch__pf:hover { filter: brightness(1.12) saturate(1.1); }
    As in the window skin, these sit at the end so a component's own rule does
    not outrank them on source order.
    -------------------------------------------------------------------------- */
-@media (pointer: coarse) {
+
   /* 16px is not a style choice: iOS zooms the page when a field under 16px
      takes focus, which throws the sticky bar off and leaves the reader
      somewhere they did not ask to be. */
   .np-search__input {
-    height: 40px;
     font-size: 16px;
-  }
-
-  /* The bar: a phone's navigation bar is 44pt, and this is that bar. */
-  .np-mode__item {
-    height: 44px;
-  }
-
-  .np-avatar {
-    width: 44px;
-    height: 44px;
-  }
+  
+    height: 44px;}
 
   /* The transport. The keys were 44 wide and 40 tall — square them off. */
   .np-key {
-    height: 44px;
-  }
+    height: 44px;}
 
   /*
    * Sliders keep the size they are drawn at and take their taps from an
@@ -2747,8 +2706,7 @@ a.srch__pf:hover { filter: brightness(1.12) saturate(1.1); }
    */
   .np-scrub,
   .np-vol__track {
-    position: relative;
-  }
+    position: relative;}
 
   .np-scrub__rail::after,
   .np-vol__track::after {
@@ -2758,40 +2716,14 @@ a.srch__pf:hover { filter: brightness(1.12) saturate(1.1); }
     width: 100%;
     height: 44px;
     content: '';
-    transform: translateY(-50%);
-  }
+    transform: translateY(-50%);}
 
   .np-scrub__rail {
-    position: relative;
-  }
+    position: relative;}
 
   /* The status line under the page. */
   .np-foot {
-    font-size: 13px;
-  }
-}
-
-@media (pointer: coarse) {
-  .np-search__input {
-    height: 44px;
-  }
-
-  /* Two segments, so each gets a finger's width rather than a label's. */
-  .np-mode__item {
-    min-width: 44px;
-  }
-
-  .np-vol__btn {
-    width: 44px;
-    height: 44px;
-  }
-
-  /* The icons in a list row keep their size — a 44px icon would swamp the row
-     it sits in — and take their taps from the same kind of overlay as the
-     sliders above. The row is 44px tall, so the overlay stays inside it. */
-  .library .lib-btn {
-    position: relative;
-  }
+    font-size: 13px;}
 
   .library .lib-btn::after {
     position: absolute;
@@ -2800,40 +2732,32 @@ a.srch__pf:hover { filter: brightness(1.12) saturate(1.1); }
     width: 44px;
     height: 44px;
     content: '';
-    transform: translate(-50%, -50%);
-  }
-}
+    transform: translate(-50%, -50%);}
 
-@media (pointer: coarse) {
   /*
    * The search popover. Its rows were 40px of 11px text — close enough on a
    * desktop, under the line on a phone. The row grows, its two lines of text
    * grow with it, and Clear becomes a target rather than a word.
    */
   .srch__row {
-    height: 52px;
-  }
+    height: 52px;}
 
   .srch__title,
   .srch__sub {
-    line-height: 16px;
-  }
+    line-height: 16px;}
 
   .srch__title {
-    font-size: 14px;
-  }
+    font-size: 14px;}
 
   .srch__sub,
   .srch__dur,
   .srch__count,
   .srch__meta {
-    font-size: 12px;
-  }
+    font-size: 12px;}
 
   .srch__clear {
     min-height: 44px;
-    padding: 2px 10px;
-  }
+    padding: 2px 10px;}
 
   /*
    * The source mark in a list row: a 20px tile. It cannot grow past that — it
@@ -2841,8 +2765,7 @@ a.srch__pf:hover { filter: brightness(1.12) saturate(1.1); }
    * its taps from an overlay, like those do.
    */
   .lib-pf {
-    position: relative;
-  }
+    position: relative;}
 
   a.lib-pf::after {
     position: absolute;
@@ -2851,27 +2774,21 @@ a.srch__pf:hover { filter: brightness(1.12) saturate(1.1); }
     width: 44px;
     height: 44px;
     content: '';
-    transform: translate(-50%, -50%);
-  }
-}
+    transform: translate(-50%, -50%);}
 
-@media (pointer: coarse) {
   /* A context menu item and a sheet's field both have room to grow. */
   .ctx__item {
-    min-height: 44px;
-  }
+    min-height: 44px;}
 
   .sheet__input {
     min-height: 44px;
-    font-size: 16px;
-  }
+    font-size: 16px;}
 
   /* Artwork in a result row doubles as the audition button, and the pager
      dots are 18px by design. Both take an overlay rather than growing. */
   .srch__art,
   .srch__page {
-    position: relative;
-  }
+    position: relative;}
 
   .srch__art::after,
   .srch__page::after {
@@ -2881,11 +2798,8 @@ a.srch__pf:hover { filter: brightness(1.12) saturate(1.1); }
     width: 44px;
     height: 44px;
     content: '';
-    transform: translate(-50%, -50%);
-  }
-}
+    transform: translate(-50%, -50%);}
 
-@media (pointer: coarse) {
   /*
    * The equalizer. Its band labels are the frequencies — 32, 64, 125 and so
    * on — and a narrow-width rule above takes them down to 9px, which is the
@@ -2896,6 +2810,4 @@ a.srch__pf:hover { filter: brightness(1.12) saturate(1.1); }
   .eqw__label,
   .eqw__scale,
   .eqw .aqua-slider__readout {
-    font-size: 12px;
-  }
-}
+    font-size: 12px;}}

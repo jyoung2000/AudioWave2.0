@@ -59,7 +59,14 @@ describe('§17.2 material', () => {
     expect(tokens.size['splitterHairline']).toBe('1px');
     // Every border declaration in every stylesheet is hairline or a variable resolving to one.
     for (const [name, sheet] of allCss) {
-      const widths = [...sheet.matchAll(/border(?:-(?:top|right|bottom|left))?:\s*([\d.]+)px/g)].map((m) => Number(m[1]));
+      // Comments first: several of them discuss borders in prose, and a pattern that reads
+      // through a comment finds a 2 px rim in a sentence explaining why there is not one.
+      const declarations = sheet.replace(/\/\*[\s\S]*?\*\//g, '');
+      // `border:`, `border-top:` and the `border-width` family alike. The first version of this
+      // matched only the first form, so a rim set with `border-width: 2px` passed unread.
+      const shorthand = [...declarations.matchAll(/border(?:-(?:top|right|bottom|left))?:[^;}]*?([\d.]+)px/g)];
+      const explicit = [...declarations.matchAll(/border-width:([^;}]*)/g)].flatMap((m) => [...m[1]!.matchAll(/([\d.]+)px/g)]);
+      const widths = [...shorthand, ...explicit].map((m) => Number(m[1]));
       expect(widths.every((w) => w <= 1), `${name} has a border wider than a hairline`).toBe(true);
     }
   });

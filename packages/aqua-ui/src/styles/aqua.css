@@ -27,6 +27,56 @@
 [data-aqua-profile="snow-leopard-itunes-9"] {
   color-scheme: light;
 
+  /*
+   * Shared controls: button, text field, checkbox.
+   *
+   * These were written as bare hex literals, which made them light-only: the player offers
+   * a dark scheme, so on a dark page every button and field kept a white face and a grey
+   * rim. The values here are exactly what shipped. `now-playing.css` overrides them in its
+   * dark block, which is the only surface that goes dark - the hub admin GUI and the
+   * companion declare `color-scheme: light` and must keep these.
+   */
+  --aqua-ctl-ink: #151515;
+  --aqua-ctl-face-1: #fdfdfd;
+  --aqua-ctl-face-2: #f4f4f4;
+  --aqua-ctl-face-3: #e6e6e6;
+  --aqua-ctl-face-4: #dcdcdc;
+  --aqua-ctl-face-hover-1: #fff;
+  --aqua-ctl-face-hover-2: #f8f8f8;
+  --aqua-ctl-face-hover-3: #ececec;
+  --aqua-ctl-face-hover-4: #e3e3e3;
+  --aqua-ctl-face-active-1: #c9c9c9;
+  --aqua-ctl-face-active-2: #d6d6d6;
+  --aqua-ctl-face-active-3: #dedede;
+  --aqua-ctl-face-disabled-1: #fbfbfb;
+  --aqua-ctl-face-disabled-2: #f1f1f1;
+  --aqua-ctl-border: #a3a3a3;
+  --aqua-ctl-border-bottom: #8d8d8d;
+  --aqua-ctl-border-disabled: #c9c9c9;
+  --aqua-ctl-focus-ring: #0d61a7;
+  --aqua-ctl-default-ink: #06203a;
+  --aqua-ctl-default-1: #cfeaff;
+  --aqua-ctl-default-2: #a3d4fb;
+  --aqua-ctl-default-3: #74b9f5;
+  --aqua-ctl-default-4: #5aa8ef;
+  --aqua-ctl-default-border: #4684c8;
+  --aqua-ctl-default-border-bottom: #356db0;
+  --aqua-ctl-box-ink: #1a2733;
+  --aqua-ctl-box-1: #fdfdfd;
+  --aqua-ctl-box-2: #f0f0f0;
+  --aqua-ctl-box-3: #e4e4e4;
+  --aqua-ctl-box-border: #a0a0a0;
+  --aqua-ctl-box-on-1: #7db4e6;
+  --aqua-ctl-box-on-2: #4f92d6;
+  --aqua-ctl-box-on-3: #3f81c6;
+  --aqua-ctl-box-on-border: #3d76ad;
+  --aqua-ctl-field-bg: #fff;
+  --aqua-ctl-field-border: #9a9a9a;
+  --aqua-ctl-field-border-top: #7d7d7d;
+  --aqua-ctl-field-focus-border: #1768a7;
+  --aqua-ctl-field-invalid-border: #b8433d;
+  --aqua-ctl-placeholder: #8b9095;
+
   --aqua-font: "Lucida Grande", "Aqua Fallback", "Lucida Sans Unicode", "Helvetica Neue", Arial, sans-serif;
   --aqua-font-system: 13px;
   --aqua-font-view: 12px;
@@ -85,6 +135,8 @@
   --aqua-lcd-text: #172326;
 
   --aqua-danger: #d64a44;
+  /* Ink for a destructive action: dark enough to read as text, not as a filled warning. */
+  --aqua-danger-ink: #7a1712;
   --aqua-warning: #d9a431;
   --aqua-success: #4e9d47;
   --aqua-traffic-close: #e9635b;
@@ -205,64 +257,7 @@
   --aqua-motion-press: 0ms;
 }
 
-/* --------------------------------------------------------------------------
-   3b. Touch
-   --------------------------------------------------------------------------
 
-   Aqua was drawn for a mouse on a 2010 desktop: 13px system text, 11px in a
-   table, controls 22px tall. At arm's length with a cursor that lands on a
-   single pixel, all of that is right, and on a desktop it is left exactly as
-   it was — including a desktop window dragged narrow, because the pointer is
-   still precise and the reader is still close.
-
-   A finger is about 9 mm across and a phone is held further away than it
-   looks. So on a coarse pointer the whole system steps up: type by two
-   points, controls and rows to something a thumb can hit, and the hit target
-   to the 44px both platform guidelines ask for. Only the numbers change —
-   every gradient, bevel, radius and border is the same, so it still reads as
-   the same interface rather than a separate mobile theme.
-
-   It is one block because the system is token-driven; the components below
-   read these variables and need no rules of their own. The selector carries
-   both `:root` and `[data-aqua-profile]` so it outranks the profile overrides
-   above whichever profile is active.
-   -------------------------------------------------------------------------- */
-@media (pointer: coarse) {
-  :root,
-  [data-aqua-profile] {
-    /* Both Apple and Google ask for 44px; nothing interactive goes below it. */
-    --aqua-hit: 44px;
-
-    /* Type: +2px across the scale, so the hierarchy between steps survives. */
-    --aqua-font-system: 15px;
-    --aqua-font-view: 14px;
-    --aqua-font-small: 13px;
-    --aqua-font-label: 12px;
-    --aqua-font-mini: 11px;
-
-    /* Controls: a finger, not a cursor. */
-    --aqua-control-h: 34px;
-    --aqua-control-h-small: 30px;
-    --aqua-control-h-mini: 26px;
-    --aqua-search-h: 34px;
-    --aqua-search-h-small: 30px;
-
-    /* Rows: a row *is* the target — it carries the roving tabindex and the
-       selection — so it gets the same 44px as everything else rather than the
-       36px that merely looked generous next to a 20px desktop row. */
-    --aqua-table-header-h: 32px;
-    --aqua-row-h: 44px;
-    --aqua-source-row-h: 44px;
-
-    /* Chrome. The toolbar shrinks: its icons grow, but 62px of it on a phone
-       is a third of the screen before any content. */
-    --aqua-toolbar-h: 52px;
-    --aqua-bottom-bar-small: 34px;
-    --aqua-bottom-bar-regular: 40px;
-    --aqua-traffic-size: 14px;
-  }
-
-}
 
 /* --------------------------------------------------------------------------
    4. Base
@@ -371,7 +366,7 @@
   margin: 0;
   padding: 1px 14px 2px;
   overflow: hidden;
-  color: #151515;
+  color: var(--aqua-ctl-ink);
   font: var(--aqua-weight-regular) var(--aqua-font-system) / 18px var(--aqua-font);
   text-align: center;
   white-space: nowrap;
@@ -385,9 +380,9 @@
    * a hairline grey rim that darkens at the bottom, and one pixel of white along the top edge.
    * There is no gloss step across the middle, because there is no gel to be lit.
    */
-  background: linear-gradient(to bottom, #fdfdfd 0%, #f4f4f4 47%, #e6e6e6 53%, #dcdcdc 100%);
-  border: 1px solid #a3a3a3;
-  border-bottom-color: #8d8d8d;
+  background: linear-gradient(to bottom, var(--aqua-ctl-face-1) 0%, var(--aqua-ctl-face-2) 47%, var(--aqua-ctl-face-3) 53%, var(--aqua-ctl-face-4) 100%);
+  border: 1px solid var(--aqua-ctl-border);
+  border-bottom-color: var(--aqua-ctl-border-bottom);
   border-radius: 4px;
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 90%),
@@ -407,22 +402,22 @@
 .aqua-button__label { overflow: hidden; text-overflow: ellipsis; }
 .aqua-button__icon { display: inline-flex; font-size: 12px; }
 
-.aqua-button:hover:not(:disabled):not([aria-disabled="true"]) { background: linear-gradient(to bottom, #fff 0%, #f8f8f8 47%, #ececec 53%, #e3e3e3 100%); }
+.aqua-button:hover:not(:disabled):not([aria-disabled="true"]) { background: linear-gradient(to bottom, var(--aqua-ctl-face-hover-1) 0%, var(--aqua-ctl-face-hover-2) 47%, var(--aqua-ctl-face-hover-3) 53%, var(--aqua-ctl-face-hover-4) 100%); }
 
 .aqua-button:active:not(:disabled):not([aria-disabled="true"]),
 .aqua-button[data-pressed="true"],
 .aqua-button[aria-pressed="true"] {
   /* Pressed is a shallower well, not a different object: the same face, darkened, with the light
      moved to the bottom edge. */
-  background: linear-gradient(to bottom, #c9c9c9 0%, #d6d6d6 50%, #dedede 100%);
-  border-color: #8d8d8d;
+  background: linear-gradient(to bottom, var(--aqua-ctl-face-active-1) 0%, var(--aqua-ctl-face-active-2) 50%, var(--aqua-ctl-face-active-3) 100%);
+  border-color: var(--aqua-ctl-border-bottom);
   box-shadow:
     inset 0 1px 2px rgb(0 0 0 / 22%),
     inset 0 -1px 0 rgb(255 255 255 / 45%);
 }
 
 .aqua-button:focus-visible {
-  outline: 1px solid #0d61a7;
+  outline: 1px solid var(--aqua-ctl-focus-ring);
   outline-offset: 2px;
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 90%), var(--aqua-focus-shadow);
 }
@@ -430,8 +425,8 @@
 .aqua-button:disabled,
 .aqua-button[aria-disabled="true"] {
   color: var(--aqua-text-disabled);
-  background: linear-gradient(to bottom, #fbfbfb, #f1f1f1);
-  border-color: #c9c9c9;
+  background: linear-gradient(to bottom, var(--aqua-ctl-face-disabled-1), var(--aqua-ctl-face-disabled-2));
+  border-color: var(--aqua-ctl-border-disabled);
   box-shadow: inset 0 1px rgb(255 255 255 / 70%);
   cursor: not-allowed;
 }
@@ -453,10 +448,10 @@
  * form where the system's blue is allowed to be a highlight rather than a selection.
  */
 .aqua-button[data-default="true"] {
-  color: #06203a;
-  background: linear-gradient(to bottom, #cfeaff 0%, #a3d4fb 44%, #74b9f5 56%, #5aa8ef 100%);
-  border-color: #4684c8;
-  border-bottom-color: #356db0;
+  color: var(--aqua-ctl-default-ink);
+  background: linear-gradient(to bottom, var(--aqua-ctl-default-1) 0%, var(--aqua-ctl-default-2) 44%, var(--aqua-ctl-default-3) 56%, var(--aqua-ctl-default-4) 100%);
+  border-color: var(--aqua-ctl-default-border);
+  border-bottom-color: var(--aqua-ctl-default-border-bottom);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 88%),
     inset 0 -1px 0 rgb(0 50 110 / 22%),
@@ -506,7 +501,7 @@
 
 /* Destructive: neutral geometry, explicit wording, red marker (never a red fill by default) */
 .aqua-button[data-variant="destructive"] {
-  color: #7a1712;
+  color: var(--aqua-danger-ink);
   border-color: #8f4a45;
 }
 
@@ -744,10 +739,10 @@
   width: 14px;
   height: 14px;
   margin-top: 2px;
-  color: #1a2733;
-  background: linear-gradient(to bottom, #fdfdfd, #f0f0f0 55%, #e4e4e4);
-  border: 1px solid #a0a0a0;
-  border-bottom-color: #8d8d8d;
+  color: var(--aqua-ctl-box-ink);
+  background: linear-gradient(to bottom, var(--aqua-ctl-box-1), var(--aqua-ctl-box-2) 55%, var(--aqua-ctl-box-3));
+  border: 1px solid var(--aqua-ctl-box-border);
+  border-bottom-color: var(--aqua-ctl-border-bottom);
   border-radius: 3px;
   box-shadow: inset 0 1px rgb(255 255 255 / 90%), 0 1px 0 rgb(255 255 255 / 60%);
   transition: box-shadow var(--aqua-motion-press) ease-out;
@@ -762,8 +757,8 @@
   /* Checked is a tinted box, not a gel bead: 10.6 fills it with a flat-ish blue and puts a white
      tick on top. */
   color: #fff;
-  background: linear-gradient(to bottom, #7db4e6 0%, #4f92d6 52%, #3f81c6 100%);
-  border-color: #3d76ad;
+  background: linear-gradient(to bottom, var(--aqua-ctl-box-on-1) 0%, var(--aqua-ctl-box-on-2) 52%, var(--aqua-ctl-box-on-3) 100%);
+  border-color: var(--aqua-ctl-box-on-border);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 55%),
     0 1px 0 rgb(255 255 255 / 60%);
@@ -832,9 +827,9 @@
   padding: 1px 6px;
   color: var(--aqua-text);
   font: var(--aqua-weight-regular) var(--aqua-font-system) / 18px var(--aqua-font);
-  background: #fff;
-  border: 1px solid #9a9a9a;
-  border-top-color: #7d7d7d;
+  background: var(--aqua-ctl-field-bg);
+  border: 1px solid var(--aqua-ctl-field-border);
+  border-top-color: var(--aqua-ctl-field-border-top);
   border-radius: 0;
   box-shadow: inset 0 1px 2px rgb(0 0 0 / 15%), 0 1px rgb(255 255 255 / 60%);
   outline: none;
@@ -843,16 +838,16 @@
 
 textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertical; }
 
-.aqua-field__input::placeholder { color: #8b9095; opacity: 1; }
+.aqua-field__input::placeholder { color: var(--aqua-ctl-placeholder); opacity: 1; }
 
 .aqua-field__input:focus-visible {
-  border-color: #1768a7;
+  border-color: var(--aqua-ctl-field-focus-border);
   outline: none;
   box-shadow: inset 0 1px 2px rgb(0 0 0 / 15%), var(--aqua-focus-shadow);
 }
 
 .aqua-field__input[aria-invalid="true"] {
-  border-color: #b8433d;
+  border-color: var(--aqua-ctl-field-invalid-border);
   padding-right: 24px;
 }
 
@@ -897,13 +892,13 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
   align-items: center;
   min-width: 96px;
   min-height: var(--aqua-control-h);
-  color: #151515;
+  color: var(--aqua-ctl-ink);
   font: var(--aqua-weight-regular) var(--aqua-font-system) / 18px var(--aqua-font);
   /* The same face as the push button: 10.6's pop-up is a rounded rect with a blue chevron block
      at its right end, not a glass pill. */
-  background: linear-gradient(to bottom, #fdfdfd 0%, #f4f4f4 47%, #e6e6e6 53%, #dcdcdc 100%);
-  border: 1px solid #a3a3a3;
-  border-bottom-color: #8d8d8d;
+  background: linear-gradient(to bottom, var(--aqua-ctl-face-1) 0%, var(--aqua-ctl-face-2) 47%, var(--aqua-ctl-face-3) 53%, var(--aqua-ctl-face-4) 100%);
+  border: 1px solid var(--aqua-ctl-border);
+  border-bottom-color: var(--aqua-ctl-border-bottom);
   border-radius: 4px;
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 90%),
@@ -1030,9 +1025,9 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
   font: var(--aqua-weight-regular) var(--aqua-font-small) / 15px var(--aqua-font);
   text-align: right;
   font-variant-numeric: tabular-nums;
-  background: #fff;
-  border: 1px solid #9a9a9a;
-  border-top-color: #7d7d7d;
+  background: var(--aqua-ctl-field-bg);
+  border: 1px solid var(--aqua-ctl-field-border);
+  border-top-color: var(--aqua-ctl-field-border-top);
   box-shadow: inset 0 1px 2px rgb(0 0 0 / 15%);
 }
 
@@ -1244,18 +1239,18 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
 /* narrow: primary label / secondary metadata rows, never cards (spec §8.3) */
 @media (max-width: 479px) {
   .aqua-table--responsive th:not(.aqua-table__col--keep),
-  .aqua-table--responsive td:not(.aqua-table__col--keep) { display: none; }
+  .aqua-table--responsive td:not(.aqua-table__col--keep) { display: none;}
   /* `height` on a cell is a minimum, not a fixed size, so the row still grows
      to fit two lines — while keeping the floor that `height: auto` gave away. */
-  .aqua-table--responsive td.aqua-table__col--keep { white-space: normal; padding-block: 3px; }
-  .aqua-table--responsive .aqua-table__stack { display: block; }
+  .aqua-table--responsive td.aqua-table__col--keep { white-space: normal; padding-block: 3px;}
+  .aqua-table--responsive .aqua-table__stack { display: block;}
   /* Fixed layout would hold the hidden columns' widths open, leaving most of each row without a
      cell: blank, and dead to the pointer, since a click there lands on the table rather than the
      row. Found in the page list, fixed in both. */
-  .aqua-table--responsive { table-layout: auto; }
+  .aqua-table--responsive { table-layout: auto;}
   /* Column widths are inline styles from the column definitions; only !important takes them back. */
-  .aqua-table--responsive col { width: auto !important; }
-}
+  .aqua-table--responsive col { width: auto !important;}
+ .aqua-form-row { grid-template-columns: minmax(0, 1fr);} .aqua-form-row > :first-child { text-align: left;}}
 .aqua-table__stack { display: none; color: var(--aqua-text-secondary); font-size: var(--aqua-font-small); }
 
 /* --------------------------------------------------------------------------
@@ -1488,6 +1483,9 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
 .aqua-menu__shortcut { color: var(--aqua-text-secondary); font-size: var(--aqua-font-small); }
 .aqua-menu__submenu-arrow { display: inline-flex; justify-content: center; font-size: 8px; }
 .aqua-menu__separator { height: 1px; margin: 4px 1px; background: rgb(0 0 0 / 14%); }
+/* A destructive item is named by its ink, not by a colour pasted into the markup. Separation
+   from the ordinary items is the separator above it; the wording is the caller's. */
+.aqua-menu__item--destructive { color: var(--aqua-danger-ink); }
 .aqua-menu__heading { padding: 3px 8px 2px; color: var(--aqua-text-secondary); font-size: var(--aqua-font-label); font-weight: var(--aqua-weight-emphasized); text-transform: uppercase; letter-spacing: 0.03em; }
 
 .aqua-toast-region {
@@ -1610,7 +1608,6 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
 .aqua-form-row > :first-child { text-align: right; font-size: var(--aqua-font-system); }
 .aqua-form-row--stack, .aqua-form-row--stacked { grid-template-columns: minmax(0, 1fr); }
 .aqua-form-row--stack > :first-child, .aqua-form-row--stacked > :first-child { text-align: left; }
-@media (max-width: 479px) { .aqua-form-row { grid-template-columns: minmax(0, 1fr); } .aqua-form-row > :first-child { text-align: left; } }
 .aqua-kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; margin: 0; font-size: var(--aqua-font-small); }
 .aqua-kv dt { color: var(--aqua-text-secondary); }
 .aqua-kv dd { margin: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -1638,6 +1635,117 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
 .aqua-slider--vertical .aqua-slider__value { width: 100%; text-align: center; }
 
 /* --------------------------------------------------------------------------
+   Touch.
+
+   Last in the file on purpose. Every rule here raises a control to a 44 px target, and it does
+   so with the same specificity as the rules it is correcting - `.aqua-button` against
+   `.aqua-button--small`, both one class - so source order is the only thing that decides.
+   Moved above the control definitions, these rules lose and every small button silently goes
+   back to 30 px on a phone. Merging the five blocks this used to be into one was safe; merging
+   them at the *top* was not, and the responsive suite caught it.
+   -------------------------------------------------------------------------- */
+@media (pointer: coarse) {
+  :root,
+  [data-aqua-profile] {
+    /* Both Apple and Google ask for 44px; nothing interactive goes below it. */
+    --aqua-hit: 44px;
+
+    /* Type: +2px across the scale, so the hierarchy between steps survives. */
+    --aqua-font-system: 15px;
+    --aqua-font-view: 14px;
+    --aqua-font-small: 13px;
+    --aqua-font-label: 12px;
+    --aqua-font-mini: 11px;
+
+    /* Controls: a finger, not a cursor. */
+    --aqua-control-h: 34px;
+    --aqua-control-h-small: 30px;
+    --aqua-control-h-mini: 26px;
+    --aqua-search-h: 34px;
+    --aqua-search-h-small: 30px;
+
+    /* Rows: a row *is* the target — it carries the roving tabindex and the
+       selection — so it gets the same 44px as everything else rather than the
+       36px that merely looked generous next to a 20px desktop row. */
+    --aqua-table-header-h: 32px;
+    --aqua-row-h: 44px;
+    --aqua-source-row-h: 44px;
+
+    /* Chrome. The toolbar shrinks: its icons grow, but 62px of it on a phone
+       is a third of the screen before any content. */
+    --aqua-toolbar-h: 52px;
+    --aqua-bottom-bar-small: 34px;
+    --aqua-bottom-bar-regular: 40px;
+    --aqua-traffic-size: 14px;}
+
+
+  /* A field is typed into as well as tapped, and its padding puts it just
+     under the line the rest of the controls clear. */
+  .aqua-field__input,
+  .aqua-search__input {
+    min-height: var(--aqua-hit);}
+
+  /* iOS zooms the page when a field under 16px takes focus. */
+  .aqua-field__input,
+  .aqua-search__input,
+  .aqua-select,
+  textarea.aqua-field__input {
+    font-size: 16px;}
+
+  /* A collapsible group heading in the source list is a real button — it is
+     what opens and closes the group — and it was drawn as a 16px label. */
+  .aqua-source-list__heading[role='button'] {
+    min-height: var(--aqua-hit);}
+
+  /* The editable number beside a slider is typed into as well as tapped. */
+  .aqua-slider__value {
+    min-height: var(--aqua-hit);
+    font-size: 16px;}
+
+  /* A table's sort header is a button spanning the column. */
+  .aqua-table__sort {
+    min-height: var(--aqua-hit);}
+
+  /* Two segments or three tabs: each gets a finger's width, not a word's. */
+  .aqua-segmented__item,
+  .aqua-tab {
+    min-width: var(--aqua-hit);}
+
+  /*
+   * The window's traffic lights are 14px by design and cannot be anything
+   * else — they are the one shape in the system everybody recognises at a
+   * glance. The span around each is spacing rather than a target, so the
+   * overlay goes on the button itself.
+   *
+   * A vertical fader is the same case in the other axis: 22px wide is the
+   * groove, and the overlay gives the thumb somewhere to be caught.
+   */
+  .aqua-traffic__light,
+  .aqua-slider--vertical .aqua-slider__track,
+  .aqua-volume > .aqua-icon-button,
+  .aqua-badge {
+    position: relative;}
+
+  .aqua-traffic__light::after,
+  .aqua-volume > .aqua-icon-button::after,
+  .aqua-badge::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--aqua-hit);
+    height: var(--aqua-hit);
+    content: '';
+    transform: translate(-50%, -50%);}
+
+  .aqua-slider--vertical .aqua-slider__track::after {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: var(--aqua-hit);
+    height: 100%;
+    content: '';
+    transform: translateX(-50%);}
+/* --------------------------------------------------------------------------
    Touch, part two: the components
    --------------------------------------------------------------------------
 
@@ -1647,18 +1755,16 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
    otherwise win on source order — which it did, the first time this was
    written, leaving every small button 30px tall in a block that asked for 44.
    -------------------------------------------------------------------------- */
-@media (pointer: coarse) {
+
   .aqua-check__box,
   .aqua-radio__dot {
     width: 20px;
-    height: 20px;
-  }
+    height: 20px;}
 
   .aqua-check,
   .aqua-radio {
     gap: 10px;
-    min-height: var(--aqua-hit);
-  }
+    min-height: var(--aqua-hit);}
 
   .aqua-button,
   .aqua-button--small,
@@ -1669,16 +1775,13 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
   .aqua-menu__item,
   .aqua-source-list__item,
   .aqua-icon-button {
-    min-height: var(--aqua-hit);
-  }
+    min-height: var(--aqua-hit);}
 
   .aqua-button {
-    padding-inline: 18px;
-  }
+    padding-inline: 18px;}
 
   .aqua-button--small {
-    padding-inline: 14px;
-  }
+    padding-inline: 14px;}
 
   /* Mini is the one size that stays visibly small — it exists for a row of
      actions inside a table cell, where 44px would double the row. It gets the
@@ -1690,8 +1793,7 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
     min-height: 32px;
     padding-inline: 12px;
     font-size: 12px;
-    line-height: 14px;
-  }
+    line-height: 14px;}
 
   /*
    * Where a control has to keep its drawn size, the target grows around it
@@ -1708,99 +1810,13 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
     width: max(100%, var(--aqua-hit));
     height: max(100%, var(--aqua-hit));
     content: '';
-    transform: translate(-50%, -50%);
-  }
+    transform: translate(-50%, -50%);}
 
   .aqua-work-area__splitter,
   .aqua-traffic-light {
-    position: relative;
-  }
+    position: relative;}
 
   /* A splitter is dragged rather than tapped: it needs width, not squareness. */
   .aqua-work-area__splitter::after {
     width: 24px;
-    height: 100%;
-  }
-}
-
-@media (pointer: coarse) {
-  /* A field is typed into as well as tapped, and its padding puts it just
-     under the line the rest of the controls clear. */
-  .aqua-field__input,
-  .aqua-search__input {
-    min-height: var(--aqua-hit);
-  }
-
-  /* iOS zooms the page when a field under 16px takes focus. */
-  .aqua-field__input,
-  .aqua-search__input,
-  .aqua-select,
-  textarea.aqua-field__input {
-    font-size: 16px;
-  }
-}
-
-@media (pointer: coarse) {
-  /* A collapsible group heading in the source list is a real button — it is
-     what opens and closes the group — and it was drawn as a 16px label. */
-  .aqua-source-list__heading[role='button'] {
-    min-height: var(--aqua-hit);
-  }
-
-  /* The editable number beside a slider is typed into as well as tapped. */
-  .aqua-slider__value {
-    min-height: var(--aqua-hit);
-    font-size: 16px;
-  }
-}
-
-@media (pointer: coarse) {
-  /* A table's sort header is a button spanning the column. */
-  .aqua-table__sort {
-    min-height: var(--aqua-hit);
-  }
-
-  /* Two segments or three tabs: each gets a finger's width, not a word's. */
-  .aqua-segmented__item,
-  .aqua-tab {
-    min-width: var(--aqua-hit);
-  }
-
-  /*
-   * The window's traffic lights are 14px by design and cannot be anything
-   * else — they are the one shape in the system everybody recognises at a
-   * glance. The span around each is spacing rather than a target, so the
-   * overlay goes on the button itself.
-   *
-   * A vertical fader is the same case in the other axis: 22px wide is the
-   * groove, and the overlay gives the thumb somewhere to be caught.
-   */
-  .aqua-traffic__light,
-  .aqua-slider--vertical .aqua-slider__track,
-  .aqua-volume > .aqua-icon-button,
-  .aqua-badge {
-    position: relative;
-  }
-
-  .aqua-traffic__light::after,
-  .aqua-volume > .aqua-icon-button::after,
-  .aqua-badge::after {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: var(--aqua-hit);
-    height: var(--aqua-hit);
-    content: '';
-    transform: translate(-50%, -50%);
-  }
-
-  .aqua-slider--vertical .aqua-slider__track::after {
-    position: absolute;
-    top: 0;
-    left: 50%;
-    width: var(--aqua-hit);
-    height: 100%;
-    content: '';
-    transform: translateX(-50%);
-  }
-}
+    height: 100%;}}
