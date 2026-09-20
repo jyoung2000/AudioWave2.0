@@ -40,8 +40,6 @@ export const IPC_CHANNELS = [
   'backup:restore',
   'backup:export-playlists',
 
-  'downloads:list',
-  'downloads:choose-directory',
 ] as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[number];

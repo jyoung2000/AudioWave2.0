@@ -1,7 +1,7 @@
 {
   "name": "@now-playing/windows-companion",
   "version": "0.1.0",
-  "description": "Now Playing Companion for Windows \u2014 secure Electron desktop app for filesystem library management, provider connections, authorized downloads, import, backup, sync and remote access.",
+  "description": "Now Playing Companion for Windows \u2014 secure Electron desktop app for filesystem library management, watched folders, import, backup, sync and remote access.",
   "license": "MIT",
   "type": "module",
   "private": true,

@@ -18,7 +18,10 @@
     scaled from its 24-unit box. Drawing it twice is how the app icon ended up mirrored once
     already; tests/unit/icon-glyphs.test.ts now fails if the two ever differ again.
   -->
-  <g transform="translate(72 131.5) scale(13)">
+  <!-- translate centres the path's own box on the folder's mouth (centre 240, 308), a step
+       smaller so the note clears the lip and the tray's bottom edge:
+       240 − 12.1·12 = 94.8 across, 308 − 12.35·12 = 159.8 down. -->
+  <g transform="translate(94.8 159.8) scale(12)">
     <path fill="#ffffff" fill-opacity="0.96" d="M19.6 3 9.8 5.2a1 1 0 0 0-.8 1v9.7a3.1 3.1 0 1 0 1.6 2.7V9.6l7.6-1.7v5.6a3.1 3.1 0 1 0 1.6 2.7V3.8a.8.8 0 0 0-1-.8z"/>
   </g>
   <rect x="24" y="24" width="464" height="220" rx="96" fill="url(#gloss)"/>

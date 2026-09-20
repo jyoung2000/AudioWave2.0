@@ -12,6 +12,9 @@
  * 3. **A link cannot start a program.** `shell.openExternal` on a `file:` URL is a way to run
  *    something; the companion opens web links and refuses everything else.
  */
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 
 const openExternal = vi.fn(async (_url: string) => undefined);
@@ -20,8 +23,8 @@ vi.mock('electron', () => ({
   shell: { openExternal: (url: string) => openExternal(url) },
 }));
 
-const { sanitize } = await import('../../src/main/hub.js');
-const { allowedOrigins, contentSecurityPolicy, openExternally } = await import('../../src/main/security.js');
+const { isPlainHttpOverInternet, sanitize } = await import('../../src/main/hub.js');
+const { appUrlGuard, contentSecurityPolicy, isAllowedAppUrl, isTrustedSender, openExternally } = await import('../../src/main/security.js');
 const { IPC_CHANNELS, IPC_EVENT_NAMES } = await import('../../src/shared/channels.js');
 const { IPC, IPC_EVENTS } = await import('../../src/shared/ipc.js');
 
@@ -53,6 +56,14 @@ describe('the renderer can only do what is on the list', () => {
     expect(Object.keys(IPC_EVENTS).sort()).toEqual([...IPC_EVENT_NAMES].sort());
   });
 
+  it('changes only the preferences a request names, and never the download folder', () => {
+    const schema = IPC['app:preferences:set'].request;
+    // Zod 4 fills `.default()`s inside optional fields; a partial of Preferences would reset the rest.
+    expect(schema.parse({ autoSync: true })).toEqual({ autoSync: true });
+    expect(schema.parse({})).toEqual({});
+    expect(schema.safeParse({ downloadDirectory: 'C:\\Windows' }).success).toBe(false);
+  });
+
   it('names no channel that could read an arbitrary file or run a command', () => {
     for (const channel of IPC_CHANNELS) {
       expect(channel).not.toMatch(/exec|spawn|shell|eval|read-?file|write-?file/i);
@@ -73,8 +84,60 @@ describe('the content security policy', () => {
   it('relaxes only what the dev server needs, and only when there is one', () => {
     const dev = contentSecurityPolicy('http://localhost:5175');
     expect(dev).toContain("'unsafe-inline'");
-    expect(allowedOrigins('http://localhost:5175')).toEqual(['http://localhost:5175', 'file://']);
-    expect(allowedOrigins(null)).toEqual(['file://']);
+    expect(dev).toContain('ws://localhost:5175');
+    expect(contentSecurityPolicy(null)).toContain("connect-src 'self';");
+  });
+
+  it('is written into index.html, because a file:// page never receives the header', async () => {
+    const html = await readFile(fileURLToPath(new URL('../../src/renderer/index.html', import.meta.url)), 'utf8');
+    const meta = /<meta http-equiv="Content-Security-Policy" content="([^"]*)"/.exec(html);
+    expect(meta?.[1]).toBe(contentSecurityPolicy(null));
+  });
+});
+
+describe('the window only ever shows the app', () => {
+  const indexFile = process.platform === 'win32' ? 'C:\\Program Files\\Now Playing Companion\\resources\\app.asar\\dist\\renderer\\index.html' : '/opt/companion/resources/app.asar/dist/renderer/index.html';
+  const indexUrl = pathToFileURL(indexFile).href;
+
+  it('allows the bundled index.html, with or without a fragment', () => {
+    expect(isAllowedAppUrl(indexUrl, null, indexFile)).toBe(true);
+    expect(isAllowedAppUrl(`${indexUrl}#/hub`, null, indexFile)).toBe(true);
+  });
+
+  it('refuses any other local file, which would otherwise inherit the preload bridge', () => {
+    expect(isAllowedAppUrl(pathToFileURL(join(indexFile, '..', 'other.html')).href, null, indexFile)).toBe(false);
+    expect(isAllowedAppUrl('file:///C:/Users/Sam/Downloads/index.html', null, indexFile)).toBe(false);
+    expect(isAllowedAppUrl(`${indexUrl}?x=1`, null, indexFile)).toBe(false);
+    expect(isAllowedAppUrl('https://example.com/', null, indexFile)).toBe(false);
+    expect(isAllowedAppUrl('not a url', null, indexFile)).toBe(false);
+  });
+
+  it('allows the dev server only in development, and nothing local alongside it', () => {
+    expect(isAllowedAppUrl('http://localhost:5175/', 'http://localhost:5175', indexFile)).toBe(true);
+    expect(isAllowedAppUrl('http://localhost:5176/', 'http://localhost:5175', indexFile)).toBe(false);
+    expect(isAllowedAppUrl(indexUrl, 'http://localhost:5175', indexFile)).toBe(false);
+  });
+
+  it('trusts an IPC sender only when its frame is the app page', () => {
+    const guard = appUrlGuard(null, indexFile);
+    expect(isTrustedSender({ senderFrame: { url: indexUrl } }, guard)).toBe(true);
+    expect(isTrustedSender({ senderFrame: { url: 'file:///C:/evil.html' } }, guard)).toBe(false);
+    expect(isTrustedSender({ senderFrame: null }, guard)).toBe(false);
+    expect(isTrustedSender({}, guard)).toBe(false);
+  });
+});
+
+describe('an unencrypted hub address', () => {
+  it('is accepted quietly on this computer or a home network', () => {
+    for (const endpoint of ['http://localhost:4546', 'http://127.0.0.1:4546', 'http://192.168.1.20:4546', 'http://10.0.0.5', 'http://172.20.0.2', 'http://nas:4546', 'http://nas.local', 'http://[::1]:4546', 'https://hub.example.com']) {
+      expect(isPlainHttpOverInternet(endpoint)).toBe(false);
+    }
+  });
+
+  it('is flagged when it crosses the internet', () => {
+    for (const endpoint of ['http://hub.example.com', 'http://8.8.8.8:4546', 'http://172.32.0.1']) {
+      expect(isPlainHttpOverInternet(endpoint)).toBe(true);
+    }
   });
 });
 

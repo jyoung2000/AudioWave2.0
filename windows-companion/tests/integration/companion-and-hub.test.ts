@@ -15,6 +15,8 @@ import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { Track } from '@now-playing/contracts';
+import { uuidv7 } from '@now-playing/domain';
 import { makeToneWav } from '@now-playing/test-fixtures';
 import { createTestHub, type TestHub } from '../../../docker-container/tests/helpers/hub.js';
 import { HubClient } from '../../src/main/hub.js';
@@ -234,7 +236,204 @@ describe('transfers', () => {
   });
 });
 
+describe('sync paging and cursors', () => {
+  function bulkTracks(count: number): void {
+    const now = Date.now();
+    store.transaction(() => {
+      for (let i = 0; i < count; i += 1) {
+        const id = uuidv7();
+        // Distinct, ordered timestamps, as a real scan over time would leave.
+        const updatedAt = new Date(now - (count - i) * 1000).toISOString();
+        const t = { id, schemaVersion: 1, title: `Song ${i}`, artistName: 'Bulk Artist', albumName: null, createdAt: updatedAt, updatedAt, deletedAt: null } as unknown as Track;
+        store.upsertTrack({ id, folderId: 'folder-1', relativePath: `bulk/${i}.flac`, track: t, sizeBytes: 1, mtimeMs: 1, contentHash: null, updatedAt, deletedAt: null });
+      }
+    });
+  }
+
+  const hubTrackCount = (): number => hub.ctx.db.prepare<[], { n: number }>("SELECT COUNT(*) AS n FROM synced_records WHERE collection = 'tracks'").get()?.n ?? 0;
+
+  it('sends a library larger than one request, and afterwards only what changed', async () => {
+    store.addFolder({ id: 'folder-1', path: musicDir, displayName: 'Music', now: new Date().toISOString() });
+    bulkTracks(2300);
+    const client = new HubClient(store, 'Test PC', () => undefined);
+    await pairCompanion(client);
+
+    const first = await client.sync();
+    expect(first.reason).toBeNull();
+    // The old code sent at most 2000 records, unordered, every time; the rest never arrived.
+    expect(hubTrackCount()).toBe(2300);
+    expect(first.pushed).toBe(2300);
+
+    // One edit later, one record is sent — not the whole library again.
+    const one = store.searchTracks({ query: 'Song 7', limit: 1, offset: 0 }).items[0]!;
+    const edited = store.findTrack(one.id)!;
+    const later = new Date(Date.now() + 1000).toISOString();
+    store.upsertTrack({ ...edited, track: { ...edited.track, title: 'Song 7 (Remastered)' }, updatedAt: later });
+    const second = await client.sync();
+    expect(second.reason).toBeNull();
+    expect(second.pushed).toBe(1);
+  }, 120_000);
+
+  it('tells the hub about the tracks of a removed folder', async () => {
+    await writeSong('a.wav', 'Removed With Folder');
+    store.addFolder({ id: '01920000-0000-7000-8000-00000000f001', path: musicDir, displayName: 'Music', now: new Date().toISOString() });
+    await scanFolder(store, { id: '01920000-0000-7000-8000-00000000f001', path: musicDir });
+    const client = new HubClient(store, 'Test PC', () => undefined);
+    await pairCompanion(client);
+    await client.sync();
+
+    store.removeFolder('01920000-0000-7000-8000-00000000f001', new Date(Date.now() + 1000).toISOString());
+    const result = await client.sync();
+    expect(result.reason).toBeNull();
+    const rows = hub.ctx.db.prepare<[], { deleted_at: string | null }>("SELECT deleted_at FROM synced_records WHERE collection = 'tracks'").all();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.deleted_at).toEqual(expect.any(String));
+  });
+});
+
+describe('applying the hub’s changes', () => {
+  const at = (offsetMs: number): string => new Date(Date.now() + offsetMs).toISOString();
+
+  it('applies a tombstone without a body, skips a malformed record, and keeps syncing', async () => {
+    const client = new HubClient(store, 'Test PC', () => undefined);
+    await pairCompanion(client);
+
+    const playlistId = uuidv7();
+    const itemId = uuidv7();
+    const brokenId = uuidv7();
+    hub.ctx.sync.publish('playlists', { id: playlistId, updatedAt: at(-5000), deletedAt: null, createdAt: at(-5000), name: 'From the hub' });
+    // A deleted playlist item this computer never had: the change carries no body at all.
+    hub.ctx.sync.publish('playlistItems', { id: itemId, updatedAt: at(-4000), deletedAt: at(-4000) });
+    // A playlist with no name does not fit the contract and must not reach the playlist list.
+    hub.ctx.sync.publish('playlists', { id: brokenId, updatedAt: at(-3000), deletedAt: null, createdAt: at(-3000) });
+
+    const first = await client.sync();
+    expect(first.reason).toBeNull();
+    expect(store.listPlaylists().map((p) => p.name)).toEqual(['From the hub']);
+    expect(store.syncedState('playlist_items', itemId)?.deletedAt).toEqual(expect.any(String));
+    expect(store.syncedState('playlists', brokenId)).toBeUndefined();
+
+    // The cursor moved, so the next sync is not stuck on the same page.
+    const second = await client.sync();
+    expect(second.reason).toBeNull();
+    expect(second.pulled).toBe(0);
+  });
+
+  it('keeps a local edit that is newer than the hub’s copy', async () => {
+    const client = new HubClient(store, 'Test PC', () => undefined);
+    await pairCompanion(client);
+
+    const id = uuidv7();
+    const localTime = at(60_000);
+    store.putSynced('playlists', id, { id, createdAt: localTime, updatedAt: localTime, name: 'Edited here' }, localTime, null);
+    hub.ctx.sync.publish('playlists', { id, updatedAt: at(-60_000), deletedAt: null, createdAt: at(-60_000), name: 'Older on the hub' });
+    // Hold the local edit back from this round, so the hub's older copy really is offered to us.
+    store.raw.prepare('INSERT INTO sync_cursors (collection, cursor) VALUES (?, ?)').run('push:playlists', JSON.stringify([at(120_000), 'z']));
+
+    const result = await client.sync();
+    expect(result.reason).toBeNull();
+    expect(store.listPlaylists().map((p) => p.name)).toEqual(['Edited here']);
+  });
+});
+
+describe('the stored credential', () => {
+  /** A reversible stand-in for DPAPI: enough to prove the plain secret never reaches the database. */
+  const secretBox = {
+    isEncryptionAvailable: () => true,
+    encryptString: (text: string) => Buffer.from([...Buffer.from(text, 'utf8')].reverse()),
+    decryptString: (data: Buffer) => Buffer.from([...data].reverse()).toString('utf8'),
+  };
+
+  it('is encrypted at rest when the operating system can encrypt it', async () => {
+    const client = new HubClient(store, 'Test PC', () => undefined, { secretBox });
+    await pairCompanion(client);
+    const stored = store.get<Record<string, unknown> | null>('hub.credential', null)!;
+    expect(stored['secret']).toBeUndefined();
+    expect(stored['secretEncrypted']).toEqual(expect.any(String));
+
+    // A fresh start can still unlock it and use it.
+    const reopened = new HubClient(store, 'Test PC', () => undefined, { secretBox });
+    expect((await reopened.refresh()).connected).toBe(true);
+    expect((await reopened.sync()).reason).toBeNull();
+  });
+
+  it('encrypts a plain-text credential left by an older build the first time it is read', async () => {
+    const client = new HubClient(store, 'Test PC', () => undefined);
+    await pairCompanion(client);
+    const legacy = store.get<Record<string, unknown> | null>('hub.credential', null)!;
+    expect(legacy['secret']).toEqual(expect.any(String));
+
+    const upgraded = new HubClient(store, 'Test PC', () => undefined, { secretBox });
+    const stored = store.get<Record<string, unknown> | null>('hub.credential', null)!;
+    expect(stored['secret']).toBeUndefined();
+    expect(secretBox.decryptString(Buffer.from(String(stored['secretEncrypted']), 'base64'))).toBe(legacy['secret']);
+    expect((await upgraded.sync()).reason).toBeNull();
+  });
+});
+
+describe('uploads that go wrong', () => {
+  async function pairedWithTrack(title: string): Promise<{ client: HubClient; trackId: string }> {
+    await writeSong('a.wav', title);
+    store.addFolder({ id: 'folder-1', path: musicDir, displayName: 'Music', now: new Date().toISOString() });
+    await scanFolder(store, { id: 'folder-1', path: musicDir });
+    const client = new HubClient(store, 'Test PC', () => undefined);
+    await pairCompanion(client);
+    return { client, trackId: store.searchTracks({ limit: 1, offset: 0 }).items[0]!.id };
+  }
+
+  it('fails, rather than reporting success, when the hub sends a nonsense resume offset', async () => {
+    const { client, trackId } = await pairedWithTrack('Bad Offset');
+    const routed = globalThis.fetch;
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      if (init?.method === 'HEAD') return new Response(null, { status: 404, headers: { 'x-received-bytes': 'abc' } });
+      return routed(input, init);
+    }) as typeof globalThis.fetch;
+    const result = await client.uploadTrack(trackId);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toMatch(/upload position/);
+  });
+
+  it('stops when cancelled', async () => {
+    const { client, trackId } = await pairedWithTrack('Cancelled');
+    const controller = new AbortController();
+    controller.abort();
+    await expect(client.uploadTrack(trackId, undefined, controller.signal)).resolves.toEqual({ ok: false, reason: 'Cancelled.' });
+  });
+
+  it('sends a file larger than one chunk', async () => {
+    await writeFile(join(musicDir, 'big.wav'), Buffer.alloc(5 * 1024 * 1024 + 123, 7));
+    store.addFolder({ id: 'folder-1', path: musicDir, displayName: 'Music', now: new Date().toISOString() });
+    await scanFolder(store, { id: 'folder-1', path: musicDir });
+    const client = new HubClient(store, 'Test PC', () => undefined);
+    await pairCompanion(client);
+    const trackId = store.searchTracks({ limit: 1, offset: 0 }).items[0]!.id;
+    const progress: number[] = [];
+    const result = await client.uploadTrack(trackId, (done) => progress.push(done));
+    expect(result).toEqual({ ok: true, reason: null });
+    expect(progress).toEqual([4 * 1024 * 1024, 5 * 1024 * 1024 + 123]);
+  });
+});
+
 describe('a hub that is not the one you paired with', () => {
+  it('refuses to send the credential when the hub’s fingerprint no longer matches', async () => {
+    const client = new HubClient(store, 'Test PC', () => undefined);
+    await pairCompanion(client);
+    const saved = store.get<Record<string, unknown>>('hub.credential', {});
+    store.set('hub.credential', { ...saved, hubFingerprint: 'not-the-fingerprint-you-confirmed' }, new Date().toISOString());
+
+    const routed = globalThis.fetch;
+    const authorized: string[] = [];
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      if ((init?.headers as Record<string, string> | undefined)?.['authorization']) authorized.push(String(input));
+      return routed(input, init);
+    }) as typeof globalThis.fetch;
+
+    const reopened = new HubClient(store, 'Test PC', () => undefined);
+    const result = await reopened.sync();
+    expect(result.reason).toMatch(/different hub/i);
+    expect(authorized).toEqual([]);
+  });
+
   it('notices a different hub at the same address and refuses to treat it as connected', async () => {
     const client = new HubClient(store, 'Test PC', () => undefined);
     await pairCompanion(client);

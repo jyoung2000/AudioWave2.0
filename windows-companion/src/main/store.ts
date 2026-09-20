@@ -15,6 +15,7 @@ import type { EqPreset, Playlist, Track } from '@now-playing/contracts';
 import type { LibraryFolder } from '../shared/ipc.js';
 
 export type CompanionDb = Database.Database;
+export type SyncedTable = 'playlists' | 'playlist_items' | 'eq_presets' | 'eq_bindings';
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS folders (
@@ -31,7 +32,7 @@ CREATE TABLE IF NOT EXISTS folders (
 
 CREATE TABLE IF NOT EXISTS tracks (
   id TEXT PRIMARY KEY,
-  folder_id TEXT NOT NULL REFERENCES folders(id) ON DELETE CASCADE,
+  folder_id TEXT NOT NULL,
   relative_path TEXT NOT NULL,
   track TEXT NOT NULL,
   size_bytes INTEGER NOT NULL,
@@ -41,9 +42,6 @@ CREATE TABLE IF NOT EXISTS tracks (
   deleted_at TEXT,
   UNIQUE(folder_id, relative_path)
 );
-CREATE INDEX IF NOT EXISTS idx_tracks_folder ON tracks(folder_id);
-CREATE INDEX IF NOT EXISTS idx_tracks_hash ON tracks(content_hash);
-CREATE INDEX IF NOT EXISTS idx_tracks_updated ON tracks(updated_at);
 
 
 CREATE TABLE IF NOT EXISTS playlists (id TEXT PRIMARY KEY, body TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT);
@@ -53,7 +51,58 @@ CREATE TABLE IF NOT EXISTS eq_bindings (id TEXT PRIMARY KEY, body TEXT NOT NULL,
 CREATE TABLE IF NOT EXISTS events (id TEXT PRIMARY KEY, body TEXT NOT NULL, occurred_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS sync_cursors (collection TEXT PRIMARY KEY, cursor TEXT);
+CREATE TABLE IF NOT EXISTS sync_echoes (collection TEXT NOT NULL, id TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (collection, id));
 `;
+
+const TRACKS_INDEXES = `
+CREATE INDEX IF NOT EXISTS idx_tracks_folder ON tracks(folder_id);
+CREATE INDEX IF NOT EXISTS idx_tracks_hash ON tracks(content_hash);
+CREATE INDEX IF NOT EXISTS idx_tracks_updated ON tracks(updated_at);
+`;
+
+/**
+ * Schema migrations, tracked with `PRAGMA user_version`.
+ *
+ * Version 1 drops the `ON DELETE CASCADE` from `tracks.folder_id`. Removing a folder has to leave
+ * its tracks behind as tombstones so a paired hub learns about the removal; a cascade deleted them
+ * instead. SQLite cannot alter a constraint, so the table is rebuilt with its rowids kept (the
+ * search index is keyed on them) and the search index is dropped so it is rebuilt from the rows.
+ */
+function migrate(db: CompanionDb): void {
+  const version = db.pragma('user_version', { simple: true }) as number;
+  if (version < 1) {
+    const tracksSql = db.prepare<[], { sql: string | null }>("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'tracks'").get()?.sql ?? '';
+    if (/REFERENCES\s+folders/i.test(tracksSql)) {
+      // Foreign-key enforcement cannot change inside a transaction, so it is switched around it.
+      db.pragma('foreign_keys = OFF');
+      try {
+        db.transaction(() => {
+          db.exec(`CREATE TABLE tracks_v1 (
+            id TEXT PRIMARY KEY,
+            folder_id TEXT NOT NULL,
+            relative_path TEXT NOT NULL,
+            track TEXT NOT NULL,
+            size_bytes INTEGER NOT NULL,
+            mtime_ms INTEGER NOT NULL,
+            content_hash TEXT,
+            updated_at TEXT NOT NULL,
+            deleted_at TEXT,
+            UNIQUE(folder_id, relative_path)
+          )`);
+          db.exec('INSERT INTO tracks_v1 (rowid, id, folder_id, relative_path, track, size_bytes, mtime_ms, content_hash, updated_at, deleted_at) SELECT rowid, id, folder_id, relative_path, track, size_bytes, mtime_ms, content_hash, updated_at, deleted_at FROM tracks');
+          db.exec('DROP TABLE tracks');
+          db.exec('ALTER TABLE tracks_v1 RENAME TO tracks');
+          db.exec(TRACKS_INDEXES);
+          // Rows removed by the old cascade left index entries behind; rebuilding clears them.
+          db.exec('DROP TABLE IF EXISTS tracks_fts');
+        })();
+      } finally {
+        db.pragma('foreign_keys = ON');
+      }
+    }
+    db.pragma('user_version = 1');
+  }
+}
 
 /**
  * The full-text index over track titles, artists and albums.
@@ -89,6 +138,8 @@ export function openCompanionDb(file: string): CompanionDb {
   db.pragma('busy_timeout = 5000');
   db.pragma('synchronous = NORMAL');
   db.exec(SCHEMA);
+  migrate(db);
+  db.exec(TRACKS_INDEXES);
   ensureSearchIndex(db);
   return db;
 }
@@ -155,8 +206,10 @@ export class CompanionStore {
   }
 
   removeFolder(id: string, now: string): void {
-    // Tracks are tombstoned rather than deleted so the removal reaches a paired hub.
+    // Tracks are tombstoned rather than deleted so the removal reaches a paired hub. The table has no
+    // cascading foreign key (see `migrate`), so deleting the folder row leaves the tombstones intact.
     this.db.transaction(() => {
+      this.db.prepare('DELETE FROM tracks_fts WHERE rowid IN (SELECT rowid FROM tracks WHERE folder_id = ?)').run(id);
       this.db.prepare('UPDATE tracks SET deleted_at = ?, updated_at = ? WHERE folder_id = ? AND deleted_at IS NULL').run(now, now, id);
       this.db.prepare('DELETE FROM folders WHERE id = ?').run(id);
     })();
@@ -164,17 +217,27 @@ export class CompanionStore {
 
   /* ---------------------------------------------------------------- tracks */
 
-  upsertTrack(record: StoredTrack): void {
-    this.db.transaction(() => {
+  /**
+   * Insert or update a track, returning the id it is stored under.
+   *
+   * A file that was tombstoned and then reappears keeps the id its row already has — the id is what
+   * the hub and the search index know it by — so the caller's id is replaced by the persisted one.
+   */
+  upsertTrack(record: StoredTrack): string {
+    return this.db.transaction(() => {
+      const persistedId = this.db.prepare<[string, string], { id: string }>('SELECT id FROM tracks WHERE folder_id = ? AND relative_path = ?').get(record.folderId, record.relativePath)?.id;
+      const id = persistedId ?? record.id;
+      const track = record.track.id === id ? record.track : { ...record.track, id };
       this.db
         .prepare('INSERT INTO tracks (id, folder_id, relative_path, track, size_bytes, mtime_ms, content_hash, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(folder_id, relative_path) DO UPDATE SET track = excluded.track, size_bytes = excluded.size_bytes, mtime_ms = excluded.mtime_ms, content_hash = excluded.content_hash, updated_at = excluded.updated_at, deleted_at = NULL')
-        .run(record.id, record.folderId, record.relativePath, JSON.stringify(record.track), record.sizeBytes, record.mtimeMs, record.contentHash, record.updatedAt, record.deletedAt);
+        .run(id, record.folderId, record.relativePath, JSON.stringify(track), record.sizeBytes, record.mtimeMs, record.contentHash, record.updatedAt, record.deletedAt);
       // Rewrite rather than update: an FTS5 row is replaced by deleting it and inserting again.
-      const rowid = this.db.prepare<[string], { rowid: number }>('SELECT rowid FROM tracks WHERE id = ?').get(record.id)?.rowid;
+      const rowid = this.db.prepare<[string], { rowid: number }>('SELECT rowid FROM tracks WHERE id = ?').get(id)?.rowid;
       if (rowid !== undefined) {
         this.db.prepare('DELETE FROM tracks_fts WHERE rowid = ?').run(rowid);
-        this.db.prepare('INSERT INTO tracks_fts (rowid, title, artist, album) VALUES (?, ?, ?, ?)').run(rowid, record.track.title, record.track.artistName, record.track.albumName ?? '');
+        this.db.prepare('INSERT INTO tracks_fts (rowid, title, artist, album) VALUES (?, ?, ?, ?)').run(rowid, track.title, track.artistName, track.albumName ?? '');
       }
+      return id;
     })();
   }
 
@@ -194,7 +257,10 @@ export class CompanionStore {
   }
 
   tombstone(id: string, now: string): void {
-    this.db.prepare('UPDATE tracks SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now, now, id);
+    this.db.transaction(() => {
+      this.db.prepare('DELETE FROM tracks_fts WHERE rowid IN (SELECT rowid FROM tracks WHERE id = ?)').run(id);
+      this.db.prepare('UPDATE tracks SET deleted_at = ?, updated_at = ? WHERE id = ?').run(now, now, id);
+    })();
   }
 
   searchTracks(options: { query?: string | undefined; limit: number; offset: number }): { items: Track[]; total: number } {
@@ -230,13 +296,37 @@ export class CompanionStore {
     return this.db.prepare<[], { body: string }>('SELECT body FROM eq_presets WHERE deleted_at IS NULL').all().map((r) => JSON.parse(r.body) as EqPreset);
   }
 
-  putSynced(table: 'playlists' | 'playlist_items' | 'eq_presets' | 'eq_bindings', id: string, body: unknown, updatedAt: string, deletedAt: string | null): void {
+  putSynced(table: SyncedTable, id: string, body: unknown, updatedAt: string, deletedAt: string | null): void {
     if (table === 'playlist_items') {
       const item = body as { playlistId: string; position: number };
       this.db.prepare('INSERT INTO playlist_items (id, playlist_id, position, body, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET playlist_id = excluded.playlist_id, position = excluded.position, body = excluded.body, updated_at = excluded.updated_at, deleted_at = excluded.deleted_at').run(id, item.playlistId, item.position, JSON.stringify(body), updatedAt, deletedAt);
       return;
     }
     this.db.prepare(`INSERT INTO ${table} (id, body, updated_at, deleted_at) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET body = excluded.body, updated_at = excluded.updated_at, deleted_at = excluded.deleted_at`).run(id, JSON.stringify(body), updatedAt, deletedAt);
+  }
+
+  /** The stored timestamps of a synced record, or undefined when this computer has never seen it. */
+  syncedState(table: SyncedTable, id: string): { updatedAt: string; deletedAt: string | null } | undefined {
+    const row = this.db.prepare<[string], { updated_at: string; deleted_at: string | null }>(`SELECT updated_at, deleted_at FROM ${table} WHERE id = ?`).get(id);
+    return row ? { updatedAt: row.updated_at, deletedAt: row.deleted_at } : undefined;
+  }
+
+  /**
+   * Record a deletion. A tombstone carries no body, so an existing row keeps its body and only its
+   * timestamps change; a record this computer never had is stored as an empty placeholder, which
+   * keeps its manifest in step with the hub's.
+   */
+  tombstoneSynced(table: SyncedTable, id: string, deletedAt: string): void {
+    if (table === 'playlist_items') {
+      this.db.prepare("INSERT INTO playlist_items (id, playlist_id, position, body, updated_at, deleted_at) VALUES (?, '', 0, '{}', ?, ?) ON CONFLICT(id) DO UPDATE SET updated_at = excluded.updated_at, deleted_at = excluded.deleted_at").run(id, deletedAt, deletedAt);
+      return;
+    }
+    this.db.prepare(`INSERT INTO ${table} (id, body, updated_at, deleted_at) VALUES (?, '{}', ?, ?) ON CONFLICT(id) DO UPDATE SET updated_at = excluded.updated_at, deleted_at = excluded.deleted_at`).run(id, deletedAt, deletedAt);
+  }
+
+  /** Run `fn` in one transaction: all of its writes land, or none do. */
+  transaction<T>(fn: () => T): T {
+    return this.db.transaction(fn)();
   }
 
   /* -------------------------------------------------------------- settings */
@@ -266,7 +356,11 @@ export class CompanionStore {
   }
 
   close(): void {
-    this.db.close();
+    if (this.db.open) this.db.close();
+  }
+
+  get isOpen(): boolean {
+    return this.db.open;
   }
 
   get raw(): CompanionDb {

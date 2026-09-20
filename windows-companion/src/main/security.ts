@@ -7,39 +7,51 @@
  *
  * - **Context isolation and no node integration**: renderer JavaScript cannot reach Node at all.
  * - **A strict CSP with no inline or remote script**: the interface is bundled; nothing else loads.
- * - **Navigation is pinned**: the window cannot be steered to a remote origin.
+ *   It is sent as a header (dev server) and written into `index.html` (packaged `file://` load).
+ * - **Navigation is pinned**: the window may only ever show the bundled `index.html` (or the dev
+ *   server in development) — not another local file, which would inherit the preload bridge.
  * - **New windows are refused**: `window.open` and target=_blank open in the real browser instead,
  *   and only for http(s) links.
+ * - **IPC checks its sender**: a request from any frame other than the app page is refused.
  * - **Permissions are denied by default**: the companion needs no camera, microphone or location,
  *   so a request for one is refused rather than prompting.
  * - **WebView tags are stripped**: they are a second, weaker security boundary and are not used.
  */
 import { app, shell, type BrowserWindow, type Session, type WebContents } from 'electron';
-import { URL } from 'node:url';
+import { URL, pathToFileURL } from 'node:url';
+import { contentSecurityPolicy } from './csp.js';
 
-/** The only origins the window may ever be at: the bundled app, and the dev server in development. */
-export function allowedOrigins(devServerUrl: string | null): string[] {
-  return devServerUrl ? [new URL(devServerUrl).origin, 'file://'] : ['file://'];
+export { contentSecurityPolicy };
+
+/** Decides whether a URL is the app itself. */
+export type AppUrlGuard = (url: string) => boolean;
+
+/**
+ * True only for the app's own page: in development any page of the dev server's origin, otherwise
+ * exactly the bundled `index.html` (a fragment is allowed; nothing else under `file://` is).
+ */
+export function isAllowedAppUrl(url: string, devServerUrl: string | null, indexFile: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  if (devServerUrl) return parsed.origin === new URL(devServerUrl).origin;
+  if (parsed.protocol !== 'file:' || parsed.search) return false;
+  const expected = pathToFileURL(indexFile);
+  const same = (a: string, b: string): boolean => (process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b);
+  return parsed.host === expected.host && same(decodeURIComponent(parsed.pathname), decodeURIComponent(expected.pathname));
 }
 
-export function contentSecurityPolicy(devServerUrl: string | null): string {
-  const connect = ["'self'", 'http://localhost:*', 'http://127.0.0.1:*', 'https:', 'ws://localhost:*', 'ws://127.0.0.1:*', 'wss:'];
-  // The dev server needs its own websocket and inline style for HMR; the packaged app allows neither.
-  const script = devServerUrl ? ["'self'", devServerUrl, "'unsafe-inline'"] : ["'self'"];
-  return [
-    "default-src 'self'",
-    `script-src ${script.join(' ')}`,
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
-    "media-src 'self' blob: http://localhost:* http://127.0.0.1:* https:",
-    `connect-src ${connect.join(' ')}`,
-    "font-src 'self'",
-    "object-src 'none'",
-    "base-uri 'none'",
-    "form-action 'none'",
-    "frame-src 'none'",
-    "worker-src 'self' blob:",
-  ].join('; ');
+export function appUrlGuard(devServerUrl: string | null, indexFile: string): AppUrlGuard {
+  return (url) => isAllowedAppUrl(url, devServerUrl, indexFile);
+}
+
+/** Whether an IPC message came from the app page (and not from some other frame or page). */
+export function isTrustedSender(event: { senderFrame?: { url: string } | null }, isAllowed: AppUrlGuard): boolean {
+  const url = event.senderFrame?.url;
+  return typeof url === 'string' && isAllowed(url);
 }
 
 export function applySessionSecurity(session: Session, devServerUrl: string | null): void {
@@ -63,12 +75,11 @@ export function applySessionSecurity(session: Session, devServerUrl: string | nu
   session.setDevicePermissionHandler(() => false);
 }
 
-export function applyWindowSecurity(window: BrowserWindow, devServerUrl: string | null): void {
-  const origins = allowedOrigins(devServerUrl);
-
+export function applyWindowSecurity(window: BrowserWindow, isAllowed: AppUrlGuard): void {
   window.webContents.on('will-navigate', (event, url) => {
-    if (!origins.some((origin) => url.startsWith(origin))) {
+    if (!isAllowed(url)) {
       event.preventDefault();
+      // openExternally itself refuses anything but http(s).
       void openExternally(url);
     }
   });
@@ -101,11 +112,15 @@ export async function openExternally(url: string): Promise<{ opened: boolean; re
 }
 
 /** Applied to every renderer as it is created, including any this code did not construct. */
-export function guardWebContents(contents: WebContents, devServerUrl: string | null): void {
-  const origins = allowedOrigins(devServerUrl);
+export function guardWebContents(contents: WebContents, isAllowed: AppUrlGuard): void {
   contents.on('will-navigate', (event, url) => {
-    if (!origins.some((origin) => url.startsWith(origin))) event.preventDefault();
+    if (!isAllowed(url)) event.preventDefault();
   });
+  // A server redirect is a navigation too, and does not pass through will-navigate.
+  contents.on('will-redirect', (event, url) => {
+    if (!isAllowed(url)) event.preventDefault();
+  });
+  contents.on('will-attach-webview', (event) => event.preventDefault());
   contents.setWindowOpenHandler(({ url }) => {
     void openExternally(url);
     return { action: 'deny' };

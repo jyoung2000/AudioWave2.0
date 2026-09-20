@@ -40,8 +40,6 @@ module.exports = {
       { target: 'nsis', arch: ['x64', 'arm64'] },
       { target: 'portable', arch: ['x64'] },
     ],
-    // Only set when CI holds a certificate; electron-builder skips signing when these are absent.
-    ...(process.env.NP_WIN_CERT_SUBJECT ? { signtoolOptions: { certificateSubjectName: process.env.NP_WIN_CERT_SUBJECT } } : {}),
     artifactName: '${productName} ${version} ${arch}.${ext}',
   },
   nsis: {

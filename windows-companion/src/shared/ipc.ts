@@ -111,11 +111,25 @@ export const Preferences = z.object({
   minimizeToTray: z.boolean().default(true),
   watchFolders: z.boolean().default(true),
   autoSync: z.boolean().default(false),
-  /** Downloads land here; the person chooses it, and the app never writes outside it. */
-  downloadDirectory: z.string().nullable().default(null),
   theme: z.enum(['system', 'light']).default('system'),
 });
 export type Preferences = z.infer<typeof Preferences>;
+
+/**
+ * A change to some preferences. Written out rather than `Preferences.partial()`: Zod 4 fills in
+ * `.default()` values even inside optional fields, so a partial of `Preferences` would reset every
+ * preference the renderer did not mention. `strict` refuses an unknown key rather than silently
+ * ignoring it, which is what keeps a renderer from introducing a preference the main process never
+ * agreed to — a filesystem path among them.
+ */
+export const PreferencesPatch = z.strictObject({
+  launchAtLogin: z.boolean().optional(),
+  minimizeToTray: z.boolean().optional(),
+  watchFolders: z.boolean().optional(),
+  autoSync: z.boolean().optional(),
+  theme: z.enum(['system', 'light']).optional(),
+});
+export type PreferencesPatch = z.infer<typeof PreferencesPatch>;
 
 /**
  * Every channel, with the shape of its request and its result.
@@ -126,7 +140,7 @@ export type Preferences = z.infer<typeof Preferences>;
 export const IPC = {
   'app:info': { request: z.void(), response: AppInfo },
   'app:preferences:get': { request: z.void(), response: Preferences },
-  'app:preferences:set': { request: Preferences.partial(), response: Preferences },
+  'app:preferences:set': { request: PreferencesPatch, response: Preferences },
   'app:open-external': { request: z.object({ url: z.string().url() }), response: z.object({ opened: z.boolean(), reason: z.string().nullable() }) },
   'app:reveal': { request: z.object({ trackId: z.uuid() }), response: z.object({ ok: z.boolean(), reason: z.string().nullable() }) },
 
@@ -153,8 +167,6 @@ export const IPC = {
   'backup:restore': { request: z.void(), response: z.object({ restored: z.boolean(), reason: z.string().nullable(), summary: BackupSummary.nullable() }) },
   'backup:export-playlists': { request: z.void(), response: z.object({ path: z.string().nullable(), count: z.number().int(), reason: z.string().nullable() }) },
 
-  'downloads:list': { request: z.void(), response: z.object({ items: z.array(z.object({ id: z.string(), title: z.string(), state: z.string(), percent: z.number().nullable(), error: z.string().nullable(), path: z.string().nullable() })) }) },
-  'downloads:choose-directory': { request: z.void(), response: z.object({ path: z.string().nullable() }) },
 } as const satisfies Record<IpcChannel, { request: z.ZodType; response: z.ZodType }>;
 
 export type IpcRequest<C extends IpcChannel> = z.infer<(typeof IPC)[C]['request']>;

@@ -8,15 +8,23 @@
  * has a handler behind it, and that a malformed request is refused at the boundary rather than
  * reaching the filesystem.
  */
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { IPC_CHANNELS } from '../../src/shared/channels.js';
 
 const dataDir = mkdtempSync(join(tmpdir(), 'np-main-'));
 const handlers = new Map<string, (event: unknown, request: unknown) => Promise<unknown>>();
+const appEvents = new Map<string, Array<(...args: unknown[]) => void>>();
+const windowEvents = new Map<string, Array<(event: { preventDefault: () => void }) => void>>();
 const openedExternally: string[] = [];
+/** What the next open-file dialog returns; null means the person cancelled. */
+const dialogPick: { path: string | null } = { path: null };
+
+/** The page the packaged app loads; the main process answers IPC only from this URL. */
+const APP_PAGE = pathToFileURL(fileURLToPath(new URL('../../src/renderer/index.html', import.meta.url))).href;
 
 vi.mock('electron', () => {
   class FakeWindow {
@@ -24,7 +32,8 @@ vi.mock('electron', () => {
     once(_event: string, fn: () => void) {
       fn();
     }
-    on() {
+    on(event: string, fn: (event: { preventDefault: () => void }) => void) {
+      windowEvents.set(event, [...(windowEvents.get(event) ?? []), fn]);
       return this;
     }
     loadURL() {}
@@ -45,15 +54,26 @@ vi.mock('electron', () => {
       getPath: (key: string) => (key === 'userData' ? dataDir : tmpdir()),
       setPath: () => undefined,
       requestSingleInstanceLock: () => true,
-      on: () => undefined,
+      on: (event: string, fn: (...args: unknown[]) => void) => {
+        appEvents.set(event, [...(appEvents.get(event) ?? []), fn]);
+      },
       whenReady: () => Promise.resolve(),
       quit: () => undefined,
       getVersion: () => '0.1.0',
+      setLoginItemSettings: () => undefined,
     },
     BrowserWindow: FakeWindow,
-    dialog: { showOpenDialog: async () => ({ canceled: true, filePaths: [] }), showSaveDialog: async () => ({ canceled: true }) },
+    dialog: {
+      showOpenDialog: async () => (dialogPick.path ? { canceled: false, filePaths: [dialogPick.path] } : { canceled: true, filePaths: [] }),
+      showSaveDialog: async () => ({ canceled: true }),
+    },
     ipcMain: { handle: (channel: string, fn: (event: unknown, request: unknown) => Promise<unknown>) => handlers.set(channel, fn) },
     Menu: { buildFromTemplate: () => ({}) },
+    safeStorage: {
+      isEncryptionAvailable: () => true,
+      encryptString: (text: string) => Buffer.from([...Buffer.from(text, 'utf8')].reverse()),
+      decryptString: (data: Buffer) => Buffer.from([...data].reverse()).toString('utf8'),
+    },
     session: { defaultSession: { webRequest: { onHeadersReceived: () => undefined }, setPermissionRequestHandler: () => undefined, setPermissionCheckHandler: () => undefined, setDevicePermissionHandler: () => undefined } },
     shell: {
       openExternal: async (url: string) => {
@@ -71,10 +91,14 @@ vi.mock('electron', () => {
   };
 });
 
-async function call(channel: string, request: unknown): Promise<unknown> {
+async function call(channel: string, request: unknown, senderUrl: string | null = APP_PAGE): Promise<unknown> {
   const handler = handlers.get(channel);
   if (!handler) throw new Error(`No handler for ${channel}`);
-  return handler({}, request);
+  return handler({ senderFrame: senderUrl === null ? null : { url: senderUrl } }, request);
+}
+
+function emitApp(event: string): void {
+  for (const fn of appEvents.get(event) ?? []) fn({ preventDefault: () => undefined });
 }
 
 beforeAll(async () => {
@@ -84,7 +108,10 @@ beforeAll(async () => {
 });
 
 afterAll(() => {
-  rmSync(dataDir, { recursive: true, force: true });
+  // Quitting closes the database; Windows refuses to delete a file that is still open.
+  emitApp('before-quit');
+  emitApp('will-quit');
+  rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 describe('startup', () => {
@@ -122,6 +149,30 @@ describe('the boundary validates both directions', () => {
   it('accepts a request that does match', async () => {
     await expect(call('library:tracks', { limit: 10, offset: 0 })).resolves.toMatchObject({ items: [], total: 0 });
   });
+
+  it('answers only the app’s own page, not another local file or a missing frame', async () => {
+    await expect(call('app:info', undefined, 'file:///C:/Users/Sam/Downloads/evil.html')).rejects.toThrow(/not this app/);
+    await expect(call('app:info', undefined, 'https://example.com/')).rejects.toThrow(/not this app/);
+    await expect(call('app:info', undefined, null)).rejects.toThrow(/not this app/);
+  });
+});
+
+describe('preferences', () => {
+  it('changes only the preference that was sent', async () => {
+    await call('app:preferences:set', { minimizeToTray: false, theme: 'light' });
+    const next = (await call('app:preferences:set', { autoSync: true })) as Record<string, unknown>;
+    expect(next).toMatchObject({ autoSync: true, minimizeToTray: false, theme: 'light' });
+    expect(await call('app:preferences:get', undefined)).toMatchObject({ autoSync: true, minimizeToTray: false, theme: 'light' });
+    await call('app:preferences:set', { minimizeToTray: true, autoSync: false });
+  });
+
+  it('refuses a preference the main process never agreed to, such as a filesystem path', async () => {
+    // `strict`: an unknown key is rejected, not quietly dropped. That is what stops a renderer from
+    // introducing a preference — a write path among them — the main process does not know about.
+    // The companion does not download anything, so it no longer has a download directory at all.
+    await expect(call('app:preferences:set', { downloadDirectory: 'C:\\Windows\\System32' })).rejects.toThrow();
+    expect(await call('app:preferences:get', undefined)).not.toHaveProperty('downloadDirectory');
+  });
 });
 
 describe('links', () => {
@@ -145,5 +196,58 @@ describe('revealing a file', () => {
     const result = (await call('app:reveal', { trackId: '00000000-0000-7000-8000-000000000000' })) as { ok: boolean; reason: string | null };
     expect(result.ok).toBe(false);
     expect(result.reason).toBeTruthy();
+  });
+});
+
+describe('transfers', () => {
+  it('refuses to cancel a transfer it does not know', async () => {
+    await expect(call('transfers:cancel', { id: 'nope' })).resolves.toEqual({ ok: false });
+  });
+});
+
+describe('backup restore', () => {
+  it('does nothing when the person cancels the file picker', async () => {
+    dialogPick.path = null;
+    await expect(call('backup:restore', undefined)).resolves.toEqual({ restored: false, reason: null, summary: null });
+  });
+
+  const now = new Date().toISOString();
+  const goodPlaylist = { id: '01920000-0000-7000-8000-000000000001', createdAt: now, updatedAt: now, name: 'Road Trip' };
+
+  it('rejects a backup with a malformed playlist and writes nothing, so the playlist list keeps working', async () => {
+    const file = join(dataDir, 'bad-backup.json');
+    writeFileSync(file, JSON.stringify({ schemaVersion: 1, playlists: [goodPlaylist, { id: 'not-a-uuid', name: '' }], presets: [] }));
+    dialogPick.path = file;
+    const result = (await call('backup:restore', undefined)) as { restored: boolean; reason: string | null };
+    expect(result.restored).toBe(false);
+    expect(result.reason).toMatch(/nothing was restored/);
+    // Neither the good nor the bad playlist was written, and the channel still answers.
+    await expect(call('library:playlists', undefined)).resolves.toEqual({ items: [] });
+  });
+
+  it('restores a valid backup', async () => {
+    const file = join(dataDir, 'good-backup.json');
+    writeFileSync(file, JSON.stringify({ schemaVersion: 1, exportedAt: now, playlists: [goodPlaylist], presets: [] }));
+    dialogPick.path = file;
+    const result = (await call('backup:restore', undefined)) as { restored: boolean; reason: string | null };
+    expect(result).toMatchObject({ restored: true, reason: null });
+    const listed = (await call('library:playlists', undefined)) as { items: Array<{ name: string }> };
+    expect(listed.items.map((p) => p.name)).toEqual(['Road Trip']);
+    dialogPick.path = null;
+  });
+});
+
+describe('quitting', () => {
+  it('lets the window close after the database has been closed', () => {
+    const closeHandlers = windowEvents.get('close') ?? [];
+    expect(closeHandlers.length).toBeGreaterThan(0);
+    emitApp('before-quit');
+    emitApp('will-quit');
+    let prevented = false;
+    // Before the fix this read preferences from the closed database and threw.
+    expect(() => {
+      for (const fn of closeHandlers) fn({ preventDefault: () => (prevented = true) });
+    }).not.toThrow();
+    expect(prevented).toBe(false);
   });
 });

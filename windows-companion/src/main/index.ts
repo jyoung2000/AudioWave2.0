@@ -7,27 +7,45 @@
  * on the way out — so a compromised renderer can call only what is listed there, with only the
  * shapes declared there.
  */
-import { app, BrowserWindow, dialog, ipcMain, Menu, session, shell, Tray, nativeImage } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage, session, shell, Tray, nativeImage } from 'electron';
 import { existsSync, mkdirSync } from 'node:fs';
 import { writeFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { CONTRACTS_VERSION, WS_PROTOCOL_VERSION } from '@now-playing/contracts';
+import { z } from 'zod';
+import { CONTRACTS_VERSION, EqPreset, Playlist, WS_PROTOCOL_VERSION } from '@now-playing/contracts';
 import { uuidv7 } from '@now-playing/domain';
-import { IPC, type AppInfo, type IpcChannel, type LibraryFolder, type Preferences, type ScanProgress, type TransferProgress } from '../shared/ipc.js';
+import { BackupSummary, IPC, Preferences, type AppInfo, type IpcChannel, type LibraryFolder, type PreferencesPatch, type ScanProgress, type TransferProgress } from '../shared/ipc.js';
 import { absolutePathOf, scanFolder } from './library.js';
+import { FolderWatcher } from './watcher.js';
 import { HubClient } from './hub.js';
-import { applySessionSecurity, applyWindowSecurity, enforceSingleInstance, guardWebContents, openExternally } from './security.js';
+import { appUrlGuard, applySessionSecurity, applyWindowSecurity, enforceSingleInstance, guardWebContents, isTrustedSender, openExternally } from './security.js';
 import { CompanionStore, openCompanionDb } from './store.js';
 
 const DEV_SERVER_URL = process.env['NP_DEV_SERVER_URL'] ?? null;
+const INDEX_FILE = join(__dirname, '..', 'renderer', 'index.html');
+/** The only page the window may show, and the only page whose IPC requests are answered. */
+const isAppUrl = appUrlGuard(DEV_SERVER_URL, INDEX_FILE);
 const PREFERENCES_KEY = 'preferences';
+const DEFAULT_PREFERENCES: Preferences = Preferences.parse({});
+/** Finished transfers kept for the Transfers screen; older ones are dropped. */
+const MAX_FINISHED_TRANSFERS = 100;
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let store: CompanionStore | null = null;
 let hub: HubClient | null = null;
 let scanning: AbortController | null = null;
+let watcher: FolderWatcher | null = null;
+let isQuitting = false;
 const transfers = new Map<string, TransferProgress>();
+const uploads = new Map<string, AbortController>();
+/** Uploads run one after another: each hashes and reads a whole file. */
+let uploadQueue: Promise<void> = Promise.resolve();
+/**
+ * Preferences are cached in memory. Window close handlers read them while the app quits, and by
+ * then the database may already be closed.
+ */
+let preferencesCache: Preferences | null = null;
 
 /**
  * Where this installation keeps its database, logs and paired-hub credentials.
@@ -51,7 +69,38 @@ function notice(kind: 'info' | 'warning' | 'error', message: string): void {
 }
 
 function preferences(): Preferences {
-  return store!.get<Preferences>(PREFERENCES_KEY, { launchAtLogin: false, minimizeToTray: true, watchFolders: true, autoSync: false, downloadDirectory: null, theme: 'system' });
+  if (preferencesCache) return preferencesCache;
+  if (!store?.isOpen) return DEFAULT_PREFERENCES;
+  const saved = Preferences.safeParse(store.get<unknown>(PREFERENCES_KEY, {}) ?? {});
+  preferencesCache = saved.success ? saved.data : DEFAULT_PREFERENCES;
+  return preferencesCache;
+}
+
+function savePreferences(next: Preferences): Preferences {
+  store!.set(PREFERENCES_KEY, next, new Date().toISOString());
+  preferencesCache = next;
+  syncWatchers();
+  return next;
+}
+
+/**
+ * Point the watchers at whatever is in the library now.
+ *
+ * Called after anything that could change the answer — a folder added or removed, the preference
+ * toggled, the app started. `sync` is idempotent, so calling it when nothing moved costs nothing.
+ */
+function syncWatchers(): void {
+  if (!store?.isOpen) return;
+  watcher ??= new FolderWatcher({
+    // The same incremental scan the Scan button runs: unchanged files are skipped by size and
+    // mtime, so a folder that gained one track does not re-read the other eighty thousand.
+    onChanged: (folderId) => startScan(folderId),
+    onError: (folderId, error) => console.error(`Watching folder ${folderId} failed:`, error.message),
+  });
+  watcher.sync(
+    store.listFolders(() => true).map((folder) => ({ id: folder.id, path: folder.path, watch: folder.watch })),
+    preferences().watchFolders,
+  );
 }
 
 /** Spread rather than assigned, so a missing icon file simply leaves the option out. */
@@ -83,11 +132,11 @@ function createWindow(): BrowserWindow {
     },
   });
 
-  applyWindowSecurity(window, DEV_SERVER_URL);
+  applyWindowSecurity(window, isAppUrl);
   window.once('ready-to-show', () => window.show());
   window.on('close', (event) => {
     // Closing hides to the tray when the person asked for that, so a scan or transfer survives.
-    if (preferences().minimizeToTray && !isQuitting) {
+    if (!isQuitting && preferences().minimizeToTray) {
       event.preventDefault();
       window.hide();
     }
@@ -97,12 +146,10 @@ function createWindow(): BrowserWindow {
   });
 
   if (DEV_SERVER_URL) void window.loadURL(DEV_SERVER_URL);
-  else void window.loadFile(join(__dirname, '..', 'renderer', 'index.html'));
+  else void window.loadFile(INDEX_FILE);
 
   return window;
 }
-
-let isQuitting = false;
 
 /**
  * Resolve a file in `resources/`, which sits two levels above the bundled main process in both
@@ -139,6 +186,7 @@ function createTray(): void {
 }
 
 function showWindow(): void {
+  if (isQuitting || !store) return;
   mainWindow ??= createWindow();
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
@@ -152,46 +200,102 @@ async function startScan(folderId?: string): Promise<{ started: boolean; reason:
   const folders = folderId ? [store!.findFolder(folderId)].filter(Boolean) : store!.raw.prepare<[], { id: string; path: string }>('SELECT id, path FROM folders').all();
   if (!folders.length) return { started: false, reason: 'No folders have been added yet.' };
 
-  scanning = new AbortController();
-  const signal = scanning.signal;
+  const controller = new AbortController();
+  scanning = controller;
+  const signal = controller.signal;
   void (async () => {
-    for (const folder of folders as Array<{ id: string; path: string }>) {
-      if (signal.aborted) break;
-      if (!existsSync(folder.path)) {
-        // A disconnected drive is reported rather than silently emptying the library.
-        store!.updateFolderStats(folder.id, { trackCount: store!.countTracks(folder.id), sizeBytes: 0, lastScanAt: new Date().toISOString(), error: 'This folder is not available right now. If it is on a removable or network drive, reconnect it.' });
-        send<ScanProgress>('event:scan-progress', { folderId: folder.id, found: 0, indexed: 0, skipped: 0, currentName: null, done: true, error: 'Folder unavailable' });
-        continue;
+    try {
+      for (const folder of folders as Array<{ id: string; path: string }>) {
+        if (signal.aborted || !store?.isOpen) break;
+        if (!existsSync(folder.path)) {
+          // A disconnected drive is reported rather than silently emptying the library.
+          store.updateFolderStats(folder.id, { trackCount: store.countTracks(folder.id), sizeBytes: 0, lastScanAt: new Date().toISOString(), error: 'This folder is not available right now. If it is on a removable or network drive, reconnect it.' });
+          send<ScanProgress>('event:scan-progress', { folderId: folder.id, found: 0, indexed: 0, skipped: 0, currentName: null, done: true, error: 'Folder unavailable' });
+          continue;
+        }
+        try {
+          const result = await scanFolder(store, folder, {
+            signal,
+            onProgress: (progress) => send<ScanProgress>('event:scan-progress', { folderId: folder.id, ...progress, done: false, error: null }),
+          });
+          send<ScanProgress>('event:scan-progress', { folderId: folder.id, found: result.added + result.updated + result.skipped, indexed: result.added + result.updated, skipped: result.skipped, currentName: null, done: true, error: null });
+          if (result.unreadable.length) notice('warning', `${result.unreadable.length} file${result.unreadable.length === 1 ? '' : 's'} could not be read in ${folder.path}.`);
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : String(err);
+          send<ScanProgress>('event:scan-progress', { folderId: folder.id, found: 0, indexed: 0, skipped: 0, currentName: null, done: true, error: reason });
+          if (store?.isOpen) store.updateFolderStats(folder.id, { trackCount: store.countTracks(folder.id), sizeBytes: 0, lastScanAt: new Date().toISOString(), error: reason });
+        }
       }
-      try {
-        const result = await scanFolder(store!, folder, {
-          signal,
-          onProgress: (progress) => send<ScanProgress>('event:scan-progress', { folderId: folder.id, ...progress, done: false, error: null }),
-        });
-        send<ScanProgress>('event:scan-progress', { folderId: folder.id, found: result.added + result.updated + result.skipped, indexed: result.added + result.updated, skipped: result.skipped, currentName: null, done: true, error: null });
-        if (result.unreadable.length) notice('warning', `${result.unreadable.length} file${result.unreadable.length === 1 ? '' : 's'} could not be read in ${folder.path}.`);
-      } catch (err) {
-        const reason = err instanceof Error ? err.message : String(err);
-        store!.updateFolderStats(folder.id, { trackCount: store!.countTracks(folder.id), sizeBytes: 0, lastScanAt: new Date().toISOString(), error: reason });
-        send<ScanProgress>('event:scan-progress', { folderId: folder.id, found: 0, indexed: 0, skipped: 0, currentName: null, done: true, error: reason });
-      }
+    } finally {
+      // Whatever happened, a finished scan must not block the next one.
+      if (scanning === controller) scanning = null;
     }
-    scanning = null;
-  })();
+  })().catch((err: unknown) => console.error('Library scan stopped:', err));
   return { started: true, reason: null };
 }
+
+/* --------------------------------------------------------------- transfers */
+
+function putTransfer(progress: TransferProgress): void {
+  transfers.set(progress.id, progress);
+  send('event:transfer-progress', progress);
+}
+
+/** Keep every active transfer and only the most recent finished ones. */
+function pruneTransfers(): void {
+  const finished = [...transfers.values()].filter((t) => t.state === 'completed' || t.state === 'failed' || t.state === 'cancelled');
+  for (const t of finished.slice(0, Math.max(0, finished.length - MAX_FINISHED_TRANSFERS))) transfers.delete(t.id);
+}
+
+async function runUpload(id: string, trackId: string): Promise<void> {
+  const queued = transfers.get(id);
+  if (!queued || queued.state !== 'queued' || isQuitting) return; // Cancelled while waiting.
+  const controller = new AbortController();
+  uploads.set(id, controller);
+  putTransfer({ ...queued, state: 'running' });
+  const result = await hub!
+    .uploadTrack(
+      trackId,
+      (bytesDone, bytesTotal) => {
+        const current = transfers.get(id);
+        if (current?.state === 'running') putTransfer({ ...current, bytesDone, bytesTotal });
+      },
+      controller.signal,
+    )
+    .catch((err: unknown) => ({ ok: false, reason: err instanceof Error ? err.message : String(err) }));
+  uploads.delete(id);
+  const current = transfers.get(id);
+  // A cancelled transfer stays cancelled, whatever the upload reported afterwards.
+  if (!current || current.state !== 'running') return;
+  putTransfer({ ...current, state: result.ok ? 'completed' : 'failed', error: result.reason });
+  pruneTransfers();
+}
+
+/* ------------------------------------------------------------------ backup */
+
+const BackupFile = z.object({
+  schemaVersion: z.literal(1),
+  exportedAt: z.iso.datetime({ offset: true }).optional(),
+  playlists: z.array(Playlist).max(100_000).default([]),
+  presets: z.array(EqPreset).max(10_000).default([]),
+  counts: BackupSummary.shape.contents.optional(),
+});
 
 /* ------------------------------------------------------------ IPC handlers */
 
 /**
  * Register a channel with validation on both sides.
  *
+ * The sender is checked first: only the app's own page may call a channel, so a frame or page that
+ * somehow ended up in the window gets nothing.
+ *
  * Validating the *response* as well as the request is not paranoia about our own code: it is how a
  * shape change in the contract shows up as a clear error during development rather than as a
  * renderer quietly rendering `undefined`.
  */
 function handle<C extends IpcChannel>(channel: C, handler: (request: unknown) => Promise<unknown> | unknown): void {
-  ipcMain.handle(channel, async (_event, raw: unknown) => {
+  ipcMain.handle(channel, async (event, raw: unknown) => {
+    if (!isTrustedSender(event, isAppUrl)) throw new Error(`${channel}: refused a request from a page that is not this app`);
     const parsedRequest = IPC[channel].request.safeParse(raw ?? undefined);
     if (!parsedRequest.success) throw new Error(`${channel}: ${parsedRequest.error.issues.map((i) => `${i.path.join('.')} ${i.message}`).join('; ')}`);
     const result = await handler(parsedRequest.data);
@@ -211,15 +315,22 @@ function registerHandlers(): void {
     contractsVersion: CONTRACTS_VERSION,
     protocolVersion: WS_PROTOCOL_VERSION,
     dataDir: dataDir(),
-    // True only when CI signed the build; an unsigned build says so rather than implying otherwise.
-    signed: process.env['NP_SIGNED'] === '1',
+    // Baked in by `scripts/build.mjs`, not read from the environment the app happens to start in:
+    // an unsigned build says so rather than repeating back whatever a variable claims.
+    signed: typeof __NP_SIGNED__ === 'boolean' ? __NP_SIGNED__ : false,
     updateFeedUrl: process.env['NP_UPDATE_FEED'] ?? null,
   }));
 
   handle('app:preferences:get', () => preferences());
   handle('app:preferences:set', (request) => {
-    const next = { ...preferences(), ...(request as Partial<Preferences>) };
-    store!.set(PREFERENCES_KEY, next, new Date().toISOString());
+    const patch = request as PreferencesPatch;
+    const next: Preferences = { ...preferences() };
+    if (patch.launchAtLogin !== undefined) next.launchAtLogin = patch.launchAtLogin;
+    if (patch.minimizeToTray !== undefined) next.minimizeToTray = patch.minimizeToTray;
+    if (patch.watchFolders !== undefined) next.watchFolders = patch.watchFolders;
+    if (patch.autoSync !== undefined) next.autoSync = patch.autoSync;
+    if (patch.theme !== undefined) next.theme = patch.theme;
+    savePreferences(next);
     app.setLoginItemSettings({ openAtLogin: next.launchAtLogin });
     return next;
   });
@@ -243,20 +354,23 @@ function registerHandlers(): void {
     const folder = { id: uuidv7(), path, displayName: path.split(/[\\/]/).filter(Boolean).pop() ?? path, now: new Date().toISOString() };
     store!.addFolder(folder);
     void startScan(folder.id);
+    syncWatchers();
     const added: LibraryFolder = { id: folder.id, path, displayName: folder.displayName, watch: true, trackCount: 0, sizeBytes: 0, lastScanAt: null, lastScanError: null, available: true };
     return { folder: added, reason: null };
   });
 
   handle('library:remove-folder', (request) => {
     store!.removeFolder((request as { folderId: string }).folderId, new Date().toISOString());
+    syncWatchers();
     return { ok: true };
   });
 
   handle('library:scan', (request) => startScan((request as { folderId?: string }).folderId));
 
   handle('library:tracks', (request) => store!.searchTracks(request as { query?: string; limit: number; offset: number }));
-  handle('library:playlists', () => ({ items: store!.listPlaylists() }));
-  handle('library:presets', () => ({ items: store!.listPresets() }));
+  // A stored record that no longer fits the contract is left out rather than breaking the list.
+  handle('library:playlists', () => ({ items: store!.listPlaylists().filter((p) => Playlist.safeParse(p).success) }));
+  handle('library:presets', () => ({ items: store!.listPresets().filter((p) => EqPreset.safeParse(p).success) }));
 
   handle('hub:status', () => hub!.getStatus());
   handle('hub:pair-start', (request) => hub!.startPairing((request as { endpoint: string }).endpoint, (request as { code: string }).code));
@@ -285,33 +399,24 @@ function registerHandlers(): void {
     let queued = 0;
     for (const trackId of ids) {
       const record = store!.findTrack(trackId);
-      if (!record) continue;
+      if (!record || record.deletedAt) continue;
       const id = uuidv7();
-      const progress: TransferProgress = { id, kind: 'upload', trackTitle: record.track.title, bytesDone: 0, bytesTotal: record.sizeBytes, state: 'running', error: null };
-      transfers.set(id, progress);
-      send('event:transfer-progress', progress);
+      putTransfer({ id, kind: 'upload', trackTitle: record.track.title, bytesDone: 0, bytesTotal: record.sizeBytes, state: 'queued', error: null });
       queued += 1;
-      void hub!
-        .uploadTrack(trackId, (bytesDone, bytesTotal) => {
-          const updated = { ...transfers.get(id)!, bytesDone, bytesTotal };
-          transfers.set(id, updated);
-          send('event:transfer-progress', updated);
-        })
-        .then((result) => {
-          const final: TransferProgress = { ...transfers.get(id)!, state: result.ok ? 'completed' : 'failed', error: result.reason };
-          transfers.set(id, final);
-          send('event:transfer-progress', final);
-        });
+      uploadQueue = uploadQueue.then(() => runUpload(id, trackId)).catch((err: unknown) => console.error('Upload failed:', err));
     }
+    pruneTransfers();
     return { queued, reason: queued ? null : 'None of those tracks are on this computer any more.' };
   });
 
   handle('transfers:cancel', (request) => {
     const id = (request as { id: string }).id;
     const existing = transfers.get(id);
-    if (!existing) return { ok: false };
-    transfers.set(id, { ...existing, state: 'cancelled' });
-    send('event:transfer-progress', transfers.get(id)!);
+    if (!existing || (existing.state !== 'queued' && existing.state !== 'running')) return { ok: false };
+    // Stops the upload itself, not just the row on screen.
+    uploads.get(id)?.abort();
+    putTransfer({ ...existing, state: 'cancelled', error: null });
+    pruneTransfers();
     return { ok: true };
   });
 
@@ -338,14 +443,34 @@ function registerHandlers(): void {
     const result = await dialog.showOpenDialog(mainWindow!, { title: 'Choose a backup', properties: ['openFile'], filters: [{ name: 'JSON', extensions: ['json'] }] });
     if (result.canceled || !result.filePaths[0]) return { restored: false, reason: null, summary: null };
     try {
-      const payload = JSON.parse(await readFile(result.filePaths[0], 'utf8')) as { schemaVersion?: number; playlists?: unknown[]; presets?: unknown[]; exportedAt?: string; counts?: { tracks: number; playlists: number; presets: number; events: number } };
-      if (payload.schemaVersion !== 1) return { restored: false, reason: `That backup is version ${payload.schemaVersion ?? 'unknown'}; this app reads version 1.`, summary: null };
+      const text = await readFile(result.filePaths[0], 'utf8');
+      const raw = JSON.parse(text) as { schemaVersion?: unknown } | null;
+      if (raw?.schemaVersion !== 1) return { restored: false, reason: `That backup is version ${String(raw?.schemaVersion ?? 'unknown')}; this app reads version 1.`, summary: null };
+      // Everything is checked before anything is written: a backup is restored whole or not at all.
+      const parsed = BackupFile.safeParse(raw);
+      if (!parsed.success) {
+        const issues = parsed.error.issues.slice(0, 3).map((i) => `${i.path.join('.') || 'file'}: ${i.message}`);
+        return { restored: false, reason: `That backup is damaged or incomplete, so nothing was restored (${issues.join('; ')}).`, summary: null };
+      }
+      const payload = parsed.data;
       const now = new Date().toISOString();
-      for (const playlist of (payload.playlists ?? []) as Array<{ id: string; updatedAt?: string }>) store!.putSynced('playlists', playlist.id, playlist, playlist.updatedAt ?? now, null);
-      for (const preset of (payload.presets ?? []) as Array<{ id: string; updatedAt?: string }>) store!.putSynced('eq_presets', preset.id, preset, preset.updatedAt ?? now, null);
+      store!.transaction(() => {
+        // A restored record is stamped now so it syncs as a change, unless this computer already
+        // has the same or a newer version of it.
+        for (const playlist of payload.playlists) {
+          const local = store!.syncedState('playlists', playlist.id);
+          if (local && !local.deletedAt && Date.parse(local.updatedAt) >= Date.parse(playlist.updatedAt)) continue;
+          store!.putSynced('playlists', playlist.id, { ...playlist, updatedAt: now, deletedAt: null }, now, null);
+        }
+        for (const preset of payload.presets) {
+          const local = store!.syncedState('eq_presets', preset.id);
+          if (local && !local.deletedAt && Date.parse(local.updatedAt) >= Date.parse(preset.updatedAt)) continue;
+          store!.putSynced('eq_presets', preset.id, { ...preset, updatedAt: now, deletedAt: null }, now, null);
+        }
+      });
       // Folders are not restored: they name paths that may not exist on this machine.
       notice('info', 'Playlists and presets were restored. Music folders are not restored from a backup — add them again, since their locations are specific to each computer.');
-      return { restored: true, reason: null, summary: { path: result.filePaths[0], createdAt: payload.exportedAt ?? now, sizeBytes: 0, contents: payload.counts ?? store!.counts() } };
+      return { restored: true, reason: null, summary: { path: result.filePaths[0], createdAt: payload.exportedAt ?? now, sizeBytes: Buffer.byteLength(text), contents: payload.counts ?? store!.counts() } };
     } catch (err) {
       return { restored: false, reason: `That file could not be read as a backup: ${err instanceof Error ? err.message : String(err)}`, summary: null };
     }
@@ -360,53 +485,61 @@ function registerHandlers(): void {
     return { path: result.filePath, count: playlists.length, reason: null };
   });
 
-  handle('downloads:list', () => ({ items: [] }));
-
-  handle('downloads:choose-directory', async () => {
-    const result = await dialog.showOpenDialog(mainWindow!, { title: 'Where should downloads be saved?', properties: ['openDirectory', 'createDirectory'] });
-    if (result.canceled || !result.filePaths[0]) return { path: null };
-    const path = result.filePaths[0];
-    store!.set(PREFERENCES_KEY, { ...preferences(), downloadDirectory: path }, new Date().toISOString());
-    return { path };
-  });
 }
 
 /* ------------------------------------------------------------------ startup */
 
-if (!enforceSingleInstance(() => showWindow())) {
+// Redirect Electron's own caches and state alongside the database, so a portable build really is
+// self-contained rather than leaving a cache folder behind in the profile. This comes before the
+// single-instance lock, which is keyed on the userData directory.
+{
+  const dir = dataDir();
+  mkdirSync(dir, { recursive: true });
+  app.setPath('userData', dir);
+  app.setPath('sessionData', dir);
+}
+
+// A second launch may arrive before this one is ready; the window is shown once it is.
+if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow()))) {
   app.quit();
 } else {
-  app.on('web-contents-created', (_event, contents) => guardWebContents(contents, DEV_SERVER_URL));
-
-  // Redirect Electron's own caches and state alongside the database, so a portable build really is
-  // self-contained rather than leaving a cache folder behind in the profile.
-  {
-    const dir = dataDir();
-    mkdirSync(dir, { recursive: true });
-    app.setPath('userData', dir);
-    app.setPath('sessionData', dir);
-  }
+  app.on('web-contents-created', (_event, contents) => guardWebContents(contents, isAppUrl));
 
   void app.whenReady().then(() => {
     store = new CompanionStore(openCompanionDb(join(dataDir(), 'companion.sqlite')));
-    hub = new HubClient(store, `${process.env['COMPUTERNAME'] ?? 'Windows'} companion`, (status) => send('event:hub-status', status));
+    hub = new HubClient(store, `${process.env['COMPUTERNAME'] ?? 'Windows'} companion`, (status) => send('event:hub-status', status), {
+      secretBox: safeStorage,
+      appVersion: app.getVersion(),
+      onNotice: (message) => notice('warning', message),
+    });
     applySessionSecurity(session.defaultSession, DEV_SERVER_URL);
     registerHandlers();
     mainWindow = createWindow();
     createTray();
     void hub.refresh();
     if (preferences().autoSync) void hub.sync();
+    // Folders added in an earlier session are watched again from start-up, not from the first
+    // time something touches the preferences.
+    syncWatchers();
   });
 
   app.on('window-all-closed', () => {
     // Windows convention: closing the last window quits, unless the tray is holding the app open.
-    if (!preferences().minimizeToTray) app.quit();
+    if (isQuitting || !preferences().minimizeToTray) app.quit();
   });
 
   app.on('before-quit', () => {
     isQuitting = true;
     scanning?.abort();
-    store?.close();
+    for (const upload of uploads.values()) upload.abort();
     tray?.destroy();
+    tray = null;
+  });
+
+  // The database closes last: windows are closed (and their close handlers have run) by now.
+  app.on('will-quit', () => {
+    void watcher?.close();
+    watcher = null;
+    store?.close();
   });
 }

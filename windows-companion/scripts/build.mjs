@@ -38,7 +38,19 @@ const common = {
   sourcemap: true,
   minify: false,
   external,
-  define: { 'process.env.NP_VERSION': JSON.stringify(pkg.version) },
+  define: {
+    'process.env.NP_VERSION': JSON.stringify(pkg.version),
+    /*
+     * Whether *this* build was signed, decided here and baked in.
+     *
+     * It used to be `process.env.NP_SIGNED === '1'` read at runtime, on the user's machine, where
+     * the variable is whatever their environment happens to hold — so an unsigned build could claim
+     * to be signed simply because someone had exported it, and a signed one could deny it. The only
+     * place that knows the answer is the build, and the CI release job is what sets
+     * `NP_RELEASE_SIGNED`.
+     */
+    __NP_SIGNED__: JSON.stringify(process.env.NP_RELEASE_SIGNED === '1' || process.env.NP_RELEASE_SIGNED === 'true'),
+  },
   logLevel: 'info',
 };
 

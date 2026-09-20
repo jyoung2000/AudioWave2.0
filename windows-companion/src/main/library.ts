@@ -204,7 +204,10 @@ export async function scanFolder(store: CompanionStore, folder: { id: string; pa
     }
 
     try {
-      const track = await readTrack(file.absolutePath, file.relativePath, folder.id, previous?.id);
+      // A file that was deleted and has come back keeps its tombstoned row's id, so it is the same
+      // track to the hub and to the search index rather than a new one under a new id.
+      const knownId = previous?.id ?? store.findTrackByPath(folder.id, file.relativePath)?.id;
+      const track = await readTrack(file.absolutePath, file.relativePath, folder.id, knownId);
       const record: StoredTrack = {
         id: track.id,
         folderId: folder.id,

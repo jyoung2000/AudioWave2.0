@@ -94,7 +94,24 @@ describe('search', () => {
     expect(store.searchTracks({ query: 'Deleted', limit: 10, offset: 0 }).items).toHaveLength(0);
     expect(store.searchTracks({ limit: 100, offset: 0 }).items.some((t) => t.title === 'Deleted Song')).toBe(false);
     // The row itself survives, which is what a paired hub reads to learn about the deletion.
-    expect(store.findTrack(record.id)?.deletedAt).not.toBeNull();
+    const stored = store.findTrack(record.id);
+    expect(stored).toBeDefined();
+    expect(stored?.deletedAt).toEqual(expect.any(String));
+  });
+
+  it('keeps a reappearing file under the id it already had, so it stays findable', () => {
+    const original = store1(track({ title: 'Comeback', artistName: 'Returner' }), 'f.flac');
+    store.tombstone(original.id, new Date().toISOString());
+
+    // A rescan that no longer knows the old id offers a fresh one; the stored id wins.
+    const again = track({ title: 'Comeback', artistName: 'Returner' });
+    const storedId = store.upsertTrack({ id: again.id, folderId: 'folder-1', relativePath: 'f.flac', track: again, sizeBytes: 1000, mtimeMs: 2, contentHash: null, updatedAt: again.updatedAt, deletedAt: null });
+
+    expect(storedId).toBe(original.id);
+    const found = store.searchTracks({ query: 'Comeback', limit: 10, offset: 0 }).items;
+    expect(found.map((t) => t.id)).toEqual([original.id]);
+    expect(store.findTrack(original.id)?.deletedAt).toBeNull();
+    expect(store.findTrack(again.id)).toBeUndefined();
   });
 
   it('reports a total that is independent of the page size', () => {
@@ -110,12 +127,52 @@ describe('folders', () => {
     store.removeFolder('folder-1', new Date().toISOString());
 
     expect(store.findFolder('folder-1')).toBeUndefined();
-    expect(store.findTrack(record.id)?.deletedAt).not.toBeNull();
+    // The track must still exist — a cascade that deleted it would never reach a paired hub.
+    const stored = store.findTrack(record.id);
+    expect(stored).toBeDefined();
+    expect(stored?.deletedAt).toEqual(expect.any(String));
+    expect(stored?.updatedAt).toBe(stored?.deletedAt);
+    // And the search index no longer holds it.
+    const orphans = store.raw.prepare<[], { n: number }>('SELECT COUNT(*) AS n FROM tracks_fts').get()?.n;
+    expect(orphans).toBe(0);
   });
 
   it('reports availability through the caller’s own check, not a cached flag', () => {
     expect(store.listFolders(() => false)[0]?.available).toBe(false);
     expect(store.listFolders(() => true)[0]?.available).toBe(true);
+  });
+});
+
+describe('migrating a database written by an earlier build', () => {
+  it('drops the cascading delete, keeps every track and its search entry, and then tombstones on folder removal', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'np-store-migrate-'));
+    const file = join(dir, 'companion.sqlite');
+    try {
+      // The layout an earlier build wrote: tracks were cascade-deleted with their folder.
+      const legacy = new Database(file);
+      legacy.exec(`CREATE TABLE folders (id TEXT PRIMARY KEY, path TEXT NOT NULL UNIQUE, display_name TEXT NOT NULL, watch INTEGER NOT NULL DEFAULT 1, track_count INTEGER NOT NULL DEFAULT 0, size_bytes INTEGER NOT NULL DEFAULT 0, last_scan_at TEXT, last_scan_error TEXT, created_at TEXT NOT NULL);
+        CREATE TABLE tracks (id TEXT PRIMARY KEY, folder_id TEXT NOT NULL REFERENCES folders(id) ON DELETE CASCADE, relative_path TEXT NOT NULL, track TEXT NOT NULL, size_bytes INTEGER NOT NULL, mtime_ms INTEGER NOT NULL, content_hash TEXT, updated_at TEXT NOT NULL, deleted_at TEXT, UNIQUE(folder_id, relative_path));`);
+      const now = new Date().toISOString();
+      legacy.prepare('INSERT INTO folders (id, path, display_name, created_at) VALUES (?, ?, ?, ?)').run('f', '/m', 'M', now);
+      const t = track({ title: 'Survivor', artistName: 'Legacy' });
+      legacy.prepare('INSERT INTO tracks (id, folder_id, relative_path, track, size_bytes, mtime_ms, content_hash, updated_at, deleted_at) VALUES (?, ?, ?, ?, 1, 1, NULL, ?, NULL)').run(t.id, 'f', 'x.flac', JSON.stringify(t), now);
+      legacy.close();
+
+      const upgraded = new CompanionStore(openCompanionDb(file));
+      try {
+        expect(upgraded.raw.pragma('user_version', { simple: true })).toBe(1);
+        const sql = upgraded.raw.prepare<[], { sql: string }>("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'tracks'").get()?.sql;
+        expect(sql).not.toMatch(/CASCADE/i);
+        expect(upgraded.searchTracks({ query: 'Survivor', limit: 10, offset: 0 }).items).toHaveLength(1);
+
+        upgraded.removeFolder('f', new Date().toISOString());
+        expect(upgraded.findTrack(t.id)?.deletedAt).toEqual(expect.any(String));
+      } finally {
+        upgraded.close();
+      }
+    } finally {
+      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    }
   });
 });
 
