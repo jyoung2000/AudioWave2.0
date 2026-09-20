@@ -1,5 +1,6 @@
 /**
- * Original time-domain pitch shifter: a sweeping delay line with a crossfade at wrap (MIT, ADR-0003).
+ * Original time-domain pitch shifter: two sweeping delay taps, windowed so their sum is unity
+ * (MIT, ADR-0003).
  *
  * Design
  * ------
@@ -9,29 +10,45 @@
  * slower lowers it. That is the Doppler principle, and inside a sweep the pitch is *exactly*
  * `ratio` — no approximation. Read positions are fractional and linearly interpolated.
  *
- * The tap eventually reaches one end of the window, so it is reset to the middle and the old and
- * new taps are equal-power crossfaded over `fadeSamples`. Only the crossfade is imperfect, and it
- * is rare for the small ratios retune uses: at a semitone (ratio 1.0595) the tap takes roughly
- * 0.7 s to cross a 2048-sample window at 48 kHz, so ~5 ms in ~700 ms is faded. Large shifts wrap
- * far more often and audibly rougher, which the UI states plainly.
+ * A single tap cannot sweep for ever: it reaches the end of the window and has to jump back, and
+ * that jump is a splice into an unrelated moment of the recording — a click. So there are two taps,
+ * held exactly half a window apart, and each is weighted by a raised cosine over the full window:
  *
- * This is deliberately *not* overlap-add granular shifting. Two permanently overlapping grains
- * drift apart by `(1 − ratio) · hop` and the phase sweep across the crossfade cancels most of the
- * intended shift — measurably so near ratio 1, exactly where retune lives. A single sweeping tap
- * has no such cancellation.
+ *     g(d) = ½ − ½·cos(2π·d / window)
+ *
+ * which is 0 at `d = 0`, 1 at `d = window/2`, and 0 again at `d = window`. Because the taps are half
+ * a window apart their arguments differ by π, so `g(dA) + g(dB) = 1` at every sample — the gains sum
+ * to unity exactly, with no equal-power approximation and no gain dip. The decisive property is that
+ * each tap's gain reaches zero precisely where that tap wraps, so the discontinuity is multiplied by
+ * nothing. Neither tap is ever spliced in at an audible amplitude.
+ *
+ * The wrap period is `window / (|1 − ratio| · sampleRate)` seconds — about 0.72 s at a semitone
+ * (ratio 1.0595) with the default 2048-sample window at 48 kHz, and about 0.17 s at ratio 1.25. That
+ * is how often each tap crosses the window, not how often something audible happens: what is audible
+ * is the slow comb between two taps half a window apart, heard as a gentle warble on sustained
+ * tones, strongest at large ratios. That is the honest cost of this method.
+ *
+ * This is deliberately *not* overlap-add granular shifting with a fixed hop. Grains that are not
+ * locked to the sweep drift apart by `(1 − ratio) · hop`, and the phase difference across their
+ * crossfade cancels part of the intended shift. Here the two taps are locked half a window apart and
+ * sweep together, so they carry the same shifted frequency and only their relative phase varies.
  *
  * `bypass` (or a ratio of exactly 1) routes the input straight to the output, bit-exact. Moving
- * between the dry and processed paths crossfades over `fadeSamples` so the ≈ half-window time
- * offset between them does not click; in steady state the dry path is a pure copy.
+ * between the dry and processed paths crossfades over `fadeSamples` so the time offset between them
+ * does not click; in steady state the dry path is a pure copy.
  *
- * Latency: the tap is re-centred at half the window, so the mean added latency of the processed
- * path is `windowSize / 2` (≈ 21 ms at 48 kHz with the default 2048-sample window); the
- * instantaneous delay ranges across the window. The dry path adds none.
+ * Latency: the weighted mean delay of the processed path stays near `windowSize / 2` (≈ 21 ms at
+ * 48 kHz with the default 2048-sample window), swinging by roughly ±5 % of the window as the taps
+ * sweep; the instantaneous delay of either tap ranges across the whole window. The dry path adds
+ * none.
  *
- * Quality limits, stated plainly in the UI: each wrap splices two unrelated moments of the
- * recording, so sustained tones show a brief warble there and transients can be doubled or
- * clipped; linear interpolation attenuates the top octave slightly at fractional read positions.
- * Good for retuning a reference pitch by tens of cents; not a studio time-stretcher.
+ * Quality limits, stated plainly in the UI: two taps reading different moments of the recording comb
+ * against each other, so sustained tones warble and transients can be doubled; linear interpolation
+ * attenuates the top octave slightly at fractional read positions. Good for retuning a reference
+ * pitch by tens of cents; not a studio time-stretcher.
+ *
+ * `scripts/measure-clicks.ts` prints the discontinuity measurement this design is judged by, and
+ * `tests/unit/pitch-shifter.test.ts` pins it.
  */
 
 export const PITCH_SHIFTER_PROCESSOR_NAME = 'np-pitch-shifter';
@@ -41,17 +58,22 @@ export const MAX_RATIO = 2;
 export const MIN_GRAIN_SIZE = 64;
 
 export interface PitchShifterParameterDescriptor {
-  name: 'ratio' | 'bypass';
+  name: 'ratio';
   defaultValue: number;
   minValue: number;
   maxValue: number;
   automationRate: 'k-rate';
 }
 
-/** Shared with the AudioWorkletProcessor wrapper and the mock so all three agree. */
+/**
+ * Shared with the AudioWorkletProcessor wrapper and the mock so all three agree.
+ *
+ * Ratio only. Bypass is a discrete switch rather than a ramped signal, so it travels over the
+ * processor's port; declaring it here as well would let the graph write to a parameter the
+ * processor does not read, which is a silent no-op and was one.
+ */
 export const PITCH_SHIFTER_PARAMETER_DESCRIPTORS: readonly PitchShifterParameterDescriptor[] = [
   { name: 'ratio', defaultValue: 1, minValue: MIN_RATIO, maxValue: MAX_RATIO, automationRate: 'k-rate' },
-  { name: 'bypass', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
 ];
 
 /**
@@ -81,7 +103,11 @@ export function sanitizeRatio(ratio: number): number {
 }
 
 export interface PitchShifterCoreOptions {
-  /** Length of every crossfade in samples. Default: an eighth of the window (≈ 5 ms at 48 kHz). */
+  /**
+   * Length of the dry/processed crossfade in samples. Default: an eighth of the window (≈ 5 ms at
+   * 48 kHz). The taps themselves need no crossfade: their window already fades each one to zero
+   * before it wraps.
+   */
   fadeSamples?: number;
 }
 
@@ -101,16 +127,13 @@ export class PitchShifterCore {
   private readonly half: number;
   private readonly mask: number;
   private readonly ring: Float32Array[];
-  /** Smallest and largest delay the sweeping tap may take before it is re-centred. */
-  private readonly minDelay: number;
-  private readonly maxDelay: number;
   private write = 0;
-  /** Delay of the live tap, in samples (fractional). */
-  private delay: number;
-  /** Delay of the tap being faded out; only meaningful while `fadePos >= 0`. */
-  private fadeDelay = 0;
-  /** Position inside the wrap crossfade, or −1 when no wrap fade is in progress. */
-  private fadePos = -1;
+  /**
+   * Delay of the first tap, in samples (fractional), always inside `[0, grainSize)`.
+   *
+   * The second tap is held exactly half a window from it, so this one number places both.
+   */
+  private phase: number;
   /** 0 = dry (bit-exact copy), 1 = processed. Moves by 1/fadeSamples per sample. */
   private mix = 0;
 
@@ -126,9 +149,9 @@ export class PitchShifterCore {
     const size = nextPowerOfTwo(this.grainSize + this.fadeSamples + 4);
     this.mask = size - 1;
     this.ring = Array.from({ length: channels }, () => new Float32Array(size));
-    this.minDelay = 1;
-    this.maxDelay = this.grainSize - 1;
-    this.delay = this.half;
+    // Start where the first tap carries the whole signal and the second is silent, so engaging the
+    // shifter begins at the middle of the window rather than part-way through a comb.
+    this.phase = this.half;
   }
 
   /** Mean latency of the processed path in samples (the dry path adds none). */
@@ -145,9 +168,7 @@ export class PitchShifterCore {
   reset(): void {
     for (const buf of this.ring) buf.fill(0);
     this.write = 0;
-    this.delay = this.half;
-    this.fadeDelay = 0;
-    this.fadePos = -1;
+    this.phase = this.half;
   }
 
   /**
@@ -169,11 +190,13 @@ export class PitchShifterCore {
 
     const mask = this.mask;
     const ring = this.ring;
+    const window = this.grainSize;
+    const half = this.half;
     const step = 1 - r;
     const fadeStep = 1 / this.fadeSamples;
-    let delay = this.delay;
-    let fadeDelay = this.fadeDelay;
-    let fadePos = this.fadePos;
+    // The raised-cosine window, expressed as an angular rate over the delay.
+    const omega = (2 * Math.PI) / window;
+    let phase = this.phase;
     let w = this.write;
     let mix = this.mix;
 
@@ -185,36 +208,32 @@ export class PitchShifterCore {
         else mix = Math.max(target, mix - fadeStep);
       }
 
-      // Equal-power weights across a wrap crossfade; outside one, the live tap is alone.
-      const fading = fadePos >= 0;
-      const x = fading ? fadePos / this.fadeSamples : 1;
-      const gNew = fading ? Math.sin((x * Math.PI) / 2) : 1;
-      const gOld = fading ? Math.cos((x * Math.PI) / 2) : 0;
+      // Two taps, half a window apart, so their window arguments differ by π. `gB = 1 - gA` is
+      // therefore not an approximation but the identity cos(θ + π) = −cos(θ): the pair sums to unity
+      // at every sample, and each gain is exactly zero where its own tap wraps — which is what keeps
+      // the wrap from being spliced in at an audible amplitude.
+      const delayA = phase;
+      const delayB = phase >= half ? phase - half : phase + half;
+      const gA = 0.5 - 0.5 * Math.cos(omega * delayA);
+      const gB = 1 - gA;
 
-      const readNew = w - delay;
-      const iNew = Math.floor(readNew);
-      const fNew = readNew - iNew;
-      const n0 = iNew & mask;
-      const n1 = (iNew + 1) & mask;
-      let o0 = 0;
-      let o1 = 0;
-      let fOld = 0;
-      if (fading) {
-        const readOld = w - fadeDelay;
-        const iOld = Math.floor(readOld);
-        fOld = readOld - iOld;
-        o0 = iOld & mask;
-        o1 = (iOld + 1) & mask;
-      }
+      const readA = w - delayA;
+      const iA = Math.floor(readA);
+      const fA = readA - iA;
+      const a0 = iA & mask;
+      const a1 = (iA + 1) & mask;
+
+      const readB = w - delayB;
+      const iB = Math.floor(readB);
+      const fB = readB - iB;
+      const b0 = iB & mask;
+      const b1 = (iB + 1) & mask;
 
       for (let c = 0; c < chans; c++) {
         const buf = ring[c]!;
-        const sNew = buf[n0]!;
-        let wet = gNew * (sNew + (buf[n1]! - sNew) * fNew);
-        if (fading) {
-          const sOld = buf[o0]!;
-          wet += gOld * (sOld + (buf[o1]! - sOld) * fOld);
-        }
+        const sA = buf[a0]!;
+        const sB = buf[b0]!;
+        const wet = gA * (sA + (buf[a1]! - sA) * fA) + gB * (sB + (buf[b1]! - sB) * fB);
         if (mix === 1) {
           outputs[c]![i] = wet;
         } else {
@@ -223,23 +242,16 @@ export class PitchShifterCore {
         }
       }
 
-      delay += step;
-      if (fading) {
-        fadeDelay += step;
-        fadePos += 1;
-        if (fadePos >= this.fadeSamples) fadePos = -1;
-      } else if (delay < this.minDelay || delay > this.maxDelay) {
-        // The tap reached the end of the window: re-centre it and crossfade from the old position.
-        fadeDelay = delay;
-        delay = this.half;
-        fadePos = 0;
-      }
+      // |step| = |1 − ratio| ≤ 1 across the allowed ratio range, so one correction always suffices
+      // and the delay can never leave [0, window) — the defect in the single-tap version was exactly
+      // a delay that kept stepping past the end of the window and went negative.
+      phase += step;
+      if (phase >= window) phase -= window;
+      else if (phase < 0) phase += window;
       w = (w + 1) & mask;
     }
 
-    this.delay = delay;
-    this.fadeDelay = fadeDelay;
-    this.fadePos = fadePos;
+    this.phase = phase;
     this.write = w;
     this.mix = mix;
   }
@@ -259,7 +271,6 @@ export class PitchShifterCore {
     }
     this.write = w;
     // A fresh engagement always starts from the middle of the window.
-    this.delay = this.half;
-    this.fadePos = -1;
+    this.phase = this.half;
   }
 }

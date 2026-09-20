@@ -20,10 +20,18 @@ import {
 const SR = 48000;
 const A4 = 440;
 
+/** Largest step between consecutive samples — the thing a click is. */
+function maxJump(samples: Float32Array): number {
+  let worst = 0;
+  for (let i = 1; i < samples.length; i++) worst = Math.max(worst, Math.abs(samples[i]! - samples[i - 1]!));
+  return worst;
+}
+
 describe('pitch shifter core', () => {
   it('exposes the parameters the worklet declares', () => {
     expect(PITCH_SHIFTER_PROCESSOR_NAME).toBe('np-pitch-shifter');
-    expect(PITCH_SHIFTER_PARAMETER_DESCRIPTORS.map((d) => d.name)).toEqual(['ratio', 'bypass']);
+    // Ratio only: bypass is a port message, and a declared-but-unread parameter is a silent no-op.
+    expect(PITCH_SHIFTER_PARAMETER_DESCRIPTORS.map((d) => d.name)).toEqual(['ratio']);
     const ratio = PITCH_SHIFTER_PARAMETER_DESCRIPTORS[0]!;
     expect(ratio.minValue).toBe(MIN_RATIO);
     expect(ratio.maxValue).toBe(MAX_RATIO);
@@ -93,14 +101,46 @@ describe('pitch shifter core', () => {
     expect(outLevel).toBeLessThan(inLevel * 1.3);
   });
 
-  it('keeps the peak within the equal-power crossfade bound (√2), which the chain limiter catches', () => {
-    const input = makeSine(A4, SR, 0.5, 0.9);
-    const output = renderThroughCore(input, SR, 1.25);
-    let peak = 0;
-    for (const s of output) peak = Math.max(peak, Math.abs(s));
-    // Two taps splice unrelated moments during a wrap; equal-power gains can sum to √2 when they
-    // happen to align. That is why the graph puts a −1 dBFS limiter after the EQ.
-    expect(peak).toBeLessThanOrEqual(0.9 * Math.SQRT2);
+  it('never exceeds the input peak, because the two tap gains sum to unity', () => {
+    // The single-tap version crossfaded with equal-power gains, which sum to √2 when the two taps
+    // happen to align, so it could overshoot by 3 dB and leaned on the chain limiter to catch it.
+    // The raised-cosine pair sums to exactly 1 at every sample, so there is no overshoot to catch.
+    for (const ratio of [0.5, 1.25, 1.5, 2]) {
+      const input = makeSine(A4, SR, 0.5, 0.9);
+      const output = renderThroughCore(input, SR, ratio);
+      let peak = 0;
+      for (const s of output) peak = Math.max(peak, Math.abs(s));
+      expect(peak, `ratio ${ratio} peaked at ${peak}`).toBeLessThanOrEqual(0.9 + 1e-6);
+    }
+  });
+
+  /**
+   * The gate on the defect this design replaced.
+   *
+   * A click is a step in the waveform, so the measurement is the largest jump between consecutive
+   * samples. A tap reading `ratio` times faster than it writes legitimately steepens the wave by
+   * `ratio`, and `ratio` never exceeds 2 — so anything past twice the input's own largest step is a
+   * splice, not a slope. The single-tap version scored 2.2× at a semitone and 8.8× at ratio 1.25,
+   * because mid-crossfade its outgoing tap stepped past the end of the window, went negative, and
+   * read a whole ring buffer of stale audio. `scripts/measure-clicks.ts` prints the table.
+   */
+  it('introduces no discontinuity larger than the shift itself justifies', () => {
+    const input = makeSine(A4, SR, 2, 0.5);
+    const reference = maxJump(input);
+    for (const ratio of [0.9438, 1.0595, 1.25, 1.5]) {
+      const jump = maxJump(renderThroughCore(input, SR, ratio));
+      expect(jump / reference, `ratio ${ratio} stepped ${(jump / reference).toFixed(2)}× the input's largest step`).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it('stays finite over ten seconds at every ratio', () => {
+    // Ten seconds is many hundreds of wraps at the larger ratios: long enough for a delay that
+    // drifts out of range, or a gain that stops summing to one, to show up as a NaN or an infinity.
+    for (const ratio of [MIN_RATIO, 0.9438, 1.0595, 1.25, MAX_RATIO]) {
+      const output = renderThroughCore(makeSine(A4, SR, 10, 0.5), SR, ratio);
+      const bad = output.findIndex((s) => !Number.isFinite(s));
+      expect(bad, `ratio ${ratio} produced a non-finite sample at index ${bad}`).toBe(-1);
+    }
   });
 
   it('processes stereo independently', () => {

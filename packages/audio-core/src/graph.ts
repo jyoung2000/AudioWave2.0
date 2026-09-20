@@ -162,6 +162,8 @@ export function createAudioEngine(context: EngineContext, options: AudioEngineOp
   // processedIn → preamp → (retune) → bands… → trim → { limiter, limiterBypass } → analyser → output → destination
   processedIn.connect(preamp);
   let retuneNode: WorkletNodeLike | null = null;
+  /** Mirrors the processor's own flag, so bypass is only posted when it actually changes. */
+  let workletBypassed = false;
   let headOfEq: AudioNodeLike = preamp;
   relinkEqHead();
   const tail: AudioNodeLike = bands.length ? bands[bands.length - 1]! : preamp;
@@ -528,6 +530,7 @@ export function createAudioEngine(context: EngineContext, options: AudioEngineOp
     // preamp → node → first band (or trim when there are no bands)
     preamp.disconnect();
     retuneNode = node;
+    workletBypassed = false;
     preamp.connect(node);
     headOfEq = node;
     const first = bands[0];
@@ -540,17 +543,26 @@ export function createAudioEngine(context: EngineContext, options: AudioEngineOp
     preamp.disconnect();
     retuneNode.disconnect();
     retuneNode = null;
+    workletBypassed = false;
     headOfEq = preamp;
     const first = bands[0];
     if (first) preamp.connect(first);
     else preamp.connect(trim);
   }
 
+  /**
+   * `ratio` is an AudioParam so it can be ramped on the audio thread. Bypass is not: it is a
+   * discrete switch, and the processor declares no such parameter — writing to one that does not
+   * exist is a silent no-op, which is how bypass came to be ignored. It travels over the port,
+   * which is what the processor listens on.
+   */
   function setWorkletParams(ratio: number, bypass: boolean): void {
     const p = retuneNode?.parameters.get('ratio');
-    const b = retuneNode?.parameters.get('bypass');
     if (p) rampParam(p, ratio, now(), rampDefault);
-    if (b) b.setValueAtTime(bypass ? 1 : 0, now());
+    if (bypass !== workletBypassed) {
+      retuneNode?.port?.postMessage({ type: 'bypass', bypass });
+      workletBypassed = bypass;
+    }
   }
 
   function applyRetuneToElement(): void {
