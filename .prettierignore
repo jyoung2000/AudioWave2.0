@@ -6,10 +6,6 @@ generated
 pnpm-lock.yaml
 docs/reference
 docs/design
-# The supplied references, kept byte-identical to what was provided.
-APPLE_AQUA_2009_2010_UI_DESIGN_SPEC.md
-CLAUDE-FABLE-5.md
-
 # Prettier owns JSON only, and `format:check` is a real gate because of it.
 #
 # Source is excluded because the code is written to a wider effective line length than any Prettier

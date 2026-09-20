@@ -9,7 +9,7 @@ This plan was written after reading, completely, the two supplied references:
 - `docs/design/APPLE_AQUA_2009_2010_UI_DESIGN_SPEC.md` (byte-identical copy of the supplied Aqua specification; sha256 `6f32304772fc…`)
 - `docs/reference/now-playing-header.html` (byte-identical copy of the supplied header/player HTML; sha256 `cf70898c6364…`)
 
-The repository contained no prior code — only the two references and an unrelated personal file (`CLAUDE-FABLE-5.md`), which is preserved untouched.
+The repository contained no prior code — only the two references.
 
 ## 1. Audit of the supplied references
 

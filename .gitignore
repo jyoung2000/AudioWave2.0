@@ -18,11 +18,12 @@ test-results/
 **/.vite/
 *.partial
 docker-container/dist/
-docker-container/data/
 music-player/dist/
 music-player/test-results/
 music-player/playwright-report/
 docker-container/backups/
+# The CI smoke test bind-mounts this as the hub's data directory.
+.ci-data/
 docker-container/test-results/
 docker-container/playwright-report/
 # The single-file player is *committed* at the repository root as now-playing.html, so it can be
@@ -36,3 +37,8 @@ android/app/src/main/assets/app/
 android/.gradle/
 android/app/build/
 android/local.properties
+
+# Scratch left behind by browser tooling and audit runs; never source.
+/.playwright-mcp/
+*.tgz
+/team-clone-*.png
