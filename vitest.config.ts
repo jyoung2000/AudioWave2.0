@@ -1,15 +1,22 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
+// fileURLToPath, not URL#pathname: the latter gives "/C:/…" on Windows and keeps %20 for spaces.
+const path = (relative: string): string => fileURLToPath(new URL(relative, import.meta.url));
+
 const alias = {
-  '@now-playing/contracts': new URL('./packages/contracts/src/index.ts', import.meta.url).pathname,
-  '@now-playing/domain': new URL('./packages/domain/src/index.ts', import.meta.url).pathname,
-  '@now-playing/audio-core': new URL('./packages/audio-core/src/index.ts', import.meta.url).pathname,
-  '@now-playing/recommendations': new URL('./packages/recommendations/src/index.ts', import.meta.url).pathname,
-  '@now-playing/test-fixtures': new URL('./packages/test-fixtures/src/index.ts', import.meta.url).pathname,
+  '@now-playing/contracts': path('./packages/contracts/src/index.ts'),
+  '@now-playing/domain': path('./packages/domain/src/index.ts'),
+  '@now-playing/audio-core': path('./packages/audio-core/src/index.ts'),
+  '@now-playing/recommendations': path('./packages/recommendations/src/index.ts'),
+  '@now-playing/test-fixtures': path('./packages/test-fixtures/src/index.ts'),
   // Listed before the bare package alias: string aliases match by prefix, so without this the
   // stylesheet path would be rewritten into "…/src/index.ts/now-playing.css".
-  '@now-playing/aqua-ui/now-playing.css': new URL('./packages/aqua-ui/src/styles/now-playing.css', import.meta.url).pathname,
-  '@now-playing/aqua-ui': new URL('./packages/aqua-ui/src/index.ts', import.meta.url).pathname,
+  '@now-playing/aqua-ui/now-playing.css': path('./packages/aqua-ui/src/styles/now-playing.css'),
+  '@now-playing/aqua-ui': path('./packages/aqua-ui/src/index.ts'),
+  // Supplied by `music-player/vite-plugins/worklet.ts` in a real build. Vitest runs no bundler
+  // plugins, so it resolves to the same "no asset" answer the single-file build gives.
+  'virtual:np-worklet-url': path('./music-player/src/lib/worklet-url.stub.ts'),
 };
 
 const exclude = ['**/node_modules/**', '**/dist/**', '**/build/**', '**/out/**', '**/e2e/**', '**/tests/e2e/**', '**/playwright/**'];

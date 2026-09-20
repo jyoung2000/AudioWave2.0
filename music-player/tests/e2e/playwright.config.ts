@@ -5,6 +5,7 @@
  * service worker, the code-split chunks and the minified bundle are part of what is being tested,
  * and none of them exist in dev mode.
  */
+import { fileURLToPath } from 'node:url';
 import { defineConfig, devices } from '@playwright/test';
 
 const PORT = 4173;
@@ -31,6 +32,8 @@ export default defineConfig({
     url: `http://127.0.0.1:${PORT}`,
     reuseExistingServer: !process.env['CI'],
     timeout: 120_000,
-    cwd: new URL('../..', import.meta.url).pathname,
+    // fileURLToPath, not URL#pathname: on Windows the latter is "/C:/…", which is not a directory,
+    // and Playwright fails to spawn the preview server with a bare ENOENT.
+    cwd: fileURLToPath(new URL('../..', import.meta.url)),
   },
 });

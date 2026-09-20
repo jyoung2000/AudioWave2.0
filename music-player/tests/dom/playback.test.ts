@@ -27,6 +27,10 @@ class FakeAudio extends EventTarget {
   preservesPitch = true;
   error: MediaError | null = null;
   readonly buffered = { length: 0, end: () => 0 };
+  /** 0 until metadata arrives, like a real element; the engine reads it to place a start point. */
+  readyState = 0;
+  /** How many times the element was told to fetch. A promoted preload must not add to this. */
+  loadCalls = 0;
   get currentSrc(): string {
     return this.src;
   }
@@ -36,7 +40,11 @@ class FakeAudio extends EventTarget {
   removeAttribute(name: string): void {
     if (name === 'src') this.src = '';
   }
-  load(): void {}
+  load(): void {
+    // As a real element does: loading starts from the top.
+    this.currentTime = 0;
+    this.loadCalls += 1;
+  }
   async play(): Promise<void> {
     this.paused = false;
     this.dispatchEvent(new Event('playing'));
@@ -213,6 +221,22 @@ describe('the two-deck playback engine', () => {
     expect(events.filter((e) => e.type === 'outgoing-finished')).toEqual([{ type: 'outgoing-finished', trackId: T1.trackId, positionMs: 20_000, durationMs: 30_000, ended: false }]);
   });
 
+  it('treats a play interrupted by a newer load as nothing to report', async () => {
+    const { a, engine } = harness();
+    await engine.load({ track: T1, url: 'blob:http://localhost:3000/One', processable: true });
+    a.play = () => Promise.reject(new DOMException('The play() request was interrupted by a new load request.', 'AbortError'));
+    const result = await engine.play();
+    expect(result).toEqual({ ok: false, reason: null });
+    expect(engine.getState().error).toBeNull();
+  });
+
+  it('starts at the requested position once the track has loaded', async () => {
+    const { a, engine } = harness();
+    await engine.load({ track: T1, url: 'blob:http://localhost:3000/One', processable: true, startAtMs: 12_000 });
+    a.dispatchEvent(new Event('loadedmetadata'));
+    expect(a.currentTime).toBe(12);
+  });
+
   it('applies the master volume and mute to both decks', async () => {
     const { a, b, engine } = harness();
     engine.setVolume(0.4);
@@ -221,5 +245,97 @@ describe('the two-deck playback engine', () => {
     expect(b.volume).toBeCloseTo(0.4, 5);
     expect(a.muted).toBe(true);
     expect(b.muted).toBe(true);
+  });
+});
+
+/**
+ * Warming the idle deck before the current track ends.
+ *
+ * The handover used to begin at `ended`: only then was the next file looked up and handed to an
+ * element that had fetched nothing, which is a real silence between two songs and not what "no gap
+ * between songs from the same album" describes.
+ */
+describe('preloading the next track', () => {
+  it('attaches the next source to the idle deck without disturbing what is playing', async () => {
+    const { a, b, engine } = harness();
+    await start(engine, T1);
+    const playingSrc = a.src;
+
+    expect(engine.preload({ track: T2, url: 'blob:http://localhost:3000/Two' })).toBe(true);
+    expect(b.src).toBe('blob:http://localhost:3000/Two');
+    expect(b.loadCalls).toBe(1);
+    // The deck that is playing is untouched, and the engine still reports the track it is on.
+    expect(a.src).toBe(playingSrc);
+    expect(a.paused).toBe(false);
+    expect(engine.getState()).toMatchObject({ status: 'playing', trackId: T1.trackId });
+  });
+
+  it('promotes the warm deck instead of fetching the track a second time', async () => {
+    const { a, b, engine } = harness();
+    await start(engine, T1);
+    engine.preload({ track: T2, url: 'blob:http://localhost:3000/Two' });
+    const fetchesBefore = b.loadCalls;
+
+    await engine.load({ track: T2, url: 'blob:http://localhost:3000/Two' });
+
+    // The whole point: the buffered source is reused, not thrown away and fetched again.
+    expect(b.loadCalls).toBe(fetchesBefore);
+    expect(b.src).toBe('blob:http://localhost:3000/Two');
+    expect(engine.getState()).toMatchObject({ trackId: T2.trackId });
+    expect(engine.element).toBe(b as unknown as HTMLAudioElement);
+    expect(a.src).toBe('');
+  });
+
+  it('is idempotent for the same track and replaces a warm-up that is no longer next', async () => {
+    const { b, engine } = harness();
+    await start(engine, T1);
+    expect(engine.preload({ track: T2, url: 'blob:http://localhost:3000/Two' })).toBe(true);
+    expect(engine.preload({ track: T2, url: 'blob:http://localhost:3000/Two' })).toBe(true);
+    // Asking twice for the same track must not refetch it.
+    expect(b.loadCalls).toBe(1);
+
+    // The queue moved on: the deck is re-warmed for whatever is next now.
+    expect(engine.preload({ track: T3, url: 'blob:http://localhost:3000/Three' })).toBe(true);
+    expect(b.src).toBe('blob:http://localhost:3000/Three');
+  });
+
+  it('refuses to take a deck that is still fading out, and never interrupts the crossfade', async () => {
+    const { a, engine, events } = harness();
+    engine.setCrossfade(2);
+    await start(engine, T1);
+    // A handover only happens from a deck that is actually part-way through something.
+    a.duration = 30;
+    a.tick(10);
+    await engine.load({ track: T2, url: 'blob:http://localhost:3000/Two', crossfadeMs: 2000 });
+    await engine.play();
+    expect(a.paused).toBe(false);
+
+    // T1's deck is on its way out under T2; warming it would cut the fade short.
+    expect(engine.preload({ track: T3, url: 'blob:http://localhost:3000/Three' })).toBe(false);
+    expect(events.some((e) => e.type === 'error')).toBe(false);
+    expect(engine.getState()).toMatchObject({ trackId: T2.trackId });
+  });
+
+  it('still crossfades into a track that was warmed', async () => {
+    const { a, b, engine, sources } = harness();
+    engine.setCrossfade(2);
+    await start(engine, T1);
+    a.duration = 30;
+    a.tick(10);
+
+    engine.preload({ track: T2, url: 'blob:http://localhost:3000/Two' });
+    await engine.load({ track: T2, url: 'blob:http://localhost:3000/Two', crossfadeMs: 2000 });
+    await engine.play();
+
+    // Both decks audible: the promoted deck goes through the same handover as a cold one.
+    expect(a.paused).toBe(false);
+    expect(b.paused).toBe(false);
+    expect(sources()).toHaveLength(2);
+  });
+
+  it('declines a track with nothing to play', async () => {
+    const { engine } = harness();
+    await start(engine, T1);
+    expect(engine.preload({ track: T2 })).toBe(false);
   });
 });

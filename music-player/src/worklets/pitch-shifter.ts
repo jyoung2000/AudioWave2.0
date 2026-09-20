@@ -5,14 +5,15 @@
  * itself lives in `audio-core` so it can be tested against rendered audio in Node; this file is
  * only the registration shim that makes it available to the graph.
  */
-import { PitchShifterCore, PITCH_SHIFTER_PROCESSOR_NAME } from '@now-playing/audio-core';
+import { PitchShifterCore, PITCH_SHIFTER_PARAMETER_DESCRIPTORS, PITCH_SHIFTER_PROCESSOR_NAME } from '@now-playing/audio-core';
 
 class PitchShifterProcessor extends AudioWorkletProcessor {
   private core: PitchShifterCore | null = null;
   private bypass = false;
 
   static get parameterDescriptors(): AudioParamDescriptor[] {
-    return [{ name: 'ratio', defaultValue: 1, minValue: 0.5, maxValue: 2, automationRate: 'k-rate' }];
+    // From audio-core, so the graph, the mock and this processor cannot disagree about what exists.
+    return PITCH_SHIFTER_PARAMETER_DESCRIPTORS.map((d) => ({ ...d }));
   }
 
   constructor() {

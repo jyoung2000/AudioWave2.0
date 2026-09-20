@@ -73,6 +73,12 @@ export const MAX_CROSSFADE_SECONDS = 12;
 
 const VOLUME_KEY = 'np.player.volume';
 
+/** How long `play()` waits for a suspended AudioContext before starting the element anyway. */
+const RESUME_WAIT_MS = 300;
+
+/** Element-volume fade step. A timer, not an animation frame: frames stop while the page is hidden. */
+const FADE_STEP_MS = 16;
+
 type DeckRole = 'idle' | 'active' | 'outgoing';
 
 interface Deck {
@@ -83,13 +89,20 @@ interface Deck {
   objectUrl: string | null;
   /** Fade multiplier on the element's own volume, for sources the graph cannot fade. */
   gain: number;
-  fadeFrame: number | null;
+  fadeFrame: ReturnType<typeof setTimeout> | null;
   /** Whether this deck's element is currently a source in the graph. */
   inGraph: boolean;
   /** Set once the crossfade point has been announced for the loaded track. */
   dueSignalled: boolean;
   /** Attaching to the graph happens when playback starts, so a crossfade begins with the sound. */
   pendingAttach: { processable: boolean; crossfadeMs: number } | null;
+  /**
+   * A track whose source is already attached to this idle deck and buffering.
+   *
+   * `trackId` stays null while this is set: the deck is warm, not loaded, and nothing else should
+   * treat it as playing. `load()` promotes it instead of fetching the source again.
+   */
+  preloaded: { trackId: string; processable: boolean } | null;
 }
 
 export class PlaybackEngine {
@@ -180,8 +193,7 @@ export class PlaybackEngine {
 
   private makeDeck(audio: HTMLAudioElement): Deck {
     audio.preload = 'auto';
-    audio.crossOrigin = 'anonymous';
-    return { audio, role: 'idle', trackId: null, durationMs: null, objectUrl: null, gain: 1, fadeFrame: null, inGraph: false, dueSignalled: false, pendingAttach: null };
+    return { audio, role: 'idle', trackId: null, durationMs: null, objectUrl: null, gain: 1, fadeFrame: null, inGraph: false, dueSignalled: false, pendingAttach: null, preloaded: null };
   }
 
   private get activeDeck(): Deck {
@@ -282,6 +294,7 @@ export class PlaybackEngine {
     deck.durationMs = null;
     deck.dueSignalled = false;
     deck.pendingAttach = null;
+    deck.preloaded = null;
     deck.inGraph = false;
     deck.gain = 1;
     this.applyVolume(deck);
@@ -294,7 +307,7 @@ export class PlaybackEngine {
 
   private cancelDeckFade(deck: Deck): void {
     if (deck.fadeFrame !== null) {
-      cancelFrame(deck.fadeFrame);
+      clearTimeout(deck.fadeFrame);
       deck.fadeFrame = null;
     }
   }
@@ -313,9 +326,9 @@ export class PlaybackEngine {
       const x = Math.min(1, (nowMs() - started) / durationMs);
       deck.gain = to > from ? from + (to - from) * Math.sin((x * Math.PI) / 2) : to + (from - to) * Math.cos((x * Math.PI) / 2);
       this.applyVolume(deck);
-      deck.fadeFrame = x < 1 ? requestFrame(step) : null;
+      deck.fadeFrame = x < 1 ? setTimeout(step, FADE_STEP_MS) : null;
     };
-    deck.fadeFrame = requestFrame(step);
+    deck.fadeFrame = setTimeout(step, FADE_STEP_MS);
   }
 
   /* ------------------------------------------------------------- audio graph */
@@ -402,11 +415,70 @@ export class PlaybackEngine {
 
   /* --------------------------------------------------------------- transport */
 
-  async load(request: SourceRequest): Promise<void> {
+  /**
+   * Warm the idle deck with the track that is coming next.
+   *
+   * Handing over between two tracks used to begin at the `ended` event: only then was the next
+   * file looked up and handed to an element that had fetched nothing. Between one song and the
+   * next that is a silence of however long the lookup and the first buffer take, which is not what
+   * "no gap between songs from the same album" describes.
+   *
+   * So the source is attached to the other deck early and left to buffer, and `load()` promotes
+   * that deck instead of fetching again. Safe to call repeatedly: a deck that is busy, or already
+   * warm for this track, is left alone.
+   *
+   * Returns whether the deck is now warm for this track.
+   */
+  preload(request: { track: TrackRef; file?: File | null; url?: string | null; processable?: boolean }): boolean {
+    const deck = this.otherDeck;
+    // Still fading out under the current track, or somehow in use: not ours to take.
+    if (deck.role !== 'idle') return false;
+    if (deck.preloaded?.trackId === request.track.trackId) return true;
+    // A stale warm-up for a track that is no longer next; its object URL is revoked here.
+    if (deck.preloaded) this.resetDeck(deck);
+
     let src: string;
     let processable: boolean;
     let objectUrl: string | null = null;
     if (request.file) {
+      objectUrl = URL.createObjectURL(request.file);
+      src = objectUrl;
+      processable = true;
+    } else if (request.url) {
+      src = request.url;
+      processable = request.processable ?? isSameOrigin(request.url);
+    } else {
+      return false;
+    }
+
+    deck.objectUrl = objectUrl;
+    deck.audio.crossOrigin = processable && !objectUrl ? 'anonymous' : null;
+    deck.audio.src = src;
+    deck.audio.load();
+    deck.preloaded = { trackId: request.track.trackId, processable };
+    return true;
+  }
+
+  async load(request: SourceRequest): Promise<void> {
+    const crossfadeMs = Math.max(0, Math.min(MAX_CROSSFADE_SECONDS * 1000, request.crossfadeMs ?? 0));
+    const current = this.activeDeck;
+    // An empty active deck takes the track itself; an occupied one hands over to the other deck,
+    // with a fade when there is something audible to fade from.
+    const switching = current.trackId !== null;
+    const next = switching ? this.otherDeck : current;
+    // `preload()` may already have attached this very track to that deck and left it buffering.
+    // Promoting it is the whole point: re-assigning `src` would throw the buffer away and put the
+    // gap back. Only when switching — a preload always lives on the deck that is *not* active.
+    const warm = switching && next.role === 'idle' && next.preloaded?.trackId === request.track.trackId;
+
+    let src = '';
+    let processable: boolean;
+    let objectUrl: string | null = null;
+    if (warm) {
+      processable = next.preloaded!.processable;
+      // The deck already owns the object URL it created; creating a second one would leak it.
+      objectUrl = next.objectUrl;
+    } else if (request.file) {
       // A blob URL is same-origin by definition, so local files always reach the equalizer.
       objectUrl = URL.createObjectURL(request.file);
       src = objectUrl;
@@ -419,17 +491,12 @@ export class PlaybackEngine {
       return;
     }
 
-    const crossfadeMs = Math.max(0, Math.min(MAX_CROSSFADE_SECONDS * 1000, request.crossfadeMs ?? 0));
-    const current = this.activeDeck;
-    // An empty active deck takes the track itself; an occupied one hands over to the other deck,
-    // with a fade when there is something audible to fade from.
-    const switching = current.trackId !== null;
-    const next = switching ? this.otherDeck : current;
     let handover = false;
     if (switching) {
       // The other deck may still be on its way out from the previous handover; this one cuts it.
       if (next.role === 'outgoing') this.finishOutgoing(next, false);
-      this.resetDeck(next);
+      // Resetting a warm deck would remove the very source it was warmed with.
+      if (!warm) this.resetDeck(next);
       handover = crossfadeMs > 0 && current.role === 'active' && !current.audio.paused && current.audio.currentTime > 0;
       if (handover) {
         current.role = 'outgoing';
@@ -445,17 +512,51 @@ export class PlaybackEngine {
     next.trackId = request.track.trackId;
     next.durationMs = request.track.durationMs;
     next.objectUrl = objectUrl;
+    next.preloaded = null;
     next.dueSignalled = false;
     next.pendingAttach = { processable, crossfadeMs: handover ? crossfadeMs : 0 };
     this.update({ status: 'loading', trackId: request.track.trackId, positionMs: 0, durationMs: request.track.durationMs, error: null, buffered: 0 });
-    next.audio.src = src;
-    if (request.startAtMs) next.audio.currentTime = request.startAtMs / 1000;
-    next.audio.load();
+    if (!warm) {
+      // A CORS request is only worth making for a source the graph will process; asking for one from
+      // a server that does not answer CORS would stop the track from loading at all.
+      next.audio.crossOrigin = processable && !objectUrl ? 'anonymous' : null;
+      next.audio.src = src;
+      next.audio.load();
+    }
+    // `load()` resets the position, so a start point has to wait until the metadata is in — unless
+    // the deck was warmed earlier and already has it, in which case `loadedmetadata` has been and
+    // gone and waiting for it again would mean waiting for ever.
+    const startAtMs = request.startAtMs;
+    if (startAtMs) {
+      const audio = next.audio;
+      const trackId = request.track.trackId;
+      if (audio.readyState >= 1) {
+        audio.currentTime = startAtMs / 1000;
+      } else {
+        audio.addEventListener(
+          'loadedmetadata',
+          () => {
+            if (next.trackId === trackId) audio.currentTime = startAtMs / 1000;
+          },
+          { once: true },
+        );
+      }
+    }
   }
 
   async play(): Promise<{ ok: boolean; reason: string | null }> {
     const context = this.ensureContext();
-    if (context && (context.state as string) !== 'running') await context.resume().catch(() => undefined);
+    if (context && (context.state as string) !== 'running') {
+      // iOS can leave an 'interrupted' context whose resume never settles; the element may still play.
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([
+        context.resume().catch(() => undefined),
+        new Promise<void>((resolve) => {
+          timer = setTimeout(resolve, RESUME_WAIT_MS);
+        }),
+      ]);
+      clearTimeout(timer);
+    }
     const deck = this.activeDeck;
     if (deck.pendingAttach) {
       const { processable, crossfadeMs } = deck.pendingAttach;
@@ -470,6 +571,8 @@ export class PlaybackEngine {
       this.emit({ type: 'started', trackId: this.state.trackId, positionMs: this.state.positionMs });
       return { ok: true, reason: null };
     } catch (err) {
+      // A newer load or a pause interrupted this play; whatever replaced it reports for itself.
+      if (err instanceof Error && err.name === 'AbortError') return { ok: false, reason: null };
       // Autoplay refusal is the common case and is not an error worth alarming about.
       const reason = err instanceof Error && err.name === 'NotAllowedError' ? 'Your browser needs a tap or click before it will start audio.' : err instanceof Error ? err.message : String(err);
       this.update({ status: 'paused', error: reason });
@@ -638,16 +741,6 @@ export function audioSessionSupported(): boolean {
 
 function nowMs(): number {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
-}
-
-function requestFrame(step: () => void): number {
-  if (typeof requestAnimationFrame === 'function') return requestAnimationFrame(step);
-  return setTimeout(step, 16) as unknown as number;
-}
-
-function cancelFrame(handle: number): void {
-  if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(handle);
-  else clearTimeout(handle);
 }
 
 /** Media errors are numeric codes; a listener needs a sentence. */

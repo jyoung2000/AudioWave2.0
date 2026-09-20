@@ -139,6 +139,16 @@ export interface AppState {
 const DEFAULT_RETUNE: RetuneConfig = { referenceHz: 440, pitchOffsetCents: 0, mode: 'off', updatedAt: new Date(0).toISOString() };
 
 /** Platform artwork shares the artwork store; the prefix keeps it apart from album covers. */
+/**
+ * How long before a track ends the next one starts buffering.
+ *
+ * Twelve seconds because that is the longest crossfade the player offers, so the deck is warm by
+ * the time the earliest possible handover begins; and because it is long enough to cover a slow
+ * IndexedDB lookup and the first buffer of a file on a spinning disk, which is what the silence
+ * between two songs used to be made of.
+ */
+const PRELOAD_LEAD_MS = 12_000;
+
 const ARTWORK_PREFIX = 'platform:';
 
 /** A URL reduced to the bit worth showing someone. Never throws: it is only ever used in a sentence. */
@@ -159,6 +169,10 @@ export class PlayerStore {
   private db: PlayerDatabase | null = null;
   private playbackStarted: { trackId: string; at: number; secondsPlayed: number } | null = null;
   private scanAbort: AbortController | null = null;
+  /** Bumped by every `loadCurrent`, so a slower, older load cannot replace a newer one. */
+  private loadGeneration = 0;
+  /** Where a hub-held track streams from; set once a hub client exists. */
+  private streamUrl: ((track: TrackRef) => Promise<string | null> | string | null) | null = null;
 
   constructor(readonly playback: PlaybackEngine) {
     this.state = {
@@ -351,9 +365,14 @@ export class PlayerStore {
     if (keepCopies) void requestPersistentStorage();
     const root: StoredRoot = { id: uuidv7(), kind: 'files', displayName: `${files.length} file${files.length === 1 ? '' : 's'}`, handle: null, copied: keepCopies, trackCount: files.length, addedAt: new Date().toISOString(), lastScanAt: new Date().toISOString(), lastScanError: null };
     await db.put('roots', root);
-    const result = await indexPickedFiles(db, root.id, files, { keepCopies, onProgress: (progress) => this.patch({ library: { ...this.state.library, scanning: progress } }) });
-    await this.reloadLibrary();
-    this.patch({ library: { ...this.state.library, scanning: null, lastScan: result } });
+    let result: ScanResult;
+    try {
+      result = await indexPickedFiles(db, root.id, files, { keepCopies, onProgress: (progress) => this.patch({ library: { ...this.state.library, scanning: progress } }) });
+      await this.reloadLibrary();
+    } finally {
+      this.patch({ library: { ...this.state.library, scanning: null } });
+    }
+    this.patch({ library: { ...this.state.library, lastScan: result } });
     if (result.unreadable.length) this.notice('warning', `${result.unreadable.length} file${result.unreadable.length === 1 ? '' : 's'} could not be read.`);
     if (result.notCopied.length) {
       const first = result.notCopied[0]!;
@@ -621,9 +640,28 @@ export class PlayerStore {
   removeFromQueue(entryId: string): void {
     const index = this.state.queue.findIndex((e) => e.id === entryId);
     if (index === -1) return;
+    const removingCurrent = index === this.state.queueIndex;
+    const removed = this.state.queue[index]!;
     const queue = this.state.queue.filter((e) => e.id !== entryId);
-    const queueIndex = index < this.state.queueIndex ? this.state.queueIndex - 1 : Math.min(this.state.queueIndex, queue.length - 1);
-    this.patch({ queue, queueIndex, shuffleOrder: this.resyncShuffle(queue) });
+    let queueIndex = index < this.state.queueIndex ? this.state.queueIndex - 1 : Math.min(this.state.queueIndex, queue.length - 1);
+    const shuffleOrder = this.resyncShuffle(queue);
+    if (removingCurrent && shuffleOrder && shuffleOrder.pos >= 0) {
+      // The pass has already moved on to whatever followed the removed entry; the queue index follows it.
+      const followingId = shuffleOrder.ids[shuffleOrder.pos];
+      const at = queue.findIndex((e) => e.id === followingId);
+      if (at !== -1) queueIndex = at;
+    }
+    this.patch({ queue, queueIndex, shuffleOrder });
+    if (!removingCurrent) return;
+    // The audio must follow the queue: the entry that was playing is gone.
+    const wasPlaying = this.state.playback.status === 'playing' || this.state.playback.status === 'loading';
+    if (this.state.playback.trackId === removed.track.trackId) this.recordSkipOrCompletion(removed, 'user');
+    if (queueIndex === -1) {
+      this.loadGeneration += 1;
+      this.playback.stop();
+      return;
+    }
+    void this.loadCurrent(wasPlaying);
   }
 
   moveInQueue(from: number, to: number): void {
@@ -637,6 +675,7 @@ export class PlayerStore {
   }
 
   clearQueue(): void {
+    this.loadGeneration += 1;
     this.playback.stop();
     this.patch({ queue: [], queueIndex: -1, shuffleOrder: this.state.shuffle ? { ids: [], pos: -1 } : null });
   }
@@ -652,25 +691,50 @@ export class PlayerStore {
   async loadCurrent(autoplay: boolean, from: TrackRef | null = null): Promise<void> {
     const entry = this.current();
     if (!entry) return;
+    const generation = ++this.loadGeneration;
+    // Whatever was warmed was warmed for the previous track's successor; from here the next
+    // position update decides again.
+    this.preloadingFor = null;
     this.recomputeEq();
     const crossfadeMs = crossfadeMsBetween(this.state.crossfade, from, entry.track);
     const resolved = await resolveFile(this.require(), entry.track.trackId);
+    // Something else was loaded (or playback stopped) while the file was being found.
+    if (generation !== this.loadGeneration) return;
     if (resolved.file) {
       await this.playback.load({ track: entry.track, file: resolved.file, crossfadeMs });
     } else {
-      const hubLocator = entry.track.locators.find((l) => l.kind === 'hub-blob');
-      if (hubLocator) {
-        await this.playback.load({ track: entry.track, url: `/api/v1/library/stream/${entry.track.trackId}`, processable: true, crossfadeMs });
+      // Processability is left to the engine, which only lets a same-origin stream into the graph.
+      let url: string | null;
+      try {
+        url = (await this.streamUrl?.(entry.track)) ?? null;
+      } catch (err) {
+        if (generation !== this.loadGeneration) return;
+        const reason = `The hub could not provide this track: ${err instanceof Error ? err.message : String(err)}`;
+        this.notice('warning', reason);
+        this.patch({ playback: { ...this.state.playback, status: 'error', error: reason } });
+        return;
+      }
+      if (generation !== this.loadGeneration) return;
+      if (url) {
+        await this.playback.load({ track: entry.track, url, crossfadeMs });
       } else {
-        this.notice('warning', resolved.reason);
-        this.patch({ playback: { ...this.state.playback, status: 'error', error: resolved.reason } });
+        const reason = entry.track.locators.some((l) => l.kind === 'hub-blob') ? 'This track is kept on a hub, and no hub is paired with this player.' : resolved.reason;
+        this.notice('warning', reason);
+        this.patch({ playback: { ...this.state.playback, status: 'error', error: reason } });
         return;
       }
     }
+    if (generation !== this.loadGeneration) return;
     if (autoplay) {
       const result = await this.playback.play();
+      if (generation !== this.loadGeneration) return;
       if (!result.ok && result.reason) this.notice('info', result.reason);
     }
+  }
+
+  /** Stream hub-held tracks from this hub. Null goes back to local files only. */
+  setStreamUrlResolver(resolve: ((track: TrackRef) => Promise<string | null> | string | null) | null): void {
+    this.streamUrl = resolve;
   }
 
   /**
@@ -700,6 +764,7 @@ export class PlayerStore {
       // The queue is finished. Discover mode, when it is on, keeps the music
       // going rather than letting the room go quiet.
       if (await this.extendWithDiscoveries(entry?.track ?? null)) return;
+      this.loadGeneration += 1;
       this.playback.stop();
       this.patch({ queueIndex: this.state.queue.length ? this.state.queue.length - 1 : -1 });
       return;
@@ -726,6 +791,19 @@ export class PlayerStore {
     const next = this.state.queueIndex + 1;
     if (next < this.state.queue.length) return { index: next, order: null };
     return repeatAll ? { index: 0, order: null } : null;
+  }
+
+  /** Whether "next" has somewhere to go, in the order that will actually play. */
+  canGoNext(): boolean {
+    return this.current() !== null && this.advance() !== null;
+  }
+
+  /** Whether "previous" does anything: restart this track, or step back through what was heard. */
+  canGoPrevious(): boolean {
+    if (!this.current()) return false;
+    if (this.state.playback.positionMs > 3000) return true;
+    if (this.state.shuffle && this.state.shuffleOrder) return this.state.shuffleOrder.pos > 0;
+    return this.state.queueIndex > 0;
   }
 
   async previous(): Promise<void> {
@@ -959,7 +1037,54 @@ export class PlayerStore {
         this.recordEvent('meaningful', entry.track, { secondsPlayed: this.playbackStarted.secondsPlayed, positionMs: playbackState.positionMs });
       }
     }
-    if (playbackState.status === 'ended') void this.next('ended');
+    // The end of a track is handled from the one-shot 'ended' event, not here: this runs on every
+    // state update, and the updates that follow the end (a seek, a load) would re-trigger it.
+    void this.maybePreloadNext(playbackState);
+  }
+
+  /** The track a preload has been started for, so the work happens once per handover. */
+  private preloadingFor: string | null = null;
+
+  /**
+   * Warm the idle deck shortly before the current track ends.
+   *
+   * Without this the handover began at the `ended` event: only then was the next file looked up in
+   * IndexedDB, its permission checked, an object URL made and an element told to fetch it. That is
+   * a real silence between two songs, and the setting that promises otherwise was not describing
+   * what the player did.
+   *
+   * Deliberately cheap and repeatable: it runs on a position update, does nothing unless the track
+   * is nearly over, and remembers the track it has already warmed for.
+   */
+  private async maybePreloadNext(playbackState: PlaybackState): Promise<void> {
+    if (playbackState.status !== 'playing' || !playbackState.trackId || !playbackState.durationMs) return;
+    const remainingMs = playbackState.durationMs - playbackState.positionMs;
+    if (remainingMs > PRELOAD_LEAD_MS || remainingMs <= 0) return;
+    // `repeat: one` replays this deck, so there is no other track to warm.
+    if (this.state.repeat === 'one') return;
+    const step = this.advance();
+    if (step === null) return;
+    const entry = this.state.queue[step.index];
+    if (!entry) return;
+    if (this.preloadingFor === entry.track.trackId) return;
+    this.preloadingFor = entry.track.trackId;
+
+    if (!this.db) return;
+    const resolved = await resolveFile(this.db, entry.track.trackId).catch(() => null);
+    // The queue may have moved on while the file was being found; warming the wrong deck now would
+    // only have to be undone.
+    if (this.preloadingFor !== entry.track.trackId) return;
+    if (resolved?.file) {
+      this.playback.preload({ track: entry.track, file: resolved.file });
+      return;
+    }
+    // Hub-held tracks are worth warming too, but only if a URL can be had without a prompt.
+    try {
+      const url = (await this.streamUrl?.(entry.track)) ?? null;
+      if (url && this.preloadingFor === entry.track.trackId) this.playback.preload({ track: entry.track, url });
+    } catch {
+      // A hub that will not answer is not an error here: the load at `ended` reports it properly.
+    }
   }
 
   private readonly meaningfulRecorded = new Set<string>();
@@ -970,6 +1095,12 @@ export class PlayerStore {
   private onPlaybackEvent(event: PlaybackEvent): void {
     if (event.type === 'crossfade-due') {
       void this.next('crossfade');
+      return;
+    }
+    if (event.type === 'ended') {
+      // Only the track the queue is on; an end that raced a skip belongs to a track already left.
+      if (event.trackId === null || event.trackId !== this.current()?.track.trackId) return;
+      void this.next('ended');
       return;
     }
     if (event.type === 'outgoing-finished') {
@@ -1220,6 +1351,7 @@ export class PlayerStore {
   async deleteAllData(): Promise<void> {
     const db = this.require();
     await clearEverything(db);
+    this.loadGeneration += 1;
     this.playback.stop();
     this.patch({
       library: { tracks: [], roots: [], ephemeralTrackIds: new Set(), scanning: null, lastScan: null, directoryHandleReason: this.state.library.directoryHandleReason, keepCopies: this.state.library.keepCopies, copiesReason: this.state.library.copiesReason },

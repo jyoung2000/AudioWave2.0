@@ -14,6 +14,7 @@ import { useEffect, useRef } from 'react';
 import { EmptyState, KeyValueList, Panel, PanelSection, StatusDot } from '@now-playing/aqua-ui';
 import { formatTime, useAppState, usePlayer } from '../state/context.js';
 import { SharedInvite, SharedSetup } from '../components/Shared.js';
+import { drawSpectrum, SPECTRUM_REDUCED_INTERVAL_MS } from '@now-playing/domain';
 
 export function NowPlayingView() {
   const { store, mode, shared } = usePlayer();
@@ -33,20 +34,9 @@ export function NowPlayingView() {
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     const draw = (): void => {
       store.playback.analyser(data, 'frequency');
-      const { width, height } = canvas;
-      context.clearRect(0, 0, width, height);
-      const bars = 64;
-      const step = Math.floor(data.length / bars);
-      for (let i = 0; i < bars; i += 1) {
-        let sum = 0;
-        for (let j = 0; j < step; j += 1) sum += data[i * step + j] ?? 0;
-        const value = sum / step / 255;
-        const barHeight = Math.max(1, value * height);
-        context.fillStyle = `hsl(${205 + value * 30} 60% ${40 + value * 25}%)`;
-        context.fillRect((i / bars) * width, height - barHeight, width / bars - 1, barHeight);
-      }
+      drawSpectrum(context, data, canvas.width, canvas.height);
       // Reduced motion still shows a level, just not sixty times a second.
-      frame = requestAnimationFrame(reduced ? () => setTimeout(draw, 250) : draw);
+      frame = requestAnimationFrame(reduced ? () => setTimeout(draw, SPECTRUM_REDUCED_INTERVAL_MS) : draw);
     };
     draw();
     return () => cancelAnimationFrame(frame);

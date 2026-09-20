@@ -5,18 +5,22 @@
  * from a CDN, because the player has to work with no network at all: that is the whole premise, and
  * a single external `<script>` would break it on a plane.
  *
- * The AudioWorklet is built as its own entry rather than inlined: it runs on the audio thread, in a
- * separate global scope, and must be loadable by URL.
+ * The AudioWorklet is compiled to a standalone script and emitted as its own asset rather than
+ * inlined: it runs on the audio thread, in a separate global scope with no module loader, and must
+ * be loadable by URL. `vite-plugins/worklet.ts` does that, and the single-file build shares it.
  */
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { audioWorklet } from './vite-plugins/worklet.js';
 
 const workspace = (name: string): string => fileURLToPath(new URL(`../packages/${name}/src/index.ts`, import.meta.url));
 
 /** Where the app is served from: "/" on its own host, "/<repo>/" on a GitHub project page. */
 const base = process.env['NP_BASE_PATH'] ?? '/';
+
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 export default defineConfig({
   base,
@@ -35,6 +39,7 @@ export default defineConfig({
   worker: { format: 'es' },
   plugins: [
     react(),
+    audioWorklet(),
     VitePWA({
       registerType: 'prompt',
       injectRegister: null,
@@ -71,6 +76,8 @@ export default defineConfig({
         // Audio never enters the service worker cache: files can be hundreds of megabytes and are
         // already on the device or streamed from a hub the user chose.
         navigateFallback: `${base}index.html`,
+        // Hub API routes and share pages are served by the hub, never by the app shell.
+        navigateFallbackDenylist: [new RegExp(`^${escapeRegExp(base)}api/`), new RegExp(`^${escapeRegExp(base)}s/`), /^\/api\//, /^\/s\//],
         cleanupOutdatedCaches: true,
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         runtimeCaching: [

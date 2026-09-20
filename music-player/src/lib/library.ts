@@ -327,7 +327,9 @@ export async function indexPickedFiles(db: PlayerDatabase, rootId: string, files
       await tx.objectStore('tracks').put(track);
       await tx.objectStore('files').put({ trackId: track.id, rootId, relativePath, ephemeral: copyId === null, ...(copyId ? { copyId } : {}), sizeBytes: file.size, lastModified: file.lastModified });
       await tx.done;
-      pickedFiles.set(track.id, file);
+      // A kept copy is read back from storage when needed; holding the original too would pin every
+      // imported file in memory for the rest of the session.
+      if (!copyId) pickedFiles.set(track.id, file);
       result.added += 1;
       progress.indexed += 1;
     } catch (err) {

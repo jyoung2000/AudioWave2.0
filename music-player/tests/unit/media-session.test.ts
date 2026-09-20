@@ -161,6 +161,27 @@ describe('handlers', () => {
     expect(session.handlers.has('seekto')).toBe(false);
   });
 
+  it('reporting capabilities leaves the installed handlers in place', () => {
+    const session = installFakeSession({ unsupportedActions: ['seekto'] });
+    installHandlers({ play: () => undefined, pause: () => undefined, stop: () => undefined, previous: () => undefined, next: () => undefined, seekTo: () => undefined, seekBy: () => undefined });
+    const before = new Map(session.handlers);
+    const report = mediaIntegrationReport();
+    mediaIntegrationReport();
+    expect(session.handlers).toEqual(before);
+    expect(session.handlers.has('play')).toBe(true);
+    expect(report.features.find((f) => f.name.includes('car and headset buttons'))?.available).toBe(true);
+    expect(report.features.find((f) => f.name.includes('Scrubbing'))?.available).toBe(false);
+  });
+
+  it('a report before the handlers exist does not stop them installing', () => {
+    const session = installFakeSession();
+    mediaIntegrationReport();
+    installHandlers({ play: () => undefined, pause: () => undefined, stop: () => undefined, previous: () => undefined, next: () => undefined, seekTo: () => undefined, seekBy: () => undefined });
+    mediaIntegrationReport();
+    expect(session.handlers.has('play')).toBe(true);
+    expect(session.handlers.has('seekto')).toBe(true);
+  });
+
   it('does nothing at all without media session support', () => {
     vi.stubGlobal('navigator', { userAgent: 'test' });
     const remove = installHandlers({ play: () => undefined, pause: () => undefined, stop: () => undefined, previous: () => undefined, next: () => undefined, seekTo: () => undefined, seekBy: () => undefined });

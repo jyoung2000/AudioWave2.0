@@ -36,21 +36,47 @@ export function mediaSessionSupported(): boolean {
 }
 
 /**
+ * Which actions this session accepted, learned from installing the handlers or from one probe.
+ *
+ * The only way to ask is to call `setActionHandler`, and that replaces whatever handler was there.
+ * Probing on every report wiped the player's own handlers and left the car's buttons dead, so an
+ * action is probed at most once, and never after the real handlers have answered the question.
+ */
+const actionSupport = new WeakMap<MediaSession, Map<MediaSessionAction, boolean>>();
+
+function supportFor(session: MediaSession): Map<MediaSessionAction, boolean> {
+  let known = actionSupport.get(session);
+  if (!known) {
+    known = new Map();
+    actionSupport.set(session, known);
+  }
+  return known;
+}
+
+function actionSupported(session: MediaSession, action: MediaSessionAction): boolean {
+  const known = supportFor(session);
+  const cached = known.get(action);
+  if (cached !== undefined) return cached;
+  let ok: boolean;
+  try {
+    // Safe only because nothing has been installed for this action yet (see above).
+    session.setActionHandler(action, null);
+    ok = true;
+  } catch {
+    // The browser rejects actions it does not implement, which is how support is detected.
+    ok = false;
+  }
+  known.set(action, ok);
+  return ok;
+}
+
+/**
  * Describe what the car, lock screen and headset can do here, honestly. Used by the settings screen
  * so someone can see why their steering-wheel button does or does not work before getting in a car.
  */
 export function mediaIntegrationReport(options: { volumeControllable?: boolean } = {}): { supported: boolean; features: Array<{ name: string; available: boolean; note: string }> } {
   const supported = mediaSessionSupported();
-  const hasHandler = (action: string): boolean => {
-    if (!supported) return false;
-    try {
-      navigator.mediaSession.setActionHandler(action as MediaSessionAction, null);
-      return true;
-    } catch {
-      // The browser rejects actions it does not implement, which is how support is detected.
-      return false;
-    }
-  };
+  const hasHandler = (action: MediaSessionAction): boolean => (supported ? actionSupported(navigator.mediaSession, action) : false);
   return {
     supported,
     features: [
@@ -124,11 +150,15 @@ export function publishPosition(positionMs: number, durationMs: number | null, p
 /** Install the action handlers. Returns a function that removes them again. */
 export function installHandlers(handlers: MediaSessionHandlers): () => void {
   if (!mediaSessionSupported()) return () => undefined;
+  const session = navigator.mediaSession;
+  const known = supportFor(session);
   const set = (action: MediaSessionAction, handler: MediaSessionActionHandler | null): void => {
     try {
-      navigator.mediaSession.setActionHandler(action, handler);
+      session.setActionHandler(action, handler);
+      known.set(action, true);
     } catch {
       // An action this browser does not know about; the others still install.
+      known.set(action, false);
     }
   };
 

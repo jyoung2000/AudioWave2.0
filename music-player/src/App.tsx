@@ -74,11 +74,20 @@ import { uuidv7 } from '@now-playing/domain';
 
 export type ViewId = 'library' | 'now-playing' | 'queue' | 'playlists' | 'search' | 'metrics' | 'constellation' | 'settings';
 
+const VIEW_IDS: readonly ViewId[] = ['library', 'now-playing', 'queue', 'playlists', 'search', 'metrics', 'constellation', 'settings'];
+
+/** The view a manifest shortcut asked for with `?view=…` (docs/PWA_AND_CAR.md), or the library. */
+function initialView(): ViewId {
+  if (typeof window === 'undefined') return 'library';
+  const requested = new URLSearchParams(window.location.search).get('view');
+  return VIEW_IDS.find((id) => id === requested) ?? 'library';
+}
+
 export function App() {
   const { store, hubStatus, shared, mode, setMode } = usePlayer();
   const state = useAppState();
   const toast = useToast();
-  const [view, setView] = useState<ViewId>('library');
+  const [view, setView] = useState<ViewId>(initialView);
   const [query, setQuery] = useState('');
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [activeOption, setActiveOption] = useState<string | null>(null);
@@ -383,9 +392,9 @@ export function App() {
             </KeyButton>
           </span>
 
-          <KeyButton glyph="previous" label="Previous track" disabled={!entry || (state.queueIndex <= 0 && state.playback.positionMs <= 3000)} onClick={() => void store.previous()} />
+          <KeyButton glyph="previous" label="Previous track" disabled={!store.canGoPrevious()} onClick={() => void store.previous()} />
           <KeyButton primary glyph={playing ? 'pause' : 'play'} label={playing ? 'Pause' : 'Play'} pressed={playing} disabled={!entry} onClick={() => void store.playback.toggle()} />
-          <KeyButton glyph="next" label="Next track" disabled={!entry || (state.queueIndex >= state.queue.length - 1 && state.repeat !== 'all')} onClick={() => void store.next('user')} />
+          <KeyButton glyph="next" label="Next track" disabled={!store.canGoNext()} onClick={() => void store.next('user')} />
 
           <span className="np-keys__aux">
             <KeyButton

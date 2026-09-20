@@ -10,6 +10,7 @@ import { getSetting, openPlayerDb, putSetting } from '../lib/db.js';
 import { GroupClient, type SharedState } from '../lib/group-client.js';
 import { HubClient, type HubStatus } from '../lib/hub-client.js';
 import { workletDataUrl } from '../lib/build-flags.js';
+import { workletAssetUrl } from 'virtual:np-worklet-url';
 import { installHandlers, publishMetadata, publishPlaybackState, publishPosition } from '../lib/media-session.js';
 import { registerServiceWorker } from '../lib/pwa.js';
 import { PlaybackEngine } from '../lib/playback.js';
@@ -36,13 +37,16 @@ const PlayerContext = createContext<PlayerContextValue | null>(null);
 /**
  * Where the pitch-shifter worklet comes from.
  *
- * In the served build it is a separate entry and Vite resolves it to a hashed URL. In the
- * single-file build there is no second file to point at — and a page opened from `file://` could
- * not fetch one anyway — so the compiled worklet travels inside the bundle and is handed to the
- * audio thread as a `data:` URL. Either way the engine receives a URL and reports honestly if it
- * cannot load it.
+ * In the served build `vite-plugins/worklet.ts` compiles it and emits it as a hashed asset, and
+ * `virtual:np-worklet-url` carries that URL. In the single-file build there is no second file to
+ * point at — and a page opened from `file://` could not fetch one anyway — so the compiled worklet
+ * travels inside the bundle and is handed to the audio thread as a `data:` URL. Either way the
+ * engine receives a URL and reports honestly if it cannot load it.
+ *
+ * It must never be the raw `.ts` path: `addModule()` does not compile TypeScript, so pointing at
+ * the source silently disables preserve-tempo retuning in the deployed app.
  */
-const WORKLET_URL = workletDataUrl() ?? new URL('../worklets/pitch-shifter.ts', import.meta.url).href;
+const WORKLET_URL = workletDataUrl() ?? workletAssetUrl;
 
 export function PlayerProvider({ children, store: injected }: { children: ReactNode; store?: PlayerStore }) {
   const [store] = useState(() => injected ?? new PlayerStore(new PlaybackEngine({ workletModuleUrl: WORKLET_URL })));
@@ -57,27 +61,40 @@ export function PlayerProvider({ children, store: injected }: { children: ReactN
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const db = await openPlayerDb();
-      if (cancelled) return;
-      dbRef.current = db;
-      await store.init(db);
+      let db: Awaited<ReturnType<typeof openPlayerDb>>;
+      try {
+        db = await openPlayerDb();
+        if (cancelled) return;
+        dbRef.current = db;
+        await store.init(db);
+      } catch (error) {
+        if (!cancelled) store.notice('error', `The player could not open its storage: ${error instanceof Error ? error.message : String(error)}`);
+        return;
+      }
       if (cancelled) return;
       // Registered after the store is up so the "new version" notice has somewhere to go.
       void registerServiceWorker((update) => store.notice('info', 'A new version of Now Playing is ready.', { label: 'Reload', run: update.reload }));
       const client = new HubClient(db);
       setHub(client);
       client.subscribe(setHubStatus);
+      store.setStreamUrlResolver((track) => client.streamUrl(track));
       const groups = new GroupClient(client, () => 'This device');
       groups.subscribe(setShared);
       setGroup(groups);
-      await client.load();
-      groups.refreshAvailability(client.getStatus().connected, client.getStatus().reason);
-      // The mode is remembered, but only honoured if it is still possible: coming back to a player
-      // that was in a group, on a laptop that has since left the network, must land in solo rather
-      // than in a shared session that is not there.
-      const remembered = await getSetting<ListeningMode>(db, 'listening.mode', 'solo');
-      if (!cancelled && remembered === 'shared') setRequestedMode('shared');
       setStarted(true);
+      // The hub is optional and may be slow or gone; the player does not wait for it to start.
+      try {
+        await client.load();
+        if (cancelled) return;
+        groups.refreshAvailability(client.getStatus().connected, client.getStatus().reason);
+        // The mode is remembered, but only honoured if it is still possible: coming back to a player
+        // that was in a group, on a laptop that has since left the network, must land in solo rather
+        // than in a shared session that is not there.
+        const remembered = await getSetting<ListeningMode>(db, 'listening.mode', 'solo');
+        if (!cancelled && remembered === 'shared') setRequestedMode('shared');
+      } catch (error) {
+        if (!cancelled) store.notice('warning', `The hub connection could not be restored: ${error instanceof Error ? error.message : String(error)}`);
+      }
     })();
     return () => {
       cancelled = true;
@@ -167,7 +184,7 @@ export function useSelector<T>(select: (state: AppState) => T): T {
 function MediaSessionBridge() {
   const { store } = usePlayer();
   const state = useAppState();
-  const artworkRef = useRef<{ id: string | null; url: string | null }>({ id: null, url: null });
+  const artworkRef = useRef<{ id: string | null; url: string | null; entryId: string | null }>({ id: null, url: null, entryId: null });
   const entry = state.queue[state.queueIndex] ?? null;
 
   useEffect(() => {
@@ -185,7 +202,16 @@ function MediaSessionBridge() {
   // Artwork is a blob URL owned here; the previous one is revoked so a long session does not leak.
   useEffect(() => {
     const artworkId = entry?.track.artworkId ?? null;
-    if (artworkRef.current.id === artworkId) return;
+    const entryId = entry?.id ?? null;
+    const track = entry?.track ?? null;
+    if (artworkRef.current.id === artworkId) {
+      // Same cover (or none) on a different track: the title and artist still have to change.
+      if (artworkRef.current.entryId !== entryId) {
+        artworkRef.current = { ...artworkRef.current, entryId };
+        publishMetadata(track, artworkRef.current.url);
+      }
+      return;
+    }
     let cancelled = false;
     void (async () => {
       const url = await store.artworkUrl(artworkId);
@@ -194,13 +220,13 @@ function MediaSessionBridge() {
         return;
       }
       if (artworkRef.current.url) URL.revokeObjectURL(artworkRef.current.url);
-      artworkRef.current = { id: artworkId, url };
-      publishMetadata(entry?.track ?? null, url);
+      artworkRef.current = { id: artworkId, url, entryId };
+      publishMetadata(track, url);
     })();
     return () => {
       cancelled = true;
     };
-  }, [entry?.track.artworkId, entry?.track.trackId, store, entry]);
+  }, [entry, store]);
 
   useEffect(() => {
     publishPlaybackState(state.playback.status === 'playing' ? 'playing' : state.playback.status === 'idle' ? 'none' : 'paused');

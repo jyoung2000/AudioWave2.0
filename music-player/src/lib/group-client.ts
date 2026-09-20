@@ -132,6 +132,11 @@ export class GroupClient {
     const id = 'id' in group ? group.id : '';
     const name = group.name;
     const role = 'myRole' in group ? (group.myRole ?? null) : null;
+    if (this.state.group?.id !== id) {
+      // Sequence numbers belong to a group; another group's position means nothing here.
+      this.lastSeq = 0;
+      if (this.socket) this.disconnect();
+    }
     this.patch({ group: { id, name, role }, rejection: null });
     try {
       const snapshot = await this.hub.groupQueue(id);
@@ -158,18 +163,26 @@ export class GroupClient {
     this.patch({ connection: this.attempt ? 'reconnecting' : 'connecting' });
     const socket = new WebSocket(target.url, target.protocols);
     this.socket = socket;
+    // A replaced socket can still deliver events; only the current one may change anything.
+    const current = (): boolean => this.socket === socket;
 
     socket.addEventListener('open', () => {
+      if (!current()) return;
+      const reconnecting = this.attempt > 0;
       this.attempt = 0;
       this.patch({ connection: 'connected', staleSince: null });
       this.send('group.subscribe', { groupId: group.id });
+      // Ask for what was missed while the socket was down; the hub answers with a snapshot if it can no longer replay.
+      if (reconnecting && this.lastSeq > 0) this.send('resync', { groupId: group.id, fromSeq: this.lastSeq });
     });
 
     socket.addEventListener('message', (event) => {
+      if (!current()) return;
       this.receive(String(event.data));
     });
 
     socket.addEventListener('close', () => {
+      if (!current()) return;
       this.socket = null;
       if (this.closing) {
         this.patch({ connection: 'idle' });
@@ -182,7 +195,7 @@ export class GroupClient {
     // `error` always arrives with a `close` behind it, so the reconnect lives there and this only
     // has to make sure the reason is not lost.
     socket.addEventListener('error', () => {
-      if (this.state.connection === 'connecting') this.patch({ rejection: 'The hub refused the realtime connection.' });
+      if (current() && this.state.connection === 'connecting') this.patch({ rejection: 'The hub refused the realtime connection.' });
     });
   }
 
@@ -215,6 +228,7 @@ export class GroupClient {
     const payload = (envelope.payload ?? {}) as Record<string, unknown>;
     switch (envelope.type) {
       case 'group.snapshot':
+        if (typeof payload['lastSeq'] === 'number') this.lastSeq = payload['lastSeq'];
         this.patch({
           queue: payload['queue'] as Queue,
           playback: payload['playback'] as GroupPlaybackState,

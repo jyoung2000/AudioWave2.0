@@ -333,7 +333,8 @@ function downloadJson(payload: unknown, filename: string): void {
   link.href = url;
   link.download = filename;
   link.click();
-  URL.revokeObjectURL(url);
+  // Safari starts the download after the click returns; revoking now would cancel it.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 function importPresets(store: ReturnType<typeof usePlayer>['store'], existing: readonly EqPreset[], toast: ReturnType<typeof useToast>): void {
@@ -344,7 +345,14 @@ function importPresets(store: ReturnType<typeof usePlayer>['store'], existing: r
     const file = input.files?.[0];
     if (!file) return;
     // The payload is validated against the schema and never executed; unknown fields are dropped.
-    const plan = planEqPresetImport(JSON.parse(await file.text()), existing, 'rename');
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(await file.text());
+    } catch {
+      toast.show('That file is not a valid preset export: it is not readable JSON.', { kind: 'error' });
+      return;
+    }
+    const plan = planEqPresetImport(parsed, existing, 'rename');
     if (!plan.valid) {
       toast.show(`That file is not a valid preset export: ${plan.errors[0] ?? 'unknown problem'}`, { kind: 'error' });
       return;

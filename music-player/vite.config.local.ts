@@ -12,7 +12,8 @@
  *   would be one of those forbidden fetches. The served build keeps its splitting; only this one
  *   pays the size, and it pays it in a file already on the disk.
  * - The CSS is inlined, and every asset — icons included — becomes a `data:` URI.
- * - The AudioWorklet is compiled separately and injected as source text, so the app can hand the
+ * - The AudioWorklet is compiled by `vite-plugins/worklet.ts` — the same compilation the served
+ *   build uses — and injected as source text, so the app can hand the
  *   audio thread a `data:` URL. Worklets are fetched with CORS and a file:// page cannot fetch, but
  *   `data:` is on Chromium's allowed-scheme list, so retuning survives. That was worth checking
  *   rather than assuming: see `docs/LOCAL_FILE.md` for what else was measured.
@@ -23,29 +24,12 @@
  */
 import { copyFileSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { build as esbuild } from 'esbuild';
 import { defineConfig, type Plugin, type UserConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { audioWorklet, compileWorklet } from './vite-plugins/worklet.js';
 
 const workspace = (name: string): string => fileURLToPath(new URL(`../packages/${name}/src/index.ts`, import.meta.url));
 const here = (path: string): string => fileURLToPath(new URL(path, import.meta.url));
-
-/** Compile the worklet to a standalone script so it can be shipped as text inside the bundle. */
-async function compileWorklet(): Promise<string> {
-  const result = await esbuild({
-    entryPoints: [here('./src/worklets/pitch-shifter.ts')],
-    bundle: true,
-    write: false,
-    format: 'iife',
-    target: 'es2022',
-    // The worklet global scope has no DOM and no module loader; everything it uses is bundled in.
-    alias: { '@now-playing/audio-core': workspace('audio-core'), '@now-playing/contracts': workspace('contracts'), '@now-playing/domain': workspace('domain') },
-    logLevel: 'silent',
-  });
-  const out = result.outputFiles[0];
-  if (!out) throw new Error('The worklet produced no output');
-  return out.text;
-}
 
 /**
  * Fold every emitted script and stylesheet into `index.html`, then drop them from the bundle.
@@ -178,7 +162,8 @@ export default defineConfig(async (): Promise<UserConfig> => {
       __NP_WORKLET_SOURCE__: JSON.stringify(workletSource),
       __NP_SINGLE_FILE__: 'true',
     },
-    plugins: [react(), inlineEverything(), publishToRepoRoot()],
+    // `inline: true`: the plugin reports no asset URL, so the app uses the source text below.
+    plugins: [react(), audioWorklet({ inline: true }), inlineEverything(), publishToRepoRoot()],
     build: {
       target: 'es2022',
       outDir: 'dist-local',

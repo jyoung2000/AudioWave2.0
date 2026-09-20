@@ -17,6 +17,7 @@ import type { Material, Mesh } from 'three';
 import type { Track } from '@now-playing/contracts';
 import { useAppState, usePlayer } from '../state/context.js';
 import { toTrackRef } from '../state/store.js';
+import { CONSTELLATION_CAMERA_Z, layoutStars } from '@now-playing/domain';
 
 interface AlbumNode {
   id: string;
@@ -190,23 +191,18 @@ function mountStarfield(
 
   const scene = new three.Scene();
   const camera = new three.PerspectiveCamera(55, width / height, 0.1, 200);
-  camera.position.set(0, 0, 42);
+  camera.position.set(0, 0, CONSTELLATION_CAMERA_Z);
 
-  const artists = [...new Set(albums.map((a) => a.artist))];
   const geometry = new three.SphereGeometry(1, 12, 12);
   const meshes: Array<{ mesh: Mesh; node: AlbumNode }> = [];
+  const placements = layoutStars(albums);
 
   albums.forEach((album, index) => {
-    const artistIndex = artists.indexOf(album.artist);
-    const sector = (artistIndex / Math.max(1, artists.length)) * Math.PI * 2;
-    const spread = ((index % 7) - 3) * 0.12;
-    const radius = 12 + ((index * 7) % 18);
-    const material = new three.MeshBasicMaterial({ color: new three.Color().setHSL((artistIndex / Math.max(1, artists.length)) * 0.8, 0.55, 0.65) });
+    const star = placements[index]!;
+    const material = new three.MeshBasicMaterial({ color: new three.Color().setHSL(star.hue, 0.55, 0.65) });
     const mesh = new three.Mesh(geometry, material);
-    mesh.position.set(Math.cos(sector + spread) * radius, Math.sin(sector + spread) * radius * 0.6, ((index % 11) - 5) * 1.6);
-    // Size carries the album's length, so a glance says which are the substantial records.
-    const scale = 0.35 + Math.min(1.6, album.trackCount * 0.08);
-    mesh.scale.setScalar(scale);
+    mesh.position.set(star.x, star.y, star.z);
+    mesh.scale.setScalar(star.scale);
     mesh.userData['id'] = album.id;
     scene.add(mesh);
     meshes.push({ mesh, node: album });
