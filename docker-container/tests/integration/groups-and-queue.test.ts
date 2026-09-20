@@ -72,8 +72,8 @@ describe('groups', () => {
     const groupId = await createGroup();
     const stranger = await pairDevice(hub, admin, { name: 'Stranger' });
     const response = await hub.app.inject({ method: 'GET', url: `/api/v1/groups/${groupId}`, headers: { authorization: stranger.authorization } });
-    expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({ myRole: null });
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({ code: 'forbidden' });
   });
 });
 

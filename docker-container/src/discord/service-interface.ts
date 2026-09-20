@@ -23,10 +23,24 @@ import type { Clock } from '../deps.js';
 import type { MetricsRegistry } from '../metrics/registry.js';
 import type { SafeHttpClient } from '../providers/http.js';
 import type { CommandService, CommandOutcome } from '../group/command-service.js';
+import { sleep } from '../util.js';
 
 const CONFIG_KEY = 'discord.config';
 const TEMPLATES_KEY = 'discord.templates';
 const TOKEN_KEY = 'discord.token';
+const WORKER_STATUS_KEY = 'discord.worker.status';
+const CONTROL_KEY = 'discord.control';
+const CONTROL_RESULT_KEY = 'discord.control.result';
+const WORKER_STALE_MS = 20_000;
+const CONTROL_TIMEOUT_MS = 30_000;
+const CONTROL_POLL_MS = 250;
+
+export type WorkerAction = 'start' | 'stop' | 'reconnect' | 'register-commands';
+export interface ControlRequest {
+  id: string;
+  action: WorkerAction;
+  requestedAt: string;
+}
 const DISCORD_API = 'https://discord.com/api/v10';
 /** The bot needs to read and send in its designated channel and speak in voice. Nothing else. */
 const REQUIRED_PERMISSIONS = ['VIEW_CHANNEL', 'SEND_MESSAGES', 'EMBED_LINKS', 'READ_MESSAGE_HISTORY', 'CONNECT', 'SPEAK'] as const;
@@ -315,33 +329,35 @@ export class DiscordService {
 
   /* ------------------------------------------------------------------- actions */
 
-  async act(action: 'start' | 'stop' | 'reconnect' | 'test' | 'register-commands', actor: { id: string; displayName: string }, meta: RequestMeta): Promise<DiscordStatus> {
+  async act(action: WorkerAction | 'test', actor: { id: string; displayName: string }, meta: RequestMeta): Promise<DiscordStatus> {
     const config = this.configuration();
     const token = this.token();
-    if (!this.gateway) {
-      // The worker is optional; the hub still serves its API and admin GUI without it.
-      throw new DomainError('unsupported', 'The Discord worker is not running in this hub process. Start the hub with NP_DISCORD_WORKER=1, or use the separate worker container.');
-    }
-    if ((action === 'start' || action === 'reconnect' || action === 'register-commands') && !token) {
+    if ((action === 'start' || action === 'reconnect' || action === 'register-commands' || action === 'test') && !token) {
       throw new DomainError('setup-required', 'Add a bot token first (Admin → Discord → Token)');
     }
-    switch (action) {
-      case 'start':
-        await this.gateway.start(token!, config);
-        break;
-      case 'stop':
-        await this.gateway.stop();
-        break;
-      case 'reconnect':
-        await this.gateway.reconnect();
-        break;
-      case 'register-commands':
-        await this.gateway.registerCommands();
-        break;
-      case 'test':
-        // "Test" checks the token and the intents without touching the running connection.
-        if (token) await this.setToken(token, actor, meta);
-        break;
+    if (action === 'test') {
+      // "Test" checks the token without touching the running connection, so it needs no worker.
+      const result = await this.setToken(token!, actor, meta);
+      if (!result.valid) throw new DomainError('validation', result.message);
+    } else if (this.gateway) {
+      switch (action) {
+        case 'start':
+          await this.gateway.start(token!, config);
+          break;
+        case 'stop':
+          await this.gateway.stop();
+          break;
+        case 'reconnect':
+          await this.gateway.reconnect();
+          break;
+        case 'register-commands':
+          await this.gateway.registerCommands();
+          break;
+      }
+    } else {
+      // The gateway lives in the worker container; the shared database is the only channel to it.
+      if (action === 'start' && !config.enabled) throw new DomainError('setup-required', 'Turn the bot on (Enabled) and save before starting it.');
+      await this.requestFromWorker(action);
     }
     this.audit.record({ actor: { kind: 'admin', id: actor.id, displayName: actor.displayName }, action: `discord.${action}`, outcome: 'success', target: { kind: 'discord', id: 'bot' }, ip: meta.ip, correlationId: meta.correlationId });
     return this.status();
@@ -357,8 +373,8 @@ export class DiscordService {
     if (config.prefixEnabled) warnings.push('Prefix commands need the Message Content intent, which Discord only grants after you enable it in the Developer Portal. Slash commands work without it.');
     if (!config.guildAllowlist.length) warnings.push('No guild allowlist is set: the bot will answer in every server it is invited to.');
 
-    if (this.gateway) {
-      const live = this.gateway.status();
+    const live = this.gateway?.status() ?? this.workerHeartbeat();
+    if (live) {
       return { ...live, enabled: config.enabled, configured, warnings: [...warnings, ...live.warnings], lastError: live.lastError ?? this.lastError };
     }
     return {
@@ -377,8 +393,48 @@ export class DiscordService {
       currentVoiceChannelId: null,
       currentTrackTitle: null,
       lastError: this.lastError,
-      warnings: [...warnings, 'The Discord worker is not attached to this hub process.'],
+      warnings: [...warnings, 'The Discord worker is not running. Start it with `docker compose --profile discord up -d` (or `./nowplaying install --discord`).'],
     };
+  }
+
+  /* ------------------------------------------------- worker process channel */
+
+  /** Called by the worker every few seconds so the hub's admin GUI can show the live connection. */
+  publishWorkerStatus(status: DiscordStatus): void {
+    this.settings.set(WORKER_STATUS_KEY, { status, at: this.clock.now() }, this.nowIso());
+  }
+
+  private workerHeartbeat(): DiscordStatus | null {
+    const beat = this.settings.get<{ status: DiscordStatus; at: number }>(WORKER_STATUS_KEY);
+    return beat && this.clock.now() - beat.at < WORKER_STALE_MS ? beat.status : null;
+  }
+
+  /** The newest admin request the worker has not handled yet. Requests older than the worker are ignored. */
+  pendingControlRequest(handledId: string | null, notBefore: number): ControlRequest | null {
+    const request = this.settings.get<ControlRequest>(CONTROL_KEY);
+    if (!request || request.id === handledId || Date.parse(request.requestedAt) < notBefore) return null;
+    return request;
+  }
+
+  completeControlRequest(id: string, error: string | null): void {
+    this.settings.set(CONTROL_RESULT_KEY, { id, ok: error === null, error, at: this.nowIso() }, this.nowIso());
+  }
+
+  private async requestFromWorker(action: WorkerAction): Promise<void> {
+    if (!this.workerHeartbeat()) {
+      throw new DomainError('unavailable', 'The Discord worker is not running. Start it with `docker compose --profile discord up -d`, then try again.');
+    }
+    const id = uuidv7(this.clock.now());
+    this.settings.set(CONTROL_KEY, { id, action, requestedAt: this.nowIso() } satisfies ControlRequest, this.nowIso());
+    const deadline = Date.now() + CONTROL_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      await sleep(CONTROL_POLL_MS);
+      const result = this.settings.get<{ id: string; ok: boolean; error: string | null }>(CONTROL_RESULT_KEY);
+      if (result?.id !== id) continue;
+      if (!result.ok) throw new DomainError('unavailable', result.error ?? 'The Discord worker could not do that.');
+      return;
+    }
+    throw new DomainError('unavailable', 'The Discord worker has not answered yet. It may still be working on it; the status will update in a moment.');
   }
 
   /** Command names accepted on both transports, for slash-command registration. */
@@ -391,7 +447,7 @@ export class DiscordService {
   }
 }
 
-function normalizeCommand(input: string): MusicCommand | null {
+export function normalizeCommand(input: string): MusicCommand | null {
   const name = input.trim().toLowerCase().replace(/^[!/]/, '');
   const aliases: Record<string, MusicCommand> = { np: 'nowplaying', now: 'nowplaying', p: 'play', s: 'skip', q: 'queue', next: 'skip', unpause: 'resume', disconnect: 'leave' };
   if (aliases[name]) return aliases[name];

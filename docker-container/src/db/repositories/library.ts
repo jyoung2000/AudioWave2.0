@@ -117,12 +117,22 @@ export class LibraryRepository {
     this.db.prepare(`UPDATE library_roots SET ${sets.join(', ')} WHERE id = ?`).run(...params);
   }
 
+  /**
+   * Soft-delete a root and tombstone its tracks. Rows are kept (and purged with other tombstones)
+   * so re-adding the same path gives every file back the id that queues, history and playlists
+   * already reference.
+   */
   removeRoot(id: string, now: string): boolean {
     return this.db.transaction(() => {
-      const n = this.db.prepare('DELETE FROM library_roots WHERE id = ?').run(id).changes;
-      void now;
+      const n = this.db.prepare('UPDATE library_roots SET deleted_at = ?, updated_at = ?, track_count = 0 WHERE id = ? AND deleted_at IS NULL').run(now, now, id).changes;
+      this.db.prepare('UPDATE hub_tracks SET deleted_at = ?, updated_at = ? WHERE root_id = ? AND deleted_at IS NULL').run(now, now, id);
       return n > 0;
     })();
+  }
+
+  /** Bring a soft-deleted root back under its original id. */
+  reviveRoot(id: string, displayName: string, now: string): void {
+    this.db.prepare("UPDATE library_roots SET deleted_at = NULL, display_name = ?, status = 'connected', last_scan_error = NULL, updated_at = ? WHERE id = ?").run(displayName, now, id);
   }
 
   /* ---- tracks ---- */
@@ -165,11 +175,32 @@ export class LibraryRepository {
     return this.db.prepare<[], { n: number }>('SELECT COUNT(*) AS n FROM hub_tracks WHERE deleted_at IS NULL').get()?.n ?? 0;
   }
 
-  tombstoneMissing(rootId: string, presentPaths: ReadonlySet<string>, now: string): number {
+  /**
+   * A row whose id a newly seen file with this content can take over: a tombstoned track anywhere,
+   * or a live track in the same root whose path is no longer on disk (a move or rename).
+   */
+  findReusableTrack(contentHash: string, rootId: string, presentPaths: ReadonlySet<string>): HubTrackRecord | undefined {
+    const rows = this.db.prepare<[string], HubTrackRow>('SELECT * FROM hub_tracks WHERE content_hash = ? ORDER BY deleted_at IS NOT NULL, updated_at DESC').all(contentHash).map(toHubTrack);
+    return rows.find((r) => (r.deletedAt !== null ? true : r.rootId === rootId && !presentPaths.has(r.relativePath)));
+  }
+
+  /** Move an existing row (by id) to a new root/path with fresh contents, reviving it. */
+  relocateTrack(rec: HubTrackRecord, now: string): void {
+    this.db
+      .prepare('UPDATE hub_tracks SET root_id = ?, relative_path = ?, track = ?, content_hash = ?, size_bytes = ?, mtime_ms = ?, mime = ?, updated_at = ?, deleted_at = NULL WHERE id = ?')
+      .run(rec.rootId, rec.relativePath, JSON.stringify(rec.track), rec.contentHash, rec.sizeBytes, rec.mtimeMs, rec.mime, now, rec.id);
+  }
+
+  /**
+   * Tombstone live tracks whose path was not seen by a scan. Paths under `keepPrefixes` (directories
+   * the scan could not read) are left alone: unreadable is not the same as deleted.
+   */
+  tombstoneMissing(rootId: string, presentPaths: ReadonlySet<string>, now: string, keepPrefixes: readonly string[] = []): number {
     const rows = this.db.prepare<[string], { id: string; relative_path: string }>('SELECT id, relative_path FROM hub_tracks WHERE root_id = ? AND deleted_at IS NULL').all(rootId);
     let n = 0;
     const stmt = this.db.prepare('UPDATE hub_tracks SET deleted_at = ?, updated_at = ? WHERE id = ?');
     for (const r of rows) {
+      if (keepPrefixes.some((prefix) => r.relative_path.startsWith(`${prefix}/`))) continue;
       if (!presentPaths.has(r.relative_path)) {
         stmt.run(now, now, r.id);
         n += 1;

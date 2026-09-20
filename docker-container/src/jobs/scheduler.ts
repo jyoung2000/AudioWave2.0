@@ -81,6 +81,9 @@ export class JobScheduler {
     this.register({ name: 'metrics.sample', intervalMs: 60_000, run: () => ctx().metricsService.sample() });
     this.register({ name: 'metrics.purge', intervalMs: 6 * 60 * 60_000, run: () => ctx().metricsService.maintenance() });
     this.register({ name: 'downloads.maintenance', intervalMs: 30_000, run: () => ctx().downloads.maintenance() });
+    // Starts queued work and retries whose backoff has elapsed. Non-blocking: a long download must
+    // not hold up the other tasks in this tick. Only the process that owns downloads acts on it.
+    this.register({ name: 'downloads.pump', intervalMs: 5_000, run: () => ctx().downloads.tick() });
     this.register({ name: 'transfers.reconcile', intervalMs: 60_000, run: () => ctx().transfers.reconcile() });
     this.register({ name: 'files.maintenance', intervalMs: 60 * 60_000, run: () => ctx().files.maintenance() });
     this.register({ name: 'sync.compact', intervalMs: 60 * 60_000, run: () => ctx().sync.maintenance() });
@@ -91,7 +94,7 @@ export class JobScheduler {
     this.register({ name: 'discovery.cachePurge', intervalMs: 60 * 60_000, run: () => ctx().platformSync.maintenance() });
     this.register({ name: 'audit.purge', intervalMs: 12 * 60 * 60_000, run: () => ctx().audit.maintenance() });
     this.register({ name: 'releases.refresh', intervalMs: 6 * 60 * 60_000, runAtStart: false, run: () => ctx().releases.refresh() });
-    this.register({ name: 'backup.daily', intervalMs: 24 * 60 * 60_000, run: () => ctx().backup.create(null, null) });
+    this.register({ name: 'backup.daily', intervalMs: 24 * 60 * 60_000, run: () => ctx().backup.create(null, null, 'auto') });
     // Token refresh is scheduled as a *job* rather than done inline, so it is retried and
     // priority-ordered like any other per-user work.
     this.register({ name: 'accounts.scheduleRefresh', intervalMs: 5 * 60_000, run: () => this.scheduleTokenRefreshes() });
@@ -262,6 +265,10 @@ export class JobScheduler {
     this.handle('sync-library', async (job, ctx) => {
       const provider = typeof job.payload['provider'] === 'string' ? job.payload['provider'] : null;
       if (!provider) return;
+      if (provider === 'hub') {
+        await ctx.library.scanAll();
+        return;
+      }
       await ctx.platformSync.syncLibrary(job.userId, provider);
     });
 

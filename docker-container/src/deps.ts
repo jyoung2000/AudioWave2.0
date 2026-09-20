@@ -51,6 +51,16 @@ export interface HubDeps {
   logDestination?: 'stdout' | 'silent';
   /** Disable background loops (tests that need deterministic timing). */
   disableBackgroundJobs?: boolean;
+  /**
+   * 'discord-worker' builds the same services over the shared database but leaves process-wide
+   * duties (download recovery, queue timers, realtime relay) to the hub, which owns them.
+   */
+  processRole?: 'hub' | 'discord-worker';
+  /**
+   * How the process ends when it cannot usefully continue — after a restore has closed the
+   * database for good. Injected so tests can observe the call instead of ending with it.
+   */
+  exit?: (code: number) => void;
   /** Startup time override for uptime metrics. */
   startedAt?: number;
 }

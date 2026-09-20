@@ -46,6 +46,14 @@ function toGroupView(ctx: HubContext, data: GroupViewData): GroupView {
 }
 
 export function registerGroupRoutes(app: FastifyInstance, ctx: HubContext): void {
+  /**
+   * Read access to a group's queue, history, sync and aggregate data is limited to its members.
+   * Hub admins bypass membership (requireMember returns without throwing for them).
+   */
+  const requireReader = (groupId: string, principal: Principal): void => {
+    ctx.groups.requireMember(groupId, groupActor(principal));
+  };
+
   registerRoute(app, ctx, routes.groupsList, ({ principal }) => ({ items: ctx.groups.listVisible(groupActor(principal)).map((g) => toGroupView(ctx, g)) }));
 
   registerRoute(app, ctx, routes.groupsCreate, ({ body, principal, ip, correlationId, reply }) => {
@@ -54,7 +62,10 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: HubContext): void
     return toGroupView(ctx, view);
   });
 
-  registerRoute(app, ctx, routes.groupsGet, ({ params, principal }) => toGroupView(ctx, ctx.groups.view(params.groupId, actorId(principal))));
+  registerRoute(app, ctx, routes.groupsGet, ({ params, principal }) => {
+    requireReader(params.groupId, principal);
+    return toGroupView(ctx, ctx.groups.view(params.groupId, actorId(principal)));
+  });
 
   registerRoute(app, ctx, routes.groupsUpdate, ({ params, body, principal }) =>
     toGroupView(ctx, ctx.groups.update(params.groupId, groupActor(principal), { ...(body.name !== undefined ? { name: body.name } : {}), ...(body.settings ? { settings: body.settings } : {}) })),
@@ -85,7 +96,8 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: HubContext): void
 
   /* ----------------------------------------------------------------- queue */
 
-  registerRoute(app, ctx, routes.groupsQueueGet, ({ params }) => {
+  registerRoute(app, ctx, routes.groupsQueueGet, ({ params, principal }) => {
+    requireReader(params.groupId, principal);
     const state = ctx.groups.state(params.groupId);
     return { queue: state.queue, playback: state.playback, serverTime: new Date(ctx.clock.now()).toISOString() };
   });
@@ -96,13 +108,15 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: HubContext): void
 
   /* --------------------------------------------------------------- history */
 
-  registerRoute(app, ctx, routes.groupsHistoryList, ({ params, query }) => {
+  registerRoute(app, ctx, routes.groupsHistoryList, ({ params, query, principal }) => {
+    requireReader(params.groupId, principal);
     const items = ctx.groups.history(params.groupId, { limit: query.limit, before: query.cursor ?? null });
     const last = items[items.length - 1];
     return { items, nextCursor: items.length === query.limit && last ? last.startedAt : null };
   });
 
-  registerRoute(app, ctx, routes.groupsHistoryExportCsv, ({ params, reply }) => {
+  registerRoute(app, ctx, routes.groupsHistoryExportCsv, ({ params, reply, principal }) => {
+    requireReader(params.groupId, principal);
     const csv = ctx.groups.exportCsv(params.groupId);
     reply
       .header('Content-Type', 'text/csv; charset=utf-8')
@@ -111,7 +125,10 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: HubContext): void
     return RAW;
   });
 
-  registerRoute(app, ctx, routes.groupsHistoryExportJson, ({ params }) => ctx.groups.exportJson(params.groupId));
+  registerRoute(app, ctx, routes.groupsHistoryExportJson, ({ params, principal }) => {
+    requireReader(params.groupId, principal);
+    return ctx.groups.exportJson(params.groupId);
+  });
 
   registerRoute(app, ctx, routes.groupsHistoryImport, ({ params, query, body, principal }) =>
     ctx.groups.importHistory(params.groupId, groupActor(principal), typeof body === 'string' ? body : String(body), query.format, query.dryRun),
@@ -119,9 +136,13 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: HubContext): void
 
   /* ------------------------------------------------------------------ sync */
 
-  registerRoute(app, ctx, routes.groupsSync, ({ params }) => ctx.groups.syncInfo(params.groupId));
+  registerRoute(app, ctx, routes.groupsSync, ({ params, principal }) => {
+    requireReader(params.groupId, principal);
+    return ctx.groups.syncInfo(params.groupId);
+  });
 
-  registerRoute(app, ctx, routes.groupNowPlayingAdmin, ({ params }) => {
+  registerRoute(app, ctx, routes.groupNowPlayingAdmin, ({ params, principal }) => {
+    requireReader(params.groupId, principal);
     const np = ctx.groups.nowPlaying(params.groupId);
     const group = ctx.groups.find(params.groupId);
     const track = np.item?.track ?? null;
@@ -148,6 +169,7 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: HubContext): void
   /* ------------------------------------------------------------- aggregate */
 
   registerRoute(app, ctx, routes.groupsAggregate, ({ params, principal }) => {
+    requireReader(params.groupId, principal);
     const viewerId = actorId(principal);
     const result = ctx.groups.aggregate(params.groupId, viewerId, null);
     const merged = result.merged;

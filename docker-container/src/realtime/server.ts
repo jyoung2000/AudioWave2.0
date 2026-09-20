@@ -2,21 +2,46 @@ import type { IncomingMessage, Server } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { WebSocketServer, WebSocket } from 'ws';
 import { ClientEventPayloads, Envelope as EnvelopeSchema, REALTIME_DEFAULTS, REALTIME_PATH, WS_MIN_SUPPORTED_PROTOCOL_VERSION, WS_PROTOCOL_VERSION, type ConnectionView, type Envelope } from '@now-playing/contracts';
-import { DomainError, uuidv7 } from '@now-playing/domain';
+import { DomainError, takeToken, uuidv7, type TokenBucketState } from '@now-playing/domain';
 import type { HubContext } from '../context.js';
 import { SESSION_COOKIE } from '../auth/service.js';
-import type { Principal } from '../auth/principal.js';
-import { parseCookies, requestBaseUrl } from '../api/register.js';
+import { hasScope, type Principal } from '../auth/principal.js';
+import { parseCookies, requestBaseUrl, sameOrigin } from '../api/register.js';
+import { isAllowedHost } from '../api/security.js';
 import type { PresenceProvider } from '../pairing/devices.js';
 import type { GroupActor, GroupEventSink, GroupPresence } from '../group/service.js';
 
 export const WS_SUBPROTOCOL = 'np-v1';
 const AUTH_PREFIX = 'np-auth-';
 
+/** Per-connection message budget: a burst of 60, refilled at 20 messages per second. */
+const MESSAGE_BURST = 60;
+const MESSAGE_REFILL_PER_SECOND = 20;
+/** A client that keeps flooding after being told to slow down is disconnected. */
+const MAX_RATE_VIOLATIONS = 50;
+
+/** Messages that act on a group need the same scope as the HTTP group routes. */
+const GROUP_MESSAGE_TYPES: ReadonlySet<string> = new Set(['group.subscribe', 'resync', 'group.command', 'group.drift', 'group.availability']);
+
+/**
+ * Never echo the auth subprotocol (it carries the device secret) back in the handshake response:
+ * select the protocol version, or refuse.
+ */
+export function selectSubprotocol(protocols: ReadonlySet<string>): string | false {
+  return protocols.has(WS_SUBPROTOCOL) ? WS_SUBPROTOCOL : false;
+}
+
+/** What is needed to re-validate a connection's principal after the upgrade (kept in memory only). */
+type Revalidation = { kind: 'device'; credentialId: string; secret: string } | { kind: 'admin'; sessionId: string };
+
 interface Connection {
   id: string;
   socket: WebSocket;
   principal: Principal;
+  revalidation: Revalidation;
+  rate: TokenBucketState | undefined;
+  rateViolations: number;
+  closed: boolean;
   memberId: string;
   displayName: string;
   kind: 'player' | 'companion' | 'hub' | 'admin';
@@ -45,7 +70,7 @@ type Deps = Pick<HubContext, 'auth' | 'deviceAuth' | 'groups' | 'devices' | 'ide
  * is re-checked on every message so revocation takes effect immediately.
  */
 export class RealtimeServer implements GroupEventSink, GroupPresence, PresenceProvider {
-  private readonly wss = new WebSocketServer({ noServer: true, maxPayload: 256 * 1024 });
+  private readonly wss = new WebSocketServer({ noServer: true, maxPayload: 256 * 1024, handleProtocols: (protocols) => selectSubprotocol(protocols) });
   private readonly connections = new Map<string, Connection>();
   private readonly recent: RecentConnection[] = [];
   private readonly reconnectsByMember = new Map<string, number>();
@@ -82,24 +107,34 @@ export class RealtimeServer implements GroupEventSink, GroupPresence, PresencePr
         .filter(Boolean);
       if (!protocols.includes(WS_SUBPROTOCOL)) return reject(426, 'Upgrade Required');
       let principal: Principal | null = null;
+      let revalidation: Revalidation | null = null;
       const authToken = protocols.find((p) => p.startsWith(AUTH_PREFIX));
       if (authToken) {
         const [credentialId, secret] = authToken.slice(AUTH_PREFIX.length).split('.');
-        if (credentialId && secret) principal = await this.ctx.deviceAuth.authenticate(credentialId, secret);
+        if (credentialId && secret) {
+          principal = await this.ctx.deviceAuth.authenticate(credentialId, secret);
+          revalidation = { kind: 'device', credentialId, secret };
+        }
       } else {
+        // Cookie sessions are browser sessions: hold them to the Host allowlist (DNS rebinding) and
+        // to the same-origin rule (cross-site WebSocket hijacking).
+        if (!isAllowedHost(this.ctx, req.headers.host)) return reject(421, 'Misdirected Request');
         const cookies = parseCookies(req.headers.cookie);
-        const origin = req.headers.origin;
         const base = requestBaseUrl(this.ctx, { headers: req.headers, protocol: 'http', socket: req.socket } as never);
-        const sameOrigin = typeof origin !== 'string' || safeOrigin(origin) === safeOrigin(base) || (typeof req.headers.host === 'string' && (origin === `http://${req.headers.host}` || origin === `https://${req.headers.host}`)) || this.ctx.network.allowedOrigins().includes(origin);
-        if (sameOrigin) principal = this.ctx.auth.resolveSession(cookies[SESSION_COOKIE]);
+        const sessionId = cookies[SESSION_COOKIE];
+        if (sessionId && sameOrigin({ headers: req.headers } as never, base, this.ctx.network.allowedOrigins())) {
+          principal = this.ctx.auth.resolveSession(sessionId);
+          revalidation = { kind: 'admin', sessionId };
+        }
       }
-      if (!principal || principal.kind === 'anonymous') return reject(401, 'Unauthorized');
+      if (!principal || principal.kind === 'anonymous' || !revalidation) return reject(401, 'Unauthorized');
       if (!this.ctx.auth.setupComplete()) return reject(403, 'Setup Required');
       const url = new URL(req.url ?? '/', 'http://localhost');
       const protocolVersion = Number(url.searchParams.get('protocol') ?? WS_PROTOCOL_VERSION);
       const ip = (req.socket.remoteAddress ?? '').replace(/^::ffff:/, '');
+      const auth = revalidation;
       this.wss.handleUpgrade(req, socket, head, (ws) => {
-        const conn = this.register(ws, principal!, protocolVersion, ip);
+        const conn = this.register(ws, principal!, auth, protocolVersion, ip);
         if (!Number.isInteger(protocolVersion) || protocolVersion < WS_MIN_SUPPORTED_PROTOCOL_VERSION) {
           this.send(conn, 'upgrade-required', { clientProtocolVersion: protocolVersion, serverProtocolVersion: WS_PROTOCOL_VERSION, minSupportedProtocolVersion: WS_MIN_SUPPORTED_PROTOCOL_VERSION, message: 'Update the app to reconnect' });
           ws.close(4426, 'upgrade-required');
@@ -113,7 +148,7 @@ export class RealtimeServer implements GroupEventSink, GroupPresence, PresencePr
     }
   }
 
-  private register(ws: WebSocket, principal: Principal, protocolVersion: number, ip: string): Connection {
+  private register(ws: WebSocket, principal: Principal, revalidation: Revalidation, protocolVersion: number, ip: string): Connection {
     const memberId = principal.kind === 'device' ? principal.deviceId : 'admin';
     const reconnects = this.reconnectsByMember.get(memberId) ?? 0;
     this.reconnectsByMember.set(memberId, reconnects + 1);
@@ -121,6 +156,10 @@ export class RealtimeServer implements GroupEventSink, GroupPresence, PresencePr
       id: uuidv7(this.ctx.clock.now()),
       socket: ws,
       principal,
+      revalidation,
+      rate: undefined,
+      rateViolations: 0,
+      closed: false,
       memberId,
       displayName: principal.kind === 'device' ? principal.displayName : principal.kind === 'admin' ? principal.username : 'anonymous',
       kind: principal.kind === 'device' ? principal.device.kind : 'admin',
@@ -189,20 +228,67 @@ export class RealtimeServer implements GroupEventSink, GroupPresence, PresencePr
     return { id: conn.memberId, kind: 'device', displayName: conn.displayName };
   }
 
-  /** Re-validate the principal on every message so revoked credentials cannot keep an open socket useful. */
+  /**
+   * Re-validate the principal so revoked credentials, logged-out or rotated admin sessions and
+   * revoked devices cannot keep an open socket useful. Cheap enough to run on every message.
+   */
   private stillValid(conn: Connection): boolean {
+    if (conn.closed) return false;
     if (conn.principal.kind === 'device') {
-      // The secret is not retained after the upgrade; revocation is checked through the device record on every message.
       const device = this.ctx.devices.find(conn.principal.deviceId);
       return !!device && !device.revokedAt && !device.deletedAt;
     }
-    if (conn.principal.kind === 'admin') return true;
+    if (conn.principal.kind === 'admin' && conn.revalidation.kind === 'admin') {
+      const session = this.ctx.auth.resolveSession(conn.revalidation.sessionId);
+      if (!session || session.kind !== 'admin') return false;
+      conn.principal = session;
+      return true;
+    }
     return false;
   }
 
+  /** Full re-authentication of a device credential (revocation, expiry, scope changes). */
+  private async revalidateDevice(conn: Connection): Promise<boolean> {
+    if (conn.revalidation.kind !== 'device') return this.stillValid(conn);
+    const fresh = await this.ctx.deviceAuth.authenticate(conn.revalidation.credentialId, conn.revalidation.secret);
+    if (!fresh || fresh.kind !== 'device' || conn.principal.kind !== 'device' || fresh.deviceId !== conn.principal.deviceId) return false;
+    conn.principal = fresh;
+    return true;
+  }
+
+  private drop(conn: Connection, code: string, message: string): void {
+    if (conn.closed) return;
+    this.sendError(conn, code, message, true);
+    conn.closed = true;
+    this.unregister(conn);
+  }
+
+  /** Drop subscriptions to groups the device is no longer a member of (or may no longer act in). */
+  private pruneSubscriptions(conn: Connection): void {
+    if (conn.principal.kind === 'admin') return;
+    const allowed = conn.principal.kind === 'device' && hasScope(conn.principal, 'group:member');
+    for (const groupId of [...conn.subscriptions]) {
+      if (allowed && this.ctx.groups.membership(groupId, conn.memberId)) continue;
+      conn.subscriptions.delete(groupId);
+      this.send(conn, 'error', { code: 'membership-revoked', message: 'You are no longer subscribed to this group', fatal: false, groupId });
+      // Deferred: this can run inside a group event fan-out, which must not publish re-entrantly.
+      queueMicrotask(() => this.announcePresence(groupId, conn, false));
+    }
+  }
+
   private async onMessage(conn: Connection, raw: string): Promise<void> {
+    if (conn.closed) return;
     conn.lastSeenAt = this.ctx.clock.now();
     this.ctx.metrics.increment('ws.messages_in');
+    const limit = takeToken(conn.rate, { capacity: MESSAGE_BURST, refillPerSecond: MESSAGE_REFILL_PER_SECOND, now: this.ctx.clock.now() });
+    conn.rate = limit.state;
+    if (!limit.allowed) {
+      conn.rateViolations += 1;
+      this.ctx.metrics.increment('ws.rate_limited');
+      if (conn.rateViolations > MAX_RATE_VIOLATIONS) this.drop(conn, 'rate-limited', 'Too many messages');
+      else this.send(conn, 'error', { code: 'rate-limited', message: 'Too many messages; slow down', fatal: false, retryAfterSeconds: limit.retryAfterSeconds });
+      return;
+    }
     let envelope: Envelope;
     try {
       envelope = EnvelopeSchema.parse(JSON.parse(raw));
@@ -211,12 +297,17 @@ export class RealtimeServer implements GroupEventSink, GroupPresence, PresencePr
       return;
     }
     if (!this.stillValid(conn)) {
-      this.sendError(conn, 'unauthenticated', 'Credential is no longer valid', true);
+      this.drop(conn, 'unauthenticated', 'Credential is no longer valid');
       return;
     }
+    this.pruneSubscriptions(conn);
     const schema = ClientEventPayloads[envelope.type as keyof typeof ClientEventPayloads];
     if (!schema) {
       this.sendError(conn, 'unknown-type', `Unknown message type ${envelope.type}`);
+      return;
+    }
+    if (GROUP_MESSAGE_TYPES.has(envelope.type) && !hasScope(conn.principal, 'group:member')) {
+      this.sendError(conn, 'forbidden', 'Scope group:member required');
       return;
     }
     const parsed = schema.safeParse(envelope.payload);
@@ -309,6 +400,7 @@ export class RealtimeServer implements GroupEventSink, GroupPresence, PresencePr
   }
 
   private tick(): void {
+    void this.revalidateAll();
     const now = this.ctx.clock.now();
     for (const conn of this.connections.values()) {
       if (now - conn.lastSeenAt > REALTIME_DEFAULTS.heartbeatTimeoutMs) {
@@ -316,6 +408,8 @@ export class RealtimeServer implements GroupEventSink, GroupPresence, PresencePr
         this.ctx.metrics.increment('ws.timeouts');
         continue;
       }
+      // Violations count per heartbeat window, so reconnect bursts over hours never add up to a drop.
+      conn.rateViolations = 0;
       if (conn.socket.readyState === WebSocket.OPEN) {
         conn.pingSentAt = now;
         conn.socket.ping();
@@ -323,9 +417,37 @@ export class RealtimeServer implements GroupEventSink, GroupPresence, PresencePr
     }
   }
 
+  /**
+   * Heartbeat re-validation: closes sockets whose admin session ended (logout, password change,
+   * expiry) or whose device credential was revoked, and prunes group subscriptions a revoked member
+   * still holds. Public so tests (and shutdown paths) can run it without waiting for the timer.
+   */
+  async revalidateAll(): Promise<void> {
+    for (const conn of [...this.connections.values()]) {
+      try {
+        const ok = conn.revalidation.kind === 'device' ? await this.revalidateDevice(conn) : this.stillValid(conn);
+        if (!ok) {
+          this.drop(conn, 'unauthenticated', 'Credential is no longer valid');
+          continue;
+        }
+        this.pruneSubscriptions(conn);
+      } catch (err) {
+        this.ctx.log.warn({ module: 'realtime', err: err instanceof Error ? err.message : String(err) }, 'connection revalidation failed');
+      }
+    }
+  }
+
   /* ---- GroupEventSink ---- */
   broadcast(groupId: string, envelope: Envelope): void {
-    for (const conn of this.connections.values()) if (conn.subscriptions.has(groupId)) this.sendEnvelope(conn, envelope);
+    for (const conn of [...this.connections.values()]) {
+      if (!conn.subscriptions.has(groupId)) continue;
+      // A member revoked since subscribing stops receiving the group's events immediately.
+      if (conn.principal.kind !== 'admin' && !this.ctx.groups.membership(groupId, conn.memberId)) {
+        this.pruneSubscriptions(conn);
+        continue;
+      }
+      this.sendEnvelope(conn, envelope);
+    }
     for (const s of this.subscribers) s(envelope);
   }
 
@@ -402,13 +524,5 @@ export class RealtimeServer implements GroupEventSink, GroupPresence, PresencePr
     for (const c of this.connections.values()) c.socket.close(1001, 'server shutting down');
     this.connections.clear();
     this.wss.close();
-  }
-}
-
-function safeOrigin(url: string): string {
-  try {
-    return new URL(url).origin;
-  } catch {
-    return '';
   }
 }

@@ -1,6 +1,9 @@
 import { randomBytes } from 'node:crypto';
+import { isIP } from 'node:net';
+import { hostname } from 'node:os';
 import type { FastifyInstance } from 'fastify';
 import type { HubContext } from '../context.js';
+import { PROBLEM_CONTENT_TYPE, problem } from './problem.js';
 import { requestBaseUrl } from './register.js';
 
 /** Content-Security-Policy for API responses and the admin GUI (same origin, no CDN, no inline script). */
@@ -17,9 +20,71 @@ export function newNonce(): string {
   return randomBytes(16).toString('base64url');
 }
 
+function extraAllowedHosts(): string[] {
+  return (process.env['NP_ALLOWED_HOSTS'] ?? '')
+    .split(',')
+    .map((h) => h.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function hostnameOf(value: string): string | null {
+  try {
+    const u = new URL(value.includes('://') ? value : `http://${value}`);
+    return u.hostname.toLowerCase().replace(/^\[(.*)\]$/, '$1').replace(/\.$/, '');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * DNS-rebinding defence: a browser tricked into talking to the hub under an attacker's domain
+ * sends that domain as Host. Only names the hub is known by are accepted: loopback names, IP
+ * literals (a rebinding page can never produce one), single-label LAN names, this machine's
+ * hostname, the configured public endpoint, the configured allowed origins and `NP_ALLOWED_HOSTS`
+ * (comma-separated; a leading dot allows subdomains).
+ */
+const PRIVATE_NAME_SUFFIXES = ['.local', '.lan', '.home.arpa', '.internal'] as const;
+
+export function isAllowedHost(ctx: Pick<HubContext, 'network'>, hostHeader: string | undefined): boolean {
+  if (hostHeader === undefined || hostHeader === '') return true; // HTTP/1.0 or non-browser client
+  const host = hostnameOf(hostHeader);
+  if (!host) return false;
+  if (isIP(host)) return true;
+  if (host === 'localhost' || host.endsWith('.localhost')) return true;
+  if (!host.includes('.')) return true;
+  const machine = hostname().toLowerCase();
+  if (host === machine || host === `${machine}.local`) return true;
+  // Names under these suffixes never resolve through public DNS, so a rebinding page cannot use them.
+  if (PRIVATE_NAME_SUFFIXES.some((suffix) => host.endsWith(suffix))) return true;
+  const known = new Set<string>();
+  const endpoint = ctx.network.publicEndpoint();
+  if (endpoint) {
+    const h = hostnameOf(endpoint);
+    if (h) known.add(h);
+  }
+  for (const origin of ctx.network.allowedOrigins()) {
+    const h = hostnameOf(origin);
+    if (h) known.add(h);
+  }
+  if (known.has(host)) return true;
+  for (const entry of extraAllowedHosts()) {
+    if (entry === host) return true;
+    if (entry.startsWith('.') && (host.endsWith(entry) || host === entry.slice(1))) return true;
+  }
+  return false;
+}
+
 /** Security headers, CORS for bearer clients (never credentials), and per-request correlation ids. */
 export function installSecurity(app: FastifyInstance, ctx: HubContext): void {
   app.addHook('onRequest', async (req, reply) => {
+    // A rebinding page cannot know a device secret, so a request carrying a *valid* bearer credential
+    // may use any host name (devices configured with a LAN DNS name keep working). Everything else
+    // (browser sessions, login, static pages) is held to the Host allowlist.
+    if (!isAllowedHost(ctx, req.headers.host) && !(await ctx.deviceAuth.authenticateHeader(req.headers.authorization).catch(() => null))) {
+      ctx.metrics.increment('http.host_rejected');
+      reply.code(421).type(PROBLEM_CONTENT_TYPE).header('Cache-Control', 'no-store');
+      return reply.send(problem(421, { title: 'Misdirected Request', detail: 'This hub does not answer to that host name. Add it as the public endpoint or to NP_ALLOWED_HOSTS.', correlationId: req.id, code: 'misdirected-request' }));
+    }
     reply.header('X-Content-Type-Options', 'nosniff');
     reply.header('X-Frame-Options', 'DENY');
     reply.header('Referrer-Policy', 'no-referrer');

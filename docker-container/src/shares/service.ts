@@ -17,7 +17,7 @@
  * the creator uploaded. Those items are metadata only: they resolve to "open at source" unless the
  * hub happens to hold the same content hash.
  */
-import { createHash } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import type { ShareKind, ShareLinkView, SharePayload } from '@now-playing/contracts';
 import { DomainError, uuidv7 } from '@now-playing/domain';
 import type { AuditService } from '../auth/audit.js';
@@ -52,9 +52,54 @@ export interface CreateShareInput {
 export interface ResolvedShare {
   share: ShareRecord;
   payload: SharePayload;
+  /**
+   * For capped links: a short-lived grant tied to this counted access. Stream requests that carry
+   * it (`?grant=`) do not count again, so one page view can play and seek freely.
+   */
+  streamGrant: string | null;
+}
+
+export interface ShareOwner {
+  id: string;
+  displayName: string;
+  /** Whether the creator may itself read hub-hosted tracks (admin, or a device with `library:read`). Default true. */
+  canReadHubLibrary?: boolean;
 }
 
 const MAX_ITEMS = 5000;
+/** How long a stream grant from one counted access stays valid. */
+const STREAM_GRANT_TTL_MS = 6 * 60 * 60 * 1000;
+
+/**
+ * Where a visitor fetches the cover for an item in a shared link.
+ *
+ * Must stay in step with `routes.shareArtwork`. It is a public path under `/s/`, not the
+ * `admin-or-device` `/api/v1/library/artwork/:id` the share payload used to point at — that one
+ * answered 401 to every visitor, so every cover on every share page was a broken image.
+ */
+function shareArtworkUrl(baseUrl: string, token: string, artworkId: string): string {
+  return `${baseUrl}/s/${encodeURIComponent(token)}/artwork/${encodeURIComponent(artworkId)}`;
+}
+
+/** Only plain web links are ever stored or rendered as "open at source". */
+export function safeSourceUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    if (url.username || url.password) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+/** A request that starts playback (no Range, or a range from byte 0) rather than seeking within it. */
+function startsPlayback(range: string | undefined): boolean {
+  if (!range) return true;
+  const m = /^bytes=(\d*)-/.exec(range.trim());
+  return !m || m[1] === '' || Number(m[1]) === 0;
+}
 
 export class ShareService {
   constructor(
@@ -67,7 +112,28 @@ export class ShareService {
     private readonly clock: Clock,
     private readonly random: RandomSource,
     private readonly hubName: () => string,
-  ) {}
+  ) {
+    this.grantKey = Buffer.from(random.bytes(32));
+  }
+
+  /** Process-local key for stream grants; grants simply lapse on restart. */
+  private readonly grantKey: Buffer;
+
+  private signGrant(shareId: string, expiresAtMs: number): string {
+    const sig = createHmac('sha256', this.grantKey).update(`share-grant:v1:${shareId}:${expiresAtMs}`).digest('base64url');
+    return `${expiresAtMs.toString(36)}.${sig}`;
+  }
+
+  private grantValid(shareId: string, grant: string | null | undefined): boolean {
+    if (!grant) return false;
+    const [expText, sig] = grant.split('.');
+    if (!expText || !sig) return false;
+    const expiresAtMs = Number.parseInt(expText, 36);
+    if (!Number.isFinite(expiresAtMs) || expiresAtMs <= this.clock.now()) return false;
+    const expected = Buffer.from(this.signGrant(shareId, expiresAtMs));
+    const given = Buffer.from(grant);
+    return expected.byteLength === given.byteLength && timingSafeEqual(expected, given);
+  }
 
   private nowIso(): string {
     return new Date(this.clock.now()).toISOString();
@@ -77,8 +143,11 @@ export class ShareService {
     return createHash('sha256').update(`share:${token}`).digest('hex');
   }
 
-  create(input: CreateShareInput, owner: { id: string; displayName: string }, meta: RequestMeta): { share: ShareLinkView; token: string } {
-    const items = this.itemsFor(input);
+  create(input: CreateShareInput, owner: ShareOwner, meta: RequestMeta): { share: ShareLinkView; token: string } {
+    for (const item of input.items ?? []) {
+      if (item.openAtSourceUrl !== null && safeSourceUrl(item.openAtSourceUrl) === null) throw new DomainError('validation', 'A source link must be an http(s) URL');
+    }
+    const items = this.itemsFor(input, owner.canReadHubLibrary !== false);
     if (!items.length) throw new DomainError('validation', 'There is nothing to share: no matching track, album or playlist items were supplied');
     if (items.length > MAX_ITEMS) throw new DomainError('validation', `A share can hold at most ${MAX_ITEMS} items`);
 
@@ -132,7 +201,7 @@ export class ShareService {
    * uploaded item list is taken at face value as metadata, with `hub_track_id` filled in only when
    * the hub genuinely holds matching content.
    */
-  private itemsFor(input: CreateShareInput): ShareItemRow[] {
+  private itemsFor(input: CreateShareInput, canReadHubLibrary: boolean): ShareItemRow[] {
     const rows: ShareItemRow[] = [];
     const push = (position: number, item: Omit<ShareItemRow, 'share_id' | 'position'>): void => {
       rows.push({ share_id: '', position, ...item });
@@ -140,7 +209,9 @@ export class ShareService {
 
     if (input.items?.length) {
       input.items.forEach((item, i) => {
-        const hubTrack = item.contentHash ? (this.libraryRepo.findTracksByHash(item.contentHash).find((t) => !t.deletedAt) ?? null) : null;
+        // Only a creator that may itself read the hub's library can turn a content hash into a
+        // publicly streamable hub track; anyone else's items stay metadata-only.
+        const hubTrack = item.contentHash && canReadHubLibrary ? (this.libraryRepo.findTracksByHash(item.contentHash).find((t) => !t.deletedAt) ?? null) : null;
         push(i, {
           track_id: item.trackId,
           title: item.title,
@@ -148,7 +219,7 @@ export class ShareService {
           album_name: item.albumName,
           duration_ms: item.durationMs,
           content_hash: item.contentHash,
-          open_at_source_url: item.openAtSourceUrl,
+          open_at_source_url: safeSourceUrl(item.openAtSourceUrl),
           hub_track_id: hubTrack?.id ?? null,
           artwork_id: hubTrack?.track.artworkId ?? null,
         });
@@ -157,6 +228,7 @@ export class ShareService {
     }
 
     // No item list: the target must be something the hub itself holds.
+    if ((input.kind === 'track' || input.kind === 'album') && !canReadHubLibrary) throw new DomainError('forbidden', 'Sharing hub-hosted tracks requires the library:read scope');
     if (input.kind === 'track') {
       const rec = this.library.findTrack(input.targetId);
       if (!rec) throw new DomainError('not-found', 'The hub does not hold that track, so it needs the item list from the device that does');
@@ -268,7 +340,7 @@ export class ShareService {
       title: record.title,
       description: record.description,
       ownerDisplayName: record.ownerDisplayName,
-      artworkUrl: items[0]?.artwork_id ? `${baseUrl}/api/v1/library/artwork/${encodeURIComponent(items[0].artwork_id)}` : null,
+      artworkUrl: items[0]?.artwork_id ? shareArtworkUrl(baseUrl, token, items[0].artwork_id) : null,
       items: items.map((item) => {
         const streamable = record.allowStream && item.hub_track_id !== null;
         return {
@@ -277,11 +349,11 @@ export class ShareService {
           artistName: item.artist_name,
           albumName: item.album_name,
           durationMs: item.duration_ms,
-          artworkUrl: item.artwork_id ? `${baseUrl}/api/v1/library/artwork/${encodeURIComponent(item.artwork_id)}` : null,
+          artworkUrl: item.artwork_id ? shareArtworkUrl(baseUrl, token, item.artwork_id) : null,
           streamable,
           downloadable: streamable && record.allowDownload,
-          openAtSourceUrl: item.open_at_source_url,
-          availabilityNote: streamable ? null : item.open_at_source_url ? 'This hub does not host this track; the link opens it at its source.' : 'This track is not hosted by this hub and has no public source link.',
+          openAtSourceUrl: safeSourceUrl(item.open_at_source_url),
+          availabilityNote: streamable ? null : safeSourceUrl(item.open_at_source_url) ? 'This hub does not host this track; the link opens it at its source.' : 'This track is not hosted by this hub and has no public source link.',
         };
       }),
       totalItems: items.length,
@@ -290,24 +362,67 @@ export class ShareService {
       allowDownload: record.allowDownload,
       hubName: this.hubName(),
     };
-    return { share: record, payload };
+    let streamGrant: string | null = null;
+    if (record.maxAccesses !== null && record.allowStream) {
+      const expiry = Math.min(this.clock.now() + STREAM_GRANT_TTL_MS, record.expiresAt ? Date.parse(record.expiresAt) : Number.POSITIVE_INFINITY);
+      streamGrant = this.signGrant(record.id, expiry);
+    }
+    return { share: record, payload, streamGrant };
   }
 
   /**
    * Authorize an anonymous stream of one shared track. Streaming is only ever possible for content
    * the hub itself hosts — a provider reference has no bytes here to serve.
+   *
+   * A capped link (`maxAccesses`) is enforced here too: a request carrying a valid grant from a
+   * counted page view streams freely; otherwise starting playback counts as an access (refused
+   * once the cap is reached) and seeking within a stream is only allowed while the cap is not used up.
    */
-  authorizeStream(token: string, trackId: string): { hubTrackId: string; share: ShareRecord } {
+  authorizeStream(token: string, trackId: string, options: { grant?: string | null; range?: string | undefined } = {}): { hubTrackId: string; share: ShareRecord } {
     const record = this.repo.findByTokenHash(ShareService.hashToken(token));
-    if (!record || record.revokedAt) throw new DomainError('not-found', 'That link is not available');
-    if (record.expiresAt !== null && Date.parse(record.expiresAt) <= this.clock.now()) throw new DomainError('not-found', 'That link is not available');
+    const gone = (): never => {
+      throw new DomainError('not-found', 'That link is not available');
+    };
+    if (!record || record.revokedAt) return gone();
+    if (record.expiresAt !== null && Date.parse(record.expiresAt) <= this.clock.now()) return gone();
     if (!record.allowStream) throw new DomainError('forbidden', 'This link shares the track list only; playback was not enabled by whoever created it');
     const item = this.repo.items(record.id).find((i) => i.track_id === trackId);
     if (!item) throw new DomainError('not-found', 'That track is not part of this link');
     if (!item.hub_track_id) throw new DomainError('unsupported', 'This hub does not host that track, so it cannot play it here. Use the link to its original source.');
+    if (record.maxAccesses !== null && !this.grantValid(record.id, options.grant)) {
+      if (startsPlayback(options.range)) {
+        if (!this.repo.countAccess(record.id)) return gone();
+      } else if (record.accessCount >= record.maxAccesses) {
+        return gone();
+      }
+    }
     this.repo.countPlay(record.id);
     this.metrics.increment('shares.streams');
     return { hubTrackId: item.hub_track_id, share: record };
+  }
+
+  /**
+   * Authorise one artwork fetch for a shared link.
+   *
+   * Deliberately does **not** count an access. A page with eight covers on it would otherwise spend
+   * eight of a capped link's allowance just by rendering, and the cap is meant to count people who
+   * opened the link, not images their browser fetched. `resolve()` already counted this visit.
+   *
+   * A token that does not resolve is 404 and says nothing more, the same as everywhere else. A
+   * token that resolves but has lapsed answers 410: whoever holds an artwork URL obtained it from a
+   * page this hub rendered for them, so they already know the link existed, and telling them it has
+   * expired reveals nothing a guess could have learned.
+   */
+  authorizeArtwork(token: string, artworkId: string): { share: ShareRecord; artworkId: string } {
+    const record = this.repo.findByTokenHash(ShareService.hashToken(token));
+    if (!record) throw new DomainError('not-found', 'That link is not available.');
+    if (record.revokedAt) throw new DomainError('gone', 'That link has been revoked.');
+    if (record.expiresAt !== null && Date.parse(record.expiresAt) <= this.clock.now()) throw new DomainError('gone', 'That link has expired.');
+    if (record.maxAccesses !== null && record.accessCount >= record.maxAccesses) throw new DomainError('gone', 'That link has been used up.');
+    // Scoped to the share: holding one link must not turn into a reader for the whole library.
+    const item = this.repo.items(record.id).find((i) => i.artwork_id === artworkId);
+    if (!item) throw new DomainError('not-found', 'That artwork is not part of this link.');
+    return { share: record, artworkId };
   }
 
   itemCount(shareId: string): number {

@@ -1,0 +1,27 @@
+# The build context is the repository root (compose.yaml), so the .dockerignore beside this file is
+# never read. BuildKit uses this one instead. Keeps the database, install key and .env files out of
+# the build cache, and keeps the context small.
+**/node_modules
+**/dist
+**/build
+**/out
+**/.gradle
+**/coverage
+**/playwright-report
+**/test-results
+**/*.log
+**/.env
+**/.env.*
+!**/.env.example
+.git
+docker-container/data
+.ci-data
+android
+windows-companion
+local-helper
+music-player
+docs
+now-playing.html
+now-playing-header.html
+*.md
+!**/README.md

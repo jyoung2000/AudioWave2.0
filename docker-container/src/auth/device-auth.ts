@@ -26,6 +26,16 @@ export class DeviceAuthService {
     if (!credential) return null;
     const expected = await hashCredentialSecret(secret, credentialId);
     if (!timingSafeEqual(expected, credential.secretHash)) return null;
+    return this.principalForCredential(credentialId);
+  }
+
+  /**
+   * The principal for a credential already proven some other way (a signed media URL). Applies the
+   * same revocation and expiry checks as `authenticate`.
+   */
+  principalForCredential(credentialId: string): Principal | null {
+    const credential = this.repo.findCredential(credentialId);
+    if (!credential) return null;
     const now = this.clock.now();
     if (credential.revokedAt) return null;
     if (credential.expiresAt && Date.parse(credential.expiresAt) <= now) return null;

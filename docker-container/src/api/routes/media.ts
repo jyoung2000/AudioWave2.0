@@ -9,10 +9,12 @@
  */
 import { createReadStream } from 'node:fs';
 import type { FastifyInstance } from 'fastify';
-import { routes } from '@now-playing/contracts';
+import { routePath, routes } from '@now-playing/contracts';
 import { DomainError } from '@now-playing/domain';
 import type { HubContext } from '../../context.js';
 import { actorDisplayName, actorId, type Principal } from '../../auth/principal.js';
+import { RangeNotSatisfiableError } from '../../library/service.js';
+import { signMediaPath } from '../media-signature.js';
 import { RAW, registerRoute } from '../register.js';
 
 /** Personalization is per hub user; a device without one has not finished pairing. */
@@ -124,23 +126,41 @@ export function registerMediaRoutes(app: FastifyInstance, ctx: HubContext): void
 
   registerRoute(app, ctx, routes.libraryScan, ({ principal }) => {
     const userId = principal.kind === 'device' ? (ctx.devices.userFor(principal.deviceId)?.id ?? actorId(principal)) : 'admin';
-    // Scanning can take minutes on a large volume, so it runs as a job and the caller polls.
+    // Scanning can take minutes on a large volume, so the job does it and the caller polls that job.
     const job = ctx.jobs.enqueue({ userId, kind: 'sync-library', priority: 'P2', payload: { provider: 'hub' } });
-    void ctx.library.scanAll().catch((err: unknown) => ctx.log.warn({ module: 'library', err: err instanceof Error ? err.message : String(err) }, 'library scan failed'));
     return { jobId: job.id, roots: ctx.library.listRoots().length };
   });
 
   registerRoute(app, ctx, routes.libraryStream, ({ params, req, reply }) => {
-    const stream = ctx.library.openRange(params.trackId, req.headers.range);
+    let stream: ReturnType<typeof ctx.library.openRange>;
+    try {
+      stream = ctx.library.openRange(params.trackId, req.headers.range);
+    } catch (err) {
+      if (err instanceof RangeNotSatisfiableError) reply.header('Content-Range', `bytes */${err.size}`);
+      throw err;
+    }
     reply
-      .status(stream.start === 0 && stream.end === stream.size - 1 && !req.headers.range ? 200 : 206)
+      .status(stream.partial ? 206 : 200)
       .header('Content-Type', stream.mime)
       .header('Accept-Ranges', 'bytes')
       .header('Content-Length', String(stream.end - stream.start + 1))
       .header('Cache-Control', 'private, max-age=0, must-revalidate');
-    if (req.headers.range) reply.header('Content-Range', `bytes ${stream.start}-${stream.end}/${stream.size}`);
+    if (stream.partial) reply.header('Content-Range', `bytes ${stream.start}-${stream.end}/${stream.size}`);
     reply.send(stream.stream);
     return RAW;
+  });
+
+  registerRoute(app, ctx, routes.libraryStreamUrls, ({ body, principal, baseUrl }) => {
+    if (principal.kind !== 'device') throw new DomainError('unauthenticated', 'Device credential required');
+    const now = ctx.clock.now();
+    let expiresAt = now;
+    const items = body.trackIds.map((trackId) => {
+      const path = routePath(routes.libraryStream, { trackId });
+      const signed = signMediaPath(ctx.installKey, path, principal.credentialId, now);
+      expiresAt = signed.expiresAt;
+      return { trackId, url: `${baseUrl}${path}?sig=${encodeURIComponent(signed.sig)}` };
+    });
+    return { items, expiresAt: new Date(expiresAt).toISOString() };
   });
 
   registerRoute(app, ctx, routes.libraryArtwork, ({ params, reply }) => {

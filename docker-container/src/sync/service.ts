@@ -18,7 +18,7 @@ import { SCHEMA_VERSIONS, WS_PROTOCOL_VERSION } from '@now-playing/contracts';
 import { changesSince, collectionsNeedingSync, DomainError, mergeChange, summarize, uuidv7, type SyncRecord } from '@now-playing/domain';
 import type { AuditService } from '../auth/audit.js';
 import type { RequestMeta } from '../auth/service.js';
-import type { SyncRepository, StoredSyncRecord } from '../db/repositories/sync.js';
+import { HUB_SYNC_OWNER, type SyncRepository, type StoredSyncRecord } from '../db/repositories/sync.js';
 import type { Clock } from '../deps.js';
 import type { MetricsRegistry } from '../metrics/registry.js';
 
@@ -36,6 +36,19 @@ const APPLIED_RETENTION_DAYS = 30;
 
 /** Keys a device must never be able to write into a synced record. */
 const FORBIDDEN_BODY_KEYS = new Set(['absolutePath', 'path', 'filePath', 'fsPath', 'localPath', 'directory', 'accessToken', 'refreshToken', 'password', 'passwordHash', 'token', 'secret']);
+
+/**
+ * Whose data a device syncs: every device of one hub user shares a data set; a device not linked to
+ * a user only sees its own. Records the hub publishes are visible to all.
+ */
+export function syncOwnerFor(device: { deviceId: string; hubUserId?: string | null }): string {
+  return device.hubUserId ? `user:${device.hubUserId}` : `device:${device.deviceId}`;
+}
+
+/** Nesting deeper than this is refused outright rather than walked. */
+const MAX_BODY_DEPTH = 32;
+
+const FORBIDDEN_BODY_KEYS_LOWER = new Set([...FORBIDDEN_BODY_KEYS].map((k) => k.toLowerCase()));
 
 export interface SyncProgress {
   pendingLocal: number;
@@ -84,9 +97,9 @@ export class SyncService {
   }
 
   /** The hub's view of every collection the device has enabled. */
-  async manifest(deviceId: string, enabled?: readonly SyncCollection[]): Promise<SyncManifest> {
+  async manifest(deviceId: string, enabled?: readonly SyncCollection[], owner: string = syncOwnerFor({ deviceId })): Promise<SyncManifest> {
     const collections = (enabled?.length ? enabled : this.stateOf(deviceId).enabled).filter((c) => (ALL_COLLECTIONS as readonly string[]).includes(c));
-    const summaries = await Promise.all(collections.map((c) => summarize(c, this.repo.all(c))));
+    const summaries = await Promise.all(collections.map((c) => summarize(c, this.repo.allForOwner(c, owner))));
     return {
       schemaVersion: SCHEMA_VERSIONS.syncManifest,
       deviceId,
@@ -97,13 +110,13 @@ export class SyncService {
   }
 
   /** Manifest exchange: returns the hub's manifest and the collections whose digests differ. */
-  async exchangeManifest(deviceId: string, incoming: SyncManifest): Promise<{ serverManifest: SyncManifest; needed: SyncCollection[] }> {
+  async exchangeManifest(deviceId: string, incoming: SyncManifest, owner: string = syncOwnerFor({ deviceId })): Promise<{ serverManifest: SyncManifest; needed: SyncCollection[] }> {
     if (incoming.protocolVersion !== WS_PROTOCOL_VERSION) {
       throw new DomainError('upgrade-required', `This hub speaks sync protocol ${WS_PROTOCOL_VERSION}; the device sent ${incoming.protocolVersion}. Update the older side.`);
     }
     const enabled = incoming.collections.map((c) => c.collection);
     this.saveState(deviceId, { enabled: enabled.length ? enabled : [...DEFAULT_COLLECTIONS] });
-    const serverManifest = await this.manifest(deviceId, enabled);
+    const serverManifest = await this.manifest(deviceId, enabled, owner);
     const needed = collectionsNeedingSync(incoming.collections, serverManifest.collections);
     this.metrics.increment('sync.manifest_exchanges');
     this.metrics.gauge('sync.collections_needing_sync', needed.length);
@@ -114,7 +127,7 @@ export class SyncService {
    * Delta exchange. Pushed changes are applied inside one transaction so a partial failure cannot
    * leave the hub half-updated; the pull is then computed from the committed state.
    */
-  delta(deviceId: string, request: SyncDeltaRequest): SyncDeltaResponse {
+  delta(deviceId: string, request: SyncDeltaRequest, owner: string = syncOwnerFor({ deviceId })): SyncDeltaResponse {
     const state = this.stateOf(deviceId);
     if (state.paused) throw new DomainError('conflict', 'Sync is paused for this device; resume it before exchanging changes');
     if (request.deviceId !== deviceId) throw new DomainError('forbidden', 'The delta names a different device than the credential presented');
@@ -138,6 +151,12 @@ export class SyncService {
           continue;
         }
         const local = this.repo.get(change.collection, change.id);
+        // A device may only create or change its own owner's records — never another user's, and
+        // never the hub's own.
+        if (local && local.ownerId !== owner) {
+          rejected += 1;
+          continue;
+        }
         const decision = mergeChange(local, change, knownChangeIds);
         if (decision.action === 'skip') {
           duplicates += 1;
@@ -146,9 +165,9 @@ export class SyncService {
         if (decision.action === 'conflict') {
           conflicts.push(decision.conflict);
           // A conflict still records a decision: whichever record won is what the hub keeps.
-          this.repo.put(change.collection, decision.record as SyncRecord, change.changeId, deviceId);
+          this.repo.put(change.collection, decision.record as SyncRecord, change.changeId, deviceId, owner);
         } else {
-          this.repo.put(change.collection, decision.record, change.changeId, deviceId);
+          this.repo.put(change.collection, decision.record, change.changeId, deviceId, owner);
           applied += 1;
         }
         this.repo.markApplied(change.changeId, change.collection, change.id, deviceId, this.nowIso());
@@ -162,7 +181,7 @@ export class SyncService {
     let budget = PAGE_LIMIT;
     for (const collection of enabled) {
       const since = request.since[collection] ?? this.repo.cursor(deviceId, collection);
-      const records = this.repo.all(collection);
+      const records = this.repo.allForOwner(collection, owner);
       if (budget <= 0) {
         cursors[collection] = since ?? null;
         if (records.some((r) => since === null || r.updatedAt > since)) more = true;
@@ -191,12 +210,12 @@ export class SyncService {
     return { applied, duplicates, conflicts, changes, cursors: cursors as SyncDeltaResponse['cursors'], more };
   }
 
-  status(deviceId: string): SyncStatus {
+  status(deviceId: string, owner: string = syncOwnerFor({ deviceId })): SyncStatus {
     const state = this.stateOf(deviceId);
     let pendingRemote = 0;
     for (const collection of state.enabled) {
       const since = this.repo.cursor(deviceId, collection);
-      pendingRemote += this.repo.all(collection).filter((r) => since === null || r.updatedAt > since).length;
+      pendingRemote += this.repo.allForOwner(collection, owner).filter((r) => since === null || r.updatedAt > since).length;
     }
     return {
       deviceId,
@@ -212,7 +231,7 @@ export class SyncService {
     };
   }
 
-  pause(deviceId: string, paused: boolean, meta: RequestMeta, actorDisplayName: string): SyncStatus {
+  pause(deviceId: string, paused: boolean, meta: RequestMeta, actorDisplayName: string, owner: string = syncOwnerFor({ deviceId })): SyncStatus {
     this.saveState(deviceId, { paused });
     this.audit.record({
       actor: { kind: 'device', id: deviceId, displayName: actorDisplayName },
@@ -222,7 +241,7 @@ export class SyncService {
       ip: meta.ip,
       correlationId: meta.correlationId,
     });
-    return this.status(deviceId);
+    return this.status(deviceId, owner);
   }
 
   recordFailure(deviceId: string, error: string): void {
@@ -233,7 +252,7 @@ export class SyncService {
   /** Records the hub itself originates (a hub library scan, an imported playlist). */
   publish(collection: SyncCollection, record: SyncRecord, originDeviceId = 'hub'): void {
     const changeId = uuidv7(this.clock.now());
-    this.repo.put(collection, record, changeId, originDeviceId);
+    this.repo.put(collection, record, changeId, originDeviceId, HUB_SYNC_OWNER);
   }
 
   publishMany(collection: SyncCollection, records: readonly SyncRecord[], originDeviceId = 'hub'): number {
@@ -275,11 +294,22 @@ export class SyncService {
 
 /**
  * Reject a change whose body carries a field the hub must never hold — a filesystem path or
- * anything token-shaped. Returning false drops the change rather than silently storing it.
+ * anything token-shaped — at any depth. Returning false drops the change rather than silently
+ * storing it.
  */
-function sanitizeBody(change: SyncChange): boolean {
+export function sanitizeBody(change: Pick<SyncChange, 'body'>): boolean {
   if (!change.body) return true;
-  for (const key of Object.keys(change.body)) if (FORBIDDEN_BODY_KEYS.has(key)) return false;
+  return bodyIsClean(change.body, 0);
+}
+
+function bodyIsClean(value: unknown, depth: number): boolean {
+  if (value === null || typeof value !== 'object') return true;
+  if (depth > MAX_BODY_DEPTH) return false;
+  if (Array.isArray(value)) return value.every((v) => bodyIsClean(v, depth + 1));
+  for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
+    if (FORBIDDEN_BODY_KEYS.has(key) || FORBIDDEN_BODY_KEYS_LOWER.has(key.toLowerCase())) return false;
+    if (!bodyIsClean(v, depth + 1)) return false;
+  }
   return true;
 }
 

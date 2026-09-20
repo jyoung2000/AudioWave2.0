@@ -68,20 +68,23 @@ export function BackupView() {
         resource={backups}
         title="Backups"
         actions={
-          <Button
-            variant="default"
-            busy={create.busy}
-            onClick={() =>
-              void create.run().then((r) => {
-                if (r) {
-                  backups.reload();
-                  toast.show('Backup written to the data volume', { kind: 'success' });
-                }
-              })
-            }
-          >
-            Back up now
-          </Button>
+          <>
+            <Button
+              variant="default"
+              busy={create.busy}
+              onClick={() =>
+                void create.run().then((r) => {
+                  if (r) {
+                    backups.reload();
+                    toast.show('Backup written to the data volume', { kind: 'success' });
+                  }
+                })
+              }
+            >
+              Back up now
+            </Button>
+            <InlineError error={restore.error ?? create.error} />
+          </>
         }
         emptyWhen={(d) => (d as { items: BackupEntry[] }).items.length === 0}
         emptyTitle="No backups yet"
@@ -108,12 +111,15 @@ export function BackupView() {
                     busy={restore.busy}
                     onClick={() => {
                       // A destructive, irreversible action deserves a blocking prompt.
-                      if (!window.confirm(`Restore ${row.id}?\n\nA safety backup of the current database is taken first, then this file replaces it. The hub must be restarted afterwards.`)) return;
+                      if (!window.confirm(`Restore ${row.id}?\n\nA safety backup of the current database is taken first, then this file replaces it. The hub restarts itself immediately afterwards and is unreachable for a few seconds.`)) return;
                       void restore.run(row.id).then((r) => {
                         if (r) {
                           const result = r as { safetyBackupId: string };
-                          toast.show(`Restored. The current database was saved as ${result.safetyBackupId}. Restart the container now.`, { kind: 'warning', durationMs: 30_000 });
-                          backups.reload();
+                          // No reload: the hub exits as soon as this response is written, so any
+                          // further request would fail until the supervisor has brought it back.
+                          toast.show(`Restored. The current database was saved as ${result.safetyBackupId}. The hub is restarting — reload this page in a few seconds.`, { kind: 'warning', durationMs: 30_000 });
+                        } else {
+                          toast.show('The restore did not complete; the details are shown above the list.', { kind: 'error' });
                         }
                       });
                     }}

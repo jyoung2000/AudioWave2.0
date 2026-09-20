@@ -1,8 +1,12 @@
 # One command: `docker compose up -d`.
 #
-# Defaults are the safe ones. The hub binds to localhost inside the container and the port is
-# published to 127.0.0.1 only, so a fresh install is not reachable from the network even before the
-# password is changed. Opening it up is two deliberate edits, described in the comments below.
+# Defaults are the safe ones. Inside the container the hub listens on all interfaces (Docker's port
+# forwarding cannot reach the container's loopback), but the port is published to 127.0.0.1 only,
+# so a fresh install is not reachable from the network even before the password is changed. Opening
+# it up is two deliberate edits, described in the comments below.
+#
+# ./data must be writable by uid 1000 (the image's `node` user). `./nowplaying install` takes care of
+# that; if you create the directory yourself, run: sudo chown -R 1000:1000 ./data
 
 name: now-playing
 
@@ -28,6 +32,10 @@ services:
       # Absolute https:// URL when the hub is behind a reverse proxy. Pairing links and share links
       # are unreachable for anyone else until this is set.
       NP_PUBLIC_ENDPOINT: "${NP_PUBLIC_ENDPOINT:-}"
+      # Extra host names the hub answers to, comma-separated (".example.com" allows subdomains).
+      # IP addresses, localhost and .local/.lan/.home.arpa names always work; any other name you
+      # type into a browser (other than the public endpoint) gets "421 Misdirected Request" until listed.
+      NP_ALLOWED_HOSTS: "${NP_ALLOWED_HOSTS:-}"
       # Comma-separated CIDRs whose X-Forwarded-For header is trusted. Leave empty unless a proxy
       # you control sits in front of the hub.
       NP_TRUSTED_PROXY_CIDRS: "${NP_TRUSTED_PROXY_CIDRS:-}"
@@ -37,12 +45,18 @@ services:
       # Optional: the Discord bot token. Prefer setting it in the admin GUI, where it is encrypted
       # at rest with the installation key rather than sitting in an environment variable.
       NP_DISCORD_TOKEN: "${NP_DISCORD_TOKEN:-}"
+      # Optional: an ffmpeg binary other than the one in the image, and a folder of public-domain
+      # audio for the built-in provider. Empty means the defaults.
+      NP_FFMPEG_PATH: "${NP_FFMPEG_PATH:-}"
+      NP_PUBLIC_DOMAIN_DIR: "${NP_PUBLIC_DOMAIN_DIR:-}"
     volumes:
       # Everything the hub owns lives here: the database, the library, blobs, artwork, backups,
       # logs and the installation key. Back this directory up and the hub is portable.
       - ./data:/data
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4546/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      # Follows NP_PORT (the port inside the container), so changing it above cannot leave the
+      # container permanently "unhealthy" — which would also keep the discord worker from starting.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:'+(process.env.NP_PORT||4546)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -73,13 +87,29 @@ services:
       hub:
         condition: service_healthy
     command: ["node", "discord-worker.js"]
+    # The worker builds the same services as the hub from the same configuration, so everything its
+    # code paths read (audit IP logging, share links, ffmpeg for voice playback) mirrors the hub.
+    # It never listens on a port.
     environment:
       NP_DATA_DIR: /data
+      NP_BIND_MODE: "${NP_BIND_MODE:-localhost}"
+      NP_PUBLIC_ENDPOINT: "${NP_PUBLIC_ENDPOINT:-}"
+      NP_TRUSTED_PROXY_CIDRS: "${NP_TRUSTED_PROXY_CIDRS:-}"
+      NP_IP_LOGGING: "${NP_IP_LOGGING:-truncated}"
       NP_LOG_LEVEL: "${NP_LOG_LEVEL:-info}"
       NP_DISCORD_TOKEN: "${NP_DISCORD_TOKEN:-}"
+      NP_FFMPEG_PATH: "${NP_FFMPEG_PATH:-}"
+      NP_PUBLIC_DOMAIN_DIR: "${NP_PUBLIC_DOMAIN_DIR:-}"
     volumes:
       - ./data:/data
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    tmpfs:
+      - /tmp:size=64m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

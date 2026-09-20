@@ -11,10 +11,16 @@ import { routes } from '@now-playing/contracts';
 import { DomainError } from '@now-playing/domain';
 import type { HubContext } from '../../context.js';
 import { actorDisplayName, actorId, type Principal } from '../../auth/principal.js';
+import { syncOwnerFor } from '../../sync/service.js';
 import { RAW, registerRoute } from '../register.js';
 
 /** 8 MiB per chunk: large enough to be efficient, small enough that a retry is cheap. */
 const MAX_CHUNK_BYTES = 8 * 1024 * 1024;
+
+function ownerOf(principal: Principal): string {
+  if (principal.kind !== 'device') throw new DomainError('unauthenticated', 'Device credential required');
+  return syncOwnerFor({ deviceId: principal.deviceId, hubUserId: principal.hubUserId });
+}
 
 function deviceIdOf(principal: Principal): string {
   if (principal.kind !== 'device') throw new DomainError('unauthenticated', 'Device credential required');
@@ -24,26 +30,28 @@ function deviceIdOf(principal: Principal): string {
 export function registerSyncRoutes(app: FastifyInstance, ctx: HubContext): void {
   registerRoute(app, ctx, routes.syncManifest, async ({ body, principal }) => {
     const deviceId = deviceIdOf(principal);
-    const result = await ctx.sync.exchangeManifest(deviceId, body);
+    const result = await ctx.sync.exchangeManifest(deviceId, body, ownerOf(principal));
     return { serverManifest: result.serverManifest, needed: result.needed };
   });
 
-  registerRoute(app, ctx, routes.syncDelta, ({ body, principal }) => ctx.sync.delta(deviceIdOf(principal), body));
+  registerRoute(app, ctx, routes.syncDelta, ({ body, principal }) => ctx.sync.delta(deviceIdOf(principal), body, ownerOf(principal)));
 
-  registerRoute(app, ctx, routes.syncStatus, ({ principal }) => ctx.sync.status(deviceIdOf(principal)));
+  registerRoute(app, ctx, routes.syncStatus, ({ principal }) => ctx.sync.status(deviceIdOf(principal), ownerOf(principal)));
 
   /* ------------------------------------------------------------------ files */
 
   registerRoute(app, ctx, routes.filesHead, ({ params, principal, reply }) => {
     const deviceId = deviceIdOf(principal);
     const auth = ctx.files.authorizeRead(params.contentHash, deviceId, false);
-    const status = ctx.files.status(params.contentHash);
-    // HEAD answers for an unauthorized hash too, but only with "nothing here": otherwise the
-    // response would confirm the hub holds a file the caller has no claim to.
+    const status = ctx.files.status(params.contentHash, deviceId);
+    // HEAD answers for an unauthorized hash too, but only with "nothing here" plus the caller's own
+    // staged progress: otherwise the response would confirm the hub holds a file the caller has no
+    // claim to.
+    const received = status.complete && auth.allowed ? status.receivedBytes : ctx.files.stagedBytes(params.contentHash, deviceId);
     reply
       .status(status.complete && auth.allowed ? 200 : 404)
       .header('Accept-Ranges', 'bytes')
-      .header('X-Received-Bytes', String(auth.allowed ? status.receivedBytes : 0))
+      .header('X-Received-Bytes', String(received))
       .header('Content-Length', String(status.complete && auth.allowed ? (status.completeBytes ?? 0) : 0))
       .send();
     return RAW;
@@ -54,13 +62,13 @@ export function registerSyncRoutes(app: FastifyInstance, ctx: HubContext): void 
     ctx,
     routes.filesPut,
     async ({ params, query, req, principal }) => {
-      deviceIdOf(principal);
+      const deviceId = deviceIdOf(principal);
       const body = req.body;
       const chunk = Buffer.isBuffer(body) ? body : typeof body === 'string' ? Buffer.from(body, 'binary') : null;
       if (!chunk) throw new DomainError('validation', 'Send the chunk as application/octet-stream');
       if (chunk.byteLength > MAX_CHUNK_BYTES) throw new DomainError('validation', `A chunk may be at most ${MAX_CHUNK_BYTES} bytes`);
-      const result = await ctx.files.putChunk(params.contentHash, query.offset, query.total, chunk);
-      ctx.transfers.recordUpload(params.contentHash, result.receivedBytes, result.complete);
+      const result = await ctx.files.putChunk(params.contentHash, query.offset, query.total, chunk, deviceId);
+      ctx.transfers.recordUpload(params.contentHash, result.receivedBytes, result.complete, deviceId);
       return result;
     },
     { bodyLimit: MAX_CHUNK_BYTES + 1024 },

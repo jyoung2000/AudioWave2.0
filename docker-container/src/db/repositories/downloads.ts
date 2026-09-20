@@ -132,6 +132,14 @@ export class DownloadsRepository {
     return this.db.prepare<[string], DownloadRow>("SELECT * FROM download_jobs WHERE state = 'retrying' AND (next_retry_at IS NULL OR next_retry_at <= ?) ORDER BY created_at").all(now).map(toDownload);
   }
 
+  /**
+   * Atomically move a queued or due-retrying job to `running`. Returns false when another runner
+   * (or a cancel/pause) got there first, so two workers can never write the same `.part` file.
+   */
+  claim(id: string, now: string): boolean {
+    return this.db.prepare("UPDATE download_jobs SET state = 'running', updated_at = ? WHERE id = ? AND (state = 'queued' OR (state = 'retrying' AND (next_retry_at IS NULL OR next_retry_at <= ?)))").run(now, id, now).changes === 1;
+  }
+
   recoverRunning(now: string): number {
     return this.db.prepare("UPDATE download_jobs SET state = 'queued', updated_at = ? WHERE state = 'running'").run(now).changes;
   }

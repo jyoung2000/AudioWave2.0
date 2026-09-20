@@ -80,8 +80,14 @@ export class FileStore {
     return join(this.blobDir(), contentHash);
   }
 
-  private partPath(contentHash: string): string {
-    return join(this.partDir(), `${contentHash}.part`);
+  /**
+   * Staged uploads are kept per uploader so one device can neither append to nor ride on another
+   * device's in-progress upload of the same hash.
+   */
+  private partPath(contentHash: string, uploaderId?: string): string {
+    if (!uploaderId) return join(this.partDir(), `${contentHash}.part`);
+    const tag = createHash('sha256').update(`uploader:${uploaderId}`).digest('hex').slice(0, 24);
+    return join(this.partDir(), `${contentHash}.${tag}.part`);
   }
 
   /** Where the bytes for this hash actually live: an uploaded blob, or a scanned library file. */
@@ -102,13 +108,27 @@ export class FileStore {
     return null;
   }
 
-  status(contentHash: string): FileStatus {
+  /**
+   * What the hub holds for this hash. With `uploaderId`, the in-progress byte count is that
+   * uploader's own staged upload (the offset its next PUT must use).
+   */
+  status(contentHash: string, uploaderId?: string): FileStatus {
     this.assertHash(contentHash);
     const existing = this.resolveExisting(contentHash);
     if (existing) return { contentHash, completeBytes: existing.size, receivedBytes: existing.size, complete: true };
-    const part = this.partPath(contentHash);
-    const receivedBytes = existsSync(part) ? statSync(part).size : 0;
-    return { contentHash, completeBytes: null, receivedBytes, complete: false };
+    return { contentHash, completeBytes: null, receivedBytes: this.stagedBytes(contentHash, uploaderId), complete: false };
+  }
+
+  /** Bytes staged by this uploader only; never reveals whether anyone else holds the file. */
+  stagedBytes(contentHash: string, uploaderId?: string): number {
+    this.assertHash(contentHash);
+    const part = this.partPath(contentHash, uploaderId);
+    return existsSync(part) ? statSync(part).size : 0;
+  }
+
+  /** The device that first uploaded these bytes, when they came from a device upload. */
+  private blobOwner(contentHash: string): string | null {
+    return this.library.findBlob(contentHash)?.owner_id ?? null;
   }
 
   /**
@@ -116,13 +136,16 @@ export class FileStore {
    * client bug or a race, and silently seeking would corrupt the file, so it is refused with the
    * offset to resume from.
    */
-  async putChunk(contentHash: string, offset: number, total: number, body: Buffer): Promise<PutResult> {
+  async putChunk(contentHash: string, offset: number, total: number, body: Buffer, uploaderId?: string): Promise<PutResult> {
     this.assertHash(contentHash);
     if (total > MAX_FILE_BYTES) throw new DomainError('validation', `That file is larger than this hub accepts (${Math.floor(MAX_FILE_BYTES / 1024 / 1024)} MB)`);
     const existing = this.resolveExisting(contentHash);
-    if (existing) return { receivedBytes: existing.size, complete: true, verified: true };
+    // Deduplication only short-circuits for a caller that may already read these bytes. Anyone else
+    // has to upload the full content (proof of possession) — otherwise knowing a hash would be
+    // enough to claim a file.
+    if (existing && (uploaderId === undefined || this.authorizeRead(contentHash, uploaderId, false).allowed)) return { receivedBytes: existing.size, complete: true, verified: true };
 
-    const part = this.partPath(contentHash);
+    const part = this.partPath(contentHash, uploaderId);
     const have = existsSync(part) ? statSync(part).size : 0;
     if (offset !== have) throw new DomainError('conflict', `Resume from byte ${have}: the hub holds ${have} bytes of this file, the chunk started at ${offset}`);
     if (have + body.byteLength > total) throw new DomainError('validation', 'That chunk would exceed the declared total size');
@@ -146,22 +169,30 @@ export class FileStore {
       this.metrics.increment('files.checksum_failures');
       throw new DomainError('validation', 'The uploaded bytes do not match the content hash; the transfer was discarded');
     }
+    if (this.resolveExisting(contentHash)) {
+      // The hub already holds these bytes; the upload only proved the caller has them too.
+      await unlink(part).catch(() => undefined);
+      this.metrics.increment('files.completed');
+      return { receivedBytes, complete: true, verified: true };
+    }
     renameSync(part, this.blobPath(contentHash));
-    this.library.putBlob({ sha256: contentHash, size_bytes: receivedBytes, relative_path: `blobs/${contentHash}`, mime: null, track_id: null, owner_id: null, created_at: new Date(this.clock.now()).toISOString() });
+    this.library.putBlob({ sha256: contentHash, size_bytes: receivedBytes, relative_path: `blobs/${contentHash}`, mime: null, track_id: null, owner_id: uploaderId ?? null, created_at: new Date(this.clock.now()).toISOString() });
     this.metrics.increment('files.completed');
     return { receivedBytes, complete: true, verified: true };
   }
 
   /**
-   * May this device read these bytes? Yes when a transfer job addressed to it names the hash, when
-   * it uploaded them itself, or when the content belongs to the hub's own library.
+   * May this device read these bytes? Yes when it uploaded them itself, when a transfer addressed
+   * to it names the hash *and* the sender proved it holds the bytes (`checksumVerified`), or when
+   * the content belongs to the hub's own library. Creating a transfer grants nothing to its creator.
    */
   authorizeRead(contentHash: string, deviceId: string, isAdmin: boolean): { allowed: boolean; reason: string | null } {
     this.assertHash(contentHash);
     if (isAdmin) return { allowed: true, reason: null };
+    if (this.blobOwner(contentHash) === deviceId) return { allowed: true, reason: null };
     const transfers = this.downloads.transfersForHash(contentHash);
-    const involved = transfers.find((t) => (t.toDeviceId === deviceId || t.fromDeviceId === deviceId) && t.state !== 'cancelled');
-    if (involved) return { allowed: true, reason: null };
+    const addressed = transfers.find((t) => t.toDeviceId === deviceId && t.fromDeviceId !== deviceId && t.state !== 'cancelled' && t.checksumVerified);
+    if (addressed) return { allowed: true, reason: null };
     if (this.library.findTracksByHash(contentHash).length) return { allowed: true, reason: null };
     return { allowed: false, reason: 'No transfer addressed to this device references that file' };
   }

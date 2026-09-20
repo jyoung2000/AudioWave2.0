@@ -13,6 +13,10 @@ import type { NetworkService } from '../network/service.js';
 import { randomToken, sha256Hex } from '../util.js';
 import type { DeviceService } from './devices.js';
 
+/** Wrong pairing codes allowed per source address per window before it is locked out. */
+const CLAIM_MAX_FAILURES_PER_WINDOW = PAIRING_MAX_ATTEMPTS * 2;
+const CLAIM_FAILURE_WINDOW_MS = 15 * 60 * 1000;
+
 export interface CreatePairingResult {
   sessionId: string;
   code: string;
@@ -101,13 +105,41 @@ export class PairingService {
     this.audit.record({ actor: { kind: 'admin', id: actor.id, displayName: actor.displayName }, action: 'pairing.revoke', outcome: 'success', target: { kind: 'pairing', id: sessionId }, ip: meta.ip, correlationId: meta.correlationId });
   }
 
-  /** The joining device presents the code. Wrong codes count against every pending session (bounded brute force). */
+  /** Failed claims per source address in the current window. */
+  private readonly claimFailures = new Map<string, { count: number; windowStart: number }>();
+
+  private failureBucket(ip: string | null): { count: number; windowStart: number } {
+    const key = ip ?? 'unknown';
+    const now = this.nowMs();
+    let bucket = this.claimFailures.get(key);
+    if (!bucket || now - bucket.windowStart >= CLAIM_FAILURE_WINDOW_MS) {
+      bucket = { count: 0, windowStart: now };
+      this.claimFailures.set(key, bucket);
+    }
+    if (this.claimFailures.size > 10_000) {
+      for (const [k, v] of this.claimFailures) if (now - v.windowStart >= CLAIM_FAILURE_WINDOW_MS) this.claimFailures.delete(k);
+    }
+    return bucket;
+  }
+
+  /**
+   * The joining device presents the code. Wrong codes are counted per source address and lock that
+   * address out for a while; they never burn the attempts of pending sessions, so an anonymous
+   * caller cannot cancel everyone else's pairing by guessing.
+   */
   async claim(input: ClaimInput, meta: RequestMeta): Promise<ClaimResult> {
     const now = this.nowIso();
     this.repo.expireStale(now);
+    const bucket = this.failureBucket(meta.ip);
+    if (bucket.count >= CLAIM_MAX_FAILURES_PER_WINDOW) {
+      this.metrics.increment('pairing.locked_out');
+      const retryAfterSeconds = Math.max(1, Math.ceil((bucket.windowStart + CLAIM_FAILURE_WINDOW_MS - this.nowMs()) / 1000));
+      throw new DomainError('rate-limited', 'Too many wrong pairing codes from this address; wait before trying again', { retryAfterSeconds });
+    }
     const normalized = normalizePairingCode(input.code);
     this.metrics.increment('pairing.attempts');
     if (!normalized) {
+      bucket.count += 1;
       this.metrics.increment('pairing.failures');
       throw new DomainError('validation', 'Pairing code is not in the expected format');
     }
@@ -120,10 +152,7 @@ export class PairingService {
       }
     }
     if (!match) {
-      for (const row of pending) {
-        const attempts = this.repo.incrementAttempts(row.id, now);
-        if (attempts >= row.max_attempts) this.repo.setState(row.id, 'expired', now);
-      }
+      bucket.count += 1;
       this.metrics.increment('pairing.failures');
       this.audit.record({ actor: { kind: 'anonymous', id: 'anonymous' }, action: 'pairing.claim', outcome: 'denied', ip: meta.ip, correlationId: meta.correlationId, details: { reason: 'code-mismatch', pendingSessions: pending.length } });
       throw new DomainError('forbidden', 'Unknown or expired pairing code');

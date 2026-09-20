@@ -21,6 +21,11 @@ export interface HubConfig {
   publicDomainDir: string | null;
   demoMode: boolean;
   nodeEnv: string;
+  /**
+   * Set by the image (`NP_CONTAINER=1`). Inside a container, loopback is unreachable from Docker's
+   * port forwarding, so exposure is governed by the published port (127.0.0.1-only by default).
+   */
+  inContainer?: boolean;
 }
 
 const BIND_MODES: readonly BindMode[] = ['localhost', 'lan', 'remote'];
@@ -103,6 +108,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): HubConfig {
     publicDomainDir: text(env, 'NP_PUBLIC_DOMAIN_DIR') ?? defaultPublicDomainDir(),
     demoMode: demo === 'true' || demo === '1',
     nodeEnv: text(env, 'NODE_ENV') ?? 'development',
+    inContainer: ['1', 'true'].includes((text(env, 'NP_CONTAINER') ?? '').toLowerCase()),
   };
 }
 

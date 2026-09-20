@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { z } from 'zod';
 import { API_PREFIX, type RouteContract } from '@now-playing/contracts';
@@ -6,6 +7,7 @@ import type { HubContext } from '../context.js';
 import { hasScope, missingScopes, type Principal } from '../auth/principal.js';
 import { SESSION_COOKIE } from '../auth/service.js';
 import type { RateLimitClassName } from '../deps.js';
+import { verifyMediaSignature } from './media-signature.js';
 import { PROBLEM_CONTENT_TYPE, problem, problemFromDomainError } from './problem.js';
 
 /** Per-request context handed to every route handler. */
@@ -73,7 +75,13 @@ export function parseCookies(header: string | undefined): Record<string, string>
     if (idx <= 0) continue;
     const name = part.slice(0, idx).trim();
     const value = part.slice(idx + 1).trim();
-    if (name) out[name] = decodeURIComponent(value);
+    if (!name) continue;
+    try {
+      out[name] = decodeURIComponent(value);
+    } catch {
+      // A malformed escape is treated as an absent cookie rather than a server error.
+      continue;
+    }
   }
   return out;
 }
@@ -105,11 +113,45 @@ export async function resolvePrincipal(ctx: Pick<HubContext, 'auth' | 'deviceAut
   return session ?? { kind: 'anonymous' };
 }
 
-function sameOrigin(req: FastifyRequest, baseUrl: string, allowed: readonly string[]): boolean {
+/**
+ * Media routes additionally accept `?sig=` (see media-signature.ts), because an `<audio>` element
+ * cannot send a bearer credential. A signature only ever stands in for the device it was issued to.
+ */
+async function resolveMediaPrincipal(ctx: Pick<HubContext, 'auth' | 'deviceAuth' | 'installKey' | 'clock'>, req: FastifyRequest): Promise<Principal> {
+  const sig = (req.query as Record<string, unknown> | undefined)?.['sig'];
+  if (typeof sig !== 'string' || req.headers.authorization) return resolvePrincipal(ctx, req);
+  const path = new URL(req.url, 'http://hub.invalid').pathname;
+  const credentialId = verifyMediaSignature(ctx.installKey, path, sig, ctx.clock.now());
+  const principal = credentialId ? ctx.deviceAuth.principalForCredential(credentialId) : null;
+  if (!principal) throw new DomainError('unauthenticated', 'This media link has expired or was revoked');
+  return principal;
+}
+
+/** Constant-time string comparison that does not throw on a length mismatch. */
+export function safeEqual(a: string, b: string): boolean {
+  const left = Buffer.from(a, 'utf8');
+  const right = Buffer.from(b, 'utf8');
+  if (left.byteLength !== right.byteLength) {
+    timingSafeEqual(left, left);
+    return false;
+  }
+  return timingSafeEqual(left, right);
+}
+
+/**
+ * Is this browser request same-origin (or from an explicitly allowed origin)? An Origin header,
+ * when present, must match; the Host it is compared with has already passed the Host allowlist
+ * (`installSecurity`), so a DNS-rebinding page cannot satisfy it. Without Origin, Sec-Fetch-Site
+ * decides; a request with neither is a non-browser client.
+ */
+export function sameOrigin(req: FastifyRequest, baseUrl: string, allowed: readonly string[]): boolean {
   const origin = req.headers.origin;
   const fetchSite = req.headers['sec-fetch-site'];
-  if (typeof fetchSite === 'string' && (fetchSite === 'same-origin' || fetchSite === 'none')) return true;
-  if (typeof origin !== 'string') return true; // non-browser client; CSRF token still required for cookie sessions
+  if (typeof origin !== 'string') {
+    if (typeof fetchSite === 'string') return fetchSite === 'same-origin' || fetchSite === 'none';
+    return true; // non-browser client; CSRF token still required for cookie sessions
+  }
+  if (origin === 'null') return false;
   try {
     const o = new URL(origin).origin;
     if (o === new URL(baseUrl).origin) return true;
@@ -154,16 +196,22 @@ export function registerRoute<R extends RouteContract>(app: FastifyInstance, ctx
             throw new DomainError('rate-limited', 'Too many requests', { retryAfterSeconds: limit.retryAfterSeconds });
           }
         }
-        const principal = await resolvePrincipal(ctx, req);
+        const principal = route.responseContentType ? await resolveMediaPrincipal(ctx, req) : await resolvePrincipal(ctx, req);
         if (route.auth === 'admin' && principal.kind !== 'admin') throw new DomainError('unauthenticated', 'Admin session required');
         if (route.auth === 'device' && principal.kind !== 'device') throw new DomainError('unauthenticated', 'Device credential required');
         if (route.auth === 'admin-or-device' && principal.kind === 'anonymous') throw new DomainError('unauthenticated', 'Authentication required');
         if (route.auth !== 'none' && route.setupRequired !== false && !ctx.auth.setupComplete()) {
           throw new DomainError('setup-required', 'Replace the bootstrap password before using this feature');
         }
-        if (principal.kind === 'admin' && !['GET', 'HEAD'].includes(route.method)) {
+        const stateChanging = !['GET', 'HEAD'].includes(route.method);
+        // Login mints a session cookie, so a cross-site (or rebinding) page must not be able to drive it.
+        if (stateChanging && route.operationId === 'login' && !sameOrigin(req, baseUrl, ctx.network.allowedOrigins())) {
+          ctx.audit.record({ actor: { kind: 'anonymous', id: 'anonymous' }, action: 'security.csrf', outcome: 'denied', ip, correlationId, details: { operation: route.operationId } });
+          throw new DomainError('forbidden', 'Cross-origin login is not allowed');
+        }
+        if (principal.kind === 'admin' && stateChanging) {
           const token = req.headers['x-csrf-token'];
-          if (typeof token !== 'string' || token !== principal.csrfToken || !sameOrigin(req, baseUrl, ctx.network.allowedOrigins())) {
+          if (typeof token !== 'string' || !safeEqual(token, principal.csrfToken) || !sameOrigin(req, baseUrl, ctx.network.allowedOrigins())) {
             ctx.audit.record({ actor: { kind: 'admin', id: principal.userId, displayName: principal.username }, action: 'security.csrf', outcome: 'denied', ip, correlationId, details: { operation: route.operationId } });
             throw new DomainError('forbidden', 'Missing or invalid CSRF token');
           }
@@ -201,7 +249,13 @@ export function registerRoute<R extends RouteContract>(app: FastifyInstance, ctx
           const check = route.response.safeParse(result);
           if (!check.success) throw new Error(`Response contract violation in ${route.operationId}: ${check.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`);
         }
-        reply.code(route.responseStatus ?? 200);
+        /*
+         * Only the default. A handler that set its own status has already made a decision this
+         * must not undo — `/readyz` answering 503 while starting or stopping, `/healthz` answering
+         * 503 once the database is closed. Overwriting it unconditionally is how both of those came
+         * to return 200 no matter what their bodies said.
+         */
+        if (reply.statusCode === 200) reply.code(route.responseStatus ?? 200);
         return result;
       } catch (err) {
         return sendError(ctx, req, reply, err, correlationId);

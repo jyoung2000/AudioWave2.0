@@ -86,6 +86,15 @@ export class GroupService {
   private presence: GroupPresence | null = null;
   private syncGradeFor: (track: TrackRef) => { grade: GroupSyncGrade; reason: string | null } = () => ({ grade: 'best_effort', reason: null });
   private readonly timers = new Map<string, { at: number; handle: ReturnType<typeof setTimeout> | null; kind: 'start' | 'ended' }>();
+  /** Per group: the highest event seq already fanned out, and seqs this process published itself. */
+  private readonly relayCursor = new Map<string, number>();
+  private readonly localSeqs = new Map<string, Set<number>>();
+  private relayHandle: ReturnType<typeof setInterval> | null = null;
+  /**
+   * Broadcasts published inside a transaction wait here until it commits, so clients never see an
+   * event whose write was rolled back. Null outside a transaction.
+   */
+  private pendingBroadcasts: Array<{ groupId: string; envelope: Envelope; local: boolean }> | null = null;
 
   constructor(
     private readonly repo: GroupsRepository,
@@ -122,8 +131,84 @@ export class GroupService {
     const seq = this.repo.nextSeq(groupId);
     const envelope: Envelope = { eventId: uuidv7(this.nowMs()), type, occurredAt: this.nowIso(), schemaVersion: WS_PROTOCOL_VERSION, actorId, payload, seq };
     this.repo.appendEvent({ group_id: groupId, seq, event_id: envelope.eventId, type, occurred_at: envelope.occurredAt, actor_id: actorId, payload: JSON.stringify(payload) }, EVENT_RING_SIZE);
-    this.sink?.broadcast(groupId, envelope);
+    const local = this.relayHandle !== null;
+    if (local) {
+      const mine = this.localSeqs.get(groupId);
+      if (mine) mine.add(seq);
+      else this.localSeqs.set(groupId, new Set([seq]));
+    }
+    if (this.pendingBroadcasts) this.pendingBroadcasts.push({ groupId, envelope, local });
+    else this.sink?.broadcast(groupId, envelope);
     return seq;
+  }
+
+  /**
+   * Run `fn` in a repository transaction and fan out the events it published only after the
+   * outermost transaction commits. On rollback the buffered events are dropped, and their seqs are
+   * forgotten from `localSeqs` — the numbers were never written, so another process may reuse them
+   * and the relay must not mistake that process's events for ours.
+   */
+  private inTransaction<T>(fn: () => T): T {
+    const outer = this.pendingBroadcasts === null;
+    const buffer = this.pendingBroadcasts ?? [];
+    const mark = buffer.length;
+    if (outer) this.pendingBroadcasts = buffer;
+    let result: T;
+    try {
+      result = this.repo.transaction(fn);
+    } catch (err) {
+      for (const dropped of buffer.splice(mark)) {
+        if (dropped.local) this.localSeqs.get(dropped.groupId)?.delete(dropped.envelope.seq!);
+      }
+      if (outer) this.pendingBroadcasts = null;
+      throw err;
+    }
+    if (outer) {
+      this.pendingBroadcasts = null;
+      for (const { groupId, envelope } of buffer) this.sink?.broadcast(groupId, envelope);
+    }
+    return result;
+  }
+
+  /**
+   * The Discord worker is a separate process writing to the same database. Its events land in the
+   * replay ring but its fan-out reaches nobody, so the hub polls the ring and relays them — and
+   * re-arms its timers, because a queue changed elsewhere still needs to advance here.
+   */
+  startExternalRelay(intervalMs = 1000): void {
+    if (this.relayHandle) return;
+    this.relayHandle = setInterval(() => {
+      try {
+        this.relayExternalEvents();
+      } catch {
+        /* a busy database is retried on the next tick */
+      }
+    }, intervalMs);
+    this.relayHandle.unref?.();
+  }
+
+  relayExternalEvents(): number {
+    let relayed = 0;
+    for (const group of this.repo.listAll()) {
+      const last = this.repo.lastSeq(group.id);
+      const cursor = this.relayCursor.get(group.id);
+      this.relayCursor.set(group.id, last);
+      if (cursor === undefined || last <= cursor) continue;
+      const mine = this.localSeqs.get(group.id) ?? new Set<number>();
+      let stateChanged = false;
+      for (const row of this.repo.eventsAfter(group.id, cursor, EVENT_RING_SIZE)) {
+        if (mine.has(row.seq)) continue;
+        this.sink?.broadcast(group.id, { eventId: row.event_id, type: row.type, occurredAt: row.occurred_at, schemaVersion: WS_PROTOCOL_VERSION, actorId: row.actor_id, payload: JSON.parse(row.payload) as unknown, seq: row.seq });
+        relayed += 1;
+        if (row.type === 'group.queue.updated' || row.type === 'group.playback') stateChanged = true;
+      }
+      for (const seq of mine) if (seq <= last) mine.delete(seq);
+      if (stateChanged) {
+        const s = this.repo.loadState(group.id);
+        if (s) this.scheduleTimers(group.id, s.queue, this.projectPlayback(s.playback));
+      }
+    }
+    return relayed;
   }
 
   /** Replay window for reconnecting clients: events after `fromSeq`, or null when the ring no longer covers it. */
@@ -245,10 +330,13 @@ export class GroupService {
     if (group.status !== 'active') throw new DomainError('conflict', 'This group is archived');
     const existing = this.repo.findMembership(group.id, actor.id);
     const membership = existing ? { ...existing, role: existing.role === 'owner' ? existing.role : invite.role, displayName: displayName ?? existing.displayName, revokedAt: null, joinedAt: now, updatedAt: now } : this.newMembership(group.id, { ...actor, displayName: displayName ?? actor.displayName }, invite.role, now);
-    this.repo.upsertMembership(membership);
-    this.repo.markInviteUsed(invite.id, actor.id, now);
+    this.inTransaction(() => {
+      // Claim first: another process may have used the same code since we looked it up.
+      if (!this.repo.markInviteUsed(invite.id, actor.id, now)) throw new DomainError('forbidden', 'Invalid or expired invite code');
+      this.repo.upsertMembership(membership);
+      this.publish(group.id, 'presence', { groupId: group.id, memberId: actor.id, displayName: membership.displayName, online: this.presence?.onlineMembers(group.id).has(actor.id) ?? false }, actor.id);
+    });
     this.metrics.increment('groups.joins');
-    this.publish(group.id, 'presence', { groupId: group.id, memberId: actor.id, displayName: membership.displayName, online: this.presence?.onlineMembers(group.id).has(actor.id) ?? false }, actor.id);
     return this.view(group.id, actor.id);
   }
 
@@ -363,6 +451,14 @@ export class GroupService {
   }
 
   applyCommand(groupId: string, actor: GroupActor, input: CommandInput): CommandOutcome {
+    // The revision check and the write must be atomic across processes (hub + Discord worker).
+    // Events published inside are broadcast only once the transaction has committed.
+    const outcome = this.inTransaction(() => this.applyCommandLocked(groupId, actor, input));
+    if (outcome.accepted && !outcome.idempotentReplay) this.scheduleTimers(groupId, outcome.queue, outcome.playback);
+    return outcome;
+  }
+
+  private applyCommandLocked(groupId: string, actor: GroupActor, input: CommandInput): CommandOutcome {
     const group = this.find(groupId);
     if (group.status !== 'active') throw new DomainError('conflict', 'This group is archived');
     const membership = actor.isHubAdmin || actor.kind === 'system' || this.hasExternalAuthority(actor) ? (this.membership(groupId, actor.id) ?? null) : this.requireMember(groupId, actor);
@@ -403,7 +499,7 @@ export class GroupService {
       this.publish(groupId, 'group.command.rejected', { groupId, idempotencyKey: input.idempotencyKey, baseRevision: input.baseRevision, currentRevision: queue.revision, reason: result.rejection!.reason, code: result.rejection!.code }, actor.id);
       return outcome;
     }
-    const nextPlayback = this.repo.transaction(() => {
+    const nextPlayback = this.inTransaction(() => {
       const projected = this.applyEffects(groupId, result.queue, playback, result.effects, command, now);
       this.repo.saveState(groupId, result.queue, projected, now);
       const seq = this.publish(groupId, 'group.queue.updated', { groupId, revision: result.queue.revision, command, idempotencyKey: input.idempotencyKey, queue: result.queue, actorDisplayName: actor.displayName }, actor.id);
@@ -413,7 +509,6 @@ export class GroupService {
       return projected;
     });
     this.metrics.increment('groups.commands.accepted');
-    this.scheduleTimers(groupId, result.queue, nextPlayback);
     return finish({ accepted: true, revision: result.queue.revision, queue: result.queue, playback: nextPlayback, rejection: null, idempotentReplay: false, effects: result.effects });
   }
 
@@ -584,6 +679,8 @@ export class GroupService {
 
   dispose(): void {
     for (const id of [...this.timers.keys()]) this.clearTimer(id);
+    if (this.relayHandle) clearInterval(this.relayHandle);
+    this.relayHandle = null;
   }
 
   /* ---------------------------------------------------- drift + availability */

@@ -11,6 +11,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { BRANDING } from '@now-playing/contracts';
 import { DomainError, uuidv7 } from '@now-playing/domain';
@@ -165,13 +166,14 @@ export async function buildApp(deps: HubDeps): Promise<HubApp> {
 
   /* ---------------------------------------------------------------- groups */
 
-  const groups = new GroupService(repos.groups, repos.canonical, identity.hubId, audit, metrics, clock, { backgroundTimers: !deps.disableBackgroundJobs });
+  const isHubProcess = (deps.processRole ?? 'hub') === 'hub';
+  const groups = new GroupService(repos.groups, repos.canonical, identity.hubId, audit, metrics, clock, { backgroundTimers: !deps.disableBackgroundJobs && isHubProcess });
   groups.attachSyncGrader((track) => providers.syncGradeFor(track));
   const commands = new CommandService(groups, search, providers, clock, metrics);
 
   /* ------------------------------------------------------------- downloads */
 
-  const downloads = new DownloadService(repos.downloads, repos.library, providers, rateLimiter, http, config, ffmpeg, audit, metrics, clock, random, log);
+  const downloads = new DownloadService(repos.downloads, repos.library, providers, rateLimiter, http, config, ffmpeg, audit, metrics, clock, random, log, identity.hubId);
   const files = new FileStore(config, repos.library, repos.downloads, metrics, clock);
   const transfers = new TransferService(repos.downloads, repos.devices, files, audit, metrics, clock);
 
@@ -198,7 +200,7 @@ export async function buildApp(deps: HubDeps): Promise<HubApp> {
   };
 
   const metricsService = new MetricsService(metrics, repos.metrics, clock, getCtx);
-  const backup = new BackupService(db, dbFile, config, repos, audit, metrics, clock, migration.to);
+  const backup = new BackupService(db, dbFile, config, repos, audit, metrics, clock, migration.to, log, deps.exit);
   const releases = new ReleaseService(repos.settings, http, metrics, clock);
   const jobs = new JobScheduler(getCtx, clock, log, !deps.disableBackgroundJobs);
   const discord = new DiscordService(repos.settings, commands, sealer, http, config, audit, metrics, clock);
@@ -266,7 +268,9 @@ export async function buildApp(deps: HubDeps): Promise<HubApp> {
 
   const app = Fastify({
     logger: false,
-    trustProxy: config.trustedProxyCidrs.length > 0,
+    // Only hops that are configured trusted proxies (env or Admin → Network) may set X-Forwarded-*;
+    // a boolean `true` would let any client spoof its address.
+    trustProxy: (address: string) => network.isTrustedProxy(address),
     genReqId: () => randomUUID(),
     bodyLimit: 2 * 1024 * 1024,
     // `logger: false` already silences Fastify's own request logging; the hub logs requests itself
@@ -293,8 +297,11 @@ export async function buildApp(deps: HubDeps): Promise<HubApp> {
   });
 
   metricsService.restore();
-  downloads.recover();
-  groups.restoreTimers();
+  if (isHubProcess) {
+    // Only the hub runs downloads and queue timers; a worker re-queueing "running" jobs would duplicate them.
+    downloads.recover();
+    groups.restoreTimers();
+  }
   jobs.registerDefaults();
   jobs.registerDefaultHandlers();
 
@@ -304,6 +311,7 @@ export async function buildApp(deps: HubDeps): Promise<HubApp> {
     async start(): Promise<void> {
       await app.ready();
       realtime.attach(app.server);
+      if (!deps.disableBackgroundJobs) groups.startExternalRelay();
       jobs.start();
       lifecycle.state = 'ok';
       log.info({ module: 'hub', version, migrationVersion: migration.to, bindMode: network.current.bindMode, setupComplete: auth.setupComplete() }, 'hub ready');
@@ -352,7 +360,9 @@ async function registerStatic(app: FastifyInstance, ctx: HubContext, deps: HubDe
   const notFound = (req: { method: string; url: string; id: string }, reply: { status(code: number): { type(t: string): { send(body: unknown): unknown } } }): unknown =>
     reply.status(404).type(PROBLEM_CONTENT_TYPE).send(problem(404, { detail: `No route matches ${req.method} ${req.url.split('?')[0]}`, correlationId: req.id }));
   void notFound;
-  const dir = deps.webDistDir ?? join(new URL('.', import.meta.url).pathname, 'web');
+  // fileURLToPath, not URL#pathname: the latter yields "/C:/…" on Windows and keeps %20 escapes,
+  // so the bundle is never found and the hub quietly serves the API alone.
+  const dir = deps.webDistDir ?? join(fileURLToPath(new URL('.', import.meta.url)), 'web');
   if (!existsSync(dir)) {
     ctx.log.info({ module: 'hub', dir }, 'admin GUI bundle not found; serving the API only');
     return;

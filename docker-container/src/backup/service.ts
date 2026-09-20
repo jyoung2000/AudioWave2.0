@@ -15,8 +15,9 @@
  * password hashes, no sealed tokens, no credential secrets, no pairing codes.
  */
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import type { Logger } from 'pino';
 import { DomainError } from '@now-playing/domain';
 import type { AuditService } from '../auth/audit.js';
 import type { RequestMeta } from '../auth/service.js';
@@ -41,9 +42,14 @@ export interface ImportReport {
 }
 
 const EXPORT_SCHEMA_VERSION = 1;
-/** Keep this many automatic backups; the operator's own backups are never pruned. */
+/**
+ * Keep this many automatic backups of each kind (scheduled `-auto`, pre-restore `-safety`); the
+ * operator's own backups (no suffix) are never pruned.
+ */
 const KEEP_BACKUPS = 10;
-const BACKUP_NAME_RE = /^backup-(\d{8}T\d{6}Z)(-safety)?\.sqlite$/;
+const BACKUP_NAME_RE = /^backup-(\d{8}T\d{6}Z)(-safety|-auto)?\.sqlite$/;
+
+export type BackupKind = 'manual' | 'auto' | 'safety';
 
 export class BackupService {
   constructor(
@@ -56,6 +62,12 @@ export class BackupService {
     private readonly clock: Clock,
     /** The schema version this build knows how to run; a newer backup is refused. */
     private readonly currentMigrationVersion: number,
+    private readonly log: Logger,
+    /**
+     * How the process ends after a restore. Injected so a test can observe the call instead of
+     * taking the suite down with it.
+     */
+    private readonly exit: (code: number) => void = (code: number) => process.exit(code),
   ) {
     mkdirSync(this.dir(), { recursive: true });
   }
@@ -72,9 +84,9 @@ export class BackupService {
     return this.nowIso().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
   }
 
-  async create(actor: { id: string; displayName: string } | null, meta: RequestMeta | null, kind: 'manual' | 'safety' = 'manual'): Promise<BackupEntry> {
+  async create(actor: { id: string; displayName: string } | null, meta: RequestMeta | null, kind: BackupKind = 'manual'): Promise<BackupEntry> {
     if (this.dbFile === ':memory:') throw new DomainError('unsupported', 'This hub is running against an in-memory database, so there is nothing to back up');
-    const id = `backup-${this.stamp()}${kind === 'safety' ? '-safety' : ''}`;
+    const id = `backup-${this.stamp()}${kind === 'manual' ? '' : `-${kind}`}`;
     const file = join(this.dir(), `${id}.sqlite`);
     // Checkpoint first so the backup contains everything the WAL is holding.
     checkpoint(this.db);
@@ -104,16 +116,25 @@ export class BackupService {
         const s = statSync(join(this.dir(), e.name));
         return { id, createdAt: new Date(s.mtimeMs).toISOString(), sizeBytes: s.size, relativePath: `backups/${e.name}` };
       })
-      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+      // Newest first, by the stamp in the name (mtime resolution varies by filesystem), then mtime.
+      .sort((a, b) => {
+        const sa = BACKUP_NAME_RE.exec(`${a.id}.sqlite`)?.[1] ?? '';
+        const sb = BACKUP_NAME_RE.exec(`${b.id}.sqlite`)?.[1] ?? '';
+        if (sa !== sb) return sa < sb ? 1 : -1;
+        return a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0;
+      });
   }
 
   lastBackupAt(): string | null {
     return this.list()[0]?.createdAt ?? null;
   }
 
+  /** Prune scheduled and safety backups, newest first; manual backups are the operator's to delete. */
   private prune(): void {
-    const automatic = this.list().filter((b) => !b.id.endsWith('-safety'));
-    for (const stale of automatic.slice(KEEP_BACKUPS)) rmSync(join(this.config.dataDir, stale.relativePath), { force: true });
+    const all = this.list();
+    for (const suffix of ['-auto', '-safety']) {
+      for (const stale of all.filter((b) => b.id.endsWith(suffix)).slice(KEEP_BACKUPS)) rmSync(join(this.config.dataDir, stale.relativePath), { force: true });
+    }
   }
 
   /**
@@ -145,22 +166,29 @@ export class BackupService {
     this.validate(source);
 
     const safety = await this.create(actor, meta, 'safety');
-    // Swap by rename so the window in which no database file exists is as small as the filesystem
-    // can make it, and the previous file is kept as `.replaced` until the restart succeeds.
-    checkpoint(this.db);
-    this.db.close();
-    const replaced = `${this.dbFile}.replaced`;
-    rmSync(replaced, { force: true });
-    if (existsSync(this.dbFile)) renameSync(this.dbFile, replaced);
-    rmSync(`${this.dbFile}-wal`, { force: true });
-    rmSync(`${this.dbFile}-shm`, { force: true });
-    const restoring = openDatabase({ file: source, readonly: true });
+
+    // Stage the candidate next to the live file and verify the copy while the hub still runs, so a
+    // failed copy never touches the live database.
+    const staged = `${this.dbFile}.restoring`;
+    removeDbFiles(staged);
     try {
-      await restoring.backup(this.dbFile);
-    } finally {
-      restoring.close();
+      const restoring = openDatabase({ file: source, readonly: true });
+      try {
+        await restoring.backup(staged);
+      } finally {
+        restoring.close();
+      }
+      this.validate(staged);
+      rmSync(`${staged}-wal`, { force: true });
+      rmSync(`${staged}-shm`, { force: true });
+    } catch (err) {
+      removeDbFiles(staged);
+      this.metrics.increment('backup.restore_failed');
+      if (err instanceof DomainError) throw err;
+      throw new DomainError('unavailable', `The backup could not be copied into place (${err instanceof Error ? err.message : String(err)}); the current database was not changed.`);
     }
 
+    // Record while the database is still open: after the swap this handle is closed for good.
     this.metrics.increment('backup.restored');
     this.audit.record({
       actor: { kind: 'admin', id: actor.id, displayName: actor.displayName },
@@ -171,6 +199,42 @@ export class BackupService {
       correlationId: meta.correlationId,
       details: { safetyBackupId: safety.id },
     });
+
+    // Swap by rename so the window in which no database file exists is as small as the filesystem
+    // can make it, and the previous file is kept as `.replaced` until the restart succeeds.
+    checkpoint(this.db);
+    this.db.close();
+    const replaced = `${this.dbFile}.replaced`;
+    rmSync(replaced, { force: true });
+    try {
+      if (existsSync(this.dbFile)) renameSync(this.dbFile, replaced);
+      rmSync(`${this.dbFile}-wal`, { force: true });
+      rmSync(`${this.dbFile}-shm`, { force: true });
+      renameSync(staged, this.dbFile);
+    } catch (err) {
+      // Roll back: put the previous file back, or failing that the safety copy just taken.
+      try {
+        if (!existsSync(this.dbFile)) {
+          if (existsSync(replaced)) renameSync(replaced, this.dbFile);
+          else copyFileSync(join(this.dir(), `${safety.id}.sqlite`), this.dbFile);
+        }
+      } finally {
+        removeDbFiles(staged);
+      }
+      throw new DomainError('unavailable', `The restored database could not be swapped in (${err instanceof Error ? err.message : String(err)}); the previous database was put back. Restart the hub.`);
+    }
+    /*
+     * The database handle is now closed for good, and nothing else in the process knows that. The
+     * hub would keep listening and keep answering `/healthz` while every request that touches the
+     * database failed — a live-but-dead container that an orchestrator has no reason to replace.
+     *
+     * So end the process deliberately. `restart: unless-stopped` in compose.yaml (and any
+     * equivalent supervisor) brings it straight back up against the restored file. `setImmediate`
+     * so this response is written first: the operator sees the result of the restore they asked
+     * for, rather than a dropped connection.
+     */
+    this.log.warn({ module: 'backup', backup: backupId, safetyBackupId: safety.id }, 'database restored; exiting so the supervisor restarts the hub against it');
+    setImmediate(() => this.exit(0));
     return { ok: true, safetyBackupId: safety.id, restartRequired: true };
   }
 
@@ -283,6 +347,10 @@ export class BackupService {
     }
     return { dryRun, applied, errors };
   }
+}
+
+function removeDbFiles(file: string): void {
+  for (const suffix of ['', '-wal', '-shm', '-journal']) rmSync(`${file}${suffix}`, { force: true });
 }
 
 /** Deterministic change id for imported rows, so re-importing the same export is a no-op. */

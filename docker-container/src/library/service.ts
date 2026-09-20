@@ -3,6 +3,7 @@ import { createReadStream, existsSync, mkdirSync, statSync, writeFileSync } from
 import type { Dirent } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
 import { extname, join, relative, resolve, sep } from 'node:path';
+import { Readable } from 'node:stream';
 import { parseFile } from 'music-metadata';
 import type { Artwork, LibraryRoot, ProviderCapabilities, SearchResult, Track, TrackRef } from '@now-playing/contracts';
 import { API_PREFIX, routePath, routes } from '@now-playing/contracts';
@@ -39,10 +40,61 @@ export interface ScanReport {
 export interface RangeStream {
   stream: NodeJS.ReadableStream;
   start: number;
+  /** Inclusive; `start - 1` (so the length is 0) for an empty file. */
   end: number;
   size: number;
+  /**
+   * True when a single satisfiable byte range was honoured (answer 206 with Content-Range). False
+   * when there was no Range header, or a multi-range request was ignored: answer 200, full body.
+   */
+  partial: boolean;
   mime: string;
   filename: string;
+}
+
+/**
+ * 416 Range Not Satisfiable. `details.contentRange` is the `bytes *\/size` value RFC 9110 §15.5.17
+ * asks the response to carry in its Content-Range header.
+ */
+export class RangeNotSatisfiableError extends DomainError {
+  override readonly status = 416;
+  readonly size: number;
+  constructor(size: number) {
+    super('validation', 'Range not satisfiable', { details: { size, contentRange: `bytes */${size}` } });
+    this.size = size;
+  }
+}
+
+/** Parse a `Range` header against a file of `size` bytes. Exported for tests. */
+export function parseRange(header: string | undefined, size: number): { start: number; end: number; partial: boolean } {
+  const full = { start: 0, end: size - 1, partial: false };
+  if (header === undefined || header.trim() === '') return full;
+  const value = header.trim();
+  // Multiple ranges would need multipart/byteranges; serving the whole representation is allowed.
+  if (/^bytes=[^,]*,/.test(value)) return full;
+  const m = /^bytes=(\d*)-(\d*)$/.exec(value);
+  if (!m || (!m[1] && !m[2])) throw new DomainError('validation', 'Malformed Range header');
+  let start: number;
+  let end: number;
+  if (!m[1]) {
+    // Suffix range: the last N bytes.
+    const suffix = Number(m[2]);
+    if (suffix === 0 || size === 0) throw new RangeNotSatisfiableError(size);
+    start = Math.max(0, size - suffix);
+    end = size - 1;
+  } else {
+    start = Number(m[1]);
+    end = m[2] ? Number(m[2]) : size - 1;
+    if (m[2] && end < start) throw new DomainError('validation', 'Malformed Range header');
+    if (start >= size) throw new RangeNotSatisfiableError(size);
+    end = Math.min(end, size - 1);
+  }
+  return { start, end, partial: true };
+}
+
+interface WalkResult {
+  files: string[];
+  unreadable: Array<{ path: string; reason: string }>;
 }
 
 interface IndexedHub extends IndexedTrackLike {
@@ -98,9 +150,17 @@ export class LibraryService {
     if (!cleaned || !isSafeRelativePath(cleaned)) throw new DomainError('validation', 'relativePath must be a safe path inside the data volume library directory');
     const abs = joinInsideRoot(this.libraryDir(), cleaned);
     if (!abs) throw new DomainError('validation', 'relativePath escapes the library directory');
-    if (this.repo.findRootByPath(cleaned)) throw new DomainError('conflict', 'A root for this path already exists');
+    const previous = this.repo.findRootByPath(cleaned);
+    if (previous && !previous.deletedAt) throw new DomainError('conflict', 'A root for this path already exists');
     mkdirSync(abs, { recursive: true });
     const now = this.nowIso();
+    if (previous) {
+      // Re-adding a removed root revives it under its old id, so its tracks keep theirs on rescan.
+      this.repo.reviveRoot(previous.id, displayName, now);
+      this.indexDirty = true;
+      this.audit.record({ actor: { kind: 'admin', id: actor.id, displayName: actor.displayName }, action: 'library.root.add', outcome: 'success', target: { kind: 'library-root', id: previous.id }, ip: meta.ip, correlationId: meta.correlationId, details: { displayName, revived: true } });
+      return this.repo.findRoot(previous.id)!;
+    }
     const root: LibraryRoot = { id: uuidv7(this.clock.now()), schemaVersion: 1, createdAt: now, updatedAt: now, deletedAt: null, deviceId: this.hubId, kind: 'hub-directory', displayName, handleId: cleaned, status: 'connected', lastScanAt: null, lastScanError: null, trackCount: 0, watch: true, scanCheckpoint: null };
     this.repo.createRoot(root);
     this.audit.record({ actor: { kind: 'admin', id: actor.id, displayName: actor.displayName }, action: 'library.root.add', outcome: 'success', target: { kind: 'library-root', id: root.id }, ip: meta.ip, correlationId: meta.correlationId, details: { displayName } });
@@ -125,7 +185,7 @@ export class LibraryService {
 
   removeRoot(rootId: string, meta: RequestMeta, actor: { id: string; displayName: string }): void {
     const root = this.repo.findRoot(rootId);
-    if (!root) throw new DomainError('not-found', 'Root not found');
+    if (!root || root.deletedAt) throw new DomainError('not-found', 'Root not found');
     if (root.handleId.startsWith(EXTERNAL_PREFIX)) throw new DomainError('forbidden', 'Configuration-registered roots are removed through the environment');
     this.repo.removeRoot(rootId, this.nowIso());
     this.indexDirty = true;
@@ -147,7 +207,7 @@ export class LibraryService {
 
   async scanRoot(rootId: string): Promise<ScanReport> {
     const root = this.repo.findRoot(rootId);
-    if (!root) throw new DomainError('not-found', 'Root not found');
+    if (!root || root.deletedAt) throw new DomainError('not-found', 'Root not found');
     if (this.scanning) throw new DomainError('conflict', 'A scan is already running');
     const started = this.clock.now();
     const report: ScanReport = { rootId, scanned: 0, added: 0, updated: 0, removed: 0, skipped: [], durationMs: 0 };
@@ -161,20 +221,38 @@ export class LibraryService {
     this.repo.updateRoot(rootId, { status: 'scanning', lastScanError: null }, now);
     const present = new Set<string>();
     try {
-      const files = await this.walk(abs, abs, 0);
-      for (const file of files) {
-        const rel = relative(abs, file).split(sep).join('/');
-        present.add(rel);
+      // A root that cannot be read (unmounted, permissions) throws here, before anything is
+      // tombstoned: an unreadable library is not an empty one.
+      const walked: WalkResult = { files: [], unreadable: [] };
+      await this.walk(abs, abs, 0, walked);
+      const files = walked.files;
+      const rels = files.map((file) => relative(abs, file).split(sep).join('/'));
+      for (const rel of rels) present.add(rel);
+      for (const unreadable of walked.unreadable) report.skipped.push({ path: unreadable.path, reason: `Directory could not be read: ${unreadable.reason}` });
+      for (const [i, file] of files.entries()) {
+        const rel = rels[i]!;
         report.scanned += 1;
         const ext = extname(file).toLowerCase();
         const mime = AUDIO_EXTENSIONS[ext];
         if (!mime) continue;
         try {
           const st = await stat(file);
-          const existing = this.repo.findTrackByPath(rootId, rel);
+          let existing = this.repo.findTrackByPath(rootId, rel);
           if (existing && existing.sizeBytes === st.size && existing.mtimeMs === Math.round(st.mtimeMs) && !existing.deletedAt) continue;
-          const record = await this.buildRecord(root, file, rel, st.size, Math.round(st.mtimeMs), mime, existing);
-          this.repo.upsertTrack(record, this.nowIso());
+          let relocated = false;
+          let contentHash: string | undefined;
+          if (!existing) {
+            // A file that moved, or came back after its root was removed, keeps its old id.
+            contentHash = await hashFile(file);
+            const reusable = this.repo.findReusableTrack(contentHash, rootId, present);
+            if (reusable) {
+              existing = reusable;
+              relocated = true;
+            }
+          }
+          const record = await this.buildRecord(root, file, rel, st.size, Math.round(st.mtimeMs), mime, existing, contentHash);
+          if (relocated) this.repo.relocateTrack(record, this.nowIso());
+          else this.repo.upsertTrack(record, this.nowIso());
           if (existing && !existing.deletedAt) report.updated += 1;
           else report.added += 1;
           this.repo.updateRoot(rootId, { scanCheckpoint: JSON.stringify({ lastPath: rel, at: this.nowIso() }) }, this.nowIso());
@@ -183,7 +261,12 @@ export class LibraryService {
           this.log.warn({ module: 'library', root: rootId, err: err instanceof Error ? err.message : String(err) }, 'file skipped');
         }
       }
-      report.removed = this.repo.tombstoneMissing(rootId, present, this.nowIso());
+      report.removed = this.repo.tombstoneMissing(
+        rootId,
+        present,
+        this.nowIso(),
+        walked.unreadable.map((u) => u.path),
+      );
       this.repo.updateRoot(rootId, { status: 'connected', lastScanAt: this.nowIso(), lastScanError: null, trackCount: this.repo.countTracks(rootId), scanCheckpoint: null }, this.nowIso());
       this.metrics.increment('library.scans');
       this.metrics.gauge('library.tracks', this.repo.countTracks());
@@ -198,28 +281,32 @@ export class LibraryService {
     return report;
   }
 
-  private async walk(dir: string, rootAbs: string, depth: number): Promise<string[]> {
-    if (depth > MAX_DEPTH) return [];
-    const out: string[] = [];
+  /**
+   * Collect files under `dir`. The root itself must be readable (the error propagates); a
+   * sub-directory that cannot be read is recorded in `out.unreadable` so its tracks are kept.
+   */
+  private async walk(dir: string, rootAbs: string, depth: number, out: WalkResult): Promise<void> {
+    if (depth > MAX_DEPTH) return;
     let entries: Dirent[];
     try {
       entries = await readdir(dir, { withFileTypes: true });
-    } catch {
-      return out;
+    } catch (err) {
+      if (depth === 0) throw new DomainError('unavailable', `The library directory could not be read: ${err instanceof Error ? err.message : String(err)}`);
+      out.unreadable.push({ path: relative(rootAbs, dir).split(sep).join('/'), reason: err instanceof Error ? err.message : String(err) });
+      return;
     }
     entries.sort((a, b) => a.name.localeCompare(b.name));
     for (const entry of entries) {
       if (entry.name.startsWith('.')) continue;
       const full = join(dir, entry.name);
       if (entry.isSymbolicLink()) continue; // never follow links out of the root
-      if (entry.isDirectory()) out.push(...(await this.walk(full, rootAbs, depth + 1)));
-      else if (entry.isFile()) out.push(full);
+      if (entry.isDirectory()) await this.walk(full, rootAbs, depth + 1, out);
+      else if (entry.isFile()) out.files.push(full);
     }
-    return out;
   }
 
-  private async buildRecord(root: LibraryRoot, file: string, rel: string, sizeBytes: number, mtimeMs: number, mime: string, existing: HubTrackRecord | undefined): Promise<HubTrackRecord> {
-    const contentHash = await hashFile(file);
+  private async buildRecord(root: LibraryRoot, file: string, rel: string, sizeBytes: number, mtimeMs: number, mime: string, existing: HubTrackRecord | undefined, knownHash?: string): Promise<HubTrackRecord> {
+    const contentHash = knownHash ?? (await hashFile(file));
     let title = rel.split('/').pop()!.replace(/\.[^.]+$/, '');
     let artistName = 'Unknown Artist';
     let albumName: string | null = null;
@@ -328,22 +415,12 @@ export class LibraryService {
     const abs = this.absolutePath(rec);
     if (!abs) throw new DomainError('unavailable', 'The file for this track is not on disk');
     const size = statSync(abs).size;
-    let start = 0;
-    let end = size - 1;
-    if (rangeHeader) {
-      const m = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader.trim());
-      if (!m) throw new DomainError('validation', 'Malformed Range header', { details: { status: 416 } });
-      if (m[1]) start = Number(m[1]);
-      if (m[2]) end = Number(m[2]);
-      if (!m[1] && m[2]) {
-        start = Math.max(0, size - Number(m[2]));
-        end = size - 1;
-      }
-      if (start > end || start >= size) throw new DomainError('validation', 'Range not satisfiable', { details: { status: 416, size } });
-      end = Math.min(end, size - 1);
-    }
+    const range = parseRange(rangeHeader, size);
+    const { start, end, partial } = range;
     this.metrics.increment('library.streams');
-    return { stream: createReadStream(abs, { start, end }), start, end, size, mime: rec.mime ?? 'application/octet-stream', filename: rec.relativePath.split('/').pop() ?? 'track' };
+    // A zero-byte file has no valid byte offsets, so a read stream with `end: -1` must not be made.
+    const stream = end < start ? Readable.from([]) : createReadStream(abs, { start, end });
+    return { stream, start, end, size, partial, mime: rec.mime ?? 'application/octet-stream', filename: rec.relativePath.split('/').pop() ?? 'track' };
   }
 
   artworkPath(artworkId: string): { path: string; mime: string } | null {

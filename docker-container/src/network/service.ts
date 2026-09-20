@@ -48,7 +48,11 @@ export class NetworkService {
 
   /** The address the process should bind to. Non-loopback only in lan/remote mode and only once setup is complete. */
   bindAddressFor(setupComplete: boolean): string {
-    if (this.settings.bindMode === 'localhost' || !setupComplete) return '127.0.0.1';
+    if (this.settings.bindMode === 'localhost' || !setupComplete) {
+      // Docker forwards published ports to the container's own address, never to its loopback, so
+      // binding 127.0.0.1 there makes the hub unreachable. The published port (127.0.0.1 in compose.yaml) is the boundary.
+      return this.config.inContainer ? '0.0.0.0' : '127.0.0.1';
+    }
     return this.settings.bindAddress ?? '0.0.0.0';
   }
 

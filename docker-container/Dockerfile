@@ -6,17 +6,22 @@
 # workspace packages. The runtime stage carries only the bundle, the migrations and the native
 # modules — no source, no toolchain, no pnpm store.
 #
-# The image runs as a non-root user and declares no VOLUME of its own: the operator mounts /data,
-# so they decide where their music and database actually live.
+# The image runs as a non-root user. /data is declared a volume; compose mounts ./data there, so the
+# operator decides where their music and database actually live.
 
 # ---------------------------------------------------------------- build stage
 FROM node:22-bookworm-slim AS build
 WORKDIR /repo
 
 RUN corepack enable
+# Compilers for native modules (better-sqlite3, argon2) when no prebuilt binary matches this platform.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends python3 make g++ && \
+    rm -rf /var/lib/apt/lists/*
 
-# Manifests first, so a source-only change reuses the dependency layer.
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# Manifests first, so a source-only change reuses the dependency layer. tsconfig.base.json is
+# extended by every package's tsconfig; without it the typecheck below cannot run.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc tsconfig.base.json ./
 COPY packages/contracts/package.json packages/contracts/
 COPY packages/domain/package.json packages/domain/
 COPY packages/audio-core/package.json packages/audio-core/
@@ -36,10 +41,13 @@ RUN pnpm --filter @now-playing/hub exec tsc -p tsconfig.json --noEmit
 RUN pnpm --filter @now-playing/hub exec node scripts/build.mjs
 RUN pnpm --filter @now-playing/hub exec vite build --config src/web/vite.config.ts
 
-# Install the runtime dependencies (native modules compile here, against this exact Node).
+# Install the runtime dependencies (native modules compile here, against this exact Node). npm, not
+# pnpm: dist/ sits inside the pnpm workspace, where `pnpm install` would act on the whole repo and
+# skip the native build scripts this bundle needs (better-sqlite3, argon2, the DAVE voice library).
 WORKDIR /repo/docker-container/dist
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --prod --no-frozen-lockfile
+RUN --mount=type=cache,id=npm,target=/root/.npm \
+    npm install --omit=dev --no-audit --no-fund && \
+    node -e "require('better-sqlite3'); require('@discordjs/voice'); console.log(require('@discordjs/voice').generateDependencyReport())"
 
 # yt-dlp for the optional external-tool provider, which is off by default and stays off until an
 # administrator enables it and accepts the rights notice (docs/DOWNLOADS_AND_LEGAL.md). Fetched with
@@ -68,7 +76,8 @@ RUN apt-get update && \
 ENV NODE_ENV=production \
     NP_DATA_DIR=/data \
     NP_PORT=4546 \
-    NP_BIND_MODE=localhost
+    NP_BIND_MODE=localhost \
+    NP_CONTAINER=1
 
 WORKDIR /app
 COPY --from=build /repo/docker-container/dist ./

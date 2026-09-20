@@ -12,7 +12,21 @@ import { hubIdentity, type HubContext } from '../../context.js';
 import { registerRoute } from '../register.js';
 
 export function registerSystemRoutes(app: FastifyInstance, ctx: HubContext): void {
-  registerRoute(app, ctx, routes.healthz, () => ({ status: 'ok' as const, version: ctx.version }));
+  /*
+   * Liveness, and it has to mean it. This used to answer `ok` unconditionally, so after a restore
+   * closed the database the container stayed "healthy" for ever while every real request failed.
+   * One cheap query is the difference between a probe that reports the process is running and one
+   * that reports the process can work.
+   */
+  registerRoute(app, ctx, routes.healthz, ({ reply }) => {
+    try {
+      ctx.db.prepare('SELECT 1').get();
+    } catch {
+      reply.status(503);
+      return { status: 'db-closed' as const, version: ctx.version };
+    }
+    return { status: 'ok' as const, version: ctx.version };
+  });
 
   registerRoute(app, ctx, routes.readyz, ({ reply }) => {
     const checks: Record<string, 'ok' | 'fail' | 'skipped'> = {};

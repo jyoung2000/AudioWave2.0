@@ -10,11 +10,16 @@ interface RecordRow {
   body: string | null;
   last_change_id: string;
   origin_device_id: string;
+  owner_id: string;
 }
+
+/** Owner of records the hub itself publishes or imports; visible to every device, writable by none. */
+export const HUB_SYNC_OWNER = 'hub';
 
 export interface StoredSyncRecord extends SyncRecord {
   lastChangeId: string;
   originDeviceId: string;
+  ownerId: string;
 }
 
 export interface SyncStateRow {
@@ -29,7 +34,7 @@ export interface SyncStateRow {
 
 function toRecord(r: RecordRow): StoredSyncRecord {
   const body = r.body ? (JSON.parse(r.body) as Record<string, unknown>) : {};
-  return { ...body, id: r.id, updatedAt: r.updated_at, deletedAt: r.deleted_at, lastChangeId: r.last_change_id, originDeviceId: r.origin_device_id };
+  return { ...body, id: r.id, updatedAt: r.updated_at, deletedAt: r.deleted_at, lastChangeId: r.last_change_id, originDeviceId: r.origin_device_id, ownerId: r.owner_id };
 }
 
 export class SyncRepository {
@@ -44,15 +49,24 @@ export class SyncRepository {
     return this.db.prepare<[string], RecordRow>('SELECT * FROM synced_records WHERE collection = ? ORDER BY updated_at, id').all(collection).map(toRecord);
   }
 
+  /** Records visible to one owner: its own plus the hub's. */
+  allForOwner(collection: SyncCollection, ownerId: string): StoredSyncRecord[] {
+    return this.db.prepare<[string, string, string], RecordRow>('SELECT * FROM synced_records WHERE collection = ? AND (owner_id = ? OR owner_id = ?) ORDER BY updated_at, id').all(collection, ownerId, HUB_SYNC_OWNER).map(toRecord);
+  }
+
   count(collection: SyncCollection): number {
     return this.db.prepare<[string], { n: number }>('SELECT COUNT(*) AS n FROM synced_records WHERE collection = ?').get(collection)?.n ?? 0;
   }
 
-  put(collection: SyncCollection, record: SyncRecord, changeId: string, originDeviceId: string): void {
-    const { id, updatedAt, deletedAt, lastChangeId: _l, originDeviceId: _o, ...body } = record as StoredSyncRecord;
+  /**
+   * Insert or update a record. The owner is fixed when the record is first written; an update never
+   * changes it (callers must check ownership before writing).
+   */
+  put(collection: SyncCollection, record: SyncRecord, changeId: string, originDeviceId: string, ownerId: string = HUB_SYNC_OWNER): void {
+    const { id, updatedAt, deletedAt, lastChangeId: _l, originDeviceId: _o, ownerId: _w, ...body } = record as StoredSyncRecord;
     this.db
-      .prepare('INSERT INTO synced_records (collection, id, updated_at, deleted_at, body, last_change_id, origin_device_id) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(collection, id) DO UPDATE SET updated_at = excluded.updated_at, deleted_at = excluded.deleted_at, body = excluded.body, last_change_id = excluded.last_change_id, origin_device_id = excluded.origin_device_id')
-      .run(collection, id, updatedAt, deletedAt, deletedAt ? null : JSON.stringify(body), changeId, originDeviceId);
+      .prepare('INSERT INTO synced_records (collection, id, updated_at, deleted_at, body, last_change_id, origin_device_id, owner_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(collection, id) DO UPDATE SET updated_at = excluded.updated_at, deleted_at = excluded.deleted_at, body = excluded.body, last_change_id = excluded.last_change_id, origin_device_id = excluded.origin_device_id')
+      .run(collection, id, updatedAt, deletedAt, deletedAt ? null : JSON.stringify(body), changeId, originDeviceId, ownerId);
   }
 
   remove(collection: SyncCollection, ids: readonly string[]): number {

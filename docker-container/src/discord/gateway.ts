@@ -11,12 +11,13 @@
  * therefore starts *without* it, notices at runtime whether prefix commands can work, and reports
  * `messageContentIntent` honestly rather than silently ignoring `!play`.
  */
-import { Client, Events, GatewayIntentBits, MessageFlags, Partials, REST, Routes, SlashCommandBuilder, type ChatInputCommandInteraction, type Message } from 'discord.js';
+import { Client, Events, GatewayIntentBits, MessageFlags, Partials, PermissionFlagsBits, REST, Routes, SlashCommandBuilder, type ChatInputCommandInteraction, type Guild, type Message } from 'discord.js';
 import type { DiscordConfiguration, DiscordStatus } from '@now-playing/contracts';
 import type { Logger } from 'pino';
 import type { Clock } from '../deps.js';
 import type { MetricsRegistry } from '../metrics/registry.js';
-import type { DiscordGateway, DiscordService } from './service-interface.js';
+import { normalizeCommand, type DiscordGateway, type DiscordService } from './service-interface.js';
+import type { VoicePlayer } from './voice.js';
 
 /** Commands registered with Discord, and the free-text argument each accepts. */
 const COMMAND_SPECS = [
@@ -42,7 +43,6 @@ export class DiscordGatewayClient implements DiscordGateway {
   private token: string | null = null;
   private config: DiscordConfiguration | null = null;
   private state: DiscordStatus['gateway'] = 'stopped';
-  private voice: DiscordStatus['voice'] = 'idle';
   private messageContentIntent: DiscordStatus['messageContentIntent'] = 'unknown';
   private commandsRegisteredAt: string | null = null;
   private connectedAt: number | null = null;
@@ -56,6 +56,7 @@ export class DiscordGatewayClient implements DiscordGateway {
     private readonly clock: Clock,
     private readonly metrics: MetricsRegistry,
     private readonly log: Logger,
+    private readonly voice: VoicePlayer | null = null,
   ) {}
 
   async start(token: string, config: DiscordConfiguration): Promise<void> {
@@ -124,7 +125,7 @@ export class DiscordGatewayClient implements DiscordGateway {
   async stop(): Promise<void> {
     this.stopping = true;
     this.state = 'stopped';
-    this.voice = 'idle';
+    this.voice?.leave();
     this.connectedAt = null;
     const client = this.client;
     this.client = null;
@@ -168,11 +169,12 @@ export class DiscordGatewayClient implements DiscordGateway {
     if (config?.prefixEnabled && this.messageContentIntent === 'disabled') {
       warnings.push('Prefix commands are enabled but Discord has not granted the Message Content intent, so only slash commands work. Enable it in the Developer Portal under Bot → Privileged Gateway Intents.');
     }
+    const voice = this.voice?.status() ?? { voice: 'idle' as const, currentGuildId: null, currentVoiceChannelId: null, currentTrackTitle: null, lastError: null };
     return {
       enabled: config?.enabled ?? false,
       configured: this.token !== null,
       gateway: this.state,
-      voice: this.voice,
+      voice: voice.voice,
       commandsRegistered: this.commandsRegisteredAt !== null,
       commandsRegisteredAt: this.commandsRegisteredAt,
       messageContentIntent: this.messageContentIntent,
@@ -180,10 +182,10 @@ export class DiscordGatewayClient implements DiscordGateway {
       reconnects: this.reconnects,
       errors: this.errors,
       uptimeSeconds: this.connectedAt === null ? 0 : Math.max(0, Math.round((this.clock.now() - this.connectedAt) / 1000)),
-      currentGuildId: null,
-      currentVoiceChannelId: null,
-      currentTrackTitle: null,
-      lastError: this.lastError,
+      currentGuildId: voice.currentGuildId,
+      currentVoiceChannelId: voice.currentVoiceChannelId,
+      currentTrackTitle: voice.currentTrackTitle,
+      lastError: this.lastError ?? voice.lastError,
       warnings,
     };
   }
@@ -209,7 +211,8 @@ export class DiscordGatewayClient implements DiscordGateway {
         roleIds,
         transport: 'slash',
       });
-      await interaction.editReply(this.payloadFor(result));
+      const note = await this.voiceFollowUp(interaction.commandName, result.ok, interaction.guildId, interaction.user.id, args);
+      await interaction.editReply(this.payloadFor(result, note));
     } catch (err) {
       await interaction.editReply({ content: this.errorText(err) });
     }
@@ -246,17 +249,73 @@ export class DiscordGatewayClient implements DiscordGateway {
         roleIds,
         transport: 'prefix',
       });
+      const note = await this.voiceFollowUp(rawCommand, result.ok, message.guildId, message.author.id, rest.join(' '));
       // Discord has no ephemeral replies for normal messages; an "ephemeral" outcome is sent as a
       // reply to the author rather than an announcement, which is the closest honest equivalent.
-      await message.reply(this.payloadFor(result));
+      await message.reply(this.payloadFor(result, note));
     } catch (err) {
       await message.reply({ content: this.errorText(err) });
     }
   }
 
-  private payloadFor(result: { content: string; embedTitle: string | null; embedDescription: string | null }): { content: string; embeds?: Array<{ title?: string; description?: string }> } {
+  /* ----------------------------------------------------------------- voice */
+
+  /**
+   * The command service only authorises `join`/`leave` and changes the queue; moving the bot in and
+   * out of voice happens here, after that decision. Returns a line to add to the reply, if any.
+   */
+  private async voiceFollowUp(commandName: string, ok: boolean, guildId: string, userId: string, args: string): Promise<string | null> {
+    const voice = this.voice;
+    if (!voice) return null;
+    const command = normalizeCommand(commandName);
+    if (!ok) return null;
+    if (command === 'leave') {
+      voice.leave();
+      return null;
+    }
+    if (command !== 'play' && command !== 'join') {
+      void voice.sync();
+      return null;
+    }
+    const current = voice.status();
+    // `play` keeps the bot where it is; only `join` (or a bot not yet in voice) moves it.
+    if (command === 'play' && current.currentGuildId === guildId && current.currentVoiceChannelId) {
+      void voice.sync();
+      return null;
+    }
+    const guild = await this.client?.guilds.fetch(guildId).catch(() => null);
+    if (!guild) return 'I could not read this server, so I cannot join voice.';
+    const picked = this.pickVoiceChannel(guild, userId, command === 'join' ? args : '');
+    if ('error' in picked) return picked.error;
+    const channel = guild.channels.cache.get(picked.channelId);
+    const me = guild.members.me ?? (await guild.members.fetchMe().catch(() => null));
+    if (channel && me && !channel.permissionsFor(me)?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak])) {
+      return `I need View Channel, Connect and Speak in ${channel.name} to play there.`;
+    }
+    try {
+      await voice.join(guild.id, picked.channelId, guild.voiceAdapterCreator);
+      return null;
+    } catch (err) {
+      return err instanceof Error ? err.message : String(err);
+    }
+  }
+
+  private pickVoiceChannel(guild: Guild, userId: string, arg: string): { channelId: string } | { error: string } {
+    const wanted = arg.trim().replace(/^<#(\d+)>$/, '$1');
+    if (wanted) {
+      const match = guild.channels.cache.find((c) => c.isVoiceBased() && (c.id === wanted || c.name.toLowerCase() === wanted.toLowerCase()));
+      return match ? { channelId: match.id } : { error: `There is no voice channel called "${wanted}" that I can see.` };
+    }
+    const override = this.config?.voiceChannelOverrides[guild.id];
+    if (override) return { channelId: override };
+    const own = guild.voiceStates.cache.get(userId)?.channelId;
+    return own ? { channelId: own } : { error: 'Join a voice channel first (or use join <channel>), so I know where to play.' };
+  }
+
+  private payloadFor(result: { content: string; embedTitle: string | null; embedDescription: string | null }, note: string | null = null): { content: string; embeds?: Array<{ title?: string; description?: string }> } {
     const embeds = result.embedTitle || result.embedDescription ? [{ ...(result.embedTitle ? { title: result.embedTitle } : {}), ...(result.embedDescription ? { description: result.embedDescription } : {}) }] : undefined;
-    return { content: result.content || (embeds ? '' : '…'), ...(embeds ? { embeds } : {}) };
+    const content = [result.content, note].filter(Boolean).join('\n').slice(0, 2000);
+    return { content: content || (embeds ? '' : '…'), ...(embeds ? { embeds } : {}) };
   }
 
   private errorText(err: unknown): string {

@@ -6,11 +6,16 @@
  * asked to do — which is exactly what these tests are about: whether the script runs the right
  * commands, keeps the profiles you chose, refuses what it does not understand, and genuinely
  * detaches so an update survives the terminal closing.
+ *
+ * The script is POSIX shell, so the tests need a POSIX shell to run it. On Windows that is Git's
+ * bundled `sh`, which every contributor already has because the repository is cloned with Git; the
+ * suite locates it rather than being skipped, because the script it covers is the one users run to
+ * install the hub and nothing else tests it.
  */
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { delimiter, dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -19,6 +24,46 @@ const script = join(hubDir, 'nowplaying');
 const dataDir = join(hubDir, 'data');
 
 let stubDir: string;
+
+/**
+ * The shell, and the directory its standard tools live in.
+ *
+ * On Linux and macOS the tools are already on PATH. Git's shell on Windows keeps its `dirname`,
+ * `basename` and friends beside itself in `usr/bin`, which is *not* on the Windows PATH — without
+ * it the script starts and then fails on its very first line with "dirname: command not found".
+ */
+function posixShellDir(): [shell: string, toolsDir: string | null] {
+  if (existsSync('/bin/sh')) return ['/bin/sh', null];
+  const found = execFileSync(process.platform === 'win32' ? 'where' : 'which', ['git'], { encoding: 'utf8' })
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  for (const gitExe of found) {
+    // Walk up rather than assuming a depth: `where git` answers `Git/cmd/git.exe` from one shell
+    // and `Git/mingw64/bin/git.exe` from another, and only the install root has `usr/bin/sh.exe`.
+    let dir = dirname(gitExe);
+    for (let up = 0; up < 4; up += 1) {
+      for (const candidate of [join(dir, 'usr', 'bin', 'sh.exe'), join(dir, 'bin', 'sh.exe')]) {
+        if (existsSync(candidate)) return [candidate, dirname(candidate)];
+      }
+      const parent = dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+  }
+  throw new Error(`No POSIX shell found (git: ${found.join(', ') || 'not on PATH'}). On Windows these tests use the sh that ships with Git; install Git or run them under WSL.`);
+}
+
+/**
+ * Block for a moment without shelling out.
+ *
+ * The poll below waits on a *detached* process, so the wait has to be synchronous. It used to run
+ * `sh -c 'sleep 0.2'`, which needs a `sh` on PATH and spawns a process per tick; `Atomics.wait` on
+ * a buffer nobody else touches does the same job on every platform with no process at all.
+ */
+function sleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
 
 /** A `docker` that answers `info` and echoes everything else, so the script's own logic is exercised. */
 function installDockerStub(): string {
@@ -35,10 +80,21 @@ function installDockerStub(): string {
 /** `exclusive` replaces PATH entirely rather than prepending, for the "tool is absent" cases. */
 function run(args: string[], options: { path?: string; exclusive?: boolean } = {}): { status: number; output: string } {
   const prefix = options.path ?? stubDir;
+  // Resolved outside the try: a shell that cannot be found is a broken environment, not a script
+  // that exited non-zero, and swallowing it into `{ status: 1, output: '' }` makes every assertion
+  // in this file fail with no clue why.
+  const [shell, toolsDir] = posixShellDir();
+  // `exclusive` still gets the shell's own tools: the point of that mode is a PATH without
+  // `docker`, not one without a working shell.
+  const rest = [options.exclusive ? null : process.env['PATH'], toolsDir].filter(Boolean).join(delimiter);
   try {
-    const output = execFileSync('/bin/sh', [script, ...args], {
+    // Forward slashes: a POSIX shell treats a backslash as an escape, so a Windows path reaches it
+    // with every separator eaten and the script "does not exist". Both shells accept `C:/...`.
+    const output = execFileSync(shell, [script.split(sep).join('/'), ...args], {
       encoding: 'utf8',
-      env: { ...process.env, PATH: options.exclusive ? prefix : `${prefix}:${process.env['PATH'] ?? ''}` },
+      // `delimiter`, not ':' -- PATH is ';'-separated on Windows, and one wrong character turns the
+      // whole list into a single nonexistent directory, so every tool the script needs disappears.
+      env: { ...process.env, PATH: rest ? `${prefix}${delimiter}${rest}` : prefix },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     return { status: 0, output };
@@ -77,9 +133,19 @@ describe('the command itself', () => {
     // A PATH with the few tools the script needs to start, and deliberately no `docker`.
     const bare = mkdtempSync(join(tmpdir(), 'np-nodocker-'));
     try {
-      for (const tool of ['dirname', 'basename']) {
-        const found = execFileSync('sh', ['-c', `command -v ${tool}`], { encoding: 'utf8' }).trim();
-        symlinkSync(found, join(bare, tool));
+      // Shell implementations rather than copies of the real tools. `command -v dirname` answers a
+      // POSIX path under MSYS (`/usr/bin/dirname`), which Node reads as `C:\usr\bin\dirname` and
+      // cannot copy; symlinking needs Developer Mode; and an MSYS binary moved out of its own
+      // directory loses the DLL beside it. All the script asks of these two is `dirname "$0"` and
+      // `basename "$0"`, which is a few lines of shell on any platform.
+      const shims: Record<string, string> = {
+        dirname: ['#!/usr/bin/env sh', 'case "$1" in', '  */*) printf "%s\\n" "${1%/*}" ;;', '  *) printf ".\\n" ;;', 'esac', ''].join('\n'),
+        basename: ['#!/usr/bin/env sh', 'printf "%s\\n" "${1##*/}"', ''].join('\n'),
+      };
+      for (const [tool, body] of Object.entries(shims)) {
+        const shim = join(bare, tool);
+        writeFileSync(shim, body);
+        chmodSync(shim, 0o755);
       }
       const result = run(['status'], { path: bare, exclusive: true });
       expect(result.status).not.toBe(0);
@@ -155,7 +221,7 @@ describe('update', () => {
     while (Date.now() < deadline) {
       logs = existsSync(logDir) ? readdirSync(logDir).filter((f) => f.endsWith('-update.log')) : [];
       if (logs.length && readFileSync(join(logDir, logs[0]!), 'utf8').includes('Update finished')) break;
-      execFileSync('sh', ['-c', 'sleep 0.2']);
+      sleepSync(200);
     }
     expect(logs.length, 'the detached run should have written a log').toBeGreaterThan(0);
     const log = readFileSync(join(logDir, logs[0]!), 'utf8');

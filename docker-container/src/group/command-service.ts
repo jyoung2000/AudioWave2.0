@@ -109,11 +109,12 @@ export class CommandService {
     }
 
     const actor = this.groupActor(req);
-    const state = this.groups.state(req.groupId);
-    const baseRevision = state.queue.revision;
+    let state = this.groups.state(req.groupId);
     const key = req.idempotencyKey ?? uuidv7(this.clock.now());
 
-    const apply = (command: QueueCommand): ReturnType<GroupService['applyCommand']> => this.groups.applyCommand(req.groupId, actor, { idempotencyKey: key, baseRevision, command });
+    // The server issues these commands against the queue as it is *now*: a search can take seconds,
+    // and a revision captured before it would make busy groups reject every request as stale.
+    const apply = (command: QueueCommand): ReturnType<GroupService['applyCommand']> => this.groups.applyCommand(req.groupId, actor, { idempotencyKey: key, baseRevision: this.groups.state(req.groupId).queue.revision, command });
 
     try {
       switch (req.command) {
@@ -128,10 +129,20 @@ export class CommandService {
             }
             track = resolved.track;
             result = resolved.result;
+            state = this.groups.state(req.groupId);
           }
-          const outcome = apply({ type: 'append', items: [track] });
+          const before = new Set(state.queue.items.map((i) => i.id));
+          let outcome = apply({ type: 'append', items: [track] });
           if (!outcome.accepted) return this.outcome('error', { reason: outcome.rejection?.reason ?? 'Rejected' }, false);
-          const position = outcome.queue.items.findIndex((i) => i.track.trackId === track.trackId) + 1;
+          const added = outcome.queue.items.find((i) => !before.has(i.id));
+          // After `stop` the queue still points at the stopped track, so an append does not start
+          // anything. A request to a silent group should play; the hub starts it, not the requester's role.
+          const silent = outcome.playback.status === 'idle' || outcome.playback.status === 'ended';
+          if (added && silent && !outcome.effects.some((e) => e.type === 'play')) {
+            const started = this.groups.applyCommand(req.groupId, { id: 'system', kind: 'system', displayName: 'Hub' }, { idempotencyKey: `${key}:start`, baseRevision: outcome.revision, command: { type: 'jump', itemId: added.id } });
+            if (started.accepted) outcome = started;
+          }
+          const position = added ? outcome.queue.items.findIndex((i) => i.id === added.id) + 1 : outcome.queue.items.length;
           return this.outcome(
             'queued',
             {

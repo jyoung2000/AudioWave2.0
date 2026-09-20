@@ -38,6 +38,24 @@ interface CursorMap {
   [provider: string]: string | null;
 }
 
+/** Decode a client-supplied cursor; anything that is not one this service issued is a 400, not a 500. */
+export function parseCursorMap(cursor: string): CursorMap {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'));
+  } catch {
+    throw new DomainError('validation', 'Invalid search cursor');
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new DomainError('validation', 'Invalid search cursor');
+  // No prototype: a `__proto__` key in the decoded JSON must stay an ordinary (ignored) entry.
+  const out = Object.create(null) as CursorMap;
+  for (const [provider, value] of Object.entries(parsed as Record<string, unknown>)) {
+    if (value !== null && typeof value !== 'string') throw new DomainError('validation', 'Invalid search cursor');
+    out[provider] = value;
+  }
+  return out;
+}
+
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
 export class SearchService {
@@ -79,7 +97,7 @@ export class SearchService {
 
     const filter = request.providers?.length ? new Set(request.providers) : null;
     const adapters = this.registry.searchable().filter((a) => !filter || filter.has(a.id));
-    const cursors: CursorMap = request.cursor ? ((JSON.parse(Buffer.from(request.cursor, 'base64url').toString('utf8')) as CursorMap) ?? {}) : {};
+    const cursors: CursorMap = request.cursor ? parseCursorMap(request.cursor) : {};
 
     const sources: SearchResponse['sources'] = [];
     const partialFailures: SearchResponse['partialFailures'] = [];

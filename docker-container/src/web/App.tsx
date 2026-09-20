@@ -71,6 +71,17 @@ const SOURCE_GROUPS: SourceGroup<ViewId>[] = [
   },
 ];
 
+const VIEW_IDS: ReadonlySet<string> = new Set(SOURCE_GROUPS.flatMap((g) => g.items.map((i) => i.id)));
+
+/** A stored view id from an older build (or a hand edit) would otherwise render an empty pane. */
+function isViewId(value: unknown): value is ViewId {
+  return typeof value === 'string' && VIEW_IDS.has(value);
+}
+
+function isSidebarWidth(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 120 && value <= 600;
+}
+
 export function App() {
   const session = useResource('authSession', {}, { pollMs: 60_000 });
   const info = session.data as SessionInfo | null;
@@ -189,8 +200,8 @@ function ChangePasswordScreen({ onDone }: { onDone: () => void }) {
 }
 
 function AdminShell({ session, onSignedOut }: { session: SessionInfo; onSignedOut: () => void }) {
-  const [view, setView] = useStoredState<ViewId>('np.admin.view', 'overview');
-  const [sidebarWidth, setSidebarWidth] = useStoredState<number>('np.admin.sidebar', 200);
+  const [view, setView] = useStoredState<ViewId>('np.admin.view', 'overview', isViewId);
+  const [sidebarWidth, setSidebarWidth] = useStoredState<number>('np.admin.sidebar', 200, isSidebarWidth);
   const toast = useToast();
   const hub = useResource('hubIdentity');
   const overview = useResource('metricsOverview', {}, { pollMs: 10_000 });

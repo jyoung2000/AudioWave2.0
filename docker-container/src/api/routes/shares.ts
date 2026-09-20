@@ -2,19 +2,24 @@
  * Shareable links, including the public HTML page a recipient opens.
  *
  * Everything a stranger can reach lives here: `/api/v1/shares/resolve/:token`,
- * `/api/v1/shares/stream/:token/:trackId` and the page at `/s/:token`. All three are rate-limited
- * as search traffic, none of them require or accept a session, and none of them reveal whether a
- * token merely expired or never existed.
+ * `/api/v1/shares/stream/:token/:trackId`, the page at `/s/:token` and the covers it shows at
+ * `/s/:token/artwork/:artworkId`. None require or accept a session. The first three are rate-limited
+ * as search traffic and never reveal whether a token merely expired or never existed; the artwork
+ * route is ordinary-rate (a page has many covers) and does distinguish an expired link from an
+ * unknown one, because its URLs only exist on a page this hub already rendered for that visitor.
  *
  * The page is rendered server-side with a per-response CSP nonce and no external requests at all —
  * no CDN font, no analytics, no remote image. Everything a visitor loads comes from this hub.
  */
+import { createReadStream } from 'node:fs';
 import type { FastifyInstance } from 'fastify';
 import type { SharePayload } from '@now-playing/contracts';
 import { routes } from '@now-playing/contracts';
 import { DomainError } from '@now-playing/domain';
 import type { HubContext } from '../../context.js';
-import { actorDisplayName, actorId } from '../../auth/principal.js';
+import { actorDisplayName, actorId, hasScope } from '../../auth/principal.js';
+import { RangeNotSatisfiableError } from '../../library/service.js';
+import { safeSourceUrl } from '../../shares/service.js';
 import { escapeHtml } from '../../util.js';
 import { RAW, registerRoute } from '../register.js';
 
@@ -31,7 +36,7 @@ export function registerShareRoutes(app: FastifyInstance, ctx: HubContext): void
         maxAccesses: body.maxAccesses,
         ...(body.items ? { items: body.items } : {}),
       },
-      { id: actorId(principal), displayName: actorDisplayName(principal) },
+      { id: actorId(principal), displayName: actorDisplayName(principal), canReadHubLibrary: hasScope(principal, 'library:read') },
       { ip, userAgent, correlationId },
     );
     reply.status(201);
@@ -49,10 +54,17 @@ export function registerShareRoutes(app: FastifyInstance, ctx: HubContext): void
   registerRoute(app, ctx, routes.shareResolve, ({ params, baseUrl }) => ctx.shares.resolve(params.token, baseUrl).payload);
 
   registerRoute(app, ctx, routes.shareStream, ({ params, req, reply }) => {
-    const { hubTrackId } = ctx.shares.authorizeStream(params.token, params.trackId);
-    const stream = ctx.library.openRange(hubTrackId, req.headers.range);
+    const grant = (req.query as Record<string, unknown> | undefined)?.['grant'];
+    const { hubTrackId } = ctx.shares.authorizeStream(params.token, params.trackId, { grant: typeof grant === 'string' ? grant : null, range: req.headers.range });
+    let stream: ReturnType<typeof ctx.library.openRange>;
+    try {
+      stream = ctx.library.openRange(hubTrackId, req.headers.range);
+    } catch (err) {
+      if (err instanceof RangeNotSatisfiableError) reply.header('Content-Range', `bytes */${err.size}`);
+      throw err;
+    }
     reply
-      .status(req.headers.range ? 206 : 200)
+      .status(stream.partial ? 206 : 200)
       .header('Content-Type', stream.mime)
       .header('Accept-Ranges', 'bytes')
       .header('Content-Length', String(stream.end - stream.start + 1))
@@ -60,15 +72,33 @@ export function registerShareRoutes(app: FastifyInstance, ctx: HubContext): void
       // button unless the link's creator enabled downloads on hub-hosted content.
       .header('Content-Disposition', 'inline')
       .header('Cache-Control', 'private, max-age=0, must-revalidate');
-    if (req.headers.range) reply.header('Content-Range', `bytes ${stream.start}-${stream.end}/${stream.size}`);
+    if (stream.partial) reply.header('Content-Range', `bytes ${stream.start}-${stream.end}/${stream.size}`);
     reply.send(stream.stream);
+    return RAW;
+  });
+
+  registerRoute(app, ctx, routes.shareArtwork, ({ params, reply }) => {
+    // Scoped to the link first, then resolved through the library's own path guard — the same
+    // confinement the authenticated route relies on, so a crafted id cannot escape the directory.
+    ctx.shares.authorizeArtwork(params.token, params.artworkId);
+    const art = ctx.library.artworkPath(params.artworkId);
+    if (!art) throw new DomainError('not-found', 'That artwork is not part of this link.');
+    reply
+      .header('Content-Type', art.mime)
+      // Public, but not indexable and not shared between visitors by a proxy: the URL carries a token.
+      .header('Cache-Control', 'private, max-age=3600')
+      .header('X-Robots-Tag', 'noindex, nofollow')
+      .send(createReadStream(art.path));
     return RAW;
   });
 
   registerRoute(app, ctx, routes.sharePage, ({ params, baseUrl, reply }) => {
     let payload: SharePayload;
+    let grant: string | null;
     try {
-      payload = ctx.shares.resolve(params.token, baseUrl).payload;
+      const resolved = ctx.shares.resolve(params.token, baseUrl);
+      payload = resolved.payload;
+      grant = resolved.streamGrant;
     } catch (err) {
       const message = err instanceof DomainError ? err.message : 'That link is not available.';
       const nonce = nonceFor(ctx);
@@ -81,7 +111,7 @@ export function registerShareRoutes(app: FastifyInstance, ctx: HubContext): void
       .header('Content-Security-Policy', pageCsp(nonce))
       .header('Referrer-Policy', 'no-referrer')
       .header('X-Robots-Tag', 'noindex, nofollow')
-      .send(sharePage(payload, params.token, nonce));
+      .send(sharePage(payload, params.token, nonce, grant));
     return RAW;
   });
 }
@@ -124,13 +154,16 @@ function formatDuration(ms: number | null): string {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
 }
 
-function sharePage(payload: SharePayload, token: string, nonce: string): string {
+function sharePage(payload: SharePayload, token: string, nonce: string, grant: string | null): string {
+  const grantQuery = grant ? `?grant=${encodeURIComponent(grant)}` : '';
   const rows = payload.items
     .map((item, i) => {
+      // Only http(s) links are ever rendered, whatever is stored.
+      const sourceUrl = safeSourceUrl(item.openAtSourceUrl);
       const action = item.streamable
-        ? `<button type="button" data-src="/api/v1/shares/stream/${encodeURIComponent(token)}/${encodeURIComponent(item.trackId)}" data-title="${escapeHtml(item.title)}">Play</button>`
-        : item.openAtSourceUrl
-          ? `<a href="${escapeHtml(item.openAtSourceUrl)}" rel="noreferrer noopener nofollow">Open at source</a>`
+        ? `<button type="button" data-src="/api/v1/shares/stream/${encodeURIComponent(token)}/${encodeURIComponent(item.trackId)}${grantQuery}" data-title="${escapeHtml(item.title)}">Play</button>`
+        : sourceUrl
+          ? `<a href="${escapeHtml(sourceUrl)}" rel="noreferrer noopener nofollow">Open at source</a>`
           : `<span class="note">${escapeHtml(item.availabilityNote ?? 'Not available here')}</span>`;
       return `<tr><td class="num">${i + 1}</td><td>${escapeHtml(item.title)}</td><td>${escapeHtml(item.artistName)}</td><td>${escapeHtml(item.albumName ?? '')}</td><td class="dur">${formatDuration(item.durationMs)}</td><td>${action}</td></tr>`;
     })

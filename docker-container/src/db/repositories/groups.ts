@@ -189,12 +189,18 @@ export class GroupsRepository {
     this.db.prepare('INSERT INTO group_invites (id, group_id, code_hash, role, created_by, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(row.id, row.group_id, row.code_hash, row.role, row.created_by, row.created_at, row.expires_at);
   }
 
-  findInviteByHash(codeHash: string): InviteRow | undefined {
-    return this.db.prepare<[string], InviteRow>('SELECT * FROM group_invites WHERE code_hash = ?').get(codeHash);
+  /**
+   * Invite codes are single-use: a used invite is never returned. Pass `now` (the caller's clock) to
+   * also ignore expired invites; the service additionally checks expiry itself.
+   */
+  findInviteByHash(codeHash: string, now?: string): InviteRow | undefined {
+    if (now !== undefined) return this.db.prepare<[string, string], InviteRow>('SELECT * FROM group_invites WHERE code_hash = ? AND used_at IS NULL AND expires_at > ?').get(codeHash, now);
+    return this.db.prepare<[string], InviteRow>('SELECT * FROM group_invites WHERE code_hash = ? AND used_at IS NULL').get(codeHash);
   }
 
-  markInviteUsed(id: string, usedBy: string, now: string): void {
-    this.db.prepare('UPDATE group_invites SET used_at = ?, used_by = ? WHERE id = ?').run(now, usedBy, id);
+  /** Claim an invite. Only an unused invite can be claimed; returns false when it was already used. */
+  markInviteUsed(id: string, usedBy: string, now: string): boolean {
+    return this.db.prepare('UPDATE group_invites SET used_at = ?, used_by = ? WHERE id = ? AND used_at IS NULL').run(now, usedBy, id).changes === 1;
   }
 
   purgeInvites(before: string): number {
@@ -272,10 +278,9 @@ export class GroupsRepository {
 
   /* ---- event log (ring) ---- */
   nextSeq(groupId: string): number {
-    const r = this.db.prepare<[string], { last_seq: number }>('SELECT last_seq FROM group_queues WHERE group_id = ?').get(groupId);
-    const next = (r?.last_seq ?? 0) + 1;
-    this.db.prepare('UPDATE group_queues SET last_seq = ? WHERE group_id = ?').run(next, groupId);
-    return next;
+    // Single statement: the hub and the Discord worker share this database, so read-then-write could hand out one seq twice.
+    const r = this.db.prepare<[string], { last_seq: number }>('UPDATE group_queues SET last_seq = last_seq + 1 WHERE group_id = ? RETURNING last_seq').get(groupId);
+    return r?.last_seq ?? 1;
   }
 
   lastSeq(groupId: string): number {
@@ -387,7 +392,8 @@ export class GroupsRepository {
     this.db.prepare('DELETE FROM group_availability WHERE group_id = ? AND item_id = ?').run(groupId, itemId);
   }
 
+  /** IMMEDIATE takes the write lock up front, so another process cannot commit between our read and our write. */
   transaction<T>(fn: () => T): T {
-    return this.db.transaction(fn)();
+    return this.db.inTransaction ? this.db.transaction(fn)() : this.db.transaction(fn).immediate();
   }
 }

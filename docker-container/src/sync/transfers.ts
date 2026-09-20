@@ -76,11 +76,17 @@ export class TransferService {
     const active = this.repo.listTransfers(input.fromDeviceId).filter((t) => ACTIVE_STATES.has(t.state));
     if (active.length >= MAX_ACTIVE_PER_DEVICE) throw new DomainError('rate-limited', `That device already has ${active.length} transfers in flight; wait for one to finish`);
 
-    // The same file to the same device twice is the same job, not a second one.
-    const duplicate = this.repo.transfersForHash(input.contentHash).find((t) => t.toDeviceId === input.toDeviceId && ACTIVE_STATES.has(t.state));
+    // The same file from the same sender to the same device twice is the same job, not a second
+    // one. The lookup is scoped to the caller so it never returns another device's transfer.
+    const duplicate = this.repo.transfersForHash(input.contentHash).find((t) => t.fromDeviceId === input.fromDeviceId && t.toDeviceId === input.toDeviceId && ACTIVE_STATES.has(t.state));
     if (duplicate) return this.publicView(duplicate);
 
-    const status = this.files.status(input.contentHash);
+    // The sender only counts as holding the bytes when it may already read them (it uploaded them,
+    // received them, or they are hub library content). Otherwise it must upload them first, and
+    // the receiver gets no read access until that upload verifies.
+    const status = this.files.status(input.contentHash, input.fromDeviceId);
+    const senderHolds = status.complete && this.files.authorizeRead(input.contentHash, input.fromDeviceId, false).allowed;
+    const staged = senderHolds ? input.sizeBytes : this.files.stagedBytes(input.contentHash, input.fromDeviceId);
     const now = this.nowIso();
     const record: TransferRecord = {
       id: uuidv7(this.clock.now()),
@@ -92,10 +98,10 @@ export class TransferService {
       toDeviceId: input.toDeviceId,
       contentHash: input.contentHash,
       sizeBytes: input.sizeBytes,
-      bytesDone: status.complete ? input.sizeBytes : status.receivedBytes,
+      bytesDone: staged,
       chunkSizeBytes: 1024 * 1024,
-      resumeOffset: status.complete ? input.sizeBytes : status.receivedBytes,
-      checksumVerified: status.complete,
+      resumeOffset: staged,
+      checksumVerified: senderHolds,
       policy: input.policy ?? 'both',
       attempts: 0,
       error: null,
@@ -163,7 +169,7 @@ export class TransferService {
         record.error = null;
         record.completedAt = null;
         // Resume from whatever the hub still holds rather than starting the upload again.
-        record.resumeOffset = this.files.status(record.contentHash).receivedBytes;
+        record.resumeOffset = record.checksumVerified ? this.files.status(record.contentHash).receivedBytes : this.files.stagedBytes(record.contentHash, record.fromDeviceId);
         record.bytesDone = record.resumeOffset;
         break;
     }
@@ -181,15 +187,20 @@ export class TransferService {
     return this.announce(record);
   }
 
-  /** Called by the file routes as bytes arrive, so both devices see live progress. */
-  recordUpload(contentHash: string, receivedBytes: number, complete: boolean): void {
+  /**
+   * Called by the file routes as bytes arrive, so both devices see live progress. Only transfers
+   * sent by the uploading device advance: another device's upload of the same hash proves nothing
+   * about this sender.
+   */
+  recordUpload(contentHash: string, receivedBytes: number, complete: boolean, uploaderDeviceId: string): void {
     const now = this.nowIso();
     for (const record of this.repo.transfersForHash(contentHash)) {
+      if (record.fromDeviceId !== uploaderDeviceId) continue;
       if (!ACTIVE_STATES.has(record.state) && record.state !== 'paused') continue;
       record.bytesDone = Math.max(record.bytesDone, receivedBytes);
       record.resumeOffset = receivedBytes;
-      record.state = complete ? 'running' : 'running';
-      record.checksumVerified = complete;
+      record.state = 'running';
+      record.checksumVerified = record.checksumVerified || complete;
       record.updatedAt = now;
       this.repo.saveTransfer(record);
       this.announce(record);
@@ -202,7 +213,7 @@ export class TransferService {
     if (!record) throw new DomainError('not-found', 'No such transfer');
     if (record.toDeviceId !== deviceId) throw new DomainError('forbidden', 'Only the receiving device can confirm a transfer');
     const status = this.files.status(record.contentHash);
-    if (!status.complete) throw new DomainError('conflict', 'The hub does not hold the complete file yet');
+    if (!status.complete || !record.checksumVerified) throw new DomainError('conflict', 'The hub does not hold the complete file yet');
     record.state = 'completed';
     record.bytesDone = record.sizeBytes;
     record.checksumVerified = true;
@@ -237,10 +248,10 @@ export class TransferService {
     let changed = 0;
     for (const record of this.repo.listTransfers()) {
       if (!ACTIVE_STATES.has(record.state)) continue;
-      const status = this.files.status(record.contentHash);
-      if (status.receivedBytes < record.resumeOffset) {
-        record.resumeOffset = status.receivedBytes;
-        record.bytesDone = status.receivedBytes;
+      const held = record.checksumVerified ? this.files.status(record.contentHash).receivedBytes : this.files.stagedBytes(record.contentHash, record.fromDeviceId);
+      if (held < record.resumeOffset) {
+        record.resumeOffset = held;
+        record.bytesDone = held;
         record.updatedAt = this.nowIso();
         this.repo.saveTransfer(record);
         changed += 1;

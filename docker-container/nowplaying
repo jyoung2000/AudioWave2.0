@@ -32,6 +32,11 @@ LOG_DIR="$DATA_DIR/logs"
 LOCK_FILE="$DATA_DIR/.nowplaying.lock"
 SERVICE_NAME="now-playing"
 TIMER_NAME="now-playing-update"
+HUB_CONTAINER="now-playing-hub"
+DISCORD_CONTAINER="now-playing-discord"
+# The image runs as the `node` user; ./data is bind-mounted and must be writable by it.
+DATA_UID="${NP_DATA_UID:-1000}"
+DATA_GID="${NP_DATA_GID:-1000}"
 
 say() { printf '%s\n' "$*"; }
 die() {
@@ -56,6 +61,24 @@ require_docker() {
   docker info >/dev/null 2>&1 || die "Docker is installed but not running, or this user cannot reach it. Start Docker, or add yourself to the 'docker' group and log in again."
 }
 
+container_running() { [ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null || true)" = "true" ]; }
+
+# Create ./data (and its logs directory) so the container's `node` user can write to it. Whoever runs
+# this script creates the directory, which on a server is often root; the hub would then fail to
+# open its database.
+ensure_data_dir() {
+  mkdir -p "$DATA_DIR" "$LOG_DIR"
+  _owner="$(ls -nd "$DATA_DIR" 2>/dev/null | awk '{print $3}')"
+  [ "$_owner" = "$DATA_UID" ] && return 0
+  if [ "$(id -u)" = "0" ]; then
+    chown "$DATA_UID:$DATA_GID" "$DATA_DIR" "$LOG_DIR"
+  elif [ "$(uname -s)" = "Linux" ] && [ "$(id -u)" != "$DATA_UID" ]; then
+    # Docker Desktop (macOS, Windows) maps ownership itself; on Linux the uid must really match.
+    say "note: $DATA_DIR is owned by uid $_owner, but the hub runs as uid $DATA_UID and must be able to write there."
+    say "      If the hub cannot open its database, run: sudo chown -R $DATA_UID:$DATA_GID \"$DATA_DIR\""
+  fi
+}
+
 # Which compose profiles to bring up. Recorded in the data directory so `update` and the scheduled
 # timer bring back exactly what you had, rather than quietly dropping the Discord bot.
 profiles_file() { printf '%s\n' "$DATA_DIR/.profiles"; }
@@ -76,7 +99,7 @@ compose_up() {
 # Re-run this script's command with no controlling terminal, logging to a file. Closing the
 # terminal, or losing an SSH connection, cannot interrupt what it started.
 detach_and_exit() {
-  mkdir -p "$LOG_DIR"
+  ensure_data_dir
   _log="$LOG_DIR/$(date -u +%Y%m%dT%H%M%SZ)-$1.log"
   shift
   if command -v setsid >/dev/null 2>&1; then
@@ -93,7 +116,7 @@ detach_and_exit() {
 
 # One install or update at a time; a scheduled update must not collide with a manual one.
 with_lock() {
-  mkdir -p "$DATA_DIR"
+  ensure_data_dir
   if command -v flock >/dev/null 2>&1; then
     exec 9>"$LOCK_FILE"
     flock -n 9 || die "Another install or update is already running. Watch it with: tail -f $LOG_DIR/*.log"
@@ -116,7 +139,6 @@ cmd_install() {
 
   require_docker
   with_lock
-  mkdir -p "$DATA_DIR" "$LOG_DIR"
 
   if [ "$discord" -eq 1 ]; then printf 'discord\n' >"$(profiles_file)"; else : >"$(profiles_file)"; fi
 
@@ -146,7 +168,6 @@ cmd_install() {
 cmd_update() {
   require_docker
   with_lock
-  mkdir -p "$LOG_DIR"
 
   say "Updating at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
@@ -256,8 +277,15 @@ cmd_status() {
   say ""
   compose ps
   say ""
-  if docker exec now-playing-hub node -e "fetch('http://127.0.0.1:4546/healthz').then(r=>r.json()).then(j=>console.log('healthy, version '+j.version)).catch(e=>{console.log('not answering yet: '+e.message);process.exit(1)})" 2>/dev/null; then
-    say "Open http://localhost:4546"
+  # The probe runs inside the container, so it uses the container's own NP_PORT.
+  if docker exec "$HUB_CONTAINER" node -e "fetch('http://127.0.0.1:'+(process.env.NP_PORT||4546)+'/healthz').then(r=>r.json()).then(j=>console.log('healthy, version '+j.version)).catch(e=>{console.log('not answering yet: '+e.message);process.exit(1)})" 2>/dev/null; then
+    # And the address to open is wherever compose published that port on this machine.
+    _cport="$(docker exec "$HUB_CONTAINER" sh -c 'printf %s "${NP_PORT:-4546}"' 2>/dev/null || true)"
+    case "$_cport" in '' | *[!0-9]*) _cport=4546 ;; esac
+    _published="$(compose port hub "$_cport" 2>/dev/null | head -n 1 || true)"
+    _hport="${_published##*:}"
+    case "$_hport" in '' | *[!0-9]*) _hport="$_cport" ;; esac
+    say "Open http://localhost:$_hport"
   else
     say "The hub is not answering yet. Give it a few seconds, then: $SCRIPT logs"
   fi
@@ -268,10 +296,38 @@ cmd_backup() {
   mkdir -p "$dest"
   stamp="$(date -u +%Y%m%dT%H%M%SZ)"
   out="$dest/now-playing-$stamp.tar.gz"
-  say "Pausing the hub so the database is copied at rest…"
-  compose stop hub >/dev/null 2>&1 || true
-  tar -czf "$out" -C "$HUB_DIR" data
-  compose_up >/dev/null 2>&1 || true
+  require_docker
+
+  # Both the hub and the Discord worker hold the SQLite database open, so both are paused for the
+  # copy — and afterwards exactly what was running is started again, nothing more.
+  was_running=""   # stop order: the worker before the hub it depends on
+  start_order=""   # start order: the hub first
+  if container_running "$DISCORD_CONTAINER"; then was_running="$was_running discord"; fi
+  if container_running "$HUB_CONTAINER"; then was_running="$was_running hub"; start_order=" hub"; fi
+  case "$was_running" in *discord*) start_order="$start_order discord" ;; esac
+
+  resume() {
+    if [ -n "$start_order" ]; then
+      # shellcheck disable=SC2086 # deliberate word splitting: one argument per service
+      compose --profile discord start $start_order >/dev/null 2>&1 || say "warning: could not restart:$start_order — run: $SCRIPT start"
+    fi
+  }
+
+  if [ -n "$was_running" ]; then
+    say "Pausing$was_running so the database is copied at rest…"
+    # shellcheck disable=SC2086 # the worker is listed first, so it stops before the hub
+    if ! compose --profile discord stop $was_running >/dev/null 2>&1; then
+      resume
+      die "Could not stop$was_running; no backup was taken rather than copying a database in use."
+    fi
+  fi
+
+  if ! tar -czf "$out" -C "$HUB_DIR" data; then
+    rm -f "$out"
+    resume
+    die "The archive could not be written. Some files in $DATA_DIR belong to uid $DATA_UID; try again with sudo."
+  fi
+  resume
   say "Wrote $out"
   say "This archive holds the database, your library index, artwork and the installation key —"
   say "everything needed to restore this hub. Keep it somewhere safe: the key decrypts stored"
