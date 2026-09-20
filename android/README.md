@@ -41,7 +41,16 @@ page cannot start a program however it was launched. This app can, because it is
 
 The bridge is reachable from any page loaded in the WebView, so the WebView loads exactly one page
 and hands every other link to the real browser. That refusal in `shouldOverrideUrlLoading` is the
-boundary everything else assumes.
+boundary everything else assumes; as a second wall, every bridge method refuses to answer when the
+top-level page is not the app's own. (Moving the bridge to `WebViewCompat.addWebMessageListener`,
+which the WebView restricts by origin and frame, would be stronger, but it is asynchronous and needs
+the player's `android-bridge.ts` to change with it.)
+
+Also in `MainActivity.kt`: `<input type="file">` opens the system document picker; `blob:` downloads
+(exports) are caught by a script injected only into the app's origin and saved through the system's
+"save as" dialog (`BlobDownloads.kt`); a crashed WebView renderer is replaced rather than taking the
+app down; and Back moves the app to the background instead of closing the player. The WebView never
+loads `http` from the `https` page, so a hub on the local network must be reached over https.
 
 ## The gate
 
@@ -57,16 +66,20 @@ that is still between you and them. See `docs/DOWNLOADS_AND_LEGAL.md`.
 
 ## Building it
 
-The player is copied in as built output, so build that first:
+The player is copied in as built output, so build that first. It must be built for the path the app
+serves it from, `/assets/app/`; with the default base of `/` the page asks for `/assets/index-*.js`,
+which is not where the file is, and the app opens to a blank screen.
 
 ```
-pnpm build:player
+NP_BASE_PATH=/assets/app/ pnpm build:player
 rm -rf android/app/src/main/assets/app
 cp -R music-player/dist android/app/src/main/assets/app
 
 cd android
 ./gradlew assembleDebug
 ```
+
+In PowerShell, set the variable with `$env:NP_BASE_PATH = '/assets/app/'` before `pnpm build:player`.
 
 APKs land in `app/build/outputs/apk/debug/`, one per architecture — `arm64-v8a` is the one almost
 every phone since about 2017 wants. They are split because the tool libraries carry a Python runtime

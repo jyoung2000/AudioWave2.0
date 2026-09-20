@@ -5,4 +5,6 @@
   <string name="channel_fetches_description">Shown while a download you asked for is running.</string>
   <string name="fetching_title">Fetching music</string>
   <string name="fetching_text">Working on the link you gave the player.</string>
+  <string name="download_saved">Saved %1$s</string>
+  <string name="download_failed">Could not save %1$s</string>
 </resources>

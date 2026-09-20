@@ -32,22 +32,13 @@ object Tools {
   const val PROTOCOL = 1
 
   /**
-   * The hosts a fetch may name. Deliberately the same list as the helper's `HELPER_DEFAULT_HOSTS`:
-   * two implementations of one promise should not quietly differ about what it covers.
+   * The hosts a fetch may name.
+   *
+   * Generated from the helper's `HELPER_DEFAULT_HOSTS` rather than typed out again. It used to be a
+   * second copy under a comment promising the two would not differ, which is not something a
+   * comment can promise; `pnpm generate` now leaves a diff when only one side is edited.
    */
-  val allowedHosts = listOf(
-    "youtube.com",
-    "www.youtube.com",
-    "m.youtube.com",
-    "music.youtube.com",
-    "youtu.be",
-    "soundcloud.com",
-    "api.soundcloud.com",
-    "on.soundcloud.com",
-    "open.spotify.com",
-    "bandcamp.com",
-    "archive.org",
-  )
+  val allowedHosts: List<String> = AllowedHosts.hosts
 
   private val starting = AtomicBoolean(false)
   private val setup = Executors.newSingleThreadExecutor()
@@ -56,20 +47,26 @@ object Tools {
   @Volatile private var failure: String? = null
   @Volatile private var version: String? = null
 
-  /** Kick off first-run setup. Safe to call more than once; only the first does anything. */
+  /**
+   * Kick off first-run setup. Safe to call more than once: while an attempt is running or after one
+   * succeeded, a call does nothing; after one failed, the next call tries again.
+   */
   fun start(context: Context) {
-    if (!starting.compareAndSet(false, true)) return
+    if (ready || !starting.compareAndSet(false, true)) return
     val app = context.applicationContext
     setup.execute {
       try {
         YoutubeDL.getInstance().init(app)
         FFmpeg.getInstance().init(app)
         version = YoutubeDL.getInstance().version(app)
+        failure = null
         ready = true
       } catch (error: Throwable) {
         // Reported rather than thrown: a phone that cannot unpack the tool should still be a music
         // player, and the panel in Settings should say what went wrong instead of the app dying.
         failure = error.message ?: error.javaClass.simpleName
+        // Released only on failure, so the next start() (the next launch of the activity) retries.
+        starting.set(false)
       }
     }
   }
@@ -161,13 +158,101 @@ object Tools {
     return if (allowed) null else "Host $host is not on the allowlist."
   }
 
-  private fun isLocal(host: String): Boolean =
-    host == "localhost" ||
-      host.endsWith(".local") ||
-      host.startsWith("127.") ||
-      host.startsWith("10.") ||
-      host.startsWith("192.168.") ||
-      host == "0.0.0.0" ||
-      host == "[::1]" ||
-      Regex("^172\\.(1[6-9]|2\\d|3[01])\\.").containsMatchIn(host)
+  /**
+   * Whether this host points somewhere inside a network rather than out at the internet.
+   *
+   * Ported from `isPrivateAddress` in `packages/domain/src/security.ts`, which is the version that
+   * has been thought about. The prefix matching this replaces looked thorough and was not: it
+   * missed CGNAT (100.64/10), link-local — including the 169.254.169.254 cloud metadata address —
+   * IPv6 unique-local (fc00::/7), and every obfuscated form of a loopback address such as `127.1`
+   * or `2130706433`, each of which a prefix check waves straight through.
+   */
+  internal fun isLocal(host: String): Boolean {
+    val h = host.removePrefix("[").removeSuffix("]").lowercase().removeSuffix(".")
+    if (h == "localhost" || h.endsWith(".localhost") || h.endsWith(".local") || h.endsWith(".internal") || h == "metadata.google.internal") return true
+    if (Regex("^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$").matches(h)) {
+      val v4 = parseIpv4(h) ?: return true
+      return isPrivateIpv4(v4)
+    }
+    if (h.contains(":")) {
+      val v6 = parseIpv6(h) ?: return true // an address we cannot read is not one we will trust
+      return isPrivateIpv6(v6)
+    }
+    // Decimal, hex, octal and short-form IPv4 (127.1, 0x7f.1, 2130706433) all reach loopback.
+    if (Regex("^(0x[0-9a-f]+|\\d+)(\\.(0x[0-9a-f]+|\\d+)){0,3}$").matches(h)) return true
+    return false
+  }
+
+  private fun parseIpv4(h: String): IntArray? {
+    val parts = h.split(".")
+    if (parts.size != 4) return null
+    val bytes = IntArray(4)
+    for (i in 0 until 4) {
+      val n = parts[i].toIntOrNull() ?: return null
+      if (n < 0 || n > 255) return null
+      bytes[i] = n
+    }
+    return bytes
+  }
+
+  private fun isPrivateIpv4(b: IntArray): Boolean {
+    val a = b[0]
+    val second = b[1]
+    val third = b[2]
+    if (a == 0 || a == 10 || a == 127) return true
+    if (a == 100 && second in 64..127) return true // CGNAT
+    if (a == 169 && second == 254) return true // link-local, incl. the 169.254.169.254 metadata address
+    if (a == 172 && second in 16..31) return true
+    if (a == 192 && second == 168) return true
+    if (a == 192 && second == 0 && third == 0) return true // IETF protocol assignments
+    if (a == 198 && (second == 18 || second == 19)) return true // benchmarking
+    if (a >= 224) return true // multicast, reserved, broadcast
+    return false
+  }
+
+  /** Sixteen bytes, or null when the literal cannot be read. Handles `::` and a trailing IPv4. */
+  private fun parseIpv6(raw: String): IntArray? {
+    var text = raw.substringBefore('%') // a zone id says nothing about reachability
+    val bytes = IntArray(16)
+    // A trailing dotted quad (::ffff:1.2.3.4) is rewritten to two hex groups first.
+    val lastColon = text.lastIndexOf(':')
+    if (lastColon >= 0 && text.substring(lastColon + 1).contains('.')) {
+      val v4 = parseIpv4(text.substring(lastColon + 1)) ?: return null
+      text = text.substring(0, lastColon + 1) + "%04x:%04x".format(v4[0] * 256 + v4[1], v4[2] * 256 + v4[3])
+    }
+    val halves = text.split("::")
+    if (halves.size > 2) return null
+    val head = if (halves[0].isEmpty()) emptyList() else halves[0].split(":")
+    val tail = if (halves.size == 1 || halves[1].isEmpty()) emptyList() else halves[1].split(":")
+    if (halves.size == 1 && head.size != 8) return null
+    if (head.size + tail.size > 8) return null
+    fun write(groups: List<String>, at: Int): Boolean {
+      groups.forEachIndexed { i, group ->
+        if (group.isEmpty() || group.length > 4) return false
+        val value = group.toIntOrNull(16) ?: return false
+        bytes[(at + i) * 2] = value shr 8
+        bytes[(at + i) * 2 + 1] = value and 0xff
+      }
+      return true
+    }
+    if (!write(head, 0)) return null
+    if (!write(tail, 8 - tail.size)) return null
+    return bytes
+  }
+
+  private fun isPrivateIpv6(b: IntArray): Boolean {
+    fun zeros(from: Int, to: Int): Boolean = (from until to).all { b[it] == 0 }
+    // IPv4-mapped ::ffff:a.b.c.d, IPv4-compatible ::a.b.c.d (incl. :: and ::1), SIIT ::ffff:0:a.b.c.d
+    if (zeros(0, 10) && b[10] == 0xff && b[11] == 0xff) return isPrivateIpv4(b.copyOfRange(12, 16))
+    if (zeros(0, 12)) return true
+    if (zeros(0, 8) && b[8] == 0xff && b[9] == 0xff && b[10] == 0 && b[11] == 0) return isPrivateIpv4(b.copyOfRange(12, 16))
+    // NAT64 64:ff9b::/96 and local-use 64:ff9b:1::/48 can reach arbitrary IPv4 targets.
+    if (b[0] == 0x00 && b[1] == 0x64 && b[2] == 0xff && b[3] == 0x9b) return true
+    // 6to4 2002::/16 embeds an IPv4 address.
+    if (b[0] == 0x20 && b[1] == 0x02) return isPrivateIpv4(b.copyOfRange(2, 6))
+    // Teredo 2001::/32 embeds an obfuscated address; documentation 2001:db8::/32.
+    if (b[0] == 0x20 && b[1] == 0x01 && ((b[2] == 0 && b[3] == 0) || (b[2] == 0x0d && b[3] == 0xb8))) return true
+    // Only global unicast 2000::/3 is public; ULA fc00::/7, link/site-local and multicast are not.
+    return (b[0] and 0xe0) != 0x20
+  }
 }

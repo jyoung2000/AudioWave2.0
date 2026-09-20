@@ -21,18 +21,35 @@ import org.json.JSONObject
  * have the rights" box is a worse gate than a choice made each time, because everyone ticks the
  * former once and then never thinks about it again.
  */
-class ToolsBridge(private val context: Context) {
+class ToolsBridge(
+  context: Context,
+  /**
+   * Whether the page currently in the WebView is the app's own. Checked on every call, as a second
+   * wall behind the navigation boundary: if anything foreign ever becomes the top-level page, the
+   * bridge answers it with a refusal rather than a tool.
+   */
+  private val isTrusted: () -> Boolean,
+  /** Told when a fetch has started, so the activity can ask for the notification permission then. */
+  private val onFetchStarted: () -> Unit = {},
+) {
+
+  // The application, not the activity: jobs and the service outlive any one activity instance.
+  private val context: Context = context.applicationContext
 
   private val allowedBases = setOf("user-owned", "creator-download", "purchased-export", "public-domain", "licensed")
 
   @JavascriptInterface
-  fun protocol(): Int = Tools.PROTOCOL
+  fun protocol(): Int = if (isTrusted()) Tools.PROTOCOL else -1
 
   @JavascriptInterface
-  fun health(): String = Tools.healthJson(context)
+  fun health(): String {
+    if (!isTrusted()) return forbidden()
+    return Tools.healthJson(context)
+  }
 
   @JavascriptInterface
   fun startFetch(request: String): String {
+    if (!isTrusted()) return forbidden()
     val body = runCatching { JSONObject(request) }.getOrNull() ?: return error("validation", "That request is not JSON.")
 
     val authorization = body.optJSONObject("authorization")
@@ -53,22 +70,27 @@ class ToolsBridge(private val context: Context) {
     if (!Tools.isReady()) return error("tool-missing", "The tools are still setting themselves up. Try again in a moment.")
 
     val format = body.optString("format", "original").ifEmpty { "original" }
-    return Jobs.toJson(Jobs.create(context, url, "yt-dlp", format))
+    val job = Jobs.create(context, url, "yt-dlp", format)
+    runCatching { onFetchStarted() }
+    return Jobs.toJson(job)
   }
 
   @JavascriptInterface
   fun jobState(id: String): String {
+    if (!isTrusted()) return forbidden()
     val job = Jobs.get(id) ?: return error("not-found", "No such job.")
     return Jobs.toJson(job)
   }
 
   @JavascriptInterface
   fun forget(id: String): String =
-    if (Jobs.forget(id)) JSONObject().put("ok", true).toString() else error("not-found", "No such job.")
+    if (!isTrusted()) forbidden()
+    else if (Jobs.forget(id)) JSONObject().put("ok", true).toString() else error("not-found", "No such job.")
 
   @JavascriptInterface
   fun install(tool: String): String =
-    JSONObject()
+    if (!isTrusted()) forbidden()
+    else JSONObject()
       .put("tool", tool)
       .put("installed", false)
       .put("version", JSONObject.NULL)
@@ -87,7 +109,9 @@ class ToolsBridge(private val context: Context) {
    */
   @JavascriptInterface
   fun fileUrl(jobId: String, fileId: String): String =
-    if (Jobs.fileFor(jobId, fileId) != null) "https://${MainActivity.ASSET_DOMAIN}/jobfiles/$jobId/$fileId" else ""
+    if (isTrusted() && Jobs.fileFor(jobId, fileId) != null) "https://${MainActivity.ASSET_DOMAIN}/jobfiles/$jobId/$fileId" else ""
+
+  private fun forbidden(): String = error("forbidden", "Only the player this app ships may use its tools.")
 
   private fun error(code: String, message: String): String =
     JSONObject().put("error", code).put("message", message).toString()

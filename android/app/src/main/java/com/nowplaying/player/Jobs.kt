@@ -9,7 +9,9 @@ import java.io.File
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Running the tool, and turning what it leaves behind into files the player can take.
@@ -53,7 +55,11 @@ object Jobs {
     @Volatile var error: String? = null
     @Volatile var finishedAt: String? = null
     val startedAt: String = Instant.now().toString()
-    val files = mutableListOf<Triple<String, File, String>>() // id, file, contentType
+    // Written by the worker, read by the bridge thread while it serialises; copy-on-write makes every
+    // read a consistent snapshot instead of a ConcurrentModificationException.
+    val files = CopyOnWriteArrayList<Triple<String, File, String>>() // id, file, contentType
+    // Set by forget(). A queued job checks it before starting; a running one is also killed.
+    @Volatile var cancelled: Boolean = false
   }
 
   /** Starts a job and returns it straight away; progress arrives by polling, as it does over HTTP. */
@@ -69,8 +75,17 @@ object Jobs {
       try {
         run(job)
       } catch (error: Throwable) {
-        fail(job, error.message ?: error.javaClass.simpleName)
+        // A cancelled job's process is killed from under it; that is not a failure worth reporting.
+        if (!job.cancelled) fail(job, error.message ?: error.javaClass.simpleName)
       } finally {
+        // forget() may have run while this was working and deleted the directory before the tool
+        // wrote more into it; whatever landed afterwards goes too.
+        if (job.cancelled) {
+          // run() may have marked it running just after it was cancelled; a job left "running"
+          // would keep the service up forever.
+          if (job.state == "queued" || job.state == "running") job.state = if (job.error != null) "failed" else "cancelled"
+          runCatching { job.dir.deleteRecursively() }
+        }
         if (jobs.values.none { it.state == "queued" || it.state == "running" }) FetchService.stop(context)
       }
     }
@@ -78,9 +93,12 @@ object Jobs {
   }
 
   private fun run(job: Job) {
+    // Forgotten while it waited in the queue: never start it.
+    if (job.cancelled) return
     if (!Tools.isReady()) return fail(job, "The tools are still setting themselves up. Try again in a moment.")
     job.state = "running"
     job.stage = "fetching"
+    if (job.cancelled) return
 
     val request = YoutubeDLRequest(job.url)
     request.addOption("--ignore-config")
@@ -105,6 +123,7 @@ object Jobs {
       }
     }
 
+    if (job.cancelled) return
     if (response.exitCode != 0) return fail(job, lastMeaningfulLine(response.err) ?: "yt-dlp exited with code ${response.exitCode}.")
 
     job.stage = "finalizing"
@@ -117,13 +136,13 @@ object Jobs {
   }
 
   private fun collect(job: Job) {
-    job.dir.walkTopDown().maxDepth(4).filter { it.isFile }.forEach { file ->
-      val extension = file.extension.lowercase()
-      if (extension in audioExtensions) {
-        job.files.add(Triple(UUID.randomUUID().toString(), file, contentTypes[extension] ?: "application/octet-stream"))
-      }
-    }
-    job.files.sortBy { it.second.name }
+    // Built and sorted privately, then published in one step, so a reader never sees a half-list.
+    val found = job.dir.walkTopDown().maxDepth(4)
+      .filter { it.isFile && it.extension.lowercase() in audioExtensions }
+      .map { file -> Triple(UUID.randomUUID().toString(), file, contentTypes[file.extension.lowercase()] ?: "application/octet-stream") }
+      .sortedBy { it.second.name }
+      .toList()
+    job.files.addAll(found)
   }
 
   private fun fail(job: Job, reason: String) {
@@ -144,16 +163,42 @@ object Jobs {
   /** Stops it if it is running, and takes its working directory with it either way. */
   fun forget(id: String): Boolean {
     val job = jobs.remove(id) ?: return false
-    if (job.state == "running") {
+    val active = job.state == "queued" || job.state == "running"
+    // Flag first: a queued job sees it before it starts, a running one after its process dies.
+    job.cancelled = true
+    if (active) {
+      // Harmless when there is no process yet; necessary when one started between the two lines.
       runCatching { YoutubeDL.getInstance().destroyProcessById(id) }
       job.state = "cancelled"
     }
-    job.dir.deleteRecursively()
+    runCatching { job.dir.deleteRecursively() }
     return true
   }
 
-  /** Anything left behind by a previous run of the app is litter; it is cleared at startup. */
+  /**
+   * Ends every queued or running job with a reason the page can show. Used when Android withdraws
+   * the foreground service's time: carrying on without it would be work the system is about to kill.
+   */
+  fun stopAll(reason: String) {
+    for (job in jobs.values) {
+      if (job.state != "queued" && job.state != "running") continue
+      job.cancelled = true
+      runCatching { YoutubeDL.getInstance().destroyProcessById(job.id) }
+      fail(job, reason)
+    }
+  }
+
+  private val swept = AtomicBoolean(false)
+
+  /**
+   * Anything left behind by a previous *process* is litter; it is cleared once, at a cold start.
+   *
+   * Only once per process: the activity can be finished and recreated while this object, the
+   * foreground service and a running job all live on, and sweeping then would delete a download
+   * from under the tool that is writing it.
+   */
   fun sweep(context: Context) {
+    if (!swept.compareAndSet(false, true)) return
     runCatching { File(context.filesDir, "jobs").deleteRecursively() }
   }
 

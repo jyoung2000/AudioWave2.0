@@ -65,7 +65,7 @@ android {
 /*
  * The player is copied in, not built here.
  *
- * `pnpm build:player` produces `music-player/dist`; CI copies it to `app/src/main/assets/app`
+ * `NP_BASE_PATH=/assets/app/ pnpm build:player` produces `music-player/dist`; CI copies it to `app/src/main/assets/app`
  * before assembling. Checking for it at configuration time turns "the app opens to a blank screen"
  * — which is a miserable thing to debug on a phone — into a build failure that says what to run.
  */
@@ -76,8 +76,8 @@ tasks.register("checkPlayerAssets") {
     val index = playerAssets.file("index.html").asFile
     check(index.exists()) {
       "No player in ${playerAssets.asFile.path}.\n" +
-        "Build it and copy it in first:\n" +
-        "  pnpm build:player\n" +
+        "Build it and copy it in first (the base path must match where the app serves it):\n" +
+        "  NP_BASE_PATH=/assets/app/ pnpm build:player\n" +
         "  rm -rf android/app/src/main/assets/app && cp -R music-player/dist android/app/src/main/assets/app"
     }
   }
@@ -88,6 +88,10 @@ tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }.con
 }
 
 dependencies {
+  // Local JVM tests for the parts of the app that are ordinary Kotlin: which hosts a fetch may
+  // name, and which addresses point back inside a network. No device, no emulator, seconds to run.
+  testImplementation("junit:junit:4.13.2")
+
   implementation("androidx.core:core-ktx:1.13.1")
   implementation("androidx.appcompat:appcompat:1.7.0")
   // WebViewAssetLoader lives here. It is what lets the player run on a real https origin rather
