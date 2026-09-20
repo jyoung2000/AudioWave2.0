@@ -62,6 +62,16 @@ describe('queue reducer', () => {
     const one = applyQueueCommand(q, { type: 'advance', reason: 'ended' }, ctx());
     expect(one.queue.currentIndex).toBe(q.currentIndex);
   });
+  it('a request after the queue ran out plays the new track, not the first one', () => {
+    let q = createQueue({ mode: 'group', now: NOW });
+    q = applyQueueCommand(q, { type: 'append', items: [ref(1), ref(2)] }, ctx()).queue;
+    q = applyQueueCommand(q, { type: 'skip' }, ctx()).queue;
+    q = applyQueueCommand(q, { type: 'advance', reason: 'ended' }, ctx()).queue;
+    expect(q.currentIndex).toBe(-1);
+    const r = applyQueueCommand(q, { type: 'append', items: [ref(3)] }, ctx());
+    expect(currentItem(r.queue)!.track.trackId).toBe(ref(3).trackId);
+    expect(r.effects[0]).toMatchObject({ type: 'play', item: { track: { trackId: ref(3).trackId } } });
+  });
   it('vote skip reaches threshold', () => {
     let q = createQueue({ mode: 'group', now: NOW });
     q = applyQueueCommand(q, { type: 'append', items: [ref(1), ref(2)] }, ctx()).queue;

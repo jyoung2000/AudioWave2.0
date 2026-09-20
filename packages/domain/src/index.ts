@@ -7,6 +7,8 @@ export * from './retune.js';
 export * from './csv.js';
 export * from './pairing.js';
 export * from './security.js';
+export * from './visualisers/spectrum.js';
+export * from './visualisers/constellation-layout.js';
 export * from './templates.js';
 export * from './permissions.js';
 export * from './sync.js';

@@ -8,35 +8,90 @@ export interface UrlValidationResult {
 
 const DEFAULT_SCHEMES = ['https:'];
 
+function isPrivateIpv4(bytes: readonly number[]): boolean {
+  const [a, b, c] = [bytes[0]!, bytes[1]!, bytes[2]!];
+  if (a === 0 || a === 10 || a === 127) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
+  if (a === 169 && b === 254) return true; // link-local incl. 169.254.169.254 metadata
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 192 && b === 0 && c === 0) return true; // IETF protocol assignments
+  if (a === 198 && (b === 18 || b === 19)) return true; // benchmarking
+  if (a >= 224) return true; // multicast/reserved/broadcast
+  return false;
+}
+
+function parseIpv4(h: string): number[] | null {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h);
+  if (!m) return null;
+  const parts = [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4])];
+  return parts.some((n) => n > 255) ? null : parts;
+}
+
+/** Parse any textual IPv6 form (compressed, zone id, embedded dotted IPv4) into 16 bytes. */
+export function parseIpv6(input: string): number[] | null {
+  let h = input.replace(/^\[|\]$/g, '').toLowerCase();
+  const zone = h.indexOf('%');
+  if (zone >= 0) h = h.slice(0, zone);
+  if (!h.includes(':') || !/^[0-9a-f:.]+$/.test(h)) return null;
+  // An embedded dotted IPv4 tail becomes two hex groups.
+  const lastColon = h.lastIndexOf(':');
+  const tail = h.slice(lastColon + 1);
+  if (tail.includes('.')) {
+    const v4 = parseIpv4(tail);
+    if (!v4) return null;
+    h = `${h.slice(0, lastColon + 1)}${((v4[0]! << 8) | v4[1]!).toString(16)}:${((v4[2]! << 8) | v4[3]!).toString(16)}`;
+  }
+  const halves = h.split('::');
+  if (halves.length > 2) return null;
+  const head = halves[0] ? halves[0].split(':') : [];
+  const rest = halves[1] ? halves[1].split(':') : [];
+  const fill = 8 - head.length - rest.length;
+  if (halves.length === 2 ? fill < 0 : fill !== 0) return null;
+  const groups = [...head, ...Array<string>(halves.length === 2 ? fill : 0).fill('0'), ...rest];
+  if (groups.length !== 8) return null;
+  const bytes: number[] = [];
+  for (const g of groups) {
+    if (!/^[0-9a-f]{1,4}$/.test(g)) return null;
+    const n = Number.parseInt(g, 16);
+    bytes.push(n >> 8, n & 0xff);
+  }
+  return bytes;
+}
+
+function isPrivateIpv6(b: readonly number[]): boolean {
+  const zeros = (from: number, to: number): boolean => b.slice(from, to).every((x) => x === 0);
+  // IPv4-mapped ::ffff:a.b.c.d, IPv4-compatible ::a.b.c.d (incl. :: and ::1), SIIT ::ffff:0:a.b.c.d
+  if (zeros(0, 10) && b[10] === 0xff && b[11] === 0xff) return isPrivateIpv4(b.slice(12));
+  if (zeros(0, 12)) return true;
+  if (zeros(0, 8) && b[8] === 0xff && b[9] === 0xff && b[10] === 0 && b[11] === 0) return isPrivateIpv4(b.slice(12));
+  // NAT64 64:ff9b::/96 and local-use 64:ff9b:1::/48 can reach arbitrary IPv4 targets.
+  if (b[0] === 0x00 && b[1] === 0x64 && b[2] === 0xff && b[3] === 0x9b) return true;
+  // 6to4 2002::/16 embeds an IPv4 address.
+  if (b[0] === 0x20 && b[1] === 0x02) return isPrivateIpv4(b.slice(2, 6));
+  // Teredo 2001::/32 embeds an obfuscated address; documentation 2001:db8::/32.
+  if (b[0] === 0x20 && b[1] === 0x01 && ((b[2] === 0 && b[3] === 0) || (b[2] === 0x0d && b[3] === 0xb8))) return true;
+  // Only global unicast 2000::/3 is public; everything else (ULA, link/site-local, multicast, discard) is not.
+  return (b[0]! & 0xe0) !== 0x20;
+}
+
 /** Is this an IPv4/IPv6 literal (or special hostname) that points at private, loopback, link-local, multicast, CGNAT or metadata ranges? */
 export function isPrivateAddress(host: string): boolean {
-  const h = host.replace(/^\[|\]$/g, '').toLowerCase();
+  const h = host
+    .replace(/^\[|\]$/g, '')
+    .toLowerCase()
+    .replace(/\.$/, '');
   if (h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.local') || h.endsWith('.internal') || h === 'metadata.google.internal') return true;
-  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h);
-  if (v4) {
-    const [a, b] = [Number(v4[1]), Number(v4[2])];
-    if ([a, b, Number(v4[3]), Number(v4[4])].some((n) => n > 255)) return true;
-    if (a === 0 || a === 10 || a === 127) return true;
-    if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
-    if (a === 169 && b === 254) return true; // link-local incl. 169.254.169.254 metadata
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 192 && b === 168) return true;
-    if (a === 192 && b === 0 && Number(v4[3]) === 0) return true;
-    if (a >= 224) return true; // multicast/reserved
-    return false;
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) {
+    const v4 = parseIpv4(h);
+    return v4 ? isPrivateIpv4(v4) : true;
   }
   if (h.includes(':')) {
-    if (h === '::' || h === '::1') return true;
-    if (/^fe[89ab]/.test(h)) return true; // link-local
-    if (h.startsWith('fc') || h.startsWith('fd')) return true; // ULA
-    if (h.startsWith('ff')) return true; // multicast
-    if (h.startsWith('::ffff:')) return isPrivateAddress(h.slice(7)); // mapped IPv4
-    if (h.startsWith('64:ff9b:')) return true; // NAT64 well-known prefix
-    if (h.startsWith('2001:db8')) return true; // documentation
-    return false;
+    const v6 = parseIpv6(h);
+    return v6 ? isPrivateIpv6(v6) : true; // unparseable literals are refused
   }
-  // decimal / hex / octal IPv4 obfuscation
-  if (/^(0x[0-9a-f]+|\d+)$/.test(h)) return true;
+  // decimal / hex / octal / short-form IPv4 obfuscation (127.1, 0x7f.1, 2130706433)
+  if (/^(0x[0-9a-f]+|\d+)(\.(0x[0-9a-f]+|\d+)){0,3}$/.test(h)) return true;
   return false;
 }
 
@@ -48,8 +103,12 @@ export function hostMatches(host: string, pattern: string): boolean {
   return h === p;
 }
 
-/** Validate an outbound URL for provider fetches: scheme + host allowlist + no private targets + no credentials. */
-export function validateOutboundUrl(input: string, options: { allowedHosts: readonly string[]; allowedSchemes?: readonly string[]; maxLength?: number } = { allowedHosts: [] }): UrlValidationResult {
+/**
+ * Validate an outbound URL for provider fetches: scheme + host allowlist + no private targets + no credentials.
+ * An empty `allowedHosts` denies every host; a caller that genuinely accepts any public host must say so with
+ * `allowAnyHost: true`.
+ */
+export function validateOutboundUrl(input: string, options: { allowedHosts: readonly string[]; allowedSchemes?: readonly string[]; maxLength?: number; allowAnyHost?: boolean } = { allowedHosts: [] }): UrlValidationResult {
   if (input.length > (options.maxLength ?? 2048)) return { ok: false, reason: 'URL too long' };
   let url: URL;
   try {
@@ -62,7 +121,11 @@ export function validateOutboundUrl(input: string, options: { allowedHosts: read
   if (url.username || url.password) return { ok: false, reason: 'Credentials in URL are not allowed' };
   if (!url.hostname) return { ok: false, reason: 'Missing host' };
   if (isPrivateAddress(url.hostname)) return { ok: false, reason: 'Private or local addresses are blocked' };
-  if (options.allowedHosts.length && !options.allowedHosts.some((p) => hostMatches(url.hostname, p))) return { ok: false, reason: `Host ${url.hostname} is not on the allowlist` };
+  if (!options.allowAnyHost) {
+    if (!options.allowedHosts.length) return { ok: false, reason: 'No hosts are allowed for this request' };
+    const host = url.hostname.replace(/\.$/, '');
+    if (!options.allowedHosts.some((p) => hostMatches(host, p))) return { ok: false, reason: `Host ${url.hostname} is not on the allowlist` };
+  }
   return { ok: true, url };
 }
 

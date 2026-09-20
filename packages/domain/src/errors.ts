@@ -4,6 +4,7 @@ export type DomainErrorCode =
   | 'forbidden'
   | 'unauthenticated'
   | 'conflict'
+  | 'gone'
   | 'rate-limited'
   | 'unavailable'
   | 'unsupported'
@@ -33,6 +34,9 @@ const STATUS: Record<DomainErrorCode, number> = {
   forbidden: 403,
   'not-found': 404,
   conflict: 409,
+  // Only for a resource the caller demonstrably held a valid reference to and that has since
+  // lapsed. Anything a stranger could be probing for stays 404, so a guess learns nothing.
+  gone: 410,
   'rate-limited': 429,
   unavailable: 503,
   unsupported: 422,

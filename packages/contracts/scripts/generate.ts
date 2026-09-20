@@ -48,7 +48,9 @@ writeFileSync(join(schemaDir, 'index.json'), JSON.stringify({ contractsVersion: 
 /* ---------- OpenAPI ---------- */
 type Json = Record<string, unknown>;
 function inline(schema: z.ZodTypeAny, io: 'input' | 'output'): Json {
-  const json = z.toJSONSchema(schema, { io, unrepresentable: 'any', reused: 'inline', target: 'openapi-3.0' }) as Json;
+  // The document declares OpenAPI 3.1.0, whose Schema Object is JSON Schema draft 2020-12 — not the
+  // 3.0 dialect (nullable, boolean exclusiveMinimum), which a 3.1 validator would misread.
+  const json = z.toJSONSchema(schema, { io, unrepresentable: 'any', reused: 'inline', target: 'draft-2020-12' }) as Json;
   delete json['$schema'];
   return json;
 }

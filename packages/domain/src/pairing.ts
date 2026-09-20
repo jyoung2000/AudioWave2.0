@@ -38,9 +38,17 @@ export function isExpired(expiresAt: string, now: number = Date.now()): boolean 
   return Date.parse(expiresAt) <= now;
 }
 
-/** Short human-comparable fingerprint of two public keys (order-independent). Shown on both devices. */
-export async function verificationFingerprint(hubPublicKey: string, devicePublicKey: string, sessionId: string): Promise<string> {
-  const material = [hubPublicKey, devicePublicKey].sort().join('|') + '|' + sessionId;
+/**
+ * Short human-comparable fingerprint, shown on both devices so a person can confirm they are
+ * pairing with each other and not with something in between. Order-independent, so both ends
+ * compute the same string.
+ *
+ * The hub's half is a real Ed25519 public key. The device's half is not: it is an opaque
+ * per-device identity with no key pair behind it, so this confirms that the two ends are talking
+ * about the same session, not that either signed anything.
+ */
+export async function verificationFingerprint(hubPublicKey: string, deviceIdentity: string, sessionId: string): Promise<string> {
+  const material = [hubPublicKey, deviceIdentity].sort().join('|') + '|' + sessionId;
   const hex = await sha256Hex(`verify:v1:${material}`);
   return formatFingerprint(hex.slice(0, 12));
 }

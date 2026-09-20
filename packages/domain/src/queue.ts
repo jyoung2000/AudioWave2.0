@@ -173,14 +173,17 @@ export function applyQueueCommand(queue: Queue, command: QueueCommand, ctx: Queu
     case 'append': {
       const rejection = checkLimits(queue, command.items, ctx);
       if (rejection) return reject(queue, rejection.code, rejection.reason);
-      let items = [...queue.items, ...makeItems(command.items, ctx, null)];
-      if (queue.fairQueue) items = fairOrder(items, queue.currentIndex + 1);
+      const added = makeItems(command.items, ctx, null);
+      let items = [...queue.items, ...added];
+      // After the queue has run out, currentIndex is -1 but the played items remain; start at the
+      // first *new* item, not items[0], or the next request replays the oldest track.
+      if (queue.fairQueue) items = fairOrder(items, queue.currentIndex >= 0 ? queue.currentIndex + 1 : queue.items.length);
       const wasEmpty = queue.currentIndex < 0;
       const effects: QueueEffect[] = [];
       let currentIndex = queue.currentIndex;
       if (wasEmpty && queue.mode === 'group') {
-        currentIndex = 0;
-        effects.push({ type: 'play', item: items[0]! });
+        currentIndex = items.findIndex((i) => i.id === added[0]!.id);
+        effects.push({ type: 'play', item: items[currentIndex]! });
       }
       return commit(queue, { items, currentIndex }, now, effects);
     }
