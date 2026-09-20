@@ -20,8 +20,8 @@
  * it is missing the helper says so and narrows what it offers: no format conversion, and yt-dlp is
  * asked for the best single audio stream rather than told to extract one.
  */
-import { createHash } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
+import { chmodSync, existsSync, mkdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { delimiter, join } from 'node:path';
 import { promisify } from 'node:util';
@@ -84,10 +84,64 @@ export async function resolveAll(options: ResolveOptions): Promise<Record<Helper
   return { 'yt-dlp': ytDlp, spotdl, ffmpeg };
 }
 
+export interface ToolResolver {
+  get: () => Promise<Record<HelperToolId, ResolvedTool>>;
+  /** Forget the cached answer, e.g. after an install. */
+  invalidate: () => void;
+}
+
+/**
+ * `resolveAll`, remembered for a short while.
+ *
+ * Health is unauthenticated and each lookup starts three `--version` processes, so without this any
+ * page that can reach the port could make the machine spawn processes as fast as it can ask.
+ * Concurrent callers share one lookup.
+ */
+export function cachedResolver(options: ResolveOptions, ttlMs = 30_000, now: () => number = Date.now): ToolResolver {
+  let pending: Promise<Record<HelperToolId, ResolvedTool>> | null = null;
+  let cached: { value: Record<HelperToolId, ResolvedTool>; at: number } | null = null;
+  let generation = 0;
+  return {
+    get: () => {
+      if (cached && now() - cached.at < ttlMs) return Promise.resolve(cached.value);
+      if (pending) return pending;
+      const mine = generation;
+      pending = resolveAll(options).then(
+        (value) => {
+          if (mine === generation) {
+            cached = { value, at: now() };
+            pending = null;
+          }
+          return value;
+        },
+        (error: unknown) => {
+          if (mine === generation) pending = null;
+          throw error;
+        },
+      );
+      return pending;
+    },
+    invalidate: () => {
+      generation += 1;
+      cached = null;
+      pending = null;
+    },
+  };
+}
+
+/**
+ * How to start a tool at `path`. A configured path that is a JavaScript file is run with this Node,
+ * because Windows cannot execute a script by its name without a shell, and a shell is not an option.
+ */
+export function toolCommand(path: string): { command: string; prefix: string[] } {
+  return /\.(?:mjs|cjs|js)$/i.test(path) ? { command: process.execPath, prefix: [path] } : { command: path, prefix: [] };
+}
+
 /** The first line of `--version`, which is all any of these three put there that is worth keeping. */
 async function versionOf(path: string): Promise<string | null> {
   try {
-    const { stdout } = await run(path, ['--version'], { timeout: 8000, windowsHide: true, maxBuffer: 1024 * 256 });
+    const { command, prefix } = toolCommand(path);
+    const { stdout } = await run(command, [...prefix, '--version'], { timeout: 8000, windowsHide: true, maxBuffer: 1024 * 256 });
     const first = stdout.split(/\r?\n/)[0]?.trim() ?? '';
     return first.slice(0, 120) || null;
   } catch {
@@ -149,10 +203,21 @@ export async function installYtDlp(toolsDir: string, fetchImpl: typeof fetch = f
 
   mkdirSync(toolsDir, { recursive: true });
   const target = join(toolsDir, BINARY_NAMES['yt-dlp']);
-  const temporary = `${target}.part`;
-  writeFileSync(temporary, binary);
-  if (process.platform !== 'win32') chmodSync(temporary, 0o755);
-  renameSync(temporary, target);
+  // Unique, so two installs never write into the same half-finished file.
+  const temporary = `${target}.${randomUUID()}.part`;
+  try {
+    writeFileSync(temporary, binary);
+    if (process.platform !== 'win32') chmodSync(temporary, 0o755);
+    renameSync(temporary, target);
+  } catch (error) {
+    rmSync(temporary, { force: true });
+    const locked = ['EBUSY', 'EPERM', 'EACCES'].includes((error as NodeJS.ErrnoException).code ?? '');
+    return {
+      installed: false,
+      version: null,
+      reason: locked ? 'The existing yt-dlp is in use and could not be replaced. Wait for running downloads to finish and try again.' : `The verified file could not be saved: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
 
   const version = await versionOf(target);
   if (!version) return { installed: false, version: null, reason: 'The downloaded file was verified but would not report a version, so it is not being used.' };

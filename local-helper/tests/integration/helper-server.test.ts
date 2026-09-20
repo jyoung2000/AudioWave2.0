@@ -12,6 +12,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { HELPER_ROUTES, type HelperHealth, type HelperJob } from '@now-playing/contracts';
@@ -54,6 +55,8 @@ const owned = { basis: 'user-owned' as const, acknowledged: true as const };
 
 beforeAll(async () => {
   root = mkdtempSync(join(tmpdir(), 'np-helper-test-'));
+  // A .mjs path is run with this Node, so the same stub works on Windows, where a script cannot be
+  // executed by name without a shell.
   const stub = join(root, 'fake-yt-dlp.mjs');
   writeFileSync(stub, STUB);
   chmodSync(stub, 0o755);
@@ -191,12 +194,37 @@ describe('what it refuses', () => {
     expect(plain.headers.get('access-control-allow-private-network')).toBeNull();
   });
 
+  it('refuses a Host that is not this helper, which is what DNS rebinding looks like', async () => {
+    // fetch will not let a test choose Host, so this goes through http directly.
+    const port = Number(new URL(base).port);
+    expect(await statusWithHost('evil.example', port, HELPER_ROUTES.health)).toBe(421);
+    expect(await statusWithHost(`evil.example:${port}`, port, '/')).toBe(421);
+    expect(await statusWithHost(`127.0.0.1:${port + 1}`, port, HELPER_ROUTES.health)).toBe(421);
+    expect(await statusWithHost(`localhost:${port}`, port, HELPER_ROUTES.health)).toBe(200);
+  });
+
+  it('answers a badly escaped id with 400, not 500', async () => {
+    expect((await call('/helper/v1/jobs/%E0%A4%A')).status).toBe(400);
+    expect((await call('/helper/v1/jobs/%zz/files/x')).status).toBe(400);
+  });
+
   it('refuses to install anything but yt-dlp, and says why', async () => {
     const response = await post(HELPER_ROUTES.install('spotdl'), {});
     expect(response.status).toBe(409);
     expect(((await response.json()) as { reason: string }).reason).toMatch(/does not fetch spotdl/);
   });
 });
+
+function statusWithHost(host: string, port: number, path: string): Promise<number> {
+  return new Promise((resolvePromise, rejectPromise) => {
+    const req = request({ host: '127.0.0.1', port, path, method: 'GET', headers: { host } }, (res) => {
+      res.resume();
+      resolvePromise(res.statusCode ?? 0);
+    });
+    req.on('error', rejectPromise);
+    req.end();
+  });
+}
 
 /** Poll until the job stops moving. The stub finishes in milliseconds; the cap is for when it does not. */
 async function settle(id: string, attempts = 200): Promise<HelperJob> {

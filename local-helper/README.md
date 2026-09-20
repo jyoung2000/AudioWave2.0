@@ -48,6 +48,7 @@ goes into the document on its way out and the app finds it there.
 | `--allow-host <h>` / `--only-hosts <a,b>` | Add to, or replace, the host allowlist. |
 | `--yt-dlp` / `--spotdl` / `--ffmpeg` `<path>` | Use a particular binary instead of looking for one. |
 | `--tools-dir <path>` | Where an installed yt-dlp is kept between runs. |
+| `--work-dir <path>` | Where downloads are staged. Default: the system temp directory. Each run makes its own new folder inside it and deletes only that folder on exit. |
 | `--timeout <seconds>` | Give up on one job after this long. Default 900. |
 | `--no-open` | Do not open a browser. |
 
@@ -70,6 +71,27 @@ Optional, and its absence is reported rather than worked around. Without it noth
 and yt-dlp is asked for the best single audio stream a site offers rather than told to extract one,
 so you get whatever container that was. The player's format buttons grey out accordingly.
 
+## One thing `/health` gives away
+
+`/health` is the only route that answers without the token. That is deliberate: the page has to be
+able to tell that a helper is running, and which tools it found, *before* it can sensibly ask you to
+paste a token. Everything that does anything, or returns bytes, needs the token.
+
+So it is worth being plain about what that costs. A page on an allowed origin can learn, without any
+token:
+
+- that a helper is running on this machine, and its version;
+- which of yt-dlp, spotDL and FFmpeg are installed, and their versions;
+- which hosts the helper will fetch from, and how long it has been up.
+
+It does **not** reveal any filesystem path — `publicTool()` strips the path before the record leaves
+the process, because a path says something about the machine — and it cannot be read by a page on an
+origin you did not allow, because the origin check runs first.
+
+If that fingerprint matters to you, run the helper with `--no-app` and a single `--allow-origin`, or
+do not leave it running when you are not using it. The trade was made knowingly: a discovery
+endpoint that needs a token cannot be used for discovery.
+
 ## What you are responsible for
 
 Running yt-dlp against YouTube is against YouTube's terms, whatever you fetch. That is between you
@@ -87,8 +109,13 @@ browser profile. See `docs/DOWNLOADS_AND_LEGAL.md`.
 pnpm --filter @now-playing/local-helper build
 ```
 
-Produces `dist/now-playing-helper.mjs`, one file with no runtime dependencies. Put it beside
-`now-playing.html` and it is the whole product.
+Produces `dist/now-playing-helper.mjs`, one file with no runtime dependencies, and copies it to
+`local-helper/now-playing-helper.mjs`, which is committed. That committed copy is what the
+instruction at the top of this file refers to: `dist/` is git-ignored, so without it there was
+nothing to download. `pnpm verify` rebuilds and compares the two, so the committed copy cannot drift
+from the source, and the release workflow attaches it to every release.
+
+Put it beside `now-playing.html` and it is the whole product.
 
 ## Tests
 

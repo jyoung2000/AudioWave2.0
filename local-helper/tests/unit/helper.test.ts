@@ -5,13 +5,14 @@
  * without a socket.
  */
 import { describe, expect, it } from 'vitest';
-import { resolve } from 'node:path';
-import { childEnv, lastMeaningfulLine, spotdlArgs, ytDlpArgs } from '../../src/jobs.js';
-import { findOnPath, digestFor, ytDlpAsset } from '../../src/tools.js';
-import { originAllowed, tokenMatches, checkFetchUrl } from '../../src/security.js';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { childEnv, lastMeaningfulLine, redactPaths, spotdlArgs, ytDlpArgs } from '../../src/jobs.js';
+import { cachedResolver, findOnPath, digestFor, toolCommand, ytDlpAsset } from '../../src/tools.js';
+import { originAllowed, hostAllowed, tokenMatches, checkFetchUrl } from '../../src/security.js';
 import { withToken, withinRoot } from '../../src/app.js';
 import { pickTool } from '../../src/server.js';
-import { dataDir, parseArgs } from '../../src/options.js';
+import { dataDir, HELP, parseArgs } from '../../src/options.js';
 import { HELPER_DEFAULT_HOSTS, HELPER_TOKEN_META } from '@now-playing/contracts';
 
 const job = (format: 'original' | 'flac' = 'original') => ({ url: 'https://www.youtube.com/watch?v=abc', format }) as const;
@@ -55,6 +56,42 @@ describe('the command line it builds', () => {
     const args = spotdlArgs({ url: 'https://open.spotify.com/track/x', format: 'original' }, '/tmp/j', { present: true });
     expect(args[args.indexOf('--format') + 1]).toBe('mp3');
   });
+
+  it('puts the URL last and behind `--` for spotDL too', () => {
+    const args = spotdlArgs({ url: 'https://open.spotify.com/track/x', format: 'mp3' }, '/tmp/j', { present: true, path: '/usr/bin/ffmpeg' });
+    expect(args[0]).toBe('download');
+    expect(args.at(-2)).toBe('--');
+    expect(args.at(-1)).toBe('https://open.spotify.com/track/x');
+  });
+
+  it('refuses to hand a tool anything that is not an http(s) URL', () => {
+    expect(() => ytDlpArgs({ url: '--exec=calc', format: 'original' }, '/tmp/j', { present: true })).toThrow(/http/);
+    expect(() => spotdlArgs({ url: '--config', format: 'mp3' }, '/tmp/j', { present: true })).toThrow(/http/);
+  });
+
+  it('gives spotDL a home of its own, so no config file of the user’s is read', () => {
+    const env = childEnv({ PATH: '/usr/bin', HOME: '/home/me', USERPROFILE: 'C:\\Users\\me' }, { HOME: '/job/home', USERPROFILE: '/job/home' });
+    expect(env['HOME']).toBe('/job/home');
+    expect(env['USERPROFILE']).toBe('/job/home');
+    expect(env['PATH']).toBe('/usr/bin');
+  });
+});
+
+describe('looking the tools up', () => {
+  it('runs a script path with this Node, and anything else directly', () => {
+    expect(toolCommand('/x/fake.mjs')).toEqual({ command: process.execPath, prefix: ['/x/fake.mjs'] });
+    expect(toolCommand('/usr/bin/yt-dlp')).toEqual({ command: '/usr/bin/yt-dlp', prefix: [] });
+  });
+
+  it('shares one lookup between callers and remembers it for a while', async () => {
+    let clock = 0;
+    const resolver = cachedResolver({ configured: {}, toolsDir: join(tmpdir(), 'np-no-such-tools') }, 1000, () => clock);
+    const [a, b] = await Promise.all([resolver.get(), resolver.get()]);
+    expect(a).toBe(b);
+    expect(await resolver.get()).toBe(a);
+    clock = 2000;
+    expect(await resolver.get()).not.toBe(a);
+  });
 });
 
 describe('the environment a tool is given', () => {
@@ -79,12 +116,48 @@ describe('which origins it answers', () => {
     expect(originAllowed(policy, undefined)).toBe(true);
   });
 
+  it('answers its own port spelled localhost, and no other port', () => {
+    expect(originAllowed(policy, 'http://localhost:17342')).toBe(true);
+    expect(originAllowed(policy, 'http://localhost:17343')).toBe(false);
+    expect(originAllowed({ allowed: [], self: null }, 'http://localhost:17342')).toBe(false);
+  });
+
   it('refuses everything else, including an opaque origin', () => {
     expect(originAllowed(policy, 'https://evil.example')).toBe(false);
     expect(originAllowed(policy, 'null')).toBe(false);
     expect(originAllowed(policy, '')).toBe(false);
     // A near miss is still a miss: a different port is a different origin.
     expect(originAllowed(policy, 'http://127.0.0.1:17343')).toBe(false);
+  });
+});
+
+describe('which Host it answers to', () => {
+  it('takes the loopback spellings of its own port', () => {
+    expect(hostAllowed('127.0.0.1:17342', 17342)).toBe(true);
+    expect(hostAllowed('LOCALHOST:17342', 17342)).toBe(true);
+    expect(hostAllowed('[::1]:17342', 17342)).toBe(true);
+  });
+
+  it('refuses a rebound name, another port, or no Host at all', () => {
+    expect(hostAllowed('evil.example:17342', 17342)).toBe(false);
+    expect(hostAllowed('127.0.0.1.evil.example:17342', 17342)).toBe(false);
+    expect(hostAllowed('127.0.0.1:17343', 17342)).toBe(false);
+    expect(hostAllowed('127.0.0.1', 17342)).toBe(false);
+    expect(hostAllowed(undefined, 17342)).toBe(false);
+  });
+});
+
+describe('what a page may see of a tool’s output', () => {
+  it('shows a file the tool wrote by its name, not its path', () => {
+    const directory = resolve('/work/run/jobs/abc/out');
+    expect(redactPaths(`[ExtractAudio] Destination: ${join(directory, 'A Song.m4a')}`, { directory })).toBe('[ExtractAudio] Destination: A Song.m4a');
+  });
+
+  it('strips the folders from any other absolute path', () => {
+    expect(redactPaths('ERROR: cannot open C:\\Users\\someone\\x\\cookies.txt', { directory: '/nowhere' })).toBe('ERROR: cannot open cookies.txt');
+    expect(redactPaths('ERROR: cannot open /home/someone/x/cookies.txt', { directory: '/nowhere' })).toBe('ERROR: cannot open cookies.txt');
+    // A URL is not a path.
+    expect(redactPaths('[youtube] https://www.youtube.com/watch?v=x', { directory: '/nowhere' })).toBe('[youtube] https://www.youtube.com/watch?v=x');
   });
 });
 
@@ -193,6 +266,16 @@ describe('the command line the helper itself takes', () => {
   it('replaces the host list once and adds to it after', () => {
     expect(parseArgs(['--only-hosts', 'archive.org']).allowedHosts).toEqual(['archive.org']);
     expect(parseArgs(['--only-hosts', 'archive.org', '--only-hosts', 'example.com']).allowedHosts).toEqual(['archive.org', 'example.com']);
+  });
+
+  it('refuses an --only-hosts that names no host, rather than allowing every host', () => {
+    expect(() => parseArgs(['--only-hosts', ','])).toThrow(/at least one/);
+    expect(() => parseArgs(['--only-hosts', ' , '])).toThrow(/at least one/);
+    expect(checkFetchUrl('https://evil.example/x', []).ok).toBe(false);
+  });
+
+  it('documents --work-dir', () => {
+    expect(HELP).toContain('--work-dir');
   });
 
   it('refuses what it cannot make sense of, by name', () => {

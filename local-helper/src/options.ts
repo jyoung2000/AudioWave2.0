@@ -9,7 +9,7 @@
  * thing it exists to do.
  */
 import { homedir, tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, posix, win32 } from 'node:path';
 import { HELPER_DEFAULT_HOSTS, HELPER_DEFAULT_PORT } from '@now-playing/contracts';
 
 export interface Options {
@@ -49,6 +49,8 @@ Options
   --allow-host <h>      Add a host the tools may fetch from (repeatable)
   --only-hosts <a,b>    Replace the host allowlist entirely
   --tools-dir <path>    Where an installed yt-dlp is kept
+  --work-dir <path>     Where downloads are staged (default: the system temp directory).
+                        Each run uses its own new folder inside it and removes only that.
   --yt-dlp <path>       Use this yt-dlp instead of looking for one
   --spotdl <path>       Use this spotDL instead of looking for one
   --ffmpeg <path>       Use this FFmpeg instead of looking for one
@@ -121,7 +123,13 @@ export function parseArgs(argv: readonly string[]): Options {
         break;
       case '--only-hosts': {
         // Repeating it adds rather than replacing again, so two flags do not silently drop the first.
-        const hosts = next().split(',').filter(Boolean).map(hostOf);
+        const hosts = next()
+          .split(',')
+          .map((h) => h.trim())
+          .filter(Boolean)
+          .map(hostOf);
+        // An empty allowlist would mean "every host" further down, which is never what this meant.
+        if (!hosts.length) throw new Error('--only-hosts needs at least one hostname.');
         options.allowedHosts = replacedHosts ? [...options.allowedHosts, ...hosts] : hosts;
         replacedHosts = true;
         break;
@@ -179,7 +187,8 @@ function hostOf(value: string): string {
 
 /** Where an installed tool should live so it is still there next time, per platform convention. */
 export function dataDir(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): string {
-  if (platform === 'win32') return join(env['LOCALAPPDATA'] ?? join(homedir(), 'AppData', 'Local'), 'NowPlaying');
-  if (platform === 'darwin') return join(homedir(), 'Library', 'Application Support', 'NowPlaying');
-  return join(env['XDG_DATA_HOME'] ?? join(homedir(), '.local', 'share'), 'now-playing');
+  // Joined in the target platform's own spelling, so the answer is the same whichever OS asks.
+  if (platform === 'win32') return win32.join(env['LOCALAPPDATA'] ?? win32.join(homedir(), 'AppData', 'Local'), 'NowPlaying');
+  if (platform === 'darwin') return posix.join(homedir(), 'Library', 'Application Support', 'NowPlaying');
+  return posix.join(env['XDG_DATA_HOME'] ?? posix.join(homedir(), '.local', 'share'), 'now-playing');
 }

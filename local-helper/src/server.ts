@@ -26,8 +26,8 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { HELPER_DEFAULT_HOSTS, HELPER_PROTOCOL, HELPER_ROUTES, HelperFetchRequest, HelperToolId, type HelperHealth, type HelperInstallResult, type HelperToolId as ToolId, type OutputFormat } from '@now-playing/contracts';
 import { Jobs } from './jobs.js';
 import { serveApp, type AppSource } from './app.js';
-import { checkFetchUrl, originAllowed, tokenMatches, type OriginPolicy } from './security.js';
-import { installYtDlp, publicTool, resolveAll, type ResolvedTool } from './tools.js';
+import { checkFetchUrl, hostAllowed, originAllowed, tokenMatches, type OriginPolicy } from './security.js';
+import { cachedResolver, installYtDlp, publicTool, type ResolvedTool } from './tools.js';
 
 const MAX_BODY_BYTES = 64 * 1024;
 const MAX_JOBS = 50;
@@ -44,6 +44,8 @@ export interface HelperOptions {
   app: AppSource | null;
   configured: { 'yt-dlp'?: string | undefined; spotdl?: string | undefined; ffmpeg?: string | undefined };
   log: (line: string) => void;
+  /** How long a finished job and its files are kept. Default one hour. */
+  finishedTtlMs?: number;
 }
 
 export interface Helper {
@@ -55,10 +57,14 @@ export interface Helper {
 
 export async function startHelper(options: HelperOptions): Promise<Helper> {
   const startedAt = new Date().toISOString();
-  const resolve_ = (): Promise<Record<ToolId, ResolvedTool>> => resolveAll({ configured: options.configured, toolsDir: options.toolsDir });
-  const jobs = new Jobs({ workDir: options.workDir, timeoutMs: options.timeoutMs, tools: resolve_ });
-  const origin = `http://127.0.0.1:${options.port}`;
-  const policy: OriginPolicy = { allowed: options.allowedOrigins, self: options.app ? origin : null };
+  const resolver = cachedResolver({ configured: options.configured, toolsDir: options.toolsDir });
+  const resolve_ = (): Promise<Record<ToolId, ResolvedTool>> => resolver.get();
+  const jobs = new Jobs({ workDir: options.workDir, timeoutMs: options.timeoutMs, tools: resolve_, log: options.log, ...(options.finishedTtlMs ? { finishedTtlMs: options.finishedTtlMs } : {}) });
+  // Settled once the socket is bound: with port 0 the real port is only known then.
+  let port = options.port;
+  let origin = `http://127.0.0.1:${port}`;
+  let policy: OriginPolicy = { allowed: options.allowedOrigins, self: options.app ? origin : null };
+  let installing: Promise<HelperInstallResult> | null = null;
 
   const server = createServer((request, response) => {
     void handle(request, response).catch((error: unknown) => {
@@ -69,6 +75,8 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
   });
 
   async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
+    // Before anything else, including the origin check: a rebound hostile name arrives with no Origin.
+    if (!hostAllowed(header(request, 'host'), port)) return fail(response, 421, 'host', 'This helper only answers to 127.0.0.1 or localhost.');
     const origin_ = header(request, 'origin');
     const url = new URL(request.url ?? '/', origin);
     const path = url.pathname;
@@ -117,7 +125,9 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
       if (body === undefined) return;
       const parsed = HelperFetchRequest.safeParse(body);
       if (!parsed.success) return fail(response, 400, 'validation', `That request is not one this helper understands: ${parsed.error.issues[0]?.message ?? 'invalid'}.`);
-      if (jobs.list().length >= MAX_JOBS) return fail(response, 429, 'busy', 'There are already too many jobs here. Clear some before starting another.');
+      if (installing) return fail(response, 409, 'busy', 'yt-dlp is being installed. Try again in a moment.');
+      await jobs.sweep();
+      if (jobs.list().length >= MAX_JOBS && !(await jobs.evictOldestFinished())) return fail(response, 429, 'busy', 'There are already too many jobs here. Clear some before starting another.');
 
       const checked = checkFetchUrl(parsed.data.url, options.allowedHosts);
       if (!checked.ok || !checked.url) return fail(response, 400, 'url', checked.reason ?? 'That address is not one this helper will fetch from.');
@@ -139,36 +149,63 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
         const result: HelperInstallResult = { tool: tool.data, installed: false, version: null, reason: `The helper does not fetch ${tool.data}; install it yourself so you know where it came from.` };
         return send(response, 409, result);
       }
-      options.log(`installing yt-dlp into ${options.toolsDir}`);
-      const outcome = await installYtDlp(options.toolsDir);
-      const result: HelperInstallResult = { tool: 'yt-dlp', installed: outcome.installed, version: outcome.version, reason: outcome.reason };
-      options.log(outcome.installed ? `installed ${outcome.version}` : `install refused: ${outcome.reason ?? 'unknown'}`);
-      return send(response, outcome.installed ? 200 : 409, result);
+      // Replacing a binary a job is running fails on Windows, so wait for the jobs instead.
+      if (!installing && jobs.busy()) {
+        const result: HelperInstallResult = { tool: 'yt-dlp', installed: false, version: null, reason: 'Downloads are running. Wait for them to finish, then install again.' };
+        return send(response, 409, result);
+      }
+      // One install at a time; a second request waits for the first and gets its answer.
+      installing ??= (async (): Promise<HelperInstallResult> => {
+        try {
+          options.log(`installing yt-dlp into ${options.toolsDir}`);
+          const outcome = await installYtDlp(options.toolsDir);
+          options.log(outcome.installed ? `installed ${outcome.version}` : `install refused: ${outcome.reason ?? 'unknown'}`);
+          return { tool: 'yt-dlp', installed: outcome.installed, version: outcome.version, reason: outcome.reason };
+        } finally {
+          resolver.invalidate();
+          installing = null;
+        }
+      })();
+      const result = await installing;
+      return send(response, result.installed ? 200 : 409, result);
     }
 
     const file = /^\/helper\/v1\/jobs\/([^/]+)\/files\/([^/]+)$/.exec(path);
     if (file && request.method === 'GET') {
-      const found = jobs.filePath(decodeURIComponent(file[1]!), decodeURIComponent(file[2]!));
+      const jobId = safeDecode(file[1]!);
+      const fileId = safeDecode(file[2]!);
+      if (jobId === null || fileId === null) return fail(response, 400, 'validation', 'That address is not encoded properly.');
+      const found = jobs.filePath(jobId, fileId);
       if (!found) return fail(response, 404, 'not-found', 'That file is not here any more.');
+      let size: number;
+      try {
+        size = statSync(found.path).size;
+      } catch {
+        return fail(response, 404, 'not-found', 'That file is not here any more.');
+      }
       response.writeHead(200, {
         'content-type': found.file.contentType,
-        'content-length': statSync(found.path).size,
+        'content-length': size,
         'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(found.file.name)}`,
         'cache-control': 'no-store',
         'x-content-type-options': 'nosniff',
       });
-      return void createReadStream(found.path).pipe(response);
+      // The job can be forgotten mid-download; a read error then ends this response, not the helper.
+      const stream = createReadStream(found.path);
+      stream.on('error', () => response.destroy());
+      return void stream.pipe(response);
     }
 
     const single = /^\/helper\/v1\/jobs\/([^/]+)$/.exec(path);
     if (single) {
-      const id = decodeURIComponent(single[1]!);
+      const id = safeDecode(single[1]!);
+      if (id === null) return fail(response, 400, 'validation', 'That address is not encoded properly.');
       if (request.method === 'GET') {
         const job = jobs.get(id);
         return job ? send(response, 200, job) : fail(response, 404, 'not-found', 'No such job.');
       }
       if (request.method === 'DELETE') {
-        return jobs.forget(id) ? send(response, 200, { ok: true }) : fail(response, 404, 'not-found', 'No such job.');
+        return (await jobs.forget(id)) ? send(response, 200, { ok: true }) : fail(response, 404, 'not-found', 'No such job.');
       }
     }
 
@@ -215,16 +252,34 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
       resolvePromise();
     });
   });
+  const address = server.address();
+  if (typeof address === 'object' && address) port = address.port;
+  origin = `http://127.0.0.1:${port}`;
+  policy = { allowed: options.allowedOrigins, self: options.app ? origin : null };
+
+  // Finished jobs that nobody collected still hold disk; drop them on a timer too, not only on demand.
+  const sweeper = setInterval(() => void jobs.sweep(), 60_000);
+  sweeper.unref();
 
   return {
     server,
     jobs,
     origin,
     close: async () => {
-      jobs.shutdown();
+      clearInterval(sweeper);
+      await jobs.shutdown();
+      server.closeAllConnections();
       await new Promise<void>((resolvePromise) => server.close(() => resolvePromise()));
     },
   };
+}
+
+function safeDecode(value: string): string | null {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
 }
 
 /** spotDL is for Spotify links and yt-dlp is for the rest; asking for one by name overrides that. */

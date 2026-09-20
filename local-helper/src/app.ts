@@ -113,7 +113,10 @@ export function serveApp(source: AppSource, urlPath: string, token: string, resp
     'cache-control': 'public, max-age=3600',
     'x-content-type-options': 'nosniff',
   });
-  createReadStream(path).pipe(response);
+  const stream = createReadStream(path);
+  // An unreadable file ends this response rather than the whole helper.
+  stream.on('error', () => response.destroy());
+  stream.pipe(response);
   return { served: true };
 }
 

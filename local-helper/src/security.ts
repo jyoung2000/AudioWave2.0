@@ -55,8 +55,28 @@ export interface OriginPolicy {
 export function originAllowed(policy: OriginPolicy, origin: string | undefined): boolean {
   if (origin === undefined) return true;
   if (origin === 'null' || origin === '') return false;
-  if (policy.self && origin === policy.self) return true;
+  if (policy.self && selfOrigins(policy.self).includes(origin)) return true;
   return policy.allowed.includes(origin);
+}
+
+/** The helper's own origin, and the same port spelled `localhost`, which is the same socket. */
+function selfOrigins(self: string): string[] {
+  const url = new URL(self);
+  return [self, `${url.protocol}//localhost:${url.port}`];
+}
+
+/**
+ * Whether the `Host` header names this helper.
+ *
+ * This is the DNS-rebinding check. A hostile page can point its own name at 127.0.0.1 and then read
+ * responses as same-origin — no `Origin` header, so the check above lets it through — and the
+ * document served at `/` carries the token. The browser still sends the hostile name in `Host`, so
+ * anything that is not a loopback spelling of this port is refused.
+ */
+export function hostAllowed(host: string | undefined, port: number): boolean {
+  if (!host) return false;
+  const value = host.trim().toLowerCase();
+  return value === `127.0.0.1:${port}` || value === `localhost:${port}` || value === `[::1]:${port}`;
 }
 
 export interface UrlCheck {
@@ -73,6 +93,8 @@ export interface UrlCheck {
  * this program runs on the inside of someone's network.
  */
 export function checkFetchUrl(input: string, allowedHosts: readonly string[]): UrlCheck {
+  // An empty list means "anything" to the shared validator; here it can only be a mistake.
+  if (!allowedHosts.length) return { ok: false, reason: 'The host allowlist is empty, so nothing may be fetched.' };
   const result = validateOutboundUrl(input, { allowedHosts, allowedSchemes: ['https:'], maxLength: 2048 });
   if (!result.ok || !result.url) return { ok: false, ...(result.reason ? { reason: result.reason } : {}) };
   return { ok: true, url: result.url };

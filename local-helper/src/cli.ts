@@ -7,9 +7,9 @@
  * use, a directory it cannot write to and a missing player are all things that happen, and each one
  * gets a sentence saying what to do rather than a stack trace.
  */
-import { mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { spawn } from 'node:child_process';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HELPER_PORT_SCAN } from '@now-playing/contracts';
 import { findApp } from './app.js';
@@ -46,17 +46,31 @@ export async function main(argv: readonly string[] = process.argv.slice(2), out:
     return 1;
   }
 
+  // `--work-dir` may be a folder the user cares about, and a second helper may share it. So this run
+  // gets a new folder of its own inside it, and that folder is the only thing it ever deletes.
+  let runDir: string;
   try {
     mkdirSync(options.workDir, { recursive: true });
+    runDir = mkdtempSync(join(options.workDir, 'now-playing-run-'));
   } catch (error) {
     out(`Cannot use ${options.workDir} for temporary files: ${error instanceof Error ? error.message : String(error)}`);
     out('Point somewhere writable with --work-dir <path>.');
     return 1;
   }
+  const removeRunDir = (): void => {
+    try {
+      rmSync(runDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    } catch {
+      out(`Could not remove ${runDir}; it is safe to delete by hand.`);
+    }
+  };
 
   const token = newToken();
-  const helper = await listen(options, app, token, out);
-  if (!helper) return 1;
+  const helper = await listen({ ...options, workDir: runDir }, app, token, out);
+  if (!helper) {
+    removeRunDir();
+    return 1;
+  }
 
   const tools = await resolveAll({ configured: options.tools, toolsDir: options.toolsDir });
   out('');
@@ -80,14 +94,21 @@ export async function main(argv: readonly string[] = process.argv.slice(2), out:
 
   if (app && options.open) openBrowser(helper.origin);
 
+  let stopping = false;
   const stop = async (): Promise<void> => {
+    if (stopping) return;
+    stopping = true;
     out('\nStopping.');
-    await helper.close();
-    rmSync(options.workDir, { recursive: true, force: true });
-    process.exit(0);
+    try {
+      await helper.close();
+    } finally {
+      removeRunDir();
+      process.exit(0);
+    }
   };
-  process.on('SIGINT', () => void stop());
-  process.on('SIGTERM', () => void stop());
+  // SIGHUP is a closed terminal, and on Windows also a closed console window; SIGBREAK is Ctrl+Break.
+  const signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM', 'SIGHUP', ...(process.platform === 'win32' ? (['SIGBREAK'] as const) : [])];
+  for (const signal of signals) process.on(signal, () => void stop());
   return 0;
 }
 
