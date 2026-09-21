@@ -78,6 +78,9 @@ export const Scope = z.enum([
   'files:serve',
   'search:use',
   'shares:create',
+  'profile:read',
+  'profile:write',
+  'backup:read',
 ]);
 export type Scope = z.infer<typeof Scope>;
 

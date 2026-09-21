@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ProviderCapabilities, ProviderDescriptor, ProviderHealth } from '../capabilities.js';
-import { API_PREFIX, Cursor, DeviceKind, IsoDateTime, ListeningMode, ProviderId, Scope, Uuid } from '../common.js';
+import { API_PREFIX, Cursor, DeviceKind, DisplayName, IsoDateTime, ListeningMode, ProviderId, Scope, Uuid } from '../common.js';
 import {
   AggregateTasteProfile,
   AuditEvent,
@@ -314,6 +314,64 @@ export const TasteProfileView = z.object({
 });
 export type TasteProfileView = z.infer<typeof TasteProfileView>;
 
+/* ---------- profiles ---------- */
+
+/**
+ * A username: 3–40 characters of letters, numbers, spaces, `.`, `_` and `-`, starting and ending
+ * with a letter or number. The hub compares names case-insensitively after NFC normalisation.
+ */
+export const ProfileName = z
+  .string()
+  .trim()
+  // Composed first: "e" plus a combining diaeresis is the same name as "ë", and only the composed form is all letters.
+  .transform((name) => name.normalize('NFC'))
+  .pipe(z.string().min(3).max(40).regex(/^[\p{L}\p{N}](?:[\p{L}\p{N} ._-]*[\p{L}\p{N}])?$/u, 'Use letters, numbers, spaces, ".", "_" or "-", starting and ending with a letter or number'));
+export const ProfilePlaylistId = z.string().min(1).max(120).regex(/^[A-Za-z0-9._:-]+$/);
+export const ProfileSummary = z.object({ id: Uuid, displayName: DisplayName, avatarUrl: z.string().nullable(), playlistCount: z.number().int().nonnegative() });
+export type ProfileSummary = z.infer<typeof ProfileSummary>;
+export const ProfileView = z.object({
+  id: Uuid,
+  displayName: DisplayName,
+  avatarUrl: z.string().nullable(),
+  playlists: z.array(z.object({ id: z.string(), name: z.string(), tracks: z.number().int().nonnegative(), updatedAt: IsoDateTime })),
+});
+export type ProfileView = z.infer<typeof ProfileView>;
+/** The moderation row the admin GUI lists: a profile plus when it last changed. */
+export const ProfileAdminView = ProfileSummary.extend({ claimed: z.boolean(), updatedAt: IsoDateTime });
+export type ProfileAdminView = z.infer<typeof ProfileAdminView>;
+
+/* ---------- group invites ---------- */
+
+export const InviteState = z.enum(['open', 'used', 'expired', 'withdrawn', 'declined']);
+export const InviteView = z.object({
+  inviteId: Uuid,
+  role: GroupRole,
+  createdBy: z.string(),
+  createdAt: IsoDateTime,
+  expiresAt: IsoDateTime,
+  toProfileId: Uuid.nullable(),
+  toName: z.string().nullable(),
+  state: InviteState,
+  usedBy: z.string().nullable(),
+  answeredAt: IsoDateTime.nullable(),
+});
+export type InviteView = z.infer<typeof InviteView>;
+export const InvitePreview = z.object({ groupName: z.string(), memberCount: z.number().int().nonnegative(), fromName: z.string(), role: GroupRole, expiresAt: IsoDateTime });
+export type InvitePreview = z.infer<typeof InvitePreview>;
+export const MyInvite = z.object({ inviteId: Uuid, groupId: Uuid, groupName: z.string(), fromName: z.string(), role: GroupRole, expiresAt: IsoDateTime });
+export type MyInvite = z.infer<typeof MyInvite>;
+
+/* ---------- backup space ---------- */
+
+export const BackupSpace = z.object({
+  path: z.string(),
+  freeBytes: z.number().int().nonnegative().nullable(),
+  totalBytes: z.number().int().nonnegative().nullable(),
+  lastArchiveBytes: z.number().int().nonnegative().nullable(),
+  keep: z.number().int().positive().nullable(),
+});
+export type BackupSpace = z.infer<typeof BackupSpace>;
+
 /* ---------- route table ---------- */
 
 const groupParams = z.object({ groupId: Uuid });
@@ -373,7 +431,13 @@ export const routes = {
   groupsGet: defineRoute({ method: 'GET', path: '/groups/:groupId', operationId: 'getGroup', summary: 'Group detail', tags: ['groups'], auth: 'admin-or-device', params: groupParams, response: GroupView }),
   groupsUpdate: defineRoute({ method: 'PATCH', path: '/groups/:groupId', operationId: 'updateGroup', summary: 'Rename or change settings', tags: ['groups'], auth: 'admin-or-device', scopes: ['group:admin'], params: groupParams, body: z.object({ name: z.string().min(1).max(80).optional(), settings: GroupSettings.partial().optional() }), response: GroupView }),
   groupsArchive: defineRoute({ method: 'POST', path: '/groups/:groupId/archive', operationId: 'archiveGroup', summary: 'Archive a group', tags: ['groups'], auth: 'admin-or-device', scopes: ['group:admin'], params: groupParams, response: Ok }),
-  groupsInvite: defineRoute({ method: 'POST', path: '/groups/:groupId/invites', operationId: 'createInvite', summary: 'Create an invite code', tags: ['groups'], auth: 'admin-or-device', scopes: ['group:admin'], rateLimit: 'write', params: groupParams, body: z.object({ ttlSeconds: z.number().int().min(60).max(86400).default(3600), role: GroupRole.exclude(['owner']).default('member') }), response: z.object({ inviteCode: z.string(), expiresAt: IsoDateTime }) }),
+  groupsInvite: defineRoute({ method: 'POST', path: '/groups/:groupId/invites', operationId: 'createInvite', summary: 'Create an invite code', tags: ['groups'], auth: 'admin-or-device', scopes: ['group:admin'], rateLimit: 'write', params: groupParams, body: z.object({ ttlSeconds: z.number().int().min(60).max(86400).default(3600), role: GroupRole.exclude(['owner']).default('member'), toProfileId: Uuid.optional() }), response: z.object({ inviteCode: z.string(), expiresAt: IsoDateTime, inviteId: Uuid, toProfileId: Uuid.nullable() }) }),
+  groupsInvitesList: defineRoute({ method: 'GET', path: '/groups/:groupId/invites', operationId: 'listInvites', summary: 'Invites of the last 30 days, newest first (never the codes themselves)', tags: ['groups'], auth: 'admin-or-device', scopes: ['group:admin'], params: groupParams, response: z.object({ items: z.array(InviteView) }) }),
+  groupsInviteWithdraw: defineRoute({ method: 'DELETE', path: '/groups/:groupId/invites/:inviteId', operationId: 'withdrawInvite', summary: 'Withdraw an invite; its code stops working immediately', tags: ['groups'], auth: 'admin-or-device', scopes: ['group:admin'], rateLimit: 'write', params: groupParams.extend({ inviteId: Uuid }), response: Ok }),
+  groupsInvitePreview: defineRoute({ method: 'GET', path: '/groups/invites/preview', operationId: 'previewInvite', summary: 'What an invite code is for, before joining (member count only, never the list)', tags: ['groups'], auth: 'device', scopes: ['group:member'], rateLimit: 'pairing', query: z.object({ code: z.string().min(4).max(40) }), response: InvitePreview }),
+  myInvitesList: defineRoute({ method: 'GET', path: '/me/invites', operationId: 'listMyInvites', summary: 'Unanswered invites addressed to the profile of the caller', tags: ['groups'], auth: 'device', scopes: ['group:member'], response: z.object({ items: z.array(MyInvite) }) }),
+  myInviteAccept: defineRoute({ method: 'POST', path: '/me/invites/:inviteId/accept', operationId: 'acceptMyInvite', summary: 'Accept a directed invite (same effect as join)', tags: ['groups'], auth: 'device', scopes: ['group:member'], rateLimit: 'write', params: z.object({ inviteId: Uuid }), response: GroupView }),
+  myInviteDecline: defineRoute({ method: 'POST', path: '/me/invites/:inviteId/decline', operationId: 'declineMyInvite', summary: 'Decline a directed invite', tags: ['groups'], auth: 'device', scopes: ['group:member'], rateLimit: 'write', params: z.object({ inviteId: Uuid }), response: Ok }),
   groupsJoin: defineRoute({ method: 'POST', path: '/groups/join', operationId: 'joinGroup', summary: 'Join with an invite code', tags: ['groups'], auth: 'device', scopes: ['group:member'], rateLimit: 'pairing', body: z.object({ inviteCode: z.string().min(4).max(40), displayName: z.string().max(120).optional() }), response: GroupView }),
   groupsLeave: defineRoute({ method: 'POST', path: '/groups/:groupId/leave', operationId: 'leaveGroup', summary: 'Leave a group', tags: ['groups'], auth: 'device', params: groupParams, response: Ok }),
   groupsMemberRevoke: defineRoute({ method: 'DELETE', path: '/groups/:groupId/members/:memberId', operationId: 'revokeMember', summary: 'Remove a member', tags: ['groups'], auth: 'admin-or-device', scopes: ['group:admin'], params: groupParams.extend({ memberId: z.string() }), response: Ok }),
@@ -398,6 +462,22 @@ export const routes = {
   recommendationsProfile: defineRoute({ method: 'GET', path: '/recommendations/profile', operationId: 'getTasteProfile', summary: 'Inspectable taste profile (dimensions and contexts)', tags: ['recommendations'], auth: 'device', response: TasteProfileView }),
   recommendationsConfigGet: defineRoute({ method: 'GET', path: '/recommendations/config', operationId: 'getRecommendationConfig', summary: 'Weights, decay and diversity configuration', tags: ['recommendations'], auth: 'admin', response: z.record(z.string(), z.unknown()) }),
   recommendationsConfigPut: defineRoute({ method: 'PUT', path: '/recommendations/config', operationId: 'putRecommendationConfig', summary: 'Update recommendation configuration', tags: ['recommendations'], auth: 'admin', rateLimit: 'write', body: z.record(z.string(), z.unknown()), response: z.record(z.string(), z.unknown()) }),
+
+  /* profiles */
+  profilesMe: defineRoute({ method: 'GET', path: '/profiles/me', operationId: 'getMyProfile', summary: 'The profile of the caller', tags: ['profiles'], auth: 'device', scopes: ['profile:read'], response: ProfileView }),
+  profilesMeUpdate: defineRoute({ method: 'PATCH', path: '/profiles/me', operationId: 'updateMyProfile', summary: 'Set the username (409 when taken)', tags: ['profiles'], auth: 'device', scopes: ['profile:write'], rateLimit: 'write', body: z.object({ displayName: ProfileName }), response: ProfileView }),
+  profilesAvailable: defineRoute({ method: 'GET', path: '/profiles/available', operationId: 'profileNameAvailable', summary: 'Is this username free', tags: ['profiles'], auth: 'device', scopes: ['profile:read'], query: z.object({ name: z.string().max(200) }), response: z.object({ available: z.boolean() }) }),
+  profilesAvatarPut: defineRoute({ method: 'PUT', path: '/profiles/me/avatar', operationId: 'putMyAvatar', summary: 'Upload a picture (PNG, JPEG or WebP; at most 512 × 512 and 1 MB); stored re-encoded', tags: ['profiles'], auth: 'device', scopes: ['profile:write'], rateLimit: 'write', requestContentType: 'image/*', response: Ok }),
+  profilesAvatarDelete: defineRoute({ method: 'DELETE', path: '/profiles/me/avatar', operationId: 'deleteMyAvatar', summary: 'Remove the picture', tags: ['profiles'], auth: 'device', scopes: ['profile:write'], rateLimit: 'write', response: Ok }),
+  profilesPlaylistPut: defineRoute({ method: 'PUT', path: '/profiles/me/playlists/:playlistId', operationId: 'putMyProfilePlaylist', summary: 'Share a playlist as CSV (title,artist,album,seconds; at most 2 MB and 5,000 rows)', tags: ['profiles'], auth: 'device', scopes: ['profile:write'], rateLimit: 'write', params: z.object({ playlistId: ProfilePlaylistId }), query: z.object({ name: z.string().trim().min(1).max(120) }), requestContentType: 'text/csv', response: Ok }),
+  profilesPlaylistDelete: defineRoute({ method: 'DELETE', path: '/profiles/me/playlists/:playlistId', operationId: 'deleteMyProfilePlaylist', summary: 'Stop sharing a playlist', tags: ['profiles'], auth: 'device', scopes: ['profile:write'], rateLimit: 'write', params: z.object({ playlistId: ProfilePlaylistId }), response: Ok }),
+  profilesSearch: defineRoute({ method: 'GET', path: '/profiles', operationId: 'searchProfiles', summary: 'People on this hub whose name contains q (never the caller)', tags: ['profiles'], auth: 'device', scopes: ['profile:read'], rateLimit: 'search', query: z.object({ q: z.string().max(80).default(''), limit: z.coerce.number().int().min(1).max(20).default(10) }), response: z.object({ items: z.array(ProfileSummary) }) }),
+  profilesGet: defineRoute({ method: 'GET', path: '/profiles/:id', operationId: 'getProfile', summary: 'A profile and its shared playlists', tags: ['profiles'], auth: 'device', scopes: ['profile:read'], params: z.object({ id: Uuid }), response: ProfileView }),
+  profilesAvatarGet: defineRoute({ method: 'GET', path: '/profiles/:id/avatar', operationId: 'getProfileAvatar', summary: 'The picture (WebP)', tags: ['profiles'], auth: 'device', scopes: ['profile:read'], params: z.object({ id: Uuid }), response: z.string(), responseContentType: 'image/webp' }),
+  profilesPlaylistCsv: defineRoute({ method: 'GET', path: '/profiles/:id/playlists/:playlistFile', operationId: 'getProfilePlaylistCsv', summary: 'A shared playlist, re-serialised as CSV (`:playlistFile` is `<playlistId>.csv`)', tags: ['profiles'], auth: 'device', scopes: ['profile:read'], params: z.object({ id: Uuid, playlistFile: z.string().max(124).regex(/^[A-Za-z0-9._:-]+\.csv$/) }), response: z.string(), responseContentType: 'text/csv; charset=utf-8' }),
+  profilesAdminList: defineRoute({ method: 'GET', path: '/admin/profiles', operationId: 'adminListProfiles', summary: 'Every profile, for moderation', tags: ['profiles'], auth: 'admin', response: z.object({ items: z.array(ProfileAdminView) }) }),
+  profilesAdminRename: defineRoute({ method: 'PATCH', path: '/admin/profiles/:id', operationId: 'adminRenameProfile', summary: 'Rename a profile (moderation)', tags: ['profiles'], auth: 'admin', rateLimit: 'write', params: z.object({ id: Uuid }), body: z.object({ displayName: ProfileName }), response: ProfileAdminView }),
+  profilesAdminAvatarDelete: defineRoute({ method: 'DELETE', path: '/admin/profiles/:id/avatar', operationId: 'adminRemoveProfileAvatar', summary: 'Remove a profile picture (moderation)', tags: ['profiles'], auth: 'admin', rateLimit: 'write', params: z.object({ id: Uuid }), response: Ok }),
 
   /* downloads */
   downloadsList: defineRoute({ method: 'GET', path: '/downloads', operationId: 'listDownloads', summary: 'Download jobs', tags: ['downloads'], auth: 'admin-or-device', response: z.object({ items: z.array(DownloadJob) }) }),
@@ -452,6 +532,7 @@ export const routes = {
   logsList: defineRoute({ method: 'GET', path: '/logs', operationId: 'listLogs', summary: 'Recent structured log lines (redacted)', tags: ['diagnostics'], auth: 'admin', query: z.object({ level: z.enum(['debug', 'info', 'warn', 'error']).default('info'), limit: z.coerce.number().int().min(1).max(2000).default(200), since: IsoDateTime.optional() }), response: z.object({ items: z.array(z.object({ time: IsoDateTime, level: z.string(), msg: z.string(), correlationId: z.string().nullable(), module: z.string().nullable(), data: z.record(z.string(), z.unknown()) })) }) }),
   diagnosticsBundle: defineRoute({ method: 'GET', path: '/diagnostics/bundle', operationId: 'diagnosticsBundle', summary: 'Redacted diagnostics bundle (no tokens, full IPs, raw history, audio or user paths)', tags: ['diagnostics'], auth: 'admin', response: z.object({ schemaVersion: z.number().int(), generatedAt: IsoDateTime, redactions: z.array(z.string()), sections: z.record(z.string(), z.unknown()) }) }),
   backupCreate: defineRoute({ method: 'POST', path: '/backup', operationId: 'createBackup', summary: 'Consistent SQLite backup into the data volume', tags: ['backup'], auth: 'admin', rateLimit: 'write', response: z.object({ id: z.string(), createdAt: IsoDateTime, sizeBytes: z.number().int(), relativePath: z.string() }), responseStatus: 201 }),
+  backupSpace: defineRoute({ method: 'GET', path: '/backup/space', operationId: 'backupSpace', summary: 'Room at the backup location and the size of the newest archive', tags: ['backup'], auth: 'admin-or-device', scopes: ['backup:read'], response: BackupSpace }),
   backupList: defineRoute({ method: 'GET', path: '/backup', operationId: 'listBackups', summary: 'Backups on the data volume', tags: ['backup'], auth: 'admin', response: z.object({ items: z.array(z.object({ id: z.string(), createdAt: IsoDateTime, sizeBytes: z.number().int(), relativePath: z.string() })) }) }),
   backupRestore: defineRoute({ method: 'POST', path: '/backup/:backupId/restore', operationId: 'restoreBackup', summary: 'Restore (a safety backup is taken first; restart required)', tags: ['backup'], auth: 'admin', rateLimit: 'write', params: z.object({ backupId: z.string() }), body: z.object({ confirm: z.literal(true) }), response: z.object({ ok: z.literal(true), safetyBackupId: z.string(), restartRequired: z.literal(true) }) }),
   exportAll: defineRoute({ method: 'GET', path: '/export', operationId: 'exportAll', summary: 'JSON export of groups, history, playlists, presets, devices (no secrets)', tags: ['backup'], auth: 'admin', response: z.object({ schemaVersion: z.number().int(), exportedAt: IsoDateTime, data: z.record(z.string(), z.unknown()) }) }),

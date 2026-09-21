@@ -98,7 +98,10 @@
           "transfers:receive",
           "files:serve",
           "search:use",
-          "shares:create"
+          "shares:create",
+          "profile:read",
+          "profile:write",
+          "backup:read"
         ]
       }
     },

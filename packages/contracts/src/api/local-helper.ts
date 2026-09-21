@@ -131,9 +131,24 @@ export const HelperError = z.object({
 });
 export type HelperError = z.infer<typeof HelperError>;
 
+/** The folders a backup can include, as the companion names them. */
+export const HelperBackupPart = z.enum(['music', 'tv', 'movies']);
+export type HelperBackupPart = z.infer<typeof HelperBackupPart>;
+
+/**
+ * How big the next backup's folders are and how much room its destination has. A part that could not
+ * be measured in time is absent — never 0 — and `destination` is null when no backup folder is set.
+ */
+export const HelperBackupEstimate = z.object({
+  parts: z.partialRecord(HelperBackupPart, z.object({ bytes: z.number().int().nonnegative(), files: z.number().int().nonnegative(), measuredAt: IsoDateTime })),
+  destination: z.object({ path: z.string(), freeBytes: z.number().int().nonnegative().nullable(), totalBytes: z.number().int().nonnegative().nullable() }).nullable(),
+});
+export type HelperBackupEstimate = z.infer<typeof HelperBackupEstimate>;
+
 export const HELPER_ROUTES = {
   health: '/helper/v1/health',
   fetch: '/helper/v1/fetch',
+  backupEstimate: '/helper/v1/backup/estimate',
   install: (tool: HelperToolId): string => `/helper/v1/tools/${tool}/install`,
   job: (id: string): string => `/helper/v1/jobs/${encodeURIComponent(id)}`,
   file: (jobId: string, fileId: string): string => `/helper/v1/jobs/${encodeURIComponent(jobId)}/files/${encodeURIComponent(fileId)}`,
