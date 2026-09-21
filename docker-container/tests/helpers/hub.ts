@@ -132,6 +132,7 @@ export async function createTestHub(options: TestHubOptions = {}): Promise<TestH
   const fetch = fakeFetch();
   const config: HubConfig = {
     dataDir,
+    backupDir: null,
     port: 0,
     bindMode: 'localhost',
     bindAddress: null,

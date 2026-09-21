@@ -8,6 +8,8 @@ export type IpLoggingMode = 'truncated' | 'hashed' | 'full';
 
 export interface HubConfig {
   dataDir: string;
+  /** Where backups are written. Null means `<dataDir>/backups`; set it to a mounted host folder to keep them off the data volume. */
+  backupDir: string | null;
   port: number;
   bindMode: BindMode;
   bindAddress: string | null;
@@ -95,6 +97,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): HubConfig {
   if (!['true', 'false', '1', '0'].includes(demo)) throw new Error('NP_DEMO_MODE must be true or false');
   return {
     dataDir,
+    backupDir: text(env, 'NP_BACKUP_DIR') ? resolve(text(env, 'NP_BACKUP_DIR')!) : null,
     port: parsePort(text(env, 'NP_PORT'), BRANDING.hubPort),
     bindMode: oneOf(text(env, 'NP_BIND_MODE'), BIND_MODES, 'localhost', 'NP_BIND_MODE'),
     bindAddress: text(env, 'NP_BIND_ADDRESS'),

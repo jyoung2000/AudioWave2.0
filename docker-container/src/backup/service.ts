@@ -16,9 +16,10 @@
  */
 import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import type { Logger } from 'pino';
 import { DomainError } from '@now-playing/domain';
+import { diskUsage } from '../disk-usage.js';
 import type { AuditService } from '../auth/audit.js';
 import type { RequestMeta } from '../auth/service.js';
 import type { HubConfig } from '../config.js';
@@ -73,7 +74,27 @@ export class BackupService {
   }
 
   private dir(): string {
-    return join(this.config.dataDir, 'backups');
+    return this.config.backupDir ?? join(this.config.dataDir, 'backups');
+  }
+
+  /**
+   * Room at the backup location and the size of the newest archive. A missing or unreadable
+   * directory is reported as unknown (nulls), never as an error and never as zero.
+   *
+   * `forDevice` hides a location outside the data volume: a paired player has no business learning
+   * the operator's host paths, only that the backups go to a host folder.
+   */
+  async space(forDevice: boolean): Promise<{ path: string; freeBytes: number | null; totalBytes: number | null; lastArchiveBytes: number | null; keep: number | null }> {
+    const dir = this.dir();
+    const inside = dir === this.config.dataDir || dir.startsWith(this.config.dataDir + sep);
+    const volume = await diskUsage(dir);
+    let lastArchiveBytes: number | null;
+    try {
+      lastArchiveBytes = this.list()[0]?.sizeBytes ?? null;
+    } catch {
+      lastArchiveBytes = null;
+    }
+    return { path: forDevice && !inside ? 'host folder' : dir, freeBytes: volume.freeBytes, totalBytes: volume.totalBytes, lastArchiveBytes, keep: KEEP_BACKUPS };
   }
 
   private nowIso(): string {
@@ -133,7 +154,7 @@ export class BackupService {
   private prune(): void {
     const all = this.list();
     for (const suffix of ['-auto', '-safety']) {
-      for (const stale of all.filter((b) => b.id.endsWith(suffix)).slice(KEEP_BACKUPS)) rmSync(join(this.config.dataDir, stale.relativePath), { force: true });
+      for (const stale of all.filter((b) => b.id.endsWith(suffix)).slice(KEEP_BACKUPS)) rmSync(join(this.dir(), `${stale.id}.sqlite`), { force: true });
     }
   }
 
@@ -272,6 +293,15 @@ export class BackupService {
       eqBindings: this.repos.sync.all('eqBindings'),
       libraryRoots: this.repos.library.listRoots().map((r) => ({ id: r.id, displayName: r.displayName, handleId: r.handleId, kind: r.kind })),
       shares: this.repos.shares.list().map(({ tokenHash: _t, ...s }) => s),
+      // Profiles are visible to every paired device already, so nothing here is secret. The SQLite
+      // backup carries the same rows; this is for moving to a new hub.
+      profiles: (this.db.prepare('SELECT id, display_name AS displayName, profile_name_key IS NOT NULL AS claimed FROM hub_users WHERE deleted_at IS NULL ORDER BY created_at').all() as Array<{ id: string; displayName: string; claimed: number }>).map((u) => ({
+        id: u.id,
+        displayName: u.displayName,
+        claimed: u.claimed === 1,
+        avatarWebpBase64: (this.db.prepare('SELECT bytes FROM profile_avatars WHERE user_id = ?').get(u.id) as { bytes: Buffer } | undefined)?.bytes.toString('base64') ?? null,
+        playlists: this.db.prepare('SELECT playlist_id AS id, name, tracks, csv, updated_at AS updatedAt FROM profile_playlists WHERE user_id = ? ORDER BY playlist_id').all(u.id),
+      })),
       providers: this.repos.providers.allConfigs().map((c) => ({ provider: c.provider, enabled: c.enabled === 1 })),
     };
     this.metrics.increment('backup.exported');

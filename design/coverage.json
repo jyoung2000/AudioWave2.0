@@ -548,6 +548,20 @@
       "authority": "adopted"
     },
     {
+      "id": "hub-profiles",
+      "kind": "screen",
+      "product": "hub",
+      "platform": "web",
+      "title": "Profiles",
+      "entry": "source list → Profiles",
+      "sourcePaths": ["docker-container/src/web/views/Profiles.tsx"],
+      "components": ["AquaTable", "Button", "TextField"],
+      "states": ["none", "listed", "renaming", "name taken", "remove picture (confirm)"],
+      "rules": ["UX-SAFE-001", "UX-FEED-001"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
       "id": "hub-shares",
       "kind": "screen",
       "product": "hub",

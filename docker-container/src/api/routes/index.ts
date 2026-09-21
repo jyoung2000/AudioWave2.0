@@ -4,6 +4,7 @@ import { registerAdminRoutes } from './admin.js';
 import { registerGroupRoutes } from './groups.js';
 import { registerMediaRoutes } from './media.js';
 import { registerPairingRoutes } from './pairing.js';
+import { registerProfileRoutes } from './profiles.js';
 import { registerProviderRoutes } from './providers.js';
 import { registerShareRoutes } from './shares.js';
 import { registerSyncRoutes } from './sync.js';
@@ -19,6 +20,7 @@ export function registerAllRoutes(app: FastifyInstance, ctx: HubContext): void {
   registerPairingRoutes(app, ctx);
   registerProviderRoutes(app, ctx);
   registerGroupRoutes(app, ctx);
+  registerProfileRoutes(app, ctx);
   registerMediaRoutes(app, ctx);
   registerSyncRoutes(app, ctx);
   registerShareRoutes(app, ctx);

@@ -72,7 +72,7 @@ describe('invite codes', () => {
   it('marks an invite used only once at the repository level', () => {
     const repo = hub.ctx.repos.groups;
     const now = new Date(hub.clock.now()).toISOString();
-    repo.createInvite({ id: 'inv-1', group_id: groupId, code_hash: 'h'.repeat(64), role: 'member', created_by: owner.deviceId, created_at: now, expires_at: new Date(hub.clock.now() + 60_000).toISOString() });
+    repo.createInvite({ id: 'inv-1', group_id: groupId, code_hash: 'h'.repeat(64), role: 'member', created_by: owner.deviceId, created_at: now, expires_at: new Date(hub.clock.now() + 60_000).toISOString() , to_profile_id: null, created_by_name: null });
     expect(repo.findInviteByHash('h'.repeat(64))?.id).toBe('inv-1');
     expect(repo.markInviteUsed('inv-1', 'a', now)).toBe(true);
     expect(repo.markInviteUsed('inv-1', 'b', now)).toBe(false);

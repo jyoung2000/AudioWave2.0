@@ -14,6 +14,7 @@ import { DomainError } from '@now-playing/domain';
 import type { HubContext } from '../../context.js';
 import { actorDisplayName, actorId, type Principal } from '../../auth/principal.js';
 import { RangeNotSatisfiableError } from '../../library/service.js';
+import { diskUsage } from '../../disk-usage.js';
 import { signMediaPath } from '../media-signature.js';
 import { RAW, registerRoute } from '../register.js';
 
@@ -171,14 +172,4 @@ export function registerMediaRoutes(app: FastifyInstance, ctx: HubContext): void
     reply.header('Content-Type', art.mime).header('Cache-Control', 'private, max-age=86400').send(createReadStream(art.path));
     return RAW;
   });
-}
-
-async function diskUsage(dir: string): Promise<{ freeBytes: number | null; totalBytes: number | null }> {
-  try {
-    const { statfs } = await import('node:fs/promises');
-    const fs = await statfs(dir);
-    return { freeBytes: Number(fs.bavail) * Number(fs.bsize), totalBytes: Number(fs.blocks) * Number(fs.bsize) };
-  } catch {
-    return { freeBytes: null, totalBytes: null };
-  }
 }

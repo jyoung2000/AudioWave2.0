@@ -113,6 +113,8 @@ export function registerAdminRoutes(app: FastifyInstance, ctx: HubContext): void
     return entry;
   });
 
+  registerRoute(app, ctx, routes.backupSpace, ({ principal }) => ctx.backup.space(principal.kind === 'device'));
+
   registerRoute(app, ctx, routes.backupList, () => ({ items: ctx.backup.list() }));
 
   registerRoute(app, ctx, routes.backupRestore, async ({ params, principal, ip, userAgent, correlationId }) =>

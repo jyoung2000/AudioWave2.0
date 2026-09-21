@@ -25,6 +25,7 @@ import { GroupsView } from './views/Groups.js';
 import { ProvidersView } from './views/Providers.js';
 import { LibraryView } from './views/Library.js';
 import { DownloadsView } from './views/Downloads.js';
+import { ProfilesView } from './views/Profiles.js';
 import { SharesView } from './views/Shares.js';
 import { DiscordView } from './views/Discord.js';
 import { NetworkView } from './views/Network.js';
@@ -32,7 +33,7 @@ import { DiagnosticsView } from './views/Diagnostics.js';
 import { BackupView } from './views/Backup.js';
 import { RecommendationsView } from './views/Recommendations.js';
 
-export type ViewId = 'overview' | 'devices' | 'groups' | 'providers' | 'library' | 'downloads' | 'shares' | 'recommendations' | 'discord' | 'network' | 'diagnostics' | 'backup';
+export type ViewId = 'overview' | 'devices' | 'groups' | 'profiles' | 'providers' | 'library' | 'downloads' | 'shares' | 'recommendations' | 'discord' | 'network' | 'diagnostics' | 'backup';
 
 const SOURCE_GROUPS: SourceGroup<ViewId>[] = [
   {
@@ -42,6 +43,7 @@ const SOURCE_GROUPS: SourceGroup<ViewId>[] = [
       { id: 'overview', label: 'Overview', icon: <Glyph name="info" /> },
       { id: 'devices', label: 'Devices', icon: <Glyph name="device" /> },
       { id: 'groups', label: 'Groups', icon: <Glyph name="group" /> },
+      { id: 'profiles', label: 'Profiles', icon: <Glyph name="solo" /> },
     ],
   },
   {
@@ -241,6 +243,8 @@ function AdminShell({ session, onSignedOut }: { session: SessionInfo; onSignedOu
         return <DownloadsView />;
       case 'shares':
         return <SharesView />;
+      case 'profiles':
+        return <ProfilesView />;
       case 'recommendations':
         return <RecommendationsView />;
       case 'discord':

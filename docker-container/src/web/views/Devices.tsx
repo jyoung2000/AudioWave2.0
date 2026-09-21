@@ -14,7 +14,7 @@ import { api } from '../lib/api.js';
 import { useAction, useResource } from '../lib/hooks.js';
 import { Ago, AsyncPanel, ConfirmButton, InlineError } from './common.js';
 
-const DEFAULT_SCOPES: Scope[] = ['library:read', 'search:use', 'group:member', 'history:events', 'shares:create'];
+const DEFAULT_SCOPES: Scope[] = ['library:read', 'search:use', 'group:member', 'history:events', 'shares:create', 'profile:read', 'profile:write', 'backup:read'];
 
 export function DevicesView() {
   const devices = useResource('devicesList', {}, { pollMs: 10_000 });

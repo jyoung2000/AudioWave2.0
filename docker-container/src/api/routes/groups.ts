@@ -23,7 +23,7 @@ import { RAW, registerRoute } from '../register.js';
 /** Group membership is by actor, so an admin session and a device credential both map to one. */
 export function groupActor(principal: Principal): GroupActor {
   if (principal.kind === 'admin') return { id: 'admin', kind: 'admin', displayName: principal.username, isHubAdmin: true };
-  if (principal.kind === 'device') return { id: principal.deviceId, kind: 'device', displayName: principal.displayName };
+  if (principal.kind === 'device') return { id: principal.deviceId, kind: 'device', displayName: principal.displayName, profileId: principal.hubUserId };
   throw new DomainError('unauthenticated', 'Authentication required');
 }
 
@@ -76,9 +76,35 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: HubContext): void
     return { ok: true as const };
   });
 
-  registerRoute(app, ctx, routes.groupsInvite, ({ params, body, principal }) => ctx.groups.createInvite(params.groupId, groupActor(principal), { ttlSeconds: body.ttlSeconds, role: body.role }));
+  registerRoute(app, ctx, routes.groupsInvite, ({ params, body, principal, ip, correlationId }) =>
+    ctx.groups.createInvite(params.groupId, groupActor(principal), { ttlSeconds: body.ttlSeconds, role: body.role, toProfileId: body.toProfileId }, { ip, correlationId }),
+  );
 
-  registerRoute(app, ctx, routes.groupsJoin, ({ body, principal }) => toGroupView(ctx, ctx.groups.join(groupActor(principal), body.inviteCode, body.displayName)));
+  registerRoute(app, ctx, routes.groupsInvitesList, ({ params, principal }) => ({ items: ctx.groups.listInvites(params.groupId, groupActor(principal)) }));
+
+  registerRoute(app, ctx, routes.groupsInviteWithdraw, ({ params, principal, ip, correlationId }) => {
+    ctx.groups.withdrawInvite(params.groupId, groupActor(principal), params.inviteId, { ip, correlationId });
+    return { ok: true as const };
+  });
+
+  // Rate-limited like `join`, so previewing cannot be used to guess codes any faster than joining can.
+  registerRoute(app, ctx, routes.groupsInvitePreview, ({ query }) => ctx.groups.previewInvite(query.code));
+
+  registerRoute(app, ctx, routes.groupsJoin, ({ body, principal, ip, correlationId }) => toGroupView(ctx, ctx.groups.join(groupActor(principal), body.inviteCode, body.displayName, { ip, correlationId })));
+
+  /* Invites addressed to a person arrive here, without anyone copying a link. */
+
+  registerRoute(app, ctx, routes.myInvitesList, ({ principal }) => {
+    const actor = groupActor(principal);
+    return { items: actor.profileId ? ctx.groups.invitesFor(actor.profileId) : [] };
+  });
+
+  registerRoute(app, ctx, routes.myInviteAccept, ({ params, principal, ip, correlationId }) => toGroupView(ctx, ctx.groups.acceptInvite(groupActor(principal), params.inviteId, { ip, correlationId })));
+
+  registerRoute(app, ctx, routes.myInviteDecline, ({ params, principal, ip, correlationId }) => {
+    ctx.groups.declineInvite(groupActor(principal), params.inviteId, { ip, correlationId });
+    return { ok: true as const };
+  });
 
   registerRoute(app, ctx, routes.groupsLeave, ({ params, principal }) => {
     ctx.groups.leave(params.groupId, groupActor(principal));

@@ -23,6 +23,7 @@ import { AuditService } from './auth/audit.js';
 import { DeviceAuthService } from './auth/device-auth.js';
 import { AuthService } from './auth/service.js';
 import { BackupService } from './backup/service.js';
+import { ProfileService } from './profiles/service.js';
 import type { HubConfig } from './config.js';
 import type { HubContext, HubIdentityState, LifecycleState } from './context.js';
 import { createSealer, generateHubKeyPair, loadOrCreateInstallKey } from './crypto/index.js';
@@ -201,6 +202,8 @@ export async function buildApp(deps: HubDeps): Promise<HubApp> {
 
   const metricsService = new MetricsService(metrics, repos.metrics, clock, getCtx);
   const backup = new BackupService(db, dbFile, config, repos, audit, metrics, clock, migration.to, log, deps.exit);
+  const profiles = new ProfileService(db, ffmpeg, audit, metrics, clock);
+  groups.attachProfileNames((id) => profiles.displayName(id));
   const releases = new ReleaseService(repos.settings, http, metrics, clock);
   const jobs = new JobScheduler(getCtx, clock, log, !deps.disableBackgroundJobs);
   const discord = new DiscordService(repos.settings, commands, sealer, http, config, audit, metrics, clock);
@@ -258,6 +261,7 @@ export async function buildApp(deps: HubDeps): Promise<HubApp> {
     shares,
     metricsService,
     backup,
+    profiles,
     releases,
     jobs,
     discord,
@@ -280,6 +284,9 @@ export async function buildApp(deps: HubDeps): Promise<HubApp> {
   // Raw bodies for the two routes that carry bytes rather than JSON.
   app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer' }, (_req, body, done) => done(null, body));
   app.addContentTypeParser('text/plain', { parseAs: 'string' }, (_req, body, done) => done(null, body));
+  // A profile picture and a shared playlist; what the bytes really are is decided by the service, not this header.
+  app.addContentTypeParser(['image/png', 'image/jpeg', 'image/webp'], { parseAs: 'buffer' }, (_req, body, done) => done(null, body));
+  app.addContentTypeParser('text/csv', { parseAs: 'string' }, (_req, body, done) => done(null, body));
 
   installSecurity(app, ctx);
   registerAllRoutes(app, ctx);

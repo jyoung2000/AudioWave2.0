@@ -68,6 +68,10 @@ export interface InviteRow {
   expires_at: string;
   used_at: string | null;
   used_by: string | null;
+  to_profile_id: string | null;
+  withdrawn_at: string | null;
+  declined_at: string | null;
+  created_by_name: string | null;
 }
 
 export interface DriftRow {
@@ -185,26 +189,53 @@ export class GroupsRepository {
   }
 
   /* ---- invites ---- */
-  createInvite(row: Omit<InviteRow, 'used_at' | 'used_by'>): void {
-    this.db.prepare('INSERT INTO group_invites (id, group_id, code_hash, role, created_by, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(row.id, row.group_id, row.code_hash, row.role, row.created_by, row.created_at, row.expires_at);
+  createInvite(row: Omit<InviteRow, 'used_at' | 'used_by' | 'withdrawn_at' | 'declined_at'>): void {
+    this.db
+      .prepare('INSERT INTO group_invites (id, group_id, code_hash, role, created_by, created_at, expires_at, to_profile_id, created_by_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(row.id, row.group_id, row.code_hash, row.role, row.created_by, row.created_at, row.expires_at, row.to_profile_id, row.created_by_name);
   }
 
   /**
-   * Invite codes are single-use: a used invite is never returned. Pass `now` (the caller's clock) to
-   * also ignore expired invites; the service additionally checks expiry itself.
+   * Invite codes are single-use: only an open invite — not used, withdrawn or declined — is ever
+   * returned. Pass `now` (the caller's clock) to also ignore expired invites; the service
+   * additionally checks expiry itself.
    */
   findInviteByHash(codeHash: string, now?: string): InviteRow | undefined {
-    if (now !== undefined) return this.db.prepare<[string, string], InviteRow>('SELECT * FROM group_invites WHERE code_hash = ? AND used_at IS NULL AND expires_at > ?').get(codeHash, now);
-    return this.db.prepare<[string], InviteRow>('SELECT * FROM group_invites WHERE code_hash = ? AND used_at IS NULL').get(codeHash);
+    const open = 'used_at IS NULL AND withdrawn_at IS NULL AND declined_at IS NULL';
+    if (now !== undefined) return this.db.prepare<[string, string], InviteRow>(`SELECT * FROM group_invites WHERE code_hash = ? AND ${open} AND expires_at > ?`).get(codeHash, now);
+    return this.db.prepare<[string], InviteRow>(`SELECT * FROM group_invites WHERE code_hash = ? AND ${open}`).get(codeHash);
   }
 
-  /** Claim an invite. Only an unused invite can be claimed; returns false when it was already used. */
+  findInvite(id: string): InviteRow | undefined {
+    return this.db.prepare<[string], InviteRow>('SELECT * FROM group_invites WHERE id = ?').get(id);
+  }
+
+  /** Newest first, including the closed ones `purgeInvites` has not removed yet. */
+  listInvites(groupId: string, since: string): InviteRow[] {
+    return this.db.prepare<[string, string], InviteRow>('SELECT * FROM group_invites WHERE group_id = ? AND created_at >= ? ORDER BY created_at DESC, id DESC').all(groupId, since);
+  }
+
+  /** Open, unexpired invites addressed to one profile. */
+  listInvitesFor(profileId: string, now: string): InviteRow[] {
+    return this.db
+      .prepare<[string, string], InviteRow>('SELECT * FROM group_invites WHERE to_profile_id = ? AND used_at IS NULL AND withdrawn_at IS NULL AND declined_at IS NULL AND expires_at > ? ORDER BY created_at DESC, id DESC')
+      .all(profileId, now);
+  }
+
+  /** Claim an invite. Only an open invite can be claimed; returns false when it was already closed. */
   markInviteUsed(id: string, usedBy: string, now: string): boolean {
-    return this.db.prepare('UPDATE group_invites SET used_at = ?, used_by = ? WHERE id = ? AND used_at IS NULL').run(now, usedBy, id).changes === 1;
+    return this.db.prepare('UPDATE group_invites SET used_at = ?, used_by = ? WHERE id = ? AND used_at IS NULL AND withdrawn_at IS NULL AND declined_at IS NULL').run(now, usedBy, id).changes === 1;
   }
 
+  /** Close an open invite as withdrawn or declined; false when it was not open any more. */
+  closeInvite(id: string, how: 'withdrawn' | 'declined', now: string): boolean {
+    const column = how === 'withdrawn' ? 'withdrawn_at' : 'declined_at';
+    return this.db.prepare(`UPDATE group_invites SET ${column} = ? WHERE id = ? AND used_at IS NULL AND withdrawn_at IS NULL AND declined_at IS NULL`).run(now, id).changes === 1;
+  }
+
+  /** Remove invites that closed — were used, withdrawn, declined or simply ran out — before `before`. */
   purgeInvites(before: string): number {
-    return this.db.prepare('DELETE FROM group_invites WHERE expires_at < ?').run(before).changes;
+    return this.db.prepare('DELETE FROM group_invites WHERE MIN(COALESCE(used_at, withdrawn_at, declined_at, expires_at), expires_at) < ?').run(before).changes;
   }
 
   /* ---- memberships ---- */

@@ -17,7 +17,10 @@ Now Playing is local-first. This page states what is stored where, what is share
 | Shareable links | Hub: link metadata + uploaded item lists (titles/artists/durations) | Public to anyone with the link until revoked/expired |
 
 ## Scopes granted at pairing
-`library:read`, `library:share`, `playlists:sync`, `eq:sync`, `history:aggregate`, `history:events`, `group:member`, `group:admin`, `downloads:request`, `transfers:receive`, `files:serve`, `search:use`, `shares:create`. Every scope is visible on the device card and can be revoked by the hub admin; the device shows its own scopes under Settings → Devices.
+`library:read`, `library:share`, `playlists:sync`, `eq:sync`, `history:aggregate`, `history:events`, `group:member`, `group:admin`, `downloads:request`, `transfers:receive`, `files:serve`, `search:use`, `shares:create`, `profile:read`, `profile:write`, `backup:read`. Every scope is visible on the device card and can be revoked by the hub admin; the device shows its own scopes under Settings → Devices.
+
+## Profiles
+A profile — username, picture and the playlists its owner chose to share — is visible to every device paired with the same hub, and to nobody else: there is no anonymous access and no public profile page. Pictures are re-encoded on the hub with their metadata removed (no EXIF location survives). An invite addressed to a profile shows the sender's name and the group's name and member count to its addressee, never the member list.
 
 ## Group aggregate sharing
 - Off by default. Turning it on shows a preview of the exact aggregate that will be uploaded.

@@ -26,5 +26,7 @@ docs/design
 # a file people copy and edit against Docker's own documentation.
 *.yaml
 *.yml
+# Per-machine tool settings, written by the tool in its own style.
+.claude
 playwright-report-local/
 test-results-local/

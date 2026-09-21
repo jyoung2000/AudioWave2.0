@@ -4,7 +4,7 @@ import { GroupSettings as GroupSettingsSchema, GroupHistoryEntry as GroupHistory
 import { applyQueueCommand, compareAggregates, createQueue, currentItem, DomainError, generateInviteCode, historyToCsv, mergeAggregates, parseHistoryCsv, planHistoryImport, uuidv7, type HistoryCsvParseResult, type QueueActor, type QueueEffect } from '@now-playing/domain';
 import type { AuditService } from '../auth/audit.js';
 import type { CanonicalRepository } from '../db/repositories/canonical.js';
-import type { GroupsRepository, MembershipRecord } from '../db/repositories/groups.js';
+import type { GroupsRepository, InviteRow, MembershipRecord } from '../db/repositories/groups.js';
 import type { Clock } from '../deps.js';
 import type { MetricsRegistry } from '../metrics/registry.js';
 import { sha256Hex } from '../util.js';
@@ -16,6 +16,31 @@ export const EVENT_RING_SIZE = 500;
 export const AGGREGATE_MIN_COHORT = 3;
 const RECENT_HISTORY_FOR_DUPLICATES = 50;
 const COMMAND_RESULT_RETENTION_MS = 24 * 3600 * 1000;
+const INVITE_RETENTION_MS = 30 * 24 * 3600 * 1000;
+
+/** Where a request came from, for the audit trail. */
+export interface InviteMeta {
+  ip?: string | null;
+  correlationId?: string | null;
+}
+
+export interface InviteSummary {
+  inviteId: string;
+  role: GroupRole;
+  createdBy: string;
+  createdAt: string;
+  expiresAt: string;
+  toProfileId: string | null;
+  toName: string | null;
+  state: 'open' | 'used' | 'expired' | 'withdrawn' | 'declined';
+  usedBy: string | null;
+  answeredAt: string | null;
+}
+
+/** Codes are compared the way they are typed: case and punctuation do not matter. */
+function hashInviteCode(code: string): string {
+  return sha256Hex(`invite:v1:${code.trim().toUpperCase().replace(/[^0-9A-Z]/g, '')}`);
+}
 
 export interface GroupActor {
   id: string;
@@ -23,6 +48,8 @@ export interface GroupActor {
   displayName: string;
   /** Hub admin sessions bypass group roles. */
   isHubAdmin?: boolean;
+  /** The HubUser a device stands for; a directed invite is addressed to this, not to the device. */
+  profileId?: string | null;
   /**
    * The role an actor was granted by an authority outside this hub — today, a Discord guild's DJ
    * and admin roles, checked by `authorizeCommand` before the command ever reaches this service.
@@ -84,6 +111,7 @@ const DJ_ROLES: readonly GroupRole[] = ['owner', 'admin'];
 export class GroupService {
   private sink: GroupEventSink | null = null;
   private presence: GroupPresence | null = null;
+  private profileName: (profileId: string) => string | null = () => null;
   private syncGradeFor: (track: TrackRef) => { grade: GroupSyncGrade; reason: string | null } = () => ({ grade: 'best_effort', reason: null });
   private readonly timers = new Map<string, { at: number; handle: ReturnType<typeof setTimeout> | null; kind: 'start' | 'ended' }>();
   /** Per group: the highest event seq already fanned out, and seqs this process published itself. */
@@ -112,6 +140,11 @@ export class GroupService {
 
   attachPresence(presence: GroupPresence): void {
     this.presence = presence;
+  }
+
+  /** How a directed invite learns its addressee's name; the profile service owns that table. */
+  attachProfileNames(fn: (profileId: string) => string | null): void {
+    this.profileName = fn;
   }
 
   attachSyncGrader(fn: (track: TrackRef) => { grade: GroupSyncGrade; reason: string | null }): void {
@@ -311,21 +344,30 @@ export class GroupService {
 
   /* ---------------------------------------------------------------- invites */
 
-  createInvite(groupId: string, actor: GroupActor, input: { ttlSeconds: number; role: GroupRole }): { inviteCode: string; expiresAt: string } {
+  createInvite(groupId: string, actor: GroupActor, input: { ttlSeconds: number; role: GroupRole; toProfileId?: string | undefined }, meta: InviteMeta = {}): { inviteCode: string; expiresAt: string; inviteId: string; toProfileId: string | null } {
     this.find(groupId);
     this.requireDj(groupId, actor);
+    const toProfileId = input.toProfileId ?? null;
+    if (toProfileId && this.profileName(toProfileId) === null) throw new DomainError('not-found', 'No such profile to invite');
     const code = generateInviteCode();
     const now = this.nowMs();
     const expiresAt = new Date(now + input.ttlSeconds * 1000).toISOString();
-    this.repo.createInvite({ id: uuidv7(now), group_id: groupId, code_hash: sha256Hex(`invite:v1:${code}`), role: input.role, created_by: actor.id, created_at: this.nowIso(), expires_at: expiresAt });
-    return { inviteCode: code, expiresAt };
+    const inviteId = uuidv7(now);
+    this.repo.createInvite({ id: inviteId, group_id: groupId, code_hash: hashInviteCode(code), role: input.role, created_by: actor.id, created_at: this.nowIso(), expires_at: expiresAt, to_profile_id: toProfileId, created_by_name: actor.displayName });
+    this.auditInvite('invite.create', actor, inviteId, groupId, meta, { directed: toProfileId !== null, role: input.role });
+    return { inviteCode: code, expiresAt, inviteId, toProfileId };
   }
 
-  join(actor: GroupActor, inviteCode: string, displayName?: string): GroupViewData {
-    const normalized = inviteCode.trim().toUpperCase().replace(/[^0-9A-Z]/g, '');
-    const invite = this.repo.findInviteByHash(sha256Hex(`invite:v1:${normalized}`));
+  join(actor: GroupActor, inviteCode: string, displayName?: string, meta: InviteMeta = {}): GroupViewData {
+    const invite = this.repo.findInviteByHash(hashInviteCode(inviteCode));
+    if (!invite || invite.expires_at <= this.nowIso()) throw new DomainError('forbidden', 'Invalid or expired invite code');
+    // A directed invite still has a code, but the code only works for the person it was made for.
+    if (invite.to_profile_id && invite.to_profile_id !== actor.profileId) throw new DomainError('forbidden', 'This invite is for someone else');
+    return this.joinWithInvite(actor, invite, displayName, meta);
+  }
+
+  private joinWithInvite(actor: GroupActor, invite: InviteRow, displayName: string | undefined, meta: InviteMeta): GroupViewData {
     const now = this.nowIso();
-    if (!invite || invite.expires_at <= now) throw new DomainError('forbidden', 'Invalid or expired invite code');
     const group = this.find(invite.group_id);
     if (group.status !== 'active') throw new DomainError('conflict', 'This group is archived');
     const existing = this.repo.findMembership(group.id, actor.id);
@@ -337,7 +379,78 @@ export class GroupService {
       this.publish(group.id, 'presence', { groupId: group.id, memberId: actor.id, displayName: membership.displayName, online: this.presence?.onlineMembers(group.id).has(actor.id) ?? false }, actor.id);
     });
     this.metrics.increment('groups.joins');
+    this.auditInvite('invite.accept', actor, invite.id, group.id, meta);
     return this.view(group.id, actor.id);
+  }
+
+  /** What a code is for, shown before joining. The member count, never the member list. */
+  previewInvite(inviteCode: string): { groupName: string; memberCount: number; fromName: string; role: GroupRole; expiresAt: string } {
+    const invite = this.repo.findInviteByHash(hashInviteCode(inviteCode), this.nowIso());
+    const group = invite ? this.repo.find(invite.group_id) : undefined;
+    if (!invite || !group || group.status !== 'active') throw new DomainError('not-found', 'This invite is unknown, used or expired');
+    return { groupName: group.name, memberCount: this.repo.listMemberships(group.id).length, fromName: invite.created_by_name ?? 'Someone', role: invite.role, expiresAt: invite.expires_at };
+  }
+
+  listInvites(groupId: string, actor: GroupActor): InviteSummary[] {
+    this.find(groupId);
+    this.requireDj(groupId, actor);
+    const now = this.nowIso();
+    const names = new Map(this.repo.listMemberships(groupId, true).map((m) => [m.memberId, m.displayName]));
+    return this.repo.listInvites(groupId, new Date(this.nowMs() - INVITE_RETENTION_MS).toISOString()).map((r) => ({
+      inviteId: r.id,
+      role: r.role,
+      createdBy: r.created_by_name ?? names.get(r.created_by) ?? r.created_by,
+      createdAt: r.created_at,
+      expiresAt: r.expires_at,
+      toProfileId: r.to_profile_id,
+      toName: r.to_profile_id ? this.profileName(r.to_profile_id) : null,
+      state: r.withdrawn_at ? 'withdrawn' : r.declined_at ? 'declined' : r.used_at ? 'used' : r.expires_at <= now ? 'expired' : 'open',
+      usedBy: r.used_by ? (names.get(r.used_by) ?? r.used_by) : null,
+      answeredAt: r.used_at ?? r.declined_at,
+    }));
+  }
+
+  withdrawInvite(groupId: string, actor: GroupActor, inviteId: string, meta: InviteMeta = {}): void {
+    this.find(groupId);
+    this.requireDj(groupId, actor);
+    const invite = this.repo.findInvite(inviteId);
+    if (!invite || invite.group_id !== groupId) throw new DomainError('not-found', 'No such invite');
+    if (invite.withdrawn_at) return;
+    if (!this.repo.closeInvite(inviteId, 'withdrawn', this.nowIso())) throw new DomainError('conflict', 'This invite was already answered');
+    this.auditInvite('invite.withdraw', actor, inviteId, groupId, meta);
+  }
+
+  /** Unanswered invites addressed to one profile. */
+  invitesFor(profileId: string): Array<{ inviteId: string; groupId: string; groupName: string; fromName: string; role: GroupRole; expiresAt: string }> {
+    const out = [];
+    for (const r of this.repo.listInvitesFor(profileId, this.nowIso())) {
+      const group = this.repo.find(r.group_id);
+      if (!group || group.status !== 'active') continue;
+      out.push({ inviteId: r.id, groupId: group.id, groupName: group.name, fromName: r.created_by_name ?? 'Someone', role: r.role, expiresAt: r.expires_at });
+    }
+    return out;
+  }
+
+  private myInvite(actor: GroupActor, inviteId: string): InviteRow {
+    const invite = this.repo.findInvite(inviteId);
+    // Someone else's invite and a missing one look the same from outside.
+    if (!invite || !actor.profileId || invite.to_profile_id !== actor.profileId) throw new DomainError('not-found', 'No such invite');
+    if (invite.used_at || invite.withdrawn_at || invite.declined_at || invite.expires_at <= this.nowIso()) throw new DomainError('forbidden', 'This invite is no longer open');
+    return invite;
+  }
+
+  acceptInvite(actor: GroupActor, inviteId: string, meta: InviteMeta = {}): GroupViewData {
+    return this.joinWithInvite(actor, this.myInvite(actor, inviteId), undefined, meta);
+  }
+
+  declineInvite(actor: GroupActor, inviteId: string, meta: InviteMeta = {}): void {
+    const invite = this.myInvite(actor, inviteId);
+    if (!this.repo.closeInvite(invite.id, 'declined', this.nowIso())) throw new DomainError('forbidden', 'This invite is no longer open');
+    this.auditInvite('invite.decline', actor, invite.id, invite.group_id, meta);
+  }
+
+  private auditInvite(action: string, actor: GroupActor, inviteId: string, groupId: string, meta: InviteMeta, details: Record<string, string | number | boolean | null> = {}): void {
+    this.audit.record({ actor: { kind: actor.kind === 'system' ? 'system' : actor.kind === 'user' ? 'device' : actor.kind, id: actor.id, displayName: actor.displayName }, action, outcome: 'success', target: { kind: 'invite', id: inviteId }, ip: meta.ip ?? null, correlationId: meta.correlationId ?? null, details: { groupId, ...details } });
   }
 
   leave(groupId: string, actor: GroupActor): void {
@@ -781,7 +894,8 @@ export class GroupService {
   maintenance(): void {
     const before = new Date(this.nowMs() - COMMAND_RESULT_RETENTION_MS).toISOString();
     this.repo.purgeCommandResults(before);
-    this.repo.purgeInvites(this.nowIso());
+    // A closed invite stays for 30 days so the group's invite list can say what became of it.
+    this.repo.purgeInvites(new Date(this.nowMs() - INVITE_RETENTION_MS).toISOString());
   }
 }
 
