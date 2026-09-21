@@ -23,6 +23,7 @@
  */
 import { createReadStream, statSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { BACKUP_PARTS, createEstimator, type BackupPart } from './measure.js';
 import { HELPER_DEFAULT_HOSTS, HELPER_PROTOCOL, HELPER_ROUTES, HelperFetchRequest, HelperToolId, type HelperHealth, type HelperInstallResult, type HelperToolId as ToolId, type OutputFormat } from '@now-playing/contracts';
 import { Jobs } from './jobs.js';
 import { serveApp, type AppSource } from './app.js';
@@ -46,6 +47,8 @@ export interface HelperOptions {
   log: (line: string) => void;
   /** How long a finished job and its files are kept. Default one hour. */
   finishedTtlMs?: number;
+  /** The folders a backup can include, and where backups go. Unset folders are simply not measured. */
+  backup?: { folders: Partial<Record<BackupPart, string | null | undefined>>; backupDir: string | null; budgetMs?: number; now?: () => number };
 }
 
 export interface Helper {
@@ -65,6 +68,7 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
   let origin = `http://127.0.0.1:${port}`;
   let policy: OriginPolicy = { allowed: options.allowedOrigins, self: options.app ? origin : null };
   let installing: Promise<HelperInstallResult> | null = null;
+  const estimate = createEstimator(options.backup ?? { folders: {}, backupDir: null });
 
   const server = createServer((request, response) => {
     void handle(request, response).catch((error: unknown) => {
@@ -118,6 +122,13 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
         startedAt,
       };
       return send(response, 200, health);
+    }
+
+    if (path === HELPER_ROUTES.backupEstimate && request.method === 'GET') {
+      const asked = (new URL(request.url ?? '/', origin).searchParams.get('parts') ?? BACKUP_PARTS.join(',')).split(',').map((p) => p.trim()).filter(Boolean);
+      const unknown = asked.find((p) => !(BACKUP_PARTS as readonly string[]).includes(p));
+      if (unknown !== undefined || !asked.length) return fail(response, 400, 'validation', `parts may only name ${BACKUP_PARTS.join(', ')}.`);
+      return send(response, 200, await estimate([...new Set(asked)] as BackupPart[]));
     }
 
     if (path === HELPER_ROUTES.fetch && request.method === 'POST') {

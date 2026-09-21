@@ -23,6 +23,8 @@ export interface Options {
   toolsDir: string;
   workDir: string;
   timeoutMs: number;
+  /** Folders a backup can include, and the folder backups go to (`/helper/v1/backup/estimate`). */
+  backup: { folders: { music?: string | undefined; tv?: string | undefined; movies?: string | undefined }; backupDir: string | null };
   tools: { 'yt-dlp'?: string | undefined; spotdl?: string | undefined; ffmpeg?: string | undefined };
   help: boolean;
   showVersion: boolean;
@@ -49,6 +51,10 @@ Options
   --allow-host <h>      Add a host the tools may fetch from (repeatable)
   --only-hosts <a,b>    Replace the host allowlist entirely
   --tools-dir <path>    Where an installed yt-dlp is kept
+  --music-dir <path>    Music folder, measured for the backup size estimate
+  --tv-dir <path>       TV folder, measured likewise
+  --movies-dir <path>   Movies folder, measured likewise
+  --backup-dir <path>   Where backups go; its drive's free space is reported
   --work-dir <path>     Where downloads are staged (default: the system temp directory).
                         Each run uses its own new folder inside it and removes only that.
   --yt-dlp <path>       Use this yt-dlp instead of looking for one
@@ -77,6 +83,7 @@ export function parseArgs(argv: readonly string[]): Options {
     toolsDir: join(dataDir(), 'tools'),
     workDir: join(tmpdir(), 'now-playing-helper'),
     timeoutMs: 900_000,
+    backup: { folders: {}, backupDir: null },
     tools: {},
     help: false,
     showVersion: false,
@@ -136,6 +143,18 @@ export function parseArgs(argv: readonly string[]): Options {
       }
       case '--tools-dir':
         options.toolsDir = next();
+        break;
+      case '--music-dir':
+        options.backup.folders.music = next();
+        break;
+      case '--tv-dir':
+        options.backup.folders.tv = next();
+        break;
+      case '--movies-dir':
+        options.backup.folders.movies = next();
+        break;
+      case '--backup-dir':
+        options.backup.backupDir = next();
         break;
       case '--work-dir':
         options.workDir = next();

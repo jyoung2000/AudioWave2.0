@@ -8,7 +8,7 @@ var __export = (target, all) => {
 // src/cli.ts
 import { mkdirSync as mkdirSync3, mkdtempSync, rmSync as rmSync3 } from "node:fs";
 import { spawn as spawn2 } from "node:child_process";
-import { dirname, join as join5, resolve as resolve2 } from "node:path";
+import { dirname as dirname2, join as join6, resolve as resolve2 } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // ../node_modules/zod/v4/classic/external.js
@@ -18917,7 +18917,10 @@ var Scope = external_exports.enum([
   "transfers:receive",
   "files:serve",
   "search:use",
-  "shares:create"
+  "shares:create",
+  "profile:read",
+  "profile:write",
+  "backup:read"
 ]);
 var DeviceKind = external_exports.enum(["player", "companion", "hub"]);
 var SyncedEntityBase = external_exports.object({
@@ -20371,6 +20374,38 @@ var TasteProfileView = external_exports.object({
   popularityPreference: external_exports.number(),
   coldStart: external_exports.boolean()
 });
+var ProfileName = external_exports.string().trim().transform((name) => name.normalize("NFC")).pipe(external_exports.string().min(3).max(40).regex(/^[\p{L}\p{N}](?:[\p{L}\p{N} ._-]*[\p{L}\p{N}])?$/u, 'Use letters, numbers, spaces, ".", "_" or "-", starting and ending with a letter or number'));
+var ProfilePlaylistId = external_exports.string().min(1).max(120).regex(/^[A-Za-z0-9._:-]+$/);
+var ProfileSummary = external_exports.object({ id: Uuid, displayName: DisplayName, avatarUrl: external_exports.string().nullable(), playlistCount: external_exports.number().int().nonnegative() });
+var ProfileView = external_exports.object({
+  id: Uuid,
+  displayName: DisplayName,
+  avatarUrl: external_exports.string().nullable(),
+  playlists: external_exports.array(external_exports.object({ id: external_exports.string(), name: external_exports.string(), tracks: external_exports.number().int().nonnegative(), updatedAt: IsoDateTime }))
+});
+var ProfileAdminView = ProfileSummary.extend({ claimed: external_exports.boolean(), updatedAt: IsoDateTime });
+var InviteState = external_exports.enum(["open", "used", "expired", "withdrawn", "declined"]);
+var InviteView = external_exports.object({
+  inviteId: Uuid,
+  role: GroupRole,
+  createdBy: external_exports.string(),
+  createdAt: IsoDateTime,
+  expiresAt: IsoDateTime,
+  toProfileId: Uuid.nullable(),
+  toName: external_exports.string().nullable(),
+  state: InviteState,
+  usedBy: external_exports.string().nullable(),
+  answeredAt: IsoDateTime.nullable()
+});
+var InvitePreview = external_exports.object({ groupName: external_exports.string(), memberCount: external_exports.number().int().nonnegative(), fromName: external_exports.string(), role: GroupRole, expiresAt: IsoDateTime });
+var MyInvite = external_exports.object({ inviteId: Uuid, groupId: Uuid, groupName: external_exports.string(), fromName: external_exports.string(), role: GroupRole, expiresAt: IsoDateTime });
+var BackupSpace = external_exports.object({
+  path: external_exports.string(),
+  freeBytes: external_exports.number().int().nonnegative().nullable(),
+  totalBytes: external_exports.number().int().nonnegative().nullable(),
+  lastArchiveBytes: external_exports.number().int().nonnegative().nullable(),
+  keep: external_exports.number().int().positive().nullable()
+});
 var groupParams = external_exports.object({ groupId: Uuid });
 var routes = {
   /* health */
@@ -20430,7 +20465,13 @@ var routes = {
   groupsGet: defineRoute({ method: "GET", path: "/groups/:groupId", operationId: "getGroup", summary: "Group detail", tags: ["groups"], auth: "admin-or-device", params: groupParams, response: GroupView }),
   groupsUpdate: defineRoute({ method: "PATCH", path: "/groups/:groupId", operationId: "updateGroup", summary: "Rename or change settings", tags: ["groups"], auth: "admin-or-device", scopes: ["group:admin"], params: groupParams, body: external_exports.object({ name: external_exports.string().min(1).max(80).optional(), settings: GroupSettings.partial().optional() }), response: GroupView }),
   groupsArchive: defineRoute({ method: "POST", path: "/groups/:groupId/archive", operationId: "archiveGroup", summary: "Archive a group", tags: ["groups"], auth: "admin-or-device", scopes: ["group:admin"], params: groupParams, response: Ok }),
-  groupsInvite: defineRoute({ method: "POST", path: "/groups/:groupId/invites", operationId: "createInvite", summary: "Create an invite code", tags: ["groups"], auth: "admin-or-device", scopes: ["group:admin"], rateLimit: "write", params: groupParams, body: external_exports.object({ ttlSeconds: external_exports.number().int().min(60).max(86400).default(3600), role: GroupRole.exclude(["owner"]).default("member") }), response: external_exports.object({ inviteCode: external_exports.string(), expiresAt: IsoDateTime }) }),
+  groupsInvite: defineRoute({ method: "POST", path: "/groups/:groupId/invites", operationId: "createInvite", summary: "Create an invite code", tags: ["groups"], auth: "admin-or-device", scopes: ["group:admin"], rateLimit: "write", params: groupParams, body: external_exports.object({ ttlSeconds: external_exports.number().int().min(60).max(86400).default(3600), role: GroupRole.exclude(["owner"]).default("member"), toProfileId: Uuid.optional() }), response: external_exports.object({ inviteCode: external_exports.string(), expiresAt: IsoDateTime, inviteId: Uuid, toProfileId: Uuid.nullable() }) }),
+  groupsInvitesList: defineRoute({ method: "GET", path: "/groups/:groupId/invites", operationId: "listInvites", summary: "Invites of the last 30 days, newest first (never the codes themselves)", tags: ["groups"], auth: "admin-or-device", scopes: ["group:admin"], params: groupParams, response: external_exports.object({ items: external_exports.array(InviteView) }) }),
+  groupsInviteWithdraw: defineRoute({ method: "DELETE", path: "/groups/:groupId/invites/:inviteId", operationId: "withdrawInvite", summary: "Withdraw an invite; its code stops working immediately", tags: ["groups"], auth: "admin-or-device", scopes: ["group:admin"], rateLimit: "write", params: groupParams.extend({ inviteId: Uuid }), response: Ok }),
+  groupsInvitePreview: defineRoute({ method: "GET", path: "/groups/invites/preview", operationId: "previewInvite", summary: "What an invite code is for, before joining (member count only, never the list)", tags: ["groups"], auth: "device", scopes: ["group:member"], rateLimit: "pairing", query: external_exports.object({ code: external_exports.string().min(4).max(40) }), response: InvitePreview }),
+  myInvitesList: defineRoute({ method: "GET", path: "/me/invites", operationId: "listMyInvites", summary: "Unanswered invites addressed to the profile of the caller", tags: ["groups"], auth: "device", scopes: ["group:member"], response: external_exports.object({ items: external_exports.array(MyInvite) }) }),
+  myInviteAccept: defineRoute({ method: "POST", path: "/me/invites/:inviteId/accept", operationId: "acceptMyInvite", summary: "Accept a directed invite (same effect as join)", tags: ["groups"], auth: "device", scopes: ["group:member"], rateLimit: "write", params: external_exports.object({ inviteId: Uuid }), response: GroupView }),
+  myInviteDecline: defineRoute({ method: "POST", path: "/me/invites/:inviteId/decline", operationId: "declineMyInvite", summary: "Decline a directed invite", tags: ["groups"], auth: "device", scopes: ["group:member"], rateLimit: "write", params: external_exports.object({ inviteId: Uuid }), response: Ok }),
   groupsJoin: defineRoute({ method: "POST", path: "/groups/join", operationId: "joinGroup", summary: "Join with an invite code", tags: ["groups"], auth: "device", scopes: ["group:member"], rateLimit: "pairing", body: external_exports.object({ inviteCode: external_exports.string().min(4).max(40), displayName: external_exports.string().max(120).optional() }), response: GroupView }),
   groupsLeave: defineRoute({ method: "POST", path: "/groups/:groupId/leave", operationId: "leaveGroup", summary: "Leave a group", tags: ["groups"], auth: "device", params: groupParams, response: Ok }),
   groupsMemberRevoke: defineRoute({ method: "DELETE", path: "/groups/:groupId/members/:memberId", operationId: "revokeMember", summary: "Remove a member", tags: ["groups"], auth: "admin-or-device", scopes: ["group:admin"], params: groupParams.extend({ memberId: external_exports.string() }), response: Ok }),
@@ -20454,6 +20495,21 @@ var routes = {
   recommendationsProfile: defineRoute({ method: "GET", path: "/recommendations/profile", operationId: "getTasteProfile", summary: "Inspectable taste profile (dimensions and contexts)", tags: ["recommendations"], auth: "device", response: TasteProfileView }),
   recommendationsConfigGet: defineRoute({ method: "GET", path: "/recommendations/config", operationId: "getRecommendationConfig", summary: "Weights, decay and diversity configuration", tags: ["recommendations"], auth: "admin", response: external_exports.record(external_exports.string(), external_exports.unknown()) }),
   recommendationsConfigPut: defineRoute({ method: "PUT", path: "/recommendations/config", operationId: "putRecommendationConfig", summary: "Update recommendation configuration", tags: ["recommendations"], auth: "admin", rateLimit: "write", body: external_exports.record(external_exports.string(), external_exports.unknown()), response: external_exports.record(external_exports.string(), external_exports.unknown()) }),
+  /* profiles */
+  profilesMe: defineRoute({ method: "GET", path: "/profiles/me", operationId: "getMyProfile", summary: "The profile of the caller", tags: ["profiles"], auth: "device", scopes: ["profile:read"], response: ProfileView }),
+  profilesMeUpdate: defineRoute({ method: "PATCH", path: "/profiles/me", operationId: "updateMyProfile", summary: "Set the username (409 when taken)", tags: ["profiles"], auth: "device", scopes: ["profile:write"], rateLimit: "write", body: external_exports.object({ displayName: ProfileName }), response: ProfileView }),
+  profilesAvailable: defineRoute({ method: "GET", path: "/profiles/available", operationId: "profileNameAvailable", summary: "Is this username free", tags: ["profiles"], auth: "device", scopes: ["profile:read"], query: external_exports.object({ name: external_exports.string().max(200) }), response: external_exports.object({ available: external_exports.boolean() }) }),
+  profilesAvatarPut: defineRoute({ method: "PUT", path: "/profiles/me/avatar", operationId: "putMyAvatar", summary: "Upload a picture (PNG, JPEG or WebP; at most 512 \xD7 512 and 1 MB); stored re-encoded", tags: ["profiles"], auth: "device", scopes: ["profile:write"], rateLimit: "write", requestContentType: "image/*", response: Ok }),
+  profilesAvatarDelete: defineRoute({ method: "DELETE", path: "/profiles/me/avatar", operationId: "deleteMyAvatar", summary: "Remove the picture", tags: ["profiles"], auth: "device", scopes: ["profile:write"], rateLimit: "write", response: Ok }),
+  profilesPlaylistPut: defineRoute({ method: "PUT", path: "/profiles/me/playlists/:playlistId", operationId: "putMyProfilePlaylist", summary: "Share a playlist as CSV (title,artist,album,seconds; at most 2 MB and 5,000 rows)", tags: ["profiles"], auth: "device", scopes: ["profile:write"], rateLimit: "write", params: external_exports.object({ playlistId: ProfilePlaylistId }), query: external_exports.object({ name: external_exports.string().trim().min(1).max(120) }), requestContentType: "text/csv", response: Ok }),
+  profilesPlaylistDelete: defineRoute({ method: "DELETE", path: "/profiles/me/playlists/:playlistId", operationId: "deleteMyProfilePlaylist", summary: "Stop sharing a playlist", tags: ["profiles"], auth: "device", scopes: ["profile:write"], rateLimit: "write", params: external_exports.object({ playlistId: ProfilePlaylistId }), response: Ok }),
+  profilesSearch: defineRoute({ method: "GET", path: "/profiles", operationId: "searchProfiles", summary: "People on this hub whose name contains q (never the caller)", tags: ["profiles"], auth: "device", scopes: ["profile:read"], rateLimit: "search", query: external_exports.object({ q: external_exports.string().max(80).default(""), limit: external_exports.coerce.number().int().min(1).max(20).default(10) }), response: external_exports.object({ items: external_exports.array(ProfileSummary) }) }),
+  profilesGet: defineRoute({ method: "GET", path: "/profiles/:id", operationId: "getProfile", summary: "A profile and its shared playlists", tags: ["profiles"], auth: "device", scopes: ["profile:read"], params: external_exports.object({ id: Uuid }), response: ProfileView }),
+  profilesAvatarGet: defineRoute({ method: "GET", path: "/profiles/:id/avatar", operationId: "getProfileAvatar", summary: "The picture (WebP)", tags: ["profiles"], auth: "device", scopes: ["profile:read"], params: external_exports.object({ id: Uuid }), response: external_exports.string(), responseContentType: "image/webp" }),
+  profilesPlaylistCsv: defineRoute({ method: "GET", path: "/profiles/:id/playlists/:playlistFile", operationId: "getProfilePlaylistCsv", summary: "A shared playlist, re-serialised as CSV (`:playlistFile` is `<playlistId>.csv`)", tags: ["profiles"], auth: "device", scopes: ["profile:read"], params: external_exports.object({ id: Uuid, playlistFile: external_exports.string().max(124).regex(/^[A-Za-z0-9._:-]+\.csv$/) }), response: external_exports.string(), responseContentType: "text/csv; charset=utf-8" }),
+  profilesAdminList: defineRoute({ method: "GET", path: "/admin/profiles", operationId: "adminListProfiles", summary: "Every profile, for moderation", tags: ["profiles"], auth: "admin", response: external_exports.object({ items: external_exports.array(ProfileAdminView) }) }),
+  profilesAdminRename: defineRoute({ method: "PATCH", path: "/admin/profiles/:id", operationId: "adminRenameProfile", summary: "Rename a profile (moderation)", tags: ["profiles"], auth: "admin", rateLimit: "write", params: external_exports.object({ id: Uuid }), body: external_exports.object({ displayName: ProfileName }), response: ProfileAdminView }),
+  profilesAdminAvatarDelete: defineRoute({ method: "DELETE", path: "/admin/profiles/:id/avatar", operationId: "adminRemoveProfileAvatar", summary: "Remove a profile picture (moderation)", tags: ["profiles"], auth: "admin", rateLimit: "write", params: external_exports.object({ id: Uuid }), response: Ok }),
   /* downloads */
   downloadsList: defineRoute({ method: "GET", path: "/downloads", operationId: "listDownloads", summary: "Download jobs", tags: ["downloads"], auth: "admin-or-device", response: external_exports.object({ items: external_exports.array(DownloadJob) }) }),
   downloadsCreate: defineRoute({ method: "POST", path: "/downloads", operationId: "createDownload", summary: "Create an authorized download job (capability-gated)", tags: ["downloads"], auth: "admin-or-device", scopes: ["downloads:request"], rateLimit: "write", body: external_exports.object({ source: DownloadJob.shape.source, authorization: external_exports.object({ basis: DownloadAuthorizationBasis, evidence: external_exports.string().max(500).optional(), acknowledged: external_exports.literal(true) }), target: external_exports.object({ destination: DownloadDestination.exclude(["ask"]), directoryId: external_exports.string().max(200).optional(), filenameTemplate: external_exports.string().max(200).optional(), format: OutputFormat.default("original"), quality: external_exports.string().max(40).optional() }) }), response: DownloadJob, responseStatus: 201 }),
@@ -20502,6 +20558,7 @@ var routes = {
   logsList: defineRoute({ method: "GET", path: "/logs", operationId: "listLogs", summary: "Recent structured log lines (redacted)", tags: ["diagnostics"], auth: "admin", query: external_exports.object({ level: external_exports.enum(["debug", "info", "warn", "error"]).default("info"), limit: external_exports.coerce.number().int().min(1).max(2e3).default(200), since: IsoDateTime.optional() }), response: external_exports.object({ items: external_exports.array(external_exports.object({ time: IsoDateTime, level: external_exports.string(), msg: external_exports.string(), correlationId: external_exports.string().nullable(), module: external_exports.string().nullable(), data: external_exports.record(external_exports.string(), external_exports.unknown()) })) }) }),
   diagnosticsBundle: defineRoute({ method: "GET", path: "/diagnostics/bundle", operationId: "diagnosticsBundle", summary: "Redacted diagnostics bundle (no tokens, full IPs, raw history, audio or user paths)", tags: ["diagnostics"], auth: "admin", response: external_exports.object({ schemaVersion: external_exports.number().int(), generatedAt: IsoDateTime, redactions: external_exports.array(external_exports.string()), sections: external_exports.record(external_exports.string(), external_exports.unknown()) }) }),
   backupCreate: defineRoute({ method: "POST", path: "/backup", operationId: "createBackup", summary: "Consistent SQLite backup into the data volume", tags: ["backup"], auth: "admin", rateLimit: "write", response: external_exports.object({ id: external_exports.string(), createdAt: IsoDateTime, sizeBytes: external_exports.number().int(), relativePath: external_exports.string() }), responseStatus: 201 }),
+  backupSpace: defineRoute({ method: "GET", path: "/backup/space", operationId: "backupSpace", summary: "Room at the backup location and the size of the newest archive", tags: ["backup"], auth: "admin-or-device", scopes: ["backup:read"], response: BackupSpace }),
   backupList: defineRoute({ method: "GET", path: "/backup", operationId: "listBackups", summary: "Backups on the data volume", tags: ["backup"], auth: "admin", response: external_exports.object({ items: external_exports.array(external_exports.object({ id: external_exports.string(), createdAt: IsoDateTime, sizeBytes: external_exports.number().int(), relativePath: external_exports.string() })) }) }),
   backupRestore: defineRoute({ method: "POST", path: "/backup/:backupId/restore", operationId: "restoreBackup", summary: "Restore (a safety backup is taken first; restart required)", tags: ["backup"], auth: "admin", rateLimit: "write", params: external_exports.object({ backupId: external_exports.string() }), body: external_exports.object({ confirm: external_exports.literal(true) }), response: external_exports.object({ ok: external_exports.literal(true), safetyBackupId: external_exports.string(), restartRequired: external_exports.literal(true) }) }),
   exportAll: defineRoute({ method: "GET", path: "/export", operationId: "exportAll", summary: "JSON export of groups, history, playlists, presets, devices (no secrets)", tags: ["backup"], auth: "admin", response: external_exports.object({ schemaVersion: external_exports.number().int(), exportedAt: IsoDateTime, data: external_exports.record(external_exports.string(), external_exports.unknown()) }) }),
@@ -20614,9 +20671,15 @@ var HelperError = external_exports.object({
   error: external_exports.string().max(80),
   message: external_exports.string().max(600)
 });
+var HelperBackupPart = external_exports.enum(["music", "tv", "movies"]);
+var HelperBackupEstimate = external_exports.object({
+  parts: external_exports.partialRecord(HelperBackupPart, external_exports.object({ bytes: external_exports.number().int().nonnegative(), files: external_exports.number().int().nonnegative(), measuredAt: IsoDateTime })),
+  destination: external_exports.object({ path: external_exports.string(), freeBytes: external_exports.number().int().nonnegative().nullable(), totalBytes: external_exports.number().int().nonnegative().nullable() }).nullable()
+});
 var HELPER_ROUTES = {
   health: "/helper/v1/health",
   fetch: "/helper/v1/fetch",
+  backupEstimate: "/helper/v1/backup/estimate",
   install: (tool) => `/helper/v1/tools/${tool}/install`,
   job: (id) => `/helper/v1/jobs/${encodeURIComponent(id)}`,
   file: (jobId, fileId) => `/helper/v1/jobs/${encodeURIComponent(jobId)}/files/${encodeURIComponent(fileId)}`
@@ -20753,6 +20816,10 @@ Options
   --allow-host <h>      Add a host the tools may fetch from (repeatable)
   --only-hosts <a,b>    Replace the host allowlist entirely
   --tools-dir <path>    Where an installed yt-dlp is kept
+  --music-dir <path>    Music folder, measured for the backup size estimate
+  --tv-dir <path>       TV folder, measured likewise
+  --movies-dir <path>   Movies folder, measured likewise
+  --backup-dir <path>   Where backups go; its drive's free space is reported
   --work-dir <path>     Where downloads are staged (default: the system temp directory).
                         Each run uses its own new folder inside it and removes only that.
   --yt-dlp <path>       Use this yt-dlp instead of looking for one
@@ -20780,6 +20847,7 @@ function parseArgs(argv) {
     toolsDir: join2(dataDir(), "tools"),
     workDir: join2(tmpdir(), "now-playing-helper"),
     timeoutMs: 9e5,
+    backup: { folders: {}, backupDir: null },
     tools: {},
     help: false,
     showVersion: false
@@ -20832,6 +20900,18 @@ function parseArgs(argv) {
       }
       case "--tools-dir":
         options.toolsDir = next();
+        break;
+      case "--music-dir":
+        options.backup.folders.music = next();
+        break;
+      case "--tv-dir":
+        options.backup.folders.tv = next();
+        break;
+      case "--movies-dir":
+        options.backup.folders.movies = next();
+        break;
+      case "--backup-dir":
+        options.backup.backupDir = next();
         break;
       case "--work-dir":
         options.workDir = next();
@@ -21144,18 +21224,103 @@ function checkFetchUrl(input2, allowedHosts) {
 import { createReadStream as createReadStream2, statSync as statSync4 } from "node:fs";
 import { createServer } from "node:http";
 
+// src/measure.ts
+import { lstat, readdir, statfs } from "node:fs/promises";
+import { dirname, join as join3 } from "node:path";
+var BACKUP_PARTS = ["music", "tv", "movies"];
+async function measureFolder(root, options) {
+  const now = options.now ?? Date.now;
+  const seenLinks = /* @__PURE__ */ new Set();
+  let bytes = 0;
+  let files = 0;
+  const pending = [root];
+  try {
+    if (!(await lstat(root)).isDirectory()) return null;
+  } catch {
+    return null;
+  }
+  while (pending.length) {
+    if (now() > options.deadline) return null;
+    const dir = pending.pop();
+    let entries;
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (entry.isSymbolicLink()) continue;
+      const full = join3(dir, entry.name);
+      if (entry.isDirectory()) {
+        pending.push(full);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      try {
+        const s = await lstat(full, { bigint: true });
+        if (s.nlink > 1n) {
+          const key = `${s.dev}:${s.ino}`;
+          if (seenLinks.has(key)) continue;
+          seenLinks.add(key);
+        }
+        bytes += Number(s.size);
+        files += 1;
+      } catch {
+        continue;
+      }
+    }
+  }
+  return { bytes, files, measuredAt: new Date(now()).toISOString() };
+}
+async function driveSpace(dir) {
+  let at = dir;
+  for (; ; ) {
+    try {
+      const s = await statfs(at);
+      return { freeBytes: Number(s.bavail) * Number(s.bsize), totalBytes: Number(s.blocks) * Number(s.bsize) };
+    } catch {
+      const parent = dirname(at);
+      if (parent === at) return { freeBytes: null, totalBytes: null };
+      at = parent;
+    }
+  }
+}
+function createEstimator(options) {
+  const now = options.now ?? Date.now;
+  const cache = /* @__PURE__ */ new Map();
+  return async (parts) => {
+    const deadline = now() + (options.budgetMs ?? 2e4);
+    const out = { parts: {}, destination: null };
+    for (const part of parts) {
+      const folder = options.folders[part];
+      if (!folder) continue;
+      const cached2 = cache.get(folder);
+      if (cached2 && now() - cached2.at < (options.cacheMs ?? 10 * 6e4)) {
+        out.parts[part] = cached2.value;
+        continue;
+      }
+      const measured = await measureFolder(folder, { deadline, now });
+      if (!measured) continue;
+      cache.set(folder, { at: now(), value: measured });
+      out.parts[part] = measured;
+    }
+    if (options.backupDir) out.destination = { path: options.backupDir, ...await driveSpace(options.backupDir) };
+    return out;
+  };
+}
+
 // src/jobs.ts
 import { execFile as execFile2, spawn } from "node:child_process";
 import { mkdirSync as mkdirSync2, readdirSync, rmSync as rmSync2, statSync as statSync3 } from "node:fs";
 import { homedir as homedir2, tmpdir as tmpdir2 } from "node:os";
-import { join as join4, extname as extname2 } from "node:path";
+import { join as join5, extname as extname2 } from "node:path";
 import { randomUUID as randomUUID2 } from "node:crypto";
 
 // src/tools.ts
 import { createHash, randomUUID } from "node:crypto";
 import { chmodSync, existsSync as existsSync2, mkdirSync, renameSync, rmSync, statSync as statSync2, writeFileSync } from "node:fs";
 import { execFile } from "node:child_process";
-import { delimiter, join as join3 } from "node:path";
+import { delimiter, join as join4 } from "node:path";
 import { promisify } from "node:util";
 var run = promisify(execFile);
 var YT_DLP_LATEST = "https://github.com/yt-dlp/yt-dlp/releases/latest/download";
@@ -21174,7 +21339,7 @@ async function resolveTool(id, options) {
   const candidates = [];
   const configured = options.configured[id];
   if (configured) candidates.push({ path: configured, origin: "configured" });
-  const installed = join3(options.toolsDir, BINARY_NAMES[id]);
+  const installed = join4(options.toolsDir, BINARY_NAMES[id]);
   if (existsSync2(installed)) candidates.push({ path: installed, origin: "installed" });
   const onPath = findOnPath(BINARY_NAMES[id]);
   if (onPath) candidates.push({ path: onPath, origin: "path" });
@@ -21238,7 +21403,7 @@ function findOnPath(binary, env = process.env) {
   const extensions = process.platform === "win32" ? (env["PATHEXT"] ?? ".EXE;.CMD;.BAT").split(";").filter(Boolean) : [""];
   for (const directory of path.split(delimiter).filter(Boolean)) {
     for (const extension of extensions) {
-      const candidate = join3(directory, binary.toLowerCase().endsWith(extension.toLowerCase()) ? binary : `${binary}${extension}`);
+      const candidate = join4(directory, binary.toLowerCase().endsWith(extension.toLowerCase()) ? binary : `${binary}${extension}`);
       try {
         if (statSync2(candidate).isFile()) return candidate;
       } catch {
@@ -21266,7 +21431,7 @@ async function installYtDlp(toolsDir, fetchImpl = fetch) {
   const actual = createHash("sha256").update(binary).digest("hex");
   if (actual !== expected) return { installed: false, version: null, reason: `The downloaded file did not match its published checksum, so it was discarded.` };
   mkdirSync(toolsDir, { recursive: true });
-  const target = join3(toolsDir, BINARY_NAMES["yt-dlp"]);
+  const target = join4(toolsDir, BINARY_NAMES["yt-dlp"]);
   const temporary = `${target}.${randomUUID()}.part`;
   try {
     writeFileSync(temporary, binary);
@@ -21324,7 +21489,7 @@ var CONTENT_TYPES = {
 var Jobs = class {
   constructor(options) {
     this.options = options;
-    mkdirSync2(join4(options.workDir, "jobs"), { recursive: true });
+    mkdirSync2(join5(options.workDir, "jobs"), { recursive: true });
   }
   options;
   records = /* @__PURE__ */ new Map();
@@ -21332,9 +21497,9 @@ var Jobs = class {
   active = null;
   create(request) {
     const id = randomUUID2();
-    const root = join4(this.options.workDir, "jobs", id);
-    const directory = join4(root, "out");
-    const home = join4(root, "home");
+    const root = join5(this.options.workDir, "jobs", id);
+    const directory = join5(root, "out");
+    const home = join5(root, "home");
     mkdirSync2(directory, { recursive: true });
     mkdirSync2(home, { recursive: true });
     const job = {
@@ -21511,7 +21676,7 @@ var Jobs = class {
     for (const name of walk(record2.directory)) {
       const extension = extname2(name).toLowerCase();
       if (!AUDIO_EXTENSIONS.has(extension)) continue;
-      const absolute = join4(record2.directory, name);
+      const absolute = join5(record2.directory, name);
       const id = randomUUID2();
       record2.paths.set(id, absolute);
       files.push({
@@ -21562,7 +21727,7 @@ function urlArgument(url2) {
   return url2;
 }
 function spotdlArgs(job, directory, ffmpeg) {
-  const args = ["download", "--output", join4(directory, "{artists} - {title}.{output-ext}"), "--format", job.format === "original" ? "mp3" : job.format];
+  const args = ["download", "--output", join5(directory, "{artists} - {title}.{output-ext}"), "--format", job.format === "original" ? "mp3" : job.format];
   if (ffmpeg.path) args.push("--ffmpeg", ffmpeg.path);
   args.push("--", urlArgument(job.url));
   return args;
@@ -21608,7 +21773,7 @@ function walk(directory, prefix = "", depth = 0) {
   const out = [];
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
     const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
-    if (entry.isDirectory()) out.push(...walk(join4(directory, entry.name), relative, depth + 1));
+    if (entry.isDirectory()) out.push(...walk(join5(directory, entry.name), relative, depth + 1));
     else if (entry.isFile()) out.push(relative);
   }
   return out;
@@ -21631,6 +21796,7 @@ async function startHelper(options) {
   let origin = `http://127.0.0.1:${port}`;
   let policy = { allowed: options.allowedOrigins, self: options.app ? origin : null };
   let installing2 = null;
+  const estimate = createEstimator(options.backup ?? { folders: {}, backupDir: null });
   const server = createServer((request, response) => {
     void handle(request, response).catch((error61) => {
       options.log(`unhandled: ${error61 instanceof Error ? error61.message : String(error61)}`);
@@ -21674,6 +21840,12 @@ async function startHelper(options) {
         startedAt
       };
       return send(response, 200, health);
+    }
+    if (path === HELPER_ROUTES.backupEstimate && request.method === "GET") {
+      const asked = (new URL(request.url ?? "/", origin).searchParams.get("parts") ?? BACKUP_PARTS.join(",")).split(",").map((p) => p.trim()).filter(Boolean);
+      const unknown2 = asked.find((p) => !BACKUP_PARTS.includes(p));
+      if (unknown2 !== void 0 || !asked.length) return fail(response, 400, "validation", `parts may only name ${BACKUP_PARTS.join(", ")}.`);
+      return send(response, 200, await estimate([...new Set(asked)]));
     }
     if (path === HELPER_ROUTES.fetch && request.method === "POST") {
       const body = await readJson(request, response);
@@ -21853,7 +22025,7 @@ async function main(argv = process.argv.slice(2), out = (line) => process.stdout
     out(VERSION);
     return 0;
   }
-  const here = dirname(fileURLToPath(import.meta.url));
+  const here = dirname2(fileURLToPath(import.meta.url));
   const app = options.serveApp ? findApp(options.app, here) : null;
   if (options.serveApp && !app) {
     out("Could not find a player to serve.");
@@ -21864,7 +22036,7 @@ async function main(argv = process.argv.slice(2), out = (line) => process.stdout
   let runDir;
   try {
     mkdirSync3(options.workDir, { recursive: true });
-    runDir = mkdtempSync(join5(options.workDir, "now-playing-run-"));
+    runDir = mkdtempSync(join6(options.workDir, "now-playing-run-"));
   } catch (error61) {
     out(`Cannot use ${options.workDir} for temporary files: ${error61 instanceof Error ? error61.message : String(error61)}`);
     out("Point somewhere writable with --work-dir <path>.");
@@ -21935,6 +22107,7 @@ async function listen(options, app, token, out) {
         allowedOrigins: options.allowedOrigins,
         app,
         configured: options.tools,
+        backup: options.backup,
         log: (line) => out(`  ${line}`)
       });
     } catch (error61) {

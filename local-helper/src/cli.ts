@@ -135,6 +135,7 @@ async function listen(options: ReturnType<typeof parseArgs>, app: ReturnType<typ
         allowedOrigins: options.allowedOrigins,
         app,
         configured: options.tools,
+        backup: options.backup,
         log: (line) => out(`  ${line}`),
       });
     } catch (error) {
