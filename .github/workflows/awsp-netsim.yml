@@ -1,0 +1,22 @@
+# The NAT-simulated AWSP test (docs/AWSP.md §8): the real server behind one NAT, a client behind
+# another, a relay on the public side, and a 3 s blackhole mid-stream. Linux-only (network
+# namespaces, root), so it runs here and nowhere else; the Windows machine the protocol was built
+# on runs the loopback and relay-only tests (`pnpm verify` → test:awsp) instead.
+name: awsp-netsim
+on:
+  workflow_dispatch:
+  push:
+    paths: ['windows-companion/awsp-server/**', 'docs/AWSP.md', '.github/workflows/awsp-netsim.yml']
+jobs:
+  netsim:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg iproute2 iptables
+      - run: cargo install iroh-relay --version =1.2.0 --features server --locked
+      - working-directory: windows-companion/awsp-server
+        run: cargo build --release && cargo build --release --example public_key && cargo test --release --test netsim --no-run
+      - working-directory: windows-companion/awsp-server
+        run: sudo -E env "PATH=$PATH" bash tests/netsim/run.sh
