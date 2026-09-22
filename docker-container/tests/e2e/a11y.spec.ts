@@ -6,14 +6,18 @@
  * of the interface's states are checked: the first-run screens, which a person meets before they
  * have any session, and the shell once signed in.
  *
- * Automated checks catch structure, not judgement. Alongside axe these walk the source list with
- * the keyboard alone, because a source list that only responds to a mouse is a navigation the
+ * Automated checks catch structure, not judgement. Alongside axe these walk the tab strip with
+ * the keyboard alone, because a tab strip that only responds to a mouse is a navigation the
  * keyboard cannot reach.
  */
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
-const VIEWS = ['Overview', 'Devices', 'Groups', 'Profiles', 'Library', 'Providers', 'Downloads', 'Shared links', 'Recommendations', 'Discord', 'Network', 'Backup', 'Diagnostics'] as const;
+/** The six tabs. Each stacks the sections the source list once listed (Profiles under Devices;
+ * Library, Providers, Downloads and Recommendations under Music; Shared links and Discord under
+ * Sharing; Network, Backup and Diagnostics under System), so a pass over the tabs is a pass over
+ * every section. */
+const TABS = ['Overview', 'Devices', 'Music', 'Groups', 'Sharing', 'System'] as const;
 
 /** axe needs a page from a real context, which is why the signed-out test builds one rather than
  * calling `browser.newPage()`. */
@@ -25,33 +29,37 @@ async function analyse(page: Page): Promise<void> {
 }
 
 test.describe('signed in', () => {
-  for (const view of VIEWS) {
-    test(`@a11y ${view} has no detectable violations`, async ({ page }) => {
+  for (const tab of TABS) {
+    test(`@a11y ${tab} has no detectable violations`, async ({ page }) => {
       await page.goto('/');
-      await page.getByRole('option', { name: new RegExp(`^${view}\\b`) }).click();
-      await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible();
+      await page.getByRole('tab', { name: tab }).click();
+      await expect(page.getByRole('tablist', { name: 'Sections' })).toBeVisible();
+      await expect(page.getByRole('tabpanel')).toBeVisible();
       await analyse(page);
     });
   }
 
-  test('@a11y the source list is navigable with the keyboard alone', async ({ page }) => {
+  test('@a11y the tab strip is navigable with the keyboard alone', async ({ page }) => {
     await page.goto('/');
-    const list = page.getByRole('navigation', { name: 'Sections' });
-    await expect(list).toBeVisible();
+    const tabs = page.getByRole('tablist', { name: 'Sections' });
+    await expect(tabs).toBeVisible();
 
-    // Every option is a tab target or reachable from one: focus the first, then walk with arrows.
-    // This is the roving-tabindex model the spec asks for — one stop into the group, then arrows.
-    const library = page.getByRole('option', { name: /^Library\b/ });
-    await library.focus();
-    expect(await library.evaluate((node) => node === document.activeElement)).toBe(true);
+    // One tab stop into the group, then arrows: the roving-tabindex model (UX-KEY-001). The arrow
+    // moves the selection with it, as a tab strip does, so the pane follows the focus.
+    const music = page.getByRole('tab', { name: 'Music' });
+    await music.focus();
+    expect(await music.evaluate((node) => node === document.activeElement)).toBe(true);
 
-    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowRight');
     const focused = await page.evaluate(() => document.activeElement?.textContent ?? '');
-    expect(focused, 'arrow-down should move focus to the next option').toContain('Providers');
+    expect(focused, 'arrow-right should move focus to the next tab').toContain('Groups');
+    await expect(page.getByRole('tab', { name: 'Groups' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('heading', { name: 'New group' })).toBeVisible();
 
-    // Enter activates what is focused, and the working area follows.
-    await page.keyboard.press('Enter');
-    await expect(page.getByRole('option', { name: /^Providers\b/ })).toHaveAttribute('aria-selected', 'true');
+    await page.keyboard.press('End');
+    await expect(page.getByRole('tab', { name: 'System' })).toHaveAttribute('aria-selected', 'true');
+    // Only the selected tab is in the tab order; the rest are reached with arrows.
+    expect(await tabs.getByRole('tab', { name: 'Overview' }).getAttribute('tabindex')).toBe('-1');
   });
 });
 

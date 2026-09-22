@@ -134,6 +134,14 @@
   --aqua-lcd-bottom: #aebcc0;
   --aqua-lcd-text: #172326;
 
+  /* Table and list headers, and the amber gate: the hub window's additions (design/frontends/airwave-hub.html). */
+  --aqua-header-top: #f8f8f8;
+  --aqua-header-bottom: #dadada;
+  --aqua-header-rule: #adadad;
+  --aqua-header-text: #3a3d41;
+  --aqua-warning-bg: #fbf3dc;
+  --aqua-warning-edge: #d8b75e;
+
   --aqua-danger: #d64a44;
   /* Ink for a destructive action: dark enough to read as text, not as a filled warning. */
   --aqua-danger-ink: #7a1712;

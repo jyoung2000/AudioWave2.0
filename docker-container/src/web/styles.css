@@ -220,6 +220,231 @@ body {
   }
 }
 
+/* --------------------------------------------------------------------------
+   The hub window, from design/frontends/airwave-hub.html: title bar, toolbar and
+   the six icon tabs share one chrome sheet; the pane scrolls beneath it; the
+   status strip stays at the foot. Colours are aqua-ui tokens; the mockup's
+   private palette folded into tokens.json (the header and warning values) or
+   was already there under an aqua-ui name.
+   -------------------------------------------------------------------------- */
+.admin-window {
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-chrome {
+  flex: none;
+  background: linear-gradient(to bottom, var(--aqua-chrome-top), var(--aqua-chrome-upper) 42%, var(--aqua-chrome-lower) 88%, var(--aqua-chrome-bottom));
+  border-bottom: 1px solid var(--aqua-chrome-separator);
+  box-shadow: inset 0 1px 0 var(--aqua-chrome-highlight);
+}
+
+/* The toolbar row sits on the chrome; its own gradient would double the sheet. */
+.admin-chrome .aqua-toolbar {
+  background: none;
+  border-bottom: 0;
+  box-shadow: none;
+}
+
+.admin-tabs {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  padding: 0 12px 6px;
+}
+
+.admin-tab {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  min-width: 66px;
+  padding: 3px 8px 4px;
+  color: #4c5054;
+  font: var(--aqua-weight-emphasized) var(--aqua-font-small) / 1.3 var(--aqua-font);
+  text-shadow: 0 1px 0 rgb(255 255 255 / 70%);
+  background: none;
+  border: 0;
+  border-radius: 5px;
+  cursor: default;
+  appearance: none;
+}
+
+.admin-tab__icon {
+  display: block;
+  width: 26px;
+  height: 26px;
+  color: #4c637c;
+}
+
+.admin-tab[aria-selected='true'] {
+  background: rgb(0 0 0 / 15%);
+  box-shadow: inset 0 1px 3px rgb(0 0 0 / 28%), 0 1px 0 rgb(255 255 255 / 55%);
+}
+
+.admin-tab:not([aria-selected='true']):hover {
+  background: rgb(0 0 0 / 6%);
+}
+
+.admin-tab:active {
+  background: rgb(0 0 0 / 20%);
+}
+
+/* The count of alerts, worn by the Overview tab as the mockup's System tab wore its gate. */
+.admin-tab__badge {
+  position: absolute;
+  top: -3px;
+  right: 8px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  color: #fff;
+  font-size: var(--aqua-font-label);
+  line-height: 16px;
+  text-align: center;
+  text-shadow: none;
+  background: linear-gradient(#f07a74, var(--aqua-danger));
+  border-radius: 8px;
+  box-shadow: 0 1px 1px rgb(0 0 0 / 35%), inset 0 0 0 1px rgb(255 255 255 / 60%);
+}
+
+.admin-pane {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* One tab stacks several sections; a rule between them says where one ends. */
+.admin-section + .admin-section {
+  border-top: 1px solid var(--aqua-row-divider);
+}
+
+.admin-counts {
+  margin-right: 12px;
+  color: var(--aqua-text-secondary);
+  font-size: var(--aqua-font-label);
+  white-space: nowrap;
+}
+
+.admin-window .aqua-bottom-bar__right {
+  display: flex;
+  gap: 0;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.admin-window .aqua-bottom-bar__right .admin-fingerprint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Overview tiles: heading, one large figure, a line under it. */
+.admin-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 0 16px;
+}
+
+.admin-tile {
+  min-width: 0;
+  padding: 9px 11px 10px;
+  background: var(--aqua-content);
+  border: 1px solid var(--aqua-ctl-field-border);
+  border-radius: 4px;
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 12%);
+}
+
+.admin-tile__heading {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 0 0 4px;
+  color: var(--aqua-text-secondary);
+  font-size: var(--aqua-font-small);
+  font-weight: var(--aqua-weight-emphasized);
+}
+
+.admin-tile__big {
+  display: block;
+  overflow: hidden;
+  font-size: 21px;
+  font-weight: 300;
+  line-height: 1.15;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.admin-tile__small {
+  display: block;
+  overflow: hidden;
+  color: var(--aqua-text-secondary);
+  font-size: var(--aqua-font-small);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* The first-run gate, amber: it names what is disabled and who enforces it. */
+.admin-login--gate {
+  max-width: 40rem;
+}
+
+.admin-gate {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  background: var(--aqua-warning-bg);
+  border: 1px solid var(--aqua-warning-edge);
+  border-radius: 4px;
+}
+
+.admin-gate__icon {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  color: var(--aqua-warning);
+}
+
+.admin-gate__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-gate__body h1 {
+  margin: 0 0 4px;
+}
+
+@media (max-width: 640px) {
+  .admin-tabs {
+    justify-content: flex-start;
+    gap: 2px;
+    padding-inline: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    scroll-snap-type: x proximity;
+  }
+
+  .admin-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .admin-tab {
+    flex: 0 0 auto;
+    min-width: 64px;
+    font-size: var(--aqua-font-label);
+    scroll-snap-align: center;
+  }
+
+  .admin-tiles {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 /* The admin GUI is a window skin, and aqua-ui's stylesheet steps its controls
    and type up on a coarse pointer. These are the GUI's own small classes,
    which that sheet does not know about: the hint under a panel, the legend on

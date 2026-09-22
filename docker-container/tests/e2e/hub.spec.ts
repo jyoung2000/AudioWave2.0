@@ -4,12 +4,15 @@
  * These run after `first-run.setup.ts` and reuse the session it saved, so nothing here logs in.
  * What they check is the part of the interface that makes a claim about the world: the remote
  * access table, the pairing screen, and whether the page is genuinely self-hosted.
+ *
+ * Navigation is by the six tabs of the hub window (Overview · Devices · Music · Groups · Sharing ·
+ * System); a section such as Network or Profiles is a stacked part of its tab's pane.
  */
 import { expect, test } from '@playwright/test';
 
 test('the remote access page states what the hub will not do, rather than promising a tunnel', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('option', { name: /^Network\b/ }).click();
+  await page.getByRole('tab', { name: 'System' }).click();
 
   await expect(page.getByText('What works where')).toBeVisible();
   // The honest part: the hub never opens a port on the operator's behalf, and the table says so.
@@ -18,7 +21,7 @@ test('the remote access page states what the hub will not do, rather than promis
 
 test('a pairing code is high-entropy, unambiguous, and shown with a fingerprint to compare', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('option', { name: /^Devices\b/ }).click();
+  await page.getByRole('tab', { name: 'Devices' }).click();
   await page.getByRole('button', { name: /Create pairing code/i }).click();
 
   const code = page.getByLabel('Pairing code');
@@ -38,7 +41,7 @@ test('the interface loads nothing from outside the hub', async ({ page }) => {
   });
 
   await page.goto('/');
-  await page.getByRole('option', { name: /^Diagnostics\b/ }).click();
+  await page.getByRole('tab', { name: 'System' }).click();
   await page.waitForLoadState('networkidle');
 
   expect(external, 'the admin GUI must be entirely self-hosted: no fonts, no analytics, no CDN').toEqual([]);
@@ -58,7 +61,7 @@ test('a signed-out visitor is no longer offered the first-run credentials', asyn
 
 test('a group is made here, invited to with a link the player understands, and the invite withdrawn', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('option', { name: /^Groups\b/ }).click();
+  await page.getByRole('tab', { name: 'Groups' }).click();
 
   await page.getByLabel('New group’s name').fill('Kitchen e2e');
   await page.getByRole('button', { name: 'New Group' }).click();
@@ -85,7 +88,28 @@ test('a group is made here, invited to with a link the player understands, and t
 
 test('profiles are listed for moderation, and say who can see them', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('option', { name: /^Profiles\b/ }).click();
+  await page.getByRole('tab', { name: 'Devices' }).click();
   await expect(page.getByRole('heading', { name: 'Profiles' })).toBeVisible();
   await expect(page.getByText(/Nobody has a profile yet|Every device paired with this hub can see these names/)).toBeVisible();
+});
+
+test('the window is the six-tab hub, its status line reads the real bind address and port, and old section ids still land on a tab', async ({ page }) => {
+  await page.goto('/');
+  const tabs = page.getByRole('tablist', { name: 'Sections' });
+  await expect(tabs.locator('.admin-tab__label')).toHaveText(['Overview', 'Devices', 'Music', 'Groups', 'Sharing', 'System']);
+
+  // The status strip says where the hub listens, from the network route, not a constant in the markup.
+  const status = page.locator('.aqua-bottom-bar__status');
+  await expect(status).toHaveText(/(127\.0\.0\.1|0\.0\.0\.0|localhost|::):\d+ · reachable from (this machine only|your network|the internet)/);
+
+  // The Overview tiles are the metrics route's figures.
+  await expect(page.locator('.admin-tile__heading')).toHaveText(['Hub', 'Connections', 'Groups', 'Providers', 'Storage', 'Jobs']);
+
+  // Every section the source list once listed opens by its id in the address, on the tab it lives in.
+  await page.goto('/#diagnostics');
+  await expect(page.getByRole('tab', { name: 'System' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('heading', { name: 'Logs' })).toBeVisible();
+  await page.goto('/#recommendations');
+  await expect(page.getByRole('tab', { name: 'Music' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('heading', { name: 'How recommendations work here' })).toBeVisible();
 });

@@ -5,17 +5,21 @@
  *
  * 1. **Not signed in** — the login screen, which also explains the first-run credentials rather
  *    than leaving someone guessing.
- * 2. **Signed in but the bootstrap password is still in place** — the password screen, with no way
+ * 2. **Signed in but the bootstrap password is still in place** — the password gate, with no way
  *    past it. Nothing else is reachable, mirroring the server's own gate rather than duplicating a
  *    rule the API might not enforce.
  * 3. **Signed in and set up** — the full interface.
  *
- * Aqua's window model is used as intended: one window, a persistent source list, a toolbar, and a
- * bottom status bar (docs/design/APPLE_AQUA_2009_2010_UI_DESIGN_SPEC.md §§9.3–9.6).
+ * The window is the one `design/frontends/airwave-hub.html` drew: a title bar and a row of six
+ * icon tabs on one chrome sheet, the pane scrolling under it, a status strip at the foot. The
+ * thirteen sections the hub had as a source list now live inside those tabs (Overview · Devices ·
+ * Music · Groups · Sharing · System); each keeps its own data flow and its own ledger entry, and a
+ * link to a section still lands on the right tab. The tab strip is a roving-tabindex group
+ * (UX-KEY-001), the same contract the source list honoured.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AquaWindow, BottomBar, Button, Content, Glyph, LoadingState, SourceList, StatusDot, TextField, Toolbar, WorkArea, useToast, type SourceGroup } from '@now-playing/aqua-ui';
-import type { SessionInfo } from '@now-playing/contracts';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { AquaWindow, BottomBar, Button, Content, Glyph, LoadingState, StatusDot, TextField, Toolbar, useToast, type GlyphName } from '@now-playing/aqua-ui';
+import type { NetworkConfig, OverviewMetrics, SessionInfo } from '@now-playing/contracts';
 import { api, setCsrfToken } from './lib/api.js';
 import { useAction, useResource, useStoredState } from './lib/hooks.js';
 import { ViewBoundary } from './ViewBoundary.js';
@@ -33,55 +37,52 @@ import { DiagnosticsView } from './views/Diagnostics.js';
 import { BackupView } from './views/Backup.js';
 import { RecommendationsView } from './views/Recommendations.js';
 
+/** The sections. Each is a screen in design/coverage.json; the tab it lives in is below. */
 export type ViewId = 'overview' | 'devices' | 'groups' | 'profiles' | 'providers' | 'library' | 'downloads' | 'shares' | 'recommendations' | 'discord' | 'network' | 'diagnostics' | 'backup';
 
-const SOURCE_GROUPS: SourceGroup<ViewId>[] = [
-  {
-    id: 'status',
-    label: 'Hub',
-    items: [
-      { id: 'overview', label: 'Overview', icon: <Glyph name="info" /> },
-      { id: 'devices', label: 'Devices', icon: <Glyph name="device" /> },
-      { id: 'groups', label: 'Groups', icon: <Glyph name="group" /> },
-      { id: 'profiles', label: 'Profiles', icon: <Glyph name="solo" /> },
-    ],
-  },
-  {
-    id: 'music',
-    label: 'Music',
-    items: [
-      { id: 'library', label: 'Library', icon: <Glyph name="note" /> },
-      { id: 'providers', label: 'Providers', icon: <Glyph name="cloud" /> },
-      { id: 'downloads', label: 'Downloads', icon: <Glyph name="download" /> },
-      { id: 'shares', label: 'Shared links', icon: <Glyph name="link" /> },
-      { id: 'recommendations', label: 'Recommendations', icon: <Glyph name="star" /> },
-    ],
-  },
-  {
-    id: 'integrations',
-    label: 'Integrations',
-    items: [{ id: 'discord', label: 'Discord', icon: <Glyph name="share" /> }],
-  },
-  {
-    id: 'system',
-    label: 'System',
-    items: [
-      { id: 'network', label: 'Network', icon: <Glyph name="reconnect" /> },
-      { id: 'backup', label: 'Backup', icon: <Glyph name="folder" /> },
-      { id: 'diagnostics', label: 'Diagnostics', icon: <Glyph name="gear" /> },
-    ],
-  },
-];
+export type TabId = 'overview' | 'devices' | 'music' | 'groups' | 'sharing' | 'system';
 
-const VIEW_IDS: ReadonlySet<string> = new Set(SOURCE_GROUPS.flatMap((g) => g.items.map((i) => i.id)));
-
-/** A stored view id from an older build (or a hand edit) would otherwise render an empty pane. */
-function isViewId(value: unknown): value is ViewId {
-  return typeof value === 'string' && VIEW_IDS.has(value);
+interface TabSpec {
+  id: TabId;
+  label: string;
+  icon: GlyphName;
+  /** In the order they stack down the pane. */
+  sections: ViewId[];
 }
 
-function isSidebarWidth(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 120 && value <= 600;
+/**
+ * Profiles sit with Devices: a profile is what a paired device's person looks like to other
+ * devices, and moderation is a per-device concern. Recommendations sit with Music: they are the
+ * hub's defaults for the same engine the player's Settings ▸ Recommendations edits.
+ */
+const TABS: readonly TabSpec[] = [
+  { id: 'overview', label: 'Overview', icon: 'info', sections: ['overview'] },
+  { id: 'devices', label: 'Devices', icon: 'device', sections: ['devices', 'profiles'] },
+  { id: 'music', label: 'Music', icon: 'note', sections: ['library', 'providers', 'downloads', 'recommendations'] },
+  { id: 'groups', label: 'Groups', icon: 'group', sections: ['groups'] },
+  { id: 'sharing', label: 'Sharing', icon: 'link', sections: ['shares', 'discord'] },
+  { id: 'system', label: 'System', icon: 'gear', sections: ['network', 'backup', 'diagnostics'] },
+];
+
+const TAB_IDS: ReadonlySet<string> = new Set(TABS.map((t) => t.id));
+
+const SECTION_TAB: Record<ViewId, TabId> = Object.fromEntries(TABS.flatMap((t) => t.sections.map((s) => [s, t.id]))) as Record<ViewId, TabId>;
+
+/** A stored id from an older build (a section id from the source-list days, or a hand edit) is
+ * mapped onto its tab rather than rendering an empty pane. */
+function isTabId(value: unknown): value is TabId {
+  return typeof value === 'string' && TAB_IDS.has(value);
+}
+
+function tabFor(value: unknown): TabId | null {
+  if (isTabId(value)) return value;
+  if (typeof value === 'string' && value in SECTION_TAB) return SECTION_TAB[value as ViewId];
+  return null;
+}
+
+/** `#system` or `#diagnostics` in the address opens that tab, so a log message can point at one. */
+function tabFromHash(): TabId | null {
+  return tabFor(window.location.hash.replace(/^#/, ''));
 }
 
 export function App() {
@@ -98,7 +99,7 @@ export function App() {
   return <AdminShell session={info} onSignedOut={session.reload} />;
 }
 
-function Centred({ children }: { children: React.ReactNode }) {
+function Centred({ children }: { children: ReactNode }) {
   // aqua-root is what carries the design system's typography; without it this screen
   // renders in whatever the browser considers a default, which is a serif at 16px.
   return <div className="aqua-root admin-centred">{children}</div>;
@@ -147,6 +148,11 @@ function LoginScreen({ onSignedIn, setupComplete }: { onSignedIn: () => void; se
   );
 }
 
+/**
+ * The first-run gate, in the mockup's amber voice. It is still a screen of its own and not a
+ * banner over a live interface: the server refuses every gated route until this is done, so a
+ * disabled interface behind it would only be a picture of one.
+ */
 function ChangePasswordScreen({ onDone }: { onDone: () => void }) {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
@@ -169,12 +175,17 @@ function ChangePasswordScreen({ onDone }: { onDone: () => void }) {
 
   return (
     <Centred>
-      <form className="admin-login" onSubmit={submit}>
-        <h1>Choose a password</h1>
-        <p className="admin-login__hint">
-          Until this is done the hub stays on this machine only: pairing, providers, group listening, the Discord bot and remote access are all disabled. Use a passphrase of several unrelated words, or a
-          password manager.
-        </p>
+      <form className="admin-login admin-login--gate" onSubmit={submit}>
+        <div className="admin-gate">
+          <Glyph name="warning" className="admin-gate__icon" aria-hidden="true" />
+          <div className="admin-gate__body">
+            <h1>Choose a password</h1>
+            <p className="admin-login__hint">
+              You’re signed in as <strong>admin / admin</strong>. Until this is done the hub stays on this machine only: pairing, providers, group listening, the Discord bot and remote access are all
+              disabled. The server enforces this, not this page. Use a passphrase of several unrelated words, or a password manager.
+            </p>
+          </div>
+        </div>
         <TextField label="Current password" type="password" value={current} autoComplete="current-password" onChange={(e) => setCurrent(e.currentTarget.value)} />
         <TextField
           label="New password"
@@ -201,12 +212,111 @@ function ChangePasswordScreen({ onDone }: { onDone: () => void }) {
   );
 }
 
+/** The mockup's icon tabs: a glyph over a label, one tab stop, arrows and Home/End inside. */
+function ToolTabs({ value, onChange, badge }: { value: TabId; onChange: (id: TabId) => void; badge: Partial<Record<TabId, number>> }) {
+  const refs = useRef<Array<HTMLButtonElement | null>>([]);
+  const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const targets: Record<string, number | undefined> = {
+      ArrowRight: (index + 1) % TABS.length,
+      ArrowLeft: (index - 1 + TABS.length) % TABS.length,
+      Home: 0,
+      End: TABS.length - 1,
+    };
+    const next = targets[e.key];
+    if (next === undefined) return;
+    e.preventDefault();
+    onChange(TABS[next]!.id);
+    refs.current[next]?.focus();
+  };
+  return (
+    <div className="admin-tabs" role="tablist" aria-label="Sections">
+      {TABS.map((tab, i) => {
+        const count = badge[tab.id];
+        return (
+          <button
+            key={tab.id}
+            ref={(el) => {
+              refs.current[i] = el;
+            }}
+            type="button"
+            role="tab"
+            id={`admin-tab-${tab.id}`}
+            className="admin-tab"
+            aria-selected={tab.id === value}
+            aria-controls={`admin-pane-${tab.id}`}
+            tabIndex={tab.id === value ? 0 : -1}
+            onClick={() => onChange(tab.id)}
+            onKeyDown={(e) => onKeyDown(e, i)}
+          >
+            <Glyph name={tab.icon} className="admin-tab__icon" aria-hidden="true" />
+            <span className="admin-tab__label">{tab.label}</span>
+            {count ? (
+              <span className="admin-tab__badge" aria-label={`${count} ${count === 1 ? 'alert' : 'alerts'}`}>
+                {count}
+              </span>
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function sectionBody(id: ViewId): ReactNode {
+  switch (id) {
+    case 'overview':
+      return <OverviewView />;
+    case 'devices':
+      return <DevicesView />;
+    case 'groups':
+      return <GroupsView />;
+    case 'providers':
+      return <ProvidersView />;
+    case 'library':
+      return <LibraryView />;
+    case 'downloads':
+      return <DownloadsView />;
+    case 'shares':
+      return <SharesView />;
+    case 'profiles':
+      return <ProfilesView />;
+    case 'recommendations':
+      return <RecommendationsView />;
+    case 'discord':
+      return <DiscordView />;
+    case 'network':
+      return <NetworkView />;
+    case 'backup':
+      return <BackupView />;
+    case 'diagnostics':
+      return <DiagnosticsView />;
+  }
+}
+
 function AdminShell({ session, onSignedOut }: { session: SessionInfo; onSignedOut: () => void }) {
-  const [view, setView] = useStoredState<ViewId>('np.admin.view', 'overview', isViewId);
-  const [sidebarWidth, setSidebarWidth] = useStoredState<number>('np.admin.sidebar', 200, isSidebarWidth);
+  const [storedTab, setStoredTab] = useStoredState<TabId>('np.admin.tab', 'overview', isTabId);
+  const [tab, setTabState] = useState<TabId>(() => tabFromHash() ?? storedTab);
+  const setTab = useCallback(
+    (next: TabId) => {
+      setTabState(next);
+      setStoredTab(next);
+      if (window.location.hash && window.location.hash !== `#${next}`) history.replaceState(null, '', window.location.pathname + window.location.search);
+    },
+    [setStoredTab],
+  );
+  useEffect(() => {
+    const onHash = () => {
+      const next = tabFromHash();
+      if (next) setTab(next);
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, [setTab]);
+
   const toast = useToast();
   const hub = useResource('hubIdentity');
   const overview = useResource('metricsOverview', {}, { pollMs: 10_000 });
+  const network = useResource('networkGet', {}, { pollMs: 30_000 });
 
   const logout = useAction(async () => api('authLogout'));
   const signOut = useCallback(async () => {
@@ -215,91 +325,95 @@ function AdminShell({ session, onSignedOut }: { session: SessionInfo; onSignedOu
     onSignedOut();
   }, [logout, onSignedOut]);
 
-  const alerts = (overview.data as { alerts?: Array<{ level: string; message: string }> } | null)?.alerts ?? [];
+  const metrics = overview.data as OverviewMetrics | null;
+  const alerts = metrics?.alerts ?? [];
   const worst = alerts.some((a) => a.level === 'error') ? 'error' : alerts.some((a) => a.level === 'warning') ? 'warning' : 'ok';
-
-  const groups = useMemo<SourceGroup<ViewId>[]>(
-    () =>
-      SOURCE_GROUPS.map((group) => ({
-        ...group,
-        items: group.items.map((item) => (item.id === 'overview' && alerts.length ? { ...item, count: alerts.length } : item)),
-      })),
-    [alerts.length],
-  );
-
-  const body = (() => {
-    switch (view) {
-      case 'overview':
-        return <OverviewView />;
-      case 'devices':
-        return <DevicesView />;
-      case 'groups':
-        return <GroupsView />;
-      case 'providers':
-        return <ProvidersView />;
-      case 'library':
-        return <LibraryView />;
-      case 'downloads':
-        return <DownloadsView />;
-      case 'shares':
-        return <SharesView />;
-      case 'profiles':
-        return <ProfilesView />;
-      case 'recommendations':
-        return <RecommendationsView />;
-      case 'discord':
-        return <DiscordView />;
-      case 'network':
-        return <NetworkView />;
-      case 'backup':
-        return <BackupView />;
-      case 'diagnostics':
-        return <DiagnosticsView />;
-      default:
-        return null;
-    }
-  })();
+  const badge = useMemo<Partial<Record<TabId, number>>>(() => (alerts.length ? { overview: alerts.length } : {}), [alerts.length]);
 
   const identity = hub.data as { name?: string; version?: string; fingerprint?: string } | null;
-  const currentName = groups.flatMap((g) => g.items).find((i) => i.id === view)?.label ?? 'Hub';
+  const current = TABS.find((t) => t.id === tab) ?? TABS[0]!;
+  const net = network.data as NetworkConfig | null;
+
+  // The status line reads the real bind and port, never a constant: "Hub running · 0.0.0.0:4546 ·
+  // reachable from your network". Until the network config has answered it says only what it knows.
+  const reach = { localhost: 'this machine only', lan: 'your network', remote: 'the internet' } as const;
+  const statusLine = [
+    `${identity?.name ?? 'Hub'} ${identity?.version ?? ''}`.trim(),
+    net ? `${net.bindAddress}:${net.port}` : null,
+    net ? `reachable from ${reach[net.bindMode]}` : null,
+    `signed in as ${session.username ?? 'admin'}`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  const counts = metrics
+    ? `${metrics.connections.active} connected · ${metrics.groups.filter((g) => g.status === 'playing').length} playing`
+    : null;
 
   return (
-    <AquaWindow active title={identity?.name ?? 'Now Playing Hub'} flush>
-      <Toolbar
-        display={<div className="admin-toolbar__title">{identity?.name ?? 'Now Playing Hub'}</div>}
-        secondary={
-          <>
-            <Button
-              size="small"
-              icon="refresh"
-              onClick={() => {
-                overview.reload();
-                toast.show('Refreshed');
-              }}
-            >
-              Refresh
-            </Button>
-            <Button size="small" icon="lock" busy={logout.busy} onClick={() => void signOut()}>
-              Sign out
-            </Button>
-          </>
-        }
-      />
-      <WorkArea
-        sidebar={<SourceList groups={groups} selectedId={view} onSelect={setView} label="Sections" dimUnfocused />}
-        currentSourceName={currentName}
-        sidebarWidth={sidebarWidth}
-        onSidebarWidthChange={setSidebarWidth}
-      >
-        <Content>
-          <ViewBoundary resetKey={view}>{body}</ViewBoundary>
-        </Content>
-      </WorkArea>
+    <AquaWindow active title={identity?.name ?? 'Now Playing Hub'} flush className="admin-window">
+      <div className="admin-chrome">
+        <Toolbar
+          display={<div className="admin-toolbar__title">{identity?.name ?? 'Now Playing Hub'}</div>}
+          secondary={
+            <>
+              <Button
+                size="small"
+                icon="refresh"
+                onClick={() => {
+                  overview.reload();
+                  network.reload();
+                  toast.show('Refreshed');
+                }}
+              >
+                Refresh
+              </Button>
+              <Button size="small" icon="lock" busy={logout.busy} onClick={() => void signOut()}>
+                Sign out
+              </Button>
+            </>
+          }
+        />
+        <ToolTabs value={tab} onChange={setTab} badge={badge} />
+      </div>
+      <Content className="admin-pane" id={`admin-pane-${current.id}`} role="tabpanel" aria-labelledby={`admin-tab-${current.id}`}>
+        {current.sections.map((section) => (
+          <section key={section} className="admin-section" id={section} aria-label={SECTION_TITLES[section]}>
+            <ViewBoundary resetKey={section}>{sectionBody(section)}</ViewBoundary>
+          </section>
+        ))}
+      </Content>
       <BottomBar
         left={<StatusDot kind={worst === 'ok' ? 'ok' : worst} label={worst === 'ok' ? 'Healthy' : `${alerts.length} ${alerts.length === 1 ? 'alert' : 'alerts'}`} />}
-        status={`${identity?.name ?? 'Hub'} ${identity?.version ?? ''} · signed in as ${session.username ?? 'admin'}`}
-        right={identity?.fingerprint ? <span className="admin-fingerprint" title="Compare this with the fingerprint a device shows while pairing">{identity.fingerprint}</span> : null}
+        status={statusLine}
+        right={
+          <>
+            {counts ? <span className="admin-counts">{counts}</span> : null}
+            {identity?.fingerprint ? (
+              <span className="admin-fingerprint" title="Compare this with the fingerprint a device shows while pairing">
+                {identity.fingerprint}
+              </span>
+            ) : null}
+          </>
+        }
       />
     </AquaWindow>
   );
 }
+
+/** What each section is called when a tab stacks several. The views keep their own panel titles;
+ * these are the landmarks a screen reader lists. */
+const SECTION_TITLES: Record<ViewId, string> = {
+  overview: 'Overview',
+  devices: 'Devices',
+  profiles: 'Profiles',
+  library: 'Library',
+  providers: 'Providers',
+  downloads: 'Downloads',
+  recommendations: 'Recommendations',
+  groups: 'Groups',
+  shares: 'Shared links',
+  discord: 'Discord',
+  network: 'Network',
+  backup: 'Backup',
+  diagnostics: 'Diagnostics',
+};

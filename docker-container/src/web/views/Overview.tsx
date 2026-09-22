@@ -4,6 +4,7 @@
  * Alerts come first because they are the only part that ever demands action, and each one is
  * phrased as a sentence with the remedy in it rather than a status code.
  */
+import type { ReactNode } from 'react';
 import { AquaTable, Panel, PanelSection, KeyValueList } from '@now-playing/aqua-ui';
 import type { OverviewMetrics, ProviderHealth } from '@now-playing/contracts';
 import { useResource } from '../lib/hooks.js';
@@ -16,8 +17,28 @@ export function OverviewView() {
     <AsyncPanel resource={overview} title="Overview">
       {(raw) => {
         const data = raw as OverviewMetrics;
+        const good = data.providers.filter((p) => p.status === 'ok').length;
+        const playing = data.groups.filter((g) => g.status === 'playing').length;
         return (
           <>
+            <div className="admin-tiles">
+              <Tile heading="Hub" dot="ok" big={data.hub.version} small={`Up ${formatUptime(data.uptimeSeconds)} · ${data.hub.bindMode}`} />
+              <Tile heading="Connections" dot={data.connections.active ? 'ok' : null} big={String(data.connections.active)} small={`${data.connections.players} players · ${data.connections.companions} companions`} />
+              <Tile
+                heading="Groups"
+                dot={playing ? 'ok' : null}
+                big={data.groups.length ? `${playing} playing` : 'None'}
+                small={data.groups.length ? `${data.groups.length} ${data.groups.length === 1 ? 'group' : 'groups'}` : 'No group has been made yet'}
+              />
+              <Tile heading="Providers" dot={data.providers.length === 0 ? null : good < data.providers.length ? 'warning' : 'ok'} big={`${good} of ${data.providers.length} working`} small={data.providers.map((p) => p.provider).join(', ') || 'None configured'} />
+              <Tile
+                heading="Storage"
+                dot={null}
+                big={data.storage.freeBytes === null ? 'Unknown' : <><Bytes value={data.storage.freeBytes} /> free</>}
+                small={data.database.lastBackupAt ? <>Last backup <Ago iso={data.database.lastBackupAt} /></> : 'Never backed up'}
+              />
+              <Tile heading="Jobs" dot={data.jobs.failed ? 'error' : data.jobs.running ? 'ok' : null} big={`${data.jobs.running} running`} small={`${data.jobs.queued} queued · ${data.jobs.failed} failed`} />
+            </div>
             {data.alerts.length ? (
               <PanelSection title="Attention">
                 <ul className="admin-alerts">
@@ -111,6 +132,20 @@ export function OverviewView() {
         );
       }}
     </AsyncPanel>
+  );
+}
+
+/** One of the mockup's overview tiles: a heading with an optional status dot, a large figure, a line under it. */
+function Tile({ heading, dot, big, small }: { heading: string; dot: 'ok' | 'warning' | 'error' | null; big: ReactNode; small: ReactNode }) {
+  return (
+    <div className="admin-tile">
+      <h3 className="admin-tile__heading">
+        {dot ? <span className="aqua-status-dot" data-kind={dot} aria-hidden="true" /> : null}
+        {heading}
+      </h3>
+      <span className="admin-tile__big">{big}</span>
+      <span className="admin-tile__small">{small}</span>
+    </div>
   );
 }
 

@@ -45,7 +45,7 @@ setup('first run', async ({ page, request }) => {
   await page.getByRole('button', { name: 'Sign in' }).click();
 
   await expect(page.getByRole('heading', { name: 'Choose a password' })).toBeVisible();
-  await expect(page.getByRole('navigation')).toHaveCount(0);
+  await expect(page.getByRole('tablist')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Sign out' })).toHaveCount(0);
   await expect(page.getByText(/pairing, providers, group listening, the Discord bot and remote access are all disabled/i)).toBeVisible();
 
@@ -61,7 +61,7 @@ setup('first run', async ({ page, request }) => {
   await page.getByLabel('New password', { exact: true }).fill(STRONG_PASSWORD);
   await page.getByLabel('Repeat new password', { exact: true }).fill(STRONG_PASSWORD);
   await page.getByRole('button', { name: 'Set password' }).click();
-  await expect(page.getByRole('option', { name: /^Devices\b/ })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Devices' })).toBeVisible();
 
   // ---- and the bootstrap password is gone for good, at the API ----
   expect((await request.post('/api/v1/auth/login', { data: { username: 'admin', password: 'admin' } })).status()).toBe(401);

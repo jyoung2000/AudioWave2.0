@@ -113,15 +113,21 @@
       "id": "UX-KEY-001",
       "group": "input",
       "title": "One tab stop per group; arrows move inside it",
-      "contract": "Source lists, the section strip, the mode switch, tables and menus use a roving tabIndex. Home/End jump, Enter activates, type-ahead selects. Focus travels with the selection.",
+      "contract": "Source lists, the section strip, the mode switch, tab strips, tables and menus use a roving tabIndex. Home/End jump, Enter activates, type-ahead selects. Focus travels with the selection.",
       "authority": "adopted",
       "owners": [
         "packages/aqua-ui/src/components/SourceList.tsx",
         "packages/aqua-ui/src/components/SectionStrip.tsx",
         "packages/aqua-ui/src/components/AquaTable.tsx",
-        "packages/aqua-ui/src/components/MusicList.tsx"
+        "packages/aqua-ui/src/components/MusicList.tsx",
+        "docker-container/src/web/App.tsx"
       ],
       "evidence": [
+        {
+          "type": "test",
+          "path": "docker-container/tests/e2e/a11y.spec.ts",
+          "name": "@a11y the tab strip is navigable with the keyboard alone"
+        },
         {
           "type": "test",
           "path": "packages/aqua-ui/tests/dom/source-list.test.tsx",
@@ -178,7 +184,7 @@
         {
           "type": "test",
           "path": "docker-container/tests/e2e/a11y.spec.ts",
-          "name": "@a11y the source list is navigable with the keyboard alone"
+          "name": "@a11y the tab strip is navigable with the keyboard alone"
         }
       ]
     },

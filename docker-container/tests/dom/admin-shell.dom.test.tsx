@@ -73,6 +73,7 @@ describe('setup gate', () => {
     expect(await screen.findByRole('heading', { name: 'Choose a password' })).toBeTruthy();
     // No navigation exists at all: there is nothing to click past.
     expect(screen.queryByRole('navigation')).toBeNull();
+    expect(screen.queryByRole('tablist')).toBeNull();
     expect(screen.queryByRole('button', { name: /pair/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /sign out/i })).toBeNull();
   });
@@ -115,14 +116,17 @@ describe('signed in', () => {
     memoryRssBytes: 1024,
   };
 
-  it('renders the full interface with the source list and status bar', async () => {
+  it('renders the full interface with the six tabs and status bar', async () => {
     vi.stubGlobal('fetch', mockFetch({ '/auth/session': SESSION, '/metrics/overview': OVERVIEW, '/hub': HUB }));
     render(<Shell />);
-    expect(await screen.findByRole('navigation', { name: 'Sections' })).toBeTruthy();
+    expect(await screen.findByRole('tablist', { name: 'Sections' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy();
-    for (const label of ['Overview', 'Devices', 'Groups', 'Providers', 'Library', 'Downloads', 'Shared links', 'Discord', 'Network', 'Diagnostics']) {
-      expect(screen.getByRole('option', { name: new RegExp(label) }), `${label} should be in the source list`).toBeTruthy();
+    for (const label of ['Overview', 'Devices', 'Music', 'Groups', 'Sharing', 'System']) {
+      expect(screen.getByRole('tab', { name: new RegExp(`^${label}`) }), `${label} should be a tab`).toBeTruthy();
     }
+    // The Overview tab wears the alert count; the pane is the one the tab controls.
+    await waitFor(() => expect(screen.getByRole('tab', { name: /^Overview/ }).textContent).toContain('1'));
+    expect(screen.getByRole('tabpanel').getAttribute('aria-labelledby')).toBe(screen.getByRole('tab', { name: /^Overview/ }).id);
   });
 
   it('shows an alert as a sentence with the remedy, not a code', async () => {
@@ -144,8 +148,8 @@ describe('signed in', () => {
     vi.stubGlobal('fetch', mockFetch({ '/auth/session': SESSION, '/metrics/overview': broken, '/hub': HUB }));
     render(<Shell />);
     expect(await screen.findByText('This panel could not be displayed')).toBeTruthy();
-    // Navigation and the sign-out button survive, so the operator can move somewhere useful.
-    expect(screen.getByRole('navigation', { name: 'Sections' })).toBeTruthy();
+    // The tabs and the sign-out button survive, so the operator can move somewhere useful.
+    expect(screen.getByRole('tablist', { name: 'Sections' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy();
   });
 });
