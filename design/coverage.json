@@ -491,7 +491,14 @@
       "entry": "source list → Groups",
       "sourcePaths": ["docker-container/src/web/views/Groups.tsx"],
       "components": ["AquaTable", "Panel"],
-      "states": ["no groups", "group with queue", "archived"],
+      "states": [
+        "no groups",
+        "group with queue",
+        "archived",
+        "new group",
+        "invite made (code shown once)",
+        "invite withdrawn (confirm)"
+      ],
       "rules": ["UX-SHARED-001", "UX-STATE-001"],
       "guideAnchor": "screens",
       "authority": "adopted"
@@ -637,7 +644,15 @@
       "entry": "source list → System → Backup",
       "sourcePaths": ["docker-container/src/web/views/Backup.tsx"],
       "components": ["AquaTable", "Button"],
-      "states": ["no backups", "list", "restore (confirm)", "restore failed with reason"],
+      "states": [
+        "no backups",
+        "list",
+        "restore (confirm)",
+        "restore failed with reason",
+        "space measured",
+        "space unknown",
+        "next backup will not fit"
+      ],
       "rules": ["UX-SAFE-001", "UX-STATE-001"],
       "guideAnchor": "screens",
       "authority": "adopted"

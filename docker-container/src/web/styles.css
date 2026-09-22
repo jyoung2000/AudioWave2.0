@@ -238,3 +238,35 @@ body {
     font-size: 12px;
   }
 }
+
+/* A new invite's code, shown once. Spaced and heavy so it survives being read aloud or retyped. */
+.admin-invite-new {
+  margin: 8px 0 12px;
+}
+
+.admin-invite-code {
+  margin: 4px 0 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  user-select: all;
+}
+
+/* Backup location: used · the next backup · free. Widths are measured numbers, never decoration. */
+.admin-space {
+  display: flex;
+  height: 12px;
+  margin: 8px 0 4px;
+  overflow: hidden;
+  border: 1px solid var(--aqua-ctl-field-border);
+  border-radius: 6px;
+}
+
+.admin-space__used {
+  background: var(--aqua-graphite-mid);
+}
+
+.admin-space__next {
+  background: var(--aqua-selection-top);
+}

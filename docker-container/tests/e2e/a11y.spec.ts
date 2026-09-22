@@ -13,7 +13,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
-const VIEWS = ['Overview', 'Devices', 'Groups', 'Library', 'Providers', 'Downloads', 'Shared links', 'Recommendations', 'Discord', 'Network', 'Backup', 'Diagnostics'] as const;
+const VIEWS = ['Overview', 'Devices', 'Groups', 'Profiles', 'Library', 'Providers', 'Downloads', 'Shared links', 'Recommendations', 'Discord', 'Network', 'Backup', 'Diagnostics'] as const;
 
 /** axe needs a page from a real context, which is why the signed-out test builds one rather than
  * calling `browser.newPage()`. */

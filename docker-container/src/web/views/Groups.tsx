@@ -6,8 +6,8 @@
  * be aligned at all. An operator seeing "best effort" knows why the timing drifts.
  */
 import { useState } from 'react';
-import { AquaTable, Button, KeyValueList, Panel, PanelSection, StatusDot, useToast } from '@now-playing/aqua-ui';
-import type { GroupHistoryEntry, GroupView } from '@now-playing/contracts';
+import { AquaTable, Button, KeyValueList, Panel, PanelSection, PopUpMenu, StatusDot, TextField, useToast } from '@now-playing/aqua-ui';
+import type { GroupHistoryEntry, GroupView, InviteView } from '@now-playing/contracts';
 import { api, apiUrl } from '../lib/api.js';
 import { useAction, useResource } from '../lib/hooks.js';
 import { Ago, AsyncPanel, ConfirmButton, Duration } from './common.js';
@@ -18,12 +18,18 @@ export function GroupsView() {
 
   return (
     <>
+      <NewGroup
+        onCreated={(id) => {
+          groups.reload();
+          setSelected(id);
+        }}
+      />
       <AsyncPanel
         resource={groups}
         title="Groups"
         emptyWhen={(d) => (d as { items: GroupView[] }).items.length === 0}
         emptyTitle="No groups yet"
-        emptyText="A group is created from a player or the Discord bot; the hub keeps its queue and timeline."
+        emptyText="Name a group above, or create one from a player or the Discord bot; the hub keeps its queue and timeline."
       >
         {(raw) => (
           <AquaTable
@@ -46,6 +52,205 @@ export function GroupsView() {
 
       {selected ? <GroupDetail groupId={selected} onClose={() => setSelected(null)} onChanged={groups.reload} /> : null}
     </>
+  );
+}
+
+function NewGroup({ onCreated }: { onCreated: (groupId: string) => void }) {
+  const [name, setName] = useState('');
+  const toast = useToast();
+  const create = useAction(async (groupName: string) => api('groupsCreate', { body: { name: groupName } }));
+
+  const submit = (): void => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    void create.run(trimmed).then((made) => {
+      if (!made) return;
+      setName('');
+      toast.show(`Created “${trimmed}”. Make an invite link below to bring people in.`);
+      onCreated((made as GroupView).id);
+    });
+  };
+
+  return (
+    <Panel title="New group">
+      <form
+        className="admin-actions"
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit();
+        }}
+      >
+        <TextField label="New group’s name" hideLabel placeholder="New group’s name" maxLength={80} value={name} onChange={(event) => setName(event.currentTarget.value)} />
+        <Button type="submit" variant="default" busy={create.busy} disabled={!name.trim()}>
+          New Group
+        </Button>
+      </form>
+      {create.error ? (
+        <p className="admin-hint admin-hint--warning" role="alert">
+          The group was not created: {create.error.message}
+        </p>
+      ) : null}
+    </Panel>
+  );
+}
+
+const INVITE_TTLS = [
+  { value: '3600', label: '1 hour' },
+  { value: '21600', label: '6 hours' },
+  { value: '86400', label: '24 hours' },
+] as const;
+const INVITE_ROLES = [
+  { value: 'member', label: 'Member — can add to the queue' },
+  { value: 'guest', label: 'Guest — listens only' },
+  { value: 'admin', label: 'Admin — can invite and remove people' },
+] as const;
+type InviteRole = (typeof INVITE_ROLES)[number]['value'];
+const PLAYER_ADDRESS_KEY = 'np-admin-player-address';
+
+/**
+ * The link a player understands. Everything after `#` stays in the browser — none of it reaches any
+ * server — and the player strips it from the address bar as soon as it has read it.
+ */
+export function inviteLink(playerAddress: string, code: string, hubBaseUrl: string, groupName: string, from: string, role: string, expiresAt: string): string {
+  const query = new URLSearchParams({ hub: hubBaseUrl, g: groupName, from });
+  if (role !== 'member') query.set('r', role);
+  query.set('x', expiresAt);
+  return `${playerAddress}#invite/${code}?${query.toString()}`;
+}
+
+function inviteStateLabel(invite: InviteView, now: number): string {
+  switch (invite.state) {
+    case 'used':
+      return `Used by ${invite.usedBy ?? 'someone'}`;
+    case 'declined':
+      return `Declined${invite.toName ? ` by ${invite.toName}` : ''}`;
+    case 'withdrawn':
+      return 'Withdrawn';
+    case 'expired':
+      return 'Expired';
+    default: {
+      const hours = (Date.parse(invite.expiresAt) - now) / 3_600_000;
+      return `Open · ${hours < 1 ? `${Math.max(1, Math.round(hours * 60))} min` : `${Math.round(hours * 10) / 10} h`} left`;
+    }
+  }
+}
+
+function GroupInvites({ groupId, groupName }: { groupId: string; groupName: string }) {
+  const invites = useResource('groupsInvitesList', { params: { groupId } }, { pollMs: 10_000 });
+  const hub = useResource('hubIdentity', {});
+  const [ttl, setTtl] = useState<string>('86400');
+  const [role, setRole] = useState<InviteRole>('member');
+  const [made, setMade] = useState<{ code: string; expiresAt: string; role: InviteRole; ttlLabel: string } | null>(null);
+  // The hub does not serve the player, so it cannot know where people open it. Remembered per browser.
+  const [playerAddress, setPlayerAddress] = useState<string>(() => {
+    try {
+      return window.localStorage.getItem(PLAYER_ADDRESS_KEY) ?? '';
+    } catch {
+      return '';
+    }
+  });
+  const rememberPlayerAddress = (value: string): void => {
+    setPlayerAddress(value);
+    try {
+      window.localStorage.setItem(PLAYER_ADDRESS_KEY, value);
+    } catch {
+      // private window: the field still works for this visit
+    }
+  };
+  const toast = useToast();
+  const make = useAction(async () => api('groupsInvite', { params: { groupId }, body: { ttlSeconds: Number(ttl), role } }));
+  const withdraw = useAction(async (inviteId: string) => api('groupsInviteWithdraw', { params: { groupId, inviteId } }));
+
+  const hubBase = (hub.data as { publicEndpoint: string | null } | null)?.publicEndpoint ?? window.location.origin;
+  const items = (invites.data as { items: InviteView[] } | null)?.items ?? [];
+  const link = made && playerAddress.trim() ? inviteLink(playerAddress.trim(), made.code, hubBase, groupName, 'admin', made.role, made.expiresAt) : null;
+
+  return (
+    <PanelSection title={`Invites to ${groupName}`}>
+      <p className="admin-hint">
+        Each invite lets one person join, then stops working. Send the link: it opens the invite page in Now Playing, where they join or decline. Someone who isn’t paired yet is asked to pair first.
+      </p>
+      <div className="admin-actions">
+        <PopUpMenu label="Works for:" size="small" options={INVITE_TTLS} value={ttl} onChange={(event) => setTtl(event.currentTarget.value)} />
+        <PopUpMenu label="Joins as:" size="small" options={INVITE_ROLES} value={role} onChange={(event) => setRole(event.currentTarget.value as InviteRole)} />
+        <Button
+          variant="default"
+          size="small"
+          busy={make.busy}
+          onClick={() =>
+            void make.run().then((result) => {
+              if (!result) return;
+              const r = result as { inviteCode: string; expiresAt: string };
+              setMade({ code: r.inviteCode, expiresAt: r.expiresAt, role, ttlLabel: INVITE_TTLS.find((t) => t.value === ttl)?.label ?? '' });
+              invites.reload();
+            })
+          }
+        >
+          Make Invite Link
+        </Button>
+      </div>
+      {make.error ? (
+        <p className="admin-hint admin-hint--warning" role="alert">
+          No invite was made: {make.error.message}
+        </p>
+      ) : null}
+      {made ? (
+        <div className="admin-invite-new">
+          <p className="admin-hint">
+            New invite · works once · {made.ttlLabel}. The code is shown here only: the hub keeps its hash, so it cannot be looked up again.
+          </p>
+          <p className="admin-invite-code">{made.code}</p>
+          <TextField
+            label="Players open Now Playing at:"
+            inline
+            placeholder="https://music.example/now-playing.html"
+            value={playerAddress}
+            onChange={(event) => rememberPlayerAddress(event.currentTarget.value)}
+            hint={link ? undefined : 'Enter the address to get a link. Without one, send the code: it can be typed into the player’s Profile tab.'}
+          />
+          <div className="admin-actions">
+            <TextField label="Invite link" hideLabel readOnly value={link ?? ''} onFocus={(event) => event.currentTarget.select()} />
+            <Button
+              size="small"
+              variant="default"
+              disabled={!link}
+              onClick={() =>
+                void navigator.clipboard.writeText(link ?? '').then(
+                  () => toast.show(`Copied the invite link for ${groupName}.`),
+                  () => toast.show('The browser would not copy it. Select the link and copy it by hand.'),
+                )
+              }
+            >
+              Copy Link
+            </Button>
+          </div>
+        </div>
+      ) : null}
+      <AquaTable
+        label={`Invites to ${groupName}`}
+        rowKey={(row: InviteView) => row.inviteId}
+        rows={items}
+        columns={[
+          { id: 'to', header: 'For', primary: true, cell: (row) => row.toName ?? (row.toProfileId ? 'a removed profile' : 'anyone with the link') },
+          { id: 'role', header: 'Role', cell: (row) => row.role.charAt(0).toUpperCase() + row.role.slice(1) },
+          { id: 'state', header: 'State', cell: (row) => `${inviteStateLabel(row, Date.now())} · made by ${row.createdBy}` },
+          {
+            id: 'actions',
+            header: '',
+            headerLabel: 'Actions',
+            cell: (row) =>
+              row.state === 'open' ? (
+                <ConfirmButton
+                  label="Withdraw"
+                  confirmLabel="Withdraw this invite? Its link stops working immediately."
+                  busy={withdraw.busy}
+                  onConfirm={() => void withdraw.run(row.inviteId).then(() => invites.reload())}
+                />
+              ) : null,
+          },
+        ]}
+      />
+    </PanelSection>
   );
 }
 
@@ -114,6 +319,8 @@ function GroupDetail({ groupId, onClose, onChanged }: { groupId: string; onClose
           ]}
         />
       </PanelSection>
+
+      {data?.status === 'active' ? <GroupInvites groupId={groupId} groupName={data.name} /> : null}
 
       <AsyncPanel resource={queue} title="Queue" emptyWhen={(d) => (d as { queue: { items: unknown[] } }).queue.items.length === 0} emptyTitle="The queue is empty">
         {(raw) => {

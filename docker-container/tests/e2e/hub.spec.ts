@@ -55,3 +55,37 @@ test('a signed-out visitor is no longer offered the first-run credentials', asyn
     await page.close();
   }
 });
+
+test('a group is made here, invited to with a link the player understands, and the invite withdrawn', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('option', { name: /^Groups\b/ }).click();
+
+  await page.getByLabel('New group’s name').fill('Kitchen e2e');
+  await page.getByRole('button', { name: 'New Group' }).click();
+  await expect(page.getByRole('heading', { name: 'Invites to Kitchen e2e' })).toBeVisible();
+
+  await page.getByLabel('Joins as:').selectOption('guest');
+  await page.getByRole('button', { name: 'Make Invite Link' }).click();
+
+  // Without knowing where players open Now Playing there is a code but, honestly, no link yet.
+  const link = page.getByLabel('Invite link');
+  await expect(link).toHaveValue('');
+  await expect(page.getByRole('button', { name: 'Copy Link' })).toBeDisabled();
+  await page.getByLabel('Players open Now Playing at:').fill('https://music.example/now-playing.html');
+  // A fragment: the code and the hub address never reach the server the page came from.
+  await expect(link).toHaveValue(/^https:\/\/music\.example\/now-playing\.html#invite\/[0-9A-Z]+\?hub=http%3A%2F%2F(127\.0\.0\.1|localhost)%3A\d+&g=Kitchen\+e2e&from=admin&r=guest&x=\d{4}-/);
+
+  const invites = page.getByRole('table', { name: 'Invites to Kitchen e2e' });
+  await expect(invites.getByText(/Open · .* left · made by admin/)).toBeVisible();
+  page.once('dialog', (dialog) => void dialog.accept());
+  await invites.getByRole('button', { name: 'Withdraw' }).click();
+  await expect(invites.getByText(/Withdrawn · made by admin/)).toBeVisible();
+  await expect(invites.getByRole('button', { name: 'Withdraw' })).toHaveCount(0);
+});
+
+test('profiles are listed for moderation, and say who can see them', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('option', { name: /^Profiles\b/ }).click();
+  await expect(page.getByRole('heading', { name: 'Profiles' })).toBeVisible();
+  await expect(page.getByText(/Nobody has a profile yet|Every device paired with this hub can see these names/)).toBeVisible();
+});

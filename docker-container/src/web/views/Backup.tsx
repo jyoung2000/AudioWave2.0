@@ -8,6 +8,7 @@
 import { useCallback, useState } from 'react';
 import { AquaTable, Button, Panel, PanelSection, useToast } from '@now-playing/aqua-ui';
 import { api } from '../lib/api.js';
+import type { BackupSpace } from '@now-playing/contracts';
 import { useAction, useResource } from '../lib/hooks.js';
 import { Ago, AsyncPanel, Bytes, InlineError } from './common.js';
 
@@ -64,6 +65,7 @@ export function BackupView() {
 
   return (
     <>
+      <BackupSpacePanel />
       <AsyncPanel
         resource={backups}
         title="Backups"
@@ -175,5 +177,51 @@ export function BackupView() {
         </PanelSection>
       </Panel>
     </>
+  );
+}
+
+/**
+ * Room at the backup location. The bar is drawn only from measured numbers: what is used, what the
+ * next backup is expected to take (the size of the newest one — a backup is the whole database, so
+ * the last is the best estimate of the next), and what would be left. With nothing to go on, it
+ * says so instead of drawing a guess.
+ */
+function BackupSpacePanel() {
+  const space = useResource('backupSpace', {}, { pollMs: 60_000 });
+  const data = space.data as BackupSpace | null;
+  if (!data) return null;
+  const { freeBytes, totalBytes, lastArchiveBytes } = data;
+  const known = freeBytes !== null && totalBytes !== null && totalBytes > 0;
+  const next = lastArchiveBytes ?? 0;
+  const fits = known && next <= freeBytes;
+  const usedPercent = known ? ((totalBytes - freeBytes) / totalBytes) * 100 : 0;
+  const nextPercent = known ? Math.min(100 - usedPercent, (next / totalBytes) * 100) : 0;
+  return (
+    <Panel title="Backup location">
+      <PanelSection>
+        <p className="admin-hint">
+          <code>{data.path}</code>
+          {data.keep ? ` · the newest ${data.keep} scheduled and safety backups are kept; ones you make here are yours to delete` : ''}
+        </p>
+        {known ? (
+          <>
+            <div className="admin-space" role="img" aria-label={`${Math.round(usedPercent)}% used, next backup about ${Math.round(nextPercent * 10) / 10}%, the rest free`}>
+              <span className="admin-space__used" style={{ width: `${usedPercent}%` }} />
+              <span className="admin-space__next" style={{ width: `${nextPercent}%` }} />
+            </div>
+            <p className="admin-hint">
+              <Bytes value={totalBytes - freeBytes} /> used · next backup {lastArchiveBytes === null ? 'not known until one exists' : <>about <Bytes value={lastArchiveBytes} /></>} · <Bytes value={Math.max(0, freeBytes - next)} /> free after it
+            </p>
+            {fits ? null : (
+              <p className="admin-hint admin-hint--warning" role="alert">
+                The next backup is not expected to fit: only <Bytes value={freeBytes} /> is free here.
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="admin-hint admin-hint--warning">This location’s free space could not be measured — the folder may not exist yet, or the drive did not answer.</p>
+        )}
+      </PanelSection>
+    </Panel>
   );
 }

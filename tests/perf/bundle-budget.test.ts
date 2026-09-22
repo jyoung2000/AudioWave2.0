@@ -47,8 +47,13 @@ const BUNDLES: Bundle[] = [
      * with them are *not*: the table travels with Settings and the unpacker is fetched only when
      * someone imports an archive, which is why `lib/audio-files.ts` exists — importing one function
      * from the scanner used to pin the whole scanner into a shared chunk.
+     *
+     * Then from 656 to 658KB with the profile, invite and backup-space contracts. The route table
+     * is one object and the hub client reads it at start-up, so a new route is in the first load
+     * whether or not its pane is ever opened; what it costs is its schema and its summary string,
+     * about 1KB for the nineteen added here.
      */
-    entryBudgetKb: 656,
+    entryBudgetKb: 658,
     /*
      * The total rose from 1600 to 1900 when the hero gained the reference's jewel case.
      *
