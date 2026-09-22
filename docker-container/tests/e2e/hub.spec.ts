@@ -96,7 +96,7 @@ test('profiles are listed for moderation, and say who can see them', async ({ pa
 test('the window is the six-tab hub, its status line reads the real bind address and port, and old section ids still land on a tab', async ({ page }) => {
   await page.goto('/');
   const tabs = page.getByRole('tablist', { name: 'Sections' });
-  await expect(tabs.locator('.admin-tab__label')).toHaveText(['Overview', 'Devices', 'Music', 'Groups', 'Sharing', 'System']);
+  await expect(tabs.locator('.aqua-tool-tab__label')).toHaveText(['Overview', 'Devices', 'Music', 'Groups', 'Sharing', 'System']);
 
   // The status strip says where the hub listens, from the network route, not a constant in the markup.
   const status = page.locator('.aqua-bottom-bar__status');

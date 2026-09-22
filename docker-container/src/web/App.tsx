@@ -17,8 +17,8 @@
  * link to a section still lands on the right tab. The tab strip is a roving-tabindex group
  * (UX-KEY-001), the same contract the source list honoured.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { AquaWindow, BottomBar, Button, Content, Glyph, LoadingState, StatusDot, TextField, Toolbar, useToast, type GlyphName } from '@now-playing/aqua-ui';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { AquaWindow, BottomBar, Button, Content, Glyph, LoadingState, StatusDot, TextField, Toolbar, ToolTabs, useToast, type GlyphName } from '@now-playing/aqua-ui';
 import type { NetworkConfig, OverviewMetrics, SessionInfo } from '@now-playing/contracts';
 import { api, setCsrfToken } from './lib/api.js';
 import { useAction, useResource, useStoredState } from './lib/hooks.js';
@@ -212,56 +212,6 @@ function ChangePasswordScreen({ onDone }: { onDone: () => void }) {
   );
 }
 
-/** The mockup's icon tabs: a glyph over a label, one tab stop, arrows and Home/End inside. */
-function ToolTabs({ value, onChange, badge }: { value: TabId; onChange: (id: TabId) => void; badge: Partial<Record<TabId, number>> }) {
-  const refs = useRef<Array<HTMLButtonElement | null>>([]);
-  const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>, index: number) => {
-    const targets: Record<string, number | undefined> = {
-      ArrowRight: (index + 1) % TABS.length,
-      ArrowLeft: (index - 1 + TABS.length) % TABS.length,
-      Home: 0,
-      End: TABS.length - 1,
-    };
-    const next = targets[e.key];
-    if (next === undefined) return;
-    e.preventDefault();
-    onChange(TABS[next]!.id);
-    refs.current[next]?.focus();
-  };
-  return (
-    <div className="admin-tabs" role="tablist" aria-label="Sections">
-      {TABS.map((tab, i) => {
-        const count = badge[tab.id];
-        return (
-          <button
-            key={tab.id}
-            ref={(el) => {
-              refs.current[i] = el;
-            }}
-            type="button"
-            role="tab"
-            id={`admin-tab-${tab.id}`}
-            className="admin-tab"
-            aria-selected={tab.id === value}
-            aria-controls={`admin-pane-${tab.id}`}
-            tabIndex={tab.id === value ? 0 : -1}
-            onClick={() => onChange(tab.id)}
-            onKeyDown={(e) => onKeyDown(e, i)}
-          >
-            <Glyph name={tab.icon} className="admin-tab__icon" aria-hidden="true" />
-            <span className="admin-tab__label">{tab.label}</span>
-            {count ? (
-              <span className="admin-tab__badge" aria-label={`${count} ${count === 1 ? 'alert' : 'alerts'}`}>
-                {count}
-              </span>
-            ) : null}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 function sectionBody(id: ViewId): ReactNode {
   switch (id) {
     case 'overview':
@@ -328,7 +278,10 @@ function AdminShell({ session, onSignedOut }: { session: SessionInfo; onSignedOu
   const metrics = overview.data as OverviewMetrics | null;
   const alerts = metrics?.alerts ?? [];
   const worst = alerts.some((a) => a.level === 'error') ? 'error' : alerts.some((a) => a.level === 'warning') ? 'warning' : 'ok';
-  const badge = useMemo<Partial<Record<TabId, number>>>(() => (alerts.length ? { overview: alerts.length } : {}), [alerts.length]);
+  const tabItems = useMemo(
+    () => TABS.map((t) => (t.id === 'overview' && alerts.length ? { id: t.id, label: t.label, icon: t.icon, badge: alerts.length, badgeLabel: `${alerts.length} ${alerts.length === 1 ? 'alert' : 'alerts'}` } : { id: t.id, label: t.label, icon: t.icon })),
+    [alerts.length],
+  );
 
   const identity = hub.data as { name?: string; version?: string; fingerprint?: string } | null;
   const current = TABS.find((t) => t.id === tab) ?? TABS[0]!;
@@ -373,7 +326,7 @@ function AdminShell({ session, onSignedOut }: { session: SessionInfo; onSignedOu
             </>
           }
         />
-        <ToolTabs value={tab} onChange={setTab} badge={badge} />
+        <ToolTabs tabs={tabItems} value={tab} onChange={setTab} label="Sections" idPrefix="admin" />
       </div>
       <Content className="admin-pane" id={`admin-pane-${current.id}`} role="tabpanel" aria-labelledby={`admin-tab-${current.id}`}>
         {current.sections.map((section) => (

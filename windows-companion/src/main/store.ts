@@ -12,7 +12,7 @@ import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { EqPreset, Playlist, Track } from '@now-playing/contracts';
-import type { LibraryFolder } from '../shared/ipc.js';
+import { FolderKind, type LibraryFolder } from '../shared/ipc.js';
 
 export type CompanionDb = Database.Database;
 export type SyncedTable = 'playlists' | 'playlist_items' | 'eq_presets' | 'eq_bindings';
@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS folders (
   path TEXT NOT NULL UNIQUE,
   display_name TEXT NOT NULL,
   watch INTEGER NOT NULL DEFAULT 1,
+  kind TEXT NOT NULL DEFAULT 'music',
   track_count INTEGER NOT NULL DEFAULT 0,
   size_bytes INTEGER NOT NULL DEFAULT 0,
   last_scan_at TEXT,
@@ -102,6 +103,12 @@ function migrate(db: CompanionDb): void {
     }
     db.pragma('user_version = 1');
   }
+  // Version 2: a folder has a kind. Everything added before this was music, so that is the default.
+  if (version < 2) {
+    const columns = db.prepare<[], { name: string }>('PRAGMA table_info(folders)').all().map((c) => c.name);
+    if (!columns.includes('kind')) db.exec("ALTER TABLE folders ADD COLUMN kind TEXT NOT NULL DEFAULT 'music'");
+    db.pragma('user_version = 2');
+  }
 }
 
 /**
@@ -149,6 +156,7 @@ interface FolderRow {
   path: string;
   display_name: string;
   watch: number;
+  kind: string;
   track_count: number;
   size_bytes: number;
   last_scan_at: string | null;
@@ -181,6 +189,7 @@ export class CompanionStore {
         path: row.path,
         displayName: row.display_name,
         watch: row.watch === 1,
+        kind: FolderKind.catch('music').parse(row.kind),
         trackCount: row.track_count,
         sizeBytes: row.size_bytes,
         lastScanAt: row.last_scan_at,
@@ -197,8 +206,18 @@ export class CompanionStore {
     return this.db.prepare<[string], FolderRow>('SELECT * FROM folders WHERE path = ?').get(path);
   }
 
-  addFolder(folder: { id: string; path: string; displayName: string; now: string }): void {
-    this.db.prepare('INSERT INTO folders (id, path, display_name, watch, track_count, size_bytes, last_scan_at, last_scan_error, created_at) VALUES (?, ?, ?, 1, 0, 0, NULL, NULL, ?)').run(folder.id, folder.path, folder.displayName, folder.now);
+  addFolder(folder: { id: string; path: string; displayName: string; kind?: FolderKind; now: string }): void {
+    this.db
+      .prepare('INSERT INTO folders (id, path, display_name, watch, kind, track_count, size_bytes, last_scan_at, last_scan_error, created_at) VALUES (?, ?, ?, 1, ?, 0, 0, NULL, NULL, ?)')
+      .run(folder.id, folder.path, folder.displayName, folder.kind ?? 'music', folder.now);
+  }
+
+  /** The paths of every folder of a kind, for the backup estimate and the archive. */
+  folderPaths(kind: FolderKind): string[] {
+    return this.db
+      .prepare<[string], { path: string }>('SELECT path FROM folders WHERE kind = ? ORDER BY display_name')
+      .all(kind)
+      .map((row) => row.path);
   }
 
   updateFolderStats(id: string, stats: { trackCount: number; sizeBytes: number; lastScanAt: string; error: string | null }): void {

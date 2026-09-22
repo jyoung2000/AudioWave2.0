@@ -340,6 +340,9 @@ importers:
         specifier: workspace:*
         version: link:../domain
     devDependencies:
+      tsx:
+        specifier: 4.23.13
+        version: 4.23.13
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -413,6 +416,9 @@ importers:
       '@now-playing/domain':
         specifier: workspace:*
         version: link:../packages/domain
+      '@now-playing/local-helper':
+        specifier: workspace:*
+        version: link:../local-helper
       better-sqlite3:
         specifier: 13.0.3
         version: 13.0.3

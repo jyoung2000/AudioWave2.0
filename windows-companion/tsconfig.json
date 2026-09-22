@@ -7,7 +7,9 @@
     "paths": {
       "@now-playing/contracts": ["../packages/contracts/src/index.ts"],
       "@now-playing/domain": ["../packages/domain/src/index.ts"],
-      "@now-playing/test-fixtures": ["../packages/test-fixtures/src/index.ts"]
+      "@now-playing/test-fixtures": ["../packages/test-fixtures/src/index.ts"],
+      "@now-playing/local-helper": ["../local-helper/src/index.ts"],
+      "@now-playing/local-helper/measure": ["../local-helper/src/measure.ts"]
     }
   },
   "include": [

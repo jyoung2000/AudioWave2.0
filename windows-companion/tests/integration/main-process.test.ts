@@ -205,6 +205,38 @@ describe('transfers', () => {
   });
 });
 
+describe('the embedded helper and the backup channels', () => {
+  it('starts the helper on the preferred port and answers its health route', async () => {
+    const status = (await call('helper:status', undefined)) as { running: boolean; origin: string | null; reason: string | null; tools: Array<{ id: string; present: boolean }> };
+    expect(status.running, status.reason ?? '').toBe(true);
+    const health = await fetch(`${status.origin}/helper/v1/health`);
+    expect(health.status).toBe(200);
+    expect(((await health.json()) as { helper: string }).helper).toBe('now-playing-local-helper');
+    expect(status.tools.map((t) => t.id)).toEqual(['yt-dlp', 'spotdl', 'ffmpeg']);
+    const token = (await call('helper:token', undefined)) as { token: string | null };
+    expect(token.token).toMatch(/^[A-Za-z0-9_-]{20,}$/);
+    // The same token every time: a player that pasted it once keeps working.
+    expect(await call('helper:token', undefined)).toEqual(token);
+  });
+
+  it('has no backup folder until one is chosen, and says so instead of guessing', async () => {
+    expect(await call('backup:settings:get', undefined)).toMatchObject({ dir: null, schedule: 'manual', keep: 5 });
+    const estimate = (await call('backup:estimate', undefined)) as { blocked: string | null };
+    expect(estimate.blocked).toBe('Choose where backups go first.');
+    expect(await call('backup:list', undefined)).toEqual({ items: [] });
+    expect(await call('backup:create', undefined)).toEqual({ backup: null, reason: 'Choose where backups go first.' });
+    // A cancelled folder picker changes nothing.
+    dialogPick.path = null;
+    expect(await call('backup:pick-dir', undefined)).toMatchObject({ settings: { dir: null }, reason: null });
+  });
+
+  it('refuses a setting the contract does not know, and keeps the rest', async () => {
+    await expect(call('backup:settings:set', { keep: 4 })).rejects.toThrow(/keep/);
+    await expect(call('backup:settings:set', { dir: 'C:\\anywhere' })).rejects.toThrow();
+    expect(await call('backup:settings:set', { include: { tv: true }, keep: 3 })).toMatchObject({ include: { tv: true, music: true }, keep: 3 });
+  });
+});
+
 describe('backup restore', () => {
   it('does nothing when the person cancels the file picker', async () => {
     dialogPick.path = null;

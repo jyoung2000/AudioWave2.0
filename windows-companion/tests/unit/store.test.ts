@@ -160,7 +160,8 @@ describe('migrating a database written by an earlier build', () => {
 
       const upgraded = new CompanionStore(openCompanionDb(file));
       try {
-        expect(upgraded.raw.pragma('user_version', { simple: true })).toBe(1);
+        // Version 2 added the folder kind; a database from before either migration lands on the current one.
+        expect(upgraded.raw.pragma('user_version', { simple: true })).toBe(2);
         const sql = upgraded.raw.prepare<[], { sql: string }>("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'tracks'").get()?.sql;
         expect(sql).not.toMatch(/CASCADE/i);
         expect(upgraded.searchTracks({ query: 'Survivor', limit: 10, offset: 0 }).items).toHaveLength(1);

@@ -16,11 +16,16 @@ import { IPC_CHANNELS, IPC_EVENT_NAMES, type IpcChannel, type IpcEvent } from '.
 
 /* ------------------------------------------------------------------ library */
 
+/** What a folder holds. Music is indexed; TV and movies are kept, watched and backed up, not indexed. */
+export const FolderKind = z.enum(['music', 'tv', 'movies']);
+export type FolderKind = z.infer<typeof FolderKind>;
+
 export const LibraryFolder = z.object({
   id: z.uuid(),
   path: z.string().min(1),
   displayName: z.string().min(1).max(200),
   watch: z.boolean().default(true),
+  kind: FolderKind.default('music'),
   trackCount: z.number().int().nonnegative().default(0),
   sizeBytes: z.number().int().nonnegative().default(0),
   lastScanAt: z.iso.datetime({ offset: true }).nullable().default(null),
@@ -89,6 +94,111 @@ export const BackupSummary = z.object({
 });
 export type BackupSummary = z.infer<typeof BackupSummary>;
 
+export const BackupSettings = z.object({
+  /** Where archives go. Null until chosen: nothing is backed up to a guessed place. */
+  dir: z.string().nullable().default(null),
+  include: z
+    .object({
+      music: z.boolean().default(true),
+      tv: z.boolean().default(false),
+      movies: z.boolean().default(false),
+      playlists: z.boolean().default(true),
+      presets: z.boolean().default(true),
+      settings: z.boolean().default(true),
+    })
+    .default({ music: true, tv: false, movies: false, playlists: true, presets: true, settings: true }),
+  schedule: z.enum(['manual', 'daily', 'weekly']).default('manual'),
+  /** How many archives to keep; 0 keeps every one. */
+  keep: z.union([z.literal(0), z.literal(3), z.literal(5), z.literal(10)]).default(5),
+  lastRunAt: z.iso.datetime({ offset: true }).nullable().default(null),
+  lastRunError: z.string().nullable().default(null),
+});
+export type BackupSettings = z.infer<typeof BackupSettings>;
+
+/** Written out like `PreferencesPatch`, for the same reason: a partial must not reset the rest. */
+export const BackupSettingsPatch = z.strictObject({
+  include: z
+    .strictObject({
+      music: z.boolean().optional(),
+      tv: z.boolean().optional(),
+      movies: z.boolean().optional(),
+      playlists: z.boolean().optional(),
+      presets: z.boolean().optional(),
+      settings: z.boolean().optional(),
+    })
+    .optional(),
+  schedule: z.enum(['manual', 'daily', 'weekly']).optional(),
+  keep: z.union([z.literal(0), z.literal(3), z.literal(5), z.literal(10)]).optional(),
+});
+export type BackupSettingsPatch = z.infer<typeof BackupSettingsPatch>;
+
+const Measure = z.object({ bytes: z.number().int().nonnegative(), files: z.number().int().nonnegative(), measuredAt: z.iso.datetime({ offset: true }) });
+
+/**
+ * How big the next backup would be and how much room it has. The folder figures come from the same
+ * measurement the helper's `/helper/v1/backup/estimate` route serves, so the player's Backup pane
+ * and this window can never disagree about the same folder.
+ */
+export const BackupEstimate = z.object({
+  parts: z.object({ music: Measure.optional(), tv: Measure.optional(), movies: Measure.optional() }),
+  /** Playlists, presets and settings as they would be written: a measured size, not a guess. */
+  dataBytes: z.number().int().nonnegative(),
+  expectedBytes: z.number().int().nonnegative(),
+  /** Null when a part that is included could not be measured: then the total is unknown, not smaller. */
+  complete: z.boolean(),
+  destination: z.object({ path: z.string(), freeBytes: z.number().int().nullable(), totalBytes: z.number().int().nullable() }).nullable(),
+  /** Why Back Up Now is disabled, in a sentence; null when it can run. */
+  blocked: z.string().nullable(),
+});
+export type BackupEstimate = z.infer<typeof BackupEstimate>;
+
+export const BackupArchive = z.object({
+  id: z.string(),
+  path: z.string(),
+  createdAt: z.iso.datetime({ offset: true }),
+  sizeBytes: z.number().int().nonnegative(),
+  parts: z.array(z.enum(['music', 'tv', 'movies', 'playlists', 'presets', 'settings'])),
+  contents: BackupSummary.shape.contents,
+  /** False for an archive whose manifest is missing or unreadable: listed, but not restorable. */
+  restorable: z.boolean(),
+});
+export type BackupArchive = z.infer<typeof BackupArchive>;
+
+export const BackupProgress = z.object({
+  phase: z.enum(['measuring', 'copying', 'writing', 'pruning', 'done', 'failed']),
+  bytesDone: z.number().int().nonnegative(),
+  bytesTotal: z.number().int().nonnegative(),
+  /** The file being copied, shown as progress. Never persisted or sent anywhere. */
+  currentName: z.string().nullable(),
+  error: z.string().nullable(),
+});
+export type BackupProgress = z.infer<typeof BackupProgress>;
+
+/* -------------------------------------------------------------------- helper */
+
+export const HelperTool = z.object({
+  id: z.enum(['yt-dlp', 'spotdl', 'ffmpeg']),
+  present: z.boolean(),
+  version: z.string().nullable(),
+  /** Where it was found, for the person to check; null when absent. */
+  path: z.string().nullable(),
+  /** What to do about it, when absent. */
+  advice: z.string().nullable(),
+});
+export type HelperTool = z.infer<typeof HelperTool>;
+
+/** The embedded local helper: the same program `local-helper/` ships on its own, run inside this app. */
+export const HelperStatus = z.object({
+  running: z.boolean(),
+  port: z.number().int().nullable(),
+  origin: z.string().nullable(),
+  /** Why it is not running, in a sentence. */
+  reason: z.string().nullable(),
+  tools: z.array(HelperTool),
+  checkedAt: z.iso.datetime({ offset: true }).nullable(),
+});
+export type HelperStatus = z.infer<typeof HelperStatus>;
+
 /* -------------------------------------------------------------------- system */
 
 export const AppInfo = z.object({
@@ -112,6 +222,8 @@ export const Preferences = z.object({
   watchFolders: z.boolean().default(true),
   autoSync: z.boolean().default(false),
   theme: z.enum(['system', 'light']).default('system'),
+  /** The port the embedded helper listens on; the player scans 17342–17345. */
+  helperPort: z.number().int().min(1024).max(65535).default(17342),
 });
 export type Preferences = z.infer<typeof Preferences>;
 
@@ -128,6 +240,7 @@ export const PreferencesPatch = z.strictObject({
   watchFolders: z.boolean().optional(),
   autoSync: z.boolean().optional(),
   theme: z.enum(['system', 'light']).optional(),
+  helperPort: z.number().int().min(1024).max(65535).optional(),
 });
 export type PreferencesPatch = z.infer<typeof PreferencesPatch>;
 
@@ -145,7 +258,7 @@ export const IPC = {
   'app:reveal': { request: z.object({ trackId: z.uuid() }), response: z.object({ ok: z.boolean(), reason: z.string().nullable() }) },
 
   'library:folders': { request: z.void(), response: z.object({ items: z.array(LibraryFolder) }) },
-  'library:add-folder': { request: z.void(), response: z.object({ folder: LibraryFolder.nullable(), reason: z.string().nullable() }) },
+  'library:add-folder': { request: z.object({ kind: FolderKind.default('music') }).default({ kind: 'music' }), response: z.object({ folder: LibraryFolder.nullable(), reason: z.string().nullable() }) },
   'library:remove-folder': { request: z.object({ folderId: z.uuid() }), response: z.object({ ok: z.boolean() }) },
   'library:scan': { request: z.object({ folderId: z.uuid().optional() }), response: z.object({ started: z.boolean(), reason: z.string().nullable() }) },
   'library:tracks': { request: z.object({ query: z.string().max(200).optional(), limit: z.number().int().min(1).max(1000).default(200), offset: z.number().int().nonnegative().default(0) }), response: z.object({ items: z.array(Track), total: z.number().int() }) },
@@ -163,9 +276,22 @@ export const IPC = {
   'transfers:send': { request: z.object({ trackIds: z.array(z.uuid()).min(1).max(500) }), response: z.object({ queued: z.number().int(), reason: z.string().nullable() }) },
   'transfers:cancel': { request: z.object({ id: z.string() }), response: z.object({ ok: z.boolean() }) },
 
+  'backup:settings:get': { request: z.void(), response: BackupSettings },
+  'backup:settings:set': { request: BackupSettingsPatch, response: BackupSettings },
+  'backup:pick-dir': { request: z.void(), response: z.object({ settings: BackupSettings, reason: z.string().nullable() }) },
+  'backup:estimate': { request: z.void(), response: BackupEstimate },
+  'backup:list': { request: z.void(), response: z.object({ items: z.array(BackupArchive) }) },
+  /** Writes an archive into the backup folder. Without one, or without room, it says why instead. */
   'backup:create': { request: z.void(), response: z.object({ backup: BackupSummary.nullable(), reason: z.string().nullable() }) },
-  'backup:restore': { request: z.void(), response: z.object({ restored: z.boolean(), reason: z.string().nullable(), summary: BackupSummary.nullable() }) },
+  /** With an id, restores that archive; without one, asks for a file (an export from any companion). */
+  'backup:restore': { request: z.object({ id: z.string().optional() }).default({}), response: z.object({ restored: z.boolean(), reason: z.string().nullable(), summary: BackupSummary.nullable() }) },
+  'backup:remove': { request: z.object({ id: z.string() }), response: z.object({ ok: z.boolean(), reason: z.string().nullable() }) },
   'backup:export-playlists': { request: z.void(), response: z.object({ path: z.string().nullable(), count: z.number().int(), reason: z.string().nullable() }) },
+
+  'helper:status': { request: z.void(), response: HelperStatus },
+  'helper:check-tools': { request: z.void(), response: HelperStatus },
+  /** The helper's token, for pasting into a player this app does not serve. Shown, never logged. */
+  'helper:token': { request: z.void(), response: z.object({ token: z.string().nullable() }) },
 
 } as const satisfies Record<IpcChannel, { request: z.ZodType; response: z.ZodType }>;
 
@@ -177,6 +303,7 @@ export const IPC_EVENTS = {
   'event:scan-progress': ScanProgress,
   'event:hub-status': HubConnection,
   'event:transfer-progress': TransferProgress,
+  'event:backup-progress': BackupProgress,
   'event:notice': z.object({ kind: z.enum(['info', 'warning', 'error']), message: z.string() }),
 } as const satisfies Record<IpcEvent, z.ZodType>;
 

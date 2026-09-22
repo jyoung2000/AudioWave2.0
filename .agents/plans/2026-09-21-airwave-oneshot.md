@@ -90,3 +90,60 @@ Not done:
   `test:e2e` after touching `src/web`, or the tests exercise the previous GUI.
 - `pnpm styleguide:pdf` rewrites the PDF with different bytes on every run; `git checkout` it unless
   the guide's fingerprint actually changed.
+
+---
+
+# Part 2 (2026-09-21, second session) — prompt: `docs/audiowave-oneshot-part2-prompt.md`
+
+Order A → B → C → D → E; each step commits green. This section is appended as each step lands.
+
+## Step A — hub GUI presentation (done, `6aa9a2b`)
+
+The six-tab window of `design/frontends/airwave-hub.html`: Overview · Devices (+ Profiles) · Music
+(Library, Providers, Downloads, Recommendations) · Groups · Sharing (Shared links, Discord) · System
+(Network, Backup, Diagnostics). The thirteen sections keep their data flows and ledger entries and
+stack inside the tabs; `#section-id` in the address still opens the right tab. Overview gained the
+mockup's six tiles from `metricsOverview`; the status line reads bind address and port from
+`networkGet`. The tab strip started as `admin-tabs` in the hub and became `ToolTabs` in aqua-ui
+during Step B, since the companion wears the same strip.
+
+Departures, recorded as DEC-017: the first-run gate is a screen, not a banner over a disabled
+interface (the server refuses every gated route until the password changes, so a live-looking
+interface behind it would be a picture of one); the invite table shows who/state, not codes; the
+mockup's `warning` #d99a1e yields to `--aqua-warning`; `header*`, `warningBg`, `warningEdge` joined
+`tokens.json`.
+
+Measured at the commit: hub e2e 16, hub a11y 9, hub DOM 10; full `pnpm verify` green except the
+two `*-up-to-date` gates, which reported the regenerated `now-playing.html` and styleguide as
+uncommitted diffs — committing them is the fix, and was.
+
+## Step B — Windows companion (done)
+
+Four tabs on the mockup's window: Library (folders by kind — Saved Music / TV / Movies — and the
+music list), Live TV, Remote (hub connection, transfers), Settings (downloaders, general, network,
+backup, storage, about). `ToolTabs` moved into aqua-ui with its styles in `aqua-window.css`; the
+hub now uses the same component. The companion had never loaded `aqua-window.css` at all — its
+chrome was unstyled — fixed with the same alias and import the hub has.
+
+- **Backup is real** (`src/main/backup.ts`): settings (folder, include, schedule, keep-count),
+  estimate through `createEstimator` from `local-helper/src/measure.ts` on the companion's own
+  folders, an archive as a dated folder (`data.json` + copied folders, hard links linked once),
+  listing, restore from an archive or a file, keep-count pruning, a schedule that ticks while the
+  app is open. Sizes are decimal. Back Up Now is disabled with the reason when it cannot run.
+- **The helper is embedded** (`src/main/helper.ts`): `startHelper` from `@now-playing/local-helper`
+  with `backup: { folders, backupDir }` from the same settings, token kept under `safeStorage`,
+  port a preference (default 17342). `tests/integration/backup.test.ts` asserts the companion's
+  estimate and `GET /helper/v1/backup/estimate` return the same bytes and files for the same
+  temp folders — the prompt's "agree by construction" test.
+- The estimator now sums several folders per part (`measure.ts`), leaving a part out if any of
+  its folders could not be finished; one new helper test.
+- Folders have a kind (`music`|`tv`|`movies`, migration v2); TV and movie folders are kept and
+  backed up, not indexed.
+- Live TV: no data exists in the repo, so the tab says so (DEC-018). No sample channels anywhere.
+- Not done from the mockup: the Remote tab's "Pair a device" code and "how devices may connect"
+  are AWSP pairing — Step D. Downloads preferences (audio format, video quality, speed limit) have
+  no main-process behaviour behind them yet and were not drawn as if they did.
+
+Measured: companion integration 20 (main process) + 10 (backup) + existing; DOM 7; helper 7 on the
+estimate route. `pnpm build:windows` green; the built app was launched through Playwright's
+Electron driver and each tab screenshotted with the embedded helper running on 17342.

@@ -15,7 +15,7 @@ let root: string;
 let helper: Helper;
 let clock: { now: number; stepPerRead: number };
 
-async function start(backup: { folders: Record<string, string>; backupDir: string | null; budgetMs?: number }): Promise<void> {
+async function start(backup: { folders: Record<string, string | string[]>; backupDir: string | null; budgetMs?: number }): Promise<void> {
   helper = await startHelper({
     port: 0,
     version: '1.0.0-test',
@@ -64,6 +64,18 @@ describe('backup estimate', () => {
     expect(body.destination?.path).toBe(join(root, 'backups'));
     expect(body.destination?.freeBytes).toBeGreaterThan(0);
     expect(body.destination?.totalBytes).toBeGreaterThanOrEqual(body.destination!.freeBytes!);
+  });
+
+  it('sums a part kept in several folders, and leaves the part out if any one of them could not be finished', async () => {
+    await start({ folders: { music: [join(root, 'music'), join(root, 'tv')] }, backupDir: null });
+    let body = HelperBackupEstimate.parse(await (await ask('?parts=music')).json());
+    expect(body.parts.music).toMatchObject({ bytes: 1800, files: 3 });
+    await helper.close();
+
+    await start({ folders: { music: [join(root, 'music'), join(root, 'not-there')] }, backupDir: null });
+    body = HelperBackupEstimate.parse(await (await ask('?parts=music')).json());
+    // 1500 would be a number for "music" that is smaller than the music; the honest answer is none.
+    expect(body.parts.music).toBeUndefined();
   });
 
   it('skips symbolic links', async () => {

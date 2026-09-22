@@ -13,6 +13,7 @@ const alias = {
   // Listed before the bare package alias: string aliases match by prefix, so without this the
   // stylesheet path would be rewritten into "…/src/index.ts/now-playing.css".
   '@now-playing/aqua-ui/now-playing.css': path('./packages/aqua-ui/src/styles/now-playing.css'),
+  '@now-playing/aqua-ui/window.css': path('./packages/aqua-ui/src/styles/aqua-window.css'),
   '@now-playing/aqua-ui': path('./packages/aqua-ui/src/index.ts'),
   // Supplied by `music-player/vite-plugins/worklet.ts` in a real build. Vitest runs no bundler
   // plugins, so it resolves to the same "no asset" answer the single-file build gives.

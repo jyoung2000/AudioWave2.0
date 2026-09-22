@@ -48,7 +48,7 @@ export interface HelperOptions {
   /** How long a finished job and its files are kept. Default one hour. */
   finishedTtlMs?: number;
   /** The folders a backup can include, and where backups go. Unset folders are simply not measured. */
-  backup?: { folders: Partial<Record<BackupPart, string | null | undefined>>; backupDir: string | null; budgetMs?: number; now?: () => number };
+  backup?: { folders: Partial<Record<BackupPart, string | readonly string[] | null | undefined>>; backupDir: string | null; budgetMs?: number; now?: () => number };
 }
 
 export interface Helper {

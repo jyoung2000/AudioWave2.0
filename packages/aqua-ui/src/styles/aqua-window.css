@@ -517,3 +517,85 @@ button.aqua-traffic__light {
 }
 
 .aqua-window[data-active="false"] .aqua-bottom-bar { background: linear-gradient(#ededed, #dadada); border-top-color: #b3b3b3; }
+
+/* --------------------------------------------------------------------------
+   Tool tabs (the Airwave window mockups): a glyph over a label on the chrome
+   sheet, the selected one pressed into it. Used by the hub admin GUI and the
+   Windows companion; the player is a page and has the section strip instead.
+   -------------------------------------------------------------------------- */
+.aqua-tool-tabs {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  padding: 0 12px 6px;
+}
+
+.aqua-tool-tab {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  min-width: 66px;
+  padding: 3px 8px 4px;
+  color: #4c5054;
+  font: var(--aqua-weight-emphasized) var(--aqua-font-small) / 1.3 var(--aqua-font);
+  text-shadow: 0 1px 0 rgb(255 255 255 / 70%);
+  background: none;
+  border: 0;
+  border-radius: 5px;
+  cursor: default;
+  appearance: none;
+}
+
+.aqua-tool-tab__icon {
+  display: block;
+  width: 26px;
+  height: 26px;
+  color: #4c637c;
+}
+
+.aqua-tool-tab[aria-selected='true'] {
+  background: rgb(0 0 0 / 15%);
+  box-shadow: inset 0 1px 3px rgb(0 0 0 / 28%), 0 1px 0 rgb(255 255 255 / 55%);
+}
+
+.aqua-tool-tab:not([aria-selected='true']):hover { background: rgb(0 0 0 / 6%); }
+.aqua-tool-tab:active { background: rgb(0 0 0 / 20%); }
+
+/* The count worn by the tab that needs attention. */
+.aqua-tool-tab__badge {
+  position: absolute;
+  top: -3px;
+  right: 8px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  color: #fff;
+  font-size: var(--aqua-font-label);
+  line-height: 16px;
+  text-align: center;
+  text-shadow: none;
+  background: linear-gradient(#f07a74, var(--aqua-danger));
+  border-radius: 8px;
+  box-shadow: 0 1px 1px rgb(0 0 0 / 35%), inset 0 0 0 1px rgb(255 255 255 / 60%);
+}
+
+@media (max-width: 640px) {
+  .aqua-tool-tabs {
+    justify-content: flex-start;
+    gap: 2px;
+    padding-inline: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    scroll-snap-type: x proximity;
+  }
+
+  .aqua-tool-tabs::-webkit-scrollbar { display: none; }
+
+  .aqua-tool-tab {
+    flex: 0 0 auto;
+    min-width: 64px;
+    font-size: var(--aqua-font-label);
+    scroll-snap-align: center;
+  }
+}

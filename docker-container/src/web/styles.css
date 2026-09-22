@@ -246,68 +246,6 @@ body {
   box-shadow: none;
 }
 
-.admin-tabs {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  padding: 0 12px 6px;
-}
-
-.admin-tab {
-  position: relative;
-  display: grid;
-  gap: 2px;
-  justify-items: center;
-  min-width: 66px;
-  padding: 3px 8px 4px;
-  color: #4c5054;
-  font: var(--aqua-weight-emphasized) var(--aqua-font-small) / 1.3 var(--aqua-font);
-  text-shadow: 0 1px 0 rgb(255 255 255 / 70%);
-  background: none;
-  border: 0;
-  border-radius: 5px;
-  cursor: default;
-  appearance: none;
-}
-
-.admin-tab__icon {
-  display: block;
-  width: 26px;
-  height: 26px;
-  color: #4c637c;
-}
-
-.admin-tab[aria-selected='true'] {
-  background: rgb(0 0 0 / 15%);
-  box-shadow: inset 0 1px 3px rgb(0 0 0 / 28%), 0 1px 0 rgb(255 255 255 / 55%);
-}
-
-.admin-tab:not([aria-selected='true']):hover {
-  background: rgb(0 0 0 / 6%);
-}
-
-.admin-tab:active {
-  background: rgb(0 0 0 / 20%);
-}
-
-/* The count of alerts, worn by the Overview tab as the mockup's System tab wore its gate. */
-.admin-tab__badge {
-  position: absolute;
-  top: -3px;
-  right: 8px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  color: #fff;
-  font-size: var(--aqua-font-label);
-  line-height: 16px;
-  text-align: center;
-  text-shadow: none;
-  background: linear-gradient(#f07a74, var(--aqua-danger));
-  border-radius: 8px;
-  box-shadow: 0 1px 1px rgb(0 0 0 / 35%), inset 0 0 0 1px rgb(255 255 255 / 60%);
-}
-
 .admin-pane {
   flex: 1 1 auto;
   min-height: 0;
@@ -420,26 +358,6 @@ body {
 }
 
 @media (max-width: 640px) {
-  .admin-tabs {
-    justify-content: flex-start;
-    gap: 2px;
-    padding-inline: 8px;
-    overflow-x: auto;
-    scrollbar-width: none;
-    scroll-snap-type: x proximity;
-  }
-
-  .admin-tabs::-webkit-scrollbar {
-    display: none;
-  }
-
-  .admin-tab {
-    flex: 0 0 auto;
-    min-width: 64px;
-    font-size: var(--aqua-font-label);
-    scroll-snap-align: center;
-  }
-
   .admin-tiles {
     grid-template-columns: 1fr 1fr;
   }

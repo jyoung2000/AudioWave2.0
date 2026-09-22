@@ -400,7 +400,6 @@
       "guideAnchor": "overlays",
       "authority": "adopted"
     },
-
     {
       "id": "hub-login",
       "kind": "screen",
@@ -692,14 +691,13 @@
       "authority": "unresolved",
       "decision": "DEC-008"
     },
-
     {
       "id": "companion-folders",
       "kind": "screen",
       "product": "companion",
       "platform": "windows",
       "title": "Folders",
-      "entry": "source list → Library → Folders",
+      "entry": "Library tab → Folders (Saved Music · Saved TV · Saved Movies)",
       "sourcePaths": ["windows-companion/src/renderer/views/Folders.tsx"],
       "components": ["AquaWindow", "AquaTable", "StatusDot", "EmptyState"],
       "states": ["no folders", "watching", "drive not connected", "remove (confirm)"],
@@ -714,7 +712,7 @@
       "product": "companion",
       "platform": "windows",
       "title": "Music",
-      "entry": "source list → Library → Music",
+      "entry": "Library tab → Music",
       "sourcePaths": ["windows-companion/src/renderer/views/Library.tsx"],
       "components": ["AquaTable", "SearchField", "EmptyState"],
       "states": ["nothing indexed", "no matches", "tracks"],
@@ -728,7 +726,7 @@
       "product": "companion",
       "platform": "windows",
       "title": "Connection",
-      "entry": "source list → Hub → Connection",
+      "entry": "Remote tab → Hub connection",
       "sourcePaths": ["windows-companion/src/renderer/views/Hub.tsx"],
       "components": ["Panel", "TextField", "Button", "KeyValueList"],
       "states": [
@@ -748,7 +746,7 @@
       "product": "companion",
       "platform": "windows",
       "title": "Transfers",
-      "entry": "source list → Hub → Transfers",
+      "entry": "Remote tab → Transfers",
       "sourcePaths": ["windows-companion/src/renderer/views/Transfers.tsx"],
       "components": ["AquaTable", "ProgressBar", "EmptyState"],
       "states": ["nothing transferring (paired / not paired)", "uploading", "cancelled", "failed"],
@@ -763,10 +761,18 @@
       "product": "companion",
       "platform": "windows",
       "title": "Backup",
-      "entry": "source list → This computer → Backup",
+      "entry": "Settings tab → Backup",
       "sourcePaths": ["windows-companion/src/renderer/views/Backup.tsx"],
-      "components": ["Panel", "Button"],
-      "states": ["export", "import (validated)", "invalid backup refused"],
+      "components": ["Panel", "Checkbox", "PopUpMenu", "ProgressBar", "AquaTable", "Button"],
+      "states": [
+        "no folder chosen (Back Up Now disabled, reason shown)",
+        "measuring",
+        "fits / does not fit (space bar: used · this backup · free)",
+        "running with progress",
+        "archives listed",
+        "restore (confirm)",
+        "delete (confirm)"
+      ],
       "rules": ["UX-SAFE-001", "VOICE-002"],
       "guideAnchor": "screens",
       "authority": "adopted"
@@ -777,13 +783,46 @@
       "product": "companion",
       "platform": "windows",
       "title": "About",
-      "entry": "source list → This computer → About",
+      "entry": "Settings tab → About",
       "sourcePaths": ["windows-companion/src/renderer/views/About.tsx"],
       "components": ["Panel", "KeyValueList"],
       "states": ["loaded"],
       "rules": ["VOICE-003"],
       "guideAnchor": "screens",
       "authority": "adopted"
+    },
+    {
+      "id": "companion-live-tv",
+      "kind": "screen",
+      "product": "companion",
+      "platform": "windows",
+      "guideAnchor": "screens",
+      "authority": "adopted",
+      "title": "Live TV",
+      "entry": "Live TV tab",
+      "sourcePaths": ["windows-companion/src/renderer/views/LiveTv.tsx"],
+      "components": ["Panel", "StatusDot"],
+      "states": ["not available yet (amber, no sample channels)", "TV folders listed"],
+      "rules": ["UX-PRIN-001"]
+    },
+    {
+      "id": "companion-settings",
+      "kind": "screen",
+      "product": "companion",
+      "platform": "windows",
+      "guideAnchor": "screens",
+      "authority": "adopted",
+      "title": "Settings",
+      "entry": "Settings tab → Settings",
+      "sourcePaths": ["windows-companion/src/renderer/views/Settings.tsx"],
+      "components": ["Panel", "Checkbox", "KeyValueList", "StatusDot", "TextField"],
+      "states": [
+        "downloaders found / missing (amber, with what to install)",
+        "helper running / not running with reason",
+        "port invalid",
+        "token shown / hidden"
+      ],
+      "rules": ["UX-PRIN-001", "UX-FEED-001"]
     },
     {
       "id": "companion-notice-bar",
@@ -799,7 +838,6 @@
       "guideAnchor": "screens",
       "authority": "adopted"
     },
-
     {
       "id": "discord-replies",
       "kind": "conversation",
@@ -843,7 +881,6 @@
       "authority": "adopted",
       "decision": "DEC-005"
     },
-
     {
       "id": "android-shell",
       "kind": "shell",

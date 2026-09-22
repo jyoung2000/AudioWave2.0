@@ -11,13 +11,14 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage, session, shell,
 import { existsSync, mkdirSync } from 'node:fs';
 import { writeFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { z } from 'zod';
 import { CONTRACTS_VERSION, EqPreset, Playlist, WS_PROTOCOL_VERSION } from '@now-playing/contracts';
 import { uuidv7 } from '@now-playing/domain';
-import { BackupSummary, IPC, Preferences, type AppInfo, type IpcChannel, type LibraryFolder, type PreferencesPatch, type ScanProgress, type TransferProgress } from '../shared/ipc.js';
+import { IPC, Preferences, type AppInfo, type BackupSettingsPatch, type FolderKind, type IpcChannel, type LibraryFolder, type PreferencesPatch, type ScanProgress, type TransferProgress } from '../shared/ipc.js';
 import { absolutePathOf, scanFolder } from './library.js';
 import { FolderWatcher } from './watcher.js';
 import { HubClient } from './hub.js';
+import { BackupManager } from './backup.js';
+import { EmbeddedHelper } from './helper.js';
 import { appUrlGuard, applySessionSecurity, applyWindowSecurity, enforceSingleInstance, guardWebContents, isTrustedSender, openExternally } from './security.js';
 import { CompanionStore, openCompanionDb } from './store.js';
 
@@ -34,6 +35,8 @@ let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let store: CompanionStore | null = null;
 let hub: HubClient | null = null;
+let backups: BackupManager | null = null;
+let helper: EmbeddedHelper | null = null;
 let scanning: AbortController | null = null;
 let watcher: FolderWatcher | null = null;
 let isQuitting = false;
@@ -77,10 +80,17 @@ function preferences(): Preferences {
 }
 
 function savePreferences(next: Preferences): Preferences {
+  const before = preferences();
   store!.set(PREFERENCES_KEY, next, new Date().toISOString());
   preferencesCache = next;
   syncWatchers();
+  if (before.helperPort !== next.helperPort) void helper?.restart(next.helperPort);
   return next;
+}
+
+/** The helper's estimate route measures the companion's folders: restarted when they change. */
+function syncHelperFolders(): void {
+  if (helper && store?.isOpen) void helper.restart(preferences().helperPort);
 }
 
 /**
@@ -271,16 +281,6 @@ async function runUpload(id: string, trackId: string): Promise<void> {
   pruneTransfers();
 }
 
-/* ------------------------------------------------------------------ backup */
-
-const BackupFile = z.object({
-  schemaVersion: z.literal(1),
-  exportedAt: z.iso.datetime({ offset: true }).optional(),
-  playlists: z.array(Playlist).max(100_000).default([]),
-  presets: z.array(EqPreset).max(10_000).default([]),
-  counts: BackupSummary.shape.contents.optional(),
-});
-
 /* ------------------------------------------------------------ IPC handlers */
 
 /**
@@ -330,6 +330,7 @@ function registerHandlers(): void {
     if (patch.watchFolders !== undefined) next.watchFolders = patch.watchFolders;
     if (patch.autoSync !== undefined) next.autoSync = patch.autoSync;
     if (patch.theme !== undefined) next.theme = patch.theme;
+    if (patch.helperPort !== undefined) next.helperPort = patch.helperPort;
     savePreferences(next);
     app.setLoginItemSettings({ openAtLogin: next.launchAtLogin });
     return next;
@@ -346,22 +347,27 @@ function registerHandlers(): void {
 
   handle('library:folders', () => ({ items: store!.listFolders((path) => existsSync(path)) }));
 
-  handle('library:add-folder', async () => {
-    const result = await dialog.showOpenDialog(mainWindow!, { title: 'Choose a music folder', properties: ['openDirectory'], buttonLabel: 'Add folder' });
+  handle('library:add-folder', async (request) => {
+    const kind = (request as { kind: FolderKind }).kind;
+    const titles: Record<FolderKind, string> = { music: 'Choose a music folder', tv: 'Choose a TV folder', movies: 'Choose a movies folder' };
+    const result = await dialog.showOpenDialog(mainWindow!, { title: titles[kind], properties: ['openDirectory'], buttonLabel: 'Add folder' });
     if (result.canceled || !result.filePaths[0]) return { folder: null, reason: null };
     const path = result.filePaths[0];
     if (store!.findFolderByPath(path)) return { folder: null, reason: 'That folder has already been added.' };
-    const folder = { id: uuidv7(), path, displayName: path.split(/[\\/]/).filter(Boolean).pop() ?? path, now: new Date().toISOString() };
+    const folder = { id: uuidv7(), path, displayName: path.split(/[\\/]/).filter(Boolean).pop() ?? path, kind, now: new Date().toISOString() };
     store!.addFolder(folder);
-    void startScan(folder.id);
+    // Only music is indexed; TV and movie folders are kept, watched for the backup, and left alone.
+    if (kind === 'music') void startScan(folder.id);
     syncWatchers();
-    const added: LibraryFolder = { id: folder.id, path, displayName: folder.displayName, watch: true, trackCount: 0, sizeBytes: 0, lastScanAt: null, lastScanError: null, available: true };
+    syncHelperFolders();
+    const added: LibraryFolder = { id: folder.id, path, displayName: folder.displayName, watch: true, kind, trackCount: 0, sizeBytes: 0, lastScanAt: null, lastScanError: null, available: true };
     return { folder: added, reason: null };
   });
 
   handle('library:remove-folder', (request) => {
     store!.removeFolder((request as { folderId: string }).folderId, new Date().toISOString());
     syncWatchers();
+    syncHelperFolders();
     return { ok: true };
   });
 
@@ -420,61 +426,47 @@ function registerHandlers(): void {
     return { ok: true };
   });
 
-  handle('backup:create', async () => {
-    const result = await dialog.showSaveDialog(mainWindow!, { title: 'Save a backup', defaultPath: join(app.getPath('documents'), `now-playing-companion-${new Date().toISOString().slice(0, 10)}.json`), filters: [{ name: 'JSON', extensions: ['json'] }] });
-    if (result.canceled || !result.filePath) return { backup: null, reason: null };
-    const counts = store!.counts();
-    const payload = {
-      schemaVersion: 1,
-      exportedAt: new Date().toISOString(),
-      // Folders are exported by name only: an absolute path is this machine's business, and a
-      // backup restored elsewhere would be wrong anyway.
-      folders: store!.listFolders(() => true).map((f) => ({ displayName: f.displayName, trackCount: f.trackCount })),
-      playlists: store!.listPlaylists(),
-      presets: store!.listPresets(),
-      counts,
-    };
-    const text = JSON.stringify(payload, null, 2);
-    await writeFile(result.filePath, text, 'utf8');
-    return { backup: { path: result.filePath, createdAt: payload.exportedAt, sizeBytes: Buffer.byteLength(text), contents: counts }, reason: null };
+  handle('backup:settings:get', () => backups!.settings());
+  handle('backup:settings:set', async (request) => {
+    const next = backups!.update(request as BackupSettingsPatch);
+    // A smaller kept count applies at once, not after the next backup.
+    await backups!.prune();
+    return next;
   });
 
-  handle('backup:restore', async () => {
+  handle('backup:pick-dir', async () => {
+    const result = await dialog.showOpenDialog(mainWindow!, { title: 'Where should backups go?', properties: ['openDirectory', 'createDirectory'], buttonLabel: 'Use this folder' });
+    if (result.canceled || !result.filePaths[0]) return { settings: backups!.settings(), reason: null };
+    const settings = backups!.setDir(result.filePaths[0]);
+    syncHelperFolders();
+    return { settings, reason: null };
+  });
+
+  handle('backup:estimate', () => backups!.estimate());
+  handle('backup:list', async () => ({ items: await backups!.list() }));
+  handle('backup:create', () => backups!.create());
+  handle('backup:remove', (request) => backups!.remove((request as { id: string }).id));
+
+  handle('backup:restore', async (request) => {
+    const id = (request as { id?: string }).id;
+    if (id) return backups!.restoreArchive(id);
     const result = await dialog.showOpenDialog(mainWindow!, { title: 'Choose a backup', properties: ['openFile'], filters: [{ name: 'JSON', extensions: ['json'] }] });
     if (result.canceled || !result.filePaths[0]) return { restored: false, reason: null, summary: null };
+    let text: string;
     try {
-      const text = await readFile(result.filePaths[0], 'utf8');
-      const raw = JSON.parse(text) as { schemaVersion?: unknown } | null;
-      if (raw?.schemaVersion !== 1) return { restored: false, reason: `That backup is version ${String(raw?.schemaVersion ?? 'unknown')}; this app reads version 1.`, summary: null };
-      // Everything is checked before anything is written: a backup is restored whole or not at all.
-      const parsed = BackupFile.safeParse(raw);
-      if (!parsed.success) {
-        const issues = parsed.error.issues.slice(0, 3).map((i) => `${i.path.join('.') || 'file'}: ${i.message}`);
-        return { restored: false, reason: `That backup is damaged or incomplete, so nothing was restored (${issues.join('; ')}).`, summary: null };
-      }
-      const payload = parsed.data;
-      const now = new Date().toISOString();
-      store!.transaction(() => {
-        // A restored record is stamped now so it syncs as a change, unless this computer already
-        // has the same or a newer version of it.
-        for (const playlist of payload.playlists) {
-          const local = store!.syncedState('playlists', playlist.id);
-          if (local && !local.deletedAt && Date.parse(local.updatedAt) >= Date.parse(playlist.updatedAt)) continue;
-          store!.putSynced('playlists', playlist.id, { ...playlist, updatedAt: now, deletedAt: null }, now, null);
-        }
-        for (const preset of payload.presets) {
-          const local = store!.syncedState('eq_presets', preset.id);
-          if (local && !local.deletedAt && Date.parse(local.updatedAt) >= Date.parse(preset.updatedAt)) continue;
-          store!.putSynced('eq_presets', preset.id, { ...preset, updatedAt: now, deletedAt: null }, now, null);
-        }
-      });
-      // Folders are not restored: they name paths that may not exist on this machine.
-      notice('info', 'Playlists and presets were restored. Music folders are not restored from a backup — add them again, since their locations are specific to each computer.');
-      return { restored: true, reason: null, summary: { path: result.filePaths[0], createdAt: payload.exportedAt ?? now, sizeBytes: Buffer.byteLength(text), contents: payload.counts ?? store!.counts() } };
+      text = await readFile(result.filePaths[0], 'utf8');
     } catch (err) {
       return { restored: false, reason: `That file could not be read as a backup: ${err instanceof Error ? err.message : String(err)}`, summary: null };
     }
+    const restored = backups!.applyFile(text, result.filePaths[0]);
+    // Folders are not restored: they name paths that may not exist on this machine.
+    if (restored.restored) notice('info', 'Playlists and presets were restored. Music folders are not restored from a backup — add them again, since their locations are specific to each computer.');
+    return restored;
   });
+
+  handle('helper:status', () => helper!.settledStatus());
+  handle('helper:check-tools', () => helper!.checkTools());
+  handle('helper:token', () => ({ token: helper!.token() }));
 
   handle('backup:export-playlists', async () => {
     const playlists = store!.listPlaylists();
@@ -512,11 +504,31 @@ if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow())))
       appVersion: app.getVersion(),
       onNotice: (message) => notice('warning', message),
     });
+    backups = new BackupManager({
+      store,
+      readSettings: () => ({ preferences: preferences() }),
+      writeSettings: (settings) => {
+        const parsed = Preferences.safeParse((settings as { preferences?: unknown }).preferences ?? {});
+        if (parsed.success) savePreferences({ ...parsed.data, launchAtLogin: preferences().launchAtLogin });
+      },
+      onProgress: (progress) => send('event:backup-progress', progress),
+      onNotice: notice,
+    });
+    helper = new EmbeddedHelper({
+      store,
+      secretBox: safeStorage,
+      version: app.getVersion(),
+      dataDir: dataDir(),
+      log: (line) => console.info(`[helper] ${line}`),
+      backup: () => ({ folders: backups!.folders(), backupDir: backups!.settings().dir }),
+    });
     applySessionSecurity(session.defaultSession, DEV_SERVER_URL);
     registerHandlers();
     mainWindow = createWindow();
     createTray();
     void hub.refresh();
+    void helper.start(preferences().helperPort);
+    backups.start();
     if (preferences().autoSync) void hub.sync();
     // Folders added in an earlier session are watched again from start-up, not from the first
     // time something touches the preferences.
@@ -538,6 +550,8 @@ if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow())))
 
   // The database closes last: windows are closed (and their close handlers have run) by now.
   app.on('will-quit', () => {
+    backups?.stop();
+    void helper?.stop();
     void watcher?.close();
     watcher = null;
     store?.close();

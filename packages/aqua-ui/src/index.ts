@@ -43,6 +43,7 @@ export * from './components/SourceList.js';
 export * from './components/AquaTable.js';
 export * from './components/ArtworkGrid.js';
 export * from './components/Tabs.js';
+export * from './components/ToolTabs.js';
 export * from './components/Marquee.js';
 export * from './components/Sheet.js';
 export * from './components/Menu.js';

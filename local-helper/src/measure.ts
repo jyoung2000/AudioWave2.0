@@ -92,7 +92,8 @@ export async function driveSpace(dir: string): Promise<{ freeBytes: number | nul
 }
 
 export interface EstimatorOptions {
-  folders: Partial<Record<BackupPart, string | null | undefined>>;
+  /** One folder per part, or several: a companion may keep music in more than one place. */
+  folders: Partial<Record<BackupPart, string | readonly string[] | null | undefined>>;
   backupDir: string | null;
   /** One request's whole budget. Default 20 s. */
   budgetMs?: number;
@@ -114,17 +115,28 @@ export function createEstimator(options: EstimatorOptions): (parts: readonly Bac
     const deadline = now() + (options.budgetMs ?? 20_000);
     const out: BackupEstimate = { parts: {}, destination: null };
     for (const part of parts) {
-      const folder = options.folders[part];
-      if (!folder) continue;
-      const cached = cache.get(folder);
-      if (cached && now() - cached.at < (options.cacheMs ?? 10 * 60_000)) {
-        out.parts[part] = cached.value;
-        continue;
+      const configured = options.folders[part];
+      const folders = (typeof configured === 'string' ? [configured] : (configured ?? [])).filter(Boolean);
+      if (!folders.length) continue;
+      // A part is the sum of its folders, and it is reported only when every one of them was
+      // measured: a partial sum would be a smaller number than the truth, presented as the truth.
+      const total: FolderMeasure = { bytes: 0, files: 0, measuredAt: new Date(now()).toISOString() };
+      let complete = true;
+      for (const folder of folders) {
+        const cached = cache.get(folder);
+        let measured = cached && now() - cached.at < (options.cacheMs ?? 10 * 60_000) ? cached.value : null;
+        if (!measured) {
+          measured = await measureFolder(folder, { deadline, now });
+          if (measured) cache.set(folder, { at: now(), value: measured });
+        }
+        if (!measured) {
+          complete = false;
+          break;
+        }
+        total.bytes += measured.bytes;
+        total.files += measured.files;
       }
-      const measured = await measureFolder(folder, { deadline, now });
-      if (!measured) continue;
-      cache.set(folder, { at: now(), value: measured });
-      out.parts[part] = measured;
+      if (complete) out.parts[part] = total;
     }
     if (options.backupDir) out.destination = { path: options.backupDir, ...(await driveSpace(options.backupDir)) };
     return out;

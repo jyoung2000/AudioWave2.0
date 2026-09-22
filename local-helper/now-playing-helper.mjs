@@ -21292,17 +21292,26 @@ function createEstimator(options) {
     const deadline = now() + (options.budgetMs ?? 2e4);
     const out = { parts: {}, destination: null };
     for (const part of parts) {
-      const folder = options.folders[part];
-      if (!folder) continue;
-      const cached2 = cache.get(folder);
-      if (cached2 && now() - cached2.at < (options.cacheMs ?? 10 * 6e4)) {
-        out.parts[part] = cached2.value;
-        continue;
+      const configured = options.folders[part];
+      const folders = (typeof configured === "string" ? [configured] : configured ?? []).filter(Boolean);
+      if (!folders.length) continue;
+      const total = { bytes: 0, files: 0, measuredAt: new Date(now()).toISOString() };
+      let complete = true;
+      for (const folder of folders) {
+        const cached2 = cache.get(folder);
+        let measured = cached2 && now() - cached2.at < (options.cacheMs ?? 10 * 6e4) ? cached2.value : null;
+        if (!measured) {
+          measured = await measureFolder(folder, { deadline, now });
+          if (measured) cache.set(folder, { at: now(), value: measured });
+        }
+        if (!measured) {
+          complete = false;
+          break;
+        }
+        total.bytes += measured.bytes;
+        total.files += measured.files;
       }
-      const measured = await measureFolder(folder, { deadline, now });
-      if (!measured) continue;
-      cache.set(folder, { at: now(), value: measured });
-      out.parts[part] = measured;
+      if (complete) out.parts[part] = total;
     }
     if (options.backupDir) out.destination = { path: options.backupDir, ...await driveSpace(options.backupDir) };
     return out;

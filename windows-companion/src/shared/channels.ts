@@ -36,15 +36,25 @@ export const IPC_CHANNELS = [
   'transfers:send',
   'transfers:cancel',
 
+  'backup:settings:get',
+  'backup:settings:set',
+  'backup:pick-dir',
+  'backup:estimate',
+  'backup:list',
   'backup:create',
   'backup:restore',
+  'backup:remove',
   'backup:export-playlists',
+
+  'helper:status',
+  'helper:check-tools',
+  'helper:token',
 
 ] as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[number];
 
 /** Events the main process pushes to the renderer. Same rule: an event not listed does not exist. */
-export const IPC_EVENT_NAMES = ['event:scan-progress', 'event:hub-status', 'event:transfer-progress', 'event:notice'] as const;
+export const IPC_EVENT_NAMES = ['event:scan-progress', 'event:hub-status', 'event:transfer-progress', 'event:backup-progress', 'event:notice'] as const;
 
 export type IpcEvent = (typeof IPC_EVENT_NAMES)[number];

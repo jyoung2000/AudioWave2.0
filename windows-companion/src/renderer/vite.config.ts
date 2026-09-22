@@ -27,6 +27,8 @@ export default defineConfig({
     alias: {
       '@now-playing/contracts': workspace('contracts'),
       '@now-playing/domain': workspace('domain'),
+      // The stylesheet entry must precede the bare package alias: string aliases match by prefix.
+      '@now-playing/aqua-ui/window.css': fileURLToPath(new URL('../../../packages/aqua-ui/src/styles/aqua-window.css', import.meta.url)),
       '@now-playing/aqua-ui': workspace('aqua-ui'),
     },
   },
