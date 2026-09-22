@@ -1,17 +1,21 @@
 /**
  * The helper, from the browser's side.
  *
- * The unit and integration tests prove the helper's own behaviour. This proves the claim the
- * *product* makes: run one program, and the player opens with the tools wired up — detected, named
- * in Settings, and able to put a real file into the library without anything being configured.
+ * The helper's own tests prove its behaviour. This proves the claim the product makes: run one
+ * program, open the player it serves, and the tools are found with nothing configured — named in
+ * Settings ▸ Sources ▸ Connections — and a link can become a real track in the library, played from
+ * this device, once the person has said why they may have the file.
  *
- * yt-dlp is stubbed, as it is in the helper's own tests, and for the same reason: the contract
- * worth testing is the one between this app and a tool that writes a file where it was told to, not
- * whether a particular video still exists. The stub copies a real fixture, so the track that lands
- * is decoded, tagged and played exactly like one off a disk — which is the part that would break if
- * the wiring were wrong.
+ * yt-dlp is stubbed, as it is in the helper's own tests: the contract worth testing is the one
+ * between this app and a tool that writes a file where it was told to. The stub copies a real
+ * fixture, so the track that lands is decoded, tagged and played exactly like one off a disk.
+ *
+ * Rewritten for the shell (DEC-019): the React "Add from a link" sheet and the platform panel are
+ * gone. A link row now reaches the library through the shell's search (covered by np/func.spec.ts);
+ * here it is added through the same `library:add` seam, and fetched through the transport's
+ * Download key, which is what the helper made real.
  */
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { chmodSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -39,7 +43,6 @@ import { join } from 'node:path';
 const args = process.argv.slice(2);
 if (args[0] === '--version') { process.stdout.write('2026.09.01\\n'); process.exit(0); }
 const paths = args[args.indexOf('--paths') + 1];
-process.stdout.write('[download]  50.0% of 1.00MiB\\n');
 process.stdout.write('[download] 100.0% of 1.00MiB\\n');
 copyFileSync(${JSON.stringify(source)}, join(paths, 'Fetched Song.wav'));
 process.exit(0);
@@ -57,11 +60,9 @@ test.beforeAll(async () => {
     [join(REPO, 'local-helper/dist/now-playing-helper.mjs'), '--no-open', '--port', String(PORT), '--app', join(REPO, 'music-player/dist'), '--yt-dlp', stub, '--work-dir', join(scratch, 'work'), '--tools-dir', join(scratch, 'tools')],
     { stdio: 'ignore' },
   );
-  // Poll rather than sleep: the helper is ready when it answers, not after a guessed delay.
   for (let attempt = 0; attempt < 100; attempt += 1) {
     try {
-      const response = await fetch(`${ORIGIN}/helper/v1/health`);
-      if (response.ok) return;
+      if ((await fetch(`${ORIGIN}/helper/v1/health`)).ok) return;
     } catch {
       // Not up yet.
     }
@@ -75,63 +76,50 @@ test.afterAll(() => {
   rmSync(scratch, { recursive: true, force: true });
 });
 
-async function openSettings(page: Page): Promise<void> {
-  await page.getByRole('button', { name: /^Settings —/ }).click();
-  await expect(page.getByRole('heading', { name: 'Settings', level: 2 })).toBeVisible();
-}
-
 test.beforeEach(async ({ page }) => {
   await page.goto(ORIGIN);
-  await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible();
+  await page.waitForFunction(() => window.NP_READY);
+  await page.evaluate(() => window.NP_READY);
 });
 
 test('the player finds the helper that served it, with nothing configured', async ({ page }) => {
-  await openSettings(page);
-  const platforms = page.locator('.aqua-panel').filter({ has: page.locator('.aqua-panel__title', { hasText: 'Platforms' }) });
-  await expect(platforms.getByText('Local helper')).toBeVisible();
-  // The label comes from the backend rather than from the panel, so this is also the assertion that
-  // the panel is reporting what answered rather than describing what it hoped for.
-  await expect(platforms.getByText('A helper, serving this page')).toBeVisible();
-  // The version it reported, not a claim that something called yt-dlp exists somewhere.
-  await expect(platforms.locator('.player-helper-tools')).toContainText('2026.09.01');
-  // FFmpeg is genuinely absent in this environment, and the panel says so rather than hiding it.
-  await expect(platforms.locator('.player-helper-tools')).toContainText('not installed');
+  await page.click('#profile');
+  await page.click('#pt-src');
+  // Connections asked the page's own origin at boot, because the helper put its token in the page.
+  await expect(page.locator('#cfgConnMsg')).toContainText(/Connected/, { timeout: 10_000 });
+  const facts = page.locator('#connAppFacts');
+  await expect(facts).toContainText(ORIGIN);
+  // The version the tool reported, not a claim that something called yt-dlp exists somewhere.
+  await expect(facts).toContainText('yt-dlp 2026.09.01');
+  // FFmpeg is absent here, and the pane says so rather than hiding it.
+  await expect(facts).toContainText('ffmpeg missing');
 });
 
-test('a tool on this machine is reported beside the platform, never instead of its terms', async ({ page }) => {
-  await openSettings(page);
-  const youtube = page.locator('.player-platform').filter({ hasText: 'YouTube' });
-  // This is the line that matters: the tool changes what is possible here, and changes nothing
-  // about what YouTube permits.
-  await expect(youtube).toContainText('Save a file: No');
-  await expect(youtube).toContainText('Your yt-dlp: can reach it');
-  await youtube.getByRole('button', { name: 'Why?' }).click();
-  await expect(youtube).toContainText('Whether you may is between you and this platform');
-});
-
-test('fetching a link puts a real track in the library', async ({ page }) => {
-  await page.getByRole('button', { name: /Add from a link/i }).first().click();
-  await expect(page.getByRole('heading', { name: 'Add from a link' })).toBeVisible();
-
-  // Nothing can be fetched until the link parses and a rights basis is chosen.
-  const fetchButton = page.getByRole('button', { name: 'Fetch', exact: true });
-  await expect(fetchButton).toBeDisabled();
-  await page.getByRole('textbox', { name: 'Link' }).fill('https://www.youtube.com/watch?v=test');
-  await expect(fetchButton).toBeDisabled();
-  await page.getByText('It is mine', { exact: true }).click();
-  await expect(fetchButton).toBeEnabled();
-
-  await fetchButton.click();
-  await expect(page.locator('tbody tr')).toHaveCount(1, { timeout: 30_000 });
-  await expect(page.locator('td.lib-title').first()).toHaveText(/\S/);
-  await expect(page.locator('.np-section-head p')).toContainText('1 track');
+test('fetching a link puts a real track in the library, and it plays from this device', async ({ page }) => {
+  await page.evaluate(() => document.dispatchEvent(new CustomEvent('library:add', { detail: { title: 'A Link', artist: 'Someone', url: 'https://www.youtube.com/watch?v=test', platform: 'YouTube' } })));
+  await page.click('#download');
+  const sheet = page.locator('#npFetch');
+  await expect(sheet).toBeVisible();
+  await expect(sheet.locator('#npFetchState')).toContainText('Using');
+  // Nothing is fetched until the person says why they may have it.
+  await sheet.locator('#npFetchGo').click();
+  await expect(sheet.locator('#npFetchState')).toContainText('Say why you may have this file first');
+  await sheet.getByText('It is mine').click();
+  await sheet.locator('#npFetchGo').click();
+  await expect(sheet).toBeHidden({ timeout: 30_000 });
+  // The link row gave way to the real file, which is now the one playing.
+  await expect.poll(() => page.evaluate(() => window.LIBRARY!.filter((s) => s.local).length), { timeout: 10_000 }).toBe(1);
+  expect(await page.evaluate(() => window.LIBRARY!.some((s) => s.title === 'A Link'))).toBe(false);
+  await expect.poll(() => page.evaluate(() => window.NP_PLAYER!.playing()), { timeout: 10_000 }).toBe(true);
 });
 
 test('a link the helper will not fetch from is refused, with the reason', async ({ page }) => {
-  await page.getByRole('button', { name: /Add from a link/i }).first().click();
-  await page.getByRole('textbox', { name: 'Link' }).fill('https://evil.example/track');
-  await page.getByText('It is mine', { exact: true }).click();
-  await page.getByRole('button', { name: 'Fetch', exact: true }).click();
-  // The refusal comes from the helper and is shown as it was given, not flattened into "failed".
-  await expect(page.locator('.player-notices, .np-notice, [role="status"], [role="alert"]').first()).toContainText(/allowlist/i, { timeout: 15_000 });
+  await page.evaluate(() => document.dispatchEvent(new CustomEvent('library:add', { detail: { title: 'Elsewhere', url: 'https://evil.example/track', platform: 'Web' } })));
+  await page.click('#download');
+  const sheet = page.locator('#npFetch');
+  await sheet.getByText('It is mine').click();
+  await sheet.locator('#npFetchGo').click();
+  // The refusal is the helper's own words, not flattened into "failed".
+  await expect(sheet.locator('#npFetchState')).toContainText(/allow/i, { timeout: 15_000 });
+  await expect(sheet).toBeVisible();
 });

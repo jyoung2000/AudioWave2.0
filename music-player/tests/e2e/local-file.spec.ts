@@ -13,8 +13,11 @@
  * - a classic script inlined into `<head>` ran before `#root` existed.
  *
  * None of them are visible in a served build. They are all visible in the first second here.
+ *
+ * Rewritten for the shell (DEC-019). The React build's "Running from a file" panel, which listed
+ * the features a browser withholds from a local page, has no counterpart in the shell and its two
+ * tests went with it; that is recorded as not done in the plan file.
  */
-import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type ConsoleMessage, type Page } from '@playwright/test';
@@ -62,36 +65,25 @@ test.describe('the file itself', () => {
 });
 
 test.describe('opened from the filesystem', () => {
-  test('renders every section, with no console errors and no request leaving the page', async ({ page }) => {
+  /** The shell, opened as a person opens it, with the bridge's store and library in place. */
+  async function open(page: Page): Promise<void> {
+    await page.goto(FILE_URL);
+    await page.waitForFunction(() => window.NP_READY);
+    await page.evaluate(() => window.NP_READY);
+  }
+
+  test('renders with no console errors and no request leaving the page, Statistics and its 3D views included', async ({ page }) => {
     const seen = watch(page);
-    await page.goto(FILE_URL);
-
-    await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible();
-    const sections = await page.getByRole('option').allTextContents();
-    for (const name of ['Music Library', 'Queue', 'Playlists', 'Listening history']) {
-      expect(sections.some((text) => text.startsWith(name)), `${name} should be in the source list`).toBe(true);
-    }
-
+    await open(page);
+    await expect(page.locator('#libraryRows')).toBeVisible();
+    await expect(page.locator('.player__title')).toBeVisible();
+    // three.js is inside the file: the 3D views draw with no CDN and no chunk beside it.
+    await page.click('#profile');
+    await page.click('#pt-stats');
+    await page.waitForSelector('#pp-stats[data-ready="true"]', { timeout: 20_000 });
+    expect(await page.evaluate(() => Boolean((window as unknown as { THREE?: { OrbitControls?: unknown } }).THREE?.OrbitControls))).toBe(true);
     expect(seen.errors).toEqual([]);
-    // The strongest statement this build makes: opening it contacts nothing.
-    expect(seen.external, 'a local file must not reach the network').toEqual([]);
-  });
-
-  test('every section renders rather than falling back to an error', async ({ page }) => {
-    const seen = watch(page);
-    await page.goto(FILE_URL);
-    for (const name of ['Music Library', 'Queue', 'Playlists', 'Listening history']) {
-      await page.getByRole('option', { name: new RegExp(`^${name}`) }).click();
-      await expect(page.locator('.aqua-content')).not.toHaveText('');
-    }
-    expect(seen.errors).toEqual([]);
-  });
-
-  test('stores its library index in the browser, so it is still there next time', async ({ page }) => {
-    await page.goto(FILE_URL);
-    await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible();
-    const databases = await page.evaluate(async () => (await indexedDB.databases()).map((entry) => entry.name));
-    expect(databases).toContain('now-playing');
+    expect(seen.external, 'nothing may leave a local file').toEqual([]);
   });
 
   test('loads the retune worklet from inside itself', async ({ page }) => {
@@ -119,66 +111,30 @@ test.describe('opened from the filesystem', () => {
 
   test('indexes a real audio file picked from the disk, and remembers it', async ({ page }) => {
     /*
-     * The headline claim of this build is "it plays the music already on your device". Everything
-     * else here checks that the page loads; this checks that it does the thing it is for — reads a
-     * real WAV off the disk, parses its tags with the bundled reader, and keeps it.
+     * The headline claim of this build is "it plays the music already on your device". This
+     * checks that it does the thing it is for — reads a real WAV off the disk through Sources ▸
+     * Music, parses its tags with the bundled reader, and keeps the index in the browser.
      */
     const seen = watch(page);
-    await page.goto(FILE_URL);
-    await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible();
-    await page.getByRole('option', { name: /^Music/ }).click();
+    await open(page);
+    await page.evaluate(() => { location.hash = '#settings/src'; });
+    await expect(page.locator('#pp-src')).toBeVisible();
 
     const fixture = fileURLToPath(new URL('../../../packages/test-fixtures/generated/audio/Marlow & the Tidewater/Quiet Arithmetic/01 Quiet Arithmetic.wav', import.meta.url));
     const chooser = page.waitForEvent('filechooser');
-    await page.getByRole('button', { name: /Choose files instead/i }).click();
+    await page.click('#libAddFiles');
     await (await chooser).setFiles([fixture]);
 
     // The title comes from the file's own tags, read by the reader bundled into this page.
-    await expect(page.getByText('Quiet Arithmetic').first()).toBeVisible({ timeout: 20_000 });
+    await expect.poll(() => page.evaluate(() => window.LIBRARY!.map((s) => s.title)), { timeout: 20_000 }).toContain('Quiet Arithmetic');
+    await expect(page.locator('#libRoots')).toContainText('1 track');
     expect(seen.errors).toEqual([]);
     expect(seen.external, 'reading a local file must not cause a request').toEqual([]);
 
     // And it is in the browser's store, so it is still there after a reload.
     await page.reload();
-    await expect(page.getByText('Quiet Arithmetic').first()).toBeVisible({ timeout: 20_000 });
-  });
-
-  test('tells you which features the browser withholds from a local file', async ({ page }) => {
-    await page.goto(FILE_URL);
-    await page.getByRole('button', { name: /^Settings —/ }).click();
-
-    await expect(page.getByRole('heading', { name: 'Running from a file' })).toBeVisible();
-    // The honest half: what it cannot do, and why, rather than a silent absence.
-    await expect(page.getByText(/cannot be installed — there is no origin to install/i)).toBeVisible();
-    await expect(page.getByText(/Shared listening needs a WebSocket, which a browser refuses to open from a local file/i)).toBeVisible();
-    // And the parts that do work, so the page is not just a list of disappointments.
-    await expect(page.getByText(/Files are read from your disk and played directly/i)).toBeVisible();
-  });
-
-  test('does not show that panel when the very same file is served over http', async ({ page }) => {
-    /*
-     * The panel is about the *origin*, not the build. Serving the identical bytes over http and
-     * finding the panel gone is the only way to show the condition is evaluated at runtime rather
-     * than baked in — and it proves the single-file build is still a normal web page if you ever
-     * want to host it.
-     */
-    const html = readFileSync(HTML_PATH);
-    const server = createServer((_request, response) => {
-      response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-      response.end(html);
-    });
-    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-    const address = server.address();
-    if (typeof address === 'string' || address === null) throw new Error('The test server reported no port');
-
-    try {
-      await page.goto(`http://127.0.0.1:${address.port}/`);
-      await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible();
-      await page.getByRole('button', { name: /^Settings —/ }).click();
-      await expect(page.getByRole('heading', { name: 'Storage' })).toBeVisible();
-      await expect(page.getByRole('heading', { name: 'Running from a file' })).toHaveCount(0);
-    } finally {
-      await new Promise<void>((resolve) => server.close(() => resolve()));
-    }
+    await page.waitForFunction(() => window.NP_READY);
+    await page.evaluate(() => window.NP_READY);
+    expect(await page.evaluate(() => window.LIBRARY!.map((s) => s.title))).toContain('Quiet Arithmetic');
   });
 });

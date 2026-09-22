@@ -1,5 +1,6 @@
 /**
- * Responsiveness, measured rather than eyeballed.
+ * Responsiveness, measured rather than eyeballed — against the shell (DEC-019), whose own viewport
+ * sweep is np/devices.spec.ts; this file holds it to this repo's touch rules (UX-TOUCH-001/002).
  *
  * The player is the same page on a 320px phone and a 1440px desktop, and the
  * design it wears was drawn for the second of those: 11px table text, 18px
@@ -18,10 +19,7 @@
  * button at 22px. A screenshot would not catch either.
  */
 import { test, expect, type Page } from '@playwright/test';
-import { readdirSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-
-const FIXTURES = fileURLToPath(new URL('../../../packages/test-fixtures/generated/audio/Marlow & the Tidewater/Quiet Arithmetic/', import.meta.url));
+import { boot, resetToLibrary, seed, stubOffline, SEED } from './np/_shell.js';
 
 /** The widths that matter: the narrowest phone still sold, a common phone, and a tablet. */
 const TOUCH_WIDTHS = [320, 390, 768];
@@ -29,14 +27,9 @@ const TOUCH_WIDTHS = [320, 390, 768];
 const MIN_TEXT_PX = 12;
 const MIN_TARGET_PX = 44;
 
+/** Real rows, indexed through the app's own import path (the shell has no "Choose files" button in its first screen). */
 async function loadFixtures(page: Page): Promise<void> {
-  const files = readdirSync(FIXTURES)
-    .filter((name) => name.endsWith('.wav'))
-    .map((name) => `${FIXTURES}${name}`);
-  const chooser = page.waitForEvent('filechooser');
-  await page.getByRole('button', { name: /Choose files/i }).first().click();
-  await (await chooser).setFiles(files);
-  await expect(page.getByRole('row').filter({ hasText: 'Quiet Arithmetic' }).first()).toBeVisible({ timeout: 20_000 });
+  await seed(page, SEED.slice(0, 6));
 }
 
 /** Everything visible, measured in the page. Returns plain data so failures name the element. */
@@ -47,7 +40,8 @@ async function measure(page: Page) {
         const s = getComputedStyle(el);
         if (s.display === 'none' || s.visibility === 'hidden' || s.opacity === '0') return false;
         const r = el.getBoundingClientRect();
-        return r.width > 0 && r.height > 0;
+        // A visually-hidden label (a 1px clip, for assistive tech) is not text anyone reads by eye.
+        return r.width > 1 && r.height > 1;
       };
       const name = (el: Element): string => {
         const cls = typeof el.className === 'string' ? el.className.split(' ').filter(Boolean).slice(0, 2).join('.') : '';
@@ -67,7 +61,7 @@ async function measure(page: Page) {
       const inScroller = (el: Element): boolean => {
         for (let p = el.parentElement; p; p = p.parentElement) {
           const o = getComputedStyle(p).overflowX;
-          if (o === 'auto' || o === 'scroll' || o === 'hidden') return true;
+          if (o === 'auto' || o === 'scroll' || o === 'hidden' || o === 'clip') return true;
         }
         return false;
       };
@@ -143,8 +137,8 @@ test.describe('on a touch device', () => {
   for (const width of TOUCH_WIDTHS) {
     test(`${width}px: nothing overflows, no text under 12px, no target under 44px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 800 });
-      await page.goto('/');
-      await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible();
+      await stubOffline(page);
+      await boot(page);
       await loadFixtures(page);
 
       const m = await measure(page);
@@ -157,9 +151,10 @@ test.describe('on a touch device', () => {
 
   test('settings, where every panel of explanatory text lives', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 800 });
-    await page.goto('/');
-    await page.getByRole('button', { name: /^Settings —/ }).click();
-    await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+    await stubOffline(page);
+    await boot(page);
+    await page.click('#profile');
+    await expect(page.locator('#prefs')).toBeVisible();
 
     const m = await measure(page);
     expect(m.docOverflow).toBeLessThanOrEqual(0);
@@ -178,10 +173,12 @@ test('the desktop keeps the design it was drawn with', async ({ page }) => {
    * quietly gone.
    */
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('/');
+  await stubOffline(page);
+  await boot(page);
   await loadFixtures(page);
+  await resetToLibrary(page);
 
-  const row = page.locator('.library tbody tr').first();
+  const row = page.locator('#libraryRows tr[data-id]').first();
   await expect(row).toBeVisible();
   const metrics = await row.evaluate((el) => {
     const cell = el.querySelector('td.lib-title') as HTMLElement;

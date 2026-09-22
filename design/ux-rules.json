@@ -26,6 +26,54 @@
     {
       "id": "voice",
       "title": "Words"
+    },
+    {
+      "id": "np-principles",
+      "title": "Player shell — Principles"
+    },
+    {
+      "id": "np-era",
+      "title": "Player shell — Period fidelity"
+    },
+    {
+      "id": "np-live",
+      "title": "Player shell — Live and broadcast"
+    },
+    {
+      "id": "np-transport",
+      "title": "Player shell — Transport and sound"
+    },
+    {
+      "id": "np-menus",
+      "title": "Player shell — Menus and commands"
+    },
+    {
+      "id": "np-lists",
+      "title": "Player shell — Lists and playlists"
+    },
+    {
+      "id": "np-chrome",
+      "title": "Player shell — Header and navigation"
+    },
+    {
+      "id": "np-prefs",
+      "title": "Player shell — Preferences"
+    },
+    {
+      "id": "np-data",
+      "title": "Player shell — Statistics and charts"
+    },
+    {
+      "id": "np-responsive",
+      "title": "Player shell — Layout across devices"
+    },
+    {
+      "id": "np-a11y",
+      "title": "Player shell — Accessibility"
+    },
+    {
+      "id": "np-voice",
+      "title": "Player shell — Voice and copy"
     }
   ],
   "rules": [
@@ -67,8 +115,8 @@
         },
         {
           "type": "test",
-          "path": "music-player/tests/e2e/player.spec.ts",
-          "name": "the status bar carries the listening mode, and says why shared is unavailable"
+          "path": "music-player/tests/e2e/np/livevol.spec.ts",
+          "name": "the radio transport: Previous and Next read as unavailable, Play does not, and they say why"
         }
       ]
     },
@@ -83,13 +131,13 @@
       "evidence": [
         {
           "type": "test",
-          "path": "music-player/tests/e2e/player.spec.ts",
-          "name": "the solfeggio presets are filters, and say so where the choice is made"
+          "path": "music-player/tests/e2e/np/connect.spec.ts",
+          "name": "the companion, the container and backup"
         },
         {
           "type": "test",
-          "path": "music-player/tests/e2e/player.spec.ts",
-          "name": "retuning states how it is applied rather than claiming preserved tempo"
+          "path": "music-player/tests/e2e/helper.spec.ts",
+          "name": "a link the helper will not fetch from is refused, with the reason"
         }
       ]
     },
@@ -104,8 +152,8 @@
       "evidence": [
         {
           "type": "test",
-          "path": "music-player/tests/e2e/player.spec.ts",
-          "name": "the solfeggio presets are filters, and say so where the choice is made"
+          "path": "music-player/tests/e2e/np/connect.spec.ts",
+          "name": "the companion, the container and backup"
         }
       ]
     },
@@ -174,7 +222,7 @@
         {
           "type": "test",
           "path": "music-player/tests/e2e/a11y.spec.ts",
-          "name": "@a11y every section is reachable with the keyboard alone"
+          "name": "@a11y the transport is reachable and named from the keyboard alone"
         },
         {
           "type": "test",
@@ -248,13 +296,13 @@
       "evidence": [
         {
           "type": "test",
-          "path": "music-player/tests/e2e/a11y.spec.ts",
-          "name": "@a11y the empty library state is announced as a group with a name"
+          "path": "music-player/tests/e2e/np/stats.spec.ts",
+          "name": "before any play: nothing recorded, and no generated source on offer"
         },
         {
           "type": "test",
           "path": "music-player/tests/e2e/player.spec.ts",
-          "name": "loads with no console errors and an honest empty state"
+          "name": "opens with no music, says so, and raises no errors"
         }
       ]
     },
@@ -273,7 +321,7 @@
         {
           "type": "test",
           "path": "music-player/tests/e2e/a11y.spec.ts",
-          "name": "@a11y respects reduced motion"
+          "name": "@a11y respects reduced motion: nothing loops that a person did not start"
         },
         {
           "type": "test",
@@ -334,8 +382,8 @@
       "evidence": [
         {
           "type": "test",
-          "path": "music-player/tests/e2e/player.spec.ts",
-          "name": "Settings opens from the avatar and carries the equalizer and the companion download"
+          "path": "music-player/tests/e2e/np/stats.spec.ts",
+          "name": "after real plays: the page counts them, and export and import round-trip them"
         }
       ]
     },
@@ -414,13 +462,13 @@
       "evidence": [
         {
           "type": "test",
-          "path": "music-player/tests/e2e/player.spec.ts",
-          "name": "privacy claims are stated where a person can check them"
+          "path": "music-player/tests/e2e/helper.spec.ts",
+          "name": "fetching a link puts a real track in the library, and it plays from this device"
         },
         {
           "type": "test",
           "path": "music-player/tests/e2e/player.spec.ts",
-          "name": "loads nothing from outside its own origin"
+          "name": "loads nothing from outside its own origin, including three.js"
         }
       ]
     },
@@ -550,6 +598,899 @@
         {
           "type": "source",
           "path": "packages/contracts/src/branding.ts"
+        }
+      ]
+    },
+    {
+      "id": "NP-PRIN-001",
+      "group": "np-principles",
+      "title": "One component, one reference",
+      "contract": "Every component reconstructs one named Apple release (iPod classic, iTunes 10, OS X 10.6, iOS 5…) and is sampled from it, not averaged. Eras mix across components, never inside one. The reference is written beside the component's tokens.",
+      "example": "The contextual menu is OS X 10.6 (opaque, 5px radius, 20px rows, 13px text); the action sheet that replaces it on touch is iOS 5/6.",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/menuverify.spec.ts",
+          "name": "era metrics, keyboard nav intact, escape closes, menu action still fires"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/menuverify.spec.ts",
+          "name": "dark menu opaque"
+        }
+      ]
+    },
+    {
+      "id": "NP-PRIN-002",
+      "group": "np-principles",
+      "title": "Unavailable is shown and explained, never hidden",
+      "contract": "A control that cannot act in this context stays visible and focusable, is marked aria-disabled, looks disabled, and says why when pressed or hovered. It is not removed and it does not silently do nothing.",
+      "example": "On a station, previous and next are greyed, titled 'Not available for radio', and pressing them says 'Pick another station from the list'.",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/livevol.spec.ts",
+          "name": "the radio transport: Previous and Next read as unavailable, Play does not, and they say why"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/radio.spec.ts",
+          "name": "the tab opens on stations, not on a menu, and the panel is the song list’s own rules"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/func.spec.ts",
+          "name": "avatar gradient not black; the transport at rest is a slider with every key reachable"
+        }
+      ]
+    },
+    {
+      "id": "NP-PRIN-003",
+      "group": "np-principles",
+      "title": "Measured, not assumed",
+      "contract": "Numbers shown to the listener come from what actually happened. A track's seconds come from the transport's own clock (a seek is not a listen); stream time is measured from playing to pause/end; anything under five seconds is not a session; a film or song counts as finished only when it played to its end. No invented history, no sample figures — with one labelled exception: Statistics shows a generated demo year while this player has recorded nothing, and says so in the Data menu, the source line and Your data (NPD-023).",
+      "example": "Statistics opens on this player's own history once anything has played; before that, on a demo year that says it is one.",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/prefs.spec.ts",
+          "name": "opening: Settings is a page with its own address, and the toolbar is the navigation"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/prefs.spec.ts",
+          "name": "it is a page at both widths, and a section has its own address"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/discover.spec.ts",
+          "name": "a track’s seconds are measured, not assumed"
+        }
+      ]
+    },
+    {
+      "id": "NP-PRIN-004",
+      "group": "np-principles",
+      "title": "Values live in tokens, once",
+      "contract": "Colour, gradient and metric values are CSS custom properties on :root. Components read variables. The dark list is written twice (Auto and forced Dark) and the two copies must be identical.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "reviewer",
+          "note": "Carried from airwave-np; its test did not survive the port as a separate assertion. Checked in review against the shell."
+        }
+      ]
+    },
+    {
+      "id": "NP-ERA-001",
+      "group": "np-era",
+      "title": "Menus are opaque",
+      "contract": "Menus, sheets and popovers of this period had no vibrancy. Their backgrounds are opaque in both themes; only the iOS HUD is translucent.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/menuverify.spec.ts",
+          "name": "dark menu opaque"
+        }
+      ]
+    },
+    {
+      "id": "NP-ERA-002",
+      "group": "np-era",
+      "title": "Selection is a gradient, not a flat fill",
+      "contract": "Selected rows and highlighted menu items use the era's two-stop vertical gradient with white text: iTunes 10 blue in lists (--lib-sel-*), Aqua blue in menus (--ctx-hi-*), iPod blue on the iPod screen (--ipod-sel-*).",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "reviewer",
+          "note": "Carried from airwave-np; its test did not survive the port as a separate assertion. Checked in review against the shell."
+        }
+      ]
+    },
+    {
+      "id": "NP-LIVE-001",
+      "group": "np-live",
+      "title": "A live feed says LIVE where the time would be",
+      "contract": "On Live TV the video controller replaces the elapsed/duration readout with a red LIVE badge, from the moment the tab opens (not only after a channel plays). The badge is centred on the progress rail horizontally in its box and vertically on the rail's centre line at every width.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/livevol.spec.ts",
+          "name": "the Live TV tab is live before a channel is chosen, and a channel does not follow you on to TV"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/devices.spec.ts",
+          "name": ": the LIVE readout sits right, idle and playing"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/livevol.spec.ts",
+          "name": "LIVE on the video bar: the tab is live on arrival and a channel keeps it so"
+        }
+      ]
+    },
+    {
+      "id": "NP-LIVE-002",
+      "group": "np-live",
+      "title": "The progress of a broadcast does not move and cannot be seeked",
+      "contract": "During a live feed the scrubber is an image (role=img, no range ARIA), the channel loops so LIVE stays true, and pressing it explains instead of seeking.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/livevol.spec.ts",
+          "name": "LIVE on the video bar: the tab is live on arrival and a channel keeps it so"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/func.spec.ts",
+          "name": "24px optical offset preserved; sort headers are buttons and sorting works; page has h1"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/func.spec.ts",
+          "name": "avatar gradient not black; the transport at rest is a slider with every key reachable"
+        }
+      ]
+    },
+    {
+      "id": "NP-TRANS-001",
+      "group": "np-transport",
+      "title": "One source sounds at a time",
+      "contract": "Starting a station stops the video; starting a channel or film stops the station. A film does not follow the listener onto the Live TV or TV tab.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/livevol.spec.ts",
+          "name": "one thing at a time: a channel stops the station, and tuning back stops the channel"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/livevol.spec.ts",
+          "name": "the Live TV tab is live before a channel is chosen, and a channel does not follow you on to TV"
+        }
+      ]
+    },
+    {
+      "id": "NP-TRANS-002",
+      "group": "np-transport",
+      "title": "The volume control owns every sound",
+      "contract": "The volume slider drives the station and the video as well as music; Home is silence and mutes, End is full, the level survives a change of station and a reload.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/livevol.spec.ts",
+          "name": "volume reaches the stream: the slider, Home and End, and a new station keeps the level"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/livevol.spec.ts",
+          "name": "the level is remembered across a reload"
+        }
+      ]
+    },
+    {
+      "id": "NP-TRANS-003",
+      "group": "np-transport",
+      "title": "Video starts at the highest quality",
+      "contract": "A channel, episode or film opens on its highest available rendition; the quality menu lets the viewer step down.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/media.spec.ts",
+          "name": "Live TV: the guide replaces the song list, the video player takes the top, and a channel plays"
+        }
+      ]
+    },
+    {
+      "id": "NP-TRANS-004",
+      "group": "np-transport",
+      "title": "The equalizer never silences what it cannot process",
+      "contract": "Audio is routed through the equalizer only when the browser allows processing it (same-origin, blob:, data:, or the companion). Cross-origin streams play unequalized, and the pane says so.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/prefs.spec.ts",
+          "name": "opening: Settings is a page with its own address, and the toolbar is the navigation"
+        }
+      ]
+    },
+    {
+      "id": "NP-MENU-001",
+      "group": "np-menus",
+      "title": "Right-click opens the item's commands; keys work inside",
+      "contract": "Right-clicking a song, station, channel, series or film opens an OS X contextual menu at the pointer with the commands for that kind of item. Arrow keys move, Return chooses, Escape closes and returns focus. Scrolling the page after opening does not close it instantly.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/menuverify.spec.ts",
+          "name": "era metrics, keyboard nav intact, escape closes, menu action still fires"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/lists.spec.ts",
+          "name": "the song menu is untouched"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/lists.spec.ts",
+          "name": "Radio: a station is played, kept or filed; a new playlist holds it and can be emptied"
+        }
+      ]
+    },
+    {
+      "id": "NP-MENU-002",
+      "group": "np-menus",
+      "title": "On touch, a long press raises an action sheet",
+      "contract": "Touch devices get the same commands as an iOS action sheet from a long press, with Cancel last.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/menuverify.spec.ts",
+          "name": "long press raises action sheet, listing all commands + playlists + cancel, and its action fires"
+        }
+      ]
+    },
+    {
+      "id": "NP-MENU-003",
+      "group": "np-menus",
+      "title": "Confirmation is a HUD, not a dialog",
+      "contract": "A command that completes (added to a playlist, removed) confirms with a brief HUD naming what happened. Dialogs are only for commands that need more input.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/menuverify.spec.ts",
+          "name": "era metrics, keyboard nav intact, escape closes, menu action still fires"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/menuverify.spec.ts",
+          "name": "long press raises action sheet, listing all commands + playlists + cancel, and its action fires"
+        }
+      ]
+    },
+    {
+      "id": "NP-LIST-001",
+      "group": "np-lists",
+      "title": "Every tab has playlists, behind the library button",
+      "contract": "Music, Radio, Live TV, TV and Movies each keep their own playlists. They are reached from the library (menu) button on the left of the scope bar, and filled from the item's contextual menu. They persist across reloads.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/lists.spec.ts",
+          "name": "Radio: a station is played, kept or filed; a new playlist holds it and can be emptied"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/lists.spec.ts",
+          "name": "the playlist is still there after a reload"
+        }
+      ]
+    },
+    {
+      "id": "NP-LIST-002",
+      "group": "np-lists",
+      "title": "Sorting is a button",
+      "contract": "Sortable column headers contain buttons and expose aria-sort; the sorted column tints blue (iTunes 10). A set order (a playlist) shows no arrow until a column sort overrides it.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/func.spec.ts",
+          "name": "24px optical offset preserved; sort headers are buttons and sorting works; page has h1"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/ipod.spec.ts",
+          "name": "no column may show a sort arrow while the rows are in set order"
+        }
+      ]
+    },
+    {
+      "id": "NP-CHROME-001",
+      "group": "np-chrome",
+      "title": "The header search belongs to Music",
+      "contract": "The status bar's search pill searches songs and takes pasted song links, so it is shown only on Music. Other tabs search with the list's own field.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/hdr.spec.ts",
+          "name": "the header field is up on Music and gone on the other tabs, which keep their own field"
+        }
+      ]
+    },
+    {
+      "id": "NP-CHROME-002",
+      "group": "np-chrome",
+      "title": "The profile button opens Settings",
+      "contract": "The avatar at the right of the status bar opens Settings as its own page (#settings), not a pop-up.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/prefs.spec.ts",
+          "name": "opening: Settings is a page with its own address, and the toolbar is the navigation"
+        }
+      ]
+    },
+    {
+      "id": "NP-PREF-001",
+      "group": "np-prefs",
+      "title": "Two idioms: iPhone OS on phones, a toolbar on desktops",
+      "contract": "Below 720px Settings is an iPhone OS drill-down: an index of 44px rows, a back button that names where it returns to. From 720px it is a preferences window with a toolbar of five panes. The browser Back button walks the same history.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/prefs.spec.ts",
+          "name": "media playlists live behind the library button"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/prefs.spec.ts",
+          "name": "opening: Settings is a page with its own address, and the toolbar is the navigation"
+        }
+      ]
+    },
+    {
+      "id": "NP-PREF-002",
+      "group": "np-prefs",
+      "title": "A preference applies when it is changed",
+      "contract": "No Save and no Apply. Theme, motion, artwork, defaults, group mode and every algorithm setting apply immediately and persist (player:prefs). Revert, in the footer, restores everything to how it was when Settings opened (NPD-016).",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/prefs.spec.ts",
+          "name": "opening: Settings is a page with its own address, and the toolbar is the navigation"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/prefs.spec.ts",
+          "name": "player preferences, the equalizer and group mode; the equalizer survives a reload"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/discover.spec.ts",
+          "name": "Revert puts back the weight, the algorithm, and removes the copy"
+        }
+      ]
+    },
+    {
+      "id": "NP-PREF-003",
+      "group": "np-prefs",
+      "title": "The algorithm is editable and cannot be made invalid",
+      "contract": "Every recommendation setting has a control. Rules the engine enforces (weights summing to 100, ranges) are checked as the user edits and offered a fix, never silently clamped.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/prefs.spec.ts",
+          "name": "opening: Settings is a page with its own address, and the toolbar is the navigation"
+        }
+      ]
+    },
+    {
+      "id": "NP-DATA-001",
+      "group": "np-data",
+      "title": "One hue for amounts, named hues for genres, and every chart as numbers",
+      "contract": "Amounts use one hue (--viz-1) with a single-hue ramp for the skyline (--viz-sky-0 → --viz-1 → --viz-peak). Genres use seven token hues (--viz-g1…g7, --viz-g0 for the rest), lifted in dark, and a genre's colour never appears without its name beside it. Every chart has its value written beside it or a table under it, and the 3D views are backed by the same numbers in 2D.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/stats.spec.ts",
+          "name": "before any play: nothing recorded, and no generated source on offer"
+        }
+      ]
+    },
+    {
+      "id": "NP-RESP-001",
+      "group": "np-responsive",
+      "title": "The video controller fits the player, not the window",
+      "contract": "Controller-bar content responds to the player's width (container queries): elapsed only under 560px, download and touch volume hidden, More hidden under 358px; the scrubber keeps at least 60px. Checked at 18 device sizes.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/devices.spec.ts",
+          "name": ": the LIVE readout sits right, idle and playing"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/livevol.spec.ts",
+          "name": "px LIVE is centred in its box, clear of its neighbours, and the scrubber keeps room"
+        }
+      ]
+    },
+    {
+      "id": "NP-RESP-002",
+      "group": "np-responsive",
+      "title": "Picture and controls fit under the status bar",
+      "contract": "On short screens (landscape phones, short laptops) the video player is capped so it and its controls fit below the status bar without scrolling.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/devices.spec.ts",
+          "name": ": the LIVE readout sits right, idle and playing"
+        }
+      ]
+    },
+    {
+      "id": "NP-A11Y-001",
+      "group": "np-a11y",
+      "title": "Every control is reachable and named",
+      "contract": "Icon-only controls carry accessible names; groups of choices are radiogroups moved with arrow keys; scrolling regions are focusable; headings give the page an outline (one h1).",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/func.spec.ts",
+          "name": "24px optical offset preserved; sort headers are buttons and sorting works; page has h1"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/prefs.spec.ts",
+          "name": "opening: Settings is a page with its own address, and the toolbar is the navigation"
+        }
+      ]
+    },
+    {
+      "id": "NP-A11Y-002",
+      "group": "np-a11y",
+      "title": "Motion stops when asked",
+      "contract": "With the OS reduced-motion setting, or Preferences > Reduce animation, pulses, barber poles, spinners and transitions stop.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/prefs.spec.ts",
+          "name": "opening: Settings is a page with its own address, and the toolbar is the navigation"
+        }
+      ]
+    },
+    {
+      "id": "NP-A11Y-003",
+      "group": "np-a11y",
+      "title": "Text meets 4.5:1; exceptions are recorded",
+      "contract": "Text/background pairs listed in design/foundations.json meet WCAG 2.2 AA (4.5:1 text, 3:1 marks) in both themes. Period colours that fall short are recorded as decisions, never added silently.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "reviewer",
+          "note": "Carried from airwave-np; its test did not survive the port as a separate assertion. Checked in review against the shell."
+        }
+      ]
+    },
+    {
+      "id": "NP-VOICE-001",
+      "group": "np-voice",
+      "title": "Commands are Title Case; an ellipsis means a dialog follows",
+      "contract": "Menu commands use Title Case verbs ('Go to Album', 'Add to Playlist'). An ellipsis marks exactly the commands that open a dialog for more input ('New Playlist…', 'Change Artist…').",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/menu2.spec.ts",
+          "name": "six commands in three groups, and an ellipsis marks exactly the dialog commands"
+        }
+      ]
+    },
+    {
+      "id": "NP-VOICE-002",
+      "group": "np-voice",
+      "title": "The verb matches the thing",
+      "contract": "A song or film is Played, a channel is Watched, a series is Opened. Commands that make no sense for a kind of item are absent from its menu, not disabled.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/lists.spec.ts",
+          "name": "Live TV: a channel is watched, not played, and its playlist still reads as a guide"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/lists.spec.ts",
+          "name": "Radio: a station is played, kept or filed; a new playlist holds it and can be emptied"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/lists.spec.ts",
+          "name": "the song menu is untouched"
+        }
+      ]
+    },
+    {
+      "id": "NP-VOICE-003",
+      "group": "np-voice",
+      "title": "Explanations are one plain sentence with a way forward",
+      "contract": "When something cannot happen, say what to do instead in one sentence, without apology or error codes: 'Pick another station from the list', 'Couldn’t reach search — open it on a platform instead:'.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "reviewer",
+          "note": "Carried from airwave-np; its test did not survive the port as a separate assertion. Checked in review against the shell."
+        }
+      ]
+    },
+    {
+      "id": "NP-DATA-002",
+      "group": "np-data",
+      "title": "Every figure is set against the period before",
+      "contract": "For 7, 30, 90 days and the year, each tile compares with the period of the same length just before it, with ▲/▼, the figure, and colour for good or bad news (more skips is up and bad). All time has no period before and shows no comparison. Heard-to-the-end and skips count only plays the transport timed (NPD-018).",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/discover.spec.ts",
+          "name": "statistics against the period before, and the recommendation funnel"
+        }
+      ]
+    },
+    {
+      "id": "NP-DATA-003",
+      "group": "np-data",
+      "title": "Recommendations are counted from the shelf's own record",
+      "contract": "What Discover shows is logged once per song per day; a play started there is a recommendation taken. The funnel reads recommended → started → heard to the end → replayed → added or favourited from those logs, never from estimates.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/discover.spec.ts",
+          "name": "the shelf records what it shows, and plays from it count"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/discover.spec.ts",
+          "name": "statistics against the period before, and the recommendation funnel"
+        }
+      ]
+    },
+    {
+      "id": "NP-DATA-004",
+      "group": "np-data",
+      "title": "The statistics page works without its 3D views",
+      "contract": "Statistics loads three.js from the page's import map the first time it opens. If that fails or takes more than eight seconds, each 3D well says it couldn't load and the page carries on; every 3D view has the same numbers in 2D or in a table. A theme change repaints the wells, scenes and labels from the tokens.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/stats.spec.ts",
+          "name": "before any play: nothing recorded, and no generated source on offer"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/stats.spec.ts",
+          "name": "the wells say so, the tables stay"
+        }
+      ]
+    },
+    {
+      "id": "NP-PREF-004",
+      "group": "np-prefs",
+      "title": "Built-in algorithms never change",
+      "contract": "Airwave default, Late night and Crate digger are read-only. The first change to one makes a named copy, selects it and says so; built-ins cannot be renamed or deleted. Delete asks twice.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/discover.spec.ts",
+          "name": "built-ins, copies, rename, duplicate, delete, export, import, and a reload"
+        }
+      ]
+    },
+    {
+      "id": "NP-PREF-005",
+      "group": "np-prefs",
+      "title": "Algorithms move as files, and imports say what they read",
+      "contract": "Export writes one algorithm (or all of yours) as an airwave-algorithm JSON file; Import takes those or a bare engine config, reads only keys the engine knows with values of the right type, and reports how many settings it read and how many it ignored.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/discover.spec.ts",
+          "name": "the shelf records what it shows, and plays from it count"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/discover.spec.ts",
+          "name": "built-ins, copies, rename, duplicate, delete, export, import, and a reload"
+        }
+      ]
+    },
+    {
+      "id": "NP-PREF-006",
+      "group": "np-prefs",
+      "title": "Settings controls are Mac OS X controls, drawn over native elements",
+      "contract": "Push buttons, pop-ups and checkboxes in Settings wear Mac OS X drawings: Snow Leopard (10.6) push buttons — a matte, brushed-metal pill with a graphite hairline, blue when pressed — and 10.4 Aqua pop-ups (white body, blue arrow segment) and gel checkboxes that AquaArt draws from sampled colour profiles and publishes as custom properties. The elements stay native button, select and checkbox, so keyboard, forms and screen readers are unchanged. 22px on desktop, 30px on touch; the drawings and their black labels are the same in both themes (NPD-021).",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/aqua.spec.ts",
+          "name": "buttons, pop-ups and checkboxes wear the Aqua drawings and still work"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/aqua.spec.ts",
+          "name": "the 30px drawings on a phone"
+        }
+      ]
+    },
+    {
+      "id": "NP-PREF-007",
+      "group": "np-prefs",
+      "title": "Connections show what answered and what goes where",
+      "contract": "Sources ▸ Connections tests the Windows companion app (GET /helper/v1/health; an empty address scans 127.0.0.1:17342–17345) and the Docker container (GET /healthz, /readyz, /api/v1/hub; port 4546), using the AudioWave repo's own endpoints. Each test shows what came back — version, downloaders, allowed sites, readiness checks, fingerprint, encryption — with a green, amber or red light; every request goes in the connection log with its status and time; and the What's passed table lists each setting, where it goes, and 'Ready' only once that destination has answered.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/connect.spec.ts",
+          "name": "the companion, the container and backup"
+        }
+      ]
+    },
+    {
+      "id": "NP-PREF-008",
+      "group": "np-prefs",
+      "title": "Backups say what they need before they run",
+      "contract": "Sources ▸ Backup chooses what to copy (Music, TV, Movies; playlists, EQ presets and settings) and where (the Docker container, the Windows companion app, or both), and how often. Media moves between the companion app and the container, so it needs both to have answered a test and its folder to be set; settings need only their destination. Back Up Now stays disabled and says which of those is missing; once it runs, the request is written to the connection log and What's passed lists a backup row per destination.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/connect.spec.ts",
+          "name": "the companion, the container and backup"
+        }
+      ]
+    },
+    {
+      "id": "NP-PREF-009",
+      "group": "np-prefs",
+      "title": "Profiles live on the container, and names are unique there",
+      "contract": "Once the player is paired with the Docker container (the hub's own /pairing/claim, /status and /complete, confirmed by fingerprint), Settings gains a Profile tab: a username, a picture cropped to 256 × 256, and playlists shared as CSV (title, artist, album, seconds), all saved to the container and never kept in the browser. A username someone else has — compared without case — is caught as you type and refused on save. Search lists people on the container above songs; a profile opens in a sheet with their picture, name and shared playlists, and a song you also have can be played from it. Your picture takes the jewel case's place on the Music page. Until the container has the profile routes, the tab says so.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/profile.spec.ts",
+          "name": "pair, edit the profile on the container, find someone, open their profile"
+        }
+      ]
+    },
+    {
+      "id": "NP-PREF-010",
+      "group": "np-prefs",
+      "title": "One default volume for every source",
+      "contract": "Settings ▸ Equalizer ▸ Default volume sets the level Airwave opens at — where you left it, or a fixed default — and Set Volume Now moves the bar's volume to it. Music, radio, Live TV, TV and films all start at and follow that one volume.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/volume.spec.ts",
+          "name": "the default volume: Set Volume Now, then each start mode across a reload"
+        }
+      ]
+    },
+    {
+      "id": "NP-LIST-003",
+      "group": "np-lists",
+      "title": "Drag a box to pick several songs",
+      "contract": "On a pointer, pressing on a song row's empty space and dragging draws a rubber band; every row it touches is selected. Cmd/Ctrl-click adds or removes one song, Shift-click takes the range, Cmd/Ctrl-A takes the list, Escape clears. Picking is never playing: the click that ends a drag, and a modified click, start nothing. A plain click goes back to one song and plays it.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/marquee.spec.ts",
+          "name": "dragging draws a selection box, and the menu for several acts on all of them"
+        }
+      ]
+    },
+    {
+      "id": "NP-MENU-004",
+      "group": "np-menus",
+      "title": "One menu for several songs",
+      "contract": "Right-clicking inside a selection of several songs opens the contextual menu for all of them: its heading says how many, and each command names the count it will act on — Download N Songs (or Remove N Downloads when all are saved), Add N Songs to Group Queue, Add to Playlist ▸ (ticked only when the playlist holds every one), New Playlist from N Songs…, Deselect All. The selection survives the repaint a command causes.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/marquee.spec.ts",
+          "name": "dragging draws a selection box, and the menu for several acts on all of them"
+        }
+      ]
+    },
+    {
+      "id": "NP-CHROME-003",
+      "group": "np-chrome",
+      "title": "A mini player while Settings is open; leaving video stops it",
+      "contract": "When Music or Radio is the tab and Settings covers the player, the header's search pill becomes a mini player: title and artist, time and duration, play/pause and skip, driving the real transport. Leaving a video tab — for Settings or another tab — pauses a film or episode, and disconnects Live TV (the stream is closed, not just muted).",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/mini.spec.ts",
+          "name": "with Settings open, the header shows a mini player that drives the real transport"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/mini.spec.ts",
+          "name": "video tabs: Settings from Live TV shows no mini player and disconnects; Music pauses a channel"
+        }
+      ]
+    },
+    {
+      "id": "NP-PREF-011",
+      "group": "np-prefs",
+      "title": "A backup says how big it is and whether it fits",
+      "contract": "Settings ▸ Sources ▸ Backup shows the expected size, part by part, and each destination's free space as a bar (in use · this backup · free after it). Figures the player can't measure itself come from the companion app and the container; until they answer, the row names which figure is waiting and who measures it. Back Up Now is unavailable when the backup doesn't fit. Algorithms can be backed up like the rest. Sizes are decimal (1 GB = 10⁹ bytes).",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/connect.spec.ts",
+          "name": "the companion, the container and backup"
+        }
+      ]
+    },
+    {
+      "id": "NP-PREF-012",
+      "group": "np-prefs",
+      "title": "Groups and invites live on the Profile tab",
+      "contract": "Settings ▸ Profile lists your groups on the container with their member count and your role, makes a new one (you own it), and — for an owner or admin — makes an invite link that works once and expires after the time chosen. Invites you have received wait there until you join or decline; ones you have sent show who they were for and when they expire. A code the container can't withdraw is never shown as withdrawn.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/groups.spec.ts",
+          "name": "the Profile tab: groups, a new group, an invite link, Withdraw, and Leave"
+        }
+      ]
+    },
+    {
+      "id": "NP-PREF-013",
+      "group": "np-prefs",
+      "title": "An invite link opens an invite page",
+      "contract": "Opening an invite link shows a page naming the group, who sent it, the container, the role and when it expires, with Join Group and Decline (Not Now keeps it waiting). What the link says is labelled as the link's until the container confirms it. An unpaired player, or one paired with another container, is asked to pair first and offered Connections. The code is taken out of the address bar as soon as it has been read.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/groups.spec.ts",
+          "name": "the invite page: from a link, Not Now, Join, a used code, a bad code, Decline"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/groups.spec.ts",
+          "name": "not paired: the invite page asks you to pair first"
         }
       ]
     }

@@ -30,3 +30,6 @@ docs/design
 .claude
 playwright-report-local/
 test-results-local/
+
+# The player shell is generated from design/frontends by music-player/scripts/make-shell.py
+music-player/index.html

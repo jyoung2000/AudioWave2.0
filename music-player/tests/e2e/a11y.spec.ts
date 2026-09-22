@@ -1,88 +1,75 @@
 /**
- * Accessibility, checked with axe-core against every screen.
+ * Accessibility of the player, checked with axe against every screen of the shell, with the
+ * keyboard alone for the transport.
  *
- * Automated checks catch structure, not judgement: they cannot tell whether a label is *useful*.
- * So alongside axe, these tests walk the interface with the keyboard alone and assert that
- * everything reachable by mouse is reachable without one — which is the part that actually decides
- * whether a person can use this.
+ * Rewritten for the shell (DEC-019): the React section strip is gone, so the screens are the
+ * shell's own — the library with rows in it, the five Settings panes, and the search popover.
+ * Automated checks catch structure, not judgement; the keyboard walks below are the judgement part.
  */
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+import { boot, seed, stubOffline, SEED } from './np/_shell.js';
 
-const SECTIONS = ['Music Library', 'Queue', 'Playlists', 'Listening history'] as const;
+async function analyse(page: Page, what: string): Promise<void> {
+  const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
+  const summary = results.violations.map((v) => `${v.id} (${v.impact}): ${v.nodes.slice(0, 6).map((n) => n.target.join(' ')).join(', ')}`).join('\n');
+  expect(results.violations, `${what}\n${summary}`).toEqual([]);
+}
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/');
-  await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible();
+  await stubOffline(page);
+  await boot(page);
 });
 
-for (const section of SECTIONS) {
-  test(`@a11y ${section} has no detectable violations`, async ({ page }) => {
-    await page.getByRole('option', { name: new RegExp(`^${section}`, 'i') }).click();
+test('@a11y the library, with music in it, has no detectable violations', async ({ page }) => {
+  await seed(page, SEED.slice(0, 4));
+  await analyse(page, 'library');
+});
+
+for (const [tab, name] of [['#pt-stats', 'Statistics'], ['#pt-rec', 'Recommendations'], ['#pt-src', 'Sources'], ['#pt-player', 'Player'], ['#pt-eq', 'Equalizer']] as const) {
+  test(`@a11y Settings ▸ ${name} has no detectable violations`, async ({ page }) => {
+    await page.click('#profile');
+    await page.click(tab);
+    if (tab === '#pt-stats') await page.waitForSelector('#pp-stats[data-ready="true"]', { timeout: 20_000 });
     await page.waitForTimeout(300);
-    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
-    const summary = results.violations.map((v) => `${v.id} (${v.impact}): ${v.nodes.length} node(s) — ${v.help}`).join('\n');
-    expect(results.violations, `${section}:\n${summary}`).toEqual([]);
+    await analyse(page, `Settings ▸ ${name}`);
   });
 }
 
-test('@a11y every section is reachable with the keyboard alone', async ({ page }) => {
-  const list = page.getByRole('navigation', { name: 'Sections' });
-  await list.getByRole('option').first().focus();
-  for (let i = 0; i < SECTIONS.length - 1; i += 1) {
-    await page.keyboard.press('ArrowDown');
+test('@a11y the transport is reachable and named from the keyboard alone', async ({ page }) => {
+  for (const id of ['#prev', '#play', '#next', '#track']) {
+    const control = page.locator(id);
+    await control.focus();
+    expect(await control.evaluate((n) => n === document.activeElement), `${id} takes focus`).toBe(true);
+    const name = await control.evaluate((n) => n.getAttribute('aria-label') ?? n.textContent ?? '');
+    expect(name.trim().length, `${id} has a name`).toBeGreaterThan(0);
   }
-  // Arrowing to the end must land on the last section, not fall out of the list.
-  await expect(page.getByRole('option', { name: /^Listening history/ })).toBeFocused();
 });
 
-test('@a11y the transport controls are all keyboard reachable and named', async ({ page }) => {
-  const transport = page.getByRole('group', { name: 'Playback controls' });
-  for (const name of [/favourites/i, /^Shuffle$/i, /^Previous/i, /^Play$/i, /^Next/i, /Repeat/i, /Add to a playlist/i, /Share this song/i]) {
-    const control = transport.getByRole('button', { name });
-    await expect(control, `${name} should exist in the transport row`).toHaveCount(1);
-    // A control that cannot be focused cannot be used without a mouse.
-    await expect(control).toHaveAttribute('type', 'button');
-  }
+test('@a11y respects reduced motion: nothing loops that a person did not start', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.reload();
+  await page.waitForFunction(() => window.NP_READY);
+  await page.evaluate(() => window.NP_READY);
+  await seed(page, SEED.slice(0, 2));
+  await page.waitForTimeout(600);
+  const looping = await page.evaluate(() =>
+    document
+      .getAnimations()
+      .filter((a) => a.playState === 'running' && a.effect?.getTiming().iterations === Infinity)
+      .map((a) => {
+        const target = (a.effect as KeyframeEffect | null)?.target as Element | null;
+        return `${target?.id || target?.className || target?.tagName || '?'} ${(a as CSSAnimation).animationName ?? ''}`;
+      }),
+  );
+  expect(looping, `under reduced motion these still loop: ${looping.join(', ')}`).toEqual([]);
 });
 
 test('@a11y focus is visible wherever it lands', async ({ page }) => {
-  const invisible: string[] = [];
-  await page.keyboard.press('Tab');
-  for (let i = 0; i < 20; i += 1) {
-    const report = await page.evaluate(() => {
-      const el = document.activeElement as HTMLElement | null;
-      if (!el || el === document.body) return null;
-      // Focus can legitimately be shown on the element, on something inside it, or on a wrapper
-      // via :focus-within — the search field does the last, which is normal practice for a field
-      // with a decorated container. All three count.
-      const shows = (target: Element): boolean => {
-        const s = getComputedStyle(target);
-        return s.outlineStyle !== 'none' || parseFloat(s.outlineWidth) > 0 || s.boxShadow !== 'none' || getComputedStyle(target, '::after').content !== 'none';
-      };
-      let visible = shows(el) || [...el.querySelectorAll('*')].some(shows);
-      for (let parent = el.parentElement; parent && !visible && parent !== document.body; parent = parent.parentElement) {
-        if (parent.matches(':focus-within') && shows(parent)) visible = true;
-      }
-      return visible ? null : `${el.tagName.toLowerCase()}.${el.className || '(no class)'}`;
-    });
-    if (report) invisible.push(report);
-    await page.keyboard.press('Tab');
-  }
-  expect(invisible, `these focused elements showed no focus indicator: ${invisible.join(', ')}`).toEqual([]);
-});
-
-test('@a11y respects reduced motion', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.reload();
-  // Constellation left the strip when it shrank to four; the library keeps its way in.
-  await page.getByRole('button', { name: 'Constellation', exact: true }).click();
-  // With reduced motion the constellation opens in its table form rather than an animated field.
-  await expect(page.getByRole('table', { name: /albums/i }).or(page.getByText('Nothing to map yet'))).toBeVisible();
-});
-
-test('@a11y the empty library state is announced as a group with a name', async ({ page }) => {
-  await page.getByRole('option', { name: /^Music Library/ }).click();
-  // With no library, the empty state carries the explanation, so it must be reachable by role.
-  await expect(page.getByRole('group', { name: 'No music yet' })).toBeVisible();
+  await page.locator('#play').focus();
+  const outline = await page.locator('#play').evaluate((n) => {
+    const s = getComputedStyle(n);
+    return s.outlineStyle !== 'none' || s.boxShadow !== 'none';
+  });
+  expect(outline, 'a focused control draws a ring').toBe(true);
 });

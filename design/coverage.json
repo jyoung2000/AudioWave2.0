@@ -42,6 +42,13 @@
       "kind": "discord-templates",
       "file": "packages/contracts/src/entities/discord.ts",
       "surface": "discord-replies"
+    },
+    {
+      "product": "player",
+      "kind": "view-union",
+      "file": "music-player/src/shell/bridge.ts",
+      "type": "ShellSurface",
+      "prefix": "player-shell-"
     }
   ],
   "surfaces": [
@@ -51,7 +58,7 @@
       "product": "player",
       "platform": "web",
       "title": "Status bar, mode switch, hero and section strip",
-      "entry": "every section",
+      "entry": "(React specimen, not served — DEC-019) every section",
       "sourcePaths": [
         "music-player/src/App.tsx",
         "packages/aqua-ui/src/components/PageBar.tsx",
@@ -86,7 +93,7 @@
       "rules": ["UX-PRIN-002", "UX-KEY-001", "UX-KEY-002", "UX-TOUCH-001"],
       "guideAnchor": "page",
       "mockup": "player-now-playing",
-      "authority": "adopted"
+      "authority": "proposed"
     },
     {
       "id": "player-library",
@@ -94,7 +101,7 @@
       "product": "player",
       "platform": "web",
       "title": "Music Library",
-      "entry": "section strip → Music Library",
+      "entry": "(React specimen, not served — DEC-019) section strip → Music Library",
       "sourcePaths": [
         "music-player/src/views/Library.tsx",
         "packages/aqua-ui/src/components/MusicList.tsx"
@@ -112,7 +119,7 @@
       "rules": ["UX-KEY-001", "UX-STATE-001", "UX-A11Y-001", "VOICE-001"],
       "guideAnchor": "screens",
       "mockup": "player-now-playing",
-      "authority": "adopted"
+      "authority": "proposed"
     },
     {
       "id": "player-now-playing",
@@ -120,7 +127,7 @@
       "product": "player",
       "platform": "web",
       "title": "Now playing",
-      "entry": "section strip → Now playing",
+      "entry": "(React specimen, not served — DEC-019) section strip → Now playing",
       "sourcePaths": [
         "music-player/src/views/NowPlaying.tsx",
         "packages/domain/src/visualisers/spectrum.ts"
@@ -137,7 +144,7 @@
       "rules": ["UX-STATE-001", "UX-MOTION-001"],
       "guideAnchor": "page",
       "mockup": "player-engine",
-      "authority": "adopted"
+      "authority": "proposed"
     },
     {
       "id": "player-queue",
@@ -145,13 +152,13 @@
       "product": "player",
       "platform": "web",
       "title": "Queue",
-      "entry": "section strip → Queue",
+      "entry": "(React specimen, not served — DEC-019) section strip → Queue",
       "sourcePaths": ["music-player/src/views/Queue.tsx"],
       "components": ["Panel", "EmptyState"],
       "states": ["nothing queued", "queued", "shuffled", "shared (hub revision)"],
       "rules": ["UX-STATE-001", "UX-SHARED-001", "VOICE-001"],
       "guideAnchor": "screens",
-      "authority": "adopted"
+      "authority": "proposed"
     },
     {
       "id": "player-playlists",
@@ -159,13 +166,13 @@
       "product": "player",
       "platform": "web",
       "title": "Playlists",
-      "entry": "section strip → Playlists",
+      "entry": "(React specimen, not served — DEC-019) section strip → Playlists",
       "sourcePaths": ["music-player/src/views/Playlists.tsx"],
       "components": ["Panel", "EmptyState", "ShareSheet"],
       "states": ["no playlists", "list", "playlist open", "empty playlist"],
       "rules": ["UX-STATE-001", "VOICE-001"],
       "guideAnchor": "screens",
-      "authority": "adopted"
+      "authority": "proposed"
     },
     {
       "id": "player-search",
@@ -173,7 +180,7 @@
       "product": "player",
       "platform": "web",
       "title": "Search",
-      "entry": "status-bar search → Enter",
+      "entry": "(React specimen, not served — DEC-019) status-bar search → Enter",
       "sourcePaths": [
         "music-player/src/views/Search.tsx",
         "music-player/src/components/SearchPopover.tsx"
@@ -188,7 +195,7 @@
       ],
       "rules": ["UX-STATE-001", "UX-PRIN-002"],
       "guideAnchor": "screens",
-      "authority": "adopted"
+      "authority": "proposed"
     },
     {
       "id": "player-metrics",
@@ -196,13 +203,13 @@
       "product": "player",
       "platform": "web",
       "title": "Listening history",
-      "entry": "section strip → Listening history",
+      "entry": "(React specimen, not served — DEC-019) section strip → Listening history",
       "sourcePaths": ["music-player/src/views/Metrics.tsx"],
       "components": ["Panel", "EmptyState"],
       "states": ["nothing yet", "history"],
       "rules": ["UX-STATE-001", "UX-SAFE-004"],
       "guideAnchor": "screens",
-      "authority": "adopted"
+      "authority": "proposed"
     },
     {
       "id": "player-constellation",
@@ -210,7 +217,7 @@
       "product": "player",
       "platform": "web",
       "title": "Constellation",
-      "entry": "section strip → Constellation",
+      "entry": "(React specimen, not served — DEC-019) section strip → Constellation",
       "sourcePaths": [
         "music-player/src/views/Constellation.tsx",
         "packages/domain/src/visualisers/constellation-layout.ts"
@@ -226,7 +233,7 @@
       "rules": ["UX-MOTION-001", "UX-STATE-001"],
       "guideAnchor": "page",
       "mockup": "player-constellation",
-      "authority": "adopted"
+      "authority": "proposed"
     },
     {
       "id": "player-settings",
@@ -234,7 +241,7 @@
       "product": "player",
       "platform": "web",
       "title": "Settings and equalizer",
-      "entry": "profile button in the status bar",
+      "entry": "(React specimen, not served — DEC-019) profile button in the status bar",
       "sourcePaths": [
         "music-player/src/views/Settings.tsx",
         "music-player/src/views/Equalizer.tsx",
@@ -270,7 +277,7 @@
       ],
       "guideAnchor": "screens",
       "mockup": "player-settings",
-      "authority": "adopted"
+      "authority": "proposed"
     },
     {
       "id": "player-sheet-add-to-playlist",
@@ -278,13 +285,13 @@
       "product": "player",
       "platform": "web",
       "title": "Add to playlist",
-      "entry": "✚ beside the transport, or row menu",
+      "entry": "(React specimen, not served — DEC-019) ✚ beside the transport, or row menu",
       "sourcePaths": ["music-player/src/components/AddToPlaylistSheet.tsx"],
       "components": ["Sheet"],
       "states": ["open", "no playlists"],
       "rules": ["UX-KEY-001"],
       "guideAnchor": "overlays",
-      "authority": "adopted"
+      "authority": "proposed"
     },
     {
       "id": "player-sheet-new-playlist",
@@ -292,7 +299,7 @@
       "product": "player",
       "platform": "web",
       "title": "New playlist",
-      "entry": "Playlists → New, or row menu",
+      "entry": "(React specimen, not served — DEC-019) Playlists → New, or row menu",
       "sourcePaths": [
         "music-player/src/components/NewPlaylistSheet.tsx",
         "packages/aqua-ui/src/components/music-list-behaviours.tsx"
@@ -301,7 +308,7 @@
       "states": ["empty name (validation)", "valid"],
       "rules": ["VOICE-002"],
       "guideAnchor": "overlays",
-      "authority": "adopted"
+      "authority": "proposed"
     },
     {
       "id": "player-sheet-download",
@@ -309,13 +316,13 @@
       "product": "player",
       "platform": "web",
       "title": "Download from the hub",
-      "entry": "row menu → Download",
+      "entry": "(React specimen, not served — DEC-019) row menu → Download",
       "sourcePaths": ["music-player/src/components/DownloadSheet.tsx"],
       "components": ["Sheet", "PopUpMenu", "ProgressBar"],
       "states": ["choose format", "basis required", "in progress", "failed with reason"],
       "rules": ["UX-FEED-001", "UX-PRIN-002"],
       "guideAnchor": "overlays",
-      "authority": "adopted"
+      "authority": "proposed"
     },
     {
       "id": "player-sheet-fetch",
@@ -323,7 +330,7 @@
       "product": "player",
       "platform": "web",
       "title": "Fetch with a local tool",
-      "entry": "Library → Fetch (when a helper or the Android tools are present)",
+      "entry": "(React specimen, not served — DEC-019) Library → Fetch (when a helper or the Android tools are present)",
       "sourcePaths": [
         "music-player/src/components/FetchSheet.tsx",
         "music-player/src/lib/fetch-helper.ts",
@@ -339,7 +346,7 @@
       ],
       "rules": ["UX-PRIN-001", "UX-FEED-001", "VOICE-002"],
       "guideAnchor": "overlays",
-      "authority": "adopted"
+      "authority": "proposed"
     },
     {
       "id": "player-sheet-share",
@@ -347,13 +354,13 @@
       "product": "player",
       "platform": "web",
       "title": "Share",
-      "entry": "share button beside the transport, or a playlist",
+      "entry": "(React specimen, not served — DEC-019) share button beside the transport, or a playlist",
       "sourcePaths": ["music-player/src/components/ShareSheet.tsx"],
       "components": ["Sheet", "Checkbox", "TextField"],
       "states": ["no hub (explains why)", "link created", "copied"],
       "rules": ["UX-PRIN-002"],
       "guideAnchor": "overlays",
-      "authority": "adopted"
+      "authority": "proposed"
     },
     {
       "id": "player-search-popover",
@@ -361,13 +368,13 @@
       "product": "player",
       "platform": "web",
       "title": "Search popover",
-      "entry": "typing in the status-bar search",
+      "entry": "(React specimen, not served — DEC-019) typing in the status-bar search",
       "sourcePaths": ["music-player/src/components/SearchPopover.tsx"],
       "components": ["ResultsPopover"],
       "states": ["counting", "results", "none", "dismissed (arrow brings back)"],
       "rules": ["UX-FEED-001", "UX-KEY-001"],
       "guideAnchor": "overlays",
-      "authority": "adopted"
+      "authority": "proposed"
     },
     {
       "id": "player-notice-bar",
@@ -375,7 +382,7 @@
       "product": "player",
       "platform": "web",
       "title": "Notice bar and toasts",
-      "entry": "any warning the store raises",
+      "entry": "(React specimen, not served — DEC-019) any warning the store raises",
       "sourcePaths": [
         "music-player/src/components/NoticeBar.tsx",
         "packages/aqua-ui/src/components/Toast.tsx"
@@ -384,7 +391,7 @@
       "states": ["info", "warning", "dismissed"],
       "rules": ["UX-FEED-001", "VOICE-002"],
       "guideAnchor": "overlays",
-      "authority": "adopted"
+      "authority": "proposed"
     },
     {
       "id": "player-row-menu",
@@ -392,13 +399,13 @@
       "product": "player",
       "platform": "web",
       "title": "Row context menu",
-      "entry": "right-click or the row's menu key",
+      "entry": "(React specimen, not served — DEC-019) right-click or the row's menu key",
       "sourcePaths": ["packages/aqua-ui/src/components/music-list-behaviours.tsx"],
       "components": ["RowMenu", "Menu"],
       "states": ["open", "disabled items with reason"],
       "rules": ["UX-KEY-001", "UX-PRIN-004"],
       "guideAnchor": "overlays",
-      "authority": "adopted"
+      "authority": "proposed"
     },
     {
       "id": "hub-login",
@@ -941,6 +948,401 @@
       "rules": ["VOICE-002"],
       "guideAnchor": "platforms",
       "authority": "observed"
+    },
+    {
+      "id": "player-shell-library",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Library",
+      "entry": "the list under the player; Music view",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts"
+      ],
+      "components": ["shell markup (design/frontends/airwave-now-playing.html)"],
+      "states": [
+        "empty (nothing indexed)",
+        "rows from this device",
+        "link rows from search",
+        "sorted",
+        "narrowed by scope chip",
+        "filtered by the bar"
+      ],
+      "rules": ["NP-LIST-001", "UX-KEY-001", "UX-STATE-001"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-shell-now-playing",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Now Playing",
+      "entry": "the jewel case and transport at the top of the page",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts"
+      ],
+      "components": ["shell markup (design/frontends/airwave-now-playing.html)"],
+      "states": [
+        "nothing playing",
+        "a track from this device playing (the bar follows the element)",
+        "paused",
+        "a link row chosen (does not pretend to play)",
+        "a station (LIVE)",
+        "a channel (video bar, LIVE)"
+      ],
+      "rules": ["NP-TRANS-001", "UX-KEY-002"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-shell-search-popover",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Search popover",
+      "entry": "the header search field",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts"
+      ],
+      "components": ["shell markup (design/frontends/airwave-now-playing.html)"],
+      "states": [
+        "empty",
+        "results from companion / iTunes",
+        "pasted link resolved",
+        "people on the hub"
+      ],
+      "rules": ["NP-PRIN-002"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-shell-row-menu",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Row menu",
+      "entry": "right-click or long-press a row",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts"
+      ],
+      "components": ["shell markup (design/frontends/airwave-now-playing.html)"],
+      "states": ["one row", "several rows (marquee)"],
+      "rules": ["NP-MENU-001"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-shell-new-playlist-sheet",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "New playlist sheet",
+      "entry": "row menu ▸ Add to Playlist ▸ New Playlist…",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts"
+      ],
+      "components": ["shell markup (design/frontends/airwave-now-playing.html)"],
+      "states": ["empty name refused", "created"],
+      "rules": ["NP-MENU-002"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-shell-fetch-sheet",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Fetch sheet",
+      "entry": "transport ▸ Download, on a link row",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts",
+        "music-player/src/lib/tools-core.ts"
+      ],
+      "components": ["shell markup (design/frontends/airwave-now-playing.html)"],
+      "states": [
+        "no basis chosen (refused, said why)",
+        "helper found / not found",
+        "fetching",
+        "refused by the helper (its reason)",
+        "fetched and playing"
+      ],
+      "rules": ["UX-SAFE-001", "UX-FEED-001"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-shell-mini-player",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Mini player",
+      "entry": "the header while Settings is open",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts"
+      ],
+      "components": ["shell markup (design/frontends/airwave-now-playing.html)"],
+      "states": ["hidden", "shown for music and radio"],
+      "rules": ["NP-CHROME-001"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-shell-radio",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Radio",
+      "entry": "toolbar ▸ Radio",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts"
+      ],
+      "components": ["shell markup (design/frontends/airwave-now-playing.html)"],
+      "states": ["directory unreachable (offline shelf)", "a station playing", "station list"],
+      "rules": ["NP-LIVE-001"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-shell-live-tv",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Live TV",
+      "entry": "toolbar ▸ Live TV",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts"
+      ],
+      "components": ["shell markup (design/frontends/airwave-now-playing.html)"],
+      "states": [
+        "no playlist loaded (empty guide)",
+        "channels from a loaded M3U",
+        "a channel playing (LIVE)"
+      ],
+      "rules": ["NP-LIVE-002"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-shell-tv",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "TV",
+      "entry": "toolbar ▸ TV",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts"
+      ],
+      "components": ["shell markup (design/frontends/airwave-now-playing.html)"],
+      "states": ["no catalogue (nothing invented)"],
+      "rules": ["NP-PRIN-001"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-shell-movies",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Movies",
+      "entry": "toolbar ▸ Movies",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts"
+      ],
+      "components": ["shell markup (design/frontends/airwave-now-playing.html)"],
+      "states": ["no catalogue (nothing invented)"],
+      "rules": ["NP-PRIN-001"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-shell-settings-statistics",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Settings ▸ Statistics",
+      "entry": "profile button ▸ Statistics, or #settings/stats",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts"
+      ],
+      "components": ["shell markup (design/frontends/airwave-now-playing.html)"],
+      "states": [
+        "nothing recorded yet",
+        "this player's history",
+        "imported file",
+        "3D views unavailable (tables still carry the numbers)"
+      ],
+      "rules": ["NP-DATA-001"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-shell-settings-recommendations",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Settings ▸ Recommendations",
+      "entry": "#settings/rec",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts"
+      ],
+      "components": ["shell markup (design/frontends/airwave-now-playing.html)"],
+      "states": ["defaults", "edited", "saved algorithm", "reverted"],
+      "rules": ["NP-PREF-001"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-shell-settings-sources",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Settings ▸ Sources",
+      "entry": "#settings/src",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts"
+      ],
+      "components": ["shell markup (design/frontends/airwave-now-playing.html)"],
+      "states": [
+        "music on this device (folders/files)",
+        "companion found / missing downloaders",
+        "hub tested / paired",
+        "backup measured (nothing sent)",
+        "backup will not fit (reason)"
+      ],
+      "rules": ["NP-PREF-002", "UX-FEED-001"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-shell-settings-player",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Settings ▸ Player",
+      "entry": "#settings/player",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts"
+      ],
+      "components": ["shell markup (design/frontends/airwave-now-playing.html)"],
+      "states": ["appearance", "listening", "defaults"],
+      "rules": ["NP-PREF-003"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-shell-settings-equalizer",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Settings ▸ Equalizer",
+      "entry": "#settings/eq",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts"
+      ],
+      "components": ["shell markup (design/frontends/airwave-now-playing.html)"],
+      "states": ["preset", "custom", "default volume"],
+      "rules": ["NP-PREF-004"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-shell-settings-profile",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Settings ▸ Profile",
+      "entry": "#settings/profile (shown when paired)",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts"
+      ],
+      "components": ["shell markup (design/frontends/airwave-now-playing.html)"],
+      "states": [
+        "name available / taken",
+        "picture",
+        "shared playlists",
+        "groups",
+        "invites received / sent",
+        "declined"
+      ],
+      "rules": ["NP-PREF-005", "UX-SAFE-001"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-shell-profile-viewer",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Profile viewer",
+      "entry": "search ▸ a person, or a group member",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts"
+      ],
+      "components": ["shell markup (design/frontends/airwave-now-playing.html)"],
+      "states": ["their name, picture and shared playlists", "a playlist opened"],
+      "rules": ["NP-PREF-005"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-shell-invite-page",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Invite page",
+      "entry": "a #invite/<code> link",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts"
+      ],
+      "components": ["shell markup (design/frontends/airwave-now-playing.html)"],
+      "states": [
+        "previewed (group, sender, role, expiry)",
+        "unknown or used code",
+        "joined",
+        "declined"
+      ],
+      "rules": ["NP-PREF-005"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
     }
   ],
   "flows": [
@@ -981,7 +1383,7 @@
         "Fingerprint differs: do not confirm",
         "Wrong codes lock out that address for a while"
       ],
-      "surfaces": ["hub-devices", "player-settings", "companion-hub"],
+      "surfaces": ["hub-devices", "player-shell-settings-sources", "companion-hub"],
       "rules": ["UX-SAFE-003"],
       "evidence": ["docker-container/tests/integration/setup-and-pairing.test.ts"]
     },
@@ -999,7 +1401,11 @@
         "Browser without folder access falls back to file choice",
         "A file that disappeared says it cannot be found"
       ],
-      "surfaces": ["player-library", "player-settings", "player-shell"],
+      "surfaces": [
+        "player-shell-library",
+        "player-shell-settings-sources",
+        "player-shell-now-playing"
+      ],
       "rules": ["UX-STATE-001", "UX-A11Y-001"],
       "evidence": [
         "music-player/tests/e2e/local-file.spec.ts",
@@ -1021,7 +1427,7 @@
         "Stale command: refused with the current revision",
         "Member without the DJ role: vote-skip instead of skip"
       ],
-      "surfaces": ["player-shell", "player-queue", "hub-groups"],
+      "surfaces": ["player-shell-now-playing", "player-shell-now-playing", "hub-groups"],
       "rules": ["UX-PRIN-002", "UX-SHARED-001"],
       "evidence": ["docker-container/tests/integration/groups-and-queue.test.ts"]
     },
@@ -1135,7 +1541,7 @@
         "Tool missing: the control is not shown",
         "Tool error: its own message, without paths"
       ],
-      "surfaces": ["player-sheet-fetch", "local-helper-cli", "android-system-ui"],
+      "surfaces": ["player-shell-fetch-sheet", "local-helper-cli", "android-system-ui"],
       "rules": ["UX-PRIN-001", "VOICE-002"],
       "evidence": [
         "music-player/tests/e2e/helper.spec.ts",

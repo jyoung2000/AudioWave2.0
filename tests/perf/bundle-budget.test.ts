@@ -52,8 +52,13 @@ const BUNDLES: Bundle[] = [
      * is one object and the hub client reads it at start-up, so a new route is in the first load
      * whether or not its pane is ever opened; what it costs is its schema and its summary string,
      * about 1KB for the nineteen added here.
+     *
+     * Then *down* from 658 to 240KB when the Airwave frontend became the shell. The first load is
+     * now the bridge — db, library, the playback engine, the hub client and the crossfade rules —
+     * at about 230KB; the interface itself is inline in the HTML and counted in the total below. The
+     * number is lowered to what was measured because a budget with 400KB of slack defends nothing.
      */
-    entryBudgetKb: 658,
+    entryBudgetKb: 240,
     /*
      * The total rose from 1600 to 1900 when the hero gained the reference's jewel case.
      *
@@ -78,8 +83,22 @@ const BUNDLES: Bundle[] = [
      * And from 2150 to 2180 for the local helper's client and the sheet that asks what entitles you
      * to a file. Both are behind a dynamic import and neither is reachable without a helper running,
      * so the entry above is unmoved — which is the number that was defended, and still is.
+     *
+     * And from 2180 to 2320 when the Airwave frontend became the shell. The shell is one HTML file
+     * of about 900 KB — its styles and its application script are inline, as the file was written —
+     * and this count includes the HTML. What left with it was the React interface's entry (the
+     * views, the components, aqua-ui's stylesheet), which is why the first load *fell*: the entry is
+     * now the bridge alone at about 230 KB. The shell is read once and cached by the service worker;
+     * three.js stays behind a dynamic import inside it, as it did before.
+     *
+     * And from 2320 to 2322 for the fetch sheet in the shell (the Download key made real) and the
+     * bridge's write journal and tools seam — measured, about 2 KB, none of it in the first load.
+     *
+     * And to 2324 for the shell's touch layer (this repo's 12px text and 44px targets on a coarse
+     * pointer) and "Now Playing" in place of the mockup's name — measured, 2 KB, all of it CSS and
+     * copy inside the HTML.
      */
-    totalBudgetKb: 2180,
+    totalBudgetKb: 2324,
     // Three.js belongs to the constellation and the jewel case; the tag reader only to a scan.
     mustBeSplit: ['three', 'music-metadata'],
   },

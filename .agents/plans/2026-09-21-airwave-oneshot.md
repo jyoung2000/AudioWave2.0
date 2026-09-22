@@ -147,3 +147,115 @@ chrome was unstyled — fixed with the same alias and import the hub has.
 Measured: companion integration 20 (main process) + 10 (backup) + existing; DOM 7; helper 7 on the
 estimate route. `pnpm build:windows` green; the built app was launched through Playwright's
 Electron driver and each tab screenshotted with the embedded helper running on 17342.
+
+## Step C — the player: inventory (work list), before any code
+
+Line numbers are into `design/frontends/airwave-now-playing.html` (19,146 lines). Structure: style
+17–4883 · Script A AquaArt 4884–5033 · Script B Statistics engine (`AW`) 5034–6766 · body 6768–7973 ·
+Script C the app 7974–17151 · Script D three.js module 17154–18824 (imports `three` via an import
+map to jsdelivr, lines 8–15) · Script E toolbar pills 18826–18858 · Script F `window.VP_DEMO`
+base64 clips, **one 173,875-char line at 18863** · Script G video player 18866–19143.
+
+**Demo data and where it is read.** `AW.buildDemo` 5101–5212 (seeded year of events) → `sets.demo`
+6143, source default `'demo'` 6121/6138, `<option value="demo">` 7397, the "generated demo year"
+copy 6638. Real history already has a bridge: `window.AW.playerHistory()` 13625 maps `state.plays`
+and `state.sessions` (written by `logPlay` 9557, `logSession` 9618; persisted in kv `library:state`).
+`window.LIBRARY` 8033–8058 sixteen rows `[title,{artist,album},seconds,bpm,platform]`, alias `LIB`
+9057; `library:add` (9473) appends real rows. `DEMO_HISTORY` 12437–12443. `window.ALBUMS` 7978–8032
+(the jewel case's two albums). Invented `CHANNELS/SHOWS/MOVIES` 11334–11369. `RADIO_SEED` 10448–10497
+is real stations (an offline shelf), not sample data of the person's — kept.
+
+**Simulated playback.** Transport IIFE 16650–17150: `setInterval(…,1000)` 17130–17144 advances
+`pos[mode] += 1`; `library:play` handler 17113–17128; `setPlaying`/scrub 16713–17062; prev 17066,
+next 17073 (dispatches cancelable `transport:next`, handled 9650); the admissions at 8978 and 12809.
+Real audio exists only for radio (`#radioAudio` 7268, 10995–11126), search preview (8590) and video.
+Volume seam: `window.setOutputVolume` 9015, `volume:change` 8994; EQ 16053–16460 wires radio/video only.
+
+**Network.** `connGet` 15016 (helper, reads `np-helper-token` meta 15028), `hubRaw` 15374 / `hubCall`
+15400 (bearer `credentialId.secret`, creds in kv `player:hub`): pairing 15423–15439, profiles
+15482–15686, groups/invites 15765–15981, people search 16038, backup estimate 15296 + `/backup/space`
+15301. Third-party: iTunes search 8292, **api.anthropic.com 8323–8336 (removed: no third-party
+accounts)**, Deezer JSONP 8522, radio-browser 10674, radio metadata feeds 16749–16794.
+
+**Seams.** `window.kv` 8094–8123 (`get` async, `set` sync; backend `window.storage` → localStorage →
+memory; keys `player:volume`, `player:prefs`, `library:state`, `player:hub`, `player:invites`,
+`nowplaying:pose`). `window.COMPANION` 15069/16486. `window.hubPeople` 16034. `window.connState`
+16052. Events `library:play` 9645→17113, `transport:next` 17078→9650, `toolbar:change` 18836→9508/
+15477/18308, `library:add`, `player:heard`, `volume:change`. Raw `localStorage` outside kv: the
+Statistics prefs `airwave:statistics` 6120–6131.
+
+**Decision on shape (a): holds.** The edits that make playback real touch one IIFE and one boot
+block; the data seams already exist. The file is served as the shell; a Vite-bundled bridge loads
+first and implements `window.storage` (→ `db.ts`), the library feed (→ `library.ts` via
+`library:add`), `window.NP_PLAYER` (→ `PlaybackEngine`), `window.THREE` (three bundled, no CDN),
+and hands pairing to `HubClient`.
+
+## Step C — the player (in progress; this entry is completed at the commit)
+
+Built: `music-player/index.html` is generated from the frontend by `music-player/scripts/make-shell.py`
+(every edit asserted against the exact text it replaces; the frontend file is untouched), and
+`music-player/src/shell/bridge.ts` stands behind its seams. Shape (a), as decided (DEC-019).
+
+What the bridge provides: `window.storage` → `db.ts` (the artifact contract: `set(key, json)`,
+`get → {key, value}`); `window.LIBRARY` from `library.ts`; `window.NP_LIBRARY` (add folder / add
+files / rescan / forget); `window.NP_PLAYER` → `PlaybackEngine` (the transport's bar follows the
+element; the one-second clock survives only for the shared broadcast); `window.NP_TOOLS` → the
+helper through `tool-backend.ts` / `tools-core.ts`; `window.NP_THREE()` lazy three.js; the shell's
+hub credential handed to `HubClient`; the service worker registered.
+
+Found and fixed on the way:
+- The kv shim reads `r.value` from `window.storage.get`; the first bridge returned the bare value, so
+  nothing the shell stored could be read back (prefs, library state, the hub credential). Fixed to the
+  artifact contract; `player.spec.ts` asserts a play survives a reload.
+- The React app registered the service worker; the shell did not — the installable, offline player
+  would have silently stopped being either. The bridge registers it now; asserted in `player.spec.ts`.
+- Top-level `await` cannot exist in the single-file IIFE build; `NP_READY` is a promise and Script D
+  waits on it. three.js moved out of the first load (dynamic imports inside that wait).
+- A rescan dropped the rows added from search/links; `refreshRows` keeps non-local rows.
+- The shell only found a helper by port scan; served by a helper (token meta present) it now asks its
+  own origin first and at boot — the zero-configuration detection the React player had.
+- The transport's Download key was a toggle that saved nothing. It now opens a sheet asking why the
+  person may have the file (the helper's authorization basis), fetches through the helper and indexes
+  the result as a real track, which then plays.
+- Back Up Now in the player logged "requested" to nobody. It now measures and says nothing was sent:
+  the companion starts backups (its figures are the same figures, by construction — Step B).
+
+Budgets: first load *down* from 658 KB to 240 KB (the bridge alone; the interface is inline in the
+HTML); total up from 2180 to 2320 KB for the ~900 KB shell. Reasons written in the test file.
+
+Later in Step C (second model; the first test-porting subagent stopped mid-run out of credits):
+- All 21 airwave-np suites are ported to `music-player/tests/e2e/np/*.spec.ts` on the shared
+  `np/_shell.ts` (real WAVs indexed through `NP_LIBRARY.addFiles`; no fabricated data). Suites that
+  asserted the demo year (prefs, stats, discover) and the sixteen rows now seed and play real files.
+- The React-era e2e specs were rewritten against the shell where their property still holds
+  (player, a11y, helper, responsive, local-file); `features.spec.ts` and `platforms.spec.ts` were
+  removed — their screens (shuffle deal, FLAC/WAV download sheet, platform table) are not in the
+  shell, and their logic stays unit-tested in `music-player/tests/unit` and `packages/*`.
+- More real bugs, each now covered: kv writes lost on an immediate reload (journal, below); adding
+  files showed "0 tracks"; Statistics threw when reopened with nothing recorded (`AW.refresh` still
+  fell back to 'demo'); the empty genre list claimed `role=list` (axe); ten controls and labels broke
+  this repo's touch rules (UX-TOUCH-001/002) — fixed with a coarse-pointer layer, desktop unchanged;
+  the jewel case's glow ran past the page edge on a tablet (clipped with `overflow-x: clip`).
+- The bridge journals every kv write to localStorage synchronously and commits it to IndexedDB, and
+  replays anything left at start-up — except the hub credential, which `hub-client.ts` keeps out of
+  localStorage on purpose.
+- The shell says "Now Playing", the product's name, not "Airwave" (the lowercase
+  `airwave-algorithm` file type stays: it is a format files carry).
+- Design records: 47 NP-* rules merged into `design/ux-rules.json` under `np-*` groups, evidence
+  pointed at the ported tests (4 carry reviewer evidence only: their test did not survive as a
+  separate assertion); NPD-001…031 appended to `design/decisions.md` with notes where this repo has
+  since changed the fact (NPD-023/024/025/028/031). `music-player/scripts/merge-np-design.py`.
+- Coverage: 19 shell surfaces (`player-shell-*`) discovered from `ShellSurface` in the bridge. The
+  React player's 17 entries stay, marked "React specimen, not served", authority `proposed`: the
+  styleguide still renders those views as specimens and 28 rule owners point at them.
+
+Not done in Step C, named plainly:
+- The React player UI (`music-player/src/{App,main}.tsx`, `views/`, `components/`) is still in the
+  tree as styleguide specimens; retiring it and re-pointing those rules at the shell is left.
+- The React build's "Running from a file" panel (what a browser withholds from a local page) has no
+  counterpart in the shell; its two tests were removed with it.
+- A layout shift in Sources ▸ Live TV: at ~744px, committing the playlist field re-renders the table
+  above and moves "Load channels now" under the finger. The test commits the field first; the shift
+  itself is not fixed.
+- `np/prefs.spec.ts` "the equalizer survives a reload" and `np/menuverify.spec.ts` stalled on a click
+  under heavy parallel load in some runs and passed alone; judged load-sensitive, not a defect.
