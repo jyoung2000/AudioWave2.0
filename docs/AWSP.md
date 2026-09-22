@@ -21,7 +21,7 @@ Checked against the published crates and packages, not memory:
 | Local relay for tests | `iroh::test_utils::run_relay_server()` (feature `test-utils`; self-signed TLS, so clients need `CaTlsConfig::insecure_skip_verify()` — itself gated on `test-utils`); binary `iroh-relay --dev` (HTTP on `[::]:3340`) | 1.2.0 | `src/test_utils.rs`, `iroh-relay/src/main.rs` |
 | Path type | `conn.paths()` / `conn.paths_stream()` → `Path::{is_selected, is_relay, is_ip, rtt}` | 1.2.0 | `src/socket/remote_map/remote_state/path_watcher.rs` |
 | Browser | official wasm32 build, **relay-only**, end-to-end encrypted QUIC carried over the relay's WebSocket; no UDP, no hole punching, no DNS lookup; no npm package — compiled with `wasm-bindgen --target web` **=0.2.122**, `default-features = false, features = ["tls-ring"]`, `getrandom_backend="wasm_js"` | 1.2.0 | docs.iroh.computer/deployment/wasm-browser-support; iroh-examples `browser-echo` |
-| Kotlin / Android | `computer.iroh:iroh-android` AAR with `libiroh_ffi.so` for arm64-v8a, armeabi-v7a, x86, x86_64 (tracks iroh 1.0.2) | **1.1.0** (2026-07-16) | repo1.maven.org/maven2/computer/iroh/iroh-android/1.1.0 |
+| Kotlin / Android | `computer.iroh:iroh-android` AAR with `libiroh_ffi.so` for arm64-v8a, armeabi-v7a, x86, x86_64 (tracks iroh 1.0.2); the Kotlin API is in its dependency `computer.iroh:iroh` (Java 21 bytecode; D8 accepts it). `Connection.watchPaths(callback)` panics when called from a JVM thread ("no reactor running"), so Kotlin clients poll `paths()` | **1.1.0** (2026-07-16) | repo1.maven.org/maven2/computer/iroh/iroh-android/1.1.0; `iroh-1.1.0-sources.jar` |
 | Node | `@number0/iroh` with win32-x64 prebuild | 1.1.0 | npmjs.com/package/@number0/iroh |
 
 Consequences for this design:
@@ -168,10 +168,17 @@ it — **backpressure end to end, never the whole file in memory**.
   cache afterwards. A per-device tier cap on the server clamps what a client may ask for.
 - **Buffering (all clients):** target 20 s ahead, low-water 5 s — the fetch loop pauses above the
   target and resumes below the low-water mark. When the current track has < 45 s left, prefetch the
-  first 30 s of the next queued track.
+  first 30 s of the next queued track. A client pauses by not reading its open audio stream, so QUIC
+  flow control stops the server; up to one stream receive window (about 1.2 MB against the sidecar)
+  still arrives after the pause.
 - **ABR (Android only; the PWA never switches tiers):** over a 10 s window compare delivered to
   consumed bytes; if sustained throughput < 1.2 × the source bitrate, request the following ranges
-  at `high` and tell the UI; return to `lossless` after 60 s of headroom.
+  at `high` and tell the UI; return to `lossless` after 60 s of headroom. Throughput is measured
+  over the time the fetch loop was actually pulling. Idle time spent above the buffer target does
+  not count, or a full buffer would read as a slow link. Tiers are different files (different
+  lengths, and Opus rather than the original codec), so "the following ranges" cannot continue the
+  current byte stream. A switch re-opens the track at its current position: at once when playback
+  is starving, otherwise from the next track.
 
 ## 5. Connection type, surfaced and logged
 

@@ -54,7 +54,19 @@ android {
     // The other half of `android.bundle.enableUncompressedNativeLibs=false`: the Python runtime is
     // unpacked from the APK at first run, which only works if it was stored rather than deflated.
     jniLibs { useLegacyPackaging = true }
-    resources { excludes += setOf("META-INF/*.kotlin_module", "META-INF/DEPENDENCIES") }
+    resources {
+      excludes += setOf("META-INF/*.kotlin_module", "META-INF/DEPENDENCIES")
+      // computer.iroh:iroh (the JVM jar under iroh-android) carries desktop builds of the FFI
+      // library as resources. Android loads libiroh_ffi.so from iroh-android's jniLibs instead, so
+      // these would only be dead weight in the APK.
+      excludes += setOf("darwin-*/**", "linux-*/**", "win32-*/**")
+    }
+  }
+
+  testOptions {
+    // The AWSP unit tests are pure JVM; any android.* call they reach by accident should fail loudly
+    // rather than return a default, so this stays false.
+    unitTests.isReturnDefaultValues = false
   }
 
   lint {
@@ -91,6 +103,8 @@ dependencies {
   // Local JVM tests for the parts of the app that are ordinary Kotlin: which hosts a fetch may
   // name, and which addresses point back inside a network. No device, no emulator, seconds to run.
   testImplementation("junit:junit:4.13.2")
+  // android.jar's org.json is a stub on the JVM; the AWSP frame tests need the real one.
+  testImplementation("org.json:json:20240303")
 
   implementation("androidx.core:core-ktx:1.13.1")
   implementation("androidx.appcompat:appcompat:1.7.0")
@@ -101,4 +115,13 @@ dependencies {
 
   implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
   implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
+
+  // AWSP (docs/AWSP.md): streaming from the Windows companion. iroh's Kotlin bindings carry the
+  // QUIC connection (libiroh_ffi.so per ABI, via JNA); Media3 plays the bytes in a
+  // MediaSessionService. 1.9.x is the newest Media3 line whose AARs accept compileSdk 35.
+  implementation("computer.iroh:iroh-android:1.1.0")
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+  implementation("androidx.media3:media3-exoplayer:1.9.3")
+  implementation("androidx.media3:media3-session:1.9.3")
+  implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
 }

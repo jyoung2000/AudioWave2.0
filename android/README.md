@@ -38,6 +38,7 @@ page cannot start a program however it was launched. This app can, because it is
 | `Jobs.kt` | Builds the command line and runs it. Every flag is written here; the page names a URL, a tool and a format and can name no flag. `--ignore-config` is first, because a config file in the app's own directory could otherwise add `--exec`. |
 | `Tools.kt` | Unpacks yt-dlp on first run, reports what it actually knows meanwhile, and holds the host allowlist — the same list the desktop helper uses, because two implementations of one promise should not quietly differ. |
 | `FetchService.kt` | A foreground service so a download survives you switching away. |
+| `awsp/` | **Stream from a PC**: the native AWSP client (iroh + Media3), a second launcher entry with its own `mediaPlayback` foreground service, so it keeps playing with the screen off. Separate from the WebView player. See [AWSP-ANDROID.md](AWSP-ANDROID.md). |
 
 The bridge is reachable from any page loaded in the WebView, so the WebView loads exactly one page
 and hands every other link to the real browser. That refusal in `shouldOverrideUrlLoading` is the

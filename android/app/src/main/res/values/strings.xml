@@ -7,4 +7,8 @@
   <string name="fetching_text">Working on the link you gave the player.</string>
   <string name="download_saved">Saved %1$s</string>
   <string name="download_failed">Could not save %1$s</string>
+  <string name="awsp_title">Stream from a PC</string>
+  <string name="awsp_battery_channel">Streaming reliability</string>
+  <string name="awsp_battery_title">Keep streaming with the screen off</string>
+  <string name="awsp_battery_text">Android\'s battery optimisation (Doze) can cut the connection to your PC. Allow Now Playing to ignore it so music keeps playing.</string>
 </resources>

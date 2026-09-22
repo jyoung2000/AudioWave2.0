@@ -21,6 +21,14 @@
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+  <!-- AWSP streaming from the PC (docs/AWSP.md, android/AWSP-ANDROID.md). Playback runs in a
+       mediaPlayback foreground service; a partial wakelock keeps the connection fed with the
+       screen off while playing (and for a 10-minute grace after a pause). The battery-optimisation
+       request is the one-time prompt shown after Doze is seen; this app is sideloaded, not on Play. -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+  <uses-permission android:name="android.permission.WAKE_LOCK" />
+  <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
   <application
     android:allowBackup="false"
     android:icon="@mipmap/ic_launcher"
@@ -47,6 +55,35 @@
       android:name=".FetchService"
       android:exported="false"
       android:foregroundServiceType="dataSync" />
+
+    <!-- The native AWSP screen: its own launcher entry, so the WebView player stays as it was. It
+         also accepts shared text, which is how a ticket arrives from any QR scanner app. -->
+    <activity
+      android:name=".awsp.StreamActivity"
+      android:exported="true"
+      android:label="@string/awsp_title"
+      android:launchMode="singleTop"
+      android:taskAffinity="com.nowplaying.player.awsp"
+      android:windowSoftInputMode="adjustResize">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+      <intent-filter>
+        <action android:name="android.intent.action.SEND" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <data android:mimeType="text/plain" />
+      </intent-filter>
+    </activity>
+
+    <service
+      android:name=".awsp.AwspPlaybackService"
+      android:exported="true"
+      android:foregroundServiceType="mediaPlayback">
+      <intent-filter>
+        <action android:name="androidx.media3.session.MediaSessionService" />
+      </intent-filter>
+    </service>
 
   </application>
 </manifest>
