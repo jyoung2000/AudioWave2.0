@@ -259,3 +259,17 @@ Not done in Step C, named plainly:
   itself is not fixed.
 - `np/prefs.spec.ts` "the equalizer survives a reload" and `np/menuverify.spec.ts` stalled on a click
   under heavy parallel load in some runs and passed alone; judged load-sensitive, not a defect.
+
+## Step C — committed `405dad6` (player e2e 141/141; verify otherwise green, docker SKIPPED)
+
+## Step D — AWSP (in progress)
+
+- D.1 spec `8035c81`: docs/AWSP.md with §0 the state of iroh as researched 2026-09-22 (iroh 1.2.0,
+  iroh-tickets 1.0.0, browser build official but unpublished, relay-only via clear_ip_transports,
+  computer.iroh:iroh-android 1.1.0 on Maven Central). Browser build viable → PWA over iroh wasm.
+- D.2 server `d935c9f`: windows-companion/awsp-server (Rust, 16 cargo tests incl. 24/96 FLAC bit
+  identity and a relay-only 3 s outage with 0 underruns), Electron supervisor src/main/awsp.ts
+  (key + allowlist under DPAPI, restarts, rebind on network change/resume), Settings ▸ Remote ▸
+  Stream to your devices. `pnpm verify` gained test:awsp.
+- Toolchain installed on this machine for D.3: rustup target wasm32-unknown-unknown,
+  wasm-bindgen-cli 0.2.122.
