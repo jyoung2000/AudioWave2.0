@@ -47,3 +47,6 @@ __pycache__/
 
 # The AWSP sidecar's Cargo build output (Cargo.lock is committed).
 windows-companion/awsp-server/target/
+# The PWA's AWSP client crate's Cargo output. Its wasm-bindgen output is committed, in
+# music-player/src/shell/awsp-web (see music-player/scripts/build-awsp-web.mjs).
+music-player/awsp-web/target/

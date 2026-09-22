@@ -79,6 +79,9 @@ export default defineConfig({
         // Hub API routes and share pages are served by the hub, never by the app shell.
         navigateFallbackDenylist: [new RegExp(`^${escapeRegExp(base)}api/`), new RegExp(`^${escapeRegExp(base)}s/`), /^\/api\//, /^\/s\//],
         cleanupOutdatedCaches: true,
+        // The streaming bridge (docs/AWSP.md §6): answers /awsp/track/<id> from the page's AWSP worker.
+        // Plain script in public/, so it runs before Workbox's own fetch routes are registered.
+        importScripts: ['awsp-sw.js'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         runtimeCaching: [
           {

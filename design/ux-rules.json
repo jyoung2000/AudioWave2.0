@@ -1328,7 +1328,7 @@
       "id": "NP-PREF-007",
       "group": "np-prefs",
       "title": "Connections show what answered and what goes where",
-      "contract": "Sources ▸ Connections tests the Windows companion app (GET /helper/v1/health; an empty address scans 127.0.0.1:17342–17345) and the Docker container (GET /healthz, /readyz, /api/v1/hub; port 4546), using the AudioWave repo's own endpoints. Each test shows what came back — version, downloaders, allowed sites, readiness checks, fingerprint, encryption — with a green, amber or red light; every request goes in the connection log with its status and time; and the What's passed table lists each setting, where it goes, and 'Ready' only once that destination has answered.",
+      "contract": "Sources ▸ Connections tests the Windows companion app (GET /helper/v1/health; an empty address scans 127.0.0.1:17342–17345) and the Docker container (GET /healthz, /readyz, /api/v1/hub; port 4546), using the AudioWave repo's own endpoints; and Stream from a PC pairs with the companion's AWSP sidecar by its ticket and six-digit code (docs/AWSP.md §2), then shows the PC's name, the connection type (relay-carried in a browser) and how many of its tracks joined the library, with the same lights. Each test shows what came back — version, downloaders, allowed sites, readiness checks, fingerprint, encryption — with a green, amber or red light; every request goes in the connection log with its status and time; and the What's passed table lists each setting, where it goes, and 'Ready' only once that destination has answered.",
       "example": "",
       "authority": "adopted",
       "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
@@ -1337,6 +1337,11 @@
           "type": "test",
           "path": "music-player/tests/e2e/np/connect.spec.ts",
           "name": "the companion, the container and backup"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/awsp.spec.ts",
+          "name": "pairs, plays relay-carried, is bit-identical, seeks by range, and resumes across a relay restart"
         }
       ]
     },

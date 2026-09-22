@@ -1243,6 +1243,38 @@
       "authority": "adopted"
     },
     {
+      "id": "player-shell-stream-from-pc",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Stream from a PC",
+      "entry": "#settings/src ▸ Connections ▸ Stream from a PC; the indicator beside the transport while a PC track plays",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts",
+        "music-player/src/shell/awsp.ts",
+        "music-player/src/shell/awsp-worker.ts",
+        "music-player/public/awsp-sw.js",
+        "music-player/awsp-web/src/lib.rs"
+      ],
+      "components": ["shell markup (design/frontends/airwave-now-playing.html)"],
+      "states": [
+        "not paired",
+        "not a ticket / not six digits (refused before sending, said why)",
+        "pairing",
+        "wrong code / code expired or used (the PC's answer, in words)",
+        "paired and connected: PC name, relay-carried, track count",
+        "reconnecting (the PC or its relay is away)",
+        "refused (revoked on the PC: pair again)",
+        "a PC track playing: indicator reads relay-carried",
+        "single-file copy: unavailable, and says so"
+      ],
+      "rules": ["NP-PREF-007", "NP-PRIN-002", "UX-FEED-001"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
       "id": "player-shell-settings-player",
       "kind": "screen",
       "product": "player",
@@ -1411,6 +1443,34 @@
       "surfaces": ["hub-devices", "player-shell-settings-sources", "companion-hub"],
       "rules": ["UX-SAFE-003"],
       "evidence": ["docker-container/tests/integration/setup-and-pairing.test.ts"]
+    },
+    {
+      "id": "flow-stream-from-pc",
+      "title": "Pair with a PC and play its music, relay-carried",
+      "preconditions": "The companion app runs its AWSP sidecar on a PC; the player is the served build (a service worker is the bridge).",
+      "steps": [
+        "On the PC, Settings ▸ Remote shows a ticket and a six-digit code",
+        "In the player, Sources ▸ Connections ▸ Stream from a PC: paste the ticket, type the code, Pair",
+        "The card shows the PC's name, relay-carried, and its track count; the tracks join the library",
+        "Play one; the bar follows the element and the indicator beside the transport reads relay-carried",
+        "The relay drops mid-track; the player reconnects and carries on from the last byte it held"
+      ],
+      "failures": [
+        "A wrong or expired code is refused in words, and nothing is stored",
+        "A revoked player is told to pair again, and stops reconnecting",
+        "The single-file copy has no service worker, and says streaming needs the served player"
+      ],
+      "surfaces": [
+        "player-shell-stream-from-pc",
+        "player-shell-settings-sources",
+        "player-shell-library",
+        "player-shell-now-playing"
+      ],
+      "rules": ["NP-PREF-007", "NP-PRIN-002"],
+      "evidence": [
+        "music-player/tests/e2e/awsp.spec.ts",
+        "windows-companion/awsp-server/tests/awsp.rs"
+      ]
     },
     {
       "id": "flow-local-music",

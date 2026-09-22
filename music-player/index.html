@@ -4909,6 +4909,8 @@ button.seg:active .ico{transform:translateY(1px)}
      edge. Clipped to the player (clip, not hidden: no scroll container, sticky parts unaffected). */
   .player { overflow-x: clip; }
 }
+/* How a track from the paired PC is carried (docs/AWSP.md §5): a quiet word between the stamps. */
+.player__conn { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; line-height: 1; color: var(--player-time); opacity: 0.8; }
 </style>
 <script>
 /* ---------- Aqua controls (Snow Leopard push button; 10.4 pop-up and checkbox) ----------
@@ -6976,6 +6978,7 @@ window.AW.startStats = function () {
         <span class="player__live" id="live" role="status" hidden>
           <span class="player__live-dot" aria-hidden="true"></span>LIVE
         </span>
+        <span class="player__conn" id="npConn" role="status" aria-label="How this track reaches you" hidden></span>
       </div>
     </div>
 
@@ -7458,7 +7461,7 @@ window.AW.startStats = function () {
 
         <fieldset class="prefs__group" id="connGroup">
           <legend class="prefs__legend">Connections</legend>
-          <p class="prefs__hint" style="margin:0 0 10px">Two things this player can talk to. Test either one to see exactly what it answers, and the table below shows what goes to each.</p>
+          <p class="prefs__hint" style="margin:0 0 10px">Three things this player can talk to. Test either one to see exactly what it answers, and the table below shows what goes to each.</p>
 
           <section class="conn__card" aria-labelledby="connAppH">
             <h3 class="conn__h" id="connAppH"><span class="conn__dot" id="connAppDot" data-state="off" aria-hidden="true"></span>Windows companion app</h3>
@@ -7503,6 +7506,25 @@ window.AW.startStats = function () {
               </div>
               <p class="prefs__hint" id="hubPairMsg">Pair this player to use your profile, and to search other people’s.</p>
             </div>
+          </section>
+
+          <section class="conn__card" aria-labelledby="connPcH">
+            <h3 class="conn__h" id="connPcH"><span class="conn__dot" id="connPcDot" data-state="off" aria-hidden="true"></span>Stream from a PC</h3>
+            <p class="conn__what">Plays the music on a PC running the companion app, from anywhere: lossless, end-to-end encrypted, carried by the PC’s relay. On the PC, Settings ▸ Remote shows its ticket and a six-digit code.</p>
+            <div class="prefs__row">
+              <label for="pcTicket">Ticket</label>
+              <input class="prefs__field" type="text" id="pcTicket" placeholder="endpoint…" spellcheck="false" autocomplete="off">
+            </div>
+            <div class="prefs__row">
+              <label for="pcCode">Pairing code</label>
+              <div class="conn__acts">
+                <input class="prefs__field" type="text" id="pcCode" inputmode="numeric" maxlength="6" placeholder="6 digits" spellcheck="false" autocomplete="one-time-code" style="flex:1 1 120px;width:auto">
+                <button class="prefs__btn" type="button" id="pcPair">Pair</button>
+                <button class="prefs__btn" type="button" id="pcForget" hidden>Forget</button>
+              </div>
+            </div>
+            <p class="prefs__hint" id="pcMsg" role="status">Not paired.</p>
+            <dl class="conn__facts" id="pcFacts" hidden></dl>
           </section>
 
           <h3 class="conn__sub" id="connPassedH">What’s passed</h3>
@@ -16906,6 +16928,7 @@ window.AW.startStats = function () {
       var c = chosen[mode];
       if (!c) { window.say('Choose a song first'); return; }
       if (c.local) { window.say('This song is already on this device'); return; }
+      if (c.remote) { window.say('This song streams from your PC'); return; }
       var sg = (window.LIBRARY || []).filter(function (s) { return s.id === c.id; })[0];
       if (!sg || !sg.url || !/^https?:/.test(sg.url)) { window.say('This row has no link to fetch from'); return; }
       openFetch(sg);
@@ -16981,7 +17004,7 @@ window.AW.startStats = function () {
       var target = 'solo';
       reportHeard(mode, false);
       if (target !== mode) reportHeard(target, false);
-      chosen[target] = { id: sg.id, title: sg.title, artist: sg.artist, album: sg.album, duration: sg.duration, local: !!sg.local };
+      chosen[target] = { id: sg.id, title: sg.title, artist: sg.artist, album: sg.album, duration: sg.duration, local: !!sg.local, remote: !!sg.remote };
       heardSecs[target] = 0;
       window.ALBUMS[target].nowPlaying = sg.title;
       pos[target] = 0;
@@ -16989,7 +17012,7 @@ window.AW.startStats = function () {
       applyMode(target);
       setPlaying(true);
       /* A row from this device plays for real; the engine's position drives the bar from here. */
-      if (sg.local && window.NP_PLAYER) {
+      if ((sg.local || sg.remote) && window.NP_PLAYER) {
         window.NP_PLAYER.play(sg.id).then(function (r) {
           if (!r.ok) { setPlaying(false); if (r.reason) window.say(r.reason); }
         });
@@ -16998,7 +17021,7 @@ window.AW.startStats = function () {
 
     /* Whether the bar follows the audio element (a track from this device) or the broadcast
        clock (the live session, which has no element here). */
-    function engineDriven() { return !!(window.NP_PLAYER && chosen[mode] && chosen[mode].local); }
+    function engineDriven() { return !!(window.NP_PLAYER && chosen[mode] && (chosen[mode].local || chosen[mode].remote)); }
     function trackEnded() {
       /* the end of the track, reached by playing rather than by seeking */
       if (chosen[mode]) { reportHeard(mode, heardSecs[mode] >= total() * 0.9); heardSecs[mode] = 0; }
@@ -17058,6 +17081,53 @@ window.AW.startStats = function () {
     rescanBtn.addEventListener('click', function () { rescanBtn.disabled = true; lib.rescan().then(function (r) { rescanBtn.disabled = false; done(r, 'Found'); }); });
     list.addEventListener('click', function (e) { var b = e.target.closest('[data-forget]'); if (!b) return; if (!confirm('Forget this source? Your files are not touched; only the index is removed.')) return; lib.forgetRoot(b.getAttribute('data-forget')).then(paintRoots); });
     paintRoots();
+  })();
+
+  /* Sources > Connections > Stream from a PC, through the bridge (window.NP_AWSP). */
+  (function () {
+    var ticketIn = document.getElementById('pcTicket'), codeIn = document.getElementById('pcCode');
+    var pairBtn = document.getElementById('pcPair'), forgetBtn = document.getElementById('pcForget');
+    var msg = document.getElementById('pcMsg'), dot = document.getElementById('connPcDot'), facts = document.getElementById('pcFacts');
+    var TYPE = { relay: 'relay-carried — end-to-end encrypted, through the PC’s relay', direct: 'direct', bridge: 'bridge' };
+    function fill(rows) {
+      facts.innerHTML = '';
+      rows.forEach(function (r) { var dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = r[0]; dd.textContent = r[1]; facts.appendChild(dt); facts.appendChild(dd); });
+      facts.hidden = !rows.length;
+    }
+    function paint() {
+      var a = window.NP_AWSP; if (!a) return;
+      a.status().then(function (s) {
+        var name = s.serverName || 'your PC';
+        forgetBtn.hidden = !s.paired;
+        dot.setAttribute('data-state', s.status === 'connected' ? 'ok' : s.status === 'refused' ? 'bad' : s.paired ? 'warn' : 'off');
+        if (!s.paired) { fill([]); if (!pairBtn.disabled) msg.textContent = 'Not paired.'; return; }
+        msg.textContent = s.status === 'connected' ? 'Paired with ' + name + '.'
+          : s.status === 'refused' ? (s.lastError || 'The PC no longer accepts this player. Pair again.')
+          : s.status === 'reconnecting' || s.status === 'connecting' ? 'Paired with ' + name + '. Reaching it…'
+          : 'Paired with ' + name + '. Not connected.';
+        fill([['PC', name], ['Connection', s.connectionType ? (TYPE[s.connectionType] || s.connectionType) : 'not connected'], ['Tracks', String(s.tracks)],
+              ['This player', s.endpointId ? s.endpointId.slice(0, 16) + '…' : '—']]);
+      });
+    }
+    pairBtn.addEventListener('click', function () {
+      var a = window.NP_AWSP;
+      if (!a) { msg.textContent = 'Streaming from a PC needs the served player; this copy cannot do it.'; return; }
+      pairBtn.disabled = true; msg.textContent = 'Pairing…'; dot.setAttribute('data-state', 'off');
+      a.pair(ticketIn.value, codeIn.value).then(function (r) {
+        pairBtn.disabled = false;
+        if (!r.ok) { msg.textContent = r.reason; dot.setAttribute('data-state', 'bad'); return; }
+        codeIn.value = ''; window.say('Paired with ' + (r.serverName || 'your PC')); paint();
+      });
+    });
+    forgetBtn.addEventListener('click', function () {
+      if (!confirm('Forget this PC? Its tracks leave the list; pairing again needs a new code.')) return;
+      window.NP_AWSP.forget().then(paint);
+    });
+    (window.NP_AWSP_READY || Promise.resolve(null)).then(function (a) {
+      if (!a) { pairBtn.disabled = true; msg.textContent = 'Streaming from a PC needs the served player; this copy cannot do it.'; return; }
+      a.on('status', paint); a.on('connection', paint); a.on('library', paint);
+      paint();
+    });
   })();
   };
 </script>

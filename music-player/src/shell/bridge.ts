@@ -12,7 +12,9 @@
  *   transport's position is the element's, not a clock;
  * - `window.NP_THREE()` → the bundled three.js, loaded on demand (975 KB, not part of the first
  *   paint), so nothing is fetched from a CDN;
- * - the hub credential the shell pairs → `HubClient`, so `src/lib` sees the same pairing.
+ * - the hub credential the shell pairs → `HubClient`, so `src/lib` sees the same pairing;
+ * - `window.NP_AWSP` → streaming from a PC (`awsp.ts`, docs/AWSP.md §6), loaded lazily: its rows join
+ *   `window.LIBRARY` with `remote: true` and play through the service worker's `/awsp/track/<id>`.
  *
  * `window.NP_READY` resolves when the store and library are loaded; the shell's boot function
  * (`window.__npStart`) is called then, so the first paint is the real library and never a placeholder.
@@ -28,6 +30,7 @@ import { HubClient, type HubCredential } from '../lib/hub-client.js';
 import { normalizeCrossfade, crossfadeMsBetween } from '../lib/crossfade.js';
 import { toTrackRef } from '../state/store.js';
 import { registerServiceWorker } from '../lib/pwa.js';
+import type { RemoteSong, ShellAwsp } from './awsp.js';
 import { detectBackend } from '../lib/tool-backend.js';
 import { runFetch, ToolError } from '../lib/tools-core.js';
 import type { SavedHelper } from '../lib/fetch-helper.js';
@@ -51,6 +54,7 @@ export type ShellSurface =
   | 'settings-statistics'
   | 'settings-recommendations'
   | 'settings-sources'
+  | 'stream-from-pc'
   | 'settings-player'
   | 'settings-equalizer'
   | 'settings-profile'
@@ -99,13 +103,16 @@ export interface ShellLibrary {
 declare global {
   interface Window {
     storage?: { get(key: string): Promise<unknown>; set(key: string, value: unknown): Promise<void> | void };
-    LIBRARY?: ShellSong[];
+    LIBRARY?: Array<ShellSong | RemoteSong>;
     THREE?: unknown;
     NP_THREE?: () => Promise<unknown>;
     NP_PLAYER?: ShellPlayer;
     NP_LIBRARY?: ShellLibrary;
     NP_TOOLS?: ShellTools;
     NP_HUB?: { status(): unknown };
+    NP_AWSP?: ShellAwsp;
+    /** Resolves `NP_AWSP` once its module has loaded, or null in the single-file build (no service worker). */
+    NP_AWSP_READY?: Promise<ShellAwsp | null>;
     NP_READY?: Promise<void>;
     NP_BRIDGE?: { version: number; log: string[] };
     __npStart?: () => void;
@@ -316,10 +323,36 @@ function installLibrary(db: PlayerDatabase): ShellLibrary {
 
 /* -------------------------------------------------------------------- player */
 
+/** A row from the paired PC, when `id` is one. */
+function remoteRow(id: string): RemoteSong | null {
+  const row = window.LIBRARY?.find((r) => r.id === id);
+  return row && 'remote' in row && row.remote ? row : null;
+}
+
 function installPlayer(db: PlayerDatabase, engine: PlaybackEngine): ShellPlayer {
   let current: TrackRef | null = null;
+  /**
+   * A track on the paired PC: the element's source is the service worker's `/awsp/track/<id>`, which
+   * streams it over AWSP (docs/AWSP.md §6). Same-origin, so the DSP graph processes it as usual.
+   */
+  async function playRemote(row: RemoteSong): Promise<{ ok: boolean; reason: string | null }> {
+    const awsp = await window.NP_AWSP_READY;
+    if (!awsp) return { ok: false, reason: 'Streaming from a PC needs the served player; this copy has no service worker.' };
+    const result = await awsp.play(row, async (ref, url) => {
+      const crossfade = normalizeCrossfade(await getSetting(db, 'playback.crossfade', null));
+      const crossfadeMs = current ? crossfadeMsBetween(crossfade, current, ref) : 0;
+      await engine.load({ track: ref, url, processable: true, crossfadeMs });
+      current = ref;
+      return engine.play();
+    });
+    note(`play ${row.title} from the PC: ${result.ok ? 'ok' : result.reason}`);
+    return result;
+  }
   const player: ShellPlayer = {
     async play(id) {
+      const remote = remoteRow(id);
+      if (remote) return playRemote(remote);
+      window.NP_AWSP?.indicate(false);
       const track = await db.get('tracks', id);
       if (!track || track.deletedAt) return { ok: false, reason: 'That track is no longer in the library.' };
       const resolved = await resolveFile(db, id);
@@ -423,6 +456,16 @@ async function boot(): Promise<void> {
   window.NP_HUB = { status: () => hub.getStatus() };
   window.LIBRARY = await loadRows(db);
   window.NP_BRIDGE = { version: 1, log };
+  // Streaming from a PC: a lazy chunk, and never in the single-file build — a file:// page has no
+  // service worker to be the bridge, and the wasm client would be megabytes inlined for nothing.
+  // (The literal check, not isSingleFileBuild(), so the bundler drops the import there.)
+  const singleFile = typeof __NP_SINGLE_FILE__ !== 'undefined' && __NP_SINGLE_FILE__ === true;
+  window.NP_AWSP_READY = singleFile
+    ? Promise.resolve(null)
+    : import('./awsp.js').then((m) => (window.NP_AWSP = m.installAwsp(db, note))).catch((err: unknown) => {
+        note(`streaming from a PC is unavailable: ${err instanceof Error ? err.message : String(err)}`);
+        return null;
+      });
   // The installable, offline player: the worker precaches the shell and its chunks. It is a no-op in
   // the single-file build and over file://, where a worker cannot run (see lib/pwa.ts).
   void registerServiceWorker((update) => {

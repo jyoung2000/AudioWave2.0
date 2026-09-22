@@ -463,6 +463,105 @@ text = text.replace('Airwave', 'Now Playing')
 edits += 1
 assert 'Airwave' not in text and n > 0
 
+# ---- 14. streaming from a PC (AWSP, docs/AWSP.md §6) -----------------------------------------------------
+# Sources ▸ Connections gains a third card: paste the PC's ticket, type its six-digit code, Pair. The
+# PC's library joins the list as rows with `remote: true`; they play through the engine like rows from
+# this device (the bridge points the element at the service worker's /awsp/track/<id>), and while one
+# plays a small indicator beside the transport says how it is carried: direct, relay-carried, bridge.
+replace('          <p class="prefs__hint" style="margin:0 0 10px">Two things this player can talk to.',
+        '          <p class="prefs__hint" style="margin:0 0 10px">Three things this player can talk to.')
+replace('          <h3 class="conn__sub" id="connPassedH">What’s passed</h3>',
+        '          <section class="conn__card" aria-labelledby="connPcH">\n'
+        '            <h3 class="conn__h" id="connPcH"><span class="conn__dot" id="connPcDot" data-state="off" aria-hidden="true"></span>Stream from a PC</h3>\n'
+        '            <p class="conn__what">Plays the music on a PC running the companion app, from anywhere: lossless, end-to-end encrypted, carried by the PC’s relay. On the PC, Settings ▸ Remote shows its ticket and a six-digit code.</p>\n'
+        '            <div class="prefs__row">\n'
+        '              <label for="pcTicket">Ticket</label>\n'
+        '              <input class="prefs__field" type="text" id="pcTicket" placeholder="endpoint…" spellcheck="false" autocomplete="off">\n'
+        '            </div>\n'
+        '            <div class="prefs__row">\n'
+        '              <label for="pcCode">Pairing code</label>\n'
+        '              <div class="conn__acts">\n'
+        '                <input class="prefs__field" type="text" id="pcCode" inputmode="numeric" maxlength="6" placeholder="6 digits" spellcheck="false" autocomplete="one-time-code" style="flex:1 1 120px;width:auto">\n'
+        '                <button class="prefs__btn" type="button" id="pcPair">Pair</button>\n'
+        '                <button class="prefs__btn" type="button" id="pcForget" hidden>Forget</button>\n'
+        '              </div>\n'
+        '            </div>\n'
+        '            <p class="prefs__hint" id="pcMsg" role="status">Not paired.</p>\n'
+        '            <dl class="conn__facts" id="pcFacts" hidden></dl>\n'
+        '          </section>\n\n'
+        '          <h3 class="conn__sub" id="connPassedH">What’s passed</h3>')
+# the indicator, in the stamps row right above the transport keys
+replace('        <span class="player__live" id="live" role="status" hidden>\n'
+        '          <span class="player__live-dot" aria-hidden="true"></span>LIVE\n'
+        '        </span>\n',
+        '        <span class="player__live" id="live" role="status" hidden>\n'
+        '          <span class="player__live-dot" aria-hidden="true"></span>LIVE\n'
+        '        </span>\n'
+        '        <span class="player__conn" id="npConn" role="status" aria-label="How this track reaches you" hidden></span>\n')
+replace("</style>\n",
+        "/* How a track from the paired PC is carried (docs/AWSP.md §5): a quiet word between the stamps. */\n"
+        ".player__conn { flex: none; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; line-height: 1; color: var(--player-time); opacity: 0.8; }\n"
+        "</style>\n")
+# a row from the PC plays through the engine, like a row from this device
+replace("      if (sg.local && window.NP_PLAYER) {", "      if ((sg.local || sg.remote) && window.NP_PLAYER) {")
+replace("      chosen[target] = { id: sg.id, title: sg.title, artist: sg.artist, album: sg.album, duration: sg.duration, local: !!sg.local };",
+        "      chosen[target] = { id: sg.id, title: sg.title, artist: sg.artist, album: sg.album, duration: sg.duration, local: !!sg.local, remote: !!sg.remote };")
+replace("    function engineDriven() { return !!(window.NP_PLAYER && chosen[mode] && chosen[mode].local); }",
+        "    function engineDriven() { return !!(window.NP_PLAYER && chosen[mode] && (chosen[mode].local || chosen[mode].remote)); }")
+replace("      if (c.local) { window.say('This song is already on this device'); return; }",
+        "      if (c.local) { window.say('This song is already on this device'); return; }\n"
+        "      if (c.remote) { window.say('This song streams from your PC'); return; }")
+# the card's wiring, beside Sources > Music's
+replace("    paintRoots();\n  })();\n  };\n</script>",
+        "    paintRoots();\n  })();\n\n"
+        "  /* Sources > Connections > Stream from a PC, through the bridge (window.NP_AWSP). */\n"
+        "  (function () {\n"
+        "    var ticketIn = document.getElementById('pcTicket'), codeIn = document.getElementById('pcCode');\n"
+        "    var pairBtn = document.getElementById('pcPair'), forgetBtn = document.getElementById('pcForget');\n"
+        "    var msg = document.getElementById('pcMsg'), dot = document.getElementById('connPcDot'), facts = document.getElementById('pcFacts');\n"
+        "    var TYPE = { relay: 'relay-carried — end-to-end encrypted, through the PC’s relay', direct: 'direct', bridge: 'bridge' };\n"
+        "    function fill(rows) {\n"
+        "      facts.innerHTML = '';\n"
+        "      rows.forEach(function (r) { var dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = r[0]; dd.textContent = r[1]; facts.appendChild(dt); facts.appendChild(dd); });\n"
+        "      facts.hidden = !rows.length;\n"
+        "    }\n"
+        "    function paint() {\n"
+        "      var a = window.NP_AWSP; if (!a) return;\n"
+        "      a.status().then(function (s) {\n"
+        "        var name = s.serverName || 'your PC';\n"
+        "        forgetBtn.hidden = !s.paired;\n"
+        "        dot.setAttribute('data-state', s.status === 'connected' ? 'ok' : s.status === 'refused' ? 'bad' : s.paired ? 'warn' : 'off');\n"
+        "        if (!s.paired) { fill([]); if (!pairBtn.disabled) msg.textContent = 'Not paired.'; return; }\n"
+        "        msg.textContent = s.status === 'connected' ? 'Paired with ' + name + '.'\n"
+        "          : s.status === 'refused' ? (s.lastError || 'The PC no longer accepts this player. Pair again.')\n"
+        "          : s.status === 'reconnecting' || s.status === 'connecting' ? 'Paired with ' + name + '. Reaching it…'\n"
+        "          : 'Paired with ' + name + '. Not connected.';\n"
+        "        fill([['PC', name], ['Connection', s.connectionType ? (TYPE[s.connectionType] || s.connectionType) : 'not connected'], ['Tracks', String(s.tracks)],\n"
+        "              ['This player', s.endpointId ? s.endpointId.slice(0, 16) + '…' : '—']]);\n"
+        "      });\n"
+        "    }\n"
+        "    pairBtn.addEventListener('click', function () {\n"
+        "      var a = window.NP_AWSP;\n"
+        "      if (!a) { msg.textContent = 'Streaming from a PC needs the served player; this copy cannot do it.'; return; }\n"
+        "      pairBtn.disabled = true; msg.textContent = 'Pairing…'; dot.setAttribute('data-state', 'off');\n"
+        "      a.pair(ticketIn.value, codeIn.value).then(function (r) {\n"
+        "        pairBtn.disabled = false;\n"
+        "        if (!r.ok) { msg.textContent = r.reason; dot.setAttribute('data-state', 'bad'); return; }\n"
+        "        codeIn.value = ''; window.say('Paired with ' + (r.serverName || 'your PC')); paint();\n"
+        "      });\n"
+        "    });\n"
+        "    forgetBtn.addEventListener('click', function () {\n"
+        "      if (!confirm('Forget this PC? Its tracks leave the list; pairing again needs a new code.')) return;\n"
+        "      window.NP_AWSP.forget().then(paint);\n"
+        "    });\n"
+        "    (window.NP_AWSP_READY || Promise.resolve(null)).then(function (a) {\n"
+        "      if (!a) { pairBtn.disabled = true; msg.textContent = 'Streaming from a PC needs the served player; this copy cannot do it.'; return; }\n"
+        "      a.on('status', paint); a.on('connection', paint); a.on('library', paint);\n"
+        "      paint();\n"
+        "    });\n"
+        "  })();\n"
+        "  };\n</script>")
+
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):
     assert bad not in text, f'left behind: {bad}'

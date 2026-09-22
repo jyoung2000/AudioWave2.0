@@ -25,6 +25,11 @@ export default tseslint.config(
       // Build output that happens to be committed, so people can download one file and run it.
       // Its source is `local-helper/src`, which is linted; bundled esbuild output is not ours.
       'local-helper/now-playing-helper.mjs',
+      // wasm-bindgen's glue for the AWSP client, generated from music-player/awsp-web (Rust, linted by clippy).
+      'music-player/src/shell/awsp-web/**',
+      'music-player/awsp-web/target/**',
+      // The Android build copies the built player here (git-ignored output, like dist/).
+      'android/app/src/main/assets/app/**',
       '**/*.d.ts',
     ],
   },

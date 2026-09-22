@@ -183,22 +183,63 @@ connection's selected path (`paths_stream()`, `is_relay()`); the browser is alwa
 
 ## 6. The PWA client
 
-- `music-player/awsp-web` — a Rust crate compiled to wasm (iroh 1.2.0, `tls-ring`, wasm-bindgen
-  0.2.122) exposing `connect(ticket)`, `pair(code)`, a control channel and `fetch(track_id, start,
-  end)` returning a `ReadableStream`. It runs in a **dedicated worker** owned by the page, so the
-  endpoint outlives view changes but not the page.
-- **Service-worker bridge.** The media element's source is a same-origin URL,
-  `/awsp/track/<id>`. The service worker answers it with HTTP semantics — `206` and `Content-Range`
-  for a `Range` request — by asking the page's worker for those bytes over a `MessageChannel` and
-  streaming them back. Chromium plays FLAC by progressive download over this bridge (seek = a new
-  `Range` request = a new AWSP audio stream). Safari plays **FLAC-in-fMP4 HLS** natively from
-  `/awsp/hls/<id>/index.m3u8`, segmented by the server with
-  `ffmpeg -c:a flac -f hls -hls_segment_type fmp4 -hls_fmp4_init_filename init.mp4`. **hls.js is
+Built and tested end to end (`music-player/tests/e2e/awsp.spec.ts`, §8). Four pieces:
+
+- **`music-player/awsp-web`** — a Rust crate compiled to wasm (iroh 1.2.0, `tls-ring`,
+  wasm-bindgen 0.2.122, getrandom `wasm_js`), following iroh-examples `browser-echo`. It is the
+  transport and the wire format only: `AwspClient.create(secret, relays)` (secret key bytes in,
+  `secret_key()` out), `connect(ticket, relay_override?)` → a connection with `connection_type()`
+  (`relay` in a browser, read from the selected path), `open_control()` → `send(json)` / `recv()`
+  frames, and `fetch(track_id, byte_start, byte_end|null, tier)` → the parsed 16-byte header
+  (`total_len`, `codec`, `tier`; the `track_id_hash` is checked) and a pull-based `read()` of the
+  range's chunks, `cancel()` = `STOP_SENDING`. The client's home relay is the **ticket's relay** (or
+  an override): nothing else is contacted, n0's relays included, unless the ticket names them.
+  Its wasm-bindgen output (`awsp_web.js` + a 2.3 MB `awsp_web_bg.wasm`, 954 KB gzipped) is
+  **committed** in `music-player/src/shell/awsp-web`, so the player builds without Rust;
+  `node music-player/scripts/build-awsp-web.mjs` regenerates it (needs cargo, wasm-bindgen-cli
+  =0.2.122, and a C compiler for wasm32 for `ring` — clang, or zig through `scripts/zig-cc.mjs`),
+  and a unit test fails when the crate's sources no longer match the hash recorded with the build.
+- **The dedicated worker** (`music-player/src/shell/awsp-worker.ts`), owned by the page, hosts the
+  wasm client and the policy: `pair` then `hello` on the same control stream, the `resume_token`,
+  a ping every 5 s with three missed pongs counted as a lost connection, reconnection with backoff
+  250 ms → 30 s (full jitter), `unknown-device` (0x1) ending the retries, and audio fetches that
+  survive a reconnection: a fetch interrupted mid-range waits for the new connection and asks again
+  from `byte_start + bytes already handed on` — the last contiguous byte it holds. The worker logs
+  `awsp connection <server> type=relay rtt=<ms>` with `console.info` (§5).
+- **The service-worker bridge** (`music-player/public/awsp-sw.js`, pulled into the generated
+  Workbox `sw.js` with `importScripts`). The media element's source is the same-origin
+  `/awsp/track/<id>`; the service worker answers `200`, or `206` with `Content-Range` for a
+  `Range` request (`bytes=a-b`, `bytes=a-`, and `bytes=-n` through a one-byte probe for the length),
+  with `Content-Length`, `Accept-Ranges: bytes` and a `Content-Type` from the header's codec; a
+  range past the end is `416`, an unknown track `404`. It posts the request to the page that made
+  it with a `MessagePort`; the page hands the port to its dedicated worker untouched, and the two
+  workers exchange `header`, then one `chunk` per `pull`, then `end` — so the element's reading pace
+  is the QUIC stream's pace. A cancelled request (a seek) stops its AWSP stream. The service worker
+  claims clients on `activate`, so the first visit streams without a reload. It holds the fetch
+  event open with `waitUntil` while the body streams; a browser that still ends it (Chromium's cap
+  on one event) makes the element ask again with a `Range`, which is a new AWSP stream.
+  Chromium plays FLAC by progressive download over this bridge, measured by the e2e test.
+- **The page's side** (`music-player/src/shell/awsp.ts`, a lazy chunk the bridge imports; none of
+  this is in the first load, and the 2.3 MB wasm is fetched only when someone pairs or a PC was
+  paired before): `window.NP_AWSP = { pair(ticket, code), connect(), status(), browse(page,
+  query), connectionType(), on(event), … }`. The PC's library joins `window.LIBRARY` as rows with
+  `remote: true`, played through the engine like the device's own (`engine.load({track, url:
+  '/awsp/track/<id>'})`). Settings ▸ Sources ▸ Connections ▸ **Stream from a PC** takes the ticket
+  and the six-digit code and shows the PC's name, the connection type and the track count; while a
+  PC track plays, the indicator beside the transport reads **relay-carried** (or direct, bridge).
+  Not in the single-file build: a `file://` page has no service worker to be the bridge.
+- **Safari's HLS path is not implemented.** `/awsp/hls/<id>/index.m3u8` (FLAC-in-fMP4 segmented by
+  the server with `ffmpeg -c:a flac -f hls -hls_segment_type fmp4 -hls_fmp4_init_filename
+  init.mp4`) does not exist in the sidecar or the service worker, and nothing here has run in
+  Safari; Safari is sent the same progressive `/awsp/track/<id>` as Chromium, untested. **hls.js is
   never used on Safari** — it cannot play lossless FLAC HLS.
-- Media Session API for lock-screen controls and artwork. **No Wake Lock** is requested: an actively
-  playing `<audio>` keeps the page, its worker and the network alive with the screen off on mobile
-  browsers. iOS Safari still suspends a *paused* PWA; resuming reconnects (§3.1).
-- Keys: the client keypair in IndexedDB, wrapped by a non-extractable WebCrypto key.
+- Media Session metadata (title, artist, album; the artwork from `get_artwork` when the file has
+  one). **No Wake Lock** is requested: an actively playing `<audio>` keeps the page, its worker and
+  the network alive with the screen off on mobile browsers. iOS Safari still suspends a *paused*
+  PWA; resuming reconnects (§3.1).
+- Keys: the client's iroh secret key in the player's IndexedDB (`settings` store), sealed with
+  AES-GCM under a WebCrypto key generated **non-extractable** and stored beside it; the ticket and
+  the PC's name in the shell's `kv` (`awsp:pc`).
 
 ## 7. The WebSocket bridge (fallback)
 
@@ -207,6 +248,9 @@ port, reachable over the user's own tailnet. It is **off by default**, behind a 
 uses the same frames as §3 multiplexed over one WebSocket (a stream id prefixed to each frame).
 Clients on it show **bridge**. It is not the PWA's normal path (§0).
 
+**Not built.** The browser build of iroh is viable (§6), so the PWA does not need it; the sidecar has
+no WSS listener and the indicator's **bridge** label is there for when one exists.
+
 ## 8. Verification
 
 - **Bit identity.** A Playwright test pairs a real browser with a real running sidecar and a local
@@ -214,6 +258,15 @@ Clients on it show **bridge**. It is not the PWA's normal path (§0).
   received equal the source file's bytes (SHA-256).
 - **Seek and resume.** The same test seeks (a new range) and drops the connection mid-stream
   (killing and restarting the relay), and asserts the client resumed at its last contiguous byte.
+  Built: `music-player/tests/e2e/awsp.spec.ts`, against the real `awsp-server` (relay-only,
+  `AWSP_RELAY_ONLY=1`, relay_mode custom) and `iroh-relay --dev` 1.2.0 on a free local port, with a
+  20 s 24-bit/96 kHz FLAC. It pairs through the UI, plays (the element's position advances, the
+  indicator reads relay-carried, both sides log `type=relay`), fetches the whole file and a range
+  through the service worker and compares SHA-256, then holds a fetch open at ~2.7 MB, kills the
+  relay, and restarts it on the same port. The test sets the client's ping interval to 1 s
+  (`NP_AWSP.tune({pingMs})`; the product's is 5 s) so three missed pongs take seconds; it asserts the
+  server accepted the resume token (`welcome.resumed`), that the interrupted fetch was re-requested
+  at exactly `request_start + bytes held` (> 0), and that the completed bytes are bit-identical.
 - **Outage.** A Rust integration test (`windows-companion/awsp-server/tests/awsp.rs`) runs two real
   iroh endpoints on this machine, relay-only (the server's config gets `AWSP_RELAY_ONLY=1` applied
   through `Config::apply_env`; the client calls `.clear_ip_transports()`) through a local

@@ -97,8 +97,16 @@ const BUNDLES: Bundle[] = [
      * And to 2324 for the shell's touch layer (this repo's 12px text and 44px targets on a coarse
      * pointer) and "Now Playing" in place of the mockup's name — measured, 2 KB, all of it CSS and
      * copy inside the HTML.
+     *
+     * And to 2372 for streaming from a PC (docs/AWSP.md §6): the dedicated worker that hosts the
+     * iroh client (31 KB of wasm-bindgen glue and policy), the page's side of it (7 KB), the service
+     * worker's range bridge (5 KB) and the Sources card in the shell (5 KB) — measured, 48 KB. The
+     * client itself is a 2.3 MB `.wasm`, which this count does not include (it counts scripts,
+     * stylesheets and HTML) and which is fetched only by someone who pairs with a PC: the worker is
+     * started on first use, the page's side is a lazy chunk, and the entry above moved by under 1 KB
+     * (the check that a row is remote and the dynamic import), staying inside 240.
      */
-    totalBudgetKb: 2324,
+    totalBudgetKb: 2372,
     // Three.js belongs to the constellation and the jewel case; the tag reader only to a scan.
     mustBeSplit: ['three', 'music-metadata'],
   },
