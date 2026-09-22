@@ -7,7 +7,7 @@
  * on the way out — so a compromised renderer can call only what is listed there, with only the
  * shapes declared there.
  */
-import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage, session, shell, Tray, nativeImage } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, powerMonitor, safeStorage, session, shell, Tray, nativeImage } from 'electron';
 import { existsSync, mkdirSync } from 'node:fs';
 import { writeFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -19,6 +19,7 @@ import { FolderWatcher } from './watcher.js';
 import { HubClient } from './hub.js';
 import { BackupManager } from './backup.js';
 import { EmbeddedHelper } from './helper.js';
+import { AwspSupervisor, findAwspBinary } from './awsp.js';
 import { appUrlGuard, applySessionSecurity, applyWindowSecurity, enforceSingleInstance, guardWebContents, isTrustedSender, openExternally } from './security.js';
 import { CompanionStore, openCompanionDb } from './store.js';
 
@@ -37,6 +38,7 @@ let store: CompanionStore | null = null;
 let hub: HubClient | null = null;
 let backups: BackupManager | null = null;
 let helper: EmbeddedHelper | null = null;
+let awsp: AwspSupervisor | null = null;
 let scanning: AbortController | null = null;
 let watcher: FolderWatcher | null = null;
 let isQuitting = false;
@@ -464,6 +466,13 @@ function registerHandlers(): void {
     return restored;
   });
 
+  handle('awsp:status', () => awsp!.getStatus());
+  handle('awsp:set-enabled', (request) => awsp!.setEnabled((request as { enabled: boolean }).enabled));
+  handle('awsp:set-port', (request) => awsp!.setPort((request as { port: number | null }).port));
+  handle('awsp:new-code', () => awsp!.newPairingCode());
+  handle('awsp:revoke', (request) => awsp!.revoke((request as { id: string }).id));
+  handle('awsp:set-tier', (request) => awsp!.setTierCap((request as { id: string }).id, (request as { tier: 'lossless' | 'high' | 'saver' }).tier));
+
   handle('helper:status', () => helper!.settledStatus());
   handle('helper:check-tools', () => helper!.checkTools());
   handle('helper:token', () => ({ token: helper!.token() }));
@@ -529,6 +538,18 @@ if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow())))
     void hub.refresh();
     void helper.start(preferences().helperPort);
     backups.start();
+    awsp = new AwspSupervisor({
+      store,
+      secretBox: safeStorage,
+      binary: findAwspBinary(join(__dirname, '..', '..'), app.isPackaged ? process.resourcesPath : null),
+      libraryDb: join(dataDir(), 'companion.sqlite'),
+      cacheDir: join(dataDir(), 'awsp-cache'),
+      serverName: `${process.env['COMPUTERNAME'] ?? 'Windows'} companion`,
+      onStatus: (status) => send('event:awsp-status', status),
+      log: (line) => console.info(line),
+    });
+    awsp.boot();
+    powerMonitor.on('resume', () => awsp?.onResume());
     if (preferences().autoSync) void hub.sync();
     // Folders added in an earlier session are watched again from start-up, not from the first
     // time something touches the preferences.
@@ -552,6 +573,7 @@ if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow())))
   app.on('will-quit', () => {
     backups?.stop();
     void helper?.stop();
+    void awsp?.stop();
     void watcher?.close();
     watcher = null;
     store?.close();

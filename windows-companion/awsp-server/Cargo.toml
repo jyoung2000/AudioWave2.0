@@ -1,0 +1,45 @@
+[package]
+name = "awsp-server"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "AWSP streaming sidecar for the Now Playing Windows companion"
+
+[[bin]]
+name = "awsp-server"
+path = "src/main.rs"
+
+[lib]
+name = "awsp_server"
+path = "src/lib.rs"
+
+[dependencies]
+iroh = "=1.2.0"
+iroh-tickets = "=1.0.0"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.37", features = ["bundled"] }
+blake3 = "1"
+anyhow = "1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+rand = "0.9"
+hex = "0.4"
+time = { version = "0.3", features = ["formatting"] }
+base64 = "0.22"
+n0-future = "0.3"
+# Same major as iroh's, for the opt-in `insecure_relay_tls` verifier only.
+rustls = { version = "0.23", default-features = false, features = ["std"] }
+
+[dev-dependencies]
+iroh = { version = "=1.2.0", features = ["test-utils"] }
+sha2 = "0.10"
+tempfile = "3"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true

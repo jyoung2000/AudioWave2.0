@@ -17,20 +17,21 @@ import { LiveTvView } from './views/LiveTv.js';
 import { HubView } from './views/Hub.js';
 import { TransfersView } from './views/Transfers.js';
 import { SettingsView } from './views/Settings.js';
+import { StreamingView } from './views/Streaming.js';
 import { BackupView } from './views/Backup.js';
 import { AboutView } from './views/About.js';
 import { NoticeBar, useNotices } from './views/NoticeBar.js';
 import type { HubConnection } from '../shared/ipc.js';
 
 /** The sections. Each is a screen in design/coverage.json; the tab it lives in is below. */
-export type ViewId = 'folders' | 'library' | 'live-tv' | 'hub' | 'transfers' | 'settings' | 'backup' | 'about';
+export type ViewId = 'folders' | 'library' | 'live-tv' | 'streaming' | 'hub' | 'transfers' | 'settings' | 'backup' | 'about';
 
 export type TabId = 'library' | 'live-tv' | 'remote' | 'settings';
 
 const TABS: ReadonlyArray<ToolTabItem<TabId> & { sections: ViewId[] }> = [
   { id: 'library', label: 'Library', icon: 'folder', sections: ['folders', 'library'] },
   { id: 'live-tv', label: 'Live TV', icon: 'device', sections: ['live-tv'] },
-  { id: 'remote', label: 'Remote', icon: 'link', sections: ['hub', 'transfers'] },
+  { id: 'remote', label: 'Remote', icon: 'link', sections: ['streaming', 'hub', 'transfers'] },
   { id: 'settings', label: 'Settings', icon: 'gear', sections: ['settings', 'backup', 'about'] },
 ];
 
@@ -38,6 +39,7 @@ const SECTION_TITLES: Record<ViewId, string> = {
   folders: 'Folders',
   library: 'Music',
   'live-tv': 'Live TV',
+  streaming: 'Stream to your devices',
   hub: 'Hub connection',
   transfers: 'Transfers',
   settings: 'Settings',
@@ -91,6 +93,8 @@ export function App() {
         return <LibraryView />;
       case 'live-tv':
         return <LiveTvView />;
+      case 'streaming':
+        return <StreamingView />;
       case 'hub':
         return <HubView status={hub} onChanged={hubStatus.reload} />;
       case 'transfers':

@@ -46,6 +46,13 @@ export const IPC_CHANNELS = [
   'backup:remove',
   'backup:export-playlists',
 
+  'awsp:status',
+  'awsp:set-enabled',
+  'awsp:set-port',
+  'awsp:new-code',
+  'awsp:revoke',
+  'awsp:set-tier',
+
   'helper:status',
   'helper:check-tools',
   'helper:token',
@@ -55,6 +62,6 @@ export const IPC_CHANNELS = [
 export type IpcChannel = (typeof IPC_CHANNELS)[number];
 
 /** Events the main process pushes to the renderer. Same rule: an event not listed does not exist. */
-export const IPC_EVENT_NAMES = ['event:scan-progress', 'event:hub-status', 'event:transfer-progress', 'event:backup-progress', 'event:notice'] as const;
+export const IPC_EVENT_NAMES = ['event:scan-progress', 'event:hub-status', 'event:transfer-progress', 'event:backup-progress', 'event:awsp-status', 'event:notice'] as const;
 
 export type IpcEvent = (typeof IPC_EVENT_NAMES)[number];

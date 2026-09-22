@@ -1343,6 +1343,31 @@
       "rules": ["NP-PREF-005"],
       "guideAnchor": "screens",
       "authority": "adopted"
+    },
+    {
+      "kind": "screen",
+      "product": "companion",
+      "platform": "windows",
+      "guideAnchor": "screens",
+      "authority": "adopted",
+      "id": "companion-streaming",
+      "title": "Stream to your devices",
+      "entry": "Remote tab → Stream to your devices",
+      "sourcePaths": [
+        "windows-companion/src/renderer/views/Streaming.tsx",
+        "windows-companion/src/main/awsp.ts"
+      ],
+      "components": ["Panel", "Checkbox", "AquaTable", "PopUpMenu", "StatusDot", "TextField"],
+      "states": [
+        "off (default)",
+        "starting",
+        "running: ticket, QR and pairing code",
+        "sidecar missing or crashed (reason, restarting)",
+        "devices paired, each direct / relay-carried / not connected",
+        "revoke (confirm)",
+        "port invalid"
+      ],
+      "rules": ["UX-SAFE-001", "UX-FEED-001", "UX-PRIN-002"]
     }
   ],
   "flows": [

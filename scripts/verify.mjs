@@ -128,6 +128,19 @@ function helperUpToDate() {
   }
 }
 
+/**
+ * The AWSP streaming server is Rust (windows-companion/awsp-server). Cargo is found on PATH or in
+ * the rustup default location; without it the gate reports SKIPPED, never PASS.
+ */
+const cargoBin = (() => {
+  const home = process.env.USERPROFILE ?? process.env.HOME ?? '';
+  const local = `${home}/.cargo/bin/cargo${process.platform === 'win32' ? '.exe' : ''}`;
+  if (spawnPortable('cargo', ['--version'], { stdio: 'ignore' }).status === 0) return 'cargo';
+  if (home && existsSync(local)) return `"${local}"`;
+  return null;
+})();
+const hasCargo = () => (cargoBin ? null : 'cargo not installed');
+
 const hasDocker = () => {
   if (process.env.NP_SKIP_DOCKER === '1') return 'NP_SKIP_DOCKER=1';
   const r = spawnPortable('docker', ['info'], { stdio: 'ignore' });
@@ -187,6 +200,7 @@ run('styleguide:check', 'pnpm', ['styleguide:check']);
 run('styleguide:pdf', 'pnpm', ['styleguide:pdf'], { skipIf: hasChromium });
 run('test:a11y', 'pnpm', ['test:a11y'], { skipIf: hasChromium });
 run('test:e2e', 'pnpm', ['test:e2e'], { skipIf: hasChromium });
+run('test:awsp', cargoBin ?? 'cargo', ['test', '--release', '--manifest-path', 'windows-companion/awsp-server/Cargo.toml'], { skipIf: hasCargo });
 run('docker-build', 'docker', ['build', '-t', 'now-playing-hub:verify', '-f', 'docker-container/Dockerfile', '.'], { skipIf: hasDocker });
 results.push({ name: 'windows-package', status: process.platform === 'win32' ? 'SEE build:windows' : 'SKIPPED', detail: process.platform === 'win32' ? '' : 'Windows-only; produced by .github/workflows/windows-companion.yml', ms: 0 });
 

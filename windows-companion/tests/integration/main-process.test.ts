@@ -69,6 +69,7 @@ vi.mock('electron', () => {
     },
     ipcMain: { handle: (channel: string, fn: (event: unknown, request: unknown) => Promise<unknown>) => handlers.set(channel, fn) },
     Menu: { buildFromTemplate: () => ({}) },
+    powerMonitor: { on: () => undefined },
     safeStorage: {
       isEncryptionAvailable: () => true,
       encryptString: (text: string) => Buffer.from([...Buffer.from(text, 'utf8')].reverse()),

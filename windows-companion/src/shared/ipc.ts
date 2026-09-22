@@ -174,6 +174,38 @@ export const BackupProgress = z.object({
 });
 export type BackupProgress = z.infer<typeof BackupProgress>;
 
+/* ---------------------------------------------------------------------- awsp */
+
+export const AwspTier = z.enum(['lossless', 'high', 'saver']);
+export type AwspTier = z.infer<typeof AwspTier>;
+
+/** A device paired to stream from this PC (docs/AWSP.md §1–2). Kept under DPAPI by the main process. */
+export const AwspDevice = z.object({
+  id: z.string().min(1).max(200),
+  name: z.string().max(200),
+  clientKind: z.enum(['pwa', 'android']),
+  tierCap: AwspTier,
+  pairedAt: z.iso.datetime({ offset: true }),
+});
+export type AwspDevice = z.infer<typeof AwspDevice>;
+
+export const AwspStatus = z.object({
+  enabled: z.boolean(),
+  running: z.boolean(),
+  /** Why it is not running, or what went wrong, in a sentence. */
+  reason: z.string().nullable(),
+  endpointId: z.string().nullable(),
+  ticket: z.string().nullable(),
+  /** The ticket as a QR code, drawn by the main process (SVG markup). */
+  ticketQrSvg: z.string().nullable(),
+  relayUrl: z.string().nullable(),
+  pairingCode: z.object({ code: z.string(), expiresAt: z.string() }).nullable(),
+  devices: z.array(AwspDevice),
+  connections: z.array(z.object({ peer: z.string(), name: z.string().nullable(), type: z.enum(['direct', 'relay', 'bridge']), rttMs: z.number().nullable() })),
+  port: z.number().int().nullable(),
+});
+export type AwspStatus = z.infer<typeof AwspStatus>;
+
 /* -------------------------------------------------------------------- helper */
 
 export const HelperTool = z.object({
@@ -288,6 +320,13 @@ export const IPC = {
   'backup:remove': { request: z.object({ id: z.string() }), response: z.object({ ok: z.boolean(), reason: z.string().nullable() }) },
   'backup:export-playlists': { request: z.void(), response: z.object({ path: z.string().nullable(), count: z.number().int(), reason: z.string().nullable() }) },
 
+  'awsp:status': { request: z.void(), response: AwspStatus },
+  'awsp:set-enabled': { request: z.object({ enabled: z.boolean() }), response: AwspStatus },
+  'awsp:set-port': { request: z.object({ port: z.number().int().min(1024).max(65535).nullable() }), response: AwspStatus },
+  'awsp:new-code': { request: z.void(), response: AwspStatus },
+  'awsp:revoke': { request: z.object({ id: z.string().min(1).max(200) }), response: AwspStatus },
+  'awsp:set-tier': { request: z.object({ id: z.string().min(1).max(200), tier: AwspTier }), response: AwspStatus },
+
   'helper:status': { request: z.void(), response: HelperStatus },
   'helper:check-tools': { request: z.void(), response: HelperStatus },
   /** The helper's token, for pasting into a player this app does not serve. Shown, never logged. */
@@ -304,6 +343,7 @@ export const IPC_EVENTS = {
   'event:hub-status': HubConnection,
   'event:transfer-progress': TransferProgress,
   'event:backup-progress': BackupProgress,
+  'event:awsp-status': AwspStatus,
   'event:notice': z.object({ kind: z.enum(['info', 'warning', 'error']), message: z.string() }),
 } as const satisfies Record<IpcEvent, z.ZodType>;
 

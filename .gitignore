@@ -44,3 +44,6 @@ android/local.properties
 /team-clone-*.png
 # Bytecode from Python one-offs run against the repository during maintenance passes.
 __pycache__/
+
+# The AWSP sidecar's Cargo build output (Cargo.lock is committed).
+windows-companion/awsp-server/target/

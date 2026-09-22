@@ -23,6 +23,7 @@
     "better-sqlite3": "13.0.3",
     "chokidar": "5.0.0",
     "music-metadata": "11.15.0",
+    "qrcode": "1.5.4",
     "ws": "8.21.3",
     "zod": "4.5.4"
   },
@@ -31,6 +32,7 @@
     "@now-playing/audio-core": "workspace:*",
     "@now-playing/test-fixtures": "workspace:*",
     "@types/better-sqlite3": "9.6.0",
+    "@types/qrcode": "1.5.6",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.7",
     "@types/ws": "8.18.1",

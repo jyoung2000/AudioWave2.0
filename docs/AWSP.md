@@ -18,7 +18,8 @@ Checked against the published crates and packages, not memory:
 | Identity | `SecretKey::generate()`, `to_bytes() -> [u8;32]`, `from_bytes`; `EndpointId = PublicKey` | iroh-base 1.2.0 | `iroh-base/src/key.rs` |
 | Tickets | `iroh_tickets::endpoint::EndpointTicket::new(endpoint.addr())`; string `"endpoint" + base32(postcard)` | iroh-tickets **1.0.0** | crates.io/crates/iroh-tickets; dumbpipe `src/main.rs` |
 | Relay-only (forced) | builder `.clear_ip_transports()` (not on wasm); `RelayMode::{Default, Staging, Custom, Disabled}` | 1.2.0 | `src/endpoint.rs`, test `endpoint_two_relay_only_no_ip` |
-| Local relay for tests | `iroh::test_utils::run_relay_server()` (feature `test-utils`); binary `iroh-relay --dev` (HTTP on `[::]:3340`) | 1.2.0 | `src/test_utils.rs`, `iroh-relay/src/main.rs` |
+| Local relay for tests | `iroh::test_utils::run_relay_server()` (feature `test-utils`; self-signed TLS, so clients need `CaTlsConfig::insecure_skip_verify()` — itself gated on `test-utils`); binary `iroh-relay --dev` (HTTP on `[::]:3340`) | 1.2.0 | `src/test_utils.rs`, `iroh-relay/src/main.rs` |
+| Path type | `conn.paths()` / `conn.paths_stream()` → `Path::{is_selected, is_relay, is_ip, rtt}` | 1.2.0 | `src/socket/remote_map/remote_state/path_watcher.rs` |
 | Browser | official wasm32 build, **relay-only**, end-to-end encrypted QUIC carried over the relay's WebSocket; no UDP, no hole punching, no DNS lookup; no npm package — compiled with `wasm-bindgen --target web` **=0.2.122**, `default-features = false, features = ["tls-ring"]`, `getrandom_backend="wasm_js"` | 1.2.0 | docs.iroh.computer/deployment/wasm-browser-support; iroh-examples `browser-echo` |
 | Kotlin / Android | `computer.iroh:iroh-android` AAR with `libiroh_ffi.so` for arm64-v8a, armeabi-v7a, x86, x86_64 (tracks iroh 1.0.2) | **1.1.0** (2026-07-16) | repo1.maven.org/maven2/computer/iroh/iroh-android/1.1.0 |
 | Node | `@number0/iroh` with win32-x64 prebuild | 1.1.0 | npmjs.com/package/@number0/iroh |
@@ -46,7 +47,10 @@ Consequences for this design:
   non-extractable WebCrypto AES-GCM key; Android in the Keystore. Its `EndpointId` is its identity.
 - **Allowlist** — the server keeps the `EndpointId`s of paired clients (with a name, a tier cap and
   the time paired), under DPAPI. A connection whose `conn.remote_id()` is not on it is closed with
-  application error `0x1` (`unknown-device`) **before any stream is accepted**.
+  application error `0x1` (`unknown-device`) **before any other stream is accepted**: the server
+  accepts exactly one stream from it, and that stream's first frame must be a `pair` (§2) arriving
+  within 10 s. Anything else — `hello`, an audio request, silence — closes with `0x1`. The sidecar
+  holds the allowlist in memory; the Electron main process owns the DPAPI copy (§10).
 
 ## 2. Pairing
 
@@ -56,8 +60,12 @@ Consequences for this design:
 2. The client scans or pastes the ticket, connects with ALPN `awsp/1`, opens the control stream and
    sends `pair {code, device_name, client_kind}` instead of `hello`.
 3. The server checks the code (constant-time; five wrong codes void it), adds `remote_id()` to the
-   allowlist, and answers `paired {server_name}`. The client stores the ticket with its keypair.
-4. Revoking a device in Settings removes it from the allowlist and closes its live connection.
+   allowlist with tier cap `lossless`, and answers `paired {server_name}`. The client stores the
+   ticket with its keypair and continues on the same control stream with `hello`. A wrong code is
+   answered `error {code: 'pair-rejected'}`, no live code (never issued, used, expired or voided)
+   `error {code: 'pair-no-code'}`; both then close the connection with `0x1`.
+4. Revoking a device in Settings removes it from the allowlist and closes its live connection with
+   `0x1`.
 
 Nothing in pairing touches the hub, a third-party account, or a public directory beyond the relay.
 
@@ -71,7 +79,9 @@ behind audio.
 
 Frames: `u32` big-endian length, then UTF-8 JSON `{id, type, seq, payload}`. `id` is the sender's
 monotonically increasing message id; `seq` is the server's state sequence (0 on client frames). A
-frame over 256 KiB closes the stream with `frame-too-large`.
+server frame answering a client frame (`pong`, `welcome`, `paired`, `library_page`, `artwork`, an
+`error`) also carries `re`, the `id` it answers. A frame over 256 KiB closes the stream with
+`frame-too-large` (`0x20`, as `STOP_SENDING` and `RESET_STREAM`).
 
 Client → server:
 
@@ -79,28 +89,36 @@ Client → server:
 |---|---|
 | `hello` | `{device_name, client_kind: 'pwa'|'android', protocol_version: 1, resume_token?}` |
 | `pair` | `{code, device_name, client_kind}` (first frame of a pairing connection only) |
-| `play` | `{track_id, offset_ms}` |
+| `play` | `{track_id, offset_ms}` (without `track_id`: resume the current track) |
 | `pause` | `{}` |
 | `seek` | `{ms}` |
 | `next` / `prev` | `{}` |
 | `set_queue` | `{track_ids}` |
-| `browse` | `{path?, query?, page}` → `library_page` |
+| `browse` | `{path?, query?, page}` → `library_page`; `path` is a `relative_path` prefix, `query` full-text, `page` 0-based |
 | `get_artwork` | `{track_id, size}` → `artwork` |
 | `prefetch` | `{track_id}` (a hint; the server may warm its cache) |
 | `report` | `{buffer_ms, throughput_kbps, dropouts}` (every 10 s while playing) |
 | `ping` | `{}` |
 
-Server → client: `welcome {server_name, resume_token, connection: 'direct'|'relay'}`, `state
-{playing, track_id, position_ms, queue, volume}` (on every change and every 5 s), `library_page`,
-`library_delta`, `artwork`, `error {code, message}`, `pong`, `paired`.
+Server → client: `welcome {server_name, resume_token, connection: 'direct'|'relay', resumed}`,
+`state {playing, track_id, position_ms, queue, volume}` (right after `welcome`, on every change and
+every 5 s), `library_page {page, page_size: 100, total, items: Track[]}`, `library_delta {since,
+until, items: Track[], removed: id[]}` (when the index changes), `artwork {track_id, size, mime,
+data}` (`data` base64 JPEG, or `mime`/`data` null when the file has no picture), `error {code,
+message}`, `pong`, `paired {server_name}`.
 
-**The server is authoritative** for queue and state. Clients render `state` and send intents.
+Frames other than `hello`, `pair` and `ping` before `hello` get `error {code: 'hello-required'}`. A
+`protocol_version` other than 1 gets `error {code: 'protocol-version'}` and a close with `0x2`.
+
+**The server is authoritative** for queue and state. Clients render `state` and send intents. The
+state is one per server, shared by every connected client.
 
 **Liveness and reconnection.** Ping every 5 s; three missed pongs is a lost connection. The client
 reconnects with exponential backoff 250 ms → 30 s (full jitter), sends `hello` with its
 `resume_token`, receives a fresh `state`, and re-issues its audio fetch **from the last contiguous
-byte it holds** (§4). A `resume_token` is 32 random bytes the server issues in `welcome`, valid for
-10 minutes, bound to the client's `EndpointId`.
+byte it holds** (§4). A `resume_token` is 32 random bytes (64 hex digits) the server issues in
+every `welcome`, valid once for 10 minutes, bound to the client's `EndpointId`; `welcome.resumed`
+says whether the one presented was accepted.
 
 ### 3.2 Audio streams
 
@@ -119,11 +137,22 @@ The server answers with a **16-byte header** and then the bytes:
 |---|---|---|
 | 0 | 8 | `track_id_hash` — first 8 bytes of BLAKE3(track_id) |
 | 8 | 6 | `total_len` — the whole file's length in bytes, big-endian |
-| 14 | 1 | `codec` — 1 FLAC, 2 ALAC(m4a), 3 MP3, 4 Opus(ogg), 5 WAV, 6 AAC(m4a) |
+| 14 | 1 | `codec` — 0 other, 1 FLAC, 2 ALAC(m4a), 3 MP3, 4 Opus(ogg), 5 WAV, 6 AAC(m4a) |
 | 15 | 1 | `tier` — 0 lossless, 1 high, 2 saver |
 
+`total_len` and the range are those of the bytes actually served — the original file for
+`lossless`, the cached Opus file for `high`/`saver` (codec 4). The tier byte is the tier served,
+after the device's cap clamps the request. An `.m4a` is ALAC or AAC by the indexed `format.codec`,
+failing that by an `alac` atom in the file.
+
 then exactly `byte_end - byte_start + 1` bytes (clamped to the file), then `finish()`. An error
-before the header is a stream reset with a code (`not-found` 0x10, `range` 0x11, `tier` 0x12).
+before the header is a stream reset with a code (`not-found` 0x10, `range` 0x11 — `byte_start`
+past the end or `byte_end < byte_start`, `tier` 0x12 — an unknown tier or a failed encode,
+`bad-request` 0x13 — no valid request frame within 10 s).
+
+**Error codes.** Connection close: `0x0` normal, `0x1` unknown-device (not allowlisted, revoked,
+or failed pairing), `0x2` protocol. Audio stream reset: `0x10`–`0x13` above. Control stream:
+`0x20` frame-too-large.
 
 The server reads from the file in 64 KiB chunks and writes each only when QUIC flow control accepts
 it — **backpressure end to end, never the whole file in memory**.
@@ -133,7 +162,8 @@ it — **backpressure end to end, never the whole file in memory**.
 - `lossless` (default): the original file's bytes, untouched — FLAC, ALAC, MP3 as they are on disk.
   **Bit-identical by construction**, and tested so (§8).
 - `high`: Opus 256 kb/s; `saver`: Opus 128 kb/s. Produced by `ffmpeg -c:a libopus`, cached on disk
-  keyed by `(track_id, tier, source mtime)` in the companion's data folder; a range request against a
+  keyed by `(track_id, tier, source mtime)` under the sidecar's `cache_dir` (§10; `tiers/`, and
+  `art/` for artwork), older encodes of the same track removed; a range request against a
   tier the cache does not hold yet waits for the encode (the first request) and streams from the
   cache afterwards. A per-device tier cap on the server clamps what a client may ask for.
 - **Buffering (all clients):** target 20 s ahead, low-water 5 s — the fetch loop pauses above the
@@ -184,9 +214,16 @@ Clients on it show **bridge**. It is not the PWA's normal path (§0).
   received equal the source file's bytes (SHA-256).
 - **Seek and resume.** The same test seeks (a new range) and drops the connection mid-stream
   (killing and restarting the relay), and asserts the client resumed at its last contiguous byte.
-- **Outage.** A Rust integration test runs two real iroh endpoints on this machine, relay-only via
-  `AWSP_RELAY_ONLY=1`, streams a 24-bit/96 kHz FLAC fixture generated by ffmpeg, pauses the relay for
-  3 s, and asserts zero underruns against the 20 s buffer.
+- **Outage.** A Rust integration test (`windows-companion/awsp-server/tests/awsp.rs`) runs two real
+  iroh endpoints on this machine, relay-only (the server's config gets `AWSP_RELAY_ONLY=1` applied
+  through `Config::apply_env`; the client calls `.clear_ip_transports()`) through a local
+  `run_relay_server`, asserts every path is `relay`, and streams a 30 s 24-bit/96 kHz FLAC fixture
+  generated by ffmpeg through a client buffer model (target 20 s, low-water 5 s, real-time
+  playback). `run_relay_server` cannot be paused, so the relay sits behind a TCP proxy that is
+  stalled for 3 s, starting 1.5 s before the buffer reaches low-water so a refill is in flight
+  during the outage. It asserts zero underruns and a byte-identical result (SHA-256). The same file
+  also covers range correctness, bit identity over a direct connection, tier clamping, and the
+  allowlist and pairing rules (§1, §2).
 - **NAT simulation.** n0's netsim tooling is Linux-side. The netsim test lives in
   `.github/workflows/awsp-netsim.yml` as a CI-only Linux job; **it has not been run on this machine**.
 - The manual matrix is `TESTING.md`.
@@ -196,3 +233,25 @@ Clients on it show **bridge**. It is not the PWA's normal path (§0).
 No third-party accounts; no Docker-container involvement in streaming; no plaintext on the wire (QUIC
 end to end; WSS for the bridge); secrets under OS protection (DPAPI on Windows, Android Keystore,
 IndexedDB + WebCrypto in the browser). iOS native: deferred.
+
+## 10. The sidecar process contract
+
+`windows-companion/awsp-server` builds `awsp-server(.exe)`. The Electron main process starts it with
+no arguments and talks newline-delimited JSON; logs go to stderr (`AWSP_LOG` sets the filter,
+default `info`). The sidecar never writes a secret to disk and opens the library read-only.
+
+- **stdin, first line — config:** `{"secret_key_hex": "<64 hex>", "library_db": "<companion.sqlite>",
+  "cache_dir": "<dir>", "server_name": "…", "allowlist": [{"id", "name", "tier_cap":
+  "lossless|high|saver", "paired_at"}], "relay_mode": "default|disabled|custom", "relay_urls": […],
+  "relay_only": false, "bind_port": null|u16, "insecure_relay_tls": false}`. `AWSP_RELAY_ONLY=1`
+  forces `relay_only`. `relay_mode: "default"` uses n0's relays and DNS address lookup; `custom` and
+  `disabled` use neither. `insecure_relay_tls` trusts any relay certificate (a local dev relay);
+  QUIC stays end-to-end encrypted either way.
+- **stdin, further lines — commands:** `{"cmd":"new_pairing_code"}`, `{"cmd":"revoke","id"}`,
+  `{"cmd":"set_tier_cap","id","tier"}`, `{"cmd":"shutdown"}`. End of stdin also shuts down.
+- **stdout — events:** `ready {endpoint_id, ticket, relay_url}` (after the home relay is reached, or
+  15 s), `pairing_code {code, expires_at}`, `paired {id, name, client_kind}` (main persists the entry
+  under DPAPI, tier cap `lossless`), `connection {peer, type: direct|relay, rtt_ms}` (on
+  establishment and on each path-type change, also logged as in §5), `disconnected {peer}`,
+  `error {message}`.
+- ffmpeg is `AWSP_FFMPEG` or `ffmpeg` on PATH. It is needed only for `high`/`saver` and artwork.

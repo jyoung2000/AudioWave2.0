@@ -428,6 +428,9 @@ importers:
       music-metadata:
         specifier: 11.15.0
         version: 11.15.0
+      qrcode:
+        specifier: 1.5.4
+        version: 1.5.4
       ws:
         specifier: 8.21.3
         version: 8.21.3
@@ -447,6 +450,9 @@ importers:
       '@types/better-sqlite3':
         specifier: 9.6.0
         version: 9.6.0
+      '@types/qrcode':
+        specifier: 1.5.6
+        version: 1.5.6
       '@types/react':
         specifier: 19.2.18
         version: 19.2.18

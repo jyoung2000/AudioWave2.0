@@ -329,3 +329,53 @@ body {
     text-align: left;
   }
 }
+
+/* Stream to your devices: the QR beside the code, as the mockup's Remote tab set them. */
+.companion-pair {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.companion-pair__qr svg {
+  display: block;
+  width: 168px;
+  height: 168px;
+  padding: 6px;
+  background: #fff;
+  border: 1px solid var(--aqua-ctl-field-border);
+  border-radius: 4px;
+}
+
+.companion-pair__text {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.companion-lcd {
+  display: grid;
+  gap: 3px;
+  justify-items: center;
+  padding: 12px 14px 13px;
+  color: var(--aqua-lcd-text);
+  text-align: center;
+  background: linear-gradient(var(--aqua-lcd-top), var(--aqua-lcd-bottom));
+  border: 1px solid #7f8a8e;
+  border-radius: 4px;
+  box-shadow: inset 0 1px 3px rgb(0 0 0 / 25%);
+}
+
+.companion-lcd__code {
+  font: 700 30px/1.1 ui-monospace, Consolas, monospace;
+  letter-spacing: 0.14em;
+}
+
+.companion-lcd__sub {
+  font-size: 11px;
+}
+
+.companion-steps {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
