@@ -96,6 +96,8 @@ export interface RankingWeights {
   popularityFit: number;
   moodContext: number;
   discoveryBonus: number;
+  /** Closeness in tempo to what the listener plays, or to the context tracks in `similar` mode. */
+  tempoFit: number;
 }
 
 export interface ColdStartConfig {
@@ -205,7 +207,7 @@ export const DEFAULT_RECOMMENDATION_CONFIG: RecommendationConfig = Object.freeze
     strongArtistAffinity: 0.35,
     knownGenreAffinity: 0.2,
   },
-  ranking: { tasteMatch: 0.3, artistAffinity: 0.2, genreAffinity: 0.15, collaborative: 0.1, recency: 0.1, popularityFit: 0.05, moodContext: 0.05, discoveryBonus: 0.05 },
+  ranking: { tasteMatch: 0.25, artistAffinity: 0.15, genreAffinity: 0.15, collaborative: 0.1, recency: 0.05, popularityFit: 0.05, moodContext: 0.05, discoveryBonus: 0.05, tempoFit: 0.15 },
   explorationRate: 0.1,
   coldStart: { minEvents: 20, minMeaningfulListens: 10, minArtists: 3 },
   limits: {
@@ -347,6 +349,7 @@ export function effectiveWeights(config: RecommendationConfig, mode: Recommendat
     popularityFit: base.popularityFit * (mult.popularityFit ?? 1),
     moodContext: base.moodContext * (mult.moodContext ?? 1),
     discoveryBonus: base.discoveryBonus * (mult.discoveryBonus ?? 1),
+    tempoFit: base.tempoFit * (mult.tempoFit ?? 1),
   };
 }
 

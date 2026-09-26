@@ -3,6 +3,9 @@ import { decadeOf, normalizeArtist, normalizeText } from '@now-playing/domain';
 /** Minimal structural view of a track used by the similarity functions (CanonicalTrack satisfies it). */
 export interface SimilarityTrack {
   artistName: string;
+  /** Weighted genres on the fixed vocabulary, when enrichment has supplied one. */
+  genreProfile?: Record<string, number>;
+  bpm?: number | null;
   genres: readonly string[];
   tags: readonly string[];
   releaseYear: number | null;
@@ -171,7 +174,9 @@ function durationSimilarity(a: number | null, b: number | null): number {
 
 /** 0..1 similarity from genres (0.35), tags (0.20), era (0.15), popularity (0.10), duration (0.10) and same artist (0.10). */
 export function trackSimilarity(a: SimilarityTrack, b: SimilarityTrack): number {
-  const genre = genreListSimilarity(a.genres, b.genres);
+  // A profile on both sides says more than two lists; fall back to the lists otherwise.
+  const bothProfiled = a.genreProfile && b.genreProfile && Object.keys(a.genreProfile).length > 0 && Object.keys(b.genreProfile).length > 0;
+  const genre = bothProfiled ? profileSimilarity(a.genreProfile!, b.genreProfile!) : genreListSimilarity(a.genres, b.genres);
   const tags = jaccard(normalizeTags(a.tags), normalizeTags(b.tags));
   const era = eraSimilarity(a.releaseYear, b.releaseYear);
   const pop = popularitySimilarity(a.popularity, b.popularity);
@@ -197,4 +202,30 @@ export function clamp01(value: number): number {
 /** Stable artist key shared by profiles, catalogues and relations: normalised name, falling back to the id. */
 export function artistKeyOf(artistName: string | null | undefined, artistId?: string | null): string {
   return normalizeArtist(artistName) || (artistId ?? '');
+}
+
+/** Cosine similarity of two weighted genre profiles; 0 when either is empty. */
+export function profileSimilarity(a: Record<string, number>, b: Record<string, number>): number {
+  const ka = Object.keys(a);
+  const kb = Object.keys(b);
+  if (!ka.length || !kb.length) return 0;
+  let dot = 0;
+  let na = 0;
+  let nb = 0;
+  for (const k of ka) {
+    na += a[k]! ** 2;
+    if (k in b) dot += a[k]! * b[k]!;
+  }
+  for (const k of kb) nb += b[k]! ** 2;
+  return na && nb ? dot / Math.sqrt(na * nb) : 0;
+}
+
+/**
+ * How close two tempos feel: 1 at the same tempo, about a half at ten beats apart, nothing at forty.
+ * Double and half time count at 0.7 (a 170 track sits well after an 85 one). Unknown on either side is 0.
+ */
+export function tempoAffinity(a: number | null | undefined, b: number | null | undefined): number {
+  if (!a || !b) return 0;
+  const g = (x: number, y: number): number => Math.exp(-(((x - y) / 12) ** 2));
+  return Math.max(g(a, b), 0.7 * g(a * 2, b), 0.7 * g(a, b * 2));
 }

@@ -46,6 +46,8 @@ export interface TrackFeatures {
   album: string | null;
   era: string | null;
   band: PopularityBand;
+  genreProfile: Record<string, number>;
+  bpm: number | null;
 }
 
 export interface RelatedArtist {
@@ -75,7 +77,7 @@ export interface CatalogueOptions {
 
 export function trackFeatures(track: CanonicalTrack): TrackFeatures {
   const artist = artistKeyOf(track.artistName, track.artistId);
-  return { artist, artistName: track.artistName, genres: normalizeGenres(track.genres), tags: normalizeTags(track.tags), album: albumKeyOf(artist, track.albumId, track.albumName), era: eraOf(track.releaseYear), band: popularityBand(track.popularity) };
+  return { artist, artistName: track.artistName, genres: normalizeGenres(track.genres), tags: normalizeTags(track.tags), album: albumKeyOf(artist, track.albumId, track.albumName), era: eraOf(track.releaseYear), band: popularityBand(track.popularity), genreProfile: track.genreProfile ?? {}, bpm: track.bpm ?? null };
 }
 
 function push<K, V>(map: Map<K, V[]>, key: K, value: V): void {

@@ -4,7 +4,7 @@ import { trackFeatures } from './candidates.js';
 import { collaborativeScores, type Cooccurrence } from './collaborative.js';
 import { DEFAULT_RECOMMENDATION_CONFIG, effectiveWeights, type RankingWeights, type RecommendationConfig, type RecommendationTier } from './config.js';
 import { DAY_MS, discoveryAppetite, maxPositiveWeight, normalizedWeight, popularityPreference, recentPlays, type TasteProfile } from './profile.js';
-import { clamp01, trackSimilarity } from './similarity.js';
+import { clamp01, trackSimilarity, tempoAffinity } from './similarity.js';
 
 export interface RankingContext {
   now: number;
@@ -56,6 +56,8 @@ export interface Evidence {
   playedRecently: boolean;
   albumLabel: string | null;
   libraryGapVia: string | null;
+  bpm: number | null;
+  tempoFit: number;
 }
 
 export interface ScoredCandidate extends Candidate {
@@ -81,6 +83,26 @@ function sourceOf(c: Candidate, kind: CandidateSource['kind']): CandidateSource 
 }
 
 /** Score candidates with per-component breakdown and penalties; sorted by score desc, then track id. */
+/**
+ * The tempo the listener keeps coming back to: the play-weighted mean of the BPMs of tracks in the
+ * profile that the catalogue knows a tempo for. Null until three such tracks exist; one song is not
+ * a preference.
+ */
+function preferredTempo(profile: TasteProfile, catalogue: RankingContext['catalogue']): number | null {
+  let sum = 0;
+  let weight = 0;
+  let n = 0;
+  for (const [trackId, entry] of Object.entries(profile.dims.tracks)) {
+    if (entry.w <= 0) continue;
+    const bpm = catalogue.byId.get(trackId)?.bpm ?? null;
+    if (!bpm) continue;
+    sum += bpm * entry.w;
+    weight += entry.w;
+    n += 1;
+  }
+  return n >= 3 && weight > 0 ? sum / weight : null;
+}
+
 export function rankCandidates(candidates: readonly Candidate[], profile: TasteProfile, ctx: RankingContext, config: RecommendationConfig = DEFAULT_RECOMMENDATION_CONFIG): ScoredCandidate[] {
   const weights = effectiveWeights(config, ctx.mode);
   const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0) || 1;
@@ -89,6 +111,7 @@ export function rankCandidates(candidates: readonly Candidate[], profile: TasteP
   const max = { track: maxPositiveWeight(dims.tracks), artist: maxPositiveWeight(dims.artists), genre: maxPositiveWeight(dims.genres), tag: maxPositiveWeight(dims.tags), era: maxPositiveWeight(dims.eras), band: maxPositiveWeight(dims.popularity) };
   const appetite = discoveryAppetite(profile);
   const preferredPopularity = popularityPreference(profile);
+  const preferredBpm = preferredTempo(profile, ctx.catalogue);
   const collab = ctx.cooccurrence ? collaborativeScores(ctx.cooccurrence, profile) : null;
   const recent = recentPlays(profile, ctx.now, config.candidates.recentDays);
   const recentArtists = new Map<string, number>();
@@ -189,8 +212,11 @@ export function rankCandidates(candidates: readonly Candidate[], profile: TasteP
 
     const discoveryBonus = !artistKnown ? 0.5 + 0.5 * appetite : trackKnown ? 0 : 0.3;
 
-    const components: ScoreBreakdown = { tasteMatch: clamp01(tasteMatch), artistAffinity: clamp01(artistAffinity), genreAffinity: clamp01(genreAffinity), collaborative: clamp01(collaborative), recency: clamp01(recency), popularityFit: clamp01(popularityFit), moodContext: clamp01(moodContext), discoveryBonus: clamp01(discoveryBonus) };
-    const weighted: ScoreBreakdown = { tasteMatch: 0, artistAffinity: 0, genreAffinity: 0, collaborative: 0, recency: 0, popularityFit: 0, moodContext: 0, discoveryBonus: 0 };
+    const tempoFit = ctx.contextTracks.length
+      ? Math.max(0, ...ctx.contextTracks.map((t) => tempoAffinity(c.track.bpm, t.bpm ?? null)))
+      : tempoAffinity(c.track.bpm, preferredBpm);
+    const components: ScoreBreakdown = { tasteMatch: clamp01(tasteMatch), artistAffinity: clamp01(artistAffinity), genreAffinity: clamp01(genreAffinity), collaborative: clamp01(collaborative), recency: clamp01(recency), popularityFit: clamp01(popularityFit), moodContext: clamp01(moodContext), discoveryBonus: clamp01(discoveryBonus), tempoFit: clamp01(tempoFit) };
+    const weighted: ScoreBreakdown = { tasteMatch: 0, artistAffinity: 0, genreAffinity: 0, collaborative: 0, recency: 0, popularityFit: 0, moodContext: 0, discoveryBonus: 0, tempoFit: 0 };
     let base = 0;
     for (const key of Object.keys(components) as (keyof RankingWeights)[]) {
       weighted[key] = round6((weights[key] * components[key]) / totalWeight);
@@ -225,6 +251,8 @@ export function rankCandidates(candidates: readonly Candidate[], profile: TasteP
       collaborativeVia,
       contextLabel: ctx.contextLabel,
       contextSimilarity: round6(contextSimilarity),
+      bpm: c.track.bpm ?? null,
+      tempoFit: round6(tempoFit),
       recentArtistPlays,
       trackKnown,
       artistKnown,
@@ -263,6 +291,7 @@ export function reasonsFor(scored: ScoredCandidate, limit = 10): ReasonEntry[] {
     else if (e.relatedVia) add('artistAffinity', w.artistAffinity, `Because ${e.artistLabel} is related to ${e.relatedVia}, an artist you play often`);
   }
   if (w.genreAffinity > 0 && e.genreLabel && e.genreNorm > 0) add('genreAffinity', w.genreAffinity, `Because you listen to a lot of ${e.genreLabel}`);
+  if (w.tempoFit > 0 && e.tempoFit >= 0.6 && e.bpm) add('tempoFit', w.tempoFit, `Because it moves at about ${e.bpm} bpm, like what you have been playing`);
   if (w.collaborative > 0 && e.collaborativeVia) add('collaborative', w.collaborative, `Because people who play ${e.collaborativeVia} also play this`);
   if (w.tasteMatch > 0 && e.contextSimilarity > 0 && scored.sources.some((s) => s.kind === 'playlist-context' && s.via?.startsWith('seed:'))) add('tasteMatch', w.tasteMatch, `Closely matches the song you picked`);
   else if (w.tasteMatch > 0 && scored.components.tasteMatch >= 0.6) add('tasteMatch', w.tasteMatch, 'Matches the genres, eras and tags you gravitate to');

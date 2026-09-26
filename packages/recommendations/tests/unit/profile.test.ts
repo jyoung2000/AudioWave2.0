@@ -76,7 +76,7 @@ describe('configuration', () => {
 
   it('ships the documented ranking weights, which sum to 1', () => {
     const r = DEFAULT_RECOMMENDATION_CONFIG.ranking;
-    expect(r).toEqual({ tasteMatch: 0.3, artistAffinity: 0.2, genreAffinity: 0.15, collaborative: 0.1, recency: 0.1, popularityFit: 0.05, moodContext: 0.05, discoveryBonus: 0.05 });
+    expect(r).toEqual({ tasteMatch: 0.25, artistAffinity: 0.15, genreAffinity: 0.15, collaborative: 0.1, recency: 0.05, popularityFit: 0.05, moodContext: 0.05, discoveryBonus: 0.05, tempoFit: 0.15 });
     expect(Object.values(r).reduce((a, b) => a + b, 0)).toBeCloseTo(1, 9);
   });
 
