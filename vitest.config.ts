@@ -7,6 +7,8 @@ const path = (relative: string): string => fileURLToPath(new URL(relative, impor
 const alias = {
   '@now-playing/contracts': path('./packages/contracts/src/index.ts'),
   '@now-playing/domain': path('./packages/domain/src/index.ts'),
+  // Before the bare alias for the same prefix reason as the stylesheets below.
+  '@now-playing/audio-core/tempo': path('./packages/audio-core/src/tempo.ts'),
   '@now-playing/audio-core': path('./packages/audio-core/src/index.ts'),
   '@now-playing/recommendations': path('./packages/recommendations/src/index.ts'),
   '@now-playing/test-fixtures': path('./packages/test-fixtures/src/index.ts'),
