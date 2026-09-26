@@ -20,7 +20,7 @@ export class DeezerAdapter extends BaseAdapter {
   }
 
   descriptor(): Omit<ProviderDescriptor, 'enabled' | 'configured' | 'capabilities'> {
-    return { provider: this.id, displayName: 'Deezer (tempo)', role: 'metadata-only', docsUrl: 'https://developers.deezer.com/api', authType: 'none', authScopes: [], attribution: 'Tempo data from Deezer', rateStrategy: 'Public API; 50 requests per 5 s; backoff on 4xx', cachePolicy: 'stored on the canonical row', groupCompatible: false, discordCompatible: false, limitations: 'Tempo is present for a subset of the catalogue and 0 means unmeasured; no audio, no previews.', reviewedAt: REVIEWED_AT };
+    return { provider: this.id, displayName: 'Deezer (tempo)', role: 'metadata-only', docsUrl: 'https://developers.deezer.com/api', authType: 'none', authScopes: [], attribution: 'Tempo data from Deezer', rateStrategy: 'Public API; 50 requests per 5 s; backoff on 4xx', cachePolicy: 'stored on the canonical row', groupCompatible: false, discordCompatible: false, limitations: ['Tempo is present for a subset of the catalogue and 0 means unmeasured; no audio, no previews.'], reviewedAt: REVIEWED_AT };
   }
 
   capabilities(): ProviderCapabilities {

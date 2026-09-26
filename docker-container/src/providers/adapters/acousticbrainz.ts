@@ -17,7 +17,7 @@ export class AcousticBrainzAdapter extends BaseAdapter {
   }
 
   descriptor(): Omit<ProviderDescriptor, 'enabled' | 'configured' | 'capabilities'> {
-    return { provider: this.id, displayName: 'AcousticBrainz (tempo archive)', role: 'metadata-only', docsUrl: 'https://acousticbrainz.org/data', authType: 'none', authScopes: [], attribution: 'AcousticBrainz (CC0)', rateStrategy: 'Archive; one lookup per recording, never retried on 404', cachePolicy: 'stored on the canonical row', groupCompatible: false, discordCompatible: false, limitations: 'Archive frozen in 2022: nothing released since is known; needs a MusicBrainz recording id.', reviewedAt: REVIEWED_AT };
+    return { provider: this.id, displayName: 'AcousticBrainz (tempo archive)', role: 'metadata-only', docsUrl: 'https://acousticbrainz.org/data', authType: 'none', authScopes: [], attribution: 'AcousticBrainz (CC0)', rateStrategy: 'Archive; one lookup per recording, never retried on 404', cachePolicy: 'stored on the canonical row', groupCompatible: false, discordCompatible: false, limitations: ['Archive frozen in 2022: nothing released since is known; needs a MusicBrainz recording id.'], reviewedAt: REVIEWED_AT };
   }
 
   capabilities(): ProviderCapabilities {

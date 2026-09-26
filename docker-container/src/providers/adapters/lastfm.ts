@@ -21,7 +21,7 @@ export class LastFmAdapter extends BaseAdapter {
   }
 
   descriptor(): Omit<ProviderDescriptor, 'enabled' | 'configured' | 'capabilities'> {
-    return { provider: this.id, displayName: 'Last.fm (tags)', role: 'metadata-only', docsUrl: 'https://www.last.fm/api', authType: 'api-key', authScopes: [], attribution: 'Tags from Last.fm', rateStrategy: '5 requests per second per key', cachePolicy: 'stored on the canonical row', groupCompatible: false, discordCompatible: false, limitations: 'Tags are community text and arrive weighted by votes; without an API key nothing is fetched.', reviewedAt: REVIEWED_AT };
+    return { provider: this.id, displayName: 'Last.fm (tags)', role: 'metadata-only', docsUrl: 'https://www.last.fm/api', authType: 'api-key', authScopes: [], attribution: 'Tags from Last.fm', rateStrategy: '5 requests per second per key', cachePolicy: 'stored on the canonical row', groupCompatible: false, discordCompatible: false, limitations: ['Tags are community text and arrive weighted by votes; without an API key nothing is fetched.'], reviewedAt: REVIEWED_AT };
   }
 
   capabilities(): ProviderCapabilities {
