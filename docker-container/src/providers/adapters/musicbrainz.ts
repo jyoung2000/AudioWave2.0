@@ -54,6 +54,59 @@ function lucene(text: string): string {
   return text.replace(/[+\-!(){}[\]^"~*?:\\/]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+
+interface MbCredit { name: string; joinphrase?: string; artist: { id: string; name: string } }
+interface MbRelease { id: string; title: string; date?: string; status?: string; 'release-group'?: { id: string; title: string; 'primary-type'?: string } }
+interface MbRecordingRaw { id: string; title: string; length?: number; isrcs?: string[]; 'artist-credit'?: MbCredit[]; releases?: MbRelease[]; genres?: Array<{ name: string; count: number }>; tags?: Array<{ name: string; count: number }> }
+
+/** A recording as the enrichment matcher needs it: who made it (features apart), where it was released, what it is called. */
+export interface MbRecordingDetail {
+  id: string;
+  title: string;
+  lengthMs: number | null;
+  isrcs: string[];
+  artistName: string;
+  featuredArtists: string[];
+  releaseGroupId: string | null;
+  albumName: string | null;
+  releaseYear: number | null;
+  genres: Array<{ name: string; count: number }>;
+  tags: Array<{ name: string; count: number }>;
+}
+
+const RECORDING_INC = 'artist-credits+releases+release-groups+genres+tags+isrcs';
+
+/** The artist credit is a list joined by phrases; once a phrase says "feat." everything after it is a feature. */
+function toDetail(r: MbRecordingRaw): MbRecordingDetail {
+  const credits = r['artist-credit'] ?? [];
+  const featured: string[] = [];
+  let main = '';
+  let inFeat = false;
+  for (const c of credits) {
+    if (inFeat) featured.push(c.name);
+    else main += c.name;
+    const jp = (c.joinphrase ?? '').toLowerCase();
+    if (/feat|ft\.|featuring/.test(jp)) inFeat = true;
+    else if (!inFeat && jp.trim()) main += c.joinphrase;
+  }
+  const official = (r.releases ?? []).filter((x) => x.status === 'Official' && x['release-group']?.['primary-type'] !== 'Single');
+  const rel = official[0] ?? (r.releases ?? [])[0] ?? null;
+  const year = rel?.date ? Number(rel.date.slice(0, 4)) : NaN;
+  return {
+    id: r.id,
+    title: r.title,
+    lengthMs: r.length ?? null,
+    isrcs: r.isrcs ?? [],
+    artistName: main.trim(),
+    featuredArtists: featured,
+    releaseGroupId: rel?.['release-group']?.id ?? null,
+    albumName: rel?.['release-group']?.title ?? rel?.title ?? null,
+    releaseYear: Number.isFinite(year) ? year : null,
+    genres: r.genres ?? [],
+    tags: r.tags ?? [],
+  };
+}
+
 /** Metadata-only provider. Never an audio source; identifies recordings, artists and release groups. */
 export class MusicBrainzAdapter extends BaseAdapter {
   readonly id = 'musicbrainz';
@@ -154,6 +207,29 @@ export class MusicBrainzAdapter extends BaseAdapter {
   }
 
   /** URL relationship lookup, used to enrich pasted Bandcamp links without scraping the page. */
+  async recordingsByIsrc(isrc: string): Promise<MbRecordingDetail[]> {
+    const d = await this.get<{ recordings?: MbRecordingRaw[] }>('recording', { query: `isrc:${isrc}`, inc: RECORDING_INC, limit: '5' });
+    return (d.recordings ?? []).map(toDetail);
+  }
+
+  async searchRecordings(title: string, artist: string, limit = 5): Promise<MbRecordingDetail[]> {
+    const q = `recording:"${title.replace(/"/g, '')}" AND artist:"${artist.replace(/"/g, '')}"`;
+    const d = await this.get<{ recordings?: MbRecordingRaw[] }>('recording', { query: q, inc: RECORDING_INC, limit: String(limit) });
+    return (d.recordings ?? []).map(toDetail);
+  }
+
+  async recordingDetail(mbid: string): Promise<MbRecordingDetail | null> {
+    const d = await this.get<MbRecordingRaw>(`recording/${encodeURIComponent(mbid)}`, { inc: RECORDING_INC }).catch(() => null);
+    return d && d.id ? toDetail(d) : null;
+  }
+
+  /** The archive's own listing, not a redirect chase: a front image means the stable front-250 address will answer. */
+  async coverArtUrl(releaseGroupMbid: string): Promise<string | null> {
+    const id = encodeURIComponent(releaseGroupMbid);
+    const d = await this.http.getJson<{ images?: Array<{ front?: boolean }> }>(`https://coverartarchive.org/release-group/${id}`, { allowedHosts: HOSTS, headers: this.headers(), timeoutMs: 8_000 }).catch(() => null);
+    return d?.images?.some((i) => i.front) ? `https://coverartarchive.org/release-group/${id}/front-250` : null;
+  }
+
   async lookupUrl(resource: string): Promise<SearchResult | null> {
     const data = await this.get<{ relations?: Array<{ type: string; recording?: MbRecording; release?: { id: string; title: string }; artist?: { id: string; name: string } }> }>('url', { resource, inc: 'recording-rels+release-rels+artist-rels' }).catch(() => null);
     const rel = data?.relations?.find((r) => r.recording) ?? null;
