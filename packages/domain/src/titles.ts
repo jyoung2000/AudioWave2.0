@@ -7,6 +7,7 @@
 const NOISE = /\s*[[(]\s*(official\s*(music\s*)?(video|audio|lyric\s*video|visuali[sz]er)|lyrics?(\s*video)?|audio|visuali[sz]er|hd|hq|4k|explicit|clean|remaster(ed)?(\s*\d{4})?|prod\.?\s+by[^\])]*|music\s*video|mv|m\/v)\s*[\])]/gi;
 const TRAILING_NOISE = /\s+(hd|hq|4k|official\s+video|official\s+audio|lyrics)\s*$/i;
 const FEAT_INLINE = /\s*[[(]\s*(?:feat\.?|ft\.?|featuring)\s+([^\])]+)\s*[\])]/i;
+const FEAT_MID = /\s+(?:feat\.?|ft\.?|featuring)\s+(.+?)(?=\s+[-\u2013\u2014]\s)/i;
 const FEAT_TAIL = /\s+(?:feat\.?|ft\.?|featuring)\s+(.+?)\s*$/i;
 
 function splitNames(s: string): string[] {
@@ -14,7 +15,8 @@ function splitNames(s: string): string[] {
 }
 
 export function splitFeatured(title: string): { title: string; featured: string[] } {
-  const m = title.match(FEAT_INLINE) ?? title.match(FEAT_TAIL);
+  // The middle shape first — "A ft. B - Song" keeps its dash and its song — then the tail.
+  const m = title.match(FEAT_INLINE) ?? title.match(FEAT_MID) ?? title.match(FEAT_TAIL);
   if (!m) return { title: title.trim(), featured: [] };
   return { title: title.replace(m[0], '').trim(), featured: splitNames(m[1]!) };
 }

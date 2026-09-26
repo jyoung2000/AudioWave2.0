@@ -53,4 +53,16 @@ describe('musicbrainz recordings', () => {
     hub.fetch.on('coverartarchive.org/release-group/none', () => ({ status: 404, body: { error: 'No cover art found.' } }));
     expect(await mb.coverArtUrl('none')).toBeNull();
   });
+
+  it('M3: the album is the earliest official release, never a compilation', async () => {
+    const releases = [
+      { id: 'r9', title: 'Now 67', date: '2019-01-01', status: 'Official', 'release-group': { id: 'rg9', title: 'Now 67', 'primary-type': 'Album', 'secondary-types': ['Compilation'] } },
+      { id: 'r1', title: 'Album', date: '2017-05-12', status: 'Official', 'release-group': { id: 'rg1', title: 'Album', 'primary-type': 'Album' } },
+    ];
+    hub.fetch.on('query=isrc', () => ({ body: { recordings: [{ ...RECORDING, releases }] } }));
+    const [r] = await mb.recordingsByIsrc('USUM71703861');
+    expect(r!.albumName).toBe('Album');
+    expect(r!.releaseYear).toBe(2017);
+    expect(r!.releaseGroupId).toBe('rg1');
+  });
 });

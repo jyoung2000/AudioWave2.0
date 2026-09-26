@@ -8,6 +8,7 @@ describe('splitFeatured', () => {
     ['Song (featuring A, B and C)', 'Song', ['A', 'B', 'C']],
     ['Song [Feat. Guest]', 'Song', ['Guest']],
     ['Song', 'Song', []],
+    ['A ft. B - Song', 'A - Song', ['B']],
   ])('%s', (input, title, featured) => {
     expect(splitFeatured(input)).toEqual({ title, featured });
   });
@@ -24,6 +25,11 @@ describe('cleanVideoTitle', () => {
   ])('%j', (input, expected) => {
     const out = cleanVideoTitle(input);
     expect({ artist: out.artist, title: out.title, featured: out.featured }).toEqual(expected);
+  });
+
+  it('keeps the song when the features sit between artist and dash (M1)', () => {
+    const out = cleanVideoTitle({ title: 'Calvin Harris ft. Rihanna - This Is What You Came For (Official Video)', channel: 'CalvinHarrisVEVO' });
+    expect(out).toMatchObject({ artist: 'Calvin Harris', title: 'This Is What You Came For', featured: ['Rihanna'] });
   });
 
   it('says when the artist came from a Topic channel', () => {

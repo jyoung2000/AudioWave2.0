@@ -1,5 +1,5 @@
 import type { ProviderCapabilities, ProviderDescriptor } from '@now-playing/contracts';
-import type { SafeHttpClient } from '../http.js';
+import { ProviderHttpError, type SafeHttpClient } from '../http.js';
 import { BaseAdapter, caps, REVIEWED_AT } from './base.js';
 
 /**
@@ -29,7 +29,10 @@ export class AcousticBrainzAdapter extends BaseAdapter {
   }
 
   async bpmByMbid(mbid: string): Promise<number | null> {
-    const d = await this.http.getJson<{ rhythm?: { bpm?: number } }>(`${API}/${encodeURIComponent(mbid)}/low-level`, { allowedHosts: HOSTS, timeoutMs: 8_000 }).catch(() => null);
+    const d = await this.http.getJson<{ rhythm?: { bpm?: number } }>(`${API}/${encodeURIComponent(mbid)}/low-level`, { allowedHosts: HOSTS, timeoutMs: 8_000 }).catch((e: unknown) => {
+      if (e instanceof ProviderHttpError && e.status === 404) return null; // not in the archive — a fact, not a failure
+      throw e;
+    });
     const bpm = d?.rhythm?.bpm;
     return bpm && bpm > 0 ? Math.round(bpm) : null;
   }

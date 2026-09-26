@@ -127,9 +127,22 @@ export class JobScheduler {
     this.ticking = true;
     try {
       await this.runDue();
-      await this.runJobOnce();
+      // Jobs are background work: the tick fires the drain and moves on, so a slow provider can
+      // never hold up the one-second timers (review I4). The jobRunning guard stops overlap.
+      void this.drainJobs();
     } finally {
       this.ticking = false;
+    }
+  }
+
+  /** Claim and run due jobs one after another until none is due — paced by the providers' own limiters, never by the tick. */
+  private async drainJobs(): Promise<void> {
+    if (this.jobRunning) return;
+    try {
+      // eslint-disable-next-line no-empty
+      while (await this.runJobOnce()) {}
+    } catch (err) {
+      this.log.warn({ module: 'jobs', err: err instanceof Error ? err.message : String(err) }, 'job drain stopped');
     }
   }
 

@@ -1,6 +1,6 @@
 import type { ProviderCapabilities, ProviderDescriptor } from '@now-playing/contracts';
 import type { ProviderRuntimeConfig } from '../adapter.js';
-import type { SafeHttpClient } from '../http.js';
+import { ProviderHttpError, type SafeHttpClient } from '../http.js';
 import { BaseAdapter, caps, REVIEWED_AT } from './base.js';
 
 /**
@@ -43,7 +43,10 @@ export class LastFmAdapter extends BaseAdapter {
   private async call(params: Record<string, string>): Promise<LastFmTag[]> {
     const url = new URL(API);
     for (const [k, v] of Object.entries({ ...params, api_key: this.config.apiKey ?? '', format: 'json', autocorrect: '1' })) url.searchParams.set(k, v);
-    const d = await this.http.getJson<{ toptags?: { tag?: LastFmTag[] } }>(url.toString(), { allowedHosts: HOSTS, timeoutMs: 8_000 }).catch(() => null);
+    const d = await this.http.getJson<{ toptags?: { tag?: LastFmTag[] } }>(url.toString(), { allowedHosts: HOSTS, timeoutMs: 8_000 }).catch((e: unknown) => {
+      if (e instanceof ProviderHttpError && e.status === 404) return null;
+      throw e;
+    });
     return (d?.toptags?.tag ?? []).filter((t) => t.name && t.count > 0);
   }
 

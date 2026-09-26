@@ -169,7 +169,7 @@ export class RecommendationService {
     };
     this.repo.upsertTrack(track);
     if (this.enrichment && !track.enrichedAt && !track.musicbrainzRecordingId) {
-      this.enrichment.enqueueForTrack({ provider: input.provider ?? 'companion', providerId: input.providerTrackId ?? track.id, title: track.title, artistName: track.artistName, durationMs: track.durationMs, isrc: track.isrc, musicbrainzRecordingId: null, previewUrl: null, genreHint: track.genres[0] ?? null });
+      this.enrichment.enqueueForTrack({ canonicalId: track.id, provider: input.provider ?? 'companion', providerId: input.providerTrackId ?? track.id, title: track.title, artistName: track.artistName, durationMs: track.durationMs, isrc: track.isrc, musicbrainzRecordingId: null, previewUrl: null, genreHint: track.genres[0] ?? null });
     }
     if (input.provider && input.providerTrackId) {
       this.repo.putPlatform({ trackId: track.id, provider: input.provider, providerTrackId: input.providerTrackId, url: input.url ?? null, availability: input.availability ?? 'unknown', lastVerifiedAt: now });

@@ -106,6 +106,7 @@ function preferredTempo(profile: TasteProfile, catalogue: RankingContext['catalo
 export function rankCandidates(candidates: readonly Candidate[], profile: TasteProfile, ctx: RankingContext, config: RecommendationConfig = DEFAULT_RECOMMENDATION_CONFIG): ScoredCandidate[] {
   const weights = effectiveWeights(config, ctx.mode);
   const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0) || 1;
+  const totalWeightNoTempo = totalWeight - weights.tempoFit || 1;
   const modeConfig = config.modes[ctx.mode];
   const dims = profile.dims;
   const max = { track: maxPositiveWeight(dims.tracks), artist: maxPositiveWeight(dims.artists), genre: maxPositiveWeight(dims.genres), tag: maxPositiveWeight(dims.tags), era: maxPositiveWeight(dims.eras), band: maxPositiveWeight(dims.popularity) };
@@ -212,14 +213,21 @@ export function rankCandidates(candidates: readonly Candidate[], profile: TasteP
 
     const discoveryBonus = !artistKnown ? 0.5 + 0.5 * appetite : trackKnown ? 0 : 0.3;
 
-    const tempoFit = ctx.contextTracks.length
+    // The tempo term only exists when both sides are known (the spec's own words): a track with
+    // no measured tempo is not a bad tempo match, it is an unmeasured one, and its other terms
+    // are re-weighted over the remaining total instead (review I7).
+    const refTempoKnown = ctx.contextTracks.length ? ctx.contextTracks.some((t) => (t.bpm ?? null) !== null) : preferredBpm !== null;
+    const tempoKnown = refTempoKnown && c.track.bpm !== null && c.track.bpm !== undefined;
+    const tempoFit = !tempoKnown ? 0 : ctx.contextTracks.length
       ? Math.max(0, ...ctx.contextTracks.map((t) => tempoAffinity(c.track.bpm, t.bpm ?? null)))
       : tempoAffinity(c.track.bpm, preferredBpm);
     const components: ScoreBreakdown = { tasteMatch: clamp01(tasteMatch), artistAffinity: clamp01(artistAffinity), genreAffinity: clamp01(genreAffinity), collaborative: clamp01(collaborative), recency: clamp01(recency), popularityFit: clamp01(popularityFit), moodContext: clamp01(moodContext), discoveryBonus: clamp01(discoveryBonus), tempoFit: clamp01(tempoFit) };
     const weighted: ScoreBreakdown = { tasteMatch: 0, artistAffinity: 0, genreAffinity: 0, collaborative: 0, recency: 0, popularityFit: 0, moodContext: 0, discoveryBonus: 0, tempoFit: 0 };
     let base = 0;
+    const denominator = tempoKnown ? totalWeight : totalWeightNoTempo;
     for (const key of Object.keys(components) as (keyof RankingWeights)[]) {
-      weighted[key] = round6((weights[key] * components[key]) / totalWeight);
+      const w = key === 'tempoFit' && !tempoKnown ? 0 : weights[key];
+      weighted[key] = round6((w * components[key]) / denominator);
       base += weighted[key];
     }
     const skipStats = profile.skips.tracks[c.trackId];

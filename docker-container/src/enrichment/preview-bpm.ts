@@ -15,6 +15,14 @@ export const MAX_CLIP_BYTES = 4 * 1024 * 1024;
 const SAMPLE_RATE = 22050;
 const CLIP_SECONDS = 30;
 const DECODE_TIMEOUT_MS = 20_000;
+const READ_TIMEOUT_MS = 15_000;
+
+/**
+ * The decode arguments, exported so a test can hold the security-bearing ones still: the protocol
+ * whitelist means a playlist body (HLS on cf-hls-media) can never make ffmpeg reach the network —
+ * the four-host invariant would otherwise end at the demuxer.
+ */
+export const DECODE_ARGS = ['-hide_banner', '-loglevel', 'error', '-protocol_whitelist', 'pipe', '-i', 'pipe:0', '-vn', '-ac', '1', '-ar', String(SAMPLE_RATE), '-f', 's16le', '-t', String(CLIP_SECONDS), 'pipe:1'];
 /** More PCM than 40 s of mono 16-bit at the sample rate means the decoder is not doing what it was told. */
 const MAX_PCM_BYTES = SAMPLE_RATE * 2 * 40;
 
@@ -24,6 +32,8 @@ export interface PreviewBpmDeps {
   log: Logger;
   /** Test seam: spawn the ffmpeg binary with these arguments instead of the decode arguments. */
   ffmpegArgsOverride?: string[];
+  /** Test seam: how long a stalled body read may hold on before the clip is abandoned. */
+  readTimeoutMs?: number;
 }
 
 export async function bpmFromPreviewClip(deps: PreviewBpmDeps, url: string): Promise<TempoEstimate | null> {
@@ -44,7 +54,7 @@ export async function bpmFromPreviewClip(deps: PreviewBpmDeps, url: string): Pro
     await res.body?.cancel().catch(() => undefined);
     return null;
   }
-  const clip = await readCapped(res.body, MAX_CLIP_BYTES);
+  const clip = await readCapped(res.body, MAX_CLIP_BYTES, deps.readTimeoutMs ?? READ_TIMEOUT_MS);
   if (!clip || clip.byteLength === 0) return null;
 
   const pcm = await decode(ffmpeg.path, clip, deps.ffmpegArgsOverride);
@@ -56,13 +66,27 @@ export async function bpmFromPreviewClip(deps: PreviewBpmDeps, url: string): Pro
 }
 
 /** Reads a stream into memory up to a cap; over the cap the clip is abandoned rather than truncated. */
-async function readCapped(body: ReadableStream<Uint8Array> | null, cap: number): Promise<Uint8Array | null> {
+async function readCapped(body: ReadableStream<Uint8Array> | null, cap: number, timeoutMs: number): Promise<Uint8Array | null> {
   if (!body) return null;
   const reader = body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
+  const deadline = Date.now() + timeoutMs;
   for (;;) {
-    const { done, value } = await reader.read();
+    const left = deadline - Date.now();
+    if (left <= 0) {
+      await reader.cancel().catch(() => undefined);
+      return null; // a stalled CDN is a missing clip, not a hostage situation (review I4)
+    }
+    const step = await Promise.race([
+      reader.read(),
+      new Promise<'timeout'>((r) => setTimeout(() => r('timeout'), left)),
+    ]);
+    if (step === 'timeout') {
+      await reader.cancel().catch(() => undefined);
+      return null;
+    }
+    const { done, value } = step;
     if (done) break;
     total += value.byteLength;
     if (total > cap) {
@@ -81,7 +105,7 @@ async function readCapped(body: ReadableStream<Uint8Array> | null, cap: number):
 }
 
 function decode(ffmpegPath: string, clip: Uint8Array, argsOverride?: string[]): Promise<Uint8Array | null> {
-  const args = argsOverride ?? ['-hide_banner', '-loglevel', 'error', '-i', 'pipe:0', '-vn', '-ac', '1', '-ar', String(SAMPLE_RATE), '-f', 's16le', '-t', String(CLIP_SECONDS), 'pipe:1'];
+  const args = argsOverride ?? DECODE_ARGS;
   return new Promise((resolve) => {
     const child = spawn(ffmpegPath, args, { stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true });
     const chunks: Buffer[] = [];

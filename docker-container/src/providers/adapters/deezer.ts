@@ -1,5 +1,6 @@
 import type { ProviderCapabilities, ProviderDescriptor } from '@now-playing/contracts';
-import type { SafeHttpClient } from '../http.js';
+import { normalizeArtist, normalizeText } from '@now-playing/domain';
+import { ProviderHttpError, type SafeHttpClient } from '../http.js';
 import { BaseAdapter, caps, REVIEWED_AT } from './base.js';
 
 /**
@@ -35,8 +36,12 @@ export class DeezerAdapter extends BaseAdapter {
     return this.http.getJson<T>(`${API}/${path}`, { allowedHosts: HOSTS, timeoutMs: 8_000 });
   }
 
+  /** A transport failure throws so the job retries; only Deezer's own "no such track" answers are null. */
   async bpmByIsrc(isrc: string): Promise<{ bpm: number; durationMs: number | null } | null> {
-    const t = await this.get<DzTrack>(`track/isrc:${encodeURIComponent(isrc)}`).catch(() => null);
+    const t = await this.get<DzTrack>(`track/isrc:${encodeURIComponent(isrc)}`).catch((e: unknown) => {
+      if (e instanceof ProviderHttpError && e.status === 404) return null;
+      throw e;
+    });
     if (!t || t.error || !(t.bpm && t.bpm > 0)) return null;
     return { bpm: Math.round(t.bpm), durationMs: t.duration && t.duration > 0 ? t.duration * 1000 : null };
   }
@@ -44,10 +49,14 @@ export class DeezerAdapter extends BaseAdapter {
   /** A search hit counts only when its length agrees with ours to three seconds; a same-named live take must not lend its tempo. */
   async bpmBySearch(artist: string, title: string, durationMs: number | null): Promise<{ bpm: number } | null> {
     const q = encodeURIComponent(`artist:"${artist}" track:"${title}"`);
-    const page = await this.get<{ data?: DzTrack[] }>(`search?limit=3&q=${q}`).catch(() => null);
-    const hit = (page?.data ?? []).find((d) => durationMs === null || !d.duration || Math.abs(d.duration * 1000 - durationMs) <= DURATION_GATE_MS);
+    const page = await this.get<{ data?: DzTrack[] }>(`search?limit=3&q=${q}`);
+    const wantA = normalizeArtist(artist);
+    const wantT = normalizeText(title);
+    const hit = (page?.data ?? []).find((d) =>
+      d.artist && normalizeArtist(d.artist.name) === wantA && d.title && normalizeText(d.title) === wantT &&
+      (durationMs === null || !d.duration || Math.abs(d.duration * 1000 - durationMs) <= DURATION_GATE_MS));
     if (!hit) return null;
-    const t = await this.get<DzTrack>(`track/${hit.id}`).catch(() => null);
+    const t = await this.get<DzTrack>(`track/${hit.id}`);
     return t && t.bpm && t.bpm > 0 ? { bpm: Math.round(t.bpm) } : null;
   }
 }

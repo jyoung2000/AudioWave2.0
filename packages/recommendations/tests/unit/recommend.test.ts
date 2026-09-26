@@ -420,3 +420,24 @@ describe('offline evaluation', () => {
     expect(one[0]!.id).toBe(seeds[0]!.id);
   });
 });
+
+describe('tempo term (review I7)', () => {
+  it('an unknown tempo is left out of the weighting, never scored as a bad match', () => {
+    const base = testCatalogue().map((t, i) => (i < 3 ? { ...t, bpm: 170, bpmSource: 'deezer' as const } : t));
+    const profile = warmProfile(base);
+    const twin = (id: string, bpm: number | null): CanonicalTrack => ({ ...base[4]!, id, bpm, bpmSource: bpm ? ('deezer' as const) : null });
+    const nullBpm = twin('00000000-0000-4000-8000-00000000a001', null);
+    const farBpm = twin('00000000-0000-4000-8000-00000000a002', 60);
+    const catalogue = buildCatalogue([...base, nullBpm, farBpm]);
+    const candidates = [nullBpm, farBpm].map((track) => ({ trackId: track.id, track, sources: [{ kind: 'top-artist' as const, via: null, score: 0.5 }], reasons: [] }));
+    const scored = rankCandidates(candidates, profile, {
+      now: NOW, mode: 'for-you', catalogue, recentlyPlayedIds: new Set(), recentlyRecommended: {}, cooccurrence: null,
+      contextKeys: [], contextTracks: [], contextLabel: null, coldStart: false,
+    });
+    const byId = new Map(scored.map((sc) => [sc.trackId, sc]));
+    const unknown = byId.get(nullBpm.id)!;
+    const far = byId.get(farBpm.id)!;
+    expect(unknown.score).toBeGreaterThan(far.score);
+    expect(unknown.weighted.tempoFit).toBe(0);
+  });
+});

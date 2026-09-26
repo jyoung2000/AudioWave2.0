@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestHub, type TestHub } from '../helpers/hub.js';
-import { bpmFromPreviewClip, MAX_CLIP_BYTES, PREVIEW_HOSTS } from '../../src/enrichment/preview-bpm.js';
+import { bpmFromPreviewClip, DECODE_ARGS, MAX_CLIP_BYTES, PREVIEW_HOSTS } from '../../src/enrichment/preview-bpm.js';
 
 /** A stand-in for ffmpeg: node itself, writing 20 s of 120 bpm clicks as s16le mono 22050 to stdout. */
 const CLICK_SCRIPT =
@@ -48,5 +48,20 @@ describe('bpm from a preview clip', () => {
     const r = await bpmFromPreviewClip({ ...hub.ctx, ffmpegArgsOverride: ['-e', CLICK_SCRIPT] }, 'https://audio-ssl.itunes.apple.com/clip');
     expect(r?.bpm).toBe(120);
     expect(r!.confidence).toBeGreaterThan(1.5);
+  });
+
+  it('I4: a stalled body gives up within the read timeout instead of holding the job', async () => {
+    const stalled = new ReadableStream<Uint8Array>({ start() { /* never enqueues */ } });
+    const deps = { ...hub.ctx, http: { request: async () => ({ status: 200, headers: new Headers(), url: 'x', body: stalled, text: async () => '', json: async () => ({}) }) }, readTimeoutMs: 300 } as never;
+    const t0 = Date.now();
+    expect(await bpmFromPreviewClip(deps, 'https://p.scdn.co/mp3-preview/stall')).toBeNull();
+    expect(Date.now() - t0).toBeLessThan(5_000);
+  });
+
+  it('M6: the decoder may only read its pipe - no playlist may reach the network', () => {
+    const i = DECODE_ARGS.indexOf('-protocol_whitelist');
+    expect(i).toBeGreaterThanOrEqual(0);
+    expect(DECODE_ARGS[i + 1]).toBe('pipe');
+    expect(DECODE_ARGS.indexOf('-protocol_whitelist')).toBeLessThan(DECODE_ARGS.indexOf('-i'));
   });
 });

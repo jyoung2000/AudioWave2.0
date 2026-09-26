@@ -43,7 +43,10 @@ export class RecordingMatcher {
     const cleaned = input.provider === 'youtube'
       ? cleanVideoTitle({ title: input.title, channel: input.channelName ?? input.artistName ?? null })
       : { ...splitFeatured(input.title), artist: null as string | null, fromTopicChannel: false };
-    const artist = cleaned.artist ?? input.artistName;
+    // A YouTube channel is not an artist (Review Focus 1): when the cleaner found no artist in
+    // the title itself, a YouTube result stays honestly unmatched. Other platforms' uploader
+    // field is the closest thing they have to an artist, so it may stand in.
+    const artist = cleaned.artist ?? (input.provider === 'youtube' ? null : input.artistName);
     const cleanedOut = { title: cleaned.title, artist, featured: cleaned.featured };
 
     if (input.musicbrainzRecordingId) {
@@ -52,7 +55,10 @@ export class RecordingMatcher {
     }
     if (input.isrc) {
       const hits = await this.run(() => this.mb.recordingsByIsrc(input.isrc!));
-      if (hits[0]) return { recording: hits[0], confidence: 0.95, via: 'isrc', cleaned: cleanedOut };
+      // One ISRC can span several edits; when we know our length, prefer the edit that shares it.
+      const gated = input.durationMs !== null ? hits.find((h) => h.lengthMs !== null && Math.abs(h.lengthMs - input.durationMs!) <= DURATION_GATE_MS) : undefined;
+      const hit = gated ?? hits[0];
+      if (hit) return { recording: hit, confidence: 0.95, via: 'isrc', cleaned: cleanedOut };
     }
     if (!artist || !cleaned.title) return null;
 

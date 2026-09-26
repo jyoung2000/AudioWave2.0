@@ -56,7 +56,7 @@ function lucene(text: string): string {
 
 
 interface MbCredit { name: string; joinphrase?: string; artist: { id: string; name: string } }
-interface MbRelease { id: string; title: string; date?: string; status?: string; 'release-group'?: { id: string; title: string; 'primary-type'?: string } }
+interface MbRelease { id: string; title: string; date?: string; status?: string; 'release-group'?: { id: string; title: string; 'primary-type'?: string; 'secondary-types'?: string[] } }
 interface MbRecordingRaw { id: string; title: string; length?: number; isrcs?: string[]; 'artist-credit'?: MbCredit[]; releases?: MbRelease[]; genres?: Array<{ name: string; count: number }>; tags?: Array<{ name: string; count: number }> }
 
 /** A recording as the enrichment matcher needs it: who made it (features apart), where it was released, what it is called. */
@@ -89,8 +89,13 @@ function toDetail(r: MbRecordingRaw): MbRecordingDetail {
     if (/feat|ft\.|featuring/.test(jp)) inFeat = true;
     else if (!inFeat && jp.trim()) main += c.joinphrase;
   }
-  const official = (r.releases ?? []).filter((x) => x.status === 'Official' && x['release-group']?.['primary-type'] !== 'Single');
-  const rel = official[0] ?? (r.releases ?? [])[0] ?? null;
+  // The first *official* release: albums before singles, never a compilation when anything else
+  // exists, and the earliest date wins — a recording's home is where it first appeared, not the
+  // "Now 67" it was later collected onto.
+  const usable = (r.releases ?? []).filter((x) => x.status === 'Official' && x['release-group']?.['primary-type'] !== 'Single');
+  const straight = usable.filter((x) => !(x['release-group']?.['secondary-types'] ?? []).includes('Compilation'));
+  const pool = straight.length ? straight : usable;
+  const rel = pool.slice().sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999'))[0] ?? (r.releases ?? [])[0] ?? null;
   const year = rel?.date ? Number(rel.date.slice(0, 4)) : NaN;
   return {
     id: r.id,
@@ -138,7 +143,21 @@ export class MusicBrainzAdapter extends BaseAdapter {
     return { 'User-Agent': BRANDING.userAgent(this.version, this.config.contactEmail ?? 'unconfigured'), Accept: 'application/json' };
   }
 
+  /** MusicBrainz asks for one request per second; this gate serialises every call through it. */
+  private lastAt = 0;
+  private gate: Promise<void> = Promise.resolve();
+  private throttle(): Promise<void> {
+    const turn = this.gate.then(async () => {
+      const wait = this.lastAt + 1000 - Date.now();
+      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+      this.lastAt = Date.now();
+    });
+    this.gate = turn.catch(() => undefined);
+    return turn;
+  }
+
   private async get<T>(path: string, params: Record<string, string>): Promise<T> {
+    await this.throttle();
     const url = new URL(`${MB}/${path}`);
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
     url.searchParams.set('fmt', 'json');
@@ -207,6 +226,7 @@ export class MusicBrainzAdapter extends BaseAdapter {
   }
 
   /** URL relationship lookup, used to enrich pasted Bandcamp links without scraping the page. */
+  /** Recordings that registered this ISRC, with credits, releases, genres and tags. */
   async recordingsByIsrc(isrc: string): Promise<MbRecordingDetail[]> {
     const d = await this.get<{ recordings?: MbRecordingRaw[] }>('recording', { query: `isrc:${isrc}`, inc: RECORDING_INC, limit: '5' });
     return (d.recordings ?? []).map(toDetail);
@@ -229,7 +249,11 @@ export class MusicBrainzAdapter extends BaseAdapter {
   /** The archive's own listing, not a redirect chase: a front image means the stable front-250 address will answer. */
   async coverArtUrl(releaseGroupMbid: string): Promise<string | null> {
     const id = encodeURIComponent(releaseGroupMbid);
-    const d = await this.http.getJson<{ images?: Array<{ front?: boolean }> }>(`https://coverartarchive.org/release-group/${id}`, { allowedHosts: HOSTS, headers: this.headers(), timeoutMs: 8_000 }).catch(() => null);
+    await this.throttle();
+    const d = await this.http.getJson<{ images?: Array<{ front?: boolean }> }>(`https://coverartarchive.org/release-group/${id}`, { allowedHosts: HOSTS, headers: this.headers(), timeoutMs: 8_000 }).catch((e: unknown) => {
+      if (e instanceof ProviderHttpError && e.status === 404) return null;
+      throw e;
+    });
     return d?.images?.some((i) => i.front) ? `https://coverartarchive.org/release-group/${id}/front-250` : null;
   }
 

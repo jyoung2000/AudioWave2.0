@@ -62,4 +62,16 @@ describe('recording matcher', () => {
     expect(m?.via).toBe('mbid');
     expect(m?.confidence).toBe(1);
   });
+
+  it('M2: a YouTube title with no dash never borrows the channel as the artist', async () => {
+    const m = await matcher.match({ title: 'Just A Song', artistName: 'RandomChannel', channelName: 'RandomChannel', durationMs: 200_000, isrc: null, musicbrainzRecordingId: null, provider: 'youtube' });
+    expect(m).toBeNull();
+    expect(hub.fetch.calls.filter((c) => c.url.includes('query=recording'))).toHaveLength(0);
+  });
+
+  it('M4: among several recordings for one isrc, the one whose length agrees wins', async () => {
+    hub.fetch.on('query=isrc', () => ({ body: { recordings: [rec({ id: 'aaaaaaaa-0000-4000-8000-000000000021', length: 200_000 }), rec({ id: 'aaaaaaaa-0000-4000-8000-000000000022', length: 260_000 })] } }));
+    const m = await matcher.match({ title: 'x', artistName: null, durationMs: 259_500, isrc: 'USUM71703861', musicbrainzRecordingId: null, provider: 'spotify' });
+    expect(m?.recording.id).toBe('aaaaaaaa-0000-4000-8000-000000000022');
+  });
 });

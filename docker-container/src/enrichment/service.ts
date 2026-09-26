@@ -21,6 +21,8 @@ const MATCHED_AT_LEAST = 0.5;
 
 /** Everything a job needs to look a track up, carried in the job's payload. */
 export interface EnrichmentKey {
+  /** When the caller already owns a canonical row, the job writes onto exactly that row. */
+  canonicalId?: string | null;
   provider: string;
   providerId: string;
   title: string;
@@ -66,8 +68,14 @@ export class EnrichmentService {
     return this.deps.providers.has(id) && this.deps.providers.isEnabled(id) ? (this.deps.providers.get(id) as T) : null;
   }
 
-  private findCanonical(r: { identity: Pick<SearchResult['identity'], 'isrc' | 'musicbrainzRecordingId'>; title: string; artistName: string | null; durationMs: number | null }): CanonicalTrack | undefined {
+  private findCanonical(r: { identity: Pick<SearchResult['identity'], 'isrc' | 'musicbrainzRecordingId'>; title: string; artistName: string | null; durationMs: number | null }, platform?: { provider: string; providerId: string }): CanonicalTrack | undefined {
     const c = this.deps.canonical;
+    // The platform's own id first (C1): it survives every difference between the platform's title
+    // and MusicBrainz's, which the normalised lookup below cannot.
+    if (platform) {
+      const t = c.findTrackByPlatform(platform.provider, platform.providerId);
+      if (t) return t;
+    }
     if (r.identity.musicbrainzRecordingId) {
       const t = c.findTrackByMbid(r.identity.musicbrainzRecordingId);
       if (t) return t;
@@ -109,7 +117,7 @@ export class EnrichmentService {
   /** Cache-first, never the network: a miss queues one job and the result goes back as it came. */
   async enrichResult(result: SearchResult, _budgetMs: number): Promise<SearchResult> {
     if (result.kind !== 'track') return result;
-    const t = this.findCanonical(result);
+    const t = this.findCanonical(result, { provider: result.provider, providerId: result.providerId });
     if (t?.enrichedAt) return this.applyCanonical(result, t);
     this.enqueueForTrack({
       provider: result.provider,
@@ -145,12 +153,13 @@ export class EnrichmentService {
       provider: key.provider,
     });
     const now = this.now();
-    const existing = this.findCanonical({
+    const owned = key.canonicalId ? this.deps.canonical.findTrackById(key.canonicalId) : undefined;
+    const existing = owned ?? this.findCanonical({
       identity: { isrc: key.isrc ?? match?.recording.isrcs[0] ?? null, musicbrainzRecordingId: match?.recording.id ?? key.musicbrainzRecordingId },
       title: key.title,
       artistName: key.artistName,
       durationMs: key.durationMs,
-    });
+    }, { provider: key.provider, providerId: key.providerId });
     const base: CanonicalTrack = existing ?? {
       id: randomUUID(),
       musicbrainzRecordingId: null,
@@ -188,16 +197,21 @@ export class EnrichmentService {
     track.updatedAt = now;
     track.enrichedAt = now;
     this.deps.canonical.upsertTrack(track);
+    // The platform link is written for every outcome, match or not: it is what stops the next
+    // search from re-queueing this track forever (C1).
+    this.deps.canonical.putPlatform({ trackId: track.id, provider: key.provider, providerTrackId: key.providerId, url: null, availability: 'unknown', lastVerifiedAt: now });
   }
 
   private async fill(base: CanonicalTrack, m: Match, key: EnrichmentKey): Promise<CanonicalTrack> {
     const mb = this.deps.providers.get('musicbrainz') as MusicBrainzAdapter;
     const lastfm = this.adapter<LastFmAdapter>('lastfm');
     const r = m.recording;
+    // A failure here throws: the scheduler owns the retry (I3). Only a source's own "not found"
+    // comes back null from the adapters.
     const artwork = r.releaseGroupId
-      ? await this.deps.rateLimiter.run('musicbrainz', 'P3', () => mb.coverArtUrl(r.releaseGroupId!), { timeoutMs: 10_000 }).catch(() => null)
+      ? await this.deps.rateLimiter.run('musicbrainz', 'P3', () => mb.coverArtUrl(r.releaseGroupId!), { timeoutMs: 10_000 })
       : null;
-    const lfm = lastfm ? await this.deps.rateLimiter.run('lastfm', 'P3', () => lastfm.topTags(r.artistName, r.title), { timeoutMs: 10_000 }).catch(() => []) : [];
+    const lfm = lastfm ? await this.deps.rateLimiter.run('lastfm', 'P3', () => lastfm.topTags(r.artistName, r.title), { timeoutMs: 10_000 }) : [];
     const maxG = Math.max(1, ...r.genres.map((g) => g.count));
     const maxT = Math.max(1, ...r.tags.map((g) => g.count));
     const maxL = Math.max(1, ...lfm.map((g) => g.count));
@@ -208,7 +222,12 @@ export class EnrichmentService {
       ...(key.genreHint ? [{ label: key.genreHint, weight: 0.3 }] : []),
     ];
     const profile = mergeGenreProfile(votes);
+    const profileKeys = Object.keys(profile);
+    // A match that brings nothing must not erase what the file carried (I2): the profile's keys
+    // lead, the row's own genres survive, and an unmappable hint lands in tags, not nowhere.
+    const genres = [...profileKeys, ...base.genres.filter((g) => !profileKeys.includes(g))];
     const unmapped = [...r.tags, ...lfm].map((t) => t.name.toLowerCase()).filter((n) => !(n in profile)).slice(0, 10);
+    if (key.genreHint && !(key.genreHint.toLowerCase() in profile)) unmapped.push(key.genreHint.toLowerCase());
     return {
       ...base,
       musicbrainzRecordingId: r.id,
@@ -221,9 +240,9 @@ export class EnrichmentService {
       releaseYear: r.releaseYear,
       durationMs: base.durationMs ?? r.lengthMs,
       featuredArtists: r.featuredArtists.length ? r.featuredArtists : m.cleaned.featured,
-      genres: Object.keys(profile),
+      genres,
       genreProfile: profile,
-      tags: [...new Set(unmapped)],
+      tags: [...new Set([...base.tags, ...unmapped])],
       artworkUrl: artwork,
       matchConfidence: m.confidence,
     };
@@ -233,7 +252,7 @@ export class EnrichmentService {
   private async bpmChain(t: CanonicalTrack, key: EnrichmentKey): Promise<BpmAnswer> {
     const deezer = this.adapter<DeezerAdapter>('deezer');
     const ab = this.adapter<AcousticBrainzAdapter>('acousticbrainz');
-    const run = <T>(p: string, fn: () => Promise<T>): Promise<T | null> => this.deps.rateLimiter.run(p, 'P3', fn, { timeoutMs: 10_000 }).catch(() => null);
+    const run = <T>(p: string, fn: () => Promise<T>): Promise<T | null> => this.deps.rateLimiter.run(p, 'P3', fn, { timeoutMs: 10_000 });
     if (deezer && t.isrc) {
       const d = await run('deezer', () => deezer.bpmByIsrc(t.isrc!));
       if (d) return { bpm: d.bpm, source: 'deezer' };
@@ -242,7 +261,9 @@ export class EnrichmentService {
       const b = await run('acousticbrainz', () => ab.bpmByMbid(t.musicbrainzRecordingId!));
       if (b) return { bpm: b, source: 'acousticbrainz' };
     }
-    if (deezer && t.artistName) {
+    // A name search is a guess unless the match was confident and the length is known (I6);
+    // the preview clip below is never a guess — it measures the result's own audio.
+    if (deezer && t.artistName && (t.matchConfidence ?? 0) >= 0.5 && t.durationMs !== null) {
       const d = await run('deezer', () => deezer.bpmBySearch(t.artistName, t.title, t.durationMs));
       if (d) return { bpm: d.bpm, source: 'deezer' };
     }

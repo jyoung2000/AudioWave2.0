@@ -3,6 +3,7 @@ import { createTestHub, type TestHub } from '../helpers/hub.js';
 import type { AcousticBrainzAdapter } from '../../src/providers/adapters/acousticbrainz.js';
 import type { DeezerAdapter } from '../../src/providers/adapters/deezer.js';
 import type { LastFmAdapter } from '../../src/providers/adapters/lastfm.js';
+import type { MusicBrainzAdapter } from '../../src/providers/adapters/musicbrainz.js';
 
 describe('metadata adapters', () => {
   let hub: TestHub;
@@ -54,5 +55,13 @@ describe('metadata adapters', () => {
       expect(a.capabilities().playback).toBe('unsupported');
       expect(a.capabilities().creatorDownload).toBe('unsupported');
     }
+  });
+
+  it('I5: MusicBrainz is asked at one request per second, even in parallel', async () => {
+    const mb = hub.ctx.providers.get('musicbrainz') as MusicBrainzAdapter;
+    hub.fetch.on('musicbrainz.org/ws/2/recording?query=recording', () => ({ body: { recordings: [] } }));
+    const t0 = Date.now();
+    await Promise.all([mb.searchRecordings('One', 'Artist'), mb.searchRecordings('Two', 'Artist')]);
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(900);
   });
 });
