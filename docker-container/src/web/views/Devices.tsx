@@ -67,13 +67,13 @@ export function DevicesView() {
                 <p className="admin-hint">
                   Hub fingerprint: <code>{created.hubFingerprint}</code>
                 </p>
-                <p className="admin-hint">Once the device has entered the code it will show a six-character verification code. Type it here — if it does not match what the device shows, do not confirm.</p>
+                <p className="admin-hint">Once the device has entered the code it will show a verification code, grouped like AB12-CD34-EF56. Type it here — if it does not match what the device shows, do not confirm.</p>
                 <div className="admin-actions">
                   <label className="aqua-field aqua-field--inline">
                     <span className="aqua-field__label">Verification code</span>
-                    <input className="aqua-input" value={fingerprint} onChange={(e) => setFingerprint(e.currentTarget.value)} maxLength={8} spellCheck={false} />
+                    <input className="aqua-input" value={fingerprint} onChange={(e) => setFingerprint(e.currentTarget.value)} maxLength={20} spellCheck={false} />
                   </label>
-                  <Button variant="default" busy={confirmPairing.busy} disabled={fingerprint.trim().length < 4} onClick={() => void confirm()}>
+                  <Button variant="default" busy={confirmPairing.busy} disabled={fingerprint.replace(/[^0-9A-Za-z]/g, '').length < 12} onClick={() => void confirm()}>
                     Confirm
                   </Button>
                   <Button
