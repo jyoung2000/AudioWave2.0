@@ -23,6 +23,7 @@ import type { RateLimitManager } from './rate-limit-manager.js';
 import { ProviderHttpError } from './http.js';
 import { parseResultId } from './adapters/base.js';
 import type { MusicBrainzAdapter } from './adapters/musicbrainz.js';
+import type { EnrichmentService } from '../enrichment/service.js';
 
 export interface SearchRequest {
   query: string;
@@ -66,6 +67,19 @@ export class SearchService {
     private readonly clock: Clock,
     private readonly metrics: MetricsRegistry,
   ) {}
+
+  private enrichment: EnrichmentService | null = null;
+
+  /** Attached after construction: the scheduler the enrichment service queues on is built later than search. */
+  attachEnrichment(service: EnrichmentService): void {
+    this.enrichment = service;
+  }
+
+  private async enriched(results: SearchResult[]): Promise<SearchResult[]> {
+    if (!this.enrichment) return results;
+    // Cache-only: enrichResult never waits on the network, so this is a handful of SQLite reads.
+    return Promise.all(results.map((r) => this.enrichment!.enrichResult(r, 200)));
+  }
 
   private cacheKey(provider: string, query: string, scope: SearchScope, cursor: string | null): string {
     return `search:${provider}:${scope}:${cursor ?? ''}:${query.trim().toLowerCase()}`;
@@ -150,7 +164,7 @@ export class SearchService {
       if (run.nextCursor) nextCursors[run.provider] = run.nextCursor;
     }
 
-    const merged = mergeSearchResults(groups).slice(0, limit);
+    const merged = await this.enriched(mergeSearchResults(groups).slice(0, limit));
     this.metrics.increment('search.requests');
     this.metrics.observe('search.latency_ms', this.clock.now() - started);
 
@@ -181,7 +195,7 @@ export class SearchService {
       if (!this.registry.isConfigured(adapter.id)) continue;
       try {
         const result = await this.rateLimiter.run(adapter.id, 'P0', () => adapter.resolve(trimmed), { timeoutMs: 12_000 });
-        if (result) return result;
+        if (result) return this.enrichment ? this.enrichment.enrichResult(result, 200) : result;
       } catch {
         // A provider that cannot resolve this link is not an error for the caller; try the next one.
       }
@@ -210,7 +224,9 @@ export class SearchService {
       identity: result.identity,
       locators: [{ kind: 'provider', provider: result.provider as ProviderId, providerTrackId: result.providerId, ...(result.canonicalUrl ? { canonicalUrl: result.canonicalUrl } : {}) }],
       provider: result.provider as ProviderId,
-      genre: result.genre,
+      genre: result.genre ?? result.genres[0] ?? null,
+      genres: result.genres,
+      bpm: result.bpm,
       year: result.year,
     };
   }

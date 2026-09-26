@@ -214,6 +214,9 @@ export async function buildApp(deps: HubDeps): Promise<HubApp> {
   const releases = new ReleaseService(repos.settings, http, metrics, clock);
   const jobs = new JobScheduler(getCtx, clock, log, !deps.disableBackgroundJobs);
   const enrichment = new EnrichmentService({ canonical: repos.canonical, providers, rateLimiter, clock, log, http, ffmpeg, enqueue: (input) => jobs.enqueue(input) });
+  search.attachEnrichment(enrichment);
+  library.attachEnrichment(enrichment);
+  recommendations.attachEnrichment(enrichment);
   const discord = new DiscordService(repos.settings, commands, sealer, http, config, audit, metrics, clock);
 
   const realtime = new RealtimeServer({ auth, deviceAuth, groups, devices, identity, clock, log, metrics, network, config, deps });

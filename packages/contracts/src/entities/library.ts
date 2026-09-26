@@ -112,6 +112,9 @@ export const TrackRef = z.object({
   locators: z.array(MediaLocator).default([]),
   provider: ProviderId.default('local'),
   genre: z.string().max(60).nullable().default(null),
+  /** Optional in the type: a snapshot written before enrichment simply has neither. */
+  genres: z.array(z.string().max(60)).optional(),
+  bpm: z.number().positive().max(400).nullable().optional(),
   year: z.number().int().nullable().default(null),
 });
 export type TrackRef = z.infer<typeof TrackRef>;

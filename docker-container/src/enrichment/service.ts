@@ -129,7 +129,8 @@ export class EnrichmentService {
   enqueueForTrack(key: EnrichmentKey): void {
     const payloadKey = `${key.provider}:${key.providerId}`;
     if (this.deps.canonical.hasQueuedJob('enrich-track', payloadKey)) return;
-    this.deps.enqueue({ userId: ENRICHMENT_USER_ID, kind: 'enrich-track', priority: 'P3', payload: { key: payloadKey, ...key } });
+    // P4: background work that never gets ahead of a user's own jobs, and the first shed when a budget runs low.
+    this.deps.enqueue({ userId: ENRICHMENT_USER_ID, kind: 'enrich-track', priority: 'P4', payload: { key: payloadKey, ...key } });
   }
 
   async runJob(job: DiscoveryJob): Promise<void> {

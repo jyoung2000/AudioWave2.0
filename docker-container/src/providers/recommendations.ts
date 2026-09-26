@@ -15,6 +15,7 @@
  * carrying provider availability so the UI can only offer what is actually playable.
  */
 import { CANONICAL_ENRICHMENT_DEFAULTS } from '@now-playing/contracts';
+import type { EnrichmentService } from '../enrichment/service.js';
 import type { ArtistRelation, CanonicalArtist, CanonicalTrack, ListeningEvent, Recommendation, RecommendationFeedback, RecommendationMode, SearchResult, TasteProfileView, Track, TrackPlatform } from '@now-playing/contracts';
 import { DomainError, uuidv7 } from '@now-playing/domain';
 import {
@@ -78,6 +79,12 @@ function normalize(text: string): string {
 }
 
 export class RecommendationService {
+  private enrichment: EnrichmentService | null = null;
+
+  attachEnrichment(service: EnrichmentService): void {
+    this.enrichment = service;
+  }
+
   private catalogueCache: { catalogue: Catalogue; builtAt: number; size: number } | null = null;
   private readonly profiles = new Map<string, TasteProfile>();
 
@@ -161,6 +168,9 @@ export class RecommendationService {
       updatedAt: now,
     };
     this.repo.upsertTrack(track);
+    if (this.enrichment && !track.enrichedAt && !track.musicbrainzRecordingId) {
+      this.enrichment.enqueueForTrack({ provider: input.provider ?? 'companion', providerId: input.providerTrackId ?? track.id, title: track.title, artistName: track.artistName, durationMs: track.durationMs, isrc: track.isrc, musicbrainzRecordingId: null, previewUrl: null, genreHint: track.genres[0] ?? null });
+    }
     if (input.provider && input.providerTrackId) {
       this.repo.putPlatform({ trackId: track.id, provider: input.provider, providerTrackId: input.providerTrackId, url: input.url ?? null, availability: input.availability ?? 'unknown', lastVerifiedAt: now });
     }

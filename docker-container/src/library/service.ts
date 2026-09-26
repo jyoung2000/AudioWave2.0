@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import type { EnrichmentService } from '../enrichment/service.js';
 import { createReadStream, existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import type { Dirent } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
@@ -107,6 +108,17 @@ interface IndexedHub extends IndexedTrackLike {
  * HTTP range support. Paths never leave this service.
  */
 export class LibraryService {
+  private enrichment: EnrichmentService | null = null;
+
+  attachEnrichment(service: EnrichmentService): void {
+    this.enrichment = service;
+  }
+
+  /** A file whose tags name no MusicBrainz recording is looked up in the background; the queue deduplicates repeat scans. */
+  private queueEnrichment(rec: HubTrackRecord): void {
+    if (!this.enrichment || rec.track.identity.musicbrainzRecordingId) return;
+    this.enrichment.enqueueForTrack({ provider: 'hub', providerId: rec.id, title: rec.track.title, artistName: rec.track.artistName, durationMs: rec.track.durationMs, isrc: rec.track.identity.isrc, musicbrainzRecordingId: null, previewUrl: null, genreHint: rec.track.genre });
+  }
   private readonly externalRoots = new Map<string, { path: string; tag: string }>();
   private index = new LocalSearchIndex<IndexedHub>();
   private indexDirty = true;
@@ -253,6 +265,7 @@ export class LibraryService {
           const record = await this.buildRecord(root, file, rel, st.size, Math.round(st.mtimeMs), mime, existing, contentHash);
           if (relocated) this.repo.relocateTrack(record, this.nowIso());
           else this.repo.upsertTrack(record, this.nowIso());
+          this.queueEnrichment(record);
           if (existing && !existing.deletedAt) report.updated += 1;
           else report.added += 1;
           this.repo.updateRoot(rootId, { scanCheckpoint: JSON.stringify({ lastPath: rel, at: this.nowIso() }) }, this.nowIso());
