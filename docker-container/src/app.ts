@@ -46,6 +46,9 @@ import { PairingService } from './pairing/service.js';
 import { AccountsService } from './providers/accounts.js';
 import { BandcampAdapter } from './providers/adapters/bandcamp.js';
 import { ExternalToolAdapter } from './providers/adapters/external-tool.js';
+import { DeezerAdapter } from './providers/adapters/deezer.js';
+import { AcousticBrainzAdapter } from './providers/adapters/acousticbrainz.js';
+import { LastFmAdapter } from './providers/adapters/lastfm.js';
 import { CompanionLibraryAdapter, HubLibraryAdapter, PublicDomainAdapter } from './providers/adapters/local.js';
 import { MusicBrainzAdapter } from './providers/adapters/musicbrainz.js';
 import { SoundCloudAdapter } from './providers/adapters/soundcloud.js';
@@ -154,6 +157,9 @@ export async function buildApp(deps: HubDeps): Promise<HubApp> {
   providers.register(new SpotifyAdapter(http, clock));
   providers.register(new BandcampAdapter((url) => musicbrainz.lookupUrl(url)));
   providers.register(new ExternalToolAdapter());
+  providers.register(new DeezerAdapter(http));
+  providers.register(new AcousticBrainzAdapter(http));
+  providers.register(new LastFmAdapter(http));
   for (const adapter of deps.extraAdapters ?? []) providers.register(adapter);
   for (const [id, adapter] of Object.entries(deps.replaceAdapters ?? {})) {
     void id;
