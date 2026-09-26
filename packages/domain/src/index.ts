@@ -18,3 +18,4 @@ export * from './search.js';
 export * from './capabilities.js';
 export * from './playlist-formats.js';
 export * from './errors.js';
+export * from './genres.js';
