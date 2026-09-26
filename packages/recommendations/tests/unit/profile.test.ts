@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { CANONICAL_ENRICHMENT_DEFAULTS } from '@now-playing/contracts';
 import type { CanonicalTrack, ListeningEvent } from '@now-playing/contracts';
 import {
   DEFAULT_RECOMMENDATION_CONFIG,
@@ -56,7 +57,7 @@ function trackEvent(trackId: string, title: string, artistName: string, genre: s
 }
 
 function canonical(id: string, title: string, artistName: string, genre: string, year = 2020): CanonicalTrack {
-  return { id, musicbrainzRecordingId: null, isrc: null, title, normalizedTitle: title.toLowerCase(), artistId: null, artistName, normalizedArtist: artistName.toLowerCase(), albumId: null, albumName: `${title} EP`, releaseYear: year, durationMs: 200_000, genres: [genre.toLowerCase()], tags: [], popularity: 0.5, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' };
+  return { id, musicbrainzRecordingId: null, isrc: null, title, normalizedTitle: title.toLowerCase(), artistId: null, artistName, ...CANONICAL_ENRICHMENT_DEFAULTS, normalizedArtist: artistName.toLowerCase(), albumId: null, albumName: `${title} EP`, releaseYear: year, durationMs: 200_000, genres: [genre.toLowerCase()], tags: [], popularity: 0.5, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' };
 }
 
 describe('configuration', () => {

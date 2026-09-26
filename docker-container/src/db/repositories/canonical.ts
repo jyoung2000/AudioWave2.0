@@ -1,3 +1,4 @@
+import { CANONICAL_ENRICHMENT_DEFAULTS } from '@now-playing/contracts';
 import type { AggregateTasteProfile, ArtistRelation, CanonicalArtist, CanonicalTrack, DiscoveryJob, ListeningEvent, RecommendationFeedback, TrackPlatform } from '@now-playing/contracts';
 import type { Db } from '../connection.js';
 
@@ -51,7 +52,7 @@ function toCanonicalTrack(r: CanonicalTrackRow): CanonicalTrack {
     normalizedTitle: r.normalized_title,
     artistId: r.artist_id,
     artistName: r.artist_name,
-    normalizedArtist: r.normalized_artist,
+    ...CANONICAL_ENRICHMENT_DEFAULTS, normalizedArtist: r.normalized_artist,
     albumId: r.album_id,
     albumName: r.album_name,
     releaseYear: r.release_year,

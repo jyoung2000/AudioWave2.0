@@ -23,6 +23,7 @@
  * box — the same rule the rest of this app follows about not claiming more
  * than it can explain.
  */
+import { CANONICAL_ENRICHMENT_DEFAULTS } from '@now-playing/contracts';
 import type { CanonicalTrack, ListeningEvent, RecommendationMode, RecommendationReason as ReasonSchema, Track } from '@now-playing/contracts';
 import type { z } from 'zod';
 import { normalizeArtist, normalizeText } from '@now-playing/domain';
@@ -52,7 +53,7 @@ export function catalogueFromLibrary(tracks: readonly Track[]): CanonicalTrack[]
     normalizedTitle: normalizeText(t.title),
     artistId: t.artistId,
     artistName: t.artistName,
-    normalizedArtist: normalizeArtist(t.artistName),
+    ...CANONICAL_ENRICHMENT_DEFAULTS, normalizedArtist: normalizeArtist(t.artistName),
     albumId: t.albumId,
     albumName: t.albumName,
     releaseYear: t.year,

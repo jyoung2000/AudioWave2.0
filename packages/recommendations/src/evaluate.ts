@@ -8,6 +8,7 @@
  * catalogue coverage, novelty (share of results whose artist the profile had never heard) and
  * skip precision (how rarely a previously-skipped artist is recommended back).
  */
+import { CANONICAL_ENRICHMENT_DEFAULTS } from '@now-playing/contracts';
 import type { CanonicalTrack, ListeningEvent, RecommendationMode } from '@now-playing/contracts';
 import { seededRandom } from '@now-playing/domain';
 import { buildCooccurrence, sessionsFromEvents } from './collaborative.js';
@@ -239,7 +240,7 @@ export function syntheticCatalogue(seedTracks: readonly CanonicalTrack[], option
       normalizedTitle: title.toLowerCase(),
       artistId: null,
       artistName,
-      normalizedArtist: artistName.toLowerCase(),
+      ...CANONICAL_ENRICHMENT_DEFAULTS, normalizedArtist: artistName.toLowerCase(),
       albumId: null,
       albumName: `${artistName} Collected`,
       releaseYear: year,
@@ -267,7 +268,7 @@ export function catalogueFromEvents(events: readonly ListeningEvent[]): Canonica
       normalizedTitle: e.track.title.toLowerCase(),
       artistId: e.track.artistId,
       artistName: e.track.artistName,
-      normalizedArtist: e.track.artistName.toLowerCase(),
+      ...CANONICAL_ENRICHMENT_DEFAULTS, normalizedArtist: e.track.artistName.toLowerCase(),
       albumId: e.track.albumId,
       albumName: e.track.albumName,
       releaseYear: e.track.year,

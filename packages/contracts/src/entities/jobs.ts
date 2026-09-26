@@ -91,7 +91,7 @@ export const DiscoveryJob = z.object({
   id: Uuid,
   state: JobState,
   userId: Uuid,
-  kind: z.enum(['profile-refresh', 'discover-seeds', 'sync-library', 'token-refresh', 'new-releases']),
+  kind: z.enum(['profile-refresh', 'discover-seeds', 'sync-library', 'token-refresh', 'new-releases', 'enrich-track']),
   priority: z.enum(['P0', 'P1', 'P2', 'P3', 'P4']).default('P3'),
   payload: z.record(z.string(), z.unknown()).default({}),
   attempts: z.number().int().nonnegative().default(0),

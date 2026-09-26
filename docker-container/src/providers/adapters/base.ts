@@ -23,6 +23,11 @@ export interface ResultInput {
   canonicalUrl?: string | null;
   year?: number | null;
   genre?: string | null;
+  genres?: string[];
+  genreProfile?: SearchResult['genreProfile'];
+  featuredArtists?: string[];
+  bpm?: number | null;
+  bpmSource?: SearchResult['bpmSource'];
   capabilities: ProviderCapabilities;
   identity?: Partial<TrackIdentity>;
   attribution?: string | null;
@@ -47,6 +52,11 @@ export function result(input: ResultInput): SearchResult {
     canonicalUrl: input.canonicalUrl ?? null,
     year: input.year ?? null,
     genre: input.genre?.slice(0, 60) ?? null,
+    genres: input.genres ?? [],
+    genreProfile: input.genreProfile ?? {},
+    featuredArtists: input.featuredArtists ?? [],
+    bpm: input.bpm ?? null,
+    bpmSource: input.bpmSource ?? null,
     capabilities: input.capabilities,
     identity,
     attribution: input.attribution ?? null,

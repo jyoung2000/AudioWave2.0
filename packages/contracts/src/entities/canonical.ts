@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { IsoDateTime, ProviderId, Uuid } from '../common.js';
+import { BpmSource, GenreProfile, IsoDateTime, ProviderId, Uuid } from '../common.js';
 
 /** Platform-independent recording used by the recommendation engine. */
 export const CanonicalTrack = z.object({
@@ -18,10 +18,20 @@ export const CanonicalTrack = z.object({
   genres: z.array(z.string().max(60)).default([]),
   tags: z.array(z.string().max(60)).default([]),
   popularity: z.number().min(0).max(1).nullable().default(null),
+  featuredArtists: z.array(z.string().max(300)).default([]),
+  genreProfile: GenreProfile.default({}),
+  bpm: z.number().positive().max(400).nullable().default(null),
+  bpmSource: BpmSource.nullable().default(null),
+  artworkUrl: z.string().url().nullable().default(null),
+  matchConfidence: z.number().min(0).max(1).nullable().default(null),
+  enrichedAt: IsoDateTime.nullable().default(null),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });
 export type CanonicalTrack = z.infer<typeof CanonicalTrack>;
+
+/** The enrichment fields of a track nothing has looked at yet — spread into a literal so the type stays strict. */
+export const CANONICAL_ENRICHMENT_DEFAULTS = Object.freeze({ featuredArtists: [] as string[], genreProfile: {} as GenreProfile, bpm: null, bpmSource: null, artworkUrl: null, matchConfidence: null, enrichedAt: null }) satisfies Pick<CanonicalTrack, 'featuredArtists' | 'genreProfile' | 'bpm' | 'bpmSource' | 'artworkUrl' | 'matchConfidence' | 'enrichedAt'>;
 
 export const CanonicalArtist = z.object({
   id: Uuid,

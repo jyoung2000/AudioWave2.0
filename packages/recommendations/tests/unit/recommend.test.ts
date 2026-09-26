@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CanonicalTrack, ListeningEvent } from '@now-playing/contracts';
+import { CANONICAL_ENRICHMENT_DEFAULTS } from '@now-playing/contracts';
 import { generateListeningEvents } from '@now-playing/test-fixtures';
 import {
   DEFAULT_RECOMMENDATION_CONFIG,
@@ -36,7 +37,7 @@ function pad(n: number): string {
 function canonical(index: number, title: string, artistName: string, genre: string, year = 2020, popularity = 0.5): CanonicalTrack {
   // Offset so a track id can never collide with the user or device ids used in these fixtures.
   const id = `00000000-0000-7000-8000-${pad(100_000 + index)}`;
-  return { id, musicbrainzRecordingId: null, isrc: null, title, normalizedTitle: title.toLowerCase(), artistId: null, artistName, normalizedArtist: artistName.toLowerCase(), albumId: null, albumName: `${artistName} — ${title}`, releaseYear: year, durationMs: 200_000, genres: [genre], tags: [], popularity, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' };
+  return { id, musicbrainzRecordingId: null, isrc: null, title, normalizedTitle: title.toLowerCase(), artistId: null, artistName, ...CANONICAL_ENRICHMENT_DEFAULTS, normalizedArtist: artistName.toLowerCase(), albumId: null, albumName: `${artistName} — ${title}`, releaseYear: year, durationMs: 200_000, genres: [genre], tags: [], popularity, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' };
 }
 
 /** A catalogue with three artists per genre so artist and genre caps have something to bite on. */

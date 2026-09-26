@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ProviderCapabilities, ProviderDescriptor, ProviderHealth } from '../capabilities.js';
-import { API_PREFIX, Cursor, DeviceKind, DisplayName, IsoDateTime, ListeningMode, ProviderId, Scope, Uuid } from '../common.js';
+import { API_PREFIX, BpmSource, Cursor, DeviceKind, DisplayName, GenreProfile, IsoDateTime, ListeningMode, ProviderId, Scope, Uuid } from '../common.js';
 import {
   AggregateTasteProfile,
   AuditEvent,
@@ -141,6 +141,11 @@ export const SearchResultBase = z.object({
   canonicalUrl: z.string().url().nullable().default(null),
   year: z.number().int().nullable().default(null),
   genre: z.string().max(60).nullable().default(null),
+  genres: z.array(z.string().max(60)).default([]),
+  genreProfile: GenreProfile.default({}),
+  featuredArtists: z.array(z.string().max(300)).default([]),
+  bpm: z.number().positive().max(400).nullable().default(null),
+  bpmSource: BpmSource.nullable().default(null),
   capabilities: ProviderCapabilities,
   identity: TrackIdentity.prefault({}),
   attribution: z.string().max(200).nullable().default(null),

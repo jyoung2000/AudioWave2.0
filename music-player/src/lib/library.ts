@@ -185,6 +185,9 @@ export async function trackFromFile(file: File, relativePath: string, rootId: st
     year,
     durationMs,
     bpm,
+    bpmSource: null,
+    featuredArtists: [],
+    genreProfile: {},
     identity,
     // `browser-handle` is the locator kind for a file the browser can reopen; the handle id is
     // the path *relative to the connected folder*, never an absolute one (docs/PRIVACY.md).

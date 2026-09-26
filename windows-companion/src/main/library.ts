@@ -163,6 +163,9 @@ export async function readTrack(absolutePath: string, relativePath: string, fold
     year,
     durationMs,
     bpm,
+    bpmSource: bpm !== null ? 'tag' : null,
+    featuredArtists: [],
+    genreProfile: {},
     identity,
     // The folder id plus a relative path: enough for this machine to find the file, and useless to
     // anyone else — which is the point.

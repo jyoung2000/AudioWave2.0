@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { DurationMs, IsoDateTime, ProviderId, Sha256Hex, SyncedEntityBase, Uuid } from '../common.js';
+import { BpmSource, DurationMs, GenreProfile, IsoDateTime, ProviderId, Sha256Hex, SyncedEntityBase, Uuid } from '../common.js';
 import { LocatorAvailability, MediaLocator } from '../locators.js';
 
 export const LibraryRootKind = z.enum(['browser-handle', 'opfs', 'windows-directory', 'hub-directory']);
@@ -54,6 +54,7 @@ export const TrackIdentity = z.object({
   musicbrainzReleaseId: z.uuid().nullable().default(null),
   acoustidId: z.string().max(80).nullable().default(null),
   providerIds: z.record(ProviderId, z.array(z.string().min(1).max(200))).default({}),
+  matchConfidence: z.number().min(0).max(1).nullable().optional().describe('How sure the hub is that the enrichment belongs to this recording; absent or null = never matched'),
 });
 export type TrackIdentity = z.infer<typeof TrackIdentity>;
 
@@ -84,6 +85,9 @@ export const Track = SyncedEntityBase.extend({
   year: z.number().int().min(1000).max(3000).nullable().default(null),
   durationMs: DurationMs.nullable().default(null),
   bpm: z.number().positive().max(400).nullable().default(null),
+  bpmSource: BpmSource.nullable().default(null),
+  featuredArtists: z.array(z.string().max(300)).default([]),
+  genreProfile: GenreProfile.default({}),
   identity: TrackIdentity.prefault({}),
   locators: z.array(MediaLocator).default([]),
   artworkId: z.string().max(200).nullable().default(null),

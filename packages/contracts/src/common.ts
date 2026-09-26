@@ -43,8 +43,15 @@ export const Cursor = z.string().min(1).max(512).describe('Opaque pagination cur
 export const ProviderId = z
   .string()
   .regex(/^[a-z][a-z0-9-]{1,31}$/)
-  .describe('Provider slug, e.g. local, hub, companion, musicbrainz, youtube, soundcloud, bandcamp, spotify, public-domain, external-tool');
+  .describe('Provider slug, e.g. local, hub, companion, musicbrainz, youtube, soundcloud, bandcamp, spotify, public-domain, external-tool, deezer, acousticbrainz, lastfm');
 export type ProviderId = z.infer<typeof ProviderId>;
+
+/** Where a tempo came from; 'preview-analysis' and 'analysis' are measured, the rest looked up. */
+export const BpmSource = z.enum(['tag', 'deezer', 'acousticbrainz', 'preview-analysis', 'analysis']);
+export type BpmSource = z.infer<typeof BpmSource>;
+/** Weighted genres on one fixed vocabulary, summing to one; empty when nothing is known. */
+export const GenreProfile = z.record(z.string().max(60), z.number().min(0).max(1));
+export type GenreProfile = z.infer<typeof GenreProfile>;
 
 export const KNOWN_PROVIDERS = [
   'local',
@@ -57,6 +64,9 @@ export const KNOWN_PROVIDERS = [
   'spotify',
   'public-domain',
   'external-tool',
+  'deezer',
+  'acousticbrainz',
+  'lastfm',
 ] as const;
 export type KnownProvider = (typeof KNOWN_PROVIDERS)[number];
 

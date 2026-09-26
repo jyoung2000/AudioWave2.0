@@ -14,6 +14,7 @@
  * **Serving**: `recommend()` runs against the canonical catalogue with the caller's profile,
  * carrying provider availability so the UI can only offer what is actually playable.
  */
+import { CANONICAL_ENRICHMENT_DEFAULTS } from '@now-playing/contracts';
 import type { ArtistRelation, CanonicalArtist, CanonicalTrack, ListeningEvent, Recommendation, RecommendationFeedback, RecommendationMode, SearchResult, TasteProfileView, Track, TrackPlatform } from '@now-playing/contracts';
 import { DomainError, uuidv7 } from '@now-playing/domain';
 import {
@@ -138,6 +139,9 @@ export class RecommendationService {
     }
 
     const track: CanonicalTrack = {
+      // Enrichment is never reset by a re-canonicalisation: what a job filled stays until a job replaces it.
+      ...CANONICAL_ENRICHMENT_DEFAULTS,
+      ...(existing ? { featuredArtists: existing.featuredArtists, genreProfile: existing.genreProfile, bpm: existing.bpm, bpmSource: existing.bpmSource, artworkUrl: existing.artworkUrl, matchConfidence: existing.matchConfidence, enrichedAt: existing.enrichedAt } : {}),
       id: existing?.id ?? uuidv7(this.clock.now()),
       musicbrainzRecordingId: input.musicbrainzRecordingId ?? existing?.musicbrainzRecordingId ?? null,
       isrc: input.isrc ?? existing?.isrc ?? null,
