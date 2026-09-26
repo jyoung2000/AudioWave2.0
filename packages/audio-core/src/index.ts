@@ -11,3 +11,4 @@ export { BitWriter, crc8, crc16, writeUtf8Number } from './export/bits.js';
 export * from './mock-audio-context.js';
 export * from './worklets/pitch-shifter-core.js';
 export * from './worklets/loader.js';
+export * from './tempo.js';
