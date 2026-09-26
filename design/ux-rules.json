@@ -1463,6 +1463,22 @@
       ]
     },
     {
+      "id": "NP-FIND-001",
+      "group": "np-find",
+      "title": "A listing can be heard before it is added",
+      "contract": "In the header search popover, a result with a clip plays it on a click of its artwork tile — the whole clip, up to 30 seconds, with a countdown ring and a fade at the tail — and resting a fine pointer on the row for five seconds arms the same play with a visible fill in the selection blue. Leaving the row, a key, a scroll or another row cancels the hold; touch and reduced motion never arm; the click always works. The main track pauses for the audition and resumes after it. A row with no clip keeps its tile and says why on hover instead of dressing as a button. When the player is paired, rows lead with the hub's enriched answers (features, album, genre, tempo) and a match below confidence 0.5 shows the platform's own words; unpaired, the keyless chain is the whole story.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        { "type": "test", "path": "music-player/tests/e2e/np/preview.spec.ts", "name": "paired, the hub answers first: album, features, genre chip and bpm on the row" },
+        { "type": "test", "path": "music-player/tests/e2e/np/preview.spec.ts", "name": "a click plays up to thirty seconds, and the main track waits its turn" },
+        { "type": "test", "path": "music-player/tests/e2e/np/preview.spec.ts", "name": "resting the pointer on a row arms it, fills the ring, and then plays" },
+        { "type": "test", "path": "music-player/tests/e2e/np/preview.spec.ts", "name": "reduced motion never arms; the click still works" },
+        { "type": "test", "path": "music-player/tests/e2e/np/preview.spec.ts", "name": "a row with no clip says so instead of pretending" }
+      ]
+    },
+    {
       "id": "NP-PREF-012",
       "group": "np-prefs",
       "title": "Groups and invites live on the Profile tab",

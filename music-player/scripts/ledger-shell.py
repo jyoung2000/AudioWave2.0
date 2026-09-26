@@ -33,7 +33,7 @@ def surface(sid, title, entry, states, rules, extra=()):
 NEW = [
     surface('library', 'Library', 'the list under the player; Music view', ['empty (nothing indexed)', 'rows from this device', 'link rows from search', 'sorted', 'narrowed by scope chip', 'filtered by the bar'], ['NP-LIST-001', 'UX-KEY-001', 'UX-STATE-001']),
     surface('now-playing', 'Now Playing', 'the jewel case and transport at the top of the page', ['nothing playing', 'a track from this device playing (the bar follows the element)', 'paused', 'a link row chosen (does not pretend to play)', 'a station (LIVE)', 'a channel (video bar, LIVE)'], ['NP-TRANS-001', 'UX-KEY-002']),
-    surface('search-popover', 'Search popover', 'the header search field', ['empty', 'results from companion / iTunes', 'pasted link resolved', 'people on the hub'], ['NP-PRIN-002']),
+    surface('search-popover', 'Search popover', 'the header search field', ['empty', 'results from companion / iTunes', 'enriched rows from the paired hub (features, album, genre, bpm)', 'pasted link resolved', 'auditioning (click, or a five-second hold that fills the ring)', 'no clip (says why)', 'people on the hub'], ['NP-PRIN-002', 'NP-FIND-001']),
     surface('row-menu', 'Row menu', 'right-click or long-press a row', ['one row', 'several rows (marquee)'], ['NP-MENU-001']),
     surface('new-playlist-sheet', 'New playlist sheet', 'row menu ▸ Add to Playlist ▸ New Playlist…', ['empty name refused', 'created'], ['NP-MENU-002']),
     surface('fetch-sheet', 'Fetch sheet', 'transport ▸ Download, on a link row', ['no basis chosen (refused, said why)', 'helper found / not found', 'fetching', 'refused by the helper (its reason)', 'fetched and playing'], ['UX-SAFE-001', 'UX-FEED-001'], ['music-player/src/lib/tools-core.ts']),
