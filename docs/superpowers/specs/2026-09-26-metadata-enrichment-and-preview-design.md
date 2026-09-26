@@ -114,7 +114,21 @@ No platform supplies it. Sources, in order, first hit wins; every answer stored 
 2. `acousticbrainz` — `api/v1/<mbid>/low-level` → `rhythm.bpm` (archive; still answers for the back
    catalogue).
 3. The file's tag (companion) — already read.
-4. Sub-project 3's analysis (companion, files you own).
+4. **Measured from the preview clip** — for songs that are *not* downloaded. When 1–2 miss and the
+   result has a `previewUrl` (Spotify 30 s, SoundCloud when playable, iTunes' clip matched in
+   sub-project 2, the hub's own library range), the hub fetches that clip — preview hosts only,
+   allowlisted: `audio-ssl.itunes.apple.com`, `p.scdn.co`, `cf-media.sndcdn.com`, `cf-hls-media.sndcdn.com`
+   — decodes it with the ffmpeg already in the image, and runs the same tempo estimator as
+   sub-project 3 (`packages/audio-core/src/tempo.ts`, plain TypeScript, so it runs in Node and in
+   the browser). Stored as `bpmSource: 'preview-analysis'` with confidence; a 30 s clip is enough
+   for a tempo. No song is downloaded: the clip is decoded in memory and discarded. YouTube rows
+   have no clip, so they get lookup answers only, and the row says nothing rather than guessing.
+5. Sub-project 3's analysis (companion, files you own).
+
+**Unpaired players** get the same measurement in the browser: the shell decodes the iTunes clip with
+Web Audio (`decodeAudioData`) and runs `tempo.ts` bundled through the bridge, only for rows the
+user has previewed or added (never the whole page — it costs CPU), and caches by title|artist as
+`enrich()` does today.
 
 A **tempo dimension** is added to the recommender: `TrackFeatures.bpm: number | null`, and in
 `ranking.ts` a `tempoAffinity` term = `exp(-(|Δbpm| / 12)²)` between candidate and seed, weight
@@ -124,7 +138,8 @@ preferred tempo band from plays the same way it learns genres.
 ### Contracts and storage
 
 - `SearchResultBase` += `featuredArtists: string[]`, `genres: string[]`, `genreProfile:
-  Record<string, number>`, `bpm: number | null`, `bpmSource`, `identity.matchConfidence`.
+  Record<string, number>`, `bpm: number | null`, `bpmSource: 'tag' | 'deezer' | 'acousticbrainz' |
+  'preview-analysis' | 'analysis' | null`, `identity.matchConfidence`.
 - `Track` += `featuredArtists`, `genreProfile`, `bpmSource`.
 - Migration `0007_enrichment.sql`: `canonical_tracks` += `featured_artists TEXT '[]'`,
   `genre_profile TEXT '{}'`, `bpm REAL`, `bpm_source TEXT`, `artwork_url TEXT`, `match_confidence
@@ -164,6 +179,16 @@ supply `prev` for a hub row with none, matched by normalised title+artist and du
 (b) append rows the hub did not have. A pasted link goes to the hub's `/providers/resolve` first when
 paired; `resolveLink`'s chain stays as the fallback. `enrich()` (Deezer JSONP) runs only for rows
 still lacking `bpm` — hub rows arrive with it.
+
+### BPM follows the song into the queue
+
+Adding a row from search (`srch__add`) already carries duration and BPM into the library merge
+("duration/BPM carry-over"). This pass makes it visible and complete: the queue row and Now Playing
+show `bpm` beside the time whenever it is known; when a row is added before its BPM has arrived, the
+library entry is marked `bpmPending` and the first answer (hub, Deezer, or the preview measurement
+above — which is triggered by the add itself) updates the entry and repaints the queue row in place.
+Tested in `find.spec.ts` ("a song added from search shows its tempo in the queue, and a late answer
+fills it in") and journey step 08.
 
 ### Row
 
