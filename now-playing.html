@@ -590,6 +590,19 @@
      no logos, those are trademarks */
   .srch__links { flex: none; display: flex; gap: 3px; }
 
+  /* The genre chip: the platform badge's own materials, worn as a word. */
+  .srch__genre {
+    flex: none;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: var(--srch-pf);
+    color: var(--srch-pf-ink);
+    font-size: 10.5px;
+    letter-spacing: 0.02em;
+    font-variant-caps: small-caps;
+  }
+  @media (max-width: 480px) { .srch__genre { display: none; } }
+
   .srch__pf {
     display: flex;
     align-items: center;
@@ -8123,10 +8136,10 @@ window.AW.startStats = function () {
       });
     }
 
-    function getJSON(url, allowJsonp, ms) {
+    function getJSON(url, allowJsonp, ms, headers) {
       var ctl = window.AbortController ? new AbortController() : null;
       var t = ctl ? setTimeout(function () { ctl.abort(); }, ms || 12000) : 0;
-      return fetch(url, { signal: ctl ? ctl.signal : undefined })
+      return fetch(url, { signal: ctl ? ctl.signal : undefined, headers: headers || undefined })
         .then(function (r) { clearTimeout(t); if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
         .catch(function (e) {
           clearTimeout(t);
@@ -8151,6 +8164,7 @@ window.AW.startStats = function () {
         d: d > 0 ? Math.round(d) : null,
         bpm: bpm > 0 ? Math.round(bpm) : null,
         bpmTried: false,
+        feat: [], genre: null, conf: null,
         links: findLinks(t, a),
       };
     }
@@ -8238,15 +8252,77 @@ window.AW.startStats = function () {
        deadline: three sequential per-request timeouts can otherwise stack into
        most of a minute of spinner, and the offline launchers are a better
        answer than a long wait. */
+    /* ---- the hub leg: enriched results when paired (NP-FIND-001) ----
+       The paired credential lives in kv; this module reads it directly because the shell's
+       hub closure is elsewhere. Same Bearer scheme as hubRaw. Without a credential nothing
+       here runs and the keyless chain below is untouched. */
+    function hubAcctFor() {
+      if (!window.kv || !window.kv.get) return Promise.resolve(null);
+      return window.kv.get('player:hub').then(function (v) {
+        return v && v.base && v.credentialId && v.secret ? v : null;
+      }, function () { return null; });
+    }
+    var hubReady = false;
+    hubAcctFor().then(function (a) { hubReady = !!a; });
+    var HUB_PLATFORM_NAMES = { youtube: 'YouTube', soundcloud: 'SoundCloud', spotify: 'Spotify', bandcamp: 'Bandcamp' };
+    function fromHub(d) {
+      var rows = (d && d.results) || [], out = [];
+      for (var i = 0; i < rows.length && out.length < 25; i++) {
+        var x = rows[i] || {};
+        if (x.kind !== 'track' || typeof x.title !== 'string') continue;
+        var conf = x.identity && typeof x.identity.matchConfidence === 'number' ? x.identity.matchConfidence : null;
+        /* Below 0.5 the hub itself refused to guess; this listing shows the platform's own words. */
+        var sure = conf === null || conf >= 0.5;
+        var r = track(x.title, x.artistName || '', sure ? (x.albumName || '') : '', x.artworkUrl || null,
+                      x.previewUrl || null, x.canonicalUrl || null, HUB_PLATFORM_NAMES[x.provider] || null,
+                      x.durationMs > 0 ? x.durationMs / 1000 : 0, x.bpm);
+        r.feat = sure && x.featuredArtists && x.featuredArtists.length ? x.featuredArtists.slice(0, 3) : [];
+        r.genre = sure && x.genres && x.genres[0] ? String(x.genres[0]) : null;
+        r.conf = conf;
+        out.push(r);
+      }
+      return out;
+    }
+    function hubAuth(acct) { return { Authorization: 'Bearer ' + acct.credentialId + '.' + acct.secret }; }
+    function hubSearch(q) {
+      return hubAcctFor().then(function (acct) {
+        if (!acct) throw new Error('not paired');
+        return getJSON(acct.base + '/api/v1/search?scope=songs&q=' + encodeURIComponent(q), false, 5000, hubAuth(acct)).then(fromHub);
+      });
+    }
+    /* iTunes lends its 30-second clips to hub rows that arrived without one: matched by name
+       and by length to three seconds, never by hope. */
+    function fillPreviewsFromITunes(q, rows) {
+      var wanting = rows.filter(function (r) { return !r.prev; });
+      if (!wanting.length) return;
+      itunesSearch(q).then(function (list) {
+        var changed = false;
+        wanting.forEach(function (r) {
+          for (var i = 0; i < list.length; i++) {
+            var m = list[i];
+            if (!m.prev) continue;
+            if ((m.t || '').toLowerCase() !== (r.t || '').toLowerCase()) continue;
+            if ((m.a || '').toLowerCase() !== (r.a || '').toLowerCase()) continue;
+            if (r.d && m.d && Math.abs(r.d - m.d) > 3) continue;
+            r.prev = m.prev; changed = true; break;
+          }
+        });
+        if (changed && state === 'list') render();
+      }, function () { /* no clips to lend is not an error */ });
+    }
     var DEADLINE = 8000;
 
     function search(q) {
-      var chain = [companionSearch, itunesSearch];
+      hubAcctFor().then(function (a) { hubReady = !!a; });
+      var chain = hubReady ? [hubSearch, companionSearch, itunesSearch] : [companionSearch, itunesSearch];
       var sawEmpty = false;
       var walk = (function step(i) {
         if (i >= chain.length) return sawEmpty ? Promise.resolve([]) : Promise.reject(new Error('all failed'));
         return chain[i](q).then(function (rows) {
-          if (rows && rows.length) return rows;
+          if (rows && rows.length) {
+            if (chain[i] === hubSearch) fillPreviewsFromITunes(q, rows);
+            return rows;
+          }
           sawEmpty = true;
           return step(i + 1);
         }, function () { return step(i + 1); });
@@ -8317,6 +8393,22 @@ window.AW.startStats = function () {
     function resolveLink(r) {
       var enc = encodeURIComponent(r.u);
       var tries = [
+        /* Paired first: the hub's resolve carries the enrichment cache — album, features,
+           genre, tempo — which no oEmbed can. Unpaired, this try fails at once. */
+        function () {
+          return hubAcctFor().then(function (acct) {
+            if (!acct) throw new Error('not paired');
+            return getJSON(acct.base + '/api/v1/providers/resolve?url=' + enc, false, 8000, hubAuth(acct)).then(function (d) {
+              var rr = fromHub({ results: [d] })[0];
+              if (!rr) throw new Error('empty');
+              if (!r.bpm && rr.bpm) r.bpm = rr.bpm;
+              r.feat = rr.feat; r.genre = rr.genre; r.conf = rr.conf;
+              if (rr.prev) r.prev = rr.prev;
+              if (rr.al) r.al = rr.al;
+              return { t: rr.t, a: rr.a, art: rr.art, d: rr.d };
+            });
+          });
+        },
         function () {
           return getJSON(COMPANION + '/resolve?q=' + enc, false, 20000).then(function (d) {
             var e = d && d.results && d.results[0];
@@ -8509,8 +8601,11 @@ window.AW.startStats = function () {
     }
 
     function rowHTML(r, i) {
-      var sub = r.p ? (r.a ? esc(r.a) + ' \u2014 ' + r.p : r.p)
-                    : (r.a ? esc(r.a) + (r.al ? ' \u2014 ' + esc(r.al) : '') : (r.al ? esc(r.al) : ''));
+      /* Features and album lead when enrichment knows them; the platform stays as the tail
+         when there is no album to name. */
+      var who = r.a ? esc(r.a) + (r.feat && r.feat.length ? ' feat. ' + esc(r.feat.join(', ')) : '') : '';
+      var tail = r.al ? esc(r.al) : (r.p || '');
+      var sub = who ? (tail ? who + ' \u2014 ' + tail : who) : tail;
       var links = r.links.map(function (l) {
         return '<a class="srch__pf" data-len="' + l.ini.length + '" href="' + esc(l.url) + '"' +
           ' target="_blank" rel="noopener noreferrer" tabindex="-1"' +
@@ -8530,6 +8625,7 @@ window.AW.startStats = function () {
         '<span class="srch__nums">' +
           '<span class="srch__time">' + (r.d ? fmtTime(r.d) : '') + '</span>' +
           '<span class="srch__bpm">' + (r.bpm ? r.bpm + ' bpm' : '') + '</span>' +
+          (r.genre ? '<span class="srch__genre">' + esc(r.genre) + '</span>' : '') +
         '</span>' +
         '<span class="srch__links">' + added + links + '</span>' +
       '</div>';

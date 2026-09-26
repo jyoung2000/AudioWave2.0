@@ -574,6 +574,148 @@ replace("r.status === 403 ? 'Only the group’s owner or an admin can invite.'",
         "r.status === 403 ? (hasScope('group:admin') ? 'Only the group’s owner or an admin can invite.' : "
         "'This player was paired without the “Manage groups” permission. Pair it again with that ticked, or invite from the container.')")
 
+# ---- search: the hub leg — enriched results when paired (sub-project 2, NP-FIND-001) ----------------
+# The paired hub's /search answers from its enrichment cache: real artist with features, album,
+# genre and tempo. Unpaired (or keyless), nothing changes: the companion/iTunes chain below is the
+# whole story, which is the keyless-first rule this product runs on.
+
+replace("    function getJSON(url, allowJsonp, ms) {\n"
+        "      var ctl = window.AbortController ? new AbortController() : null;\n"
+        "      var t = ctl ? setTimeout(function () { ctl.abort(); }, ms || 12000) : 0;\n"
+        "      return fetch(url, { signal: ctl ? ctl.signal : undefined })",
+        "    function getJSON(url, allowJsonp, ms, headers) {\n"
+        "      var ctl = window.AbortController ? new AbortController() : null;\n"
+        "      var t = ctl ? setTimeout(function () { ctl.abort(); }, ms || 12000) : 0;\n"
+        "      return fetch(url, { signal: ctl ? ctl.signal : undefined, headers: headers || undefined })")
+
+replace("        bpmTried: false,",
+        "        bpmTried: false,\n"
+        "        feat: [], genre: null, conf: null,")
+
+replace("    var DEADLINE = 8000;",
+        "    /* ---- the hub leg: enriched results when paired (NP-FIND-001) ----\n"
+        "       The paired credential lives in kv; this module reads it directly because the shell's\n"
+        "       hub closure is elsewhere. Same Bearer scheme as hubRaw. Without a credential nothing\n"
+        "       here runs and the keyless chain below is untouched. */\n"
+        "    function hubAcctFor() {\n"
+        "      if (!window.kv || !window.kv.get) return Promise.resolve(null);\n"
+        "      return window.kv.get('player:hub').then(function (v) {\n"
+        "        return v && v.base && v.credentialId && v.secret ? v : null;\n"
+        "      }, function () { return null; });\n"
+        "    }\n"
+        "    var hubReady = false;\n"
+        "    hubAcctFor().then(function (a) { hubReady = !!a; });\n"
+        "    var HUB_PLATFORM_NAMES = { youtube: 'YouTube', soundcloud: 'SoundCloud', spotify: 'Spotify', bandcamp: 'Bandcamp' };\n"
+        "    function fromHub(d) {\n"
+        "      var rows = (d && d.results) || [], out = [];\n"
+        "      for (var i = 0; i < rows.length && out.length < 25; i++) {\n"
+        "        var x = rows[i] || {};\n"
+        "        if (x.kind !== 'track' || typeof x.title !== 'string') continue;\n"
+        "        var conf = x.identity && typeof x.identity.matchConfidence === 'number' ? x.identity.matchConfidence : null;\n"
+        "        /* Below 0.5 the hub itself refused to guess; this listing shows the platform's own words. */\n"
+        "        var sure = conf === null || conf >= 0.5;\n"
+        "        var r = track(x.title, x.artistName || '', sure ? (x.albumName || '') : '', x.artworkUrl || null,\n"
+        "                      x.previewUrl || null, x.canonicalUrl || null, HUB_PLATFORM_NAMES[x.provider] || null,\n"
+        "                      x.durationMs > 0 ? x.durationMs / 1000 : 0, x.bpm);\n"
+        "        r.feat = sure && x.featuredArtists && x.featuredArtists.length ? x.featuredArtists.slice(0, 3) : [];\n"
+        "        r.genre = sure && x.genres && x.genres[0] ? String(x.genres[0]) : null;\n"
+        "        r.conf = conf;\n"
+        "        out.push(r);\n"
+        "      }\n"
+        "      return out;\n"
+        "    }\n"
+        "    function hubAuth(acct) { return { Authorization: 'Bearer ' + acct.credentialId + '.' + acct.secret }; }\n"
+        "    function hubSearch(q) {\n"
+        "      return hubAcctFor().then(function (acct) {\n"
+        "        if (!acct) throw new Error('not paired');\n"
+        "        return getJSON(acct.base + '/api/v1/search?scope=songs&q=' + encodeURIComponent(q), false, 5000, hubAuth(acct)).then(fromHub);\n"
+        "      });\n"
+        "    }\n"
+        "    /* iTunes lends its 30-second clips to hub rows that arrived without one: matched by name\n"
+        "       and by length to three seconds, never by hope. */\n"
+        "    function fillPreviewsFromITunes(q, rows) {\n"
+        "      var wanting = rows.filter(function (r) { return !r.prev; });\n"
+        "      if (!wanting.length) return;\n"
+        "      itunesSearch(q).then(function (list) {\n"
+        "        var changed = false;\n"
+        "        wanting.forEach(function (r) {\n"
+        "          for (var i = 0; i < list.length; i++) {\n"
+        "            var m = list[i];\n"
+        "            if (!m.prev) continue;\n"
+        "            if ((m.t || '').toLowerCase() !== (r.t || '').toLowerCase()) continue;\n"
+        "            if ((m.a || '').toLowerCase() !== (r.a || '').toLowerCase()) continue;\n"
+        "            if (r.d && m.d && Math.abs(r.d - m.d) > 3) continue;\n"
+        "            r.prev = m.prev; changed = true; break;\n"
+        "          }\n"
+        "        });\n"
+        "        if (changed && state === 'list') render();\n"
+        "      }, function () { /* no clips to lend is not an error */ });\n"
+        "    }\n"
+        "    var DEADLINE = 8000;")
+
+replace("      var chain = [companionSearch, itunesSearch];",
+        "      hubAcctFor().then(function (a) { hubReady = !!a; });\n"
+        "      var chain = hubReady ? [hubSearch, companionSearch, itunesSearch] : [companionSearch, itunesSearch];")
+
+replace("        return chain[i](q).then(function (rows) {\n"
+        "          if (rows && rows.length) return rows;",
+        "        return chain[i](q).then(function (rows) {\n"
+        "          if (rows && rows.length) {\n"
+        "            if (chain[i] === hubSearch) fillPreviewsFromITunes(q, rows);\n"
+        "            return rows;\n"
+        "          }")
+
+replace("      var tries = [\n"
+        "        function () {\n"
+        "          return getJSON(COMPANION + '/resolve?q=' + enc, false, 20000).then(function (d) {",
+        "      var tries = [\n"
+        "        /* Paired first: the hub's resolve carries the enrichment cache — album, features,\n"
+        "           genre, tempo — which no oEmbed can. Unpaired, this try fails at once. */\n"
+        "        function () {\n"
+        "          return hubAcctFor().then(function (acct) {\n"
+        "            if (!acct) throw new Error('not paired');\n"
+        "            return getJSON(acct.base + '/api/v1/providers/resolve?url=' + enc, false, 8000, hubAuth(acct)).then(function (d) {\n"
+        "              var rr = fromHub({ results: [d] })[0];\n"
+        "              if (!rr) throw new Error('empty');\n"
+        "              if (!r.bpm && rr.bpm) r.bpm = rr.bpm;\n"
+        "              r.feat = rr.feat; r.genre = rr.genre; r.conf = rr.conf;\n"
+        "              if (rr.prev) r.prev = rr.prev;\n"
+        "              if (rr.al) r.al = rr.al;\n"
+        "              return { t: rr.t, a: rr.a, art: rr.art, d: rr.d };\n"
+        "            });\n"
+        "          });\n"
+        "        },\n"
+        "        function () {\n"
+        "          return getJSON(COMPANION + '/resolve?q=' + enc, false, 20000).then(function (d) {")
+
+replace("      var sub = r.p ? (r.a ? esc(r.a) + ' \\u2014 ' + r.p : r.p)\n"
+        "                    : (r.a ? esc(r.a) + (r.al ? ' \\u2014 ' + esc(r.al) : '') : (r.al ? esc(r.al) : ''));",
+        "      /* Features and album lead when enrichment knows them; the platform stays as the tail\n"
+        "         when there is no album to name. */\n"
+        "      var who = r.a ? esc(r.a) + (r.feat && r.feat.length ? ' feat. ' + esc(r.feat.join(', ')) : '') : '';\n"
+        "      var tail = r.al ? esc(r.al) : (r.p || '');\n"
+        "      var sub = who ? (tail ? who + ' \\u2014 ' + tail : who) : tail;")
+
+replace("          '<span class=\"srch__bpm\">' + (r.bpm ? r.bpm + ' bpm' : '') + '</span>' +",
+        "          '<span class=\"srch__bpm\">' + (r.bpm ? r.bpm + ' bpm' : '') + '</span>' +\n"
+        "          (r.genre ? '<span class=\"srch__genre\">' + esc(r.genre) + '</span>' : '') +")
+
+replace("  .srch__pf {",
+        "  /* The genre chip: the platform badge's own materials, worn as a word. */\n"
+        "  .srch__genre {\n"
+        "    flex: none;\n"
+        "    padding: 1px 6px;\n"
+        "    border-radius: 3px;\n"
+        "    background: var(--srch-pf);\n"
+        "    color: var(--srch-pf-ink);\n"
+        "    font-size: 10.5px;\n"
+        "    letter-spacing: 0.02em;\n"
+        "    font-variant-caps: small-caps;\n"
+        "  }\n"
+        "  @media (max-width: 480px) { .srch__genre { display: none; } }\n"
+        "\n"
+        "  .srch__pf {")
+
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):
     assert bad not in text, f'left behind: {bad}'
