@@ -15,6 +15,24 @@ Legend: ✔ available · 🔑 requires credentials/user auth · ⛔ unsupported 
 | Spotify | metadata + library import (+ browser SDK playback) | https://developer.spotify.com/documentation/web-api · https://developer.spotify.com/documentation/web-playback-sdk | app client credentials + user PKCE | ✔ 🔑 | ✔ 🔑 | ⛔ (previews removed for new apps) | ◐ Web Playback SDK, Premium, browser only | 🔑 (`user-library-read`, `playlist-read-private`) | ⛔ | ⛔ | unsupported | ⛔ | Spotify attribution rules | 30 s rolling limits, `Retry-After`, batch endpoints, playlist `snapshot_id` checks | 1 h | ⛔ | Development mode limits authenticated users; extended quota required for multi-user deployments |
 | Public-domain fixture | audio source | in-repo | none | ✔ | ✔ | ✔ | ✔ | — | ✔ | ✔ | exact | ✔ | "Synthetic fixture" | none | — | ✔ | Real end-to-end provider serving generated tone files |
 | External media tool (optional) | tool | configured binary | admin-enabled + rights notice | ◐ | ⛔ | ⛔ | ⛔ | ⛔ | ◐ | ◐ only for content you own / are authorized to download | unsupported | — | preserved from source | serialized, timeouts | none | ⛔ | Off by default; allowlisted hosts; no cookies, no DRM bypass |
+| Deezer (tempo) | metadata only | https://developers.deezer.com/api | none | ◐ tempo and duration by ISRC or by name (length ± 3 s) | ⛔ | ⛔ | ⛔ | ⛔ | ⛔ | ⛔ | unsupported | ⛔ | "Tempo data from Deezer" | public API, backoff on 4xx | canonical row | ⛔ | `bpm` 0 means unmeasured, never zero |
+| AcousticBrainz (tempo archive) | metadata only | https://acousticbrainz.org/data | none | ◐ tempo by MusicBrainz recording id | ⛔ | ⛔ | ⛔ | ⛔ | ⛔ | ⛔ | unsupported | ⛔ | CC0 | one lookup per recording | canonical row | ⛔ | Collection ended in 2022; answers for the back catalogue |
+| Last.fm (tags) | metadata only | https://www.last.fm/api | API key (optional) | ◐ tags → the genre profile | ⛔ | ⛔ | ⛔ | ⛔ | ⛔ | ⛔ | unsupported | ⛔ | "Tags from Last.fm" | 5/s per key | canonical row | ⛔ | Skipped entirely without a key |
+
+## Enrichment — what a link becomes
+
+A link or a search result is matched to a MusicBrainz recording: by the id a file already carries,
+by ISRC when the platform supplies one, and only then by its cleaned title and artist, and a name
+match is kept only when the length agrees to three seconds and the artist is the same artist. A
+match fills the album and release year, the featured artists (from the artist credit), the cover
+(Cover Art Archive), a weighted genre profile on one fixed vocabulary (MusicBrainz genres and tags,
+Last.fm tags when a key is set, the platform's own genre as a weak vote) and a tempo, in this order:
+Deezer by ISRC, AcousticBrainz by recording id, Deezer by name, and finally the 30-second preview
+clip decoded in memory by the ffmpeg in the image and discarded. Below a match confidence of 0.5
+nothing is filled: the row keeps the platform's own words and `identity.matchConfidence` says how
+sure the hub is. The work runs as background jobs (priority P4) on the hub's scheduler; a request
+answers from the cache at once and the next one sees the result. No audio is ever taken from a
+YouTube or Spotify stream; the four preview hosts are the only ones a clip is fetched from.
 
 ## Setup limitations (known)
 - YouTube: API key must be restricted to the hub; quota resets at midnight Pacific; embed playback needs a visible player element.

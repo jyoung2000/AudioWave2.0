@@ -696,3 +696,35 @@ loopback origin with no CORS or host configuration. The container's log carried 
 line, the expected first-run notice: `{"level":40,"levelName":"warn","time":"2026-09-26T13:23:16.248Z","module":"hub","msg":"Open http://localhost:4546 and sign in with admin / admin. You will be asked to set a real password before anything else is enabled."}`.
 
 So the E.3 table's "Docker leg — static review only" is superseded: **run**.
+
+## Sub-project 1 — hub enrichment (album, genre, BPM): shipped 2026-09-26
+
+Spec `docs/superpowers/specs/2026-09-26-metadata-enrichment-and-preview-design.md`, plan
+`docs/superpowers/plans/2026-09-26-hub-enrichment.md`, executed inline task by task, test first,
+ledger in `.superpowers/sdd/2026-09-26-hub-enrichment/progress.md` until the final review.
+
+What landed, one commit per task: contract fields (`featuredArtists`, `genreProfile`, `bpm`,
+`bpmSource`, `artworkUrl`, `matchConfidence`, `enrichedAt`; `enrich-track` job; three provider ids);
+migration `0007_enrichment.sql`; the genre vocabulary and profile merge (`packages/domain/genres.ts`);
+the video-title cleaner (`titles.ts`); Deezer, AcousticBrainz and Last.fm adapters; MusicBrainz
+recordings by ISRC/id/name with artist credits, release group and cover art; the recording matcher;
+`estimateTempo` in `packages/audio-core` (exported as `./tempo` for Node-only consumers); the
+enrichment service and its job handler on the existing scheduler; BPM from the preview clip
+(preview hosts only, 4 MB, in memory); wiring into search, resolve and library sync with
+`TrackRef.bpm/genres`; the recommender's cosine genre profiles and `tempoFit` term.
+
+Measured, from the runs (not remembered): contracts 165; domain 107; audio-core 70;
+recommendations 53; hub integration 261/261 (27 files); hub security 117; `pnpm typecheck` green.
+`node scripts/verify.mjs` result is recorded in the Task 13 ledger line and the commit that follows.
+
+Departures from the plan, each ledgered: `TrackIdentity.matchConfidence` and `TrackRef.genres/bpm`
+optional in the type (dozens of literal sites); `CANONICAL_ENRICHMENT_DEFAULTS` spread instead of
+loosening `CanonicalTrack`; cover art via the archive's JSON listing, not a HEAD/307; the matcher
+throws on provider failure (a 503 had been recorded as a no-match); enrichment jobs at P4 (at P3
+they pre-empted a user's `profile-refresh`); the tempo search band starts at 40 BPM so a slow pulse
+can be folded; the preferred tempo is derived per ranking call, not persisted; the weights were
+rebalanced to keep summing to 1 (tasteMatch/artistAffinity/recency each −0.05).
+
+Not done, by design: live calls to any platform (no keys in the repo — Hermes §3.6 covers it);
+Spotify audio features (withdrawn for new apps); key/energy analysis; the Providers tab needs no
+code — it renders the registry, and Last.fm's API-key field is the generic one.

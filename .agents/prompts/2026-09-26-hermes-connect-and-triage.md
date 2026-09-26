@@ -74,6 +74,12 @@ then check the truth at the API or the other app.
    the hub's Providers tab, never in files): paste a link → resolve → audition → add to a group
    queue → import likes and playlists. Downloads: YouTube and Spotify **must be refused with a
    reason**; SoundCloud only for creator-downloadable tracks; yt-dlp only through the admin-enabled
+   external tool. **Enrichment:** resolve a Spotify and a SoundCloud link at
+   `GET /api/v1/providers/resolve?url=…` twice, ten seconds apart — the second answer must carry
+   `albumName`, `featuredArtists`, `genreProfile`, `bpm` and `bpmSource`; a YouTube link must show
+   `identity.matchConfidence` and never a guessed album; `GET /api/v1/providers/usage` must list
+   `deezer`, `acousticbrainz` and `lastfm`. Judge the *result*: is the album right, are the features
+   the real features, is the tempo believable?
    external tool. If no keys: exercise every refusal and every "sign in through the hub" path and
    grade the copy. Known unbacked claim: the Connections card says the companion "decodes the song
    titles radio stations send" — no code does. Report it as a decision for the owner.

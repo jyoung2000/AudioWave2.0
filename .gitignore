@@ -56,3 +56,5 @@ music-player/awsp-web/target/
 
 # Playwright output kept from failed verify gates (scripts/verify.mjs)
 .verify-artifacts/
+
+.superpowers/
