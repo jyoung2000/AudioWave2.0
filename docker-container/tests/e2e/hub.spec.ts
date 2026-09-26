@@ -33,6 +33,22 @@ test('a pairing code is high-entropy, unambiguous, and shown with a fingerprint 
   await expect(page.getByText(/if it does not match what the device shows, do not confirm/i)).toBeVisible();
 });
 
+test('a permission can be ticked before the code is made, and the session shows it was granted', async ({ page }) => {
+  // The scope boxes crashed the whole panel on the first tick ("Cannot read properties of null
+  // (reading 'checked')": the box was read inside the state updater, after React had released the
+  // event), so no operator could ever pair a device with anything but the default set. Found by the
+  // cross-app journey, which needs "Manage groups" for a player that invites to its own group.
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Devices' }).click();
+  await page.getByText('Manage groups', { exact: true }).click();
+  await expect(page.getByLabel('Manage groups')).toBeChecked();
+  await expect(page.getByText('This panel could not be displayed')).toHaveCount(0);
+  await page.getByRole('button', { name: /Create pairing code/i }).click();
+  await expect(page.getByLabel('Pairing code')).toBeVisible();
+  // The default set is eight permissions; with one more ticked the pending session carries nine.
+  await expect(page.getByRole('row').filter({ hasText: /pending/i }).first()).toContainText('9');
+});
+
 test('the interface loads nothing from outside the hub', async ({ page }) => {
   const external: string[] = [];
   page.on('request', (request) => {

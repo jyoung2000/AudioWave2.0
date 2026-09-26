@@ -15,7 +15,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { boot, CORS, HUB, watchErrors } from './_shell';
 
-const ACCT = { base: HUB, credentialId: '00000000-0000-4000-8000-0000000000aa', secret: 'x'.repeat(40), scopes: ['group:member'], hubName: 'TOWER', deviceId: 'd1' };
+const ACCT = { base: HUB, credentialId: '00000000-0000-4000-8000-0000000000aa', secret: 'x'.repeat(40), scopes: ['group:member', 'group:admin'], hubName: 'TOWER', deviceId: 'd1' };
 type Group = { id: string; name: string; status: string; myRole: string | null; members: Array<{ memberId: string; role: string; displayName?: string; revokedAt: null }> };
 type Hub = {
   directed: boolean; calls: string[]; seq: number; declined?: boolean;
@@ -74,14 +74,14 @@ async function wire(page: Page, hub: Hub): Promise<void> {
 }
 
 /** Store the device account (paired or not) through kv, then open the page afresh at `hash`. */
-async function start(page: Page, hub: Hub, hash = '', paired = true): Promise<void> {
+async function start(page: Page, hub: Hub, hash = '', paired: boolean | typeof ACCT = true): Promise<void> {
   await page.route(/cdn\.jsdelivr\.net/, (r) => r.abort());
   await wire(page, hub);
   await boot(page);
   await page.evaluate(async (a) => {
     (window as unknown as { kv: { set(k: string, v: unknown): void } }).kv.set('player:hub', a);
     await new Promise((res) => setTimeout(res, 300));
-  }, paired ? ACCT : null);
+  }, paired === true ? ACCT : paired || null);
   await page.goto('about:blank');
   await boot(page, hash);
   await page.waitForTimeout(500);
@@ -120,6 +120,16 @@ test('the Profile tab: groups, a new group, an invite link, Withdraw, and Leave'
   await page.click('#grpList li:nth-child(2) [data-grp="leave"]'); await page.waitForTimeout(500);
   expect(hub.calls, 'Leave leaves the group').toContain('POST /groups/g-2/leave');
   await expect(page.locator('#grpList')).not.toContainText('Office Radio');
+});
+
+test('paired without “Manage groups”, no group offers an invite link — the hub would refuse it', async ({ page }) => {
+  // The hub gates every invite route on group:admin; the operator grants it at pairing. A button that
+  // can only be answered with 403 is not offered, and the owner row still says who owns it.
+  const hub = mkHub(false);
+  await start(page, hub, '#settings/profile', { ...ACCT, scopes: ['group:member'] });
+  await expect(page.locator('#grpList li')).toHaveCount(2);
+  await expect(page.locator('#grpList li').first()).toContainText('Owner');
+  expect(await page.$$eval('#grpList [data-grp="link"]', (b) => b.length), 'no invite link on any row').toBe(0);
 });
 
 test('the invite page: from a link, Not Now, Join, a used code, a bad code, Decline', async ({ page }) => {

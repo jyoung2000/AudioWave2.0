@@ -73,7 +73,7 @@ async function pairOverApi(admin: APIRequestContext, device: APIRequestContext, 
   return `Bearer ${cred.credentialId}.${cred.secret}`;
 }
 
-test('the whole pass: hub set up, player paired, group joined, invite declined, name taken', async ({ page, context, request }) => {
+test('the whole pass: hub set up, player paired, group joined, invite declined, name taken, group owned, someone found', async ({ page, context, request }) => {
   // The whole journey, including the hub's real pairing poll, which the player runs every 2 s.
   test.setTimeout(600_000);
   const hub = page;
@@ -84,6 +84,7 @@ test('the whole pass: hub set up, player paired, group joined, invite declined, 
   let csrf = '';
   let groupId = '';
   let playerAuth = '';
+  let otherAuth = '';
 
   await test.step('01 — the hub is set up, and its bootstrap password stops working', async () => {
     await hub.goto('/');
@@ -105,6 +106,11 @@ test('the whole pass: hub set up, player paired, group joined, invite declined, 
   await test.step('02 — the player pairs with the real hub, its verification code typed into the hub', async () => {
     // A person reads the code off the hub's Devices tab, so it is made there.
     await hub.getByRole('tab', { name: 'Devices' }).click();
+    // Not in the default set: without it the hub refuses every invite this player will later make.
+    // The Aqua checkbox's input is a 1 px, opacity-0 element behind a drawn box, so it is ticked the
+    // way a person ticks it — by its label — and the state is then asserted rather than assumed.
+    await hub.getByText('Manage groups', { exact: true }).click();
+    await expect(hub.getByLabel('Manage groups')).toBeChecked();
     await hub.getByRole('button', { name: /Create pairing code/i }).click();
     const code = (await hub.getByLabel('Pairing code').innerText()).trim();
     expect(code, 'ten Crockford base32 characters, grouped for reading aloud').toMatch(/^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}$/);
@@ -127,10 +133,11 @@ test('the whole pass: hub set up, player paired, group joined, invite declined, 
     await expect(player.locator('#hubUnpair')).toBeVisible({ timeout: 120_000 });
     const paired = await player.evaluate(async () => {
       const kv = (window as unknown as { kv: { get(k: string): Promise<unknown> } }).kv;
-      return (await kv.get('player:hub')) as { credentialId?: string; deviceId?: string; secret?: string } | null;
+      return (await kv.get('player:hub')) as { credentialId?: string; deviceId?: string; secret?: string; scopes?: string[] } | null;
     });
     expect(paired?.credentialId, 'the player kept the credential the hub issued').toBeTruthy();
     expect(paired?.secret, 'and the secret it authenticates with').toBeTruthy();
+    expect(paired?.scopes, 'and the permissions the operator ticked, which the shell reads before offering to invite').toContain('group:admin');
     playerAuth = `Bearer ${paired?.credentialId}.${paired?.secret}`;
   });
 
@@ -223,12 +230,81 @@ test('the whole pass: hub set up, player paired, group joined, invite declined, 
     // Uniqueness is only visible from *another* identity — the hub's availability check excludes
     // the caller's own profile — so a second player is paired over the API, the same four calls
     // the GUI made in step 02, and it is this player that is refused.
-    const otherAuth = await pairOverApi(request, device, csrf, 'Second player');
+    otherAuth = await pairOverApi(request, device, csrf, 'Second player');
     const free = await device.get(`${HUB_URL}/api/v1/profiles/available?name=${encodeURIComponent(PLAYER_NAME)}`, { headers: { authorization: otherAuth } });
     expect(free.status()).toBe(200);
     expect(((await free.json()) as { available?: boolean }).available, 'the name the player took is not available to another').toBe(false);
     const claim = await device.patch(`${HUB_URL}/api/v1/profiles/me`, { headers: { authorization: otherAuth }, data: { displayName: PLAYER_NAME } });
     expect(claim.status(), 'the second claim on the same name is refused').toBe(409);
+  });
+
+  await test.step('06 — the player owns a group: makes an invite link, withdraws it, then leaves the other group', async () => {
+    // Until now the hub's operator made every group. These are the player's own acts, the ones
+    // np/groups.spec.ts proves against a stub: New Group, Make Invite Link, Withdraw, Leave.
+    await player.goto(`${PLAYER_URL}/#settings/profile`);
+    await player.waitForFunction(() => (window as unknown as { NP_READY?: unknown }).NP_READY, null, { timeout: 60_000 });
+    await player.click('#grpNew');
+    await player.keyboard.type('Player’s own');
+    await player.keyboard.press('Enter');
+    const ownRow = player.locator('#grpList li', { hasText: 'Player’s own' });
+    await expect(ownRow, 'the group the player created is listed, and it is the owner').toContainText(/owner/i, { timeout: 30_000 });
+
+    let ownId = '';
+    await expect
+      .poll(
+        async () => {
+          const list = await request.get(`${HUB_URL}/api/v1/groups`, { headers: { 'x-csrf-token': csrf } });
+          const body = (await list.json()) as { items?: Array<{ id: string; name: string }> };
+          ownId = body.items?.find((g) => g.name === 'Player’s own')?.id ?? '';
+          return ownId;
+        },
+        { message: 'the hub has the group the player made', timeout: 30_000 },
+      )
+      .not.toBe('');
+
+    await ownRow.locator('[data-grp="link"]').click();
+    const link = await ownRow.locator('.grp__link input').inputValue({ timeout: 30_000 });
+    expect(link, 'the player composed an invite link the hub issued the code for').toContain('#invite/');
+    await player.locator('#invOut li', { hasText: 'Player’s own' }).locator('[data-out="withdraw"]').click();
+    await expect
+      .poll(
+        async () => {
+          const list = await request.get(`${HUB_URL}/api/v1/groups/${ownId}/invites`, { headers: { 'x-csrf-token': csrf } });
+          const body = (await list.json()) as { items?: Array<{ state?: string }> };
+          return (body.items ?? []).map((i) => i.state ?? '').join(',');
+        },
+        { message: 'the hub records the withdrawn invite', timeout: 30_000 },
+      )
+      .toContain('withdrawn');
+
+    // A guest may leave; the hub's group list is what says whether it happened.
+    await player.locator(`#grpList li[data-g="${groupId}"] [data-grp="leave"]`).click();
+    await expect
+      .poll(
+        async () => {
+          const list = await request.get(`${HUB_URL}/api/v1/groups`, { headers: { 'x-csrf-token': csrf } });
+          const body = (await list.json()) as { items?: Array<{ id: string; members?: Array<{ displayName: string; revokedAt: string | null }> }> };
+          const group = body.items?.find((g) => g.id === groupId);
+          return (group?.members ?? []).filter((m) => m.revokedAt === null && m.displayName === PLAYER_NAME).length;
+        },
+        { message: 'the hub no longer counts the player among the group’s members', timeout: 30_000 },
+      )
+      .toBe(0);
+  });
+
+  await test.step('07 — another player is found from search and its profile opens', async () => {
+    const named = await device.patch(`${HUB_URL}/api/v1/profiles/me`, { headers: { authorization: otherAuth }, data: { displayName: 'Second player' } });
+    expect(named.status(), `the second player takes a name of its own (${named.status()})`).toBe(200);
+
+    await player.goto(`${PLAYER_URL}/`);
+    await player.waitForFunction(() => (window as unknown as { NP_READY?: unknown }).NP_READY, null, { timeout: 60_000 });
+    await player.fill('#q', 'Second');
+    await player.keyboard.press('Enter');
+    const person = player.locator('#srchPeople [data-person]', { hasText: 'Second player' });
+    await expect(person, 'search lists people on the real hub').toBeVisible({ timeout: 30_000 });
+    await person.click();
+    await expect(player.locator('#pfv')).toBeVisible();
+    await expect(player.locator('#pfvName'), 'their profile opens in a sheet with the name the hub holds').toHaveText('Second player');
   });
 
   await device.dispose();

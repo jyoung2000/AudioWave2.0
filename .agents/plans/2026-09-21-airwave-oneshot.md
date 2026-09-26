@@ -557,3 +557,125 @@ One product defect found and fixed on the way: pairing through the hub's GUI cou
 (`Devices.tsx`, `maxLength={8}` against a twelve-character fingerprint). `docs/design/styleguide.pdf`
 is dirty because Chrome's PDF output is byte-nondeterministic; the HTML fingerprint `153b057d9109861c`
 is unchanged, so it is left out of the commit as noise. Not pushed.
+
+## Step E follow-ups (2026-09-26) — 8 → 2 → 7 → 3, and a provider audit
+
+Order asked for: make the journey a gate; run the Docker leg live; keep failed-gate evidence; run the
+hub-dependent player legs against the real hub.
+
+### 8 — `test:journey` is a verify gate
+
+`scripts/verify.mjs` runs `pnpm test:journey` after `test:e2e`, skipped only when Chromium is absent
+(same predicate as the other browser gates). `node scripts/verify.mjs test:journey`: **PASS, 22 s**.
+
+### 2 — Docker: blocked on the machine, not the repo
+
+Docker Desktop had to be factory-reset and then failed to start: `initializing Ingest server …
+sailor-ingest.sock … The file cannot be accessed by the system`. `%LOCALAPPDATA%\Docker\run\` holds
+four stale Unix-socket stubs Windows cannot stat; with no Docker process running the fix is to remove
+that `run\` folder and start Docker Desktop, which recreates it. Left with the operator; the daemon
+was still down at the end of this pass, so the container leg stays **reviewed, not run** (E.3 above).
+
+### 7 — a failed browser gate keeps its evidence
+
+Every Playwright suite writes `playwright-report/` and `test-results/` beside its config and the next
+run overwrites them, which is how the `np/func.spec.ts` one-off in E.1 left nothing to read. `run()`
+in `scripts/verify.mjs` now takes `artifacts`; when a gate fails those directories are copied to
+`.verify-artifacts/<run timestamp>/<gate>/` and the summary line says where. Wired for `test:local`,
+`test:a11y`, `test:e2e` (player and hub) and `test:journey`. On a green gate nothing is created
+(checked). `.verify-artifacts/` is ignored. `verify.mjs` already exports `CI=1` to gates, so the
+HTML report exists to be kept.
+
+### Provider audit — radio titles, and links from YouTube / SoundCloud / Spotify
+
+Asked: does the radio "enhancement" work, and can the player preview, queue and download links and
+playlists from YouTube, SoundCloud and Spotify when the container or the Windows app is connected.
+Read from code and the tests that exist, not from the capability prose:
+
+**Radio.** The Radio tab (`index.html` ~10190–10700) is the page's own: stations from the
+radio-browser directory (`radioApi`, several hosts, `hidebroken`), a seeded list, favourites, LIVE
+state. "What is on the air" (`index.html:16564`) is resolved **by the page** from feeds a station
+publishes with CORS open — SomaFM's songs JSON, Triton/StreamTheWorld's nowplaying XML — and
+otherwise falls back to the directory's programme format, deliberately, because a browser is never
+shown ICY headers. Tested: `np/radio.spec.ts` (6 tests, radio-browser stubbed). **Finding:** the
+Connections card for the Windows companion says it "decodes the song titles radio stations send"
+(`index.html:7468`, from `design/frontends/…:7578`). Nothing in `local-helper/`,
+`windows-companion/src/main` or the hub reads ICY metadata; no helper route exists for it. The claim
+is not backed by code. Two honest fixes, either is fine: implement an ICY `StreamTitle` reader in the
+helper (`Icy-MetaData: 1`, parse `icy-metaint` blocks, serve `/helper/v1/radio/title?url=`) and have
+`nowTrack` prefer it when a helper is connected; or drop the clause from the card. Not done in this
+pass — it is a product decision, recorded here.
+
+**Links and playlists — what is real, per `docs/PROVIDER_CAPABILITIES.md` and the adapters**
+(`docker-container/src/providers/adapters/*.ts`, `caps({...})`):
+
+| | YouTube | SoundCloud | Spotify |
+| --- | --- | --- | --- |
+| Search / resolve a pasted link (hub) | ✔ Data API key | ✔ app credentials | ✔ app credentials |
+| Preview | via embedded player | ◐ per track (`access`) | ◐ only when `preview_url` exists |
+| Play | ✔ IFrame embed (`playback: 'available'`) | ◐ when creator allows streaming | ⛔ Premium + Spotify's own SDK only |
+| Add to a group queue | ✔ search results map to `TrackRef`s (`search-service.ts:201,291`) | ✔ | ✔ as a reference; audio never leaves Spotify |
+| Import likes / playlists | 🔑 user OAuth (`accountsSync`) | 🔑 user OAuth | 🔑 user OAuth, as *lists* matched to owned copies |
+| Download | ⛔ refused by policy (`save: NO`) | ◐ only tracks the creator marked downloadable | ⛔ no audio API; refused |
+| Download via companion / helper (yt-dlp, spotDL, FFmpeg) | only through the admin-enabled `external-tool` provider with a `DownloadAuthorizationBasis`, allowlisted hosts, `--ignore-config` first | same | spotDL deliberately absent (`external-tool-presets.test.ts:49`) |
+
+What is **proven by tests**: resolving and refusing links and downloads
+(`ssrf-and-downloads.test.ts`: private addresses, unlisted hosts, "refuses a download the provider
+does not permit, and says why", `downloads:request` scope, FFmpeg formats); the yt-dlp command line
+(`external-tool-presets.test.ts`, 13 tests); the player finding a helper and fetching a link into the
+library and playing it (`helper.spec.ts`: "fetching a link puts a real track in the library, and it
+plays from this device"; "a link the helper will not fetch from is refused, with the reason");
+the tool-backend discovery (`tool-backend.test.ts`, 14 tests); incremental likes import against an
+in-process SoundCloud (`discovery-engine.test.ts:288`); the fifteen-second audition in the search
+popover (`SearchPopover.tsx`). What is **not proven anywhere**: a live call to YouTube, SoundCloud or
+Spotify — every one needs an API key or OAuth the repo does not have, so the adapters are exercised
+against fixtures only. "Connected" changes the route, not the rights: pairing the hub or the
+companion adds keys, OAuth, the audition and the admin-enabled download tool; it never turns a ⛔
+into a ✔, by design (`platforms.ts` header, `PROVIDER_CAPABILITIES.md`).
+
+### 3 — the hub-dependent player legs, against the real hub
+
+The player's `np/*.spec.ts` suites stub the hub on purpose: they test the player's own states,
+including refusals a real hub would not produce on demand (a used code, a bad code, a hub that is
+not the one you paired with). Rewriting them against a live hub would lose those. So the legs that
+only a real hub can vouch for were added to the journey instead, as steps 06 and 07, and the stubbed
+suites stay as the player's own. What was added:
+
+- **06** — the player makes a group of its own (`#grpNew`, the shell's dialog), the hub lists it
+  with the player as owner; the player makes an invite link from its row (`[data-grp="link"]`), the
+  hub having issued the code; the player withdraws it from its outgoing list (`[data-out="withdraw"]`)
+  and the hub reads `withdrawn`; the player leaves "Kitchen journey" and the hub's member list no
+  longer carries it.
+- **07** — the second device names itself; the player finds it from the search box (`#q`,
+  `#srchPeople [data-person]`) and its profile opens in the sheet with the name the hub holds.
+
+**Two more real defects, both found by step 06, both fixed:**
+
+1. **Permissions could not be changed in the hub's GUI.** Ticking any box under "What this device may
+   do" crashed the Devices panel: `Cannot read properties of null (reading 'checked')`.
+   `Devices.tsx` read `e.currentTarget.checked` *inside* the `setScopes` updater, by which time React
+   has released the event. So every device ever paired through the GUI got the default eight scopes
+   and nothing else. Fix: read the box first, then update. Regression test in
+   `docker-container/tests/e2e/hub.spec.ts` ("a permission can be ticked before the code is made…").
+2. **An owner shown a button that could only fail.** Every invite route requires `group:admin`
+   (`packages/contracts`, routes 434–436); creating a group needs only `group:member`; the default
+   pairing omits `group:admin`. A GUI-paired player therefore owns the group it made and is offered
+   **Make Invite Link**, which the hub answers with 403 — and the shell blamed the *role* ("Only the
+   group's owner or an admin can invite"). Fix, recorded in `music-player/scripts/make-shell.py` as an
+   asserted edit (the shell is generated from `design/frontends/`, never hand-edited): `canInvite`
+   also requires the credential to carry `group:admin`, and the 403 message names the missing
+   permission when that is the cause. Rule **NP-PREF-012** contract and evidence updated; new case in
+   `np/groups.spec.ts` ("paired without “Manage groups”, no group offers an invite link"); the stubbed
+   credential there now carries `group:admin`, as a real one must to invite. Styleguide rebuilt
+   (fingerprint `3de1d0a16342e972`), check green. Not changed: which scope `groupsCreate` demands —
+   whether a member-scoped device should be able to *create* groups at all is a design call, left open.
+
+Harness lessons that cost most of the wall-clock: `test.setTimeout(600_000)` in the spec overrides
+`--timeout`, and the config had no `actionTimeout`, so an action that never resolved (`check()` on the
+Aqua checkbox's 1 px, opacity-0 input) ate the whole ten minutes with no message. `actionTimeout:
+30_000` now; a box is ticked by its label and its state asserted. Playwright writes this suite's
+`test-results/` and `playwright-report/` at the repo root, not beside the config — the verify
+artifact paths were corrected to match.
+
+Results: journey **1 passed, 11.9 s and 11.6 s** (two consecutive runs, seven steps);
+`np/groups.spec.ts` **6/6**.

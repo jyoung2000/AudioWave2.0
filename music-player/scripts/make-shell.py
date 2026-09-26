@@ -562,6 +562,18 @@ replace("    paintRoots();\n  })();\n  };\n</script>",
         "  })();\n"
         "  };\n</script>")
 
+# ---- groups: Make Invite Link only when this player may invite -------------------------------------------
+# Every invite route on the hub is gated on the group:admin scope (packages/contracts, routes.ts), and the
+# Devices tab's default pairing does not grant it, while creating a group needs only group:member. Without
+# this, a player that owns a group it made is shown a button that can only fail, and the 403 it gets is
+# blamed on its role rather than on the permission it was paired without. Found by tests/journey step 06.
+replace("    function canInvite(g) { return g.myRole === 'owner' || g.myRole === 'admin'; }",
+        "    function hasScope(s) { return !!(hubAcct && hubAcct.scopes && hubAcct.scopes.indexOf(s) >= 0); }\n"
+        "    function canInvite(g) { return (g.myRole === 'owner' || g.myRole === 'admin') && hasScope('group:admin'); }")
+replace("r.status === 403 ? 'Only the group’s owner or an admin can invite.'",
+        "r.status === 403 ? (hasScope('group:admin') ? 'Only the group’s owner or an admin can invite.' : "
+        "'This player was paired without the “Manage groups” permission. Pair it again with that ticked, or invite from the container.')")
+
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):
     assert bad not in text, f'left behind: {bad}'

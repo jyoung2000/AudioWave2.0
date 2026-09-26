@@ -53,3 +53,6 @@ music-player/awsp-web/target/
 
 # Serena (semantic code MCP) per-machine project metadata
 .serena/
+
+# Playwright output kept from failed verify gates (scripts/verify.mjs)
+.verify-artifacts/

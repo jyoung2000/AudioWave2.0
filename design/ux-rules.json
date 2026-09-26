@@ -1466,7 +1466,7 @@
       "id": "NP-PREF-012",
       "group": "np-prefs",
       "title": "Groups and invites live on the Profile tab",
-      "contract": "Settings ▸ Profile lists your groups on the container with their member count and your role, makes a new one (you own it), and — for an owner or admin — makes an invite link that works once and expires after the time chosen. Invites you have received wait there until you join or decline; ones you have sent show who they were for and when they expire. A code the container can't withdraw is never shown as withdrawn.",
+      "contract": "Settings ▸ Profile lists your groups on the container with their member count and your role, makes a new one (you own it), and — for an owner or admin whose player was paired with the “Manage groups” permission — makes an invite link that works once and expires after the time chosen. Without that permission no invite link is offered, because the container would refuse it, and the message names the missing permission rather than blaming the role. Invites you have received wait there until you join or decline; ones you have sent show who they were for and when they expire. A code the container can't withdraw is never shown as withdrawn.",
       "example": "",
       "authority": "adopted",
       "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
@@ -1475,6 +1475,16 @@
           "type": "test",
           "path": "music-player/tests/e2e/np/groups.spec.ts",
           "name": "the Profile tab: groups, a new group, an invite link, Withdraw, and Leave"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/groups.spec.ts",
+          "name": "paired without “Manage groups”, no group offers an invite link — the hub would refuse it"
+        },
+        {
+          "type": "test",
+          "path": "tests/journey/cross-app.spec.ts",
+          "name": "the whole pass: hub set up, player paired, group joined, invite declined, name taken, group owned, someone found"
         }
       ]
     },

@@ -15594,7 +15594,8 @@ window.AW.startStats = function () {
         paintGroups(r.ok ? '' : r.status === 401 || r.status === 403 ? 'The container no longer accepts this player.' : 'No answer from ' + hubAcct.hubName + '.');
       });
     }
-    function canInvite(g) { return g.myRole === 'owner' || g.myRole === 'admin'; }
+    function hasScope(s) { return !!(hubAcct && hubAcct.scopes && hubAcct.scopes.indexOf(s) >= 0); }
+    function canInvite(g) { return (g.myRole === 'owner' || g.myRole === 'admin') && hasScope('group:admin'); }
     function paintGroups(why) {
       var list = document.getElementById('grpList');
       if (why || !groups) { list.innerHTML = '<li class="empty">' + esc(why || 'Couldn’t load groups.') + '</li>'; paintPfvInvite(); return; }
@@ -15614,7 +15615,7 @@ window.AW.startStats = function () {
       if (toProfile) body.toProfileId = toProfile.id;
       return hubCall('POST', '/groups/' + encodeURIComponent(g.id) + '/invites', body).then(function (r) {
         if (!r.ok || !r.json || !r.json.inviteCode) {
-          return { error: r.status === 403 ? 'Only the group’s owner or an admin can invite.' : r.status === 429 ? 'Too many invites at once. Wait a minute.' : 'The container didn’t make an invite.' };
+          return { error: r.status === 403 ? (hasScope('group:admin') ? 'Only the group’s owner or an admin can invite.' : 'This player was paired without the “Manage groups” permission. Pair it again with that ticked, or invite from the container.') : r.status === 429 ? 'Too many invites at once. Wait a minute.' : 'The container didn’t make an invite.' };
         }
         var x = { code: r.json.inviteCode, expiresAt: r.json.expiresAt, inviteId: r.json.inviteId || null, groupId: g.id, group: g.name,
                   hub: hubAcct.base, from: myProfile ? myProfile.displayName : '', role: 'member', at: new Date().toISOString(),

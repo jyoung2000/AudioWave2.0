@@ -4,7 +4,7 @@
  * Gates that cannot run here (Windows packaging, Docker when the daemon is unavailable) are reported as skipped, never as passed.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -29,7 +29,28 @@ function spawnPortable(cmd, args, options = {}) {
   return spawnSync(cmd, quoted, { ...options, shell: true });
 }
 
-function run(name, cmd, args, { optional = false, skipIf = null, env = {} } = {}) {
+/**
+ * Where a failed gate's Playwright output is kept. Every suite writes `playwright-report/` and
+ * `test-results/` beside its config and overwrites them on the next run, so by the time a one-off
+ * failure is looked into the evidence has usually been replaced by a green run. A gate that names
+ * `artifacts` has those directories copied here when it fails — one folder per verify run, one per
+ * gate — and the summary says where.
+ */
+const ARTIFACTS_ROOT = join(process.cwd(), '.verify-artifacts', new Date().toISOString().replace(/[:.]/g, '-'));
+
+function keepArtifacts(name, dirs) {
+  const kept = [];
+  for (const dir of dirs) {
+    if (!existsSync(dir)) continue;
+    const dest = join(ARTIFACTS_ROOT, name, dir.replace(/[/\\]/g, '__'));
+    mkdirSync(dest, { recursive: true });
+    cpSync(dir, dest, { recursive: true });
+    kept.push(dest);
+  }
+  return kept;
+}
+
+function run(name, cmd, args, { optional = false, skipIf = null, env = {}, artifacts = [] } = {}) {
   if (only.length && !only.includes(name)) return;
   if (skipIf) {
     const reason = skipIf();
@@ -43,7 +64,9 @@ function run(name, cmd, args, { optional = false, skipIf = null, env = {} } = {}
   const t = Date.now();
   const r = spawnPortable(cmd, args, { stdio: 'inherit', env: { ...process.env, CI: process.env.CI ?? '1', ...env } });
   const ok = r.status === 0;
-  results.push({ name, status: ok ? 'PASS' : optional ? 'WARN' : 'FAIL', detail: ok ? '' : `exit ${r.status}`, ms: Date.now() - t });
+  const kept = ok ? [] : keepArtifacts(name, artifacts);
+  const detail = ok ? '' : kept.length ? `exit ${r.status}; report kept at ${kept.join(', ')}` : `exit ${r.status}`;
+  results.push({ name, status: ok ? 'PASS' : optional ? 'WARN' : 'FAIL', detail, ms: Date.now() - t });
 }
 
 /**
@@ -189,7 +212,7 @@ run('test:perf', 'pnpm', ['test:perf']);
 run('build:local', 'pnpm', ['build:local']);
 run('local-file-up-to-date', 'git', ['diff', '--exit-code', '--', 'now-playing.html']);
 check('helper-up-to-date', helperUpToDate);
-run('test:local', 'pnpm', ['test:local'], { skipIf: hasChromium });
+run('test:local', 'pnpm', ['test:local'], { skipIf: hasChromium, artifacts: ['music-player/test-results-local', 'music-player/playwright-report-local'] });
 // The styleguide is built from the products' own components and stylesheets, so the committed copy
 // goes stale the moment either moves — same shape as the single-file player above, and the same
 // reason: it is opened straight from the repository, by people who are not running a toolchain.
@@ -198,8 +221,10 @@ run('styleguide-up-to-date', 'git', ['diff', '--exit-code', '--', 'docs/design/s
 // Sources, coverage against the products' navigation, tokens against the stylesheets, and freshness.
 run('styleguide:check', 'pnpm', ['styleguide:check']);
 run('styleguide:pdf', 'pnpm', ['styleguide:pdf'], { skipIf: hasChromium });
-run('test:a11y', 'pnpm', ['test:a11y'], { skipIf: hasChromium });
-run('test:e2e', 'pnpm', ['test:e2e'], { skipIf: hasChromium });
+run('test:a11y', 'pnpm', ['test:a11y'], { skipIf: hasChromium, artifacts: ['music-player/test-results', 'music-player/playwright-report'] });
+run('test:e2e', 'pnpm', ['test:e2e'], { skipIf: hasChromium, artifacts: [...['music-player/test-results', 'music-player/playwright-report'], ...['docker-container/test-results', 'docker-container/playwright-report']] });
+// The only test in which the hub and the player meet: both real, side by side (tests/journey/).
+run('test:journey', 'pnpm', ['test:journey'], { skipIf: hasChromium, artifacts: ['test-results', 'playwright-report'] });
 run('test:awsp', cargoBin ?? 'cargo', ['test', '--release', '--manifest-path', 'windows-companion/awsp-server/Cargo.toml'], { skipIf: hasCargo });
 run('docker-build', 'docker', ['build', '-t', 'now-playing-hub:verify', '-f', 'docker-container/Dockerfile', '.'], { skipIf: hasDocker });
 results.push({ name: 'windows-package', status: process.platform === 'win32' ? 'SEE build:windows' : 'SKIPPED', detail: process.platform === 'win32' ? '' : 'Windows-only; produced by .github/workflows/windows-companion.yml', ms: 0 });

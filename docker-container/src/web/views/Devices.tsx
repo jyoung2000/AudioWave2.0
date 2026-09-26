@@ -110,7 +110,11 @@ export function DevicesView() {
                   <Checkbox
                     key={scope}
                     checked={scopes.includes(scope)}
-                    onChange={(e) => setScopes((list) => (e.currentTarget.checked ? [...list, scope] : list.filter((s) => s !== scope)))}
+                    onChange={(e) => {
+                      // Read the box before the updater runs: React has released the event's target by then.
+                      const on = e.currentTarget.checked;
+                      setScopes((list) => (on ? [...list, scope] : list.filter((s) => s !== scope)));
+                    }}
                   >
                     {SCOPE_LABELS[scope] ?? scope}
                   </Checkbox>
