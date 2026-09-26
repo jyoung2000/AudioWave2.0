@@ -1,4 +1,5 @@
-import { estimateTempo, type TempoEstimate } from '@now-playing/audio-core';
+// The estimator alone: the package root pulls in Web Audio types the hub does not have and does not need.
+import { estimateTempo, type TempoEstimate } from '@now-playing/audio-core/tempo';
 import { spawn } from 'node:child_process';
 import type { Logger } from 'pino';
 import type { FfmpegInfo } from '../deps.js';
