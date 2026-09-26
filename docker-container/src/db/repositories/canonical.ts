@@ -1,4 +1,3 @@
-import { CANONICAL_ENRICHMENT_DEFAULTS } from '@now-playing/contracts';
 import type { AggregateTasteProfile, ArtistRelation, CanonicalArtist, CanonicalTrack, DiscoveryJob, ListeningEvent, RecommendationFeedback, TrackPlatform } from '@now-playing/contracts';
 import type { Db } from '../connection.js';
 
@@ -20,6 +19,13 @@ interface CanonicalTrackRow {
   popularity: number | null;
   created_at: string;
   updated_at: string;
+  featured_artists: string;
+  genre_profile: string;
+  bpm: number | null;
+  bpm_source: CanonicalTrack['bpmSource'];
+  artwork_url: string | null;
+  match_confidence: number | null;
+  enriched_at: string | null;
 }
 
 interface CanonicalArtistRow {
@@ -52,7 +58,7 @@ function toCanonicalTrack(r: CanonicalTrackRow): CanonicalTrack {
     normalizedTitle: r.normalized_title,
     artistId: r.artist_id,
     artistName: r.artist_name,
-    ...CANONICAL_ENRICHMENT_DEFAULTS, normalizedArtist: r.normalized_artist,
+    normalizedArtist: r.normalized_artist,
     albumId: r.album_id,
     albumName: r.album_name,
     releaseYear: r.release_year,
@@ -62,6 +68,13 @@ function toCanonicalTrack(r: CanonicalTrackRow): CanonicalTrack {
     popularity: r.popularity,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
+    featuredArtists: JSON.parse(r.featured_artists ?? '[]') as string[],
+    genreProfile: JSON.parse(r.genre_profile ?? '{}') as CanonicalTrack['genreProfile'],
+    bpm: r.bpm ?? null,
+    bpmSource: r.bpm_source ?? null,
+    artworkUrl: r.artwork_url ?? null,
+    matchConfidence: r.match_confidence ?? null,
+    enrichedAt: r.enriched_at ?? null,
   };
 }
 
@@ -190,9 +203,14 @@ export class CanonicalRepository {
   upsertTrack(track: CanonicalTrack): void {
     this.db
       .prepare(
-        'INSERT INTO canonical_tracks (id, musicbrainz_recording_id, isrc, title, normalized_title, artist_id, artist_name, normalized_artist, album_id, album_name, release_year, duration_ms, genres, tags, popularity, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET musicbrainz_recording_id = COALESCE(excluded.musicbrainz_recording_id, canonical_tracks.musicbrainz_recording_id), isrc = COALESCE(excluded.isrc, canonical_tracks.isrc), title = excluded.title, normalized_title = excluded.normalized_title, artist_id = COALESCE(excluded.artist_id, canonical_tracks.artist_id), artist_name = excluded.artist_name, normalized_artist = excluded.normalized_artist, album_id = COALESCE(excluded.album_id, canonical_tracks.album_id), album_name = COALESCE(excluded.album_name, canonical_tracks.album_name), release_year = COALESCE(excluded.release_year, canonical_tracks.release_year), duration_ms = COALESCE(excluded.duration_ms, canonical_tracks.duration_ms), genres = excluded.genres, tags = excluded.tags, popularity = COALESCE(excluded.popularity, canonical_tracks.popularity), updated_at = excluded.updated_at',
+        'INSERT INTO canonical_tracks (id, musicbrainz_recording_id, isrc, title, normalized_title, artist_id, artist_name, normalized_artist, album_id, album_name, release_year, duration_ms, genres, tags, popularity, created_at, updated_at, featured_artists, genre_profile, bpm, bpm_source, artwork_url, match_confidence, enriched_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET musicbrainz_recording_id = COALESCE(excluded.musicbrainz_recording_id, canonical_tracks.musicbrainz_recording_id), isrc = COALESCE(excluded.isrc, canonical_tracks.isrc), title = excluded.title, normalized_title = excluded.normalized_title, artist_id = COALESCE(excluded.artist_id, canonical_tracks.artist_id), artist_name = excluded.artist_name, normalized_artist = excluded.normalized_artist, album_id = COALESCE(excluded.album_id, canonical_tracks.album_id), album_name = COALESCE(excluded.album_name, canonical_tracks.album_name), release_year = COALESCE(excluded.release_year, canonical_tracks.release_year), duration_ms = COALESCE(excluded.duration_ms, canonical_tracks.duration_ms), genres = excluded.genres, tags = excluded.tags, popularity = COALESCE(excluded.popularity, canonical_tracks.popularity), updated_at = excluded.updated_at, featured_artists = CASE WHEN excluded.featured_artists = \'[]\' THEN canonical_tracks.featured_artists ELSE excluded.featured_artists END, genre_profile = CASE WHEN excluded.genre_profile = \'{}\' THEN canonical_tracks.genre_profile ELSE excluded.genre_profile END, bpm = COALESCE(excluded.bpm, canonical_tracks.bpm), bpm_source = CASE WHEN excluded.bpm IS NULL THEN canonical_tracks.bpm_source ELSE excluded.bpm_source END, artwork_url = COALESCE(excluded.artwork_url, canonical_tracks.artwork_url), match_confidence = COALESCE(excluded.match_confidence, canonical_tracks.match_confidence), enriched_at = COALESCE(excluded.enriched_at, canonical_tracks.enriched_at)',
       )
-      .run(track.id, track.musicbrainzRecordingId, track.isrc, track.title, track.normalizedTitle, track.artistId, track.artistName, track.normalizedArtist, track.albumId, track.albumName, track.releaseYear, track.durationMs, JSON.stringify(track.genres), JSON.stringify(track.tags), track.popularity, track.createdAt, track.updatedAt);
+      .run(track.id, track.musicbrainzRecordingId, track.isrc, track.title, track.normalizedTitle, track.artistId, track.artistName, track.normalizedArtist, track.albumId, track.albumName, track.releaseYear, track.durationMs, JSON.stringify(track.genres), JSON.stringify(track.tags), track.popularity, track.createdAt, track.updatedAt, JSON.stringify(track.featuredArtists), JSON.stringify(track.genreProfile), track.bpm, track.bpmSource, track.artworkUrl, track.matchConfidence, track.enrichedAt);
+  }
+
+  /** Rows nothing has looked up yet, oldest first — the enrichment worker's backlog. */
+  tracksNeedingEnrichment(limit: number): CanonicalTrack[] {
+    return this.db.prepare<[number], CanonicalTrackRow>('SELECT * FROM canonical_tracks WHERE enriched_at IS NULL ORDER BY created_at ASC LIMIT ?').all(limit).map(toCanonicalTrack);
   }
 
   findTrackById(id: string): CanonicalTrack | undefined {
