@@ -88,3 +88,25 @@ test('a hub that never answers leaves the chain to iTunes inside the deadline', 
   await page.press('#q', 'Enter');
   await expect(page.locator('.srch__row .srch__title').first()).toHaveText('Fallback Song', { timeout: 12_000 });
 });
+
+test('a click plays up to thirty seconds, and the main track waits its turn', async ({ page }) => {
+  await pairAndOpen(page, [hubRow()]);
+  await page.route('https://p.scdn.co/**', (r) => r.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'content-type': 'audio/mpeg' }, body: Buffer.alloc(4000) }));
+  await page.fill('#q', 'Golden Hour');
+  await page.press('#q', 'Enter');
+  expect(await page.evaluate(() => (window as unknown as { NP_SRCH_CLIP?: number }).NP_SRCH_CLIP ?? null), 'the clip length the module exposes').toBe(30);
+  const art = page.locator('.srch__row button.srch__art').first();
+  await expect(art).toHaveAttribute('aria-label', /30 seconds/);
+  await art.click();
+  await expect(page.locator('.srch__art.is-preview')).toHaveCount(1);
+  await art.click();
+  await expect(page.locator('.srch__art.is-preview')).toHaveCount(0);
+});
+
+test('a row with no clip says so instead of pretending', async ({ page }) => {
+  await pairAndOpen(page, [hubRow({ provider: 'youtube', providerId: 'v1', id: 'youtube:track:v1', previewUrl: null, canonicalUrl: 'https://youtu.be/v1' })]);
+  await page.fill('#q', 'Golden Hour');
+  await page.press('#q', 'Enter');
+  await expect(page.locator('.srch__row button.srch__art')).toHaveCount(0);
+  await expect(page.locator('.srch__row .srch__art').first()).toHaveAttribute('title', /No preview/);
+});

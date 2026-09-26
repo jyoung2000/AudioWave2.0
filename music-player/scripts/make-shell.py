@@ -716,6 +716,47 @@ replace("  .srch__pf {",
         "\n"
         "  .srch__pf {")
 
+# ---- search: the audition runs the whole clip, and steps aside for nothing dishonest (NP-FIND-001) --
+# Thirty seconds is what the platforms serve; fifteen was the mockup's guess. The main track pauses
+# for the audition and returns after it; a row with no clip says why instead of dressing as a button.
+
+replace("    var CLIP = 15;                 // seconds of preview",
+        "    var CLIP = 30;                 // seconds of preview \\u2014 the whole clip a platform serves\n"
+        "    window.NP_SRCH_CLIP = CLIP;    /* read by tests; one constant drives label, ring and cutoff */")
+
+replace("      if (!r.prev) return '<span class=\"srch__art\" aria-hidden=\"true\">' + inner + '</span>';",
+        "      if (!r.prev) {\n"
+        "        /* Unavailable is shown and explained (NP-PRIN-002): the tile stays, and says why. */\n"
+        "        var whyNot = 'No preview \\u2014 ' + (r.p ? 'opens on ' + r.p : 'nothing to play here');\n"
+        "        return '<span class=\"srch__art\" title=\"' + esc(whyNot) + '\" aria-label=\"' + esc(whyNot) + '\">' + inner + '</span>';\n"
+        "      }")
+
+replace("        ' aria-label=\"Preview ' + esc(r.t) + ', 15 seconds\">' + inner +",
+        "        ' aria-label=\"Preview ' + esc(r.t) + ', ' + CLIP + ' seconds\">' + inner +")
+
+replace("    var audio = null, playing = null, raf = 0;",
+        "    var audio = null, playing = null, raf = 0, resumeMain = false;")
+
+replace("      var same = playing === r;\n"
+        "      stopPreview();\n"
+        "      if (same) return;",
+        "      var same = playing === r;\n"
+        "      stopPreview();\n"
+        "      if (same) return;\n"
+        "      /* One sound at a time: the main track steps aside for the audition and returns after. */\n"
+        "      if (window.NP_PLAYER && window.NP_PLAYER.playing && window.NP_PLAYER.playing()) {\n"
+        "        try { window.NP_PLAYER.pause(); resumeMain = true; } catch (e) { resumeMain = false; }\n"
+        "      }")
+
+replace("      playing = null;\n"
+        "    }",
+        "      playing = null;\n"
+        "      if (resumeMain) {\n"
+        "        resumeMain = false;\n"
+        "        try { window.NP_PLAYER.resume(); } catch (e) { /* the engine may have been torn down */ }\n"
+        "      }\n"
+        "    }")
+
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):
     assert bad not in text, f'left behind: {bad}'

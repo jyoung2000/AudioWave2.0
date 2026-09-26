@@ -8090,7 +8090,8 @@ window.AW.startStats = function () {
     var live = document.getElementById('srchLive');
 
     var PAGE = 5;
-    var CLIP = 15;                 // seconds of preview
+    var CLIP = 30;                 // seconds of preview \u2014 the whole clip a platform serves
+    window.NP_SRCH_CLIP = CLIP;    /* read by tests; one constant drives label, ring and cutoff */
     var TAIL = 0.7;                // seconds of volume ramp before the cut
     var COMPANION = 'http://127.0.0.1:8642';
     var results = [], page = 0, hot = -1, state = 'idle', lastQ = '', seq = 0;
@@ -8499,7 +8500,7 @@ window.AW.startStats = function () {
 
     /* ---- preview ---- */
 
-    var audio = null, playing = null, raf = 0;
+    var audio = null, playing = null, raf = 0, resumeMain = false;
 
     function stopPreview() {
       if (raf) { cancelAnimationFrame(raf); raf = 0; }
@@ -8509,6 +8510,10 @@ window.AW.startStats = function () {
         if (el) { el.classList.remove('is-preview'); el.style.removeProperty('--p'); el.setAttribute('aria-pressed', 'false'); }
       }
       playing = null;
+      if (resumeMain) {
+        resumeMain = false;
+        try { window.NP_PLAYER.resume(); } catch (e) { /* the engine may have been torn down */ }
+      }
     }
 
     function tick() {
@@ -8533,6 +8538,10 @@ window.AW.startStats = function () {
       var same = playing === r;
       stopPreview();
       if (same) return;
+      /* One sound at a time: the main track steps aside for the audition and returns after. */
+      if (window.NP_PLAYER && window.NP_PLAYER.playing && window.NP_PLAYER.playing()) {
+        try { window.NP_PLAYER.pause(); resumeMain = true; } catch (e) { resumeMain = false; }
+      }
       if (!audio) {
         audio = new Audio();
         audio.preload = 'none';
@@ -8588,9 +8597,13 @@ window.AW.startStats = function () {
       var inner = r.art
         ? '<img src="' + esc(r.art) + '" alt="" loading="lazy" onerror="this.remove()">' + NOTE
         : NOTE;
-      if (!r.prev) return '<span class="srch__art" aria-hidden="true">' + inner + '</span>';
+      if (!r.prev) {
+        /* Unavailable is shown and explained (NP-PRIN-002): the tile stays, and says why. */
+        var whyNot = 'No preview \u2014 ' + (r.p ? 'opens on ' + r.p : 'nothing to play here');
+        return '<span class="srch__art" title="' + esc(whyNot) + '" aria-label="' + esc(whyNot) + '">' + inner + '</span>';
+      }
       return '<button class="srch__art" type="button" data-preview="' + i + '" aria-pressed="false"' +
-        ' aria-label="Preview ' + esc(r.t) + ', 15 seconds">' + inner +
+        ' aria-label="Preview ' + esc(r.t) + ', ' + CLIP + ' seconds">' + inner +
         '<span class="srch__scrim">' +
           '<svg viewBox="0 0 30 30" aria-hidden="true">' +
             '<circle class="srch__ring" cx="15" cy="15" r="13.5"/>' +
