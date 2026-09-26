@@ -106,5 +106,6 @@ export default defineConfig({
       },
     },
   },
-  server: { host: '127.0.0.1', port: 5173 },
+  // The desktop harness assigns a free port through PORT (autoPort); by hand it stays 5173.
+  server: { host: '127.0.0.1', port: Number(process.env['PORT']) || 5173 },
 });

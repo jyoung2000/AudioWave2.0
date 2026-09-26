@@ -35,7 +35,7 @@ export default defineConfig({
     chunkSizeWarningLimit: 900,
   },
   server: {
-    port: 5174,
+    port: Number(process.env['PORT']) || 5174,
     // In development the GUI runs on its own origin and talks to the hub through this proxy, so
     // the session cookie stays same-origin exactly as it is in production.
     proxy: {

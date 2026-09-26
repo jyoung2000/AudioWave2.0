@@ -4,8 +4,13 @@
     {
       "name": "player",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@now-playing/music-player", "dev"],
-      "port": 5173
+      "runtimeArgs": [
+        "--filter",
+        "@now-playing/music-player",
+        "dev"
+      ],
+      "port": 5173,
+      "autoPort": true
     },
     {
       "name": "hub-web",
@@ -18,7 +23,8 @@
         "--config",
         "src/web/vite.config.ts"
       ],
-      "port": 5174
+      "port": 5174,
+      "autoPort": true
     }
   ]
 }
