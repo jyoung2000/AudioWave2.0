@@ -757,6 +757,78 @@ replace("      playing = null;\n"
         "      }\n"
         "    }")
 
+# ---- search: hold-to-hear — five seconds of rest on a row with a clip (NP-FIND-001) ----------------
+# The ring fills clockwise in the library's selection blue while the hold runs, so the person sees
+# it coming and can move away; the countdown that follows runs down in white. Touch never arms
+# (a finger rests on things it reads), reduced motion never arms, and any key, scroll or departure
+# cancels. The click is always there first.
+
+replace("  /* dasharray is the full circumference; the offset is driven from JS as a\n"
+        "     fraction of the 15 seconds elapsed */",
+        "  /* Arming: the ring fills clockwise in the selection blue over the hold; leaving empties it\n"
+        "     in a fifth of a second. Distinct colours, so filling and counting down cannot be confused. */\n"
+        "  .srch__art.is-arming .srch__scrim { opacity: 1; }\n"
+        "  .srch__art.is-arming .srch__ring--on {\n"
+        "    display: block;\n"
+        "    stroke: var(--lib-accent);\n"
+        "    transition: stroke-dashoffset var(--arm-ms, 5000ms) linear;\n"
+        "  }\n"
+        "  .srch__art:not(.is-arming):not(.is-preview) .srch__ring--on { transition: stroke-dashoffset 0.2s ease; }\n"
+        "\n"
+        "  /* dasharray is the full circumference; the offset is driven from JS as a\n"
+        "     fraction of the clip's seconds elapsed */")
+
+replace("    /* ---- preview ---- */\n",
+        "    /* ---- hold-to-hear: five seconds of rest arms a row with a clip (NP-FIND-001) ---- */\n"
+        "    var ARM_DEFAULT_MS = 5000;\n"
+        "    window.NP_SRCH_ARM_MS = ARM_DEFAULT_MS;\n"
+        "    var armTimer = 0, armedEl = null;\n"
+        "    function canArm() {\n"
+        "      try {\n"
+        "        return matchMedia('(hover: hover) and (pointer: fine)').matches &&\n"
+        "               !matchMedia('(prefers-reduced-motion: reduce)').matches;\n"
+        "      } catch (e) { return false; }\n"
+        "    }\n"
+        "    function disarm() {\n"
+        "      if (armTimer) { clearTimeout(armTimer); armTimer = 0; }\n"
+        "      if (armedEl) { armedEl.classList.remove('is-arming'); armedEl.style.removeProperty('--p'); armedEl.style.removeProperty('--arm-ms'); armedEl = null; }\n"
+        "    }\n"
+        "    body.addEventListener('pointerenter', function (e) {\n"
+        "      if (!canArm()) return;\n"
+        "      var rowEl = e.target && e.target.closest ? e.target.closest('.srch__row') : null;\n"
+        "      if (!rowEl) return;\n"
+        "      var i = +rowEl.dataset.i, r = visible()[i];\n"
+        "      var el = rowEl.querySelector('button.srch__art');\n"
+        "      if (!r || !r.prev || !el || playing === r) return;\n"
+        "      disarm();\n"
+        "      armedEl = el;\n"
+        "      el.style.setProperty('--arm-ms', (window.NP_SRCH_ARM_MS || ARM_DEFAULT_MS) + 'ms');\n"
+        "      el.classList.add('is-arming');\n"
+        "      /* two frames: the class lands with the ring empty, then the transition carries it full */\n"
+        "      requestAnimationFrame(function () { requestAnimationFrame(function () { if (armedEl === el) el.style.setProperty('--p', '1'); }); });\n"
+        "      armTimer = setTimeout(function () {\n"
+        "        var target = armedEl;\n"
+        "        disarm();\n"
+        "        if (target) {\n"
+        "          var live = body.querySelector('.srch__row[data-i=\"' + i + '\"] button.srch__art');\n"
+        "          if (live) preview(i, live);\n"
+        "        }\n"
+        "      }, window.NP_SRCH_ARM_MS || ARM_DEFAULT_MS);\n"
+        "    }, true);\n"
+        "    body.addEventListener('pointerleave', function (e) {\n"
+        "      if (armedEl && e.target && e.target.closest && e.target.closest('.srch__row')) disarm();\n"
+        "    }, true);\n"
+        "    body.addEventListener('scroll', disarm, true);\n"
+        "    document.addEventListener('keydown', disarm, true);\n"
+        "\n"
+        "    /* ---- preview ---- */\n")
+
+replace("    function stopPreview() {\n"
+        "      if (raf) { cancelAnimationFrame(raf); raf = 0; }",
+        "    function stopPreview() {\n"
+        "      disarm();\n"
+        "      if (raf) { cancelAnimationFrame(raf); raf = 0; }")
+
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):
     assert bad not in text, f'left behind: {bad}'

@@ -570,8 +570,18 @@
   .srch__glyph { fill: #fff; }
   .srch__ring { fill: none; stroke: rgba(255, 255, 255, 0.35); stroke-width: 2; }
 
+  /* Arming: the ring fills clockwise in the selection blue over the hold; leaving empties it
+     in a fifth of a second. Distinct colours, so filling and counting down cannot be confused. */
+  .srch__art.is-arming .srch__scrim { opacity: 1; }
+  .srch__art.is-arming .srch__ring--on {
+    display: block;
+    stroke: var(--lib-accent);
+    transition: stroke-dashoffset var(--arm-ms, 5000ms) linear;
+  }
+  .srch__art:not(.is-arming):not(.is-preview) .srch__ring--on { transition: stroke-dashoffset 0.2s ease; }
+
   /* dasharray is the full circumference; the offset is driven from JS as a
-     fraction of the 15 seconds elapsed */
+     fraction of the clip's seconds elapsed */
   .srch__ring--on {
     stroke: #fff;
     stroke-linecap: round;
@@ -8498,11 +8508,54 @@ window.AW.startStats = function () {
       });
     }
 
+    /* ---- hold-to-hear: five seconds of rest arms a row with a clip (NP-FIND-001) ---- */
+    var ARM_DEFAULT_MS = 5000;
+    window.NP_SRCH_ARM_MS = ARM_DEFAULT_MS;
+    var armTimer = 0, armedEl = null;
+    function canArm() {
+      try {
+        return matchMedia('(hover: hover) and (pointer: fine)').matches &&
+               !matchMedia('(prefers-reduced-motion: reduce)').matches;
+      } catch (e) { return false; }
+    }
+    function disarm() {
+      if (armTimer) { clearTimeout(armTimer); armTimer = 0; }
+      if (armedEl) { armedEl.classList.remove('is-arming'); armedEl.style.removeProperty('--p'); armedEl.style.removeProperty('--arm-ms'); armedEl = null; }
+    }
+    body.addEventListener('pointerenter', function (e) {
+      if (!canArm()) return;
+      var rowEl = e.target && e.target.closest ? e.target.closest('.srch__row') : null;
+      if (!rowEl) return;
+      var i = +rowEl.dataset.i, r = visible()[i];
+      var el = rowEl.querySelector('button.srch__art');
+      if (!r || !r.prev || !el || playing === r) return;
+      disarm();
+      armedEl = el;
+      el.style.setProperty('--arm-ms', (window.NP_SRCH_ARM_MS || ARM_DEFAULT_MS) + 'ms');
+      el.classList.add('is-arming');
+      /* two frames: the class lands with the ring empty, then the transition carries it full */
+      requestAnimationFrame(function () { requestAnimationFrame(function () { if (armedEl === el) el.style.setProperty('--p', '1'); }); });
+      armTimer = setTimeout(function () {
+        var target = armedEl;
+        disarm();
+        if (target) {
+          var live = body.querySelector('.srch__row[data-i="' + i + '"] button.srch__art');
+          if (live) preview(i, live);
+        }
+      }, window.NP_SRCH_ARM_MS || ARM_DEFAULT_MS);
+    }, true);
+    body.addEventListener('pointerleave', function (e) {
+      if (armedEl && e.target && e.target.closest && e.target.closest('.srch__row')) disarm();
+    }, true);
+    body.addEventListener('scroll', disarm, true);
+    document.addEventListener('keydown', disarm, true);
+
     /* ---- preview ---- */
 
     var audio = null, playing = null, raf = 0, resumeMain = false;
 
     function stopPreview() {
+      disarm();
       if (raf) { cancelAnimationFrame(raf); raf = 0; }
       if (audio) { audio.pause(); audio.removeAttribute('src'); try { audio.load(); } catch (e) {} }
       if (playing) {

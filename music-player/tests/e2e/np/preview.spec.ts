@@ -9,6 +9,21 @@
 import { expect, test, type Page } from '@playwright/test';
 import { boot, CORS, HUB } from './_shell';
 
+/** The same origin the suite's own config serves; a second context does not inherit baseURL. */
+const PREVIEW_ORIGIN = 'http://127.0.0.1:4173';
+
+/** A real, decodable clip: two seconds of silent 8 kHz PCM WAV. play() must resolve, not race. */
+function silentWav(seconds = 2): Buffer {
+  const rate = 8000;
+  const n = rate * seconds * 2;
+  const b = Buffer.alloc(44 + n);
+  b.write('RIFF', 0); b.writeUInt32LE(36 + n, 4); b.write('WAVEfmt ', 8);
+  b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22);
+  b.writeUInt32LE(rate, 24); b.writeUInt32LE(rate * 2, 28); b.writeUInt16LE(2, 32); b.writeUInt16LE(16, 34);
+  b.write('data', 36); b.writeUInt32LE(n, 40);
+  return b;
+}
+
 const ACCT = { base: HUB, credentialId: '00000000-0000-4000-8000-0000000000aa', secret: 'x'.repeat(40), scopes: ['search:use'], hubName: 'TOWER', deviceId: 'd1' };
 
 function hubRow(over: Record<string, unknown> = {}) {
@@ -91,7 +106,7 @@ test('a hub that never answers leaves the chain to iTunes inside the deadline', 
 
 test('a click plays up to thirty seconds, and the main track waits its turn', async ({ page }) => {
   await pairAndOpen(page, [hubRow()]);
-  await page.route('https://p.scdn.co/**', (r) => r.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'content-type': 'audio/mpeg' }, body: Buffer.alloc(4000) }));
+  await page.route('https://p.scdn.co/**', (r) => r.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'content-type': 'audio/wav' }, body: silentWav() }));
   await page.fill('#q', 'Golden Hour');
   await page.press('#q', 'Enter');
   expect(await page.evaluate(() => (window as unknown as { NP_SRCH_CLIP?: number }).NP_SRCH_CLIP ?? null), 'the clip length the module exposes').toBe(30);
@@ -109,4 +124,62 @@ test('a row with no clip says so instead of pretending', async ({ page }) => {
   await page.press('#q', 'Enter');
   await expect(page.locator('.srch__row button.srch__art')).toHaveCount(0);
   await expect(page.locator('.srch__row .srch__art').first()).toHaveAttribute('title', /No preview/);
+});
+
+test('resting the pointer on a row arms it, fills the ring, and then plays', async ({ page }) => {
+  await pairAndOpen(page, [hubRow()]);
+  await page.route('https://p.scdn.co/**', (r) => r.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'content-type': 'audio/wav' }, body: silentWav() }));
+  await page.fill('#q', 'Golden Hour');
+  await page.press('#q', 'Enter');
+  await page.waitForSelector('.srch__row');
+  await page.evaluate(() => ((window as unknown as { NP_SRCH_ARM_MS: number }).NP_SRCH_ARM_MS = 300));
+  await page.locator('.srch__row').first().hover();
+  await expect(page.locator('.srch__art.is-arming')).toHaveCount(1);
+  await expect(page.locator('.srch__art.is-preview')).toHaveCount(1, { timeout: 3000 });
+  await expect(page.locator('.srch__art.is-arming')).toHaveCount(0);
+});
+
+test('leaving the row mid-hold cancels; nothing plays', async ({ page }) => {
+  await pairAndOpen(page, [hubRow()]);
+  await page.fill('#q', 'Golden Hour');
+  await page.press('#q', 'Enter');
+  await page.waitForSelector('.srch__row');
+  await page.evaluate(() => ((window as unknown as { NP_SRCH_ARM_MS: number }).NP_SRCH_ARM_MS = 800));
+  await page.locator('.srch__row').first().hover();
+  await expect(page.locator('.srch__art.is-arming')).toHaveCount(1);
+  await page.mouse.move(10, 10);
+  await expect(page.locator('.srch__art.is-arming')).toHaveCount(0);
+  await page.waitForTimeout(900);
+  await expect(page.locator('.srch__art.is-preview')).toHaveCount(0);
+});
+
+test('a key press cancels the hold too', async ({ page }) => {
+  await pairAndOpen(page, [hubRow()]);
+  await page.fill('#q', 'Golden Hour');
+  await page.press('#q', 'Enter');
+  await page.waitForSelector('.srch__row');
+  await page.evaluate(() => ((window as unknown as { NP_SRCH_ARM_MS: number }).NP_SRCH_ARM_MS = 800));
+  await page.locator('.srch__row').first().hover();
+  await expect(page.locator('.srch__art.is-arming')).toHaveCount(1);
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('.srch__art.is-arming')).toHaveCount(0);
+});
+
+test('reduced motion never arms; the click still works', async ({ browser }) => {
+  const ctx = await browser.newContext({ reducedMotion: 'reduce', baseURL: PREVIEW_ORIGIN });
+  const p2 = await ctx.newPage();
+  try {
+    await pairAndOpen(p2, [hubRow()]);
+    await p2.route('https://p.scdn.co/**', (r) => r.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'content-type': 'audio/wav' }, body: silentWav() }));
+    await p2.fill('#q', 'Golden Hour');
+    await p2.press('#q', 'Enter');
+    await p2.waitForSelector('.srch__row');
+    await p2.locator('.srch__row').first().hover();
+    await p2.waitForTimeout(500);
+    await expect(p2.locator('.srch__art.is-arming')).toHaveCount(0);
+    await p2.locator('.srch__row button.srch__art').first().click();
+    await expect(p2.locator('.srch__art.is-preview')).toHaveCount(1);
+  } finally {
+    await ctx.close();
+  }
 });
