@@ -42,9 +42,11 @@ describe('the platform table', () => {
   });
 
   it('offers a way in for every platform that has one, and says so plainly when there is none', () => {
-    // MusicBrainz is a catalogue, so a null here is the honest answer rather than an omission.
-    expect(platform('musicbrainz')?.bringIn).toBeNull();
-    for (const row of PLATFORMS.filter((p) => p.provider !== 'musicbrainz')) {
+    // Catalogues (MusicBrainz, and the tempo and tag sources) hold no audio, so a null here is the
+    // honest answer rather than an omission.
+    const catalogues: readonly string[] = ['musicbrainz', 'deezer', 'acousticbrainz', 'lastfm'];
+    for (const slug of catalogues) expect(platform(slug as never)?.bringIn, slug).toBeNull();
+    for (const row of PLATFORMS.filter((p) => !catalogues.includes(p.provider))) {
       expect(row.bringIn, row.provider).toBeTruthy();
     }
     // The archive route is the one that needs no key and no hub.

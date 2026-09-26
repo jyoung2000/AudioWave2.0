@@ -18902,7 +18902,9 @@ var PositiveInt = external_exports.number().int().nonnegative();
 var DurationMs = external_exports.number().int().nonnegative().describe("Duration in milliseconds");
 var Percent = external_exports.number().min(0).max(100);
 var Cursor = external_exports.string().min(1).max(512).describe("Opaque pagination cursor");
-var ProviderId = external_exports.string().regex(/^[a-z][a-z0-9-]{1,31}$/).describe("Provider slug, e.g. local, hub, companion, musicbrainz, youtube, soundcloud, bandcamp, spotify, public-domain, external-tool");
+var ProviderId = external_exports.string().regex(/^[a-z][a-z0-9-]{1,31}$/).describe("Provider slug, e.g. local, hub, companion, musicbrainz, youtube, soundcloud, bandcamp, spotify, public-domain, external-tool, deezer, acousticbrainz, lastfm");
+var BpmSource = external_exports.enum(["tag", "deezer", "acousticbrainz", "preview-analysis", "analysis"]);
+var GenreProfile = external_exports.record(external_exports.string().max(60), external_exports.number().min(0).max(1));
 var ListeningMode = external_exports.enum(["solo", "group"]);
 var Scope = external_exports.enum([
   "library:read",
@@ -19111,7 +19113,8 @@ var TrackIdentity = external_exports.object({
   musicbrainzRecordingId: external_exports.uuid().nullable().default(null),
   musicbrainzReleaseId: external_exports.uuid().nullable().default(null),
   acoustidId: external_exports.string().max(80).nullable().default(null),
-  providerIds: external_exports.record(ProviderId, external_exports.array(external_exports.string().min(1).max(200))).default({})
+  providerIds: external_exports.record(ProviderId, external_exports.array(external_exports.string().min(1).max(200))).default({}),
+  matchConfidence: external_exports.number().min(0).max(1).nullable().optional().describe("How sure the hub is that the enrichment belongs to this recording; absent or null = never matched")
 });
 var AudioFormat = external_exports.object({
   container: external_exports.string().max(20).optional(),
@@ -19138,6 +19141,9 @@ var Track = SyncedEntityBase.extend({
   year: external_exports.number().int().min(1e3).max(3e3).nullable().default(null),
   durationMs: DurationMs.nullable().default(null),
   bpm: external_exports.number().positive().max(400).nullable().default(null),
+  bpmSource: BpmSource.nullable().default(null),
+  featuredArtists: external_exports.array(external_exports.string().max(300)).default([]),
+  genreProfile: GenreProfile.default({}),
   identity: TrackIdentity.prefault({}),
   locators: external_exports.array(MediaLocator).default([]),
   artworkId: external_exports.string().max(200).nullable().default(null),
@@ -19159,6 +19165,9 @@ var TrackRef = external_exports.object({
   locators: external_exports.array(MediaLocator).default([]),
   provider: ProviderId.default("local"),
   genre: external_exports.string().max(60).nullable().default(null),
+  /** Optional in the type: a snapshot written before enrichment simply has neither. */
+  genres: external_exports.array(external_exports.string().max(60)).optional(),
+  bpm: external_exports.number().positive().max(400).nullable().optional(),
   year: external_exports.number().int().nullable().default(null)
 });
 var TrackAvailability = external_exports.object({
@@ -19666,7 +19675,7 @@ var DiscoveryJob = external_exports.object({
   id: Uuid,
   state: JobState,
   userId: Uuid,
-  kind: external_exports.enum(["profile-refresh", "discover-seeds", "sync-library", "token-refresh", "new-releases"]),
+  kind: external_exports.enum(["profile-refresh", "discover-seeds", "sync-library", "token-refresh", "new-releases", "enrich-track"]),
   priority: external_exports.enum(["P0", "P1", "P2", "P3", "P4"]).default("P3"),
   payload: external_exports.record(external_exports.string(), external_exports.unknown()).default({}),
   attempts: external_exports.number().int().nonnegative().default(0),
@@ -19831,9 +19840,17 @@ var CanonicalTrack = external_exports.object({
   genres: external_exports.array(external_exports.string().max(60)).default([]),
   tags: external_exports.array(external_exports.string().max(60)).default([]),
   popularity: external_exports.number().min(0).max(1).nullable().default(null),
+  featuredArtists: external_exports.array(external_exports.string().max(300)).default([]),
+  genreProfile: GenreProfile.default({}),
+  bpm: external_exports.number().positive().max(400).nullable().default(null),
+  bpmSource: BpmSource.nullable().default(null),
+  artworkUrl: external_exports.string().url().nullable().default(null),
+  matchConfidence: external_exports.number().min(0).max(1).nullable().default(null),
+  enrichedAt: IsoDateTime.nullable().default(null),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime
 });
+var CANONICAL_ENRICHMENT_DEFAULTS = Object.freeze({ featuredArtists: [], genreProfile: {}, bpm: null, bpmSource: null, artworkUrl: null, matchConfidence: null, enrichedAt: null });
 var CanonicalArtist = external_exports.object({
   id: Uuid,
   musicbrainzArtistId: external_exports.uuid().nullable().default(null),
@@ -20228,6 +20245,11 @@ var SearchResultBase = external_exports.object({
   canonicalUrl: external_exports.string().url().nullable().default(null),
   year: external_exports.number().int().nullable().default(null),
   genre: external_exports.string().max(60).nullable().default(null),
+  genres: external_exports.array(external_exports.string().max(60)).default([]),
+  genreProfile: GenreProfile.default({}),
+  featuredArtists: external_exports.array(external_exports.string().max(300)).default([]),
+  bpm: external_exports.number().positive().max(400).nullable().default(null),
+  bpmSource: BpmSource.nullable().default(null),
   capabilities: ProviderCapabilities,
   identity: TrackIdentity.prefault({}),
   attribution: external_exports.string().max(200).nullable().default(null),

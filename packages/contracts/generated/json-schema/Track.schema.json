@@ -198,6 +198,45 @@
         }
       ]
     },
+    "bpmSource": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "tag",
+            "deezer",
+            "acousticbrainz",
+            "preview-analysis",
+            "analysis"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "featuredArtists": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 300
+      }
+    },
+    "genreProfile": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "maxLength": 60
+      },
+      "additionalProperties": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      }
+    },
     "identity": {
       "type": "object",
       "properties": {
@@ -284,7 +323,7 @@
           "propertyNames": {
             "type": "string",
             "pattern": "^[a-z][a-z0-9-]{1,31}$",
-            "description": "Provider slug, e.g. local, hub, companion, musicbrainz, youtube, soundcloud, bandcamp, spotify, public-domain, external-tool"
+            "description": "Provider slug, e.g. local, hub, companion, musicbrainz, youtube, soundcloud, bandcamp, spotify, public-domain, external-tool, deezer, acousticbrainz, lastfm"
           },
           "additionalProperties": {
             "type": "array",
@@ -294,6 +333,19 @@
               "maxLength": 200
             }
           }
+        },
+        "matchConfidence": {
+          "description": "How sure the hub is that the enrichment belongs to this recording; absent or null = never matched",
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -422,7 +474,7 @@
               "provider": {
                 "type": "string",
                 "pattern": "^[a-z][a-z0-9-]{1,31}$",
-                "description": "Provider slug, e.g. local, hub, companion, musicbrainz, youtube, soundcloud, bandcamp, spotify, public-domain, external-tool"
+                "description": "Provider slug, e.g. local, hub, companion, musicbrainz, youtube, soundcloud, bandcamp, spotify, public-domain, external-tool, deezer, acousticbrainz, lastfm"
               },
               "providerTrackId": {
                 "type": "string",
@@ -576,6 +628,9 @@
     "year",
     "durationMs",
     "bpm",
+    "bpmSource",
+    "featuredArtists",
+    "genreProfile",
     "identity",
     "locators",
     "artworkId",

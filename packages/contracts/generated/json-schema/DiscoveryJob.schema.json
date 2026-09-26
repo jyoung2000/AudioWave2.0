@@ -34,7 +34,8 @@
         "discover-seeds",
         "sync-library",
         "token-refresh",
-        "new-releases"
+        "new-releases",
+        "enrich-track"
       ]
     },
     "priority": {

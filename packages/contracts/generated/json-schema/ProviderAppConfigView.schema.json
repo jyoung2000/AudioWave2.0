@@ -6,7 +6,7 @@
     "provider": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]{1,31}$",
-      "description": "Provider slug, e.g. local, hub, companion, musicbrainz, youtube, soundcloud, bandcamp, spotify, public-domain, external-tool"
+      "description": "Provider slug, e.g. local, hub, companion, musicbrainz, youtube, soundcloud, bandcamp, spotify, public-domain, external-tool, deezer, acousticbrainz, lastfm"
     },
     "enabled": {
       "type": "boolean"

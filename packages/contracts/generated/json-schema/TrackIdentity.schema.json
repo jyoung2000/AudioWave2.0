@@ -86,7 +86,7 @@
       "propertyNames": {
         "type": "string",
         "pattern": "^[a-z][a-z0-9-]{1,31}$",
-        "description": "Provider slug, e.g. local, hub, companion, musicbrainz, youtube, soundcloud, bandcamp, spotify, public-domain, external-tool"
+        "description": "Provider slug, e.g. local, hub, companion, musicbrainz, youtube, soundcloud, bandcamp, spotify, public-domain, external-tool, deezer, acousticbrainz, lastfm"
       },
       "additionalProperties": {
         "type": "array",
@@ -96,6 +96,19 @@
           "maxLength": 200
         }
       }
+    },
+    "matchConfidence": {
+      "description": "How sure the hub is that the enrichment belongs to this recording; absent or null = never matched",
+      "anyOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "required": [

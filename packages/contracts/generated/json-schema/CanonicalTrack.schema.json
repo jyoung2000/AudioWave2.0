@@ -140,6 +140,97 @@
         }
       ]
     },
+    "featuredArtists": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 300
+      }
+    },
+    "genreProfile": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "maxLength": 60
+      },
+      "additionalProperties": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      }
+    },
+    "bpm": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 400
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "bpmSource": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "tag",
+            "deezer",
+            "acousticbrainz",
+            "preview-analysis",
+            "analysis"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "artworkUrl": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "uri"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "matchConfidence": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "enrichedAt": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+          "description": "UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "createdAt": {
       "type": "string",
       "format": "date-time",
@@ -169,6 +260,13 @@
     "genres",
     "tags",
     "popularity",
+    "featuredArtists",
+    "genreProfile",
+    "bpm",
+    "bpmSource",
+    "artworkUrl",
+    "matchConfidence",
+    "enrichedAt",
     "createdAt",
     "updatedAt"
   ],

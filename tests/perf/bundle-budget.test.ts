@@ -105,8 +105,12 @@ const BUNDLES: Bundle[] = [
      * stylesheets and HTML) and which is fetched only by someone who pairs with a PC: the worker is
      * started on first use, the page's side is a lazy chunk, and the entry above moved by under 1 KB
      * (the check that a row is remote and the dynamic import), staying inside 240.
+     *
+     * And to 2374 for enrichment (docs/PROVIDER_CAPABILITIES.md, Enrichment): the contract fields a
+     * track now carries (album, featured artists, genre profile, tempo and where it came from) and
+     * three metadata-only rows in the platform table — measured, 2 KB, none of it in the first load.
      */
-    totalBudgetKb: 2372,
+    totalBudgetKb: 2374,
     // Three.js belongs to the constellation and the jewel case; the tag reader only to a scan.
     mustBeSplit: ['three', 'music-metadata'],
   },
