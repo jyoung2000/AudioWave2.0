@@ -1,3 +1,4 @@
+import type { SafeHttpClient } from './providers/http.js';
 import type { EnrichmentService } from './enrichment/service.js';
 import type { Logger } from 'pino';
 import type { HubIdentity } from '@now-playing/contracts';
@@ -82,6 +83,8 @@ export interface HubContext {
   providers: ProviderRegistry;
   search: SearchService;
   rateLimiter: RateLimitManager;
+  /** The one outbound HTTP client: host-allowlisted, DNS-checked, size- and time-capped. */
+  http: SafeHttpClient;
   enrichment: EnrichmentService;
   accounts: AccountsService;
   recommendations: RecommendationService;

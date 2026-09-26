@@ -258,6 +258,7 @@ export async function buildApp(deps: HubDeps): Promise<HubApp> {
     providers,
     search,
     rateLimiter,
+    http,
     enrichment,
     accounts,
     recommendations,
