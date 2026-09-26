@@ -183,3 +183,24 @@ test('reduced motion never arms; the click still works', async ({ browser }) => 
     await ctx.close();
   }
 });
+
+test('a song added before its tempo arrives is filled in where it now lives', async ({ page }) => {
+  await pairAndOpen(page, [hubRow({ bpm: null, bpmSource: null, previewUrl: null })]);
+  // Deezer answers late, over JSONP, after the add has already happened.
+  await page.route('**/api.deezer.com/**', async (r) => {
+    const u = new URL(r.request().url());
+    const cb = u.searchParams.get('callback') ?? 'cb';
+    const payload = u.pathname.includes('/track/')
+      ? { id: 7, bpm: 120, duration: 200 }
+      : { data: [{ id: 7, duration: 200, title: 'Golden Hour', artist: { name: 'Artist' } }] };
+    await new Promise((res) => setTimeout(res, 700));
+    await r.fulfill({ status: 200, contentType: 'text/javascript', body: `${cb}(${JSON.stringify(payload)})` });
+  });
+  await page.fill('#q', 'Golden Hour');
+  await page.press('#q', 'Enter');
+  await page.waitForSelector('.srch__row');
+  await page.click('.srch__row[data-i="0"] .srch__add');
+  const cell = page.locator('#libraryRows tr', { hasText: 'Golden Hour' }).first().locator('.lib-col-bpm');
+  await expect(cell).toHaveText('—');
+  await expect(cell).toHaveText('120', { timeout: 10_000 });
+});

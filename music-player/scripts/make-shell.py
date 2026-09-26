@@ -829,6 +829,43 @@ replace("    function stopPreview() {\n"
         "      disarm();\n"
         "      if (raf) { cancelAnimationFrame(raf); raf = 0; }")
 
+# ---- search -> library: a tempo that arrives after the add still reaches the row -------------------
+# The bridge already carries bpm at add time; this closes the other half: a song added while its
+# tempo was still being looked up is filled in where it now lives, instead of wearing an em dash
+# forever. Same one-event pattern as library:add.
+
+replace("          r.bpmTried = true;\n"
+        "          if (m.bpm) r.bpm = m.bpm;\n"
+        "          if (m.d && !r.d) r.d = m.d;",
+        "          r.bpmTried = true;\n"
+        "          if (m.bpm) r.bpm = m.bpm;\n"
+        "          if (m.d && !r.d) r.d = m.d;\n"
+        "          if (m.bpm && r.added) {\n"
+        "            /* The row already moved into the library; hand the late answer over the same wall. */\n"
+        "            document.dispatchEvent(new CustomEvent('library:bpm', { detail: { title: r.t, artist: r.a, bpm: m.bpm } }));\n"
+        "          }")
+
+replace("      var row = tbody.querySelector('tr[data-id=\"' + have.id + '\"]');\n"
+        "      if (row && row.scrollIntoView) row.scrollIntoView({ block: 'nearest' });\n"
+        "    });",
+        "      var row = tbody.querySelector('tr[data-id=\"' + have.id + '\"]');\n"
+        "      if (row && row.scrollIntoView) row.scrollIntoView({ block: 'nearest' });\n"
+        "    });\n"
+        "\n"
+        "    /* A tempo that was still being looked up when the song was added: fill it in, once. */\n"
+        "    document.addEventListener('library:bpm', function (e) {\n"
+        "      var d = e.detail || {};\n"
+        "      for (var i = 0; i < LIB.length; i++) {\n"
+        "        var sg = LIB[i];\n"
+        "        if (sg.bpm) continue;\n"
+        "        if (sg.title.toLowerCase() !== String(d.title || '').toLowerCase()) continue;\n"
+        "        if ((sg.artist || '').toLowerCase() !== String(d.artist || '').toLowerCase()) continue;\n"
+        "        sg.bpm = d.bpm || null;\n"
+        "        render();\n"
+        "        break;\n"
+        "      }\n"
+        "    });")
+
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):
     assert bad not in text, f'left behind: {bad}'

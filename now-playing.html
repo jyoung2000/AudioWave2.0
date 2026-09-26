@@ -8492,6 +8492,10 @@ window.AW.startStats = function () {
           r.bpmTried = true;
           if (m.bpm) r.bpm = m.bpm;
           if (m.d && !r.d) r.d = m.d;
+          if (m.bpm && r.added) {
+            /* The row already moved into the library; hand the late answer over the same wall. */
+            document.dispatchEvent(new CustomEvent('library:bpm', { detail: { title: r.t, artist: r.a, bpm: m.bpm } }));
+          }
           if (state === 'list' && visible().indexOf(r) >= 0) {
             var el = body.querySelector('.srch__row[data-i="' + visible().indexOf(r) + '"]');
             if (el) {
@@ -9521,6 +9525,20 @@ window.AW.startStats = function () {
       play(have.id);
       var row = tbody.querySelector('tr[data-id="' + have.id + '"]');
       if (row && row.scrollIntoView) row.scrollIntoView({ block: 'nearest' });
+    });
+
+    /* A tempo that was still being looked up when the song was added: fill it in, once. */
+    document.addEventListener('library:bpm', function (e) {
+      var d = e.detail || {};
+      for (var i = 0; i < LIB.length; i++) {
+        var sg = LIB[i];
+        if (sg.bpm) continue;
+        if (sg.title.toLowerCase() !== String(d.title || '').toLowerCase()) continue;
+        if ((sg.artist || '').toLowerCase() !== String(d.artist || '').toLowerCase()) continue;
+        sg.bpm = d.bpm || null;
+        render();
+        break;
+      }
     });
 
     /* The toolbar used to shout into the void: it managed its own pressed
