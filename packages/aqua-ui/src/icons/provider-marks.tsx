@@ -26,7 +26,7 @@
 import { svgProps, type IconProps } from './Icon.js';
 import { useProviderArtwork } from '../lib/provider-artwork.js';
 
-export type ProviderGlyph = 'play' | 'cloud' | 'bars' | 'tag' | 'disc' | 'note' | 'house' | 'desktop' | 'speaker' | 'wrench';
+export type ProviderGlyph = 'play' | 'cloud' | 'bars' | 'tag' | 'disc' | 'note' | 'house' | 'desktop' | 'speaker' | 'wrench' | 'metronome' | 'archive' | 'hash';
 
 export interface ProviderMarkSpec {
   /** Display name, spelled the way the platform spells it. */
@@ -47,9 +47,9 @@ export const PROVIDER_MARKS: Readonly<Record<string, ProviderMarkSpec>> = {
   hub: { name: 'Your hub', initials: 'H', tile: ['#7cc4f7', '#1a5f9e'], glyph: 'house' },
   companion: { name: 'Windows companion', initials: 'PC', tile: ['#8ab0d8', '#3b5f88'], glyph: 'desktop' },
   musicbrainz: { name: 'MusicBrainz', initials: 'MB', tile: ['#d07ab4', '#8a2f68'], glyph: 'disc' },
-  deezer: { name: 'Deezer', initials: 'Dz', tile: ['#9aa7b8', '#4f5d70'], glyph: 'disc' },
-  acousticbrainz: { name: 'AcousticBrainz', initials: 'AB', tile: ['#c9a36b', '#7a5a2a'], glyph: 'disc' },
-  lastfm: { name: 'Last.fm', initials: 'Lf', tile: ['#d98080', '#8e3434'], glyph: 'disc' },
+  deezer: { name: 'Deezer', initials: 'Dz', tile: ['#9aa7b8', '#4f5d70'], glyph: 'metronome' },
+  acousticbrainz: { name: 'AcousticBrainz', initials: 'AB', tile: ['#c9a36b', '#7a5a2a'], glyph: 'archive' },
+  lastfm: { name: 'Last.fm', initials: 'Lf', tile: ['#d98080', '#8e3434'], glyph: 'hash' },
   youtube: { name: 'YouTube', initials: 'YT', tile: ['#ff4f47', '#c00000'], glyph: 'play' },
   soundcloud: { name: 'SoundCloud', initials: 'SC', tile: ['#ff8a3d', '#e04b00'], glyph: 'cloud' },
   bandcamp: { name: 'Bandcamp', initials: 'BC', tile: ['#8dbcc8', '#41707e'], glyph: 'tag' },
@@ -182,6 +182,26 @@ function Glyph({ name, shadow }: { name: ProviderGlyph; shadow: string }) {
           <path d="M10.3 6.1a2.8 2.8 0 0 1 0 3.8M12 4.6a5 5 0 0 1 0 6.8" fill="none" stroke="#fff" strokeWidth="1.15" strokeLinecap="round" />
         </g>
       );
+    case 'metronome':
+      // Tempo: a metronome's body with its arm swung off centre.
+      return (
+        <g>
+          <path d="M6.6 3.4h2.8l2.3 9.1H4.3z" fill="#fff" />
+          <path d="M8 10.6 10.9 4.2" fill="none" stroke={shadow} strokeWidth="1.1" strokeLinecap="round" />
+        </g>
+      );
+    case 'archive':
+      // A frozen archive: a lidded box with a pull.
+      return (
+        <g>
+          <rect x="3.2" y="3.9" width="9.6" height="2.4" rx="0.7" fill="#fff" />
+          <path d="M4 6.9h8v4.6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z" fill="#fff" />
+          <rect x="6.6" y="8.2" width="2.8" height="1.1" rx="0.55" fill={shadow} />
+        </g>
+      );
+    case 'hash':
+      // Tags as listeners write them.
+      return <path d="M6.3 3.6 5.5 12.4M10.5 3.6 9.7 12.4M3.8 6.4h8.6M3.4 9.6h8.6" fill="none" stroke="#fff" strokeWidth="1.45" strokeLinecap="round" />;
     case 'wrench':
       return <path d="M12.1 3.2a3.1 3.1 0 0 0-4.05 3.85l-4.2 4.2a1.25 1.25 0 1 0 1.77 1.77l4.2-4.2A3.1 3.1 0 0 0 13.67 4.77l-1.72 1.72-1.55-1.55z" fill="#fff" />;
     default:
