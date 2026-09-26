@@ -679,3 +679,20 @@ artifact paths were corrected to match.
 
 Results: journey **1 passed, 11.9 s and 11.6 s** (two consecutive runs, seven steps);
 `np/groups.spec.ts` **6/6**.
+
+### 2 — Docker: run, later the same day
+
+After the `run\` folder was cleared Docker Desktop came up (`docker desktop start`; daemon 29.8.0).
+`docker compose up -d --build` in `docker-container/` built the image from scratch and the container
+reported **healthy** on `127.0.0.1:4546` (tini → `node server.js`, `NP_CONTAINER=1`, bound `0.0.0.0`
+inside, published to loopback only). The journey config now honours `JOURNEY_HUB_URL`: with it set
+the hub webServer is not started and the same seven steps run against whatever is at that address.
+
+`JOURNEY_HUB_URL=http://127.0.0.1:4546 npx playwright test --config tests/journey/playwright.config.ts`
+→ **1 passed, 17.4 s** — first run, bootstrap-password revocation, GUI pairing with a ticked
+permission, link invite, directed invite declined, name uniqueness, the player's own group, invite
+withdrawn, leave, people search — all against the containerised hub, from a player served on a
+loopback origin with no CORS or host configuration. The container's log carried one warning-level
+line, the expected first-run notice: `{"level":40,"levelName":"warn","time":"2026-09-26T13:23:16.248Z","module":"hub","msg":"Open http://localhost:4546 and sign in with admin / admin. You will be asked to set a real password before anything else is enabled."}`.
+
+So the E.3 table's "Docker leg — static review only" is superseded: **run**.

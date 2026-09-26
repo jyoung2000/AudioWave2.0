@@ -30,7 +30,13 @@ import { defineConfig, devices } from '@playwright/test';
 const HUB_PORT = 4548;
 const PLAYER_PORT = 4174;
 
-export const HUB_URL = `http://127.0.0.1:${HUB_PORT}`;
+/**
+ * Set JOURNEY_HUB_URL to run the same pass against a hub that is already up — the Docker container
+ * (`docker compose up -d` in docker-container/, then http://127.0.0.1:4546). The hub is then not
+ * started here, and it must be at first run: step 01 sets its password.
+ */
+const EXTERNAL_HUB = process.env['JOURNEY_HUB_URL'];
+export const HUB_URL = EXTERNAL_HUB ?? `http://127.0.0.1:${HUB_PORT}`;
 export const PLAYER_URL = `http://127.0.0.1:${PLAYER_PORT}`;
 
 const dataDir = process.env['NP_JOURNEY_DATA_DIR'] ?? mkdtempSync(join(tmpdir(), 'np-journey-'));
@@ -56,7 +62,7 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], ...launchOptions } }],
   webServer: [
-    {
+    ...(EXTERNAL_HUB ? [] : [{
       command: 'node dist/server.js',
       url: `${HUB_URL}/healthz`,
       reuseExistingServer: !process.env['CI'],
@@ -69,7 +75,7 @@ export default defineConfig({
         NP_LOG_LEVEL: 'warn',
         NP_DEMO_MODE: 'false',
       },
-    },
+    }]),
     {
       command: `npx vite preview --port ${PLAYER_PORT} --host 127.0.0.1`,
       url: PLAYER_URL,
