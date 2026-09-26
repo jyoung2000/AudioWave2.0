@@ -188,6 +188,11 @@ export class CanonicalRepository {
     return this.db.prepare("UPDATE discovery_jobs SET state = 'queued', updated_at = ? WHERE state = 'running'").run(now).changes;
   }
 
+  /** Is a job of this kind already waiting or running for this payload key? Keeps a hot track from being queued twice. */
+  hasQueuedJob(kind: DiscoveryJob['kind'], payloadKey: string): boolean {
+    return !!this.db.prepare<[string, string], { one: number }>("SELECT 1 AS one FROM discovery_jobs WHERE kind = ? AND state IN ('queued', 'running') AND json_extract(payload, '$.key') = ? LIMIT 1").get(kind, payloadKey);
+  }
+
   jobCounts(): Record<string, number> {
     const out: Record<string, number> = {};
     for (const r of this.db.prepare<[], { state: string; n: number }>('SELECT state, COUNT(*) AS n FROM discovery_jobs GROUP BY state').all()) out[r.state] = r.n;

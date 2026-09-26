@@ -272,6 +272,10 @@ export class JobScheduler {
       await ctx.platformSync.syncLibrary(job.userId, provider);
     });
 
+    this.handle('enrich-track', async (job, ctx) => {
+      await ctx.enrichment.runJob(job);
+    });
+
     this.handle('discover-seeds', async (job, ctx) => {
       await ctx.platformSync.warmDiscoveryCache(job.userId);
     });

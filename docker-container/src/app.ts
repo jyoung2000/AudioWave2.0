@@ -36,6 +36,7 @@ import { DownloadService } from './downloads/service.js';
 import { CommandService } from './group/command-service.js';
 import { GroupService } from './group/service.js';
 import { JobScheduler } from './jobs/scheduler.js';
+import { EnrichmentService } from './enrichment/service.js';
 import { LibraryService } from './library/service.js';
 import { MetricsRegistry } from './metrics/registry.js';
 import { MetricsService } from './metrics/service.js';
@@ -212,6 +213,7 @@ export async function buildApp(deps: HubDeps): Promise<HubApp> {
   groups.attachProfileNames((id) => profiles.displayName(id));
   const releases = new ReleaseService(repos.settings, http, metrics, clock);
   const jobs = new JobScheduler(getCtx, clock, log, !deps.disableBackgroundJobs);
+  const enrichment = new EnrichmentService({ canonical: repos.canonical, providers, rateLimiter, clock, log, http, ffmpeg, enqueue: (input) => jobs.enqueue(input) });
   const discord = new DiscordService(repos.settings, commands, sealer, http, config, audit, metrics, clock);
 
   const realtime = new RealtimeServer({ auth, deviceAuth, groups, devices, identity, clock, log, metrics, network, config, deps });
@@ -256,6 +258,7 @@ export async function buildApp(deps: HubDeps): Promise<HubApp> {
     providers,
     search,
     rateLimiter,
+    enrichment,
     accounts,
     recommendations,
     platformSync,

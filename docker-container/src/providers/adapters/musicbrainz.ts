@@ -1,6 +1,6 @@
 import type { ProviderCapabilities, ProviderDescriptor, SearchResult } from '@now-playing/contracts';
 import { BRANDING } from '@now-playing/contracts';
-import type { SafeHttpClient } from '../http.js';
+import { ProviderHttpError, type SafeHttpClient } from '../http.js';
 import type { ProviderSearchPage, ProviderTestResult } from '../adapter.js';
 import { BaseAdapter, caps, REVIEWED_AT, result } from './base.js';
 
@@ -219,7 +219,10 @@ export class MusicBrainzAdapter extends BaseAdapter {
   }
 
   async recordingDetail(mbid: string): Promise<MbRecordingDetail | null> {
-    const d = await this.get<MbRecordingRaw>(`recording/${encodeURIComponent(mbid)}`, { inc: RECORDING_INC }).catch(() => null);
+    const d = await this.get<MbRecordingRaw>(`recording/${encodeURIComponent(mbid)}`, { inc: RECORDING_INC }).catch((e: unknown) => {
+      if (e instanceof ProviderHttpError && e.status === 404) return null;
+      throw e;
+    });
     return d && d.id ? toDetail(d) : null;
   }
 

@@ -1,3 +1,4 @@
+import type { EnrichmentService } from './enrichment/service.js';
 import type { Logger } from 'pino';
 import type { HubIdentity } from '@now-playing/contracts';
 import { CONTRACTS_VERSION, WS_MIN_SUPPORTED_PROTOCOL_VERSION, WS_PROTOCOL_VERSION } from '@now-playing/contracts';
@@ -81,6 +82,7 @@ export interface HubContext {
   providers: ProviderRegistry;
   search: SearchService;
   rateLimiter: RateLimitManager;
+  enrichment: EnrichmentService;
   accounts: AccountsService;
   recommendations: RecommendationService;
   platformSync: PlatformSyncService;

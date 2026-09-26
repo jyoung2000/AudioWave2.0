@@ -25,7 +25,8 @@ const DURATION_TIGHT_MS = 1500;
 /**
  * Which MusicBrainz recording a result is. By the id a file already carries, by ISRC when there is
  * one (a code, not a guess), and only then by name — and a name match is thrown away unless the
- * length agrees to three seconds and the artist is the same artist. Nothing here returns "probably".
+ * length agrees to three seconds and the artist is the same artist. Nothing here returns "probably",
+ * and a provider that fails is a thrown error, not a "no match": the job retries later.
  */
 export class RecordingMatcher {
   constructor(
@@ -46,16 +47,16 @@ export class RecordingMatcher {
     const cleanedOut = { title: cleaned.title, artist, featured: cleaned.featured };
 
     if (input.musicbrainzRecordingId) {
-      const r = await this.run(() => this.mb.recordingDetail(input.musicbrainzRecordingId!)).catch(() => null);
+      const r = await this.run(() => this.mb.recordingDetail(input.musicbrainzRecordingId!));
       if (r) return { recording: r, confidence: 1, via: 'mbid', cleaned: cleanedOut };
     }
     if (input.isrc) {
-      const hits = await this.run(() => this.mb.recordingsByIsrc(input.isrc!)).catch(() => [] as MbRecordingDetail[]);
+      const hits = await this.run(() => this.mb.recordingsByIsrc(input.isrc!));
       if (hits[0]) return { recording: hits[0], confidence: 0.95, via: 'isrc', cleaned: cleanedOut };
     }
     if (!artist || !cleaned.title) return null;
 
-    const hits = await this.run(() => this.mb.searchRecordings(cleaned.title, artist)).catch(() => [] as MbRecordingDetail[]);
+    const hits = await this.run(() => this.mb.searchRecordings(cleaned.title, artist));
     const wantArtist = normalizeArtist(artist);
     const wantTitle = normalizeText(cleaned.title);
     for (const r of hits) {
