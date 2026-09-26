@@ -75,7 +75,7 @@ async function pairOverApi(admin: APIRequestContext, device: APIRequestContext, 
 
 test('the whole pass: hub set up, player paired, group joined, invite declined, name taken, group owned, someone found', async ({ page, context, request }) => {
   // The whole journey, including the hub's real pairing poll, which the player runs every 2 s.
-  test.setTimeout(600_000);
+  test.setTimeout(300_000); // the eight steps finish inside two minutes; a failure must not cost ten
   const hub = page;
   const player = await context.newPage();
   // Device calls travel without the operator's session cookie — as they do from a real player —
@@ -305,6 +305,46 @@ test('the whole pass: hub set up, player paired, group joined, invite declined, 
     await person.click();
     await expect(player.locator('#pfv')).toBeVisible();
     await expect(player.locator('#pfvName'), 'their profile opens in a sheet with the name the hub holds').toHaveText('Second player');
+  });
+
+  await test.step('08 — paired search reaches the real hub, and a public-domain clip audibly plays', async () => {
+    // The hub materialised the repo's public-domain fixtures at startup (NP_PUBLIC_DOMAIN_DIR):
+    // a keyless, rights-clean library with real audio. The enriched *fields* are proven against a
+    // stubbed hub in np/preview.spec.ts — live MusicBrainz is not reachable here — but the paired
+    // leg itself, the auth header, loopback CORS and the signed stream are all real in this step.
+    // A registered root is not an indexed one: scanning is the operator's act, so the operator
+    // does it — and the hub is then asked, not believed, before the player goes looking.
+    const scan = await request.post(`${HUB_URL}/api/v1/library/scan`, { headers: { 'x-csrf-token': csrf } });
+    expect([200, 201, 202], `the scan was accepted (${scan.status()})`).toContain(scan.status());
+    await expect
+      .poll(
+        async () => {
+          // params, not a hand-encoded query: the fixture re-encodes percent signs, and %2520 matches nothing.
+          const list = await request.get(`${HUB_URL}/api/v1/library/tracks`, { params: { limit: 5, q: 'Paper Harbour' }, headers: { 'x-csrf-token': csrf } });
+          const body = (await list.json()) as { items?: unknown[] };
+          return body.items?.length ?? 0;
+        },
+        { message: 'the fixture library is indexed', timeout: 120_000 },
+      )
+      .toBeGreaterThan(0);
+
+    await player.goto(`${PLAYER_URL}/`);
+    await player.waitForFunction(() => (window as unknown as { NP_READY?: unknown }).NP_READY, null, { timeout: 60_000 });
+    await player.fill('#q', 'Paper Harbour');
+    await player.press('#q', 'Enter');
+    const row = player.locator('.srch__row', { hasText: 'Paper Harbour' }).first();
+    await expect(row, 'the hub answered the paired search with its own library').toBeVisible({ timeout: 30_000 });
+    await expect(row.locator('.srch__sub')).toContainText('Fennel Grove');
+    const art = row.locator('button.srch__art');
+    await expect(art, 'a row with real audio offers the audition').toBeVisible();
+    await art.click();
+    await expect(player.locator('.srch__art.is-preview'), 'the clip is playing').toHaveCount(1, { timeout: 15_000 });
+    await art.click();
+    await expect(player.locator('.srch__art.is-preview')).toHaveCount(0);
+    // Leave the page before the step ends: an audio element that streamed through the service
+    // worker's range bridge keeps the context's teardown waiting otherwise (observed: a clean
+    // 147-second run followed by browserContext.close hanging the full timeout).
+    await player.goto('about:blank');
   });
 
   await device.dispose();
