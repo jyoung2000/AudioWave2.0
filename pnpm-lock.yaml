@@ -77,6 +77,9 @@ importers:
       '@node-rs/argon2':
         specifier: 2.2.0
         version: 2.2.0
+      '@now-playing/audio-core':
+        specifier: workspace:*
+        version: link:../packages/audio-core
       '@now-playing/contracts':
         specifier: workspace:*
         version: link:../packages/contracts
