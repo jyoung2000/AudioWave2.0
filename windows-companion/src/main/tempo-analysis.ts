@@ -107,7 +107,7 @@ export async function runTempoPass(deps: TempoPassDeps): Promise<{ measured: num
       skipped += 1;
       continue;
     }
-    let answer: TempoEstimate | null = null;
+    let answer: TempoEstimate | null;
     try {
       answer = await analyze({ ffmpegPath: deps.ffmpegPath, ...(deps.signal ? { signal: deps.signal } : {}) }, { absolutePath, durationMs: record.track.durationMs });
     } catch {
