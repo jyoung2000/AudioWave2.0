@@ -67,6 +67,13 @@ describe('the companion helper and a player page', () => {
     expect(job.status).toBe(401);
   });
 
+  it('a request with no Origin (an <img> on any website) is refused unless it carries the token', async () => {
+    const blind = await fetch(`${base}${HELPER_ROUTES.radioNowPlaying}?url=${station}`);
+    expect(blind.status).toBe(403);
+    const tokened = await fetch(`${base}${HELPER_ROUTES.radioNowPlaying}?url=${station}`, { headers: { 'x-helper-token': 'radio-test-token-radio-test-token' } });
+    expect(tokened.status).toBe(200);
+  });
+
   it('asks which station when none is named', async () => {
     const response = await fetch(`${base}${HELPER_ROUTES.radioNowPlaying}`, { headers: { origin: 'http://127.0.0.1:4174' } });
     expect(response.status).toBe(400);

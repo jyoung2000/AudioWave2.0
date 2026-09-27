@@ -83,6 +83,7 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
   let origin = `http://127.0.0.1:${port}`;
   let policy: OriginPolicy = { allowed: options.allowedOrigins, self: options.app ? origin : null, loopbackPages: options.loopbackPages === true };
   const stationCache = new Map<string, { at: number; value: Promise<StationNowPlaying> }>();
+  let stationReads = 0;
   const tools = new ToolProvisioner({
     toolsDir: options.toolsDir,
     configured: options.configured,
@@ -133,16 +134,29 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
 
     // Radio titles need no token: the route only ever reads a public stream (the reader refuses
     // private and loopback addresses, on the name and after DNS), and a page opened from the hub
-    // has no way to learn the token. The origin check above still applies.
+    // has no way to learn the token. But it must come from a page the origin check has vetted: a
+    // request with no Origin is what an <img> or a no-cors fetch on any website sends, and without
+    // this it would make the helper a blind GET relay for the whole web. The token still opens it.
     if (path === HELPER_ROUTES.radioNowPlaying && request.method === 'GET') {
+      if (origin_ === undefined && !tokenMatches(options.token, header(request, 'x-helper-token'))) {
+        return fail(response, 403, 'origin', 'This origin may not talk to the helper.');
+      }
       const station = url.searchParams.get('url') ?? '';
       if (!station || station.length > 2048) return fail(response, 400, 'bad-request', 'Say which station: ?url=');
       const now = Date.now();
       const hit = stationCache.get(station);
       if (hit && now - hit.at < 15_000) return send(response, 200, await hit.value);
+      // One tuned station per player; a burst of distinct stations is not a player.
+      if (stationReads >= 8) return fail(response, 429, 'busy', 'Too many stations at once. Try again in a moment.');
       const read = options.stationTitle ?? ((u: string) => readStationTitle(u, { timeoutMs: 8000, userAgent: `NowPlaying-helper/${options.version}` }));
-      const value = read(station);
-      if (stationCache.size > 200) stationCache.delete(stationCache.keys().next().value!);
+      stationReads += 1;
+      const value = read(station)
+        .catch((): StationNowPlaying => ({ raw: null, artist: null, title: null, station: null, reason: 'The station could not be read' }))
+        .finally(() => {
+          stationReads -= 1;
+        });
+      stationCache.delete(station);
+      if (stationCache.size >= 200) stationCache.delete(stationCache.keys().next().value!);
       stationCache.set(station, { at: now, value });
       return send(response, 200, await value);
     }
@@ -317,6 +331,8 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
     tools,
     close: async () => {
       clearInterval(sweeper);
+      // Setup stops with the helper: a restarted helper starts its own, into the same folder.
+      await tools.close();
       await jobs.shutdown();
       server.closeAllConnections();
       await new Promise<void>((resolvePromise) => server.close(() => resolvePromise()));

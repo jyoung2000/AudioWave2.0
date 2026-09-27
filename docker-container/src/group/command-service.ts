@@ -86,15 +86,18 @@ export class CommandService {
       if (resolved.capabilities.playback !== 'available') return { track: null, result: resolved, candidates: [resolved], reason: resolved.capabilities.reason ?? 'This source cannot be played here' };
       return { track: this.search.toTrackRef(resolved), result: resolved, candidates: [resolved], reason: null };
     }
+    // "Artist - Title" is how radio stations name a song and how people type one. When a request
+    // names an artist, only a copy by that artist counts — on the first search as much as on the
+    // retry — because a same-titled song by someone else is a different song. An artist that
+    // normalises to nothing ("!!!") names no one, so it is not used to match.
+    const split = splitOnAir(trimmed);
+    const wanted = split?.artist ? normalizeArtist(split.artist) : '';
+    const named = wanted ? split : null;
     const page = await this.search.search({ query: trimmed, scope: 'songs', limit: 10, actorId });
-    const playable = page.results.find((r) => r.capabilities.playback === 'available');
-    // "Artist - Title" is how radio stations name a song and how people type one, but search
-    // matches titles. So a miss is asked again by title — and only a copy by that artist counts,
-    // because a same-titled song by someone else is a different song.
-    const named = !playable ? splitOnAir(trimmed) : null;
-    if (named?.artist) {
+    const playable = page.results.find((r) => r.capabilities.playback === 'available' && (!named || normalizeArtist(r.artistName) === wanted));
+    // Search matches titles, so a miss is asked again by the title alone.
+    if (named?.artist && !playable) {
       const byTitle = await this.search.search({ query: named.title, scope: 'songs', limit: 25, actorId });
-      const wanted = normalizeArtist(named.artist);
       const match = byTitle.results.find((r) => r.capabilities.playback === 'available' && normalizeArtist(r.artistName) === wanted);
       if (match) return { track: this.search.toTrackRef(match), result: match, candidates: byTitle.results, reason: null };
       return { track: null, result: null, candidates: byTitle.results, reason: `No copy of “${named.title}” by ${named.artist} plays on this hub` };

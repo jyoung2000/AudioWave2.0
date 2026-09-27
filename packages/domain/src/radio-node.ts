@@ -57,7 +57,11 @@ export async function readStationTitle(input: string, options: ReadStationTitleO
     if (left <= 0) return none('The station did not answer in time');
     const outcome = await once(url, { ...options, timeoutMs: left });
     if ('redirect' in outcome) {
-      url = new URL(outcome.redirect, url).toString();
+      try {
+        url = new URL(outcome.redirect, url).toString();
+      } catch {
+        return none('The station redirected somewhere unreadable');
+      }
       continue;
     }
     return outcome;
@@ -70,6 +74,7 @@ function once(url: string, options: ReadStationTitleOptions & { timeoutMs: numbe
     const target = new URL(url);
     const client = target.protocol === 'https:' ? https : http;
     const maxBytes = options.maxBytes ?? 512 * 1024;
+    const startedAt = Date.now();
     let settled = false;
     const finish = (value: StationTitle | { redirect: string }): void => {
       if (settled) return;
@@ -114,7 +119,8 @@ function once(url: string, options: ReadStationTitleOptions & { timeoutMs: numbe
         settled = true;
         clearTimeout(timer);
         request.destroy();
-        void rawOnce(target, options, lookup, maxBytes).then(resolve);
+        // What is left of this hop's time, not the whole of it again.
+        void rawOnce(target, { ...options, timeoutMs: Math.max(1, options.timeoutMs - (Date.now() - startedAt)) }, lookup, maxBytes).then(resolve);
         return;
       }
       finish(none(/private/i.test(err.message) ? 'Private or local addresses are blocked' : 'The station could not be reached'));

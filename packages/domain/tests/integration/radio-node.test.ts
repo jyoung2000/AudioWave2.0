@@ -93,6 +93,13 @@ describe('readStationTitle', () => {
     await new Promise<void>((resolve) => first!.close(() => resolve()));
   });
 
+  it('a redirect to an unreadable address is an answer, not an exception', async () => {
+    const url = await station((socket) => socket.end('HTTP/1.1 302 Found\r\nLocation: http://[\r\nContent-Length: 0\r\n\r\n'));
+    const r = await readStationTitle(url, LOCAL);
+    expect(r.title).toBeNull();
+    expect(r.reason).toMatch(/unreadable/);
+  });
+
   it('refuses private and loopback addresses unless a test says otherwise', async () => {
     const r = await readStationTitle('http://127.0.0.1:1/stream', { timeoutMs: 1000 });
     expect(r.title).toBeNull();

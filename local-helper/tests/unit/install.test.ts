@@ -115,6 +115,19 @@ describe('installing yt-dlp', () => {
     expect(existsSync(join(toolsDir, 'yt-dlp.exe'))).toBe(false);
   });
 
+  it('stops a download that runs past the size the release lists, and leaves nothing behind', async () => {
+    const gh = fakeGitHub('yt-dlp/yt-dlp', '2026.09.01', [{ name: 'yt-dlp.exe', bytes: binary }]);
+    const inflated = (async (input: string | URL | Request, init?: RequestInit) => {
+      const r = await gh.fetchImpl(input, init);
+      return String(input).includes('/releases/download/') ? new Response(Buffer.concat([binary, Buffer.alloc(4096)])) : r;
+    }) as typeof fetch;
+    const outcome = await installTool('yt-dlp', { toolsDir, fetchImpl: inflated, platform: 'win32', arch: 'x64', probe });
+    expect(outcome.installed).toBe(false);
+    expect(outcome.reason).toMatch(/ran past/);
+    expect(existsSync(join(toolsDir, 'yt-dlp.exe'))).toBe(false);
+    expect(leftovers()).toEqual([]);
+  });
+
   it('refuses a file that was verified but will not report a version', async () => {
     const gh = fakeGitHub('yt-dlp/yt-dlp', '2026.09.01', [{ name: 'yt-dlp.exe', bytes: binary }]);
     const outcome = await installTool('yt-dlp', { toolsDir, fetchImpl: gh.fetchImpl, platform: 'win32', arch: 'x64', probe: async () => null });

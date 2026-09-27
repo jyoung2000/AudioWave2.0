@@ -166,4 +166,36 @@ describe('the provisioner a server holds', () => {
     await again;
     expect(provisioner.status().spotdl).toEqual({ state: 'ready' });
   });
+
+  it('pressing "try again" five times queues one fresh pass, not five', async () => {
+    failing.add('ffmpeg');
+    const provisioner = new ToolProvisioner(options());
+    await provisioner.ensure();
+    installs = [];
+    const presses = [1, 2, 3, 4, 5].map(() => provisioner.ensure({ ignoreBackoff: true }));
+    await Promise.all(presses);
+    expect(installs.filter((id) => id === 'ffmpeg')).toHaveLength(1);
+  });
+
+  it('close() stops a pass mid-install and nothing further starts (a helper restart must not race it)', async () => {
+    let release: () => void = () => undefined;
+    const slow = async (id: HelperToolId, o: { signal?: AbortSignal }): Promise<InstallOutcome> => {
+      installs.push(id);
+      await new Promise<void>((done) => {
+        release = done;
+        o.signal?.addEventListener('abort', () => done(), { once: true });
+      });
+      return o.signal?.aborted ? { installed: false, version: null, reason: 'stopped', tag: null } : install(id, {});
+    };
+    const provisioner = new ToolProvisioner(options({ install: slow }));
+    const pass = provisioner.ensure();
+    await new Promise((r) => setTimeout(r, 10));
+    expect(installs).toEqual(['yt-dlp']);
+    await provisioner.close();
+    release();
+    await pass.catch(() => undefined);
+    expect(installs, 'nothing after yt-dlp was started once closed').toEqual(['yt-dlp']);
+    await provisioner.ensure().catch(() => undefined);
+    expect(installs, 'a closed provisioner starts nothing new').toEqual(['yt-dlp']);
+  });
 });

@@ -21368,7 +21368,7 @@ function checkFetchUrl(input2, allowedHosts) {
 }
 
 // src/server.ts
-import { createReadStream as createReadStream2, statSync as statSync4 } from "node:fs";
+import { createReadStream as createReadStream2, statSync as statSync5 } from "node:fs";
 import { createServer } from "node:http";
 
 // src/measure.ts
@@ -21953,7 +21953,11 @@ async function readStationTitle(input2, options = {}) {
     if (left <= 0) return none("The station did not answer in time");
     const outcome = await once(url2, { ...options, timeoutMs: left });
     if ("redirect" in outcome) {
-      url2 = new URL(outcome.redirect, url2).toString();
+      try {
+        url2 = new URL(outcome.redirect, url2).toString();
+      } catch {
+        return none("The station redirected somewhere unreadable");
+      }
       continue;
     }
     return outcome;
@@ -21965,6 +21969,7 @@ function once(url2, options) {
     const target = new URL(url2);
     const client = target.protocol === "https:" ? https : http;
     const maxBytes = options.maxBytes ?? 512 * 1024;
+    const startedAt = Date.now();
     let settled = false;
     const finish = (value) => {
       if (settled) return;
@@ -22008,7 +22013,7 @@ function once(url2, options) {
         settled = true;
         clearTimeout(timer);
         request.destroy();
-        void rawOnce(target, options, lookup, maxBytes).then(resolve3);
+        void rawOnce(target, { ...options, timeoutMs: Math.max(1, options.timeoutMs - (Date.now() - startedAt)) }, lookup, maxBytes).then(resolve3);
         return;
       }
       finish(none(/private/i.test(err.message) ? "Private or local addresses are blocked" : "The station could not be reached"));
@@ -22103,7 +22108,7 @@ import { join as join7 } from "node:path";
 
 // src/install.ts
 import { createHash } from "node:crypto";
-import { chmodSync, mkdirSync as mkdirSync2, mkdtempSync, renameSync, rmSync as rmSync2, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync as mkdirSync2, mkdtempSync, readdirSync as readdirSync2, renameSync, rmSync as rmSync2, statSync as statSync4, writeFileSync } from "node:fs";
 import { open as open2 } from "node:fs/promises";
 import { join as join6 } from "node:path";
 
@@ -22325,6 +22330,7 @@ async function installTool(id, options) {
     }
     if (!expected) throw new Refusal(`${source.repo} ${release.tag} publishes no SHA-256 for ${asset.name}, so it was not installed.`);
     mkdirSync2(options.toolsDir, { recursive: true });
+    sweepStaging(options.toolsDir);
     staging = mkdtempSync(join6(options.toolsDir, ".staging-"));
     const download = join6(staging, "download.part");
     const actual = await downloadTo(fetchImpl, asset, download, signal, options.onProgress);
@@ -22374,20 +22380,38 @@ async function downloadTo(fetchImpl, asset, path, signal, onProgress) {
   const hash2 = createHash("sha256");
   const file2 = await open2(path, "w");
   let received = 0;
+  const reader = response.body.getReader();
   try {
-    const reader = response.body.getReader();
     for (; ; ) {
       const { done, value } = await reader.read();
       if (done) break;
+      received += value.byteLength;
+      if (asset.size > 0 && received > asset.size) throw new Refusal(`The download ran past the ${asset.size} bytes the release lists, so it was discarded.`);
       hash2.update(value);
       await file2.write(value);
-      received += value.byteLength;
       onProgress?.(received, total);
     }
   } finally {
+    await reader.cancel().catch(() => void 0);
     await file2.close();
   }
   return hash2.digest("hex");
+}
+function sweepStaging(toolsDir, olderThanMs = 36e5) {
+  let names;
+  try {
+    names = readdirSync2(toolsDir);
+  } catch {
+    return;
+  }
+  for (const name of names) {
+    if (!name.startsWith(".staging-")) continue;
+    const path = join6(toolsDir, name);
+    try {
+      if (Date.now() - statSync4(path).mtimeMs > olderThanMs) rmSync2(path, { recursive: true, force: true });
+    } catch {
+    }
+  }
 }
 function assertGitHub(url2) {
   let parsed;
@@ -22478,13 +22502,16 @@ async function ensureTools(options) {
       if (id === "yt-dlp" && tool.origin === "installed" && source && due(record2.lastUpdateCheckAt, UPDATE_CHECK_MS, now) && !options.busy?.()) {
         try {
           const latest = await release(source.repo);
-          record2.lastUpdateCheckAt = new Date(now()).toISOString();
-          if (latest.tag && tool.version && latest.tag.trim() !== tool.version.trim()) {
+          const behind = !!latest.tag && !!tool.version && latest.tag.trim() !== tool.version.trim();
+          if (!behind) record2.lastUpdateCheckAt = new Date(now()).toISOString();
+          else if (options.busy?.()) log("yt-dlp update deferred: downloads are running");
+          else {
             log(`yt-dlp ${tool.version} is behind ${latest.tag}; updating`);
             const outcome2 = await runInstall(id);
             record2.lastAttemptAt = new Date(now()).toISOString();
             record2.lastError = outcome2.installed ? null : outcome2.reason;
             if (outcome2.installed) {
+              record2.lastUpdateCheckAt = new Date(now()).toISOString();
               record2.tag = outcome2.tag ?? latest.tag;
               options.onInstalled?.(id, outcome2);
             } else log(`yt-dlp update refused: ${outcome2.reason ?? "unknown"}`);
@@ -22558,6 +22585,9 @@ var ToolProvisioner = class {
   queue = Promise.resolve();
   active = null;
   pending = null;
+  /** A "try again" pass that is queued but has not started: further presses share it. */
+  freshQueued = null;
+  stopped = new AbortController();
   status() {
     return { ...this.setup };
   }
@@ -22575,18 +22605,37 @@ var ToolProvisioner = class {
       this.options.onChange?.();
     }
     if (this.pending && !options.ignoreBackoff) return this.pending;
-    return this.run(options.ignoreBackoff ? { ignoreBackoff: true } : {});
+    if (options.ignoreBackoff && this.freshQueued) return this.freshQueued;
+    if (!options.ignoreBackoff) return this.run({});
+    const fresh = this.run({ ignoreBackoff: true }, () => {
+      if (this.freshQueued === fresh) this.freshQueued = null;
+    });
+    this.freshQueued = fresh;
+    return fresh;
+  }
+  /**
+   * Stop: abort the pass in flight (its download and its staging are thrown away) and start
+   * nothing after it. A helper that restarts builds a new provisioner, and two of them writing
+   * into one tools folder is exactly the race this exists to prevent.
+   */
+  async close() {
+    this.stopped.abort();
+    await this.queue;
   }
   /** A manual install of one tool, queued behind whatever is running. */
   async install(id) {
     const result = await this.run({ only: [id], force: true, ignoreBackoff: true });
     return result.outcomes[id] ?? { installed: false, version: null, reason: `${id} could not be set up.` };
   }
-  run(extra) {
-    const next = this.queue.then(
-      () => ensureTools({
+  run(extra, onStart) {
+    const signal = this.options.signal ? AbortSignal.any([this.options.signal, this.stopped.signal]) : this.stopped.signal;
+    const next = this.queue.then(() => {
+      onStart?.();
+      if (signal.aborted) return Promise.reject(new Error("The tool setup was stopped."));
+      return ensureTools({
         ...this.options,
         ...extra,
+        signal,
         onStatus: (id, setup) => {
           this.active = setup.state === "installing" ? id : this.active === id ? null : this.active;
           this.setup[id] = setup;
@@ -22594,8 +22643,8 @@ var ToolProvisioner = class {
         }
       }).finally(() => {
         this.active = null;
-      })
-    );
+      });
+    });
     this.queue = next.catch(() => void 0);
     this.pending = next;
     void next.finally(() => {
@@ -22617,6 +22666,7 @@ async function startHelper(options) {
   let origin = `http://127.0.0.1:${port}`;
   let policy = { allowed: options.allowedOrigins, self: options.app ? origin : null, loopbackPages: options.loopbackPages === true };
   const stationCache = /* @__PURE__ */ new Map();
+  let stationReads = 0;
   const tools = new ToolProvisioner({
     toolsDir: options.toolsDir,
     configured: options.configured,
@@ -22658,14 +22708,22 @@ async function startHelper(options) {
       return;
     }
     if (path === HELPER_ROUTES.radioNowPlaying && request.method === "GET") {
+      if (origin_ === void 0 && !tokenMatches(options.token, header(request, "x-helper-token"))) {
+        return fail(response, 403, "origin", "This origin may not talk to the helper.");
+      }
       const station = url2.searchParams.get("url") ?? "";
       if (!station || station.length > 2048) return fail(response, 400, "bad-request", "Say which station: ?url=");
       const now = Date.now();
       const hit = stationCache.get(station);
       if (hit && now - hit.at < 15e3) return send(response, 200, await hit.value);
+      if (stationReads >= 8) return fail(response, 429, "busy", "Too many stations at once. Try again in a moment.");
       const read = options.stationTitle ?? ((u) => readStationTitle(u, { timeoutMs: 8e3, userAgent: `NowPlaying-helper/${options.version}` }));
-      const value = read(station);
-      if (stationCache.size > 200) stationCache.delete(stationCache.keys().next().value);
+      stationReads += 1;
+      const value = read(station).catch(() => ({ raw: null, artist: null, title: null, station: null, reason: "The station could not be read" })).finally(() => {
+        stationReads -= 1;
+      });
+      stationCache.delete(station);
+      if (stationCache.size >= 200) stationCache.delete(stationCache.keys().next().value);
       stationCache.set(station, { at: now, value });
       return send(response, 200, await value);
     }
@@ -22738,7 +22796,7 @@ async function startHelper(options) {
       if (!found) return fail(response, 404, "not-found", "That file is not here any more.");
       let size;
       try {
-        size = statSync4(found.path).size;
+        size = statSync5(found.path).size;
       } catch {
         return fail(response, 404, "not-found", "That file is not here any more.");
       }
@@ -22816,6 +22874,7 @@ async function startHelper(options) {
     tools,
     close: async () => {
       clearInterval(sweeper);
+      await tools.close();
       await jobs.shutdown();
       server.closeAllConnections();
       await new Promise((resolvePromise) => server.close(() => resolvePromise()));

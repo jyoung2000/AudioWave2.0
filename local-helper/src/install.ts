@@ -18,7 +18,7 @@
  * Nothing here reaches the network except through `fetchImpl`, so tests hand it a fake GitHub.
  */
 import { createHash } from 'node:crypto';
-import { chmodSync, mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { open } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -143,6 +143,7 @@ export async function installTool(id: HelperToolId, options: InstallOptions): Pr
     if (!expected) throw new Refusal(`${source.repo} ${release.tag} publishes no SHA-256 for ${asset.name}, so it was not installed.`);
 
     mkdirSync(options.toolsDir, { recursive: true });
+    sweepStaging(options.toolsDir);
     staging = mkdtempSync(join(options.toolsDir, '.staging-'));
     const download = join(staging, 'download.part');
     const actual = await downloadTo(fetchImpl, asset, download, signal, options.onProgress);
@@ -204,20 +205,46 @@ async function downloadTo(fetchImpl: typeof fetch, asset: ReleaseAsset, path: st
   const hash = createHash('sha256');
   const file = await open(path, 'w');
   let received = 0;
+  const reader = response.body.getReader();
   try {
-    const reader = response.body.getReader();
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
+      received += value.byteLength;
+      // More bytes than the release says the file has is not that file; stop before the disk fills.
+      if (asset.size > 0 && received > asset.size) throw new Refusal(`The download ran past the ${asset.size} bytes the release lists, so it was discarded.`);
       hash.update(value);
       await file.write(value);
-      received += value.byteLength;
       onProgress?.(received, total);
     }
   } finally {
+    await reader.cancel().catch(() => undefined);
     await file.close();
   }
   return hash.digest('hex');
+}
+
+/**
+ * Staging folders a killed process left behind (up to a whole FFmpeg archive each). Never
+ * executed — nothing runs from staging — but never cleaned either, until now. Only ones an hour
+ * old, so a concurrent install's live folder is never touched.
+ */
+function sweepStaging(toolsDir: string, olderThanMs = 3_600_000): void {
+  let names: string[];
+  try {
+    names = readdirSync(toolsDir);
+  } catch {
+    return;
+  }
+  for (const name of names) {
+    if (!name.startsWith('.staging-')) continue;
+    const path = join(toolsDir, name);
+    try {
+      if (Date.now() - statSync(path).mtimeMs > olderThanMs) rmSync(path, { recursive: true, force: true });
+    } catch {
+      // Held open by something else: leave it for the next sweep.
+    }
+  }
 }
 
 function assertGitHub(url: string): void {

@@ -121,13 +121,18 @@ export async function ensureTools(options: EnsureOptions): Promise<EnsureResult>
       if (id === 'yt-dlp' && tool.origin === 'installed' && source && due(record.lastUpdateCheckAt, UPDATE_CHECK_MS, now) && !options.busy?.()) {
         try {
           const latest = await release(source.repo);
-          record.lastUpdateCheckAt = new Date(now()).toISOString();
-          if (latest.tag && tool.version && latest.tag.trim() !== tool.version.trim()) {
+          const behind = !!latest.tag && !!tool.version && latest.tag.trim() !== tool.version.trim();
+          if (!behind) record.lastUpdateCheckAt = new Date(now()).toISOString();
+          // A download that started while GitHub was asked holds yt-dlp.exe open; replacing it now
+          // would fail at the rename. Leave it — and leave the check unstamped — for the next pass.
+          else if (options.busy?.()) log('yt-dlp update deferred: downloads are running');
+          else {
             log(`yt-dlp ${tool.version} is behind ${latest.tag}; updating`);
             const outcome = await runInstall(id);
             record.lastAttemptAt = new Date(now()).toISOString();
             record.lastError = outcome.installed ? null : outcome.reason;
             if (outcome.installed) {
+              record.lastUpdateCheckAt = new Date(now()).toISOString();
               record.tag = outcome.tag ?? latest.tag;
               options.onInstalled?.(id, outcome);
             } else log(`yt-dlp update refused: ${outcome.reason ?? 'unknown'}`);
@@ -218,6 +223,9 @@ export class ToolProvisioner {
   private queue: Promise<unknown> = Promise.resolve();
   private active: HelperToolId | null = null;
   private pending: Promise<EnsureResult> | null = null;
+  /** A "try again" pass that is queued but has not started: further presses share it. */
+  private freshQueued: Promise<EnsureResult> | null = null;
+  private readonly stopped = new AbortController();
 
   constructor(private readonly options: ProvisionerOptions) {}
 
@@ -239,9 +247,26 @@ export class ToolProvisioner {
       for (const id of SETUP_ORDER) if (this.setup[id]?.state === 'failed') this.setup[id] = { state: 'installing', progress: 0 };
       this.options.onChange?.();
     }
-    // A routine check while one is running just shares it; "try again now" queues a fresh pass.
+    // A routine check while one is running just shares it; "try again now" queues a fresh pass —
+    // one, however many times it is pressed before that pass gets going.
     if (this.pending && !options.ignoreBackoff) return this.pending;
-    return this.run(options.ignoreBackoff ? { ignoreBackoff: true } : {});
+    if (options.ignoreBackoff && this.freshQueued) return this.freshQueued;
+    if (!options.ignoreBackoff) return this.run({});
+    const fresh = this.run({ ignoreBackoff: true }, () => {
+      if (this.freshQueued === fresh) this.freshQueued = null;
+    });
+    this.freshQueued = fresh;
+    return fresh;
+  }
+
+  /**
+   * Stop: abort the pass in flight (its download and its staging are thrown away) and start
+   * nothing after it. A helper that restarts builds a new provisioner, and two of them writing
+   * into one tools folder is exactly the race this exists to prevent.
+   */
+  async close(): Promise<void> {
+    this.stopped.abort();
+    await this.queue;
   }
 
   /** A manual install of one tool, queued behind whatever is running. */
@@ -250,11 +275,15 @@ export class ToolProvisioner {
     return result.outcomes[id] ?? { installed: false, version: null, reason: `${id} could not be set up.` };
   }
 
-  private run(extra: Pick<EnsureOptions, 'ignoreBackoff' | 'only' | 'force'>): Promise<EnsureResult> {
-    const next = this.queue.then(() =>
-      ensureTools({
+  private run(extra: Pick<EnsureOptions, 'ignoreBackoff' | 'only' | 'force'>, onStart?: () => void): Promise<EnsureResult> {
+    const signal = this.options.signal ? AbortSignal.any([this.options.signal, this.stopped.signal]) : this.stopped.signal;
+    const next = this.queue.then(() => {
+      onStart?.();
+      if (signal.aborted) return Promise.reject(new Error('The tool setup was stopped.'));
+      return ensureTools({
         ...this.options,
         ...extra,
+        signal,
         onStatus: (id, setup) => {
           this.active = setup.state === 'installing' ? id : this.active === id ? null : this.active;
           this.setup[id] = setup;
@@ -262,8 +291,8 @@ export class ToolProvisioner {
         },
       }).finally(() => {
         this.active = null;
-      }),
-    );
+      });
+    });
     this.queue = next.catch(() => undefined);
     this.pending = next;
     void next.finally(() => {
