@@ -19,7 +19,17 @@ import { delimiter, dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-const hubDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+/*
+ * The script works on the folder it lives in (HUB_DIR is its own directory), and these tests wipe
+ * that folder's data/ around every case. Run against the repository copy, that deleted the real
+ * docker-container/data — a live hub's database and install key, on any machine that ran the
+ * suite. So the script and its compose file are copied into a scratch hub folder first.
+ */
+const repoHub = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const hubDir = mkdtempSync(join(tmpdir(), 'np-hub-dir-'));
+writeFileSync(join(hubDir, 'nowplaying'), readFileSync(join(repoHub, 'nowplaying')));
+writeFileSync(join(hubDir, 'compose.yaml'), readFileSync(join(repoHub, 'compose.yaml')));
+chmodSync(join(hubDir, 'nowplaying'), 0o755);
 const script = join(hubDir, 'nowplaying');
 const dataDir = join(hubDir, 'data');
 
