@@ -887,6 +887,22 @@ replace("      var row = tbody.querySelector('tr[data-id=\"' + have.id + '\"]');
         "      }\n"
         "    });")
 
+# ---- Connections: a downloader being set up is not "missing" (UX-SETUP-001) ----------------------------------
+# The companion and the helper set yt-dlp, spotDL and FFmpeg up by themselves now, and health carries
+# each tool's `setup` state. A tool on its way reads "setting up" in the muted colour; only one that
+# failed or cannot be set up on that machine counts toward "N downloader(s) missing".
+replace("        span.className = t.present ? 'conn__good' : 'conn__warn';\n"
+        "        span.textContent = (i ? ' · ' : '') + t.id + (t.present ? ' ' + (t.version || '✓') : ' missing');\n"
+        "        if (!t.present) { missing++; if (t.installHint) span.title = t.installHint; }",
+        "        var setup = (t.setup && t.setup.state) || '';\n"
+        "        var coming = !t.present && setup === 'installing';\n"
+        "        span.className = t.present ? 'conn__good' : coming ? 'muted' : 'conn__warn';\n"
+        "        span.textContent = (i ? ' · ' : '') + t.id + (t.present ? ' ' + (t.version || '✓')\n"
+        "          : coming ? ' setting up' + (typeof t.setup.progress === 'number' ? ' ' + Math.round(t.setup.progress * 100) + '%' : '')\n"
+        "          : ' missing');\n"
+        "        if (coming) span.title = 'The companion is downloading and verifying ' + t.id + '.';\n"
+        "        else if (!t.present) { missing++; span.title = (t.setup && t.setup.reason) || t.installHint || ''; }")
+
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):
     assert bad not in text, f'left behind: {bad}'

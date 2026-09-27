@@ -15096,9 +15096,14 @@ window.AW.startStats = function () {
       var frag = document.createDocumentFragment(), missing = 0;
       tools.forEach(function (t, i) {
         var span = document.createElement('span');
-        span.className = t.present ? 'conn__good' : 'conn__warn';
-        span.textContent = (i ? ' · ' : '') + t.id + (t.present ? ' ' + (t.version || '✓') : ' missing');
-        if (!t.present) { missing++; if (t.installHint) span.title = t.installHint; }
+        var setup = (t.setup && t.setup.state) || '';
+        var coming = !t.present && setup === 'installing';
+        span.className = t.present ? 'conn__good' : coming ? 'muted' : 'conn__warn';
+        span.textContent = (i ? ' · ' : '') + t.id + (t.present ? ' ' + (t.version || '✓')
+          : coming ? ' setting up' + (typeof t.setup.progress === 'number' ? ' ' + Math.round(t.setup.progress * 100) + '%' : '')
+          : ' missing');
+        if (coming) span.title = 'The companion is downloading and verifying ' + t.id + '.';
+        else if (!t.present) { missing++; span.title = (t.setup && t.setup.reason) || t.installHint || ''; }
         frag.appendChild(span);
       });
       if (!tools.length) frag.appendChild(document.createTextNode('none reported'));
