@@ -547,6 +547,13 @@ That is the verdict the isolated runs were pointing at: the four failures belong
 to the code. They were browser crashes and a timing-sensitive assertion under whole-suite load, and
 they are not reproducible on the same bytes.
 
+**Provenance, so this is not mistaken for stale evidence.** That run's own log preamble reads
+`head=51065b7 dirty=0` — the checkout it was launched from, not a rollback, and `d6=0` there just
+means the D-6 section had not been written yet. Everything committed after `51065b7` is
+`.agents/plans/2026-09-26-hermes-triage.md` alone — **zero non-documentation files changed** — so
+this green verdict applies to the current code unchanged. The repair commit `51065b7` is inside the
+run, which is the point: the three broken gates were fixed *before* the tests that prove them.
+
 **What is settled, and what is not.** `test:e2e` is cleared, and the three gates broken by my own
 commits were repaired in `51065b7` and each re-verified PASS in isolation. **The full `pnpm verify`
 re-run on `30a6c4a` is the remaining step, and until it prints its own `Verification summary` the
