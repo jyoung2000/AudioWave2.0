@@ -135,15 +135,40 @@ than attacked; non-audio entries are left where they are.
 Settings → Platforms states all of this per platform, in the app, with the reason attached to every
 "no". `docs/PROVIDER_CAPABILITIES.md` records the sources.
 
-**The other half: tools you run yourself.** yt-dlp and spotDL exist, they are widely used, and
-whether you may point one at a given site is a question between you and that site — not one this
-project can answer for you, and not one it will pretend does not exist.
+**The other half: the downloaders, set up for you.** yt-dlp and spotDL exist, they are widely used,
+and whether you may point one at a given site is a question between you and that site — not one
+this project can answer for you, and not one it will pretend does not exist.
 
-So there is a supported way to use them, and it is deliberately explicit at every step:
+Until 2026-09-27 this section promised that those were tools you installed yourself: the helper
+fetched yt-dlp only when asked and refused spotDL and FFmpeg. **The owner reversed that on
+2026-09-27** — "for automatic downloader override the doc and make everything automatic and seamless
+for the user" — and this is the posture now:
 
-- **Nothing runs unless you start it.** `local-helper/` is a separate program you download and run.
-  The player alone cannot start a process — no browser page can, installed or not — and this project
-  does not ship a background service that quietly can.
+- **The companion and the standalone helper set the tools up automatically.** When either starts,
+  every tool that is missing — yt-dlp, then FFmpeg, then spotDL — is downloaded in the background,
+  one at a time, with no prompt. FFmpeg is fetched on Windows only (BtbN's GPL build); on macOS and
+  Linux the helper says which package-manager command installs it, because the system's own copy is
+  the better one there. Nothing waits for setup: the window opens and the player connects at once,
+  and Settings ▸ Downloaders shows each tool's progress ("Setting up… 42%"), "Ready — Set up
+  automatically", or "Couldn't set up: <reason>" with Try Again. A failure is retried on the next
+  start or after six hours.
+- **Every file is verified, and an unverifiable one is refused.** Each tool comes from its own
+  project's GitHub release — `yt-dlp/yt-dlp`, `spotDL/spotify-downloader`, `BtbN/FFmpeg-Builds` —
+  resolved once through the GitHub API, so the file and its checksum always belong to the same
+  release. The download must match the SHA-256 GitHub publishes for that asset (its `digest`), or,
+  for an older release without one, the checksum file published in that same release
+  (`SHA2-256SUMS`, `checksums.sha256`). If neither exists, nothing is installed. A verified file must
+  then answer its version flag before it is used. See `local-helper/src/install.ts`.
+- **An app-owned folder, and your own copies left alone.** The tools go into
+  `<userData>\helper\tools` in the companion (`%LOCALAPPDATA%\NowPlaying\tools`, or the XDG / Library
+  equivalent, for the standalone helper). A yt-dlp, spotDL or FFmpeg already on PATH, or named on the
+  command line, is used as it is and never replaced. The yt-dlp the app set up is compared with the
+  latest release at most once a day and replaced when it differs, because an out-of-date yt-dlp is the
+  usual reason a download fails.
+- **Removing them.** Quit the companion (or stop the helper) and delete the `tools` folder above; the
+  helper fetches them again on its next start. To stop that, run the standalone helper with
+  `--no-auto-tools`, or put your own copies on PATH. The folder holds only these executables and a
+  small `setup-state.json` recording what was tried and when.
 - **Every fetch records why you are entitled to the file.** Five options, in plain words: it is
   mine, the creator offers it, public domain, licensed to me, I bought it. The helper refuses a
   request without one. The app cannot tell whether what you chose is true; you can.
@@ -156,8 +181,9 @@ So there is a supported way to use them, and it is deliberately explicit at ever
   Music, so what you get is another recording of the same song. The app says so on the sheet, in
   those words, because assuming otherwise is the single most common misunderstanding about it.
 - **The hub can do the same thing**, through the external-tool provider that has been there all
-  along: off by default, enabled by an administrator who accepts a rights notice, allowlisted hosts,
-  no cookies. The image now ships yt-dlp so enabling it is a toggle rather than an install.
+  along, and that is unchanged by the 2026-09-27 decision: off by default, enabled by an
+  administrator who accepts a rights notice, allowlisted hosts, no cookies. The image ships yt-dlp so
+  enabling it is a toggle rather than an install — but it stays a toggle an administrator chooses.
 - **The Android app carries it**, and that is a change of posture worth naming rather than sliding
   past. Until it existed, someone had to go and install yt-dlp themselves, and that was itself a
   decision; in the app it arrives bundled. What stands in for that decision is the per-fetch rights

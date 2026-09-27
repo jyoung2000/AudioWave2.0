@@ -6,9 +6,9 @@ var __export = (target, all) => {
 };
 
 // src/cli.ts
-import { mkdirSync as mkdirSync3, mkdtempSync, rmSync as rmSync3 } from "node:fs";
+import { mkdirSync as mkdirSync4, mkdtempSync as mkdtempSync2, rmSync as rmSync3 } from "node:fs";
 import { spawn as spawn2 } from "node:child_process";
-import { dirname as dirname2, join as join6, resolve as resolve2 } from "node:path";
+import { dirname as dirname2, join as join8, resolve as resolve2 } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // ../node_modules/zod/v4/classic/external.js
@@ -1315,9 +1315,9 @@ var Class = class {
   constructor(..._args) {
   }
 };
-function members(proto, table) {
-  for (const key in table) {
-    const desc = Object.getOwnPropertyDescriptor(table, key);
+function members(proto, table2) {
+  for (const key in table2) {
+    const desc = Object.getOwnPropertyDescriptor(table2, key);
     if (desc.get)
       Object.defineProperty(proto, key, { ...desc, enumerable: false });
     else
@@ -19939,6 +19939,22 @@ var SharePayload = external_exports.object({
   hubName: external_exports.string()
 });
 
+// ../packages/contracts/src/entities/radio.ts
+var StationNowPlaying = external_exports.object({
+  raw: external_exports.string().max(500).nullable(),
+  artist: external_exports.string().max(300).nullable(),
+  title: external_exports.string().max(300).nullable(),
+  station: external_exports.string().max(200).nullable(),
+  reason: external_exports.string().max(200).nullable()
+});
+var GroupRequestResult = external_exports.object({
+  queued: external_exports.boolean(),
+  title: external_exports.string().nullable(),
+  artistName: external_exports.string().nullable(),
+  position: external_exports.number().int().positive().nullable(),
+  reason: external_exports.string().nullable()
+});
+
 // ../packages/contracts/src/realtime/envelope.ts
 var Envelope = external_exports.object({
   eventId: Uuid,
@@ -20471,6 +20487,7 @@ var routes = {
   providersConfigGet: defineRoute({ method: "GET", path: "/providers/:provider/config", operationId: "getProviderConfig", summary: "Application-level provider configuration (secrets masked)", tags: ["providers"], auth: "admin", params: external_exports.object({ provider: ProviderId }), response: ProviderAppConfigView }),
   providersConfigPut: defineRoute({ method: "PUT", path: "/providers/:provider/config", operationId: "putProviderConfig", summary: "Set application credentials once (admin); never returned", tags: ["providers"], auth: "admin", rateLimit: "write", params: external_exports.object({ provider: ProviderId }), body: ProviderAppConfigInput.omit({ provider: true }), response: ProviderAppConfigView }),
   providersTest: defineRoute({ method: "POST", path: "/providers/:provider/test", operationId: "testProvider", summary: "Test provider connectivity/credentials", tags: ["providers"], auth: "admin", params: external_exports.object({ provider: ProviderId }), response: external_exports.object({ ok: external_exports.boolean(), latencyMs: external_exports.number().nullable(), message: external_exports.string() }) }),
+  radioNowPlaying: defineRoute({ method: "GET", path: "/radio/now-playing", operationId: "radioNowPlaying", summary: "The song an internet radio station says it is playing, read from its ICY metadata", tags: ["search"], auth: "admin-or-device", scopes: ["search:use"], rateLimit: "search", query: external_exports.object({ url: external_exports.string().min(1).max(2048) }), response: StationNowPlaying }),
   providersResolve: defineRoute({ method: "GET", path: "/providers/resolve", operationId: "resolveUrl", summary: "Resolve a pasted URL or id to a capability-annotated result", tags: ["providers"], auth: "admin-or-device", scopes: ["search:use"], rateLimit: "search", query: external_exports.object({ url: external_exports.string().min(1).max(2048) }), response: SearchResult }),
   providersUsage: defineRoute({ method: "GET", path: "/providers/usage", operationId: "providerUsage", summary: "Quota budgets, circuit state and request classes", tags: ["providers"], auth: "admin", response: external_exports.object({ items: external_exports.array(external_exports.object({ provider: ProviderId, health: ProviderHealth, budget: external_exports.object({ perMinute: external_exports.number(), perDay: external_exports.number().nullable(), usedMinute: external_exports.number(), usedDay: external_exports.number(), shedding: external_exports.array(external_exports.string()) }), queueDepth: external_exports.record(external_exports.string(), external_exports.number()), concurrency: external_exports.object({ limit: external_exports.number(), inFlight: external_exports.number() }) })) }) }),
   artistReleases: defineRoute({ method: "GET", path: "/artists/releases", operationId: "latestReleases", summary: "Latest releases from MusicBrainz plus enabled playback providers", tags: ["discovery"], auth: "admin-or-device", scopes: ["search:use"], rateLimit: "search", query: external_exports.object({ mbid: external_exports.string().optional(), name: external_exports.string().optional(), refresh: external_exports.coerce.boolean().default(false) }), response: LatestReleasesResponse }),
@@ -20499,6 +20516,7 @@ var routes = {
   groupsMemberRevoke: defineRoute({ method: "DELETE", path: "/groups/:groupId/members/:memberId", operationId: "revokeMember", summary: "Remove a member", tags: ["groups"], auth: "admin-or-device", scopes: ["group:admin"], params: groupParams.extend({ memberId: external_exports.string() }), response: Ok }),
   groupsMemberRole: defineRoute({ method: "PATCH", path: "/groups/:groupId/members/:memberId", operationId: "setMemberRole", summary: "Change a member role or sharing flag", tags: ["groups"], auth: "admin-or-device", params: groupParams.extend({ memberId: external_exports.string() }), body: external_exports.object({ role: GroupRole.exclude(["owner"]).optional(), shareAggregate: external_exports.boolean().optional() }), response: GroupMemberView }),
   groupsQueueGet: defineRoute({ method: "GET", path: "/groups/:groupId/queue", operationId: "getGroupQueue", summary: "Authoritative queue + playback", tags: ["groups"], auth: "admin-or-device", params: groupParams, response: external_exports.object({ queue: Queue, playback: GroupPlaybackState, serverTime: IsoDateTime }) }),
+  groupsRequest: defineRoute({ method: "POST", path: "/groups/:groupId/requests", operationId: "requestInGroup", summary: 'Queue a song by what it is called ("Artist - Title" or a link): the hub finds a playable copy and appends it, as a Discord /play would', tags: ["groups"], auth: "admin-or-device", scopes: ["group:member"], rateLimit: "write", params: groupParams, body: external_exports.object({ query: external_exports.string().trim().min(1).max(300), idempotencyKey: external_exports.string().min(1).max(120).optional() }), response: GroupRequestResult }),
   groupsQueueCommand: defineRoute({ method: "POST", path: "/groups/:groupId/queue/commands", operationId: "groupQueueCommand", summary: "Revisioned, idempotent queue command", tags: ["groups"], auth: "admin-or-device", scopes: ["group:member"], rateLimit: "write", params: groupParams, body: external_exports.object({ idempotencyKey: external_exports.string().min(1).max(120), baseRevision: external_exports.number().int().nonnegative(), command: QueueCommand }), response: QueueCommandResult }),
   groupsHistoryList: defineRoute({ method: "GET", path: "/groups/:groupId/history", operationId: "listGroupHistory", summary: "Group history (JSON)", tags: ["groups"], auth: "admin-or-device", params: groupParams, query: PagingQuery, response: Paged(GroupHistoryEntry) }),
   groupsHistoryExportCsv: defineRoute({ method: "GET", path: "/groups/:groupId/history.csv", operationId: "exportGroupHistoryCsv", summary: "RFC-4180 CSV export (UTF-8, schema_version column)", tags: ["groups"], auth: "admin-or-device", params: groupParams, response: external_exports.string(), responseContentType: "text/csv; charset=utf-8" }),
@@ -20625,6 +20643,11 @@ var HELPER_DEFAULT_PORT = 17342;
 var HELPER_PORT_SCAN = 4;
 var HELPER_TOKEN_META = "np-helper-token";
 var HelperToolId = external_exports.enum(["yt-dlp", "spotdl", "ffmpeg"]);
+var HelperToolSetup = external_exports.object({
+  state: external_exports.enum(["ready", "installing", "failed", "unsupported"]),
+  progress: external_exports.number().min(0).max(1).optional(),
+  reason: external_exports.string().max(400).optional()
+});
 var HelperTool = external_exports.object({
   id: HelperToolId,
   present: external_exports.boolean(),
@@ -20633,8 +20656,10 @@ var HelperTool = external_exports.object({
   origin: external_exports.enum(["path", "installed", "configured", "missing"]),
   /** What to do about it when it is missing, written for the person reading it. */
   installHint: external_exports.string().max(400).nullable().default(null),
-  /** True when the helper can fetch and verify a pinned release of this tool on request. */
-  installable: external_exports.boolean().default(false)
+  /** True when the helper can fetch this tool's current release here and verify its published SHA-256. */
+  installable: external_exports.boolean().default(false),
+  /** Automatic setup's progress for this tool (since protocol 1, optional). */
+  setup: HelperToolSetup.optional()
 });
 var HelperHealth = external_exports.object({
   helper: external_exports.literal("now-playing-local-helper"),
@@ -20702,6 +20727,8 @@ var HELPER_ROUTES = {
   health: "/helper/v1/health",
   fetch: "/helper/v1/fetch",
   backupEstimate: "/helper/v1/backup/estimate",
+  /** `?url=` — what a radio station says it is playing (StationNowPlaying). No token: it only ever reads a public stream. */
+  radioNowPlaying: "/helper/v1/radio/now-playing",
   install: (tool) => `/helper/v1/tools/${tool}/install`,
   job: (id) => `/helper/v1/jobs/${encodeURIComponent(id)}`,
   file: (jobId, fileId) => `/helper/v1/jobs/${encodeURIComponent(jobId)}/files/${encodeURIComponent(fileId)}`
@@ -20823,8 +20850,10 @@ var HELP = `now-playing-helper \u2014 run yt-dlp and spotDL for the Now Playing 
   loopback address and runs the tools on its behalf, so the two share an origin
   and there is nothing to configure.
 
-  It does not ship the tools. It finds what you have installed, and it can fetch
-  yt-dlp for you \u2014 verified against the checksums published with that release.
+  It does not ship the tools. It uses what you have installed, and on start it
+  sets up whatever is missing \u2014 yt-dlp, spotDL and, on Windows, FFmpeg \u2014 in its
+  own tools folder, each checked against the SHA-256 its project published on
+  GitHub for that release. Nothing unverified is ever run.
 
 Usage
   now-playing-helper [options]
@@ -20837,7 +20866,11 @@ Options
   --allow-origin <o>    Let a player on this origin call the helper (repeatable)
   --allow-host <h>      Add a host the tools may fetch from (repeatable)
   --only-hosts <a,b>    Replace the host allowlist entirely
-  --tools-dir <path>    Where an installed yt-dlp is kept
+  --tools-dir <path>    Where the tools it sets up are kept (default: "tools" in
+                        %LOCALAPPDATA%\\NowPlaying, ~/Library/Application Support/
+                        NowPlaying or ~/.local/share/now-playing)
+  --no-auto-tools       Do not set up missing tools on start, and do not update
+                        the yt-dlp it set up; use only what is already installed
   --music-dir <path>    Music folder, measured for the backup size estimate
   --tv-dir <path>       TV folder, measured likewise
   --movies-dir <path>   Movies folder, measured likewise
@@ -20871,6 +20904,7 @@ function parseArgs(argv) {
     timeoutMs: 9e5,
     backup: { folders: {}, backupDir: null },
     tools: {},
+    autoTools: true,
     help: false,
     showVersion: false
   };
@@ -20922,6 +20956,12 @@ function parseArgs(argv) {
       }
       case "--tools-dir":
         options.toolsDir = next();
+        break;
+      case "--no-auto-tools":
+        options.autoTools = false;
+        break;
+      case "--auto-tools":
+        options.autoTools = true;
         break;
       case "--music-dir":
         options.backup.folders.music = next();
@@ -21160,6 +21200,11 @@ function validateOutboundUrl(input2, options = { allowedHosts: [] }) {
   }
   return { ok: true, url: url2 };
 }
+function isResolvedAddressAllowed(addresses) {
+  if (!addresses.length) return { ok: false, reason: "No addresses resolved" };
+  const bad = addresses.find((a) => isPrivateAddress(a));
+  return bad ? { ok: false, reason: `Resolved to a private address (${bad})` } : { ok: true };
+}
 var WINDOWS_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i;
 var UNSAFE_FILENAME_CHARS = /[\x00-\x1f<>:"/\\|?*]/g;
 function sanitizeFilename(name, options = {}) {
@@ -21210,6 +21255,76 @@ var DEFAULT_DISCORD_TEMPLATES = {
 // ../packages/domain/src/permissions.ts
 var DISCORD_MINIMAL_PERMISSIONS = 1n << 10n | 1n << 11n | 1n << 14n | 1n << 16n | 1n << 20n | 1n << 21n | 1n << 31n;
 
+// ../packages/domain/src/icy.ts
+var IcyReader = class {
+  constructor(metaint) {
+    this.metaint = metaint;
+    if (!Number.isInteger(metaint) || metaint <= 0) throw new RangeError("icy-metaint must be a positive integer");
+    this.audioLeft = metaint;
+  }
+  metaint;
+  audioLeft;
+  metaLeft = -1;
+  meta = [];
+  /** Returns the text of every non-empty metadata block completed by this chunk. */
+  feed(chunk) {
+    const out = [];
+    let i = 0;
+    while (i < chunk.length) {
+      if (this.audioLeft > 0) {
+        const skip = Math.min(this.audioLeft, chunk.length - i);
+        this.audioLeft -= skip;
+        i += skip;
+        continue;
+      }
+      if (this.metaLeft < 0) {
+        this.metaLeft = chunk[i] * 16;
+        this.meta = [];
+        i += 1;
+      } else {
+        const take = Math.min(this.metaLeft, chunk.length - i);
+        for (let k = 0; k < take; k++) this.meta.push(chunk[i + k]);
+        this.metaLeft -= take;
+        i += take;
+      }
+      if (this.metaLeft === 0) {
+        const text = decodeMeta(Uint8Array.from(this.meta));
+        if (text) out.push(text);
+      }
+      if (this.metaLeft <= 0 && this.metaLeft !== -1) {
+        this.metaLeft = -1;
+        this.audioLeft = this.metaint;
+      }
+    }
+    return out;
+  }
+};
+function decodeMeta(bytes) {
+  let end = bytes.length;
+  while (end > 0 && bytes[end - 1] === 0) end -= 1;
+  const body = bytes.subarray(0, end);
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(body).trim();
+  } catch {
+    return new TextDecoder("latin1").decode(body).trim();
+  }
+}
+function parseStreamTitle(meta3) {
+  const match = /StreamTitle='(.*?)';/s.exec(meta3) ?? /StreamTitle='(.*)'\s*$/s.exec(meta3);
+  const title = match?.[1]?.trim();
+  return title ? title : null;
+}
+function splitOnAir(value) {
+  const text = value.trim();
+  if (!/[\p{L}\p{N}]/u.test(text)) return null;
+  const at = text.indexOf(" - ");
+  if (at < 0) return text ? { artist: null, title: text } : null;
+  const artist = text.slice(0, at).trim();
+  const title = text.slice(at + 3).trim();
+  if (!title) return artist ? { artist: null, title: artist } : null;
+  return { artist: artist || null, title };
+}
+
 // src/security.ts
 function newToken() {
   return randomBytes2(24).toString("base64url");
@@ -21220,10 +21335,20 @@ function tokenMatches(expected, supplied) {
   const b = Buffer.from(supplied);
   return a.length === b.length && timingSafeEqual2(a, b);
 }
+var LOOPBACK_HOSTS = /* @__PURE__ */ new Set(["127.0.0.1", "localhost", "[::1]"]);
+function isLoopbackPage(origin) {
+  try {
+    const url2 = new URL(origin);
+    return (url2.protocol === "http:" || url2.protocol === "https:") && LOOPBACK_HOSTS.has(url2.hostname) && url2.origin === origin;
+  } catch {
+    return false;
+  }
+}
 function originAllowed(policy, origin) {
   if (origin === void 0) return true;
   if (origin === "null" || origin === "") return false;
   if (policy.self && selfOrigins(policy.self).includes(origin)) return true;
+  if (policy.loopbackPages && isLoopbackPage(origin)) return true;
   return policy.allowed.includes(origin);
 }
 function selfOrigins(self) {
@@ -21342,44 +21467,82 @@ function createEstimator(options) {
 
 // src/jobs.ts
 import { execFile as execFile2, spawn } from "node:child_process";
-import { mkdirSync as mkdirSync2, readdirSync, rmSync as rmSync2, statSync as statSync3 } from "node:fs";
+import { mkdirSync, readdirSync, rmSync, statSync as statSync3 } from "node:fs";
 import { homedir as homedir2, tmpdir as tmpdir2 } from "node:os";
 import { join as join5, extname as extname2 } from "node:path";
-import { randomUUID as randomUUID2 } from "node:crypto";
+import { randomUUID } from "node:crypto";
 
 // src/tools.ts
-import { createHash, randomUUID } from "node:crypto";
-import { chmodSync, existsSync as existsSync2, mkdirSync, renameSync, rmSync, statSync as statSync2, writeFileSync } from "node:fs";
+import { existsSync as existsSync2, statSync as statSync2 } from "node:fs";
 import { execFile } from "node:child_process";
-import { delimiter, join as join4 } from "node:path";
+import { basename, delimiter, join as join4 } from "node:path";
 import { promisify } from "node:util";
+
+// src/sources.ts
+function ytDlpAsset(platform = process.platform, arch = process.arch) {
+  if (platform === "win32") return arch === "ia32" ? "yt-dlp_x86.exe" : arch === "arm64" ? "yt-dlp_arm64.exe" : "yt-dlp.exe";
+  if (platform === "darwin") return "yt-dlp_macos";
+  if (platform !== "linux") return null;
+  if (arch === "arm64") return "yt-dlp_linux_aarch64";
+  return arch === "x64" ? "yt-dlp_linux" : null;
+}
+function spotdlPattern(platform, arch) {
+  if (platform === "win32" && arch !== "ia32") return /^spotdl-v?\d[\w.+-]*-win32\.exe$/i;
+  if (platform === "linux" && arch === "x64") return /^spotdl-v?\d[\w.+-]*-linux$/i;
+  if (platform === "darwin") return /^spotdl-v?\d[\w.+-]*-darwin$/i;
+  return null;
+}
+function ffmpegAsset(platform, arch) {
+  if (platform !== "win32") return null;
+  if (arch === "x64") return "ffmpeg-master-latest-win64-gpl.zip";
+  if (arch === "arm64") return "ffmpeg-master-latest-winarm64-gpl.zip";
+  return null;
+}
+function toolSource(id, platform = process.platform, arch = process.arch) {
+  if (id === "yt-dlp") {
+    const name2 = ytDlpAsset(platform, arch);
+    return name2 ? { repo: "yt-dlp/yt-dlp", asset: (names) => names.includes(name2) ? name2 : null, sums: "SHA2-256SUMS", kind: "binary" } : null;
+  }
+  if (id === "spotdl") {
+    const pattern = spotdlPattern(platform, arch);
+    return pattern ? { repo: "spotDL/spotify-downloader", asset: (names) => names.find((n) => pattern.test(n)) ?? null, sums: null, kind: "binary" } : null;
+  }
+  const name = ffmpegAsset(platform, arch);
+  return name ? { repo: "BtbN/FFmpeg-Builds", asset: (names) => names.includes(name) ? name : null, sums: "checksums.sha256", kind: "zip" } : null;
+}
+function binaryName(id, platform = process.platform) {
+  return platform === "win32" ? `${id}.exe` : id;
+}
+function digestFor(sums, asset) {
+  for (const line of sums.split(/\r?\n/)) {
+    const match = /^([a-f0-9]{64})\s+\*?(.+)$/i.exec(line.trim());
+    if (match && match[2] === asset) return match[1].toLowerCase();
+  }
+  return null;
+}
+
+// src/tools.ts
 var run = promisify(execFile);
-var YT_DLP_LATEST = "https://github.com/yt-dlp/yt-dlp/releases/latest/download";
-var INSTALL_HINTS = {
-  "yt-dlp": "Not installed. The player can fetch it for you, or install it yourself: pipx install yt-dlp (or brew install yt-dlp, or winget install yt-dlp).",
-  spotdl: "Not installed. Install it with: pipx install spotdl \u2014 the helper does not fetch this one, because its releases cannot be checksum-verified the way yt-dlp\u2019s can.",
-  ffmpeg: "Not installed. Without it nothing can be converted and yt-dlp takes whatever single audio stream a site offers. Install it with: brew install ffmpeg, apt install ffmpeg, or winget install ffmpeg."
-};
-var BINARY_NAMES = {
-  "yt-dlp": process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp",
-  spotdl: process.platform === "win32" ? "spotdl.exe" : "spotdl",
-  ffmpeg: process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg"
-};
+function installHint(id, installable) {
+  if (installable) return `Not set up yet. The helper downloads ${id} from its project\u2019s GitHub release and checks it against the published SHA-256 before using it.`;
+  if (id === "ffmpeg") return "Not installed. Without it nothing can be converted and yt-dlp takes whatever single audio stream a site offers. Install it with your package manager: brew install ffmpeg, apt install ffmpeg or dnf install ffmpeg.";
+  return `Not installed, and no ${id} build is published for this system. Install it with: pipx install ${id}.`;
+}
 async function resolveTool(id, options) {
-  const installable = id === "yt-dlp";
+  const installable = toolSource(id) !== null;
   const candidates = [];
   const configured = options.configured[id];
   if (configured) candidates.push({ path: configured, origin: "configured" });
-  const installed = join4(options.toolsDir, BINARY_NAMES[id]);
+  const installed = join4(options.toolsDir, binaryName(id));
   if (existsSync2(installed)) candidates.push({ path: installed, origin: "installed" });
-  const onPath = findOnPath(BINARY_NAMES[id]);
+  const onPath = findOnPath(binaryName(id));
   if (onPath) candidates.push({ path: onPath, origin: "path" });
   for (const candidate of candidates) {
-    const version2 = await versionOf(candidate.path);
+    const version2 = await versionOf(candidate.path, id, id === "spotdl" ? 3e4 : 8e3);
     if (version2 === null) continue;
     return { id, present: true, version: version2, origin: candidate.origin, installHint: null, installable, path: candidate.path };
   }
-  return { id, present: false, version: null, origin: "missing", installHint: INSTALL_HINTS[id], installable, path: null };
+  return { id, present: false, version: null, origin: "missing", installHint: installHint(id, installable), installable, path: null };
 }
 async function resolveAll(options) {
   const [ytDlp, spotdl, ffmpeg] = await Promise.all([resolveTool("yt-dlp", options), resolveTool("spotdl", options), resolveTool("ffmpeg", options)]);
@@ -21419,10 +21582,14 @@ function cachedResolver(options, ttlMs = 3e4, now = Date.now) {
 function toolCommand(path) {
   return /\.(?:mjs|cjs|js)$/i.test(path) ? { command: process.execPath, prefix: [path] } : { command: path, prefix: [] };
 }
-async function versionOf(path) {
+function versionFlag(path, id) {
+  if (id === "ffmpeg") return "-version";
+  return /^(?:ffmpeg|ffprobe)(?:\.exe)?$/i.test(basename(path)) ? "-version" : "--version";
+}
+async function versionOf(path, id, timeoutMs = 8e3) {
   try {
     const { command, prefix } = toolCommand(path);
-    const { stdout } = await run(command, [...prefix, "--version"], { timeout: 8e3, windowsHide: true, maxBuffer: 1024 * 256 });
+    const { stdout } = await run(command, [...prefix, versionFlag(path, id)], { timeout: timeoutMs, windowsHide: true, maxBuffer: 1024 * 256 });
     const first = stdout.split(/\r?\n/)[0]?.trim() ?? "";
     return first.slice(0, 120) || null;
   } catch {
@@ -21440,59 +21607,6 @@ function findOnPath(binary, env = process.env) {
       } catch {
       }
     }
-  }
-  return null;
-}
-async function installYtDlp(toolsDir, fetchImpl = fetch) {
-  const asset = ytDlpAsset();
-  if (!asset) return { installed: false, version: null, reason: `There is no published yt-dlp build for ${process.platform}/${process.arch}. Install it with pipx instead.` };
-  let binary;
-  let sums;
-  try {
-    const [binaryResponse, sumsResponse] = await Promise.all([fetchImpl(`${YT_DLP_LATEST}/${asset}`, { redirect: "follow" }), fetchImpl(`${YT_DLP_LATEST}/SHA2-256SUMS`, { redirect: "follow" })]);
-    if (!binaryResponse.ok) return { installed: false, version: null, reason: `The download failed: ${binaryResponse.status} ${binaryResponse.statusText}` };
-    if (!sumsResponse.ok) return { installed: false, version: null, reason: `The checksum file could not be read: ${sumsResponse.status}. Nothing was installed.` };
-    binary = new Uint8Array(await binaryResponse.arrayBuffer());
-    sums = await sumsResponse.text();
-  } catch (error61) {
-    return { installed: false, version: null, reason: `The download could not be started: ${error61 instanceof Error ? error61.message : String(error61)}` };
-  }
-  const expected = digestFor(sums, asset);
-  if (!expected) return { installed: false, version: null, reason: `The release publishes no checksum for ${asset}, so it was not installed.` };
-  const actual = createHash("sha256").update(binary).digest("hex");
-  if (actual !== expected) return { installed: false, version: null, reason: `The downloaded file did not match its published checksum, so it was discarded.` };
-  mkdirSync(toolsDir, { recursive: true });
-  const target = join4(toolsDir, BINARY_NAMES["yt-dlp"]);
-  const temporary = `${target}.${randomUUID()}.part`;
-  try {
-    writeFileSync(temporary, binary);
-    if (process.platform !== "win32") chmodSync(temporary, 493);
-    renameSync(temporary, target);
-  } catch (error61) {
-    rmSync(temporary, { force: true });
-    const locked = ["EBUSY", "EPERM", "EACCES"].includes(error61.code ?? "");
-    return {
-      installed: false,
-      version: null,
-      reason: locked ? "The existing yt-dlp is in use and could not be replaced. Wait for running downloads to finish and try again." : `The verified file could not be saved: ${error61 instanceof Error ? error61.message : String(error61)}`
-    };
-  }
-  const version2 = await versionOf(target);
-  if (!version2) return { installed: false, version: null, reason: "The downloaded file was verified but would not report a version, so it is not being used." };
-  return { installed: true, version: version2, reason: null };
-}
-function ytDlpAsset(platform = process.platform, arch = process.arch) {
-  if (platform === "win32") return arch === "ia32" ? "yt-dlp_x86.exe" : "yt-dlp.exe";
-  if (platform === "darwin") return "yt-dlp_macos";
-  if (platform !== "linux") return null;
-  if (arch === "arm64") return "yt-dlp_linux_aarch64";
-  if (arch === "arm") return "yt-dlp_linux_armv7l";
-  return arch === "x64" ? "yt-dlp_linux" : null;
-}
-function digestFor(sums, asset) {
-  for (const line of sums.split(/\r?\n/)) {
-    const match = /^([a-f0-9]{64})\s+\*?(.+)$/i.exec(line.trim());
-    if (match && match[2] === asset) return match[1].toLowerCase();
   }
   return null;
 }
@@ -21520,19 +21634,19 @@ var CONTENT_TYPES = {
 var Jobs = class {
   constructor(options) {
     this.options = options;
-    mkdirSync2(join5(options.workDir, "jobs"), { recursive: true });
+    mkdirSync(join5(options.workDir, "jobs"), { recursive: true });
   }
   options;
   records = /* @__PURE__ */ new Map();
   queue = [];
   active = null;
   create(request) {
-    const id = randomUUID2();
+    const id = randomUUID();
     const root = join5(this.options.workDir, "jobs", id);
     const directory = join5(root, "out");
     const home = join5(root, "home");
-    mkdirSync2(directory, { recursive: true });
-    mkdirSync2(home, { recursive: true });
+    mkdirSync(directory, { recursive: true });
+    mkdirSync(home, { recursive: true });
     const job = {
       id,
       state: "queued",
@@ -21608,7 +21722,7 @@ var Jobs = class {
   }
   remove(path) {
     try {
-      rmSync2(path, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+      rmSync(path, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     } catch (error61) {
       this.options.log?.(`could not remove a job directory: ${error61.code ?? "error"}`);
     }
@@ -21708,7 +21822,7 @@ var Jobs = class {
       const extension = extname2(name).toLowerCase();
       if (!AUDIO_EXTENSIONS.has(extension)) continue;
       const absolute = join5(record2.directory, name);
-      const id = randomUUID2();
+      const id = randomUUID();
       record2.paths.set(id, absolute);
       files.push({
         id,
@@ -21815,6 +21929,682 @@ function lastMeaningfulLine(stderr) {
   return last ? last.replace(/^ERROR:\s*/i, "").slice(0, 600) : null;
 }
 
+// ../packages/domain/src/radio-node.ts
+import { lookup as dnsLookup } from "node:dns";
+import http from "node:http";
+import https from "node:https";
+import net from "node:net";
+import tls from "node:tls";
+var MAX_REDIRECTS = 3;
+function none(reason, station = null) {
+  return { raw: null, artist: null, title: null, station, reason };
+}
+async function readStationTitle(input2, options = {}) {
+  const timeoutMs = options.timeoutMs ?? 8e3;
+  const deadline = Date.now() + timeoutMs;
+  let url2 = input2;
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    const checked = validateOutboundUrl(url2, { allowedHosts: [], allowAnyHost: true, allowedSchemes: ["http:", "https:"] });
+    if (!checked.ok) {
+      const privateOnly = checked.reason === "Private or local addresses are blocked";
+      if (!(privateOnly && options.allowPrivateNetworkForTests)) return none(checked.reason ?? "That address cannot be read");
+    }
+    const left = deadline - Date.now();
+    if (left <= 0) return none("The station did not answer in time");
+    const outcome = await once(url2, { ...options, timeoutMs: left });
+    if ("redirect" in outcome) {
+      url2 = new URL(outcome.redirect, url2).toString();
+      continue;
+    }
+    return outcome;
+  }
+  return none("The station redirected too many times");
+}
+function once(url2, options) {
+  return new Promise((resolve3) => {
+    const target = new URL(url2);
+    const client = target.protocol === "https:" ? https : http;
+    const maxBytes = options.maxBytes ?? 512 * 1024;
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      request.destroy();
+      resolve3(value);
+    };
+    const lookup = (hostname3, lookupOptions, callback) => {
+      dnsLookup(hostname3, { ...lookupOptions, all: true }, (err, addresses) => {
+        if (err) return callback(err, "", 0);
+        const list = addresses;
+        const verdict = isResolvedAddressAllowed(list.map((a) => a.address));
+        if (!verdict.ok && !options.allowPrivateNetworkForTests) return callback(new Error(verdict.reason ?? "Blocked address"), "", 0);
+        if (lookupOptions.all) return callback(null, list);
+        const first = list[0];
+        return callback(null, first.address, first.family);
+      });
+    };
+    const request = client.get(
+      target,
+      {
+        headers: { "Icy-MetaData": "1", "User-Agent": options.userAgent ?? "NowPlaying/1.0", Accept: "*/*" },
+        lookup,
+        // SHOUTcast v1 answers "ICY 200 OK" and headers that are not quite HTTP.
+        insecureHTTPParser: true
+      },
+      (response) => {
+        const status = response.statusCode ?? 0;
+        if (status >= 300 && status < 400 && response.headers.location) return finish({ redirect: response.headers.location });
+        if (status !== 200) return finish(none(`The station answered ${status}`));
+        const feed = titleConsumer(response.headers, maxBytes, finish);
+        if (!feed) return;
+        response.on("data", feed);
+        response.on("end", () => finish(none("The station sent no song title", headerText(response.headers["icy-name"]))));
+        response.on("error", () => finish(none("The station stopped sending", headerText(response.headers["icy-name"]))));
+      }
+    );
+    request.on("error", (err) => {
+      if (/^HPE_/.test(err.code ?? "") && !settled) {
+        settled = true;
+        clearTimeout(timer);
+        request.destroy();
+        void rawOnce(target, options, lookup, maxBytes).then(resolve3);
+        return;
+      }
+      finish(none(/private/i.test(err.message) ? "Private or local addresses are blocked" : "The station could not be reached"));
+    });
+    const timer = setTimeout(() => finish(none("The station did not answer in time")), options.timeoutMs);
+  });
+}
+function titleConsumer(headers, maxBytes, finish) {
+  const stationName = headerText(headers["icy-name"]);
+  const metaint = Number.parseInt(headerText(headers["icy-metaint"]) ?? "", 10);
+  if (!Number.isInteger(metaint) || metaint <= 0 || metaint > 256 * 1024) {
+    finish(none("This station does not send song titles", stationName));
+    return null;
+  }
+  const reader = new IcyReader(metaint);
+  let seen = 0;
+  let blocks = 0;
+  return (chunk) => {
+    seen += chunk.length;
+    for (const meta3 of reader.feed(chunk)) {
+      blocks += 1;
+      const raw = parseStreamTitle(meta3);
+      if (raw) {
+        const parts = splitOnAir(raw);
+        finish({ raw, artist: parts?.artist ?? null, title: parts?.title ?? null, station: stationName, reason: parts ? null : "The station sent no song title" });
+        return;
+      }
+    }
+    if (blocks >= 2 || seen > maxBytes) finish(none("The station sent no song title", stationName));
+  };
+}
+function rawOnce(target, options, lookup, maxBytes) {
+  return new Promise((resolve3) => {
+    const secure = target.protocol === "https:";
+    const port = Number(target.port) || (secure ? 443 : 80);
+    const socket = secure ? tls.connect({ host: target.hostname, port, servername: target.hostname, lookup }) : net.connect({ host: target.hostname, port, lookup });
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      socket.destroy();
+      resolve3(value);
+    };
+    const timer = setTimeout(() => finish(none("The station did not answer in time")), options.timeoutMs);
+    let head = Buffer.alloc(0);
+    let feed = null;
+    socket.on(secure ? "secureConnect" : "connect", () => {
+      socket.write(`GET ${target.pathname}${target.search} HTTP/1.0\r
+Host: ${target.host}\r
+Icy-MetaData: 1\r
+User-Agent: ${options.userAgent ?? "NowPlaying/1.0"}\r
+Accept: */*\r
+\r
+`);
+    });
+    socket.on("data", (chunk) => {
+      if (feed) return feed(chunk);
+      head = Buffer.concat([head, chunk]);
+      const end = head.indexOf("\r\n\r\n");
+      if (end < 0) {
+        if (head.length > 16 * 1024) finish(none("The station sent a reply this cannot read"));
+        return;
+      }
+      const lines = head.subarray(0, end).toString("latin1").split("\r\n");
+      const status = /^(?:ICY|HTTP\/1\.[01]) (\d{3})/.exec(lines[0] ?? "");
+      if (!status) return finish(none("The station sent a reply this cannot read"));
+      const headers = {};
+      for (const line of lines.slice(1)) {
+        const at = line.indexOf(":");
+        if (at > 0) headers[line.slice(0, at).trim().toLowerCase()] = line.slice(at + 1).trim();
+      }
+      const code = Number(status[1]);
+      if (code >= 300 && code < 400 && headers["location"]) return finish({ redirect: headers["location"] });
+      if (code !== 200) return finish(none(`The station answered ${code}`));
+      feed = titleConsumer(headers, maxBytes, finish);
+      const rest = head.subarray(end + 4);
+      if (feed && rest.length) feed(rest);
+    });
+    socket.on("end", () => finish(none("The station sent no song title")));
+    socket.on("error", (err) => finish(none(/private/i.test(err.message) ? "Private or local addresses are blocked" : "The station could not be reached")));
+  });
+}
+function headerText(value) {
+  const first = Array.isArray(value) ? value[0] : value;
+  return first?.trim() || null;
+}
+
+// src/provision.ts
+import { mkdirSync as mkdirSync3, readFileSync as readFileSync2, renameSync as renameSync2, writeFileSync as writeFileSync2 } from "node:fs";
+import { join as join7 } from "node:path";
+
+// src/install.ts
+import { createHash } from "node:crypto";
+import { chmodSync, mkdirSync as mkdirSync2, mkdtempSync, renameSync, rmSync as rmSync2, writeFileSync } from "node:fs";
+import { open as open2 } from "node:fs/promises";
+import { join as join6 } from "node:path";
+
+// src/zip.ts
+import { closeSync, fstatSync, openSync, readSync } from "node:fs";
+import { inflateRawSync } from "node:zlib";
+var ZipError = class extends Error {
+  name = "ZipError";
+};
+var EOCD = 101010256;
+var ZIP64_LOCATOR = 117853008;
+var ZIP64_EOCD = 101075792;
+var CENTRAL = 33639248;
+var LOCAL = 67324752;
+var MAX_ENTRY_BYTES = 1024 * 1024 * 1024;
+function withZipFile(path, use) {
+  const fd = openSync(path, "r");
+  try {
+    const size = fstatSync(fd).size;
+    const source = {
+      size,
+      read: (offset, length) => {
+        if (offset < 0 || offset + length > size) throw new ZipError("The archive is truncated.");
+        const buffer = Buffer.alloc(length);
+        let done = 0;
+        while (done < length) {
+          const n = readSync(fd, buffer, done, length - done, offset + done);
+          if (n === 0) throw new ZipError("The archive is truncated.");
+          done += n;
+        }
+        return buffer;
+      }
+    };
+    return use(openZip(source));
+  } finally {
+    closeSync(fd);
+  }
+}
+function openZip(source) {
+  const end = findEnd(source);
+  let count = end.readUInt16LE(10);
+  let directorySize = end.readUInt32LE(12);
+  let directoryOffset = end.readUInt32LE(16);
+  if (count === 65535 || directorySize === 4294967295 || directoryOffset === 4294967295) {
+    const eocdAt = locateEnd(source);
+    if (eocdAt < 20) throw new ZipError("The archive says it is ZIP64 but has no ZIP64 locator.");
+    const locator = source.read(eocdAt - 20, 20);
+    if (locator.readUInt32LE(0) !== ZIP64_LOCATOR) throw new ZipError("The archive says it is ZIP64 but has no ZIP64 locator.");
+    const recordAt = toNumber(locator.readBigUInt64LE(8));
+    const record2 = source.read(recordAt, 56);
+    if (record2.readUInt32LE(0) !== ZIP64_EOCD) throw new ZipError("The ZIP64 end record is missing.");
+    count = toNumber(record2.readBigUInt64LE(32));
+    directorySize = toNumber(record2.readBigUInt64LE(40));
+    directoryOffset = toNumber(record2.readBigUInt64LE(48));
+  }
+  const directory = source.read(directoryOffset, directorySize);
+  const entries = [];
+  let at = 0;
+  for (let i = 0; i < count; i += 1) {
+    if (at + 46 > directory.length || directory.readUInt32LE(at) !== CENTRAL) throw new ZipError("The central directory is damaged.");
+    const flags = directory.readUInt16LE(at + 8);
+    const method = directory.readUInt16LE(at + 10);
+    const crc = directory.readUInt32LE(at + 16);
+    let compressedSize = directory.readUInt32LE(at + 20);
+    let uncompressedSize = directory.readUInt32LE(at + 24);
+    const nameLength = directory.readUInt16LE(at + 28);
+    const extraLength = directory.readUInt16LE(at + 30);
+    const commentLength = directory.readUInt16LE(at + 32);
+    let localHeaderOffset = directory.readUInt32LE(at + 42);
+    const name = directory.subarray(at + 46, at + 46 + nameLength).toString("utf8");
+    const extra = directory.subarray(at + 46 + nameLength, at + 46 + nameLength + extraLength);
+    for (let e = 0; e + 4 <= extra.length; ) {
+      const id = extra.readUInt16LE(e);
+      const size = extra.readUInt16LE(e + 2);
+      if (id === 1) {
+        let p = e + 4;
+        const next = () => {
+          if (p + 8 > e + 4 + size) throw new ZipError("A ZIP64 field is short.");
+          const value = toNumber(extra.readBigUInt64LE(p));
+          p += 8;
+          return value;
+        };
+        if (uncompressedSize === 4294967295) uncompressedSize = next();
+        if (compressedSize === 4294967295) compressedSize = next();
+        if (localHeaderOffset === 4294967295) localHeaderOffset = next();
+      }
+      e += 4 + size;
+    }
+    if (!safeEntryName(name)) throw new ZipError(`The archive holds an unsafe entry name (${JSON.stringify(name.slice(0, 80))}), so none of it was used.`);
+    entries.push({ name, method, flags, crc32: crc, compressedSize, uncompressedSize, localHeaderOffset });
+    at += 46 + nameLength + extraLength + commentLength;
+  }
+  return { entries, read: (entry) => readEntry(source, entry) };
+}
+function readEntry(source, entry) {
+  if (entry.flags & 1) throw new ZipError(`${entry.name} is encrypted.`);
+  if (entry.uncompressedSize > MAX_ENTRY_BYTES) throw new ZipError(`${entry.name} is larger than anything this reader will unpack.`);
+  const header2 = source.read(entry.localHeaderOffset, 30);
+  if (header2.readUInt32LE(0) !== LOCAL) throw new ZipError(`The local header for ${entry.name} is missing.`);
+  const dataAt = entry.localHeaderOffset + 30 + header2.readUInt16LE(26) + header2.readUInt16LE(28);
+  const raw = source.read(dataAt, entry.compressedSize);
+  let data;
+  if (entry.method === 0) data = Buffer.from(raw);
+  else if (entry.method === 8) {
+    try {
+      data = inflateRawSync(raw, { maxOutputLength: Math.max(1, entry.uncompressedSize) });
+    } catch (error61) {
+      throw new ZipError(`${entry.name} could not be inflated: ${error61 instanceof Error ? error61.message : String(error61)}`);
+    }
+  } else throw new ZipError(`${entry.name} uses compression method ${entry.method}, which this reader does not handle.`);
+  if (data.length !== entry.uncompressedSize) throw new ZipError(`${entry.name} unpacked to the wrong size.`);
+  if (crc32(data) !== entry.crc32 >>> 0) throw new ZipError(`${entry.name} failed its CRC-32 check.`);
+  return data;
+}
+function safeEntryName(name) {
+  if (!name || name.includes("\0")) return false;
+  if (name.startsWith("/") || name.startsWith("\\")) return false;
+  if (/^[a-zA-Z]:/.test(name)) return false;
+  return !name.split(/[\\/]/).some((segment) => segment === "..");
+}
+function findEnd(source) {
+  return source.read(locateEnd(source), 22);
+}
+function locateEnd(source) {
+  if (source.size < 22) throw new ZipError("This is not a zip archive.");
+  const span = Math.min(source.size, 22 + 65535);
+  const tail = source.read(source.size - span, span);
+  for (let i = tail.length - 22; i >= 0; i -= 1) {
+    if (tail.readUInt32LE(i) === EOCD) return source.size - span + i;
+  }
+  throw new ZipError("This is not a zip archive.");
+}
+function toNumber(value) {
+  if (value > BigInt(Number.MAX_SAFE_INTEGER)) throw new ZipError("A size in the archive is out of range.");
+  return Number(value);
+}
+var table = null;
+function crc32(data) {
+  if (!table) {
+    table = new Uint32Array(256);
+    for (let n = 0; n < 256; n += 1) {
+      let c = n;
+      for (let k = 0; k < 8; k += 1) c = c & 1 ? 3988292384 ^ c >>> 1 : c >>> 1;
+      table[n] = c >>> 0;
+    }
+  }
+  let crc = 4294967295;
+  for (let i = 0; i < data.length; i += 1) crc = table[(crc ^ data[i]) & 255] ^ crc >>> 8;
+  return (crc ^ 4294967295) >>> 0;
+}
+
+// src/install.ts
+var USER_AGENT = "NowPlaying-helper";
+var API = "https://api.github.com";
+var ReleaseBody = external_exports.object({
+  tag_name: external_exports.string().min(1).max(200),
+  assets: external_exports.array(
+    external_exports.object({
+      name: external_exports.string().max(300),
+      browser_download_url: external_exports.string().max(2048),
+      size: external_exports.number().int().nonnegative(),
+      digest: external_exports.string().max(200).nullable().optional()
+    })
+  ).max(1e3)
+});
+var Refusal = class extends Error {
+};
+async function latestRelease(repo, options = {}) {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const response = await fetchImpl(`${API}/repos/${repo}/releases/latest`, {
+    headers: { accept: "application/vnd.github+json", "user-agent": USER_AGENT },
+    redirect: "follow",
+    ...options.signal ? { signal: options.signal } : {}
+  });
+  if (!response.ok) throw new Refusal(`GitHub did not answer for ${repo}'s latest release (${response.status}${response.statusText ? ` ${response.statusText}` : ""}).`);
+  const parsed = ReleaseBody.safeParse(await response.json());
+  if (!parsed.success) throw new Refusal(`GitHub's answer for ${repo} was not a release this helper understands.`);
+  return {
+    tag: parsed.data.tag_name,
+    assets: parsed.data.assets.map((asset) => {
+      const match = /^sha256:([a-f0-9]{64})$/i.exec(asset.digest ?? "");
+      return { name: asset.name, url: asset.browser_download_url, size: asset.size, digest: match ? match[1].toLowerCase() : null };
+    })
+  };
+}
+function unsupportedReason(id, platform, arch) {
+  if (id === "ffmpeg") return `FFmpeg is not set up automatically on ${platform === "darwin" ? "macOS" : platform}. Install it with your package manager: brew install ffmpeg, apt install ffmpeg or dnf install ffmpeg.`;
+  return `There is no published ${id} build for ${platform}/${arch}. Install it with pipx install ${id}.`;
+}
+async function installTool(id, options) {
+  const platform = options.platform ?? process.platform;
+  const arch = options.arch ?? process.arch;
+  const source = toolSource(id, platform, arch);
+  if (!source) return { installed: false, version: null, reason: unsupportedReason(id, platform, arch), tag: null };
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const limitMs = options.timeoutMs ?? (id === "ffmpeg" ? 20 * 6e4 : 10 * 6e4);
+  const timeout = AbortSignal.timeout(limitMs);
+  const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
+  const probe = options.probe ?? ((tool, path) => versionOf(path, tool, 6e4));
+  let tag = null;
+  let staging = null;
+  try {
+    if (signal.aborted) throw signal.reason;
+    const release = await latestRelease(source.repo, { fetchImpl, signal });
+    tag = release.tag;
+    const assetName = source.asset(release.assets.map((a) => a.name));
+    const asset = assetName ? release.assets.find((a) => a.name === assetName) : void 0;
+    if (!asset) throw new Refusal(`${source.repo} ${release.tag} publishes no ${id} build for ${platform}/${arch}.`);
+    assertGitHub(asset.url);
+    let expected = asset.digest;
+    if (!expected && source.sums) {
+      const sumsAsset = release.assets.find((a) => a.name === source.sums);
+      if (sumsAsset) {
+        assertGitHub(sumsAsset.url);
+        const sumsResponse = await fetchImpl(sumsAsset.url, { redirect: "follow", signal, headers: { "user-agent": USER_AGENT } });
+        if (!sumsResponse.ok) throw new Refusal(`The checksum file could not be read (${sumsResponse.status}). Nothing was installed.`);
+        expected = digestFor(await sumsResponse.text(), asset.name);
+      }
+    }
+    if (!expected) throw new Refusal(`${source.repo} ${release.tag} publishes no SHA-256 for ${asset.name}, so it was not installed.`);
+    mkdirSync2(options.toolsDir, { recursive: true });
+    staging = mkdtempSync(join6(options.toolsDir, ".staging-"));
+    const download = join6(staging, "download.part");
+    const actual = await downloadTo(fetchImpl, asset, download, signal, options.onProgress);
+    if (actual !== expected) throw new Refusal(`The downloaded ${asset.name} did not match its published SHA-256, so it was discarded.`);
+    const staged = [];
+    if (source.kind === "binary") {
+      const name = binaryName(id, platform);
+      renameSync(download, join6(staging, name));
+      staged.push({ from: join6(staging, name), name });
+    } else {
+      const wanted = ["ffmpeg", "ffprobe"].map((tool) => binaryName(tool, platform));
+      withZipFile(download, (zip) => {
+        for (const name of wanted) {
+          const entry = zip.entries.find((e) => isBinEntry(e.name, name));
+          if (!entry) throw new Refusal(`The FFmpeg archive has no bin/${name}, so nothing was installed.`);
+          const part = join6(staging, `${name}.part`);
+          writeFileSync(part, zip.read(entry));
+          renameSync(part, join6(staging, name));
+          staged.push({ from: join6(staging, name), name });
+        }
+      });
+      rmSync2(download, { force: true });
+    }
+    if (platform !== "win32") for (const file2 of staged) chmodSync(file2.from, 493);
+    const main2 = staged.find((f) => f.name === binaryName(id, platform));
+    const version2 = await probe(id, main2.from);
+    if (!version2) throw new Refusal(`The downloaded ${id} was verified but would not report a version, so it is not being used.`);
+    for (const file2 of [...staged.filter((f) => f !== main2), main2]) {
+      try {
+        await renameWithRetry(file2.from, join6(options.toolsDir, file2.name));
+      } catch (error61) {
+        throw new Refusal(describeWriteError(id, error61));
+      }
+    }
+    return { installed: true, version: version2, reason: null, tag };
+  } catch (error61) {
+    return { installed: false, version: null, reason: explain(error61, id, options.signal, timeout, limitMs), tag };
+  } finally {
+    if (staging) rmSync2(staging, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
+  }
+}
+async function downloadTo(fetchImpl, asset, path, signal, onProgress) {
+  const response = await fetchImpl(asset.url, { redirect: "follow", signal, headers: { "user-agent": USER_AGENT } });
+  if (!response.ok || !response.body) throw new Refusal(`The download failed: ${response.status}${response.statusText ? ` ${response.statusText}` : ""}.`);
+  const header2 = Number(response.headers.get("content-length"));
+  const total = Number.isFinite(header2) && header2 > 0 ? header2 : asset.size > 0 ? asset.size : null;
+  const hash2 = createHash("sha256");
+  const file2 = await open2(path, "w");
+  let received = 0;
+  try {
+    const reader = response.body.getReader();
+    for (; ; ) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      hash2.update(value);
+      await file2.write(value);
+      received += value.byteLength;
+      onProgress?.(received, total);
+    }
+  } finally {
+    await file2.close();
+  }
+  return hash2.digest("hex");
+}
+function assertGitHub(url2) {
+  let parsed;
+  try {
+    parsed = new URL(url2);
+  } catch {
+    throw new Refusal("The release named a download address that is not a URL, so nothing was fetched.");
+  }
+  if (parsed.protocol !== "https:" || parsed.hostname !== "github.com") throw new Refusal(`The release pointed somewhere other than GitHub (${parsed.hostname}), so nothing was fetched.`);
+}
+async function renameWithRetry(from, to, attempts = 4) {
+  for (let i = 1; ; i += 1) {
+    try {
+      renameSync(from, to);
+      return;
+    } catch (error61) {
+      const code = error61.code ?? "";
+      if (i >= attempts || !["EBUSY", "EPERM", "EACCES"].includes(code)) throw error61;
+      await new Promise((resolve3) => setTimeout(resolve3, 250 * i));
+    }
+  }
+}
+function describeWriteError(id, error61) {
+  const code = error61?.code ?? "";
+  if (["EBUSY", "EPERM", "EACCES"].includes(code)) return `The existing ${id} is in use and could not be replaced. Wait for running downloads to finish and try again.`;
+  return `The verified ${id} could not be saved: ${error61 instanceof Error ? error61.message : String(error61)}`;
+}
+function explain(error61, id, outer, timeout, limitMs) {
+  if (error61 instanceof Refusal) return error61.message;
+  if (error61 instanceof ZipError) return `The FFmpeg archive could not be unpacked: ${error61.message}`;
+  if (timeout.aborted) return `Setting up ${id} took longer than ${Math.round(limitMs / 6e4)} minutes and was stopped. It will be tried again.`;
+  if (outer?.aborted) return `Setting up ${id} was cancelled.`;
+  return `The download could not be completed: ${error61 instanceof Error ? error61.message : String(error61)}`;
+}
+function isBinEntry(entryName, file2) {
+  const parts = entryName.split(/[\\/]/);
+  return parts.length >= 2 && parts.length <= 3 && parts[parts.length - 2].toLowerCase() === "bin" && parts[parts.length - 1].toLowerCase() === file2.toLowerCase();
+}
+
+// src/provision.ts
+var SETUP_ORDER = ["yt-dlp", "ffmpeg", "spotdl"];
+var RETRY_AFTER_MS = 6 * 60 * 60 * 1e3;
+var UPDATE_CHECK_MS = 24 * 60 * 60 * 1e3;
+var STATE_FILE = "setup-state.json";
+async function ensureTools(options) {
+  const now = options.now ?? Date.now;
+  const platform = options.platform ?? process.platform;
+  const arch = options.arch ?? process.arch;
+  const log = options.log ?? (() => void 0);
+  const resolve3 = options.resolve ?? ((id) => resolveTool(id, { configured: options.configured, toolsDir: options.toolsDir }));
+  const install = options.install ?? installTool;
+  const release = options.release ?? ((repo) => latestRelease(repo, { ...options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}, ...options.signal ? { signal: options.signal } : {} }));
+  const state = readState(options.toolsDir);
+  const setup = {};
+  const outcomes = {};
+  const report = (id, value) => {
+    setup[id] = value;
+    options.onStatus?.(id, value);
+  };
+  const runInstall = async (id) => {
+    report(id, { state: "installing", progress: 0 });
+    let last = 0;
+    const outcome = await install(id, {
+      toolsDir: options.toolsDir,
+      platform,
+      arch,
+      ...options.fetchImpl ? { fetchImpl: options.fetchImpl } : {},
+      ...options.signal ? { signal: options.signal } : {},
+      onProgress: (received, total) => {
+        if (!total) return;
+        const fraction = Math.min(0.99, received / total);
+        if (fraction - last >= 0.01) {
+          last = fraction;
+          report(id, { state: "installing", progress: Math.floor(fraction * 100) / 100 });
+        }
+      }
+    });
+    outcomes[id] = outcome;
+    return outcome;
+  };
+  for (const id of SETUP_ORDER) {
+    if (options.only && !options.only.includes(id)) continue;
+    if (options.signal?.aborted) break;
+    const record2 = state.tools[id] ??= {};
+    const tool = await resolve3(id);
+    const source = toolSource(id, platform, arch);
+    if (tool.present && !options.force) {
+      if (id === "yt-dlp" && tool.origin === "installed" && source && due(record2.lastUpdateCheckAt, UPDATE_CHECK_MS, now) && !options.busy?.()) {
+        try {
+          const latest = await release(source.repo);
+          record2.lastUpdateCheckAt = new Date(now()).toISOString();
+          if (latest.tag && tool.version && latest.tag.trim() !== tool.version.trim()) {
+            log(`yt-dlp ${tool.version} is behind ${latest.tag}; updating`);
+            const outcome2 = await runInstall(id);
+            record2.lastAttemptAt = new Date(now()).toISOString();
+            record2.lastError = outcome2.installed ? null : outcome2.reason;
+            if (outcome2.installed) {
+              record2.tag = outcome2.tag ?? latest.tag;
+              options.onInstalled?.(id, outcome2);
+            } else log(`yt-dlp update refused: ${outcome2.reason ?? "unknown"}`);
+          }
+        } catch (error61) {
+          record2.lastUpdateCheckAt = new Date(now()).toISOString();
+          log(`could not check for a newer yt-dlp: ${error61 instanceof Error ? error61.message : String(error61)}`);
+        }
+      }
+      report(id, { state: "ready" });
+      continue;
+    }
+    if (!source) {
+      report(id, { state: "unsupported", reason: installHint(id, false) });
+      continue;
+    }
+    if (!options.ignoreBackoff && !options.force && record2.lastError && !due(record2.lastAttemptAt, RETRY_AFTER_MS, now)) {
+      report(id, { state: "failed", reason: record2.lastError });
+      continue;
+    }
+    log(`setting up ${id} in ${options.toolsDir}`);
+    const outcome = await runInstall(id);
+    record2.lastAttemptAt = new Date(now()).toISOString();
+    if (outcome.installed) {
+      record2.lastError = null;
+      record2.tag = outcome.tag ?? null;
+      if (id === "yt-dlp") record2.lastUpdateCheckAt = record2.lastAttemptAt;
+      log(`set up ${id} ${outcome.version ?? ""}`.trim());
+      report(id, { state: "ready" });
+      options.onInstalled?.(id, outcome);
+    } else {
+      record2.lastError = outcome.reason ?? "It could not be set up.";
+      log(`could not set up ${id}: ${record2.lastError}`);
+      report(id, tool.present ? { state: "ready" } : { state: "failed", reason: record2.lastError });
+    }
+  }
+  writeState(options.toolsDir, state, log);
+  return { setup, outcomes };
+}
+function due(iso, afterMs, now) {
+  if (!iso) return true;
+  const at = Date.parse(iso);
+  return !Number.isFinite(at) || now() - at >= afterMs;
+}
+function readState(toolsDir) {
+  try {
+    const parsed = JSON.parse(readFileSync2(join7(toolsDir, STATE_FILE), "utf8"));
+    if (parsed && typeof parsed === "object" && parsed.tools && typeof parsed.tools === "object") return { version: 1, tools: parsed.tools };
+  } catch {
+  }
+  return { version: 1, tools: {} };
+}
+function writeState(toolsDir, state, log) {
+  try {
+    mkdirSync3(toolsDir, { recursive: true });
+    const path = join7(toolsDir, STATE_FILE);
+    const part = `${path}.${process.pid}.part`;
+    writeFileSync2(part, `${JSON.stringify(state, null, 2)}
+`);
+    renameSync2(part, path);
+  } catch (error61) {
+    log(`could not record tool setup: ${error61 instanceof Error ? error61.message : String(error61)}`);
+  }
+}
+var ToolProvisioner = class {
+  constructor(options) {
+    this.options = options;
+  }
+  options;
+  setup = {};
+  queue = Promise.resolve();
+  active = null;
+  pending = null;
+  status() {
+    return { ...this.setup };
+  }
+  /** The tool being installed right now, if any. */
+  installing() {
+    return this.active;
+  }
+  /**
+   * Install every missing tool. A call while one is already running shares it, except that a
+   * "try again now" marks every failed tool as queued straight away, so the person sees it start.
+   */
+  ensure(options = {}) {
+    if (options.ignoreBackoff) {
+      for (const id of SETUP_ORDER) if (this.setup[id]?.state === "failed") this.setup[id] = { state: "installing", progress: 0 };
+      this.options.onChange?.();
+    }
+    if (this.pending && !options.ignoreBackoff) return this.pending;
+    return this.run(options.ignoreBackoff ? { ignoreBackoff: true } : {});
+  }
+  /** A manual install of one tool, queued behind whatever is running. */
+  async install(id) {
+    const result = await this.run({ only: [id], force: true, ignoreBackoff: true });
+    return result.outcomes[id] ?? { installed: false, version: null, reason: `${id} could not be set up.` };
+  }
+  run(extra) {
+    const next = this.queue.then(
+      () => ensureTools({
+        ...this.options,
+        ...extra,
+        onStatus: (id, setup) => {
+          this.active = setup.state === "installing" ? id : this.active === id ? null : this.active;
+          this.setup[id] = setup;
+          this.options.onChange?.();
+        }
+      }).finally(() => {
+        this.active = null;
+      })
+    );
+    this.queue = next.catch(() => void 0);
+    this.pending = next;
+    void next.finally(() => {
+      if (this.pending === next) this.pending = null;
+    }).catch(() => void 0);
+    return next;
+  }
+};
+
 // src/server.ts
 var MAX_BODY_BYTES = 64 * 1024;
 var MAX_JOBS = 50;
@@ -21825,8 +22615,20 @@ async function startHelper(options) {
   const jobs = new Jobs({ workDir: options.workDir, timeoutMs: options.timeoutMs, tools: resolve_, log: options.log, ...options.finishedTtlMs ? { finishedTtlMs: options.finishedTtlMs } : {} });
   let port = options.port;
   let origin = `http://127.0.0.1:${port}`;
-  let policy = { allowed: options.allowedOrigins, self: options.app ? origin : null };
-  let installing2 = null;
+  let policy = { allowed: options.allowedOrigins, self: options.app ? origin : null, loopbackPages: options.loopbackPages === true };
+  const stationCache = /* @__PURE__ */ new Map();
+  const tools = new ToolProvisioner({
+    toolsDir: options.toolsDir,
+    configured: options.configured,
+    ...options.fetchImpl ? { fetchImpl: options.fetchImpl } : {},
+    busy: () => jobs.busy(),
+    log: options.log,
+    onInstalled: (id) => {
+      resolver.invalidate();
+      options.onToolInstalled?.(id);
+    },
+    ...options.onToolSetupChange ? { onChange: options.onToolSetupChange } : {}
+  });
   const estimate = createEstimator(options.backup ?? { folders: {}, backupDir: null });
   const server = createServer((request, response) => {
     void handle(request, response).catch((error61) => {
@@ -21855,19 +22657,37 @@ async function startHelper(options) {
       if (!serveApp(options.app, path, options.token, response).served) return fail(response, 404, "not-found", "No such file.");
       return;
     }
+    if (path === HELPER_ROUTES.radioNowPlaying && request.method === "GET") {
+      const station = url2.searchParams.get("url") ?? "";
+      if (!station || station.length > 2048) return fail(response, 400, "bad-request", "Say which station: ?url=");
+      const now = Date.now();
+      const hit = stationCache.get(station);
+      if (hit && now - hit.at < 15e3) return send(response, 200, await hit.value);
+      const read = options.stationTitle ?? ((u) => readStationTitle(u, { timeoutMs: 8e3, userAgent: `NowPlaying-helper/${options.version}` }));
+      const value = read(station);
+      if (stationCache.size > 200) stationCache.delete(stationCache.keys().next().value);
+      stationCache.set(station, { at: now, value });
+      return send(response, 200, await value);
+    }
     if (path !== HELPER_ROUTES.health && !tokenMatches(options.token, header(request, "x-helper-token"))) {
       return fail(response, 401, "token", "This request needs the helper\u2019s token. It is printed when the helper starts.");
     }
     if (path === HELPER_ROUTES.health && request.method === "GET") {
-      const tools = await resolve_();
+      const found = await resolve_();
+      const setup = tools.status();
+      const withSetup = (id) => {
+        const record2 = publicTool(found[id]);
+        const state = setup[id];
+        return state ? { ...record2, setup: state } : record2;
+      };
       const health = {
         helper: "now-playing-local-helper",
         protocol: HELPER_PROTOCOL,
         version: options.version,
         servesApp: options.app !== null,
-        tools: [publicTool(tools["yt-dlp"]), publicTool(tools.spotdl), publicTool(tools.ffmpeg)],
+        tools: [withSetup("yt-dlp"), withSetup("spotdl"), withSetup("ffmpeg")],
         allowedHosts: [...options.allowedHosts],
-        formats: tools.ffmpeg.present ? ["original", "mp3", "aac", "opus", "flac"] : ["original"],
+        formats: found.ffmpeg.present ? ["original", "mp3", "aac", "opus", "flac"] : ["original"],
         startedAt
       };
       return send(response, 200, health);
@@ -21883,14 +22703,14 @@ async function startHelper(options) {
       if (body === void 0) return;
       const parsed = HelperFetchRequest.safeParse(body);
       if (!parsed.success) return fail(response, 400, "validation", `That request is not one this helper understands: ${parsed.error.issues[0]?.message ?? "invalid"}.`);
-      if (installing2) return fail(response, 409, "busy", "yt-dlp is being installed. Try again in a moment.");
       await jobs.sweep();
       if (jobs.list().length >= MAX_JOBS && !await jobs.evictOldestFinished()) return fail(response, 429, "busy", "There are already too many jobs here. Clear some before starting another.");
       const checked = checkFetchUrl(parsed.data.url, options.allowedHosts);
       if (!checked.ok || !checked.url) return fail(response, 400, "url", checked.reason ?? "That address is not one this helper will fetch from.");
-      const tools = await resolve_();
       const tool = pickTool(parsed.data.tool, checked.url);
-      if (!tools[tool].present) return fail(response, 409, "tool-missing", tools[tool].installHint ?? `${tool} is not installed.`);
+      if (tools.installing() === tool) return fail(response, 409, "busy", `${tool} is being set up. Try again in a moment.`);
+      const found = await resolve_();
+      if (!found[tool].present) return fail(response, 409, "tool-missing", tools.status()[tool]?.reason ?? found[tool].installHint ?? `${tool} is not installed.`);
       const job = jobs.create({ url: checked.url.toString(), tool, format: parsed.data.format });
       options.log(`job ${job.id}: ${tool} ${checked.url.hostname} (${parsed.data.authorization.basis})`);
       return send(response, 202, job);
@@ -21899,26 +22719,14 @@ async function startHelper(options) {
     if (install && request.method === "POST") {
       const tool = HelperToolId.safeParse(install[1]);
       if (!tool.success) return fail(response, 404, "not-found", "No such tool.");
-      if (tool.data !== "yt-dlp") {
-        const result2 = { tool: tool.data, installed: false, version: null, reason: `The helper does not fetch ${tool.data}; install it yourself so you know where it came from.` };
+      const id = tool.data;
+      if (jobs.busy() && (await resolve_())[id].present) {
+        const result2 = { tool: id, installed: false, version: null, reason: "Downloads are running. Wait for them to finish, then install again." };
         return send(response, 409, result2);
       }
-      if (!installing2 && jobs.busy()) {
-        const result2 = { tool: "yt-dlp", installed: false, version: null, reason: "Downloads are running. Wait for them to finish, then install again." };
-        return send(response, 409, result2);
-      }
-      installing2 ??= (async () => {
-        try {
-          options.log(`installing yt-dlp into ${options.toolsDir}`);
-          const outcome = await installYtDlp(options.toolsDir);
-          options.log(outcome.installed ? `installed ${outcome.version}` : `install refused: ${outcome.reason ?? "unknown"}`);
-          return { tool: "yt-dlp", installed: outcome.installed, version: outcome.version, reason: outcome.reason };
-        } finally {
-          resolver.invalidate();
-          installing2 = null;
-        }
-      })();
-      const result = await installing2;
+      const outcome = await tools.install(id);
+      resolver.invalidate();
+      const result = { tool: id, installed: outcome.installed, version: outcome.version, reason: outcome.reason };
       return send(response, result.installed ? 200 : 409, result);
     }
     const file2 = /^\/helper\/v1\/jobs\/([^/]+)\/files\/([^/]+)$/.exec(path);
@@ -21998,13 +22806,14 @@ async function startHelper(options) {
   const address = server.address();
   if (typeof address === "object" && address) port = address.port;
   origin = `http://127.0.0.1:${port}`;
-  policy = { allowed: options.allowedOrigins, self: options.app ? origin : null };
+  policy = { allowed: options.allowedOrigins, self: options.app ? origin : null, loopbackPages: options.loopbackPages === true };
   const sweeper = setInterval(() => void jobs.sweep(), 6e4);
   sweeper.unref();
   return {
     server,
     jobs,
     origin,
+    tools,
     close: async () => {
       clearInterval(sweeper);
       await jobs.shutdown();
@@ -22066,8 +22875,8 @@ async function main(argv = process.argv.slice(2), out = (line) => process.stdout
   }
   let runDir;
   try {
-    mkdirSync3(options.workDir, { recursive: true });
-    runDir = mkdtempSync(join6(options.workDir, "now-playing-run-"));
+    mkdirSync4(options.workDir, { recursive: true });
+    runDir = mkdtempSync2(join8(options.workDir, "now-playing-run-"));
   } catch (error61) {
     out(`Cannot use ${options.workDir} for temporary files: ${error61 instanceof Error ? error61.message : String(error61)}`);
     out("Point somewhere writable with --work-dir <path>.");
@@ -22092,11 +22901,18 @@ async function main(argv = process.argv.slice(2), out = (line) => process.stdout
   out(`  ${app ? "Player and tools" : "Tools"} at  ${helper.origin}`);
   out("");
   for (const tool of [tools["yt-dlp"], tools.spotdl, tools.ffmpeg]) {
-    out(`  ${tool.present ? "\xB7" : "!"} ${tool.id.padEnd(8)} ${tool.present ? tool.version ?? "present" : "not installed"}`);
+    const missing = options.autoTools && tool.installable ? "setting up \u2014 verified download" : "not installed";
+    out(`  ${tool.present ? "\xB7" : "!"} ${tool.id.padEnd(8)} ${tool.present ? tool.version ?? "present" : missing}`);
   }
-  if (!tools["yt-dlp"].present) out(`    yt-dlp is the one that matters. The player can fetch it for you from Settings \u2192 Platforms.`);
-  if (!tools.ffmpeg.present) out(`    Without FFmpeg nothing can be converted, and the player will say so.`);
+  if (!options.autoTools && !tools["yt-dlp"].present) out(`    yt-dlp is the one that matters. Run without --no-auto-tools and it is set up for you.`);
+  if (!tools.ffmpeg.present && !tools.ffmpeg.installable) out(`    Without FFmpeg nothing can be converted. ${tools.ffmpeg.installHint ?? ""}`.trimEnd());
   out("");
+  let setupTimer = null;
+  if (options.autoTools) {
+    void helper.tools.ensure({ ignoreBackoff: true }).catch((error61) => out(`  Tool setup stopped: ${error61 instanceof Error ? error61.message : String(error61)}`));
+    setupTimer = setInterval(() => void helper.tools.ensure().catch(() => void 0), 60 * 60 * 1e3);
+    setupTimer.unref();
+  }
   if (!app) {
     out(`  Serving the API only. Allowed origins: ${options.allowedOrigins.length ? options.allowedOrigins.join(", ") : "none yet \u2014 add one with --allow-origin"}`);
     out(`  Token (paste it into Settings \u2192 Platforms):`);
@@ -22111,6 +22927,7 @@ async function main(argv = process.argv.slice(2), out = (line) => process.stdout
     if (stopping) return;
     stopping = true;
     out("\nStopping.");
+    if (setupTimer) clearInterval(setupTimer);
     try {
       await helper.close();
     } finally {

@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { childEnv, lastMeaningfulLine, redactPaths, spotdlArgs, ytDlpArgs } from '../../src/jobs.js';
-import { cachedResolver, findOnPath, digestFor, toolCommand, ytDlpAsset } from '../../src/tools.js';
+import { cachedResolver, findOnPath, digestFor, toolCommand, versionFlag, ytDlpAsset } from '../../src/tools.js';
 import { originAllowed, hostAllowed, tokenMatches, checkFetchUrl } from '../../src/security.js';
 import { withToken, withinRoot } from '../../src/app.js';
 import { pickTool } from '../../src/server.js';
@@ -249,7 +249,15 @@ describe('finding the tools', () => {
     expect(ytDlpAsset('linux', 'arm64')).toBe('yt-dlp_linux_aarch64');
     expect(ytDlpAsset('darwin', 'arm64')).toBe('yt-dlp_macos');
     expect(ytDlpAsset('win32', 'x64')).toBe('yt-dlp.exe');
+    expect(ytDlpAsset('win32', 'arm64')).toBe('yt-dlp_arm64.exe');
     expect(ytDlpAsset('freebsd', 'x64')).toBeNull();
+  });
+
+  it('asks FFmpeg for -version and everything else for --version', () => {
+    expect(versionFlag('C:\\tools\\ffmpeg.exe')).toBe('-version');
+    expect(versionFlag('/usr/bin/ffprobe')).toBe('-version');
+    expect(versionFlag('/opt/anything', 'ffmpeg')).toBe('-version');
+    expect(versionFlag('/usr/bin/yt-dlp', 'yt-dlp')).toBe('--version');
   });
 
   it('reads a checksum only for the exact asset it asked about', () => {
@@ -287,6 +295,12 @@ describe('the command line the helper itself takes', () => {
 
   it('documents --work-dir', () => {
     expect(HELP).toContain('--work-dir');
+  });
+
+  it('sets tools up by default, and --no-auto-tools opts out', () => {
+    expect(parseArgs([]).autoTools).toBe(true);
+    expect(parseArgs(['--no-auto-tools']).autoTools).toBe(false);
+    expect(HELP).toContain('--no-auto-tools');
   });
 
   it('refuses what it cannot make sense of, by name', () => {

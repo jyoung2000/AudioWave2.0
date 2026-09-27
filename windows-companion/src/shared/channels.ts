@@ -55,6 +55,7 @@ export const IPC_CHANNELS = [
 
   'helper:status',
   'helper:check-tools',
+  'helper:install-tools',
   'helper:token',
 
 ] as const;

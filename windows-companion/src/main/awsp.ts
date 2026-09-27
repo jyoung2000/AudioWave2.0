@@ -50,6 +50,8 @@ export interface AwspSupervisorOptions {
   log: (line: string) => void;
   /** n0's public relays by default; `disabled` keeps a test off the network. */
   relayMode?: 'default' | 'disabled';
+  /** The FFmpeg the helper resolved (possibly one it set up itself), passed as AWSP_FFMPEG. */
+  ffmpegPath?: () => string | null;
 }
 
 /** Where the sidecar lives: beside the app when packaged, in the crate's target folder in a checkout. */
@@ -176,6 +178,14 @@ export class AwspSupervisor {
     this.netTimer.unref?.();
   }
 
+  /**
+   * FFmpeg just became available. The sidecar reads it at start, so an idle sidecar is restarted
+   * to pick it up; one with connected devices is left alone and picks it up on its next start.
+   */
+  toolsChanged(): void {
+    if (this.child && !this.status.connections.length) void this.restart();
+  }
+
   /** From Electron's powerMonitor: a machine that slept has new sockets to make. */
   onResume(): void {
     if (this.child) void this.restart();
@@ -197,7 +207,10 @@ export class AwspSupervisor {
       return;
     }
     this.stopping = false;
-    const child = spawn(this.options.binary, [], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, env: { ...process.env } });
+    // The sidecar transcodes with `AWSP_FFMPEG`, else whatever `ffmpeg` is on PATH. A copy the helper
+    // set up itself is not on PATH, so it is named here.
+    const ffmpeg = this.options.ffmpegPath?.() ?? null;
+    const child = spawn(this.options.binary, [], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, env: { ...process.env, ...(ffmpeg ? { AWSP_FFMPEG: ffmpeg } : {}) } });
     this.child = child;
     const config = {
       secret_key_hex: secret,

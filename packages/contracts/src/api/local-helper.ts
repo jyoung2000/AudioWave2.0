@@ -46,6 +46,18 @@ export const HELPER_TOKEN_META = 'np-helper-token';
 export const HelperToolId = z.enum(['yt-dlp', 'spotdl', 'ffmpeg']);
 export type HelperToolId = z.infer<typeof HelperToolId>;
 
+/**
+ * Where automatic setup has got to for one tool. `installing` carries a 0–1 progress when the size
+ * is known; `failed` and `unsupported` carry the sentence to show. Absent means setup has not looked
+ * at this tool yet (an older helper, or one started with `--no-auto-tools`).
+ */
+export const HelperToolSetup = z.object({
+  state: z.enum(['ready', 'installing', 'failed', 'unsupported']),
+  progress: z.number().min(0).max(1).optional(),
+  reason: z.string().max(400).optional(),
+});
+export type HelperToolSetup = z.infer<typeof HelperToolSetup>;
+
 export const HelperTool = z.object({
   id: HelperToolId,
   present: z.boolean(),
@@ -54,8 +66,10 @@ export const HelperTool = z.object({
   origin: z.enum(['path', 'installed', 'configured', 'missing']),
   /** What to do about it when it is missing, written for the person reading it. */
   installHint: z.string().max(400).nullable().default(null),
-  /** True when the helper can fetch and verify a pinned release of this tool on request. */
+  /** True when the helper can fetch this tool's current release here and verify its published SHA-256. */
   installable: z.boolean().default(false),
+  /** Automatic setup's progress for this tool (since protocol 1, optional). */
+  setup: HelperToolSetup.optional(),
 });
 export type HelperTool = z.infer<typeof HelperTool>;
 

@@ -315,3 +315,6 @@ default `info`). The sidecar never writes a secret to disk and opens the library
   establishment and on each path-type change, also logged as in §5), `disconnected {peer}`,
   `error {message}`.
 - ffmpeg is `AWSP_FFMPEG` or `ffmpeg` on PATH. It is needed only for `high`/`saver` and artwork.
+  The companion sets `AWSP_FFMPEG` to the FFmpeg its embedded helper resolved — including the copy it
+  sets up automatically in `<userData>\helper\tools`, which is not on PATH — and, when that copy
+  lands while the sidecar is running with no devices connected, restarts the sidecar to pick it up.

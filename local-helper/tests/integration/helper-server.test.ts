@@ -11,6 +11,7 @@
  * one where "it said no" is the behaviour most worth proving.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -53,6 +54,23 @@ async function post(path: string, body: unknown, headers: Record<string, string>
 
 const owned = { basis: 'user-owned' as const, acknowledged: true as const };
 
+/** GitHub, faked: spotDL publishes a build (not a real program), nothing else answers. */
+const githubCalls: string[] = [];
+const SPOTDL_BYTES = Buffer.from('not really spotdl');
+const fakeGitHub = (async (input: string | URL | Request) => {
+  const url = String(input);
+  githubCalls.push(url);
+  if (url === 'https://api.github.com/repos/spotDL/spotify-downloader/releases/latest') {
+    const names = ['spotdl-4.5.2-win32.exe', 'spotdl-4.5.2-linux', 'spotdl-4.5.2-darwin'];
+    return Response.json({
+      tag_name: 'v4.5.2',
+      assets: names.map((name) => ({ name, size: SPOTDL_BYTES.length, browser_download_url: `https://github.com/spotDL/spotify-downloader/releases/download/v4.5.2/${name}`, digest: `sha256:${createHash('sha256').update(SPOTDL_BYTES).digest('hex')}` })),
+    });
+  }
+  if (url.startsWith('https://github.com/spotDL/spotify-downloader/releases/download/')) return new Response(SPOTDL_BYTES);
+  return new Response('unavailable', { status: 503, statusText: 'Service Unavailable' });
+}) as typeof fetch;
+
 beforeAll(async () => {
   root = mkdtempSync(join(tmpdir(), 'np-helper-test-'));
   // A .mjs path is run with this Node, so the same stub works on Windows, where a script cannot be
@@ -74,6 +92,7 @@ beforeAll(async () => {
     app: null,
     configured: { 'yt-dlp': stub },
     log: () => {},
+    fetchImpl: fakeGitHub,
   });
   const address = helper.server.address();
   base = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`;
@@ -92,8 +111,11 @@ describe('what it says about itself', () => {
     const ytDlp = health.tools.find((t) => t.id === 'yt-dlp');
     expect(ytDlp).toMatchObject({ present: true, origin: 'configured', version: '2026.09.01' });
     expect(health.tools.find((t) => t.id === 'spotdl')).toMatchObject({ present: false, origin: 'missing' });
-    // A missing tool carries the sentence that fixes it rather than just a false.
-    expect(health.tools.find((t) => t.id === 'spotdl')?.installHint).toMatch(/pipx install spotdl/);
+    // A missing tool carries the sentence that explains it rather than just a false: where a build
+    // is published it is set up automatically; where none is, the one line that installs it.
+    expect(health.tools.find((t) => t.id === 'spotdl')?.installHint).toMatch(/checks it against the published SHA-256|pipx install spotdl/);
+    // Setup has not looked yet, so no setup state is claimed.
+    expect(health.tools.find((t) => t.id === 'spotdl')?.setup).toBeUndefined();
   });
 
   it('never puts a path to anything on this machine in an answer', async () => {
@@ -208,10 +230,38 @@ describe('what it refuses', () => {
     expect((await call('/helper/v1/jobs/%zz/files/x')).status).toBe(400);
   });
 
-  it('refuses to install anything but yt-dlp, and says why', async () => {
-    const response = await post(HELPER_ROUTES.install('spotdl'), {});
-    expect(response.status).toBe(409);
-    expect(((await response.json()) as { reason: string }).reason).toMatch(/does not fetch spotdl/);
+  it('refuses an install route for a tool it does not know', async () => {
+    expect((await post('/helper/v1/tools/curl/install', {})).status).toBe(404);
+  });
+});
+
+describe('setting tools up', () => {
+  it('takes an install request for spotDL and FFmpeg too, and installs nothing it could not verify', async () => {
+    // The fake GitHub publishes a spotDL build with the right digest; the bytes are not a program,
+    // so the version check refuses them. FFmpeg's repository does not answer at all.
+    githubCalls.length = 0;
+    const spotdl = await post(HELPER_ROUTES.install('spotdl'), {});
+    expect(spotdl.status).toBe(409);
+    const spotdlResult = (await spotdl.json()) as { tool: string; installed: boolean; reason: string };
+    expect(spotdlResult).toMatchObject({ tool: 'spotdl', installed: false });
+    expect(spotdlResult.reason).toMatch(/would not report a version|no .*build|pipx/);
+
+    const ffmpeg = await post(HELPER_ROUTES.install('ffmpeg'), {});
+    expect(ffmpeg.status).toBe(409);
+    expect(((await ffmpeg.json()) as { reason: string }).reason).toMatch(/GitHub did not answer|package manager/);
+    // Only ever the fake GitHub.
+    expect(githubCalls.every((url) => url.startsWith('https://api.github.com/') || url.startsWith('https://github.com/'))).toBe(true);
+  });
+
+  it('reports each tool’s setup state in health once setup has run', async () => {
+    await helper.tools.ensure({ ignoreBackoff: true });
+    const health = (await (await call(HELPER_ROUTES.health)).json()) as HelperHealth;
+    // The configured yt-dlp is the person's own: ready, and never replaced.
+    expect(health.tools.find((t) => t.id === 'yt-dlp')?.setup).toEqual({ state: 'ready' });
+    const spotdl = health.tools.find((t) => t.id === 'spotdl')!;
+    expect(spotdl.present).toBe(false);
+    expect(['failed', 'unsupported']).toContain(spotdl.setup?.state);
+    expect(spotdl.setup?.reason).toBeTruthy();
   });
 });
 

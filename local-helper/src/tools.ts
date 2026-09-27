@@ -1,35 +1,36 @@
 /**
- * Finding the tools, and fetching yt-dlp when it is not there.
+ * Finding the tools.
  *
- * The helper ships no binaries. It looks for what is already installed, and it can fetch yt-dlp
- * itself when asked — because "install Python, then install yt-dlp, then add it to PATH" is exactly
- * the setup this was meant to remove.
+ * The helper ships no binaries. It looks for what is already installed — a path it was given, a
+ * copy it set up itself, or one on PATH — and reports each tool with where it came from. Setting a
+ * missing tool up is `install.ts` (one verified download) and `provision.ts` (doing that for every
+ * missing tool on start, without being asked).
+ *
+ * **Automatic, since 2026-09-27.** The owner's decision was that the downloaders should "be
+ * automatic and seamless for the user", so yt-dlp, spotDL and — on Windows — FFmpeg are fetched into
+ * an app-owned folder (`<data>/tools`, or `<userData>\helper\tools` inside the companion) with no
+ * prompt. What did not change is the bar for doing it: every file is checked against the SHA-256
+ * its project published on GitHub for that exact release, and a file with no published SHA-256 is
+ * refused rather than trusted. See docs/DOWNLOADS_AND_LEGAL.md.
  *
  * **Why yt-dlp is not pinned.** Pinning a version is usually the careful choice and here it is the
- * opposite: yt-dlp works by keeping up with sites that change, so a pinned copy does not get
- * safer with age, it stops working. So the helper takes the current release and verifies it against
- * the `SHA2-256SUMS` file the project published *in that same release*. That is the same trust as
- * `pip install yt-dlp` — HTTPS to the project's own release — with the bytes checked rather than
- * assumed, and it is written down here rather than left for someone to discover.
+ * opposite: yt-dlp works by keeping up with sites that change, so a pinned copy does not get safer
+ * with age, it stops working. The helper takes the current release, verifies it, and replaces the
+ * copy it set up when a newer release appears.
  *
- * **Why spotDL is not fetched.** Its releases are not published in a shape this can verify the same
- * way, so the helper refuses to guess. It reports the one line that installs it and otherwise
- * treats it as absent — an absence with an instruction beats an unverified download.
- *
- * **Why FFmpeg is not fetched.** It is large, it is per-platform, and most machines have it. When
- * it is missing the helper says so and narrows what it offers: no format conversion, and yt-dlp is
- * asked for the best single audio stream rather than told to extract one.
+ * **Why FFmpeg is not fetched on macOS or Linux.** The package manager's copy is the better one
+ * there, and every such machine has a package manager. The helper says which command to run.
  */
-import { createHash, randomUUID } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { execFile } from 'node:child_process';
-import { delimiter, join } from 'node:path';
+import { basename, delimiter, join } from 'node:path';
 import { promisify } from 'node:util';
 import type { HelperTool, HelperToolId } from '@now-playing/contracts';
+import { binaryName, toolSource } from './sources.js';
+
+export { digestFor, ytDlpAsset } from './sources.js';
 
 const run = promisify(execFile);
-
-const YT_DLP_LATEST = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download';
 
 export interface ToolPaths {
   'yt-dlp'?: string | undefined;
@@ -44,39 +45,35 @@ export interface ResolvedTool extends HelperTool {
 export interface ResolveOptions {
   /** Explicit paths from the command line, which win over everything. */
   configured: ToolPaths;
-  /** Where `install` puts things, and the second place to look. */
+  /** Where setup puts things, and the second place to look. */
   toolsDir: string;
 }
 
-const INSTALL_HINTS: Record<HelperToolId, string> = {
-  'yt-dlp': 'Not installed. The player can fetch it for you, or install it yourself: pipx install yt-dlp (or brew install yt-dlp, or winget install yt-dlp).',
-  spotdl: 'Not installed. Install it with: pipx install spotdl — the helper does not fetch this one, because its releases cannot be checksum-verified the way yt-dlp’s can.',
-  ffmpeg: 'Not installed. Without it nothing can be converted and yt-dlp takes whatever single audio stream a site offers. Install it with: brew install ffmpeg, apt install ffmpeg, or winget install ffmpeg.',
-};
-
-const BINARY_NAMES: Record<HelperToolId, string> = {
-  'yt-dlp': process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp',
-  spotdl: process.platform === 'win32' ? 'spotdl.exe' : 'spotdl',
-  ffmpeg: process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
-};
+/** What a missing tool's record says, written for the person reading it. */
+export function installHint(id: HelperToolId, installable: boolean): string {
+  if (installable) return `Not set up yet. The helper downloads ${id} from its project’s GitHub release and checks it against the published SHA-256 before using it.`;
+  if (id === 'ffmpeg') return 'Not installed. Without it nothing can be converted and yt-dlp takes whatever single audio stream a site offers. Install it with your package manager: brew install ffmpeg, apt install ffmpeg or dnf install ffmpeg.';
+  return `Not installed, and no ${id} build is published for this system. Install it with: pipx install ${id}.`;
+}
 
 export async function resolveTool(id: HelperToolId, options: ResolveOptions): Promise<ResolvedTool> {
-  const installable = id === 'yt-dlp';
+  const installable = toolSource(id) !== null;
   const candidates: Array<{ path: string; origin: ResolvedTool['origin'] }> = [];
   const configured = options.configured[id];
   if (configured) candidates.push({ path: configured, origin: 'configured' });
-  const installed = join(options.toolsDir, BINARY_NAMES[id]);
+  const installed = join(options.toolsDir, binaryName(id));
   if (existsSync(installed)) candidates.push({ path: installed, origin: 'installed' });
-  const onPath = findOnPath(BINARY_NAMES[id]);
+  const onPath = findOnPath(binaryName(id));
   if (onPath) candidates.push({ path: onPath, origin: 'path' });
 
   for (const candidate of candidates) {
-    const version = await versionOf(candidate.path);
-    // A path that will not answer `--version` is not a tool, whatever its name says.
+    // spotDL's standalone build unpacks itself on every start, which can take a while the first time.
+    const version = await versionOf(candidate.path, id, id === 'spotdl' ? 30_000 : 8000);
+    // A path that will not answer its version flag is not a tool, whatever its name says.
     if (version === null) continue;
     return { id, present: true, version, origin: candidate.origin, installHint: null, installable, path: candidate.path };
   }
-  return { id, present: false, version: null, origin: 'missing', installHint: INSTALL_HINTS[id], installable, path: null };
+  return { id, present: false, version: null, origin: 'missing', installHint: installHint(id, installable), installable, path: null };
 }
 
 export async function resolveAll(options: ResolveOptions): Promise<Record<HelperToolId, ResolvedTool>> {
@@ -93,7 +90,7 @@ export interface ToolResolver {
 /**
  * `resolveAll`, remembered for a short while.
  *
- * Health is unauthenticated and each lookup starts three `--version` processes, so without this any
+ * Health is unauthenticated and each lookup starts three version processes, so without this any
  * page that can reach the port could make the machine spawn processes as fast as it can ask.
  * Concurrent callers share one lookup.
  */
@@ -137,11 +134,17 @@ export function toolCommand(path: string): { command: string; prefix: string[] }
   return /\.(?:mjs|cjs|js)$/i.test(path) ? { command: process.execPath, prefix: [path] } : { command: path, prefix: [] };
 }
 
-/** The first line of `--version`, which is all any of these three put there that is worth keeping. */
-async function versionOf(path: string): Promise<string | null> {
+/** FFmpeg and ffprobe take `-version`; everything else here takes `--version`. */
+export function versionFlag(path: string, id?: HelperToolId): string {
+  if (id === 'ffmpeg') return '-version';
+  return /^(?:ffmpeg|ffprobe)(?:\.exe)?$/i.test(basename(path)) ? '-version' : '--version';
+}
+
+/** The first line of the version flag's output, which is all any of these put there that is worth keeping. */
+export async function versionOf(path: string, id?: HelperToolId, timeoutMs = 8000): Promise<string | null> {
   try {
     const { command, prefix } = toolCommand(path);
-    const { stdout } = await run(command, [...prefix, '--version'], { timeout: 8000, windowsHide: true, maxBuffer: 1024 * 256 });
+    const { stdout } = await run(command, [...prefix, versionFlag(path, id)], { timeout: timeoutMs, windowsHide: true, maxBuffer: 1024 * 256 });
     const first = stdout.split(/\r?\n/)[0]?.trim() ?? '';
     return first.slice(0, 120) || null;
   } catch {
@@ -166,79 +169,6 @@ export function findOnPath(binary: string, env: NodeJS.ProcessEnv = process.env)
         // Unreadable directory on PATH — normal, and not this program's problem.
       }
     }
-  }
-  return null;
-}
-
-export interface InstallOutcome {
-  installed: boolean;
-  version: string | null;
-  reason: string | null;
-}
-
-/**
- * Fetch the current yt-dlp release for this platform and verify it against the checksums published
- * beside it. Nothing is made executable until the digest matches.
- */
-export async function installYtDlp(toolsDir: string, fetchImpl: typeof fetch = fetch): Promise<InstallOutcome> {
-  const asset = ytDlpAsset();
-  if (!asset) return { installed: false, version: null, reason: `There is no published yt-dlp build for ${process.platform}/${process.arch}. Install it with pipx instead.` };
-
-  let binary: Uint8Array;
-  let sums: string;
-  try {
-    const [binaryResponse, sumsResponse] = await Promise.all([fetchImpl(`${YT_DLP_LATEST}/${asset}`, { redirect: 'follow' }), fetchImpl(`${YT_DLP_LATEST}/SHA2-256SUMS`, { redirect: 'follow' })]);
-    if (!binaryResponse.ok) return { installed: false, version: null, reason: `The download failed: ${binaryResponse.status} ${binaryResponse.statusText}` };
-    if (!sumsResponse.ok) return { installed: false, version: null, reason: `The checksum file could not be read: ${sumsResponse.status}. Nothing was installed.` };
-    binary = new Uint8Array(await binaryResponse.arrayBuffer());
-    sums = await sumsResponse.text();
-  } catch (error) {
-    return { installed: false, version: null, reason: `The download could not be started: ${error instanceof Error ? error.message : String(error)}` };
-  }
-
-  const expected = digestFor(sums, asset);
-  if (!expected) return { installed: false, version: null, reason: `The release publishes no checksum for ${asset}, so it was not installed.` };
-  const actual = createHash('sha256').update(binary).digest('hex');
-  if (actual !== expected) return { installed: false, version: null, reason: `The downloaded file did not match its published checksum, so it was discarded.` };
-
-  mkdirSync(toolsDir, { recursive: true });
-  const target = join(toolsDir, BINARY_NAMES['yt-dlp']);
-  // Unique, so two installs never write into the same half-finished file.
-  const temporary = `${target}.${randomUUID()}.part`;
-  try {
-    writeFileSync(temporary, binary);
-    if (process.platform !== 'win32') chmodSync(temporary, 0o755);
-    renameSync(temporary, target);
-  } catch (error) {
-    rmSync(temporary, { force: true });
-    const locked = ['EBUSY', 'EPERM', 'EACCES'].includes((error as NodeJS.ErrnoException).code ?? '');
-    return {
-      installed: false,
-      version: null,
-      reason: locked ? 'The existing yt-dlp is in use and could not be replaced. Wait for running downloads to finish and try again.' : `The verified file could not be saved: ${error instanceof Error ? error.message : String(error)}`,
-    };
-  }
-
-  const version = await versionOf(target);
-  if (!version) return { installed: false, version: null, reason: 'The downloaded file was verified but would not report a version, so it is not being used.' };
-  return { installed: true, version, reason: null };
-}
-
-/** The asset yt-dlp publishes for this platform, or null where it publishes none. */
-export function ytDlpAsset(platform: NodeJS.Platform = process.platform, arch: string = process.arch): string | null {
-  if (platform === 'win32') return arch === 'ia32' ? 'yt-dlp_x86.exe' : 'yt-dlp.exe';
-  if (platform === 'darwin') return 'yt-dlp_macos';
-  if (platform !== 'linux') return null;
-  if (arch === 'arm64') return 'yt-dlp_linux_aarch64';
-  if (arch === 'arm') return 'yt-dlp_linux_armv7l';
-  return arch === 'x64' ? 'yt-dlp_linux' : null;
-}
-
-/** `SHA2-256SUMS` is `<hex>  <name>` per line, which is the format every checksum tool writes. */
-export function digestFor(sums: string, asset: string): string | null {
-  for (const line of sums.split(/\r?\n/)) {
-    const match = /^([a-f0-9]{64})\s+\*?(.+)$/i.exec(line.trim());
-    if (match && match[2] === asset) return match[1]!.toLowerCase();
   }
   return null;
 }

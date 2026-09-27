@@ -250,25 +250,42 @@ async function startScan(folderId?: string): Promise<{ started: boolean; reason:
     // The measurement pass rides behind the scan it belongs to: files that still have no tempo
     // get one from their own audio, one at a time. It carries its own controller because the
     // scan's is already released by now — the next scan, and quitting, abort it through that.
-    if (!signal.aborted && store?.isOpen) {
-      const pass = new AbortController();
-      tempoPass = pass;
-      try {
-        const tools = await helper?.checkTools().catch(() => null);
-        const ffmpegPath = tools?.tools.find((t) => t.id === 'ffmpeg' && t.present)?.path ?? null;
-        await runTempoPass({
-          store,
-          ffmpegPath,
-          signal: pass.signal,
-          resolvePath: (record) => absolutePathOf(store!, record.id),
-        });
-        // No invented event: the Library view re-queries whenever it looks (Task 3 pins that).
-      } finally {
-        if (tempoPass === pass) tempoPass = null;
-      }
-    }
+    if (!signal.aborted && store?.isOpen) await measureTempoBacklog();
   })().catch((err: unknown) => console.error('Library scan stopped:', err));
   return { started: true, reason: null };
+}
+
+/**
+ * The tempo measurement pass over whatever still has no tempo. Runs behind every scan, and once
+ * more when automatic setup lands FFmpeg (UX-SETUP-001), so a library scanned before FFmpeg existed
+ * gets its tempos without a rescan. It owns `tempoPass`, so a new scan and quitting abort it.
+ */
+async function measureTempoBacklog(): Promise<void> {
+  if (!store?.isOpen) return;
+  tempoPass?.abort();
+  const pass = new AbortController();
+  tempoPass = pass;
+  try {
+    const tools = await helper?.checkTools().catch(() => null);
+    const ffmpegPath = tools?.tools.find((t) => t.id === 'ffmpeg' && t.present)?.path ?? null;
+    await runTempoPass({
+      store,
+      ffmpegPath,
+      signal: pass.signal,
+      resolvePath: (record) => absolutePathOf(store!, record.id),
+    });
+    // No invented event: the Library view re-queries whenever it looks (Task 3 pins that).
+  } finally {
+    if (tempoPass === pass) tempoPass = null;
+  }
+}
+
+/** Automatic setup landed a tool. FFmpeg unlocks the tempo backlog and the streaming sidecar's transcoder. */
+function onToolInstalled(id: 'yt-dlp' | 'spotdl' | 'ffmpeg'): void {
+  if (id !== 'ffmpeg' || isQuitting) return;
+  awsp?.toolsChanged();
+  // A scan in progress runs the pass itself when it finishes.
+  if (!scanning) void measureTempoBacklog().catch((err: unknown) => console.error('Tempo pass stopped:', err));
 }
 
 /* --------------------------------------------------------------- transfers */
@@ -500,6 +517,7 @@ function registerHandlers(): void {
 
   handle('helper:status', () => helper!.settledStatus());
   handle('helper:check-tools', () => helper!.checkTools());
+  handle('helper:install-tools', () => helper!.installTools());
   handle('helper:token', () => ({ token: helper!.token() }));
 
   handle('backup:export-playlists', async () => {
@@ -584,6 +602,7 @@ if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow())))
       dataDir: dataDir(),
       log: (line) => console.info(`[helper] ${line}`),
       backup: () => ({ folders: backups!.folders(), backupDir: backups!.settings().dir }),
+      onToolInstalled,
     });
     applySessionSecurity(session.defaultSession, DEV_SERVER_URL);
     registerHandlers();
@@ -601,6 +620,7 @@ if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow())))
       serverName: `${process.env['COMPUTERNAME'] ?? 'Windows'} companion`,
       onStatus: (status) => send('event:awsp-status', status),
       log: (line) => console.info(line),
+      ffmpegPath: () => helper?.ffmpegPath() ?? null,
     });
     awsp.boot();
     powerMonitor.on('resume', () => awsp?.onResume());
