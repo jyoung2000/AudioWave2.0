@@ -532,9 +532,28 @@ crash-heavy specs was **20/20 in 3.2 m**; the awsp spec then passed alone. Same 
 result, a fraction of the duration — the pattern points at machine load, not a deterministic defect.
 Evidence is kept at `.verify-artifacts/2026-09-27T12-51-58-383Z/test-e2e/`.
 
-**That is evidence, not a verdict.** A hypothesis is not a finding, and four isolated passes do not
-clear a gate that failed as a suite. **Tally: 27/27 is not claimed.** The last whole-repo run
-predates the three repairs, and a full re-run is what settles it.
+**Then the whole gate was re-run on its own — and it is green.** With nothing else competing for
+the machine, `pnpm test:e2e` cleared end to end on the same build that had just failed four of its
+tests:
+
+| Suite | Result |
+|---|---|
+| `@now-playing/music-player` | **156 passed (19.9 m)** |
+| `@now-playing/hub` | **17 passed (10.8 s)** |
+| `@now-playing/aqua-ui` | **5 passed (1.0 m)** |
+| failure markers in the log | **0** |
+
+That is the verdict the isolated runs were pointing at: the four failures belonged to the run, not
+to the code. They were browser crashes and a timing-sensitive assertion under whole-suite load, and
+they are not reproducible on the same bytes.
+
+**What is settled, and what is not.** `test:e2e` is cleared, and the three gates broken by my own
+commits were repaired in `51065b7` and each re-verified PASS in isolation. **The full `pnpm verify`
+re-run on `30a6c4a` is the remaining step, and until it prints its own `Verification summary` the
+state of record is the three runs above — not 27/27.** Note also that even a clean run reports
+`windows-package` as `SEE build:windows`, not PASS: that gate is a no-op on Windows (D-2), so the
+honest ceiling for `pnpm verify` is **26 PASS, 0 FAIL, 1 SEE**, and "27/27" would be wrong even on
+a perfect run.
 
 ---
 
