@@ -487,9 +487,8 @@ parsing or drop the clause.
 
 ## 6. Not done
 
-- **A full clean `pnpm verify` end to end — no longer owed.** It landed: **26 PASS, 0 FAIL,
-  1 SEE, Total 1498 s**, `pnpm verify` exiting 0, on the same source that carries the current
-  commits. See §7.
+- **A full clean `pnpm verify` end to end — no longer owed.** It landed: **27 gates, 27 PASS, 0 FAIL,
+  Total 1498 s**, `pnpm verify` exiting 0, on the source that carries the current commits. See §7.
 - **Companion ↔ hub pairing.** Never performed from the companion's own Settings. This is §3.4's
   core and the largest remaining gap.
 - **Tempo measurement, backup byte-match, second-hub refusal, ffmpeg-removed backlog.** The corpus
@@ -556,18 +555,19 @@ run, which is the point: the three broken gates were fixed *before* the tests th
 
 **What is settled.** `test:e2e` is cleared, the three gates broken by my own commits were repaired
 in `51065b7` and each re-verified PASS in isolation, and **the full `pnpm verify` has now landed**:
-**26 PASS, 0 FAIL, 1 SEE, Total 1498 s**, with `pnpm verify` itself exiting 0. Every gate passed,
-including the two that were red for most of this pass — `test:e2e` at 1,258 s against the failing
-run's 2,738 s, and `test:journey` at 24 s.
+**27 gates ran, 27 PASS, 0 FAIL, Total 1498 s**, with `pnpm verify` itself exiting 0. Every gate
+passed, including the two that were red for most of this pass — `test:e2e` at 1,258 s against the
+failing run's 2,738 s, and `test:journey` at 24 s.
 
 The run launched from `30a6c4a` with a clean tree and port 4174 free. HEAD has since moved to
 `7092399`, and **every commit since is `.agents/` documentation — zero non-documentation files
 changed** — so this verdict is a validation of current source, not a stale one.
 
-The one non-PASS row is `windows-package`, reported as `SEE build:windows`: the gate is a no-op on
-Windows (D-2), so the suite never packages the companion. That is the honest ceiling of
-`pnpm verify`, reached — **26 PASS, 0 FAIL, 1 SEE** — and "27/27" would misdescribe what ran, in the
-flattering direction. Windows packaging is covered instead by the installed NSIS build in §2.
+The summary carries one row that is not a gate: `windows-package`, pushed rather than run, reading
+`SEE build:windows` because that gate is a no-op on Windows (D-2) — the suite never packages the
+companion. So the tally is 28 rows for 27 gates, and the honest phrasing is **"27 gates, 27 PASS,
+0 FAIL, plus a non-gate `SEE` for windows-package."** Windows packaging is covered instead by the
+installed NSIS build in §2.
 
 ---
 
