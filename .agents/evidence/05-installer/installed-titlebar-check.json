@@ -1,16 +1,16 @@
 ﻿{
-    "pid":  40108,
-    "title":  "Now Playing Companion",
-    "style":  "0x16CF0000",
-    "exstyle":  "0x00200100",
-    "hasSystemMenu":  true,
-    "screen":  "2560x1440",
-    "styles":  {
-                   "WS_CAPTION":  true,
-                   "WS_SYSMENU":  true,
-                   "WS_THICKFRAME":  true,
-                   "WS_MINIMIZEBOX":  true,
-                   "WS_MAXIMIZEBOX":  true
-               },
-    "verdict":  "NATIVE TITLE BAR PRESENT: minimize, maximize and close all exist"
+  "pid": 40108,
+  "title": "Now Playing Companion",
+  "style": "0x16CF0000",
+  "exstyle": "0x00200100",
+  "hasSystemMenu": true,
+  "screen": "2560x1440",
+  "styles": {
+    "WS_CAPTION": true,
+    "WS_SYSMENU": true,
+    "WS_THICKFRAME": true,
+    "WS_MINIMIZEBOX": true,
+    "WS_MAXIMIZEBOX": true
+  },
+  "verdict": "NATIVE TITLE BAR PRESENT: minimize, maximize and close all exist"
 }

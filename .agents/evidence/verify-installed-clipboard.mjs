@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- stdout IS the evidence record for these CLI reporters. */
 /**
  * Did removing the application menu break copy/paste?
  *

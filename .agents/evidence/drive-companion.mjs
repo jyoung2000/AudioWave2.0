@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- stdout IS the evidence record for these CLI reporters. */
 /**
  * Drive the REAL Windows companion window with Playwright's Electron support.
  *

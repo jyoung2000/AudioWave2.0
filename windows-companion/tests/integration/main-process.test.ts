@@ -53,6 +53,11 @@ vi.mock('electron', () => {
     app: {
       getPath: (key: string) => (key === 'userData' ? dataDir : tmpdir()),
       setPath: () => undefined,
+      // The main process declares the Windows app identity at startup (src/shared/identity.ts),
+      // before the single-instance lock and before the first window. It is a real Electron API,
+      // so the stub has to carry it: without this the whole suite fails to boot with
+      // "app.setAppUserModelId is not a function" and reports it as 20 skipped tests.
+      setAppUserModelId: () => undefined,
       requestSingleInstanceLock: () => true,
       on: (event: string, fn: (...args: unknown[]) => void) => {
         appEvents.set(event, [...(appEvents.get(event) ?? []), fn]);
@@ -68,7 +73,11 @@ vi.mock('electron', () => {
       showSaveDialog: async () => ({ canceled: true }),
     },
     ipcMain: { handle: (channel: string, fn: (event: unknown, request: unknown) => Promise<unknown>) => handlers.set(channel, fn) },
-    Menu: { buildFromTemplate: () => ({}) },
+    // setApplicationMenu(null) runs at startup — the companion has no File/Edit/View/Window bar —
+    // and the tray still builds its own menu below. Both are real Electron APIs, so the stub has to
+    // model both: without this the main process throws "Menu.setApplicationMenu is not a function"
+    // and every assertion in this file fails for a reason that has nothing to do with what it tests.
+    Menu: { buildFromTemplate: () => ({}), setApplicationMenu: () => undefined },
     powerMonitor: { on: () => undefined },
     safeStorage: {
       isEncryptionAvailable: () => true,

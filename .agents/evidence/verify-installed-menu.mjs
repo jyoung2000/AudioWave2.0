@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- stdout IS the evidence record for these CLI reporters. */
 /**
  * Verify the INSTALLED companion: the File/Edit/View/Window menu is really gone.
  *

@@ -18,6 +18,12 @@ export default tseslint.config(
       '**/coverage/**',
       '**/playwright-report/**',
       '**/test-results/**',
+      // A FAILED browser gate parks a copy of its Playwright report under this directory
+      // (verify.mjs `artifacts:`), and that report ships minified viewer bundles. Without this
+      // line the next run's lint gate lints that evidence and reports thousands of errors in
+      // code nobody in this repository wrote — the run that just failed its own lint because
+      // an earlier run's evidence was still on disk. Git-ignored is not the same as lint-ignored.
+      '.verify-artifacts/**',
       // The single-file suite writes its own report and results beside the served one.
       '**/playwright-report-local/**',
       '**/test-results-local/**',

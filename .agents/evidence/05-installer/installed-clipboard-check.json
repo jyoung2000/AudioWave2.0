@@ -23,12 +23,7 @@
     }
   ],
   "errors": [],
-  "tabsSeen": [
-    "Library",
-    "Live TV",
-    "Remote",
-    "Settings3"
-  ],
+  "tabsSeen": ["Library", "Live TV", "Remote", "Settings3"],
   "textFields": [
     {
       "id": "field-_r_1_",
