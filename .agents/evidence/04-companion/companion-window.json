@@ -1,0 +1,59 @@
+{
+  "steps": [
+    {
+      "name": "launched",
+      "detail": "electron window is up"
+    },
+    {
+      "name": "initial-window",
+      "detail": "title=\"Now Playing Companion\" headings=[\"Folders\",\"SAVED MUSIC\",\"No music folders yet\",\"SAVED TV\",\"No TV folders yet\",\"SAVED MOVIES\"]"
+    },
+    {
+      "name": "windows",
+      "detail": "1 open: [{}]"
+    },
+    {
+      "name": "preload-api",
+      "detail": "no preload bridge key found"
+    }
+  ],
+  "consoleErrors": [],
+  "pageErrors": [],
+  "01-initial-window": {
+    "title": "Now Playing Companion",
+    "headings": [
+      "Folders",
+      "SAVED MUSIC",
+      "No music folders yet",
+      "SAVED TV",
+      "No TV folders yet",
+      "SAVED MOVIES",
+      "No movie folders yet",
+      "Music",
+      "No music indexed yet"
+    ],
+    "buttons": [
+      "Scan",
+      "Sync",
+      "Library",
+      "Live TV",
+      "Remote",
+      "Settings",
+      "Scan all music folders",
+      "Add Folder…",
+      "Add Folder…",
+      "Add Folder…",
+      "Send to hub"
+    ],
+    "inputs": [
+      {
+        "id": "search-_r_0_",
+        "type": "search",
+        "placeholder": "Search titles, artists and albums",
+        "aria": "Search"
+      }
+    ],
+    "bodyText": "Now Playing Companion Now Playing Companion Scan Sync Library Live TV Remote Settings Folders The folders on this PC that Now Playing plays from. The companion reads music where it already is — nothing is copied or moved — and folder locations stay on this computer: a hub is told a folder’s name and what is in it, never where it lives. Scan all music folders SAVED MUSIC No music folders yet Add the folder your music is in. The companion indexes it in place; your files are never copied or moved. Add Folder… SAVED TV No TV folders yet A TV folder is kept for the backup and the Live TV tab. It is not indexed as music. Add Folder… SAVED MOVIES No movie folders yet A movies folder is kept for the backup. It is not indexed as music. Add Folder… Music Send to hub No music indexed yet Add a folder and scan it. No hub paired 0 tracks in 0 folders"
+  },
+  "preloadApi": null
+}

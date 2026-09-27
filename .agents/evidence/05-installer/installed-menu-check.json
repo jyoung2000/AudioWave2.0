@@ -1,0 +1,35 @@
+{
+  "installedExe": "C:\\Users\\jalon\\AppData\\Local\\Programs\\Now Playing Companion\\Now Playing Companion.exe",
+  "checks": [
+    {
+      "name": "no application menu exists (Menu.getApplicationMenu() === null)",
+      "pass": true,
+      "detail": "0 top-level items"
+    },
+    {
+      "name": "the File/Edit/View/Window bar is not drawn",
+      "pass": true,
+      "detail": "isMenuBarVisible=false"
+    },
+    {
+      "name": "Alt does not reveal a hidden bar",
+      "pass": true,
+      "detail": "isMenuBarAutoHide=false"
+    },
+    {
+      "name": "window title is the product, never \"Electron\"",
+      "pass": true,
+      "detail": "title=\"Now Playing Companion\""
+    }
+  ],
+  "errors": [],
+  "state": {
+    "applicationMenuIsNull": true,
+    "menuItemCount": 0,
+    "menuLabels": [],
+    "isMenuBarVisible": false,
+    "isMenuBarAutoHide": false,
+    "windowCount": 1,
+    "title": "Now Playing Companion"
+  }
+}

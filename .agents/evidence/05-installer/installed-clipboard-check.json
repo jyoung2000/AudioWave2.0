@@ -1,0 +1,53 @@
+{
+  "installedExe": "C:\\Users\\jalon\\AppData\\Local\\Programs\\Now Playing Companion\\Now Playing Companion.exe",
+  "checks": [
+    {
+      "name": "no application menu in this process (the condition under test)",
+      "pass": true,
+      "detail": "{\"isNull\":true}"
+    },
+    {
+      "name": "the app has at least one editable text field to test",
+      "pass": true,
+      "detail": "3 found"
+    },
+    {
+      "name": "Ctrl+A then Ctrl+C copies the focused field (Edit-menu roles not needed)",
+      "pass": true,
+      "detail": "clipboard=\"http://127.0.0.1:4546\""
+    },
+    {
+      "name": "Ctrl+V pastes from the clipboard",
+      "pass": true,
+      "detail": "field=\"http://127.0.0.1:4546\""
+    }
+  ],
+  "errors": [],
+  "tabsSeen": [
+    "Library",
+    "Live TV",
+    "Remote",
+    "Settings3"
+  ],
+  "textFields": [
+    {
+      "id": "field-_r_1_",
+      "placeholder": null,
+      "type": "text",
+      "label": null
+    },
+    {
+      "id": "field-_r_2_",
+      "placeholder": null,
+      "type": "text",
+      "label": null
+    },
+    {
+      "id": "field-_r_3_",
+      "placeholder": null,
+      "type": "text",
+      "label": null
+    }
+  ],
+  "clipboard": "http://127.0.0.1:4546"
+}
