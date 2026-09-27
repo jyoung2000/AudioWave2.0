@@ -427,6 +427,14 @@ container run both pass against this build. Worth profiling before optimising â€
 bundle that is not yet shown to be the startup cost is the wrong fix. Recorded here so it is not
 mistaken for a green-light or a red-light.
 
+**Packaging debt (not a defect).** `electron-builder` reports `duplicate dependency references
+dependencies=["strtok3@10.3.5","token-types@6.1.2","string-width@4.2.3"]` on every package run. The
+build succeeds and all four Windows artifacts (x64 NSIS, arm64 NSIS, combined installer, x64
+portable) are produced and signed, so this is noise, not a failure. It is recorded because duplicate
+copies of a native-dependency chain can inflate the asar and complicate future native resolution
+(`better-sqlite3` is `asarUnpack`ed and is rebuilt by `@electron/rebuild`, which is where such
+conflicts bite). Low priority; no action taken.
+
 **The unbacked claim.** `design/frontends/airwave-now-playing.html:7578` and the generated
 `music-player/index.html:7491` both tell the user the companion *"decodes the song titles radio
 stations send"*. A search for `streamtitle|icy|somafm|triton|nowplaying` across the player returns
