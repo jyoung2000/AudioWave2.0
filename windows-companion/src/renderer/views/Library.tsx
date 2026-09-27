@@ -3,13 +3,27 @@ import { useState } from 'react';
 import { AquaTable, Button, EmptyState, Panel, SearchField, useToast } from '@now-playing/aqua-ui';
 import type { Track } from '@now-playing/contracts';
 import { invoke } from '../bridge.js';
-import { useAction, useChannel } from '../hooks.js';
+import { useAction, useChannel, type Resource } from '../hooks.js';
+import type { HelperStatus } from '../../shared/ipc.js';
 
-export function LibraryView() {
+/**
+ * Why the Tempo column is still empty, when it is (NP-PRIN-002, UX-SETUP-001): FFmpeg is on its way,
+ * FFmpeg could not be set up, or there is none and this PC cannot get one automatically. Null when
+ * FFmpeg is here and nothing needs saying.
+ */
+export function tempoHint(status: HelperStatus | null): string | null {
+  const ffmpeg = status?.tools.find((t) => t.id === 'ffmpeg');
+  if (!status || ffmpeg?.present) return null;
+  if (ffmpeg?.setup?.state === 'installing') return 'Setting up ffmpeg — tempos appear once it finishes.';
+  if (ffmpeg?.setup?.state === 'failed') return 'Tempo needs ffmpeg, which could not be set up automatically. Try again in Settings.';
+  return 'Tempo needs ffmpeg — install it and rescan.';
+}
+
+export function LibraryView({ helper }: { helper: Resource<HelperStatus> }) {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const tracks = useChannel('library:tracks', { query: query.trim() || undefined, limit: 300, offset: 0 });
-  const helper = useChannel('helper:status', undefined, { pollMs: 30_000 });
+  const hint = tempoHint(helper.data);
   const toast = useToast();
   const reveal = useAction(async (trackId: string) => invoke('app:reveal', { trackId }));
   const send = useAction(async (trackIds: string[]) => invoke('transfers:send', { trackIds }));
@@ -36,9 +50,7 @@ export function LibraryView() {
         </Button>
         {tracks.data ? <span className="companion-hint">{tracks.data.total.toLocaleString()} tracks{query ? ' matching' : ''}</span> : null}
         {/* Unavailable is shown and explained (NP-PRIN-002): silent rows stay silent until the decoder exists. */}
-        {helper.data && !helper.data.tools.some((t) => t.id === 'ffmpeg' && t.present) && items.some((row) => row.bpm === null) ? (
-          <span className="companion-hint">Tempo needs ffmpeg — install it and rescan.</span>
-        ) : null}
+        {hint && items.some((row) => row.bpm === null) ? <span className="companion-hint">{hint}</span> : null}
       </div>
 
       {items.length ? (

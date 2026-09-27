@@ -111,7 +111,23 @@ function emitApp(event: string): void {
   for (const fn of appEvents.get(event) ?? []) fn({ preventDefault: () => undefined });
 }
 
+/**
+ * The embedded helper sets missing downloaders up on start. This suite must never reach the
+ * network, so GitHub answers 503 here and every request to it is recorded; loopback passes through.
+ */
+const githubRequests: string[] = [];
+const realFetch = globalThis.fetch;
+
 beforeAll(async () => {
+  vi.stubGlobal('fetch', (input: string | URL | Request, init?: RequestInit) => {
+    const url = input instanceof Request ? input.url : String(input);
+    if (/^https:\/\/(?:api\.)?github\.com\//.test(url)) {
+      githubRequests.push(url);
+      return Promise.resolve(new Response('offline in tests', { status: 503, statusText: 'Service Unavailable' }));
+    }
+    if (!/^http:\/\/(?:127\.0\.0\.1|localhost)[:/]/.test(url)) return Promise.reject(new Error(`The test suite does not reach ${url}`));
+    return realFetch(input, init);
+  });
   await import('../../src/main/index.js');
   // The bootstrap runs inside `app.whenReady().then(...)`; let that microtask settle.
   await new Promise((resolve) => setTimeout(resolve, 50));
@@ -121,6 +137,7 @@ afterAll(() => {
   // Quitting closes the database; Windows refuses to delete a file that is still open.
   emitApp('before-quit');
   emitApp('will-quit');
+  vi.unstubAllGlobals();
   rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
@@ -227,6 +244,37 @@ describe('the embedded helper and the backup channels', () => {
     expect(token.token).toMatch(/^[A-Za-z0-9_-]{20,}$/);
     // The same token every time: a player that pasted it once keeps working.
     expect(await call('helper:token', undefined)).toEqual(token);
+  });
+
+  it('sets missing downloaders up by itself, reports how that went, and tries again on request', async () => {
+    type Status = { running: boolean; tools: Array<{ id: string; present: boolean; setup?: { state: string; reason?: string } | null }> };
+    const settled = async (): Promise<Status> => {
+      let status = (await call('helper:status', undefined)) as Status;
+      for (let i = 0; i < 200 && status.tools.some((t) => !t.setup || t.setup.state === 'installing'); i += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        status = (await call('helper:status', undefined)) as Status;
+      }
+      return status;
+    };
+    const first = await settled();
+    expect(first.running).toBe(true);
+    for (const tool of first.tools) {
+      // A tool this PC already has is ready; a missing one was tried (GitHub is "down" here) and says why.
+      if (tool.present) expect(tool.setup?.state).toBe('ready');
+      else {
+        expect(['failed', 'unsupported']).toContain(tool.setup?.state);
+        expect(tool.setup?.reason).toBeTruthy();
+      }
+    }
+    if (first.tools.some((t) => t.setup?.state === 'failed')) expect(githubRequests.length).toBeGreaterThan(0);
+
+    // "Try Again" answers at once, with the failed tools already shown as under way.
+    const before = githubRequests.length;
+    const again = (await call('helper:install-tools', undefined)) as Status;
+    expect(again.tools.map((t) => t.id)).toEqual(['yt-dlp', 'spotdl', 'ffmpeg']);
+    expect(again.tools.some((t) => t.setup?.state === 'failed')).toBe(false);
+    const after = await settled();
+    if (after.tools.some((t) => t.setup?.state === 'failed')) expect(githubRequests.length).toBeGreaterThan(before);
   });
 
   it('has no backup folder until one is chosen, and says so instead of guessing', async () => {

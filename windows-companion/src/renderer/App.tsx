@@ -16,12 +16,12 @@ import { FoldersView } from './views/Folders.js';
 import { LiveTvView } from './views/LiveTv.js';
 import { HubView } from './views/Hub.js';
 import { TransfersView } from './views/Transfers.js';
-import { SettingsView } from './views/Settings.js';
+import { needsAttention, SettingsView } from './views/Settings.js';
 import { StreamingView } from './views/Streaming.js';
 import { BackupView } from './views/Backup.js';
 import { AboutView } from './views/About.js';
 import { NoticeBar, useNotices } from './views/NoticeBar.js';
-import type { HubConnection } from '../shared/ipc.js';
+import type { HelperStatus, HubConnection } from '../shared/ipc.js';
 
 /** The sections. Each is a screen in design/coverage.json; the tab it lives in is below. */
 export type ViewId = 'folders' | 'library' | 'live-tv' | 'streaming' | 'hub' | 'transfers' | 'settings' | 'backup' | 'about';
@@ -47,12 +47,17 @@ const SECTION_TITLES: Record<ViewId, string> = {
   about: 'About',
 };
 
+/** While a downloader is being set up its progress is worth watching; otherwise every 30 s is plenty. */
+export function helperPollMs(status: HelperStatus | null): number {
+  return status?.tools.some((t) => t.setup?.state === 'installing') ? 1_500 : 30_000;
+}
+
 export function App() {
   const [tab, setTab] = useState<TabId>('library');
   const info = useChannel('app:info', undefined);
   const folders = useChannel('library:folders', undefined, { pollMs: 5_000 });
   const hubStatus = useChannel('hub:status', undefined, { pollMs: 10_000 });
-  const helper = useChannel('helper:status', undefined, { pollMs: 30_000 });
+  const helper = useChannel('helper:status', undefined, { pollMs: helperPollMs });
   const [liveHub, setLiveHub] = useState<HubConnection | null>(null);
   const notices = useNotices();
 
@@ -62,11 +67,12 @@ export function App() {
   const items = folders.data?.items ?? [];
   const trackCount = items.reduce((sum, folder) => sum + folder.trackCount, 0);
   const unavailable = items.filter((folder) => !folder.available).length;
-  // A missing downloader is worth a badge on Settings, as the mockup's gear wore one.
-  const missingTools = helper.data?.tools.filter((t) => !t.present).length ?? 0;
+  // A downloader that needs the person is worth a badge on Settings, as the mockup's gear wore one.
+  // One still being set up does not: it is on its way (UX-SETUP-001).
+  const missingTools = helper.data?.tools.filter(needsAttention).length ?? 0;
 
   const tabItems = useMemo(
-    () => TABS.map((t) => (t.id === 'settings' && missingTools ? { id: t.id, label: t.label, icon: t.icon, badge: missingTools, badgeLabel: `${missingTools} downloader${missingTools === 1 ? '' : 's'} missing` } : { id: t.id, label: t.label, icon: t.icon })),
+    () => TABS.map((t) => (t.id === 'settings' && missingTools ? { id: t.id, label: t.label, icon: t.icon, badge: missingTools, badgeLabel: `${missingTools} downloader${missingTools === 1 ? '' : 's'} not set up` } : { id: t.id, label: t.label, icon: t.icon })),
     [missingTools],
   );
 
@@ -90,7 +96,7 @@ export function App() {
       case 'folders':
         return <FoldersView onFoldersChanged={folders.reload} />;
       case 'library':
-        return <LibraryView />;
+        return <LibraryView helper={helper} />;
       case 'live-tv':
         return <LiveTvView />;
       case 'streaming':

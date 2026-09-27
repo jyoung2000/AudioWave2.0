@@ -208,14 +208,29 @@ export type AwspStatus = z.infer<typeof AwspStatus>;
 
 /* -------------------------------------------------------------------- helper */
 
+/**
+ * Automatic setup's progress for one tool (UX-SETUP-001): ready, installing with a 0–1 progress,
+ * failed with the reason, or unsupported on this PC with what to do instead.
+ */
+export const HelperToolSetup = z.object({
+  state: z.enum(['ready', 'installing', 'failed', 'unsupported']),
+  progress: z.number().min(0).max(1).optional(),
+  reason: z.string().optional(),
+});
+export type HelperToolSetup = z.infer<typeof HelperToolSetup>;
+
 export const HelperTool = z.object({
   id: z.enum(['yt-dlp', 'spotdl', 'ffmpeg']),
   present: z.boolean(),
   version: z.string().nullable(),
   /** Where it was found, for the person to check; null when absent. */
   path: z.string().nullable(),
-  /** What to do about it, when absent. */
+  /** What to do about it, when absent and it cannot be set up automatically. */
   advice: z.string().nullable(),
+  /** How it was found: `installed` means the companion set it up itself. */
+  origin: z.enum(['path', 'installed', 'configured', 'missing']).optional(),
+  /** Automatic setup's state; absent until setup has looked at the tool. */
+  setup: HelperToolSetup.nullable().optional(),
 });
 export type HelperTool = z.infer<typeof HelperTool>;
 
@@ -329,6 +344,8 @@ export const IPC = {
 
   'helper:status': { request: z.void(), response: HelperStatus },
   'helper:check-tools': { request: z.void(), response: HelperStatus },
+  /** "Try Again": set up every tool that is missing now, without waiting out the retry backoff. Returns at once. */
+  'helper:install-tools': { request: z.void(), response: HelperStatus },
   /** The helper's token, for pasting into a player this app does not serve. Shown, never logged. */
   'helper:token': { request: z.void(), response: z.object({ token: z.string().nullable() }) },
 

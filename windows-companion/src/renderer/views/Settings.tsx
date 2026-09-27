@@ -2,11 +2,12 @@
  * Settings: the downloaders on this PC, how the companion behaves, and the helper's port.
  *
  * Every row is read from the main process and written back through the bridge. The downloader
- * rows keep the mockup's honesty: a missing tool is amber and says what to install; nothing is
- * called ready that has not been found on this PC.
+ * rows keep the mockup's honesty (UX-SETUP-001): a tool being set up says how far along it is, one
+ * that could not be set up is amber with the reason and a Try Again, and only a tool that cannot be
+ * set up on this PC at all says what to install; nothing is called ready that has not been found.
  */
 import { useState } from 'react';
-import { Button, Checkbox, KeyValueList, Panel, PanelSection, StatusDot, TextField, useToast } from '@now-playing/aqua-ui';
+import { Button, Checkbox, KeyValueList, Panel, PanelSection, ProgressBar, StatusDot, TextField, useToast } from '@now-playing/aqua-ui';
 import type { HelperStatus, HelperTool, Preferences } from '../../shared/ipc.js';
 import { invoke } from '../bridge.js';
 import { useAction, useChannel, type Resource } from '../hooks.js';
@@ -17,12 +18,38 @@ const TOOL_ROLES: Record<HelperTool['id'], string> = {
   ffmpeg: 'Converts formats and adds tags',
 };
 
+/**
+ * One downloader's light and words (UX-SETUP-001). Setup's state wins when there is one; without it
+ * (the helper is not running) the row falls back to found or missing.
+ */
+export function toolLook(tool: HelperTool): { kind: 'ok' | 'warning' | 'info'; label: string } {
+  switch (tool.setup?.state) {
+    case 'installing':
+      return { kind: 'info', label: tool.setup.progress !== undefined ? `Setting up… ${Math.round(tool.setup.progress * 100)}%` : 'Setting up…' };
+    case 'failed':
+      return { kind: 'warning', label: 'Couldn’t set up' };
+    case 'unsupported':
+      return tool.present ? { kind: 'ok', label: 'Ready' } : { kind: 'warning', label: 'Install it yourself' };
+    case 'ready':
+      return { kind: 'ok', label: 'Ready' };
+    default:
+      return tool.present ? { kind: 'ok', label: 'Ready' } : { kind: 'warning', label: 'Missing' };
+  }
+}
+
+/** Failed or unsupported-and-absent: the downloaders that need the person, which is what the tab badge counts. */
+export function needsAttention(tool: HelperTool): boolean {
+  if (tool.setup) return tool.setup.state === 'failed' || (tool.setup.state === 'unsupported' && !tool.present);
+  return !tool.present;
+}
+
 export function SettingsView({ helper }: { helper: Resource<HelperStatus> }) {
   const toast = useToast();
   const prefs = useChannel('app:preferences:get', undefined);
   const info = useChannel('app:info', undefined);
   const save = useAction(async (patch: Partial<Preferences>) => invoke('app:preferences:set', patch));
   const check = useAction(async () => invoke('helper:check-tools', undefined));
+  const retry = useAction(async () => invoke('helper:install-tools', undefined));
   const [token, setToken] = useState<string | null>(null);
   const [port, setPort] = useState<string | null>(null);
 
@@ -35,23 +62,36 @@ export function SettingsView({ helper }: { helper: Resource<HelperStatus> }) {
   return (
     <Panel title="Settings">
       <PanelSection title="Downloaders">
-        <p className="companion-hint">The copies on this PC. The hub keeps its own; spotDL runs only here.</p>
+        <p className="companion-hint">The copies on this PC. Missing ones are set up automatically and checked against the SHA-256 their projects publish. The hub keeps its own; spotDL runs only here.</p>
         {helper.data ? (
           <ul className="companion-tools" aria-label="Downloaders" aria-live="polite">
-            {helper.data.tools.map((tool) => (
-              <li key={tool.id} className="companion-tool">
-                <StatusDot kind={tool.present ? 'ok' : 'warning'} label={tool.present ? 'Found' : 'Missing'} />
-                <span className="companion-tool__main">
-                  <b>
-                    {tool.id}
-                    {tool.version ? <span className="companion-tool__version"> {tool.version}</span> : null}
-                  </b>
-                  <span className="companion-hint">{TOOL_ROLES[tool.id]}</span>
-                  {tool.present && tool.path ? <code className="companion-path companion-tool__path">{tool.path}</code> : null}
-                  {!tool.present && tool.advice ? <span className="companion-hint companion-hint--warning">{tool.advice}</span> : null}
-                </span>
-              </li>
-            ))}
+            {helper.data.tools.map((tool) => {
+              const look = toolLook(tool);
+              return (
+                <li key={tool.id} className="companion-tool">
+                  <StatusDot kind={look.kind} label={look.label} />
+                  <span className="companion-tool__main">
+                    <b>
+                      {tool.id}
+                      {tool.version ? <span className="companion-tool__version"> {tool.version}</span> : null}
+                    </b>
+                    <span className="companion-hint">{TOOL_ROLES[tool.id]}</span>
+                    {tool.setup?.state === 'installing' ? <ProgressBar size="small" label={`Setting up ${tool.id}`} {...(tool.setup.progress !== undefined ? { value: tool.setup.progress * 100 } : {})} showValue={false} /> : null}
+                    {tool.present && tool.origin === 'installed' ? <span className="companion-hint">Set up automatically</span> : null}
+                    {tool.present && tool.path ? <code className="companion-path companion-tool__path">{tool.path}</code> : null}
+                    {tool.setup?.state === 'failed' ? (
+                      <span className="companion-inline">
+                        <span className="companion-hint companion-hint--warning">Couldn&rsquo;t set up: {tool.setup.reason ?? 'the download did not finish.'}</span>
+                        <Button size="small" busy={retry.busy} onClick={() => void retry.run().then(() => helper.reload())}>
+                          Try Again
+                        </Button>
+                      </span>
+                    ) : null}
+                    {!tool.present && tool.setup?.state !== 'failed' && tool.setup?.state !== 'installing' && tool.advice ? <span className="companion-hint companion-hint--warning">{tool.setup?.reason ?? tool.advice}</span> : null}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         ) : (
           <p className="companion-hint">{helper.error ?? 'Looking for downloaders…'}</p>

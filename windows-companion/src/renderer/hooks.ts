@@ -14,19 +14,28 @@ export interface Resource<T> {
   reload: () => void;
 }
 
-export function useChannel<C extends IpcChannel>(channel: C, request: IpcRequest<C>, options: { pollMs?: number } = {}): Resource<IpcResponse<C>> {
+/**
+ * `pollMs` may be a function of the latest answer, so a view can watch closely while something is
+ * moving (a downloader being set up) and relax when it is not, without restarting the poll.
+ */
+export function useChannel<C extends IpcChannel>(channel: C, request: IpcRequest<C>, options: { pollMs?: number | ((data: IpcResponse<C> | null) => number) } = {}): Resource<IpcResponse<C>> {
   const [data, setData] = useState<IpcResponse<C> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [nonce, setNonce] = useState(0);
   const key = JSON.stringify(request ?? null);
-  const pollMs = options.pollMs;
+  const pollRef = useRef(options.pollMs);
+  pollRef.current = options.pollMs;
+  const polling = options.pollMs !== undefined;
 
   useEffect(() => {
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let latest: IpcResponse<C> | null = null;
     const load = async (): Promise<void> => {
       try {
         const result = await invoke(channel, JSON.parse(key) as IpcRequest<C>);
+        latest = result;
         if (!cancelled) {
           setData(result);
           setError(null);
@@ -37,13 +46,18 @@ export function useChannel<C extends IpcChannel>(channel: C, request: IpcRequest
         if (!cancelled) setLoading(false);
       }
     };
-    void load();
-    const timer = pollMs ? setInterval(() => void load(), pollMs) : null;
+    const schedule = (): void => {
+      const poll = pollRef.current;
+      if (cancelled || poll === undefined) return;
+      const ms = typeof poll === 'function' ? poll(latest) : poll;
+      if (ms > 0) timer = setTimeout(() => void load().then(schedule), ms);
+    };
+    void load().then(schedule);
     return () => {
       cancelled = true;
-      if (timer) clearInterval(timer);
+      if (timer) clearTimeout(timer);
     };
-  }, [channel, key, nonce, pollMs]);
+  }, [channel, key, nonce, polling]);
 
   return { data, error, loading, reload: useCallback(() => setNonce((n) => n + 1), []) };
 }

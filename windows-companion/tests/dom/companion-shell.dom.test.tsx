@@ -190,6 +190,108 @@ describe("the Library names each tempo's provenance", () => {
   });
 });
 
+describe('downloaders set themselves up (UX-SETUP-001)', () => {
+  const NOW = new Date().toISOString();
+  const base = {
+    'app:info': () => ({ version: '0.1.0', electron: '44.1.1', node: '22.0.0', chrome: '132', platform: 'win32', dataDir: 'C:\\x', contractsVersion: '1.0.0', protocolVersion: 1, signed: false, updateFeedUrl: null }),
+    'library:folders': () => ({ items: [] }),
+    'hub:status': () => ({ endpoint: null, hubId: null, hubName: null, hubFingerprint: null, connected: false, reason: 'No hub is paired.', scopes: [], lastSyncAt: null }),
+    'app:preferences:get': () => ({ launchAtLogin: false, minimizeToTray: true, watchFolders: true, autoSync: false, theme: 'system', helperPort: 17342 }),
+    'backup:settings:get': () => ({ dir: null, include: { music: true, tv: false, movies: false, playlists: true, presets: true, settings: true }, schedule: 'manual', keep: 5, lastRunAt: null, lastRunError: null }),
+    'backup:estimate': () => ({ parts: {}, dataBytes: 812, expectedBytes: 812, complete: true, destination: null, blocked: 'Choose where backups go first.' }),
+    'backup:list': () => ({ items: [] }),
+  };
+  const status = (ffmpeg: Record<string, unknown>) => ({
+    running: true,
+    port: 17342,
+    origin: 'http://127.0.0.1:17342',
+    reason: null,
+    checkedAt: NOW,
+    tools: [
+      { id: 'yt-dlp', present: true, version: '2026.09.20', path: 'C:\\x\\helper\\tools\\yt-dlp.exe', advice: null, origin: 'installed', setup: { state: 'ready' } },
+      { id: 'spotdl', present: false, version: null, path: null, advice: 'Install spotDL.', origin: 'missing', setup: { state: 'failed', reason: 'GitHub did not answer (503).' } },
+      { id: 'ffmpeg', present: false, version: null, path: null, advice: 'Install ffmpeg.', origin: 'missing', ...ffmpeg },
+    ],
+  });
+
+  it('Settings shows setting up with progress, ready and set up automatically, and a failure with Try Again', async () => {
+    const { invoked } = installBridge({ ...base, 'helper:status': () => status({ setup: { state: 'installing', progress: 0.42 } }), 'helper:install-tools': () => status({ setup: { state: 'installing', progress: 0 } }) });
+    render(
+      <Shell>
+        <App />
+      </Shell>,
+    );
+    const tabs = await screen.findByRole('tablist', { name: 'Sections' });
+    // Only the failed tool needs the person; the one on its way does not wear the badge.
+    await waitFor(() => expect(within(tabs).getByRole('tab', { name: /Settings/ }).textContent).toContain('1'));
+    await userEvent.click(within(tabs).getByRole('tab', { name: /Settings/ }));
+    const list = await screen.findByRole('list', { name: 'Downloaders' });
+    expect(within(list).getByText('Setting up… 42%')).toBeTruthy();
+    expect(within(list).getByRole('progressbar', { name: 'Setting up ffmpeg' }).getAttribute('aria-valuenow')).toBe('42');
+    expect(within(list).getByText('Ready')).toBeTruthy();
+    expect(within(list).getByText('Set up automatically')).toBeTruthy();
+    expect(within(list).getByText(/Couldn.t set up: GitHub did not answer \(503\)\./)).toBeTruthy();
+    // The manual advice is only a fallback: a tool being set up, or that failed, does not show it.
+    expect(within(list).queryByText('Install ffmpeg.')).toBeNull();
+    expect(within(list).queryByText('Install spotDL.')).toBeNull();
+    await userEvent.click(within(list).getByRole('button', { name: 'Try Again' }));
+    expect(invoked.some((call) => call.channel === 'helper:install-tools')).toBe(true);
+  });
+
+  it('Settings keeps the install advice for a tool this PC cannot set up', async () => {
+    installBridge({ ...base, 'helper:status': () => status({ setup: { state: 'unsupported', reason: 'Install it with your package manager.' } }) });
+    render(
+      <Shell>
+        <App />
+      </Shell>,
+    );
+    await userEvent.click(await screen.findByRole('tab', { name: /Settings/ }));
+    const list = await screen.findByRole('list', { name: 'Downloaders' });
+    expect(within(list).getByText('Install it yourself')).toBeTruthy();
+    expect(within(list).getByText('Install it with your package manager.')).toBeTruthy();
+  });
+
+  const tracks = {
+    'library:tracks': () => ({
+      items: [{ id: 't3', schemaVersion: 1, createdAt: NOW, updatedAt: NOW, deletedAt: null, title: 'Silent Song', artistId: null, artistName: 'A', albumId: null, albumName: 'LP', albumArtistName: null, discNumber: null, trackNumber: null, genre: null, genres: [], tags: [], year: null, durationMs: 200_000, bpm: null, bpmSource: null, featuredArtists: [], genreProfile: {}, identity: { contentHash: null, quickHash: null, isrc: null, musicbrainzRecordingId: null, musicbrainzReleaseId: null, acoustidId: null, providerIds: {} }, locators: [], artworkId: null, format: null, rootId: null, unsupportedReason: null, liked: false, explicit: null, popularity: null }],
+      total: 1,
+    }),
+  };
+
+  it('the Library says tempos are on their way while ffmpeg is being set up', async () => {
+    installBridge({ ...base, ...tracks, 'helper:status': () => status({ setup: { state: 'installing', progress: 0.1 } }) });
+    render(
+      <Shell>
+        <App />
+      </Shell>,
+    );
+    await screen.findByText('Silent Song');
+    expect(await screen.findByText('Setting up ffmpeg — tempos appear once it finishes.')).toBeTruthy();
+    expect(screen.queryByText(/install it and rescan/)).toBeNull();
+  });
+
+  it('the Library points to Settings when ffmpeg could not be set up, and says nothing once it is ready', async () => {
+    installBridge({ ...base, ...tracks, 'helper:status': () => status({ setup: { state: 'failed', reason: 'No SHA-256.' } }) });
+    render(
+      <Shell>
+        <App />
+      </Shell>,
+    );
+    await screen.findByText('Silent Song');
+    expect(await screen.findByText('Tempo needs ffmpeg, which could not be set up automatically. Try again in Settings.')).toBeTruthy();
+    cleanup();
+
+    installBridge({ ...base, ...tracks, 'helper:status': () => status({ present: true, version: '7.1', path: 'C:\\x\\helper\\tools\\ffmpeg.exe', origin: 'installed', setup: { state: 'ready' } }) });
+    render(
+      <Shell>
+        <App />
+      </Shell>,
+    );
+    await screen.findByText('Silent Song');
+    await waitFor(() => expect(screen.queryByText(/ffmpeg/i)).toBeNull());
+  });
+});
+
 describe('pairing', () => {
   it('shows the fingerprint to compare, and does not claim to be paired while waiting', async () => {
     let resolveAwait: ((value: unknown) => void) | null = null;
