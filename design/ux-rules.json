@@ -353,6 +353,60 @@
       ]
     },
     {
+      "id": "UX-SETUP-001",
+      "group": "feedback",
+      "title": "Downloaders set themselves up and say how far along they are",
+      "contract": "yt-dlp, spotDL and (on Windows) FFmpeg are set up without a prompt, in the background, into the app's own tools folder, and only after the file matches the SHA-256 its project published for that release. Each downloader row reads Setting up… with a named progress bar, Ready (adding \"Set up automatically\" when the app installed it), or Couldn’t set up: <reason> beside a Try Again button; the manual install advice appears only when the tool cannot be set up on this machine. Only failed or unsupported tools count as missing — in the companion's Settings badge and on the player's Connections card, where a tool on its way reads \"setting up\". Where FFmpeg's absence explains an empty Tempo column, the Library says whether it is on its way or could not be set up.",
+      "example": "Settings ▸ Downloaders: “ffmpeg — Setting up… 42%” with a progress bar; “spotdl — Couldn’t set up: GitHub did not answer (503).” and Try Again. Music: “Setting up ffmpeg — tempos appear once it finishes.”",
+      "authority": "adopted",
+      "owners": [
+        "local-helper/src/provision.ts",
+        "local-helper/src/install.ts",
+        "windows-companion/src/main/helper.ts",
+        "windows-companion/src/renderer/views/Settings.tsx",
+        "windows-companion/src/renderer/views/Library.tsx",
+        "windows-companion/src/renderer/App.tsx",
+        "music-player/scripts/make-shell.py"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-shell.dom.test.tsx",
+          "name": "Settings shows setting up with progress, ready and set up automatically, and a failure with Try Again"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-shell.dom.test.tsx",
+          "name": "Settings keeps the install advice for a tool this PC cannot set up"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-shell.dom.test.tsx",
+          "name": "the Library says tempos are on their way while ffmpeg is being set up"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-shell.dom.test.tsx",
+          "name": "the Library points to Settings when ffmpeg could not be set up, and says nothing once it is ready"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/integration/main-process.test.ts",
+          "name": "sets missing downloaders up by itself, reports how that went, and tries again on request"
+        },
+        {
+          "type": "test",
+          "path": "local-helper/tests/unit/install.test.ts",
+          "name": "refuses bytes that do not match the published digest, and leaves nothing behind"
+        },
+        {
+          "type": "test",
+          "path": "local-helper/tests/unit/provision.test.ts",
+          "name": "records a failure and waits six hours before trying again, unless told to try now"
+        }
+      ]
+    },
+    {
       "id": "UX-A11Y-001",
       "group": "feedback",
       "title": "Roles are true and colour is never the only signal",

@@ -82,7 +82,7 @@ A browser page cannot start a program, so yt-dlp and spotDL need something outsi
 | | |
 | --- | --- |
 | Reachable from | 127.0.0.1 only, and not configurable |
-| Tools | Found on PATH or configured. yt-dlp can be fetched on request, verified against the `SHA2-256SUMS` published in the same release. spotDL is not fetched — its releases cannot be verified the same way — and reports the line that installs it |
+| Tools | Found on PATH or configured; otherwise set up automatically on start (owner decision 2026-09-27): yt-dlp, spotDL and, on Windows, FFmpeg, each verified against the SHA-256 GitHub publishes for that release asset, or the checksum file in the same release. With no published SHA-256 nothing is installed and the reason is reported |
 | Arguments | Built in `src/jobs.ts` and nowhere else. The page names a URL, a tool and a format; it can name no flag. `--ignore-config` is always first, because a `yt-dlp.conf` could otherwise add `--exec` |
 | Authorisation | Every fetch carries a `DownloadAuthorizationBasis`; without one the helper refuses |
 | Hosts | An allowlist, and never a private address |

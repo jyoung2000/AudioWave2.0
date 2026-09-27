@@ -722,8 +722,15 @@
       "entry": "Library tab → Music",
       "sourcePaths": ["windows-companion/src/renderer/views/Library.tsx"],
       "components": ["AquaTable", "SearchField", "EmptyState"],
-      "states": ["nothing indexed", "no matches", "tracks"],
-      "rules": ["UX-STATE-001", "VOICE-001"],
+      "states": [
+        "nothing indexed",
+        "no matches",
+        "tracks",
+        "tempo waiting: ffmpeg being set up",
+        "tempo unavailable: ffmpeg could not be set up (try again in Settings)",
+        "tempo unavailable: no ffmpeg (install it and rescan)"
+      ],
+      "rules": ["UX-STATE-001", "VOICE-001", "NP-PRIN-002", "UX-SETUP-001"],
       "guideAnchor": "screens",
       "authority": "adopted"
     },
@@ -824,12 +831,16 @@
       "sourcePaths": ["windows-companion/src/renderer/views/Settings.tsx"],
       "components": ["Panel", "Checkbox", "KeyValueList", "StatusDot", "TextField"],
       "states": [
-        "downloaders found / missing (amber, with what to install)",
+        "downloader setting up (progress bar and %)",
+        "downloader ready (set up automatically, or found on this PC)",
+        "downloader couldn't be set up (amber, reason, Try Again)",
+        "downloader cannot be set up on this PC (amber, with what to install)",
+        "downloaders not looked at yet: found / missing (helper not running)",
         "helper running / not running with reason",
         "port invalid",
         "token shown / hidden"
       ],
-      "rules": ["UX-PRIN-001", "UX-FEED-001"]
+      "rules": ["UX-PRIN-001", "UX-FEED-001", "UX-SETUP-001"]
     },
     {
       "id": "companion-notice-bar",
@@ -944,8 +955,14 @@
       "entry": "now-playing-helper",
       "sourcePaths": ["local-helper/src/cli.ts", "local-helper/src/options.ts"],
       "components": [],
-      "states": ["tools found / missing with install hint", "token shown", "stopping"],
-      "rules": ["VOICE-002"],
+      "states": [
+        "tools found / missing with install hint",
+        "missing tools setting up (verified download)",
+        "--no-auto-tools: found / missing only",
+        "token shown",
+        "stopping"
+      ],
+      "rules": ["VOICE-002", "UX-SETUP-001"],
       "guideAnchor": "platforms",
       "authority": "observed"
     },
@@ -1234,11 +1251,12 @@
       "states": [
         "music on this device (folders/files)",
         "companion found / missing downloaders",
+        "companion downloader setting up (with %), not counted as missing",
         "hub tested / paired",
         "backup measured (nothing sent)",
         "backup will not fit (reason)"
       ],
-      "rules": ["NP-PREF-002", "UX-FEED-001"],
+      "rules": ["NP-PREF-002", "UX-FEED-001", "UX-SETUP-001"],
       "guideAnchor": "screens",
       "authority": "adopted"
     },
@@ -1597,6 +1615,36 @@
       "surfaces": ["companion-folders", "companion-library", "companion-transfers"],
       "rules": ["UX-FEED-001"],
       "evidence": ["windows-companion/tests/integration/companion-and-hub.test.ts"]
+    },
+    {
+      "id": "flow-tool-setup",
+      "title": "Downloaders set themselves up",
+      "preconditions": "The companion (or the standalone helper) starts on a machine without yt-dlp, spotDL or FFmpeg.",
+      "steps": [
+        "The helper starts; the window opens without waiting",
+        "Each missing tool is fetched from its project's GitHub release, one at a time, and checked against the published SHA-256",
+        "Settings ▸ Downloaders shows Setting up… with progress, then Ready — Set up automatically",
+        "When FFmpeg lands, tempos are measured for the library without a rescan"
+      ],
+      "failures": [
+        "No published SHA-256, or a mismatch: nothing is installed; Couldn't set up with the reason and Try Again",
+        "Offline: retried on the next start or after six hours; Try Again retries at once",
+        "No build for this platform (FFmpeg on macOS/Linux): the install advice is shown instead"
+      ],
+      "surfaces": [
+        "companion-settings",
+        "companion-library",
+        "local-helper-cli",
+        "player-shell-settings-sources"
+      ],
+      "rules": ["UX-SETUP-001", "UX-FEED-001"],
+      "evidence": [
+        "local-helper/tests/unit/install.test.ts",
+        "local-helper/tests/unit/provision.test.ts",
+        "local-helper/tests/integration/helper-server.test.ts",
+        "windows-companion/tests/integration/main-process.test.ts",
+        "windows-companion/tests/dom/companion-shell.dom.test.tsx"
+      ]
     },
     {
       "id": "flow-backup",

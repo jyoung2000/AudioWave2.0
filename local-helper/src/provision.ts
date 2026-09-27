@@ -13,6 +13,7 @@
  *
  * `ToolProvisioner` wraps this with the state a server needs: one operation at a time, the live
  * per-tool status that health reports, and a manual install that queues behind an automatic one.
+ * How those states read on screen is design rule UX-SETUP-001 (design/ux-rules.json).
  */
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';

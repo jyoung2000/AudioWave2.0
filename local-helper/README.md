@@ -8,7 +8,32 @@ node now-playing-helper.mjs
 
 That is the whole setup. It finds `now-playing.html` or a built player beside it, serves both on
 `http://127.0.0.1:17342`, opens a browser, and the player comes up with the tools already wired in.
-No container, no desktop app, nothing to configure.
+No container, no desktop app, nothing to configure — and nothing to install first: whatever of
+yt-dlp, spotDL and FFmpeg is missing is set up in the background (see below).
+
+## The tools set themselves up
+
+Since 2026-09-27 (owner decision; `docs/DOWNLOADS_AND_LEGAL.md`) the helper does not wait to be
+asked. On start it looks for each tool — a path you gave it, a copy it set up before, or one on PATH —
+and installs every one that is missing, one at a time: yt-dlp, then FFmpeg, then spotDL.
+
+- **From the project's own GitHub release, verified.** The release is read once through the GitHub
+  API; the file must match the SHA-256 GitHub publishes for it (or, for an older release, the checksum
+  file in that same release). No published SHA-256 means nothing is installed. The verified file must
+  then answer its version flag before it is used.
+- **Into its own folder.** `%LOCALAPPDATA%\NowPlaying\tools` on Windows,
+  `~/Library/Application Support/NowPlaying/tools` on macOS, `~/.local/share/now-playing/tools` on
+  Linux, or `--tools-dir`. Delete that folder to remove them. Copies on PATH or given with `--yt-dlp`
+  and friends are yours and are never replaced.
+- **FFmpeg on Windows only.** On macOS and Linux the helper names the package-manager command instead.
+- **Retried, and kept current.** A failure is recorded in `setup-state.json` and tried again on the
+  next start or after six hours. The yt-dlp it set up is compared with the latest release at most once
+  a day and replaced when it differs (never while a download is running).
+- **Watchable.** `/helper/v1/health` reports each tool's `setup` state — `ready`, `installing` with a
+  progress, `failed` or `unsupported` with the reason — and `POST /helper/v1/tools/<id>/install`
+  installs one now.
+
+`--no-auto-tools` turns all of this off: the helper then uses only what is already installed.
 
 ## Why this exists at all
 
@@ -24,9 +49,8 @@ goes into the document on its way out and the app finds it there.
 
 ## What it will not do
 
-- **It ships no tools.** It finds what you have installed. It can fetch yt-dlp for you, verified
-  against the checksums published in that same release; it will not fetch spotDL, whose releases it
-  cannot verify the same way, and says so with the line that installs it.
+- **It ships no tools, and runs nothing unverified.** It sets the tools up from their projects'
+  releases, as above, and refuses any file whose SHA-256 was not published or does not match.
 - **It listens on loopback only.** Not a setting. A program that runs subprocesses should not be
   reachable from anywhere its operator is not already sitting.
 - **It takes no arguments from the page.** The player names a URL, a tool and an output format. Every
@@ -47,7 +71,8 @@ goes into the document on its way out and the app finds it there.
 | `--allow-origin <o>` | Let a player on that origin call this helper. Needed only with `--no-app`. |
 | `--allow-host <h>` / `--only-hosts <a,b>` | Add to, or replace, the host allowlist. |
 | `--yt-dlp` / `--spotdl` / `--ffmpeg` `<path>` | Use a particular binary instead of looking for one. |
-| `--tools-dir <path>` | Where an installed yt-dlp is kept between runs. |
+| `--tools-dir <path>` | Where the tools it sets up are kept between runs. |
+| `--no-auto-tools` | Do not set up missing tools on start, and do not update the yt-dlp it set up. |
 | `--work-dir <path>` | Where downloads are staged. Default: the system temp directory. Each run makes its own new folder inside it and deletes only that folder on exit. |
 | `--timeout <seconds>` | Give up on one job after this long. Default 900. |
 | `--no-open` | Do not open a browser. |
@@ -67,9 +92,10 @@ behind a disclosure triangle.
 
 ## FFmpeg
 
-Optional, and its absence is reported rather than worked around. Without it nothing can be converted
-and yt-dlp is asked for the best single audio stream a site offers rather than told to extract one,
-so you get whatever container that was. The player's format buttons grey out accordingly.
+Set up automatically on Windows; on macOS and Linux, install it with your package manager. Until it
+is there, its absence is reported rather than worked around: nothing can be converted and yt-dlp is
+asked for the best single audio stream a site offers rather than told to extract one, so you get
+whatever container that was. The player's format buttons grey out accordingly.
 
 ## One thing `/health` gives away
 
@@ -81,7 +107,7 @@ So it is worth being plain about what that costs. A page on an allowed origin ca
 token:
 
 - that a helper is running on this machine, and its version;
-- which of yt-dlp, spotDL and FFmpeg are installed, and their versions;
+- which of yt-dlp, spotDL and FFmpeg are installed, their versions, and how their setup is going;
 - which hosts the helper will fetch from, and how long it has been up.
 
 It does **not** reveal any filesystem path — `publicTool()` strips the path before the record leaves
@@ -121,6 +147,8 @@ Put it beside `now-playing.html` and it is the whole product.
 
 `tests/unit` covers the parts where being wrong is dangerous rather than merely broken: the command
 line it builds, the environment it hands a subprocess, which origins it answers, which paths it
-serves. `tests/integration` runs the whole chain over a real socket against a stub that behaves like
+serves — and the installer, the zip reader and automatic setup, against a fake GitHub, so a file that
+does not match its published SHA-256 is proven to be refused without anything reaching the network.
+`tests/integration` runs the whole chain over a real socket against a stub that behaves like
 yt-dlp — so the wiring is tested without the suite depending on a video still existing somewhere.
 `music-player/tests/e2e/helper.spec.ts` does the same from the browser's side.
