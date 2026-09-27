@@ -26,6 +26,8 @@ export interface Options {
   /** Folders a backup can include, and the folder backups go to (`/helper/v1/backup/estimate`). */
   backup: { folders: { music?: string | undefined; tv?: string | undefined; movies?: string | undefined }; backupDir: string | null };
   tools: { 'yt-dlp'?: string | undefined; spotdl?: string | undefined; ffmpeg?: string | undefined };
+  /** Set up missing tools on start (default). `--no-auto-tools` turns it off. */
+  autoTools: boolean;
   help: boolean;
   showVersion: boolean;
 }
@@ -36,8 +38,10 @@ export const HELP = `now-playing-helper — run yt-dlp and spotDL for the Now Pl
   loopback address and runs the tools on its behalf, so the two share an origin
   and there is nothing to configure.
 
-  It does not ship the tools. It finds what you have installed, and it can fetch
-  yt-dlp for you — verified against the checksums published with that release.
+  It does not ship the tools. It uses what you have installed, and on start it
+  sets up whatever is missing — yt-dlp, spotDL and, on Windows, FFmpeg — in its
+  own tools folder, each checked against the SHA-256 its project published on
+  GitHub for that release. Nothing unverified is ever run.
 
 Usage
   now-playing-helper [options]
@@ -50,7 +54,11 @@ Options
   --allow-origin <o>    Let a player on this origin call the helper (repeatable)
   --allow-host <h>      Add a host the tools may fetch from (repeatable)
   --only-hosts <a,b>    Replace the host allowlist entirely
-  --tools-dir <path>    Where an installed yt-dlp is kept
+  --tools-dir <path>    Where the tools it sets up are kept (default: "tools" in
+                        %LOCALAPPDATA%\\NowPlaying, ~/Library/Application Support/
+                        NowPlaying or ~/.local/share/now-playing)
+  --no-auto-tools       Do not set up missing tools on start, and do not update
+                        the yt-dlp it set up; use only what is already installed
   --music-dir <path>    Music folder, measured for the backup size estimate
   --tv-dir <path>       TV folder, measured likewise
   --movies-dir <path>   Movies folder, measured likewise
@@ -85,6 +93,7 @@ export function parseArgs(argv: readonly string[]): Options {
     timeoutMs: 900_000,
     backup: { folders: {}, backupDir: null },
     tools: {},
+    autoTools: true,
     help: false,
     showVersion: false,
   };
@@ -143,6 +152,12 @@ export function parseArgs(argv: readonly string[]): Options {
       }
       case '--tools-dir':
         options.toolsDir = next();
+        break;
+      case '--no-auto-tools':
+        options.autoTools = false;
+        break;
+      case '--auto-tools':
+        options.autoTools = true;
         break;
       case '--music-dir':
         options.backup.folders.music = next();

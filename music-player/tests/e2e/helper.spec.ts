@@ -57,7 +57,7 @@ test.beforeAll(async () => {
   const stub = writeStub(scratch);
   helper = spawn(
     process.execPath,
-    [join(REPO, 'local-helper/dist/now-playing-helper.mjs'), '--no-open', '--port', String(PORT), '--app', join(REPO, 'music-player/dist'), '--yt-dlp', stub, '--work-dir', join(scratch, 'work'), '--tools-dir', join(scratch, 'tools')],
+    [join(REPO, 'local-helper/dist/now-playing-helper.mjs'), '--no-open', '--port', String(PORT), '--app', join(REPO, 'music-player/dist'), '--yt-dlp', stub, '--work-dir', join(scratch, 'work'), '--tools-dir', join(scratch, 'tools'), '--no-auto-tools'],
     { stdio: 'ignore' },
   );
   for (let attempt = 0; attempt < 100; attempt += 1) {

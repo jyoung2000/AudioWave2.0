@@ -28,7 +28,8 @@ import { HELPER_DEFAULT_HOSTS, HELPER_PROTOCOL, HELPER_ROUTES, HelperFetchReques
 import { Jobs } from './jobs.js';
 import { serveApp, type AppSource } from './app.js';
 import { checkFetchUrl, hostAllowed, originAllowed, tokenMatches, type OriginPolicy } from './security.js';
-import { cachedResolver, installYtDlp, publicTool, type ResolvedTool } from './tools.js';
+import { cachedResolver, publicTool, type ResolvedTool } from './tools.js';
+import { ToolProvisioner } from './provision.js';
 
 const MAX_BODY_BYTES = 64 * 1024;
 const MAX_JOBS = 50;
@@ -49,12 +50,20 @@ export interface HelperOptions {
   finishedTtlMs?: number;
   /** The folders a backup can include, and where backups go. Unset folders are simply not measured. */
   backup?: { folders: Partial<Record<BackupPart, string | readonly string[] | null | undefined>>; backupDir: string | null; budgetMs?: number; now?: () => number };
+  /** How tool setup reaches GitHub. Tests pass a fake; nothing else should. */
+  fetchImpl?: typeof fetch;
+  /** Called when setup lands a tool, after the resolver has forgotten its old answer. */
+  onToolInstalled?: (id: ToolId) => void;
+  /** Called whenever a tool's setup status changes. */
+  onToolSetupChange?: () => void;
 }
 
 export interface Helper {
   server: Server;
   jobs: Jobs;
   origin: string;
+  /** Tool setup. The CLI and the companion call `tools.ensure()` after start; the server never does by itself. */
+  tools: ToolProvisioner;
   close: () => Promise<void>;
 }
 
@@ -67,7 +76,18 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
   let port = options.port;
   let origin = `http://127.0.0.1:${port}`;
   let policy: OriginPolicy = { allowed: options.allowedOrigins, self: options.app ? origin : null };
-  let installing: Promise<HelperInstallResult> | null = null;
+  const tools = new ToolProvisioner({
+    toolsDir: options.toolsDir,
+    configured: options.configured,
+    ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
+    busy: () => jobs.busy(),
+    log: options.log,
+    onInstalled: (id) => {
+      resolver.invalidate();
+      options.onToolInstalled?.(id);
+    },
+    ...(options.onToolSetupChange ? { onChange: options.onToolSetupChange } : {}),
+  });
   const estimate = createEstimator(options.backup ?? { folders: {}, backupDir: null });
 
   const server = createServer((request, response) => {
@@ -110,15 +130,21 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
     }
 
     if (path === HELPER_ROUTES.health && request.method === 'GET') {
-      const tools = await resolve_();
+      const found = await resolve_();
+      const setup = tools.status();
+      const withSetup = (id: ToolId) => {
+        const record = publicTool(found[id]);
+        const state = setup[id];
+        return state ? { ...record, setup: state } : record;
+      };
       const health: HelperHealth = {
         helper: 'now-playing-local-helper',
         protocol: HELPER_PROTOCOL,
         version: options.version,
         servesApp: options.app !== null,
-        tools: [publicTool(tools['yt-dlp']), publicTool(tools.spotdl), publicTool(tools.ffmpeg)],
+        tools: [withSetup('yt-dlp'), withSetup('spotdl'), withSetup('ffmpeg')],
         allowedHosts: [...options.allowedHosts],
-        formats: tools.ffmpeg.present ? ['original', 'mp3', 'aac', 'opus', 'flac'] : ['original'],
+        formats: found.ffmpeg.present ? ['original', 'mp3', 'aac', 'opus', 'flac'] : ['original'],
         startedAt,
       };
       return send(response, 200, health);
@@ -136,16 +162,17 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
       if (body === undefined) return;
       const parsed = HelperFetchRequest.safeParse(body);
       if (!parsed.success) return fail(response, 400, 'validation', `That request is not one this helper understands: ${parsed.error.issues[0]?.message ?? 'invalid'}.`);
-      if (installing) return fail(response, 409, 'busy', 'yt-dlp is being installed. Try again in a moment.');
       await jobs.sweep();
       if (jobs.list().length >= MAX_JOBS && !(await jobs.evictOldestFinished())) return fail(response, 429, 'busy', 'There are already too many jobs here. Clear some before starting another.');
 
       const checked = checkFetchUrl(parsed.data.url, options.allowedHosts);
       if (!checked.ok || !checked.url) return fail(response, 400, 'url', checked.reason ?? 'That address is not one this helper will fetch from.');
 
-      const tools = await resolve_();
       const tool = pickTool(parsed.data.tool, checked.url);
-      if (!tools[tool].present) return fail(response, 409, 'tool-missing', tools[tool].installHint ?? `${tool} is not installed.`);
+      // Only the tool being set up is off limits: its file is about to be replaced.
+      if (tools.installing() === tool) return fail(response, 409, 'busy', `${tool} is being set up. Try again in a moment.`);
+      const found = await resolve_();
+      if (!found[tool].present) return fail(response, 409, 'tool-missing', tools.status()[tool]?.reason ?? found[tool].installHint ?? `${tool} is not installed.`);
 
       const job = jobs.create({ url: checked.url.toString(), tool, format: parsed.data.format as OutputFormat });
       options.log(`job ${job.id}: ${tool} ${checked.url.hostname} (${parsed.data.authorization.basis})`);
@@ -156,28 +183,16 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
     if (install && request.method === 'POST') {
       const tool = HelperToolId.safeParse(install[1]);
       if (!tool.success) return fail(response, 404, 'not-found', 'No such tool.');
-      if (tool.data !== 'yt-dlp') {
-        const result: HelperInstallResult = { tool: tool.data, installed: false, version: null, reason: `The helper does not fetch ${tool.data}; install it yourself so you know where it came from.` };
-        return send(response, 409, result);
-      }
+      const id = tool.data;
       // Replacing a binary a job is running fails on Windows, so wait for the jobs instead.
-      if (!installing && jobs.busy()) {
-        const result: HelperInstallResult = { tool: 'yt-dlp', installed: false, version: null, reason: 'Downloads are running. Wait for them to finish, then install again.' };
+      if (jobs.busy() && (await resolve_())[id].present) {
+        const result: HelperInstallResult = { tool: id, installed: false, version: null, reason: 'Downloads are running. Wait for them to finish, then install again.' };
         return send(response, 409, result);
       }
-      // One install at a time; a second request waits for the first and gets its answer.
-      installing ??= (async (): Promise<HelperInstallResult> => {
-        try {
-          options.log(`installing yt-dlp into ${options.toolsDir}`);
-          const outcome = await installYtDlp(options.toolsDir);
-          options.log(outcome.installed ? `installed ${outcome.version}` : `install refused: ${outcome.reason ?? 'unknown'}`);
-          return { tool: 'yt-dlp', installed: outcome.installed, version: outcome.version, reason: outcome.reason };
-        } finally {
-          resolver.invalidate();
-          installing = null;
-        }
-      })();
-      const result = await installing;
+      // One install at a time: this queues behind automatic setup or another request, then runs.
+      const outcome = await tools.install(id);
+      resolver.invalidate();
+      const result: HelperInstallResult = { tool: id, installed: outcome.installed, version: outcome.version, reason: outcome.reason };
       return send(response, result.installed ? 200 : 409, result);
     }
 
@@ -276,6 +291,7 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
     server,
     jobs,
     origin,
+    tools,
     close: async () => {
       clearInterval(sweeper);
       await jobs.shutdown();

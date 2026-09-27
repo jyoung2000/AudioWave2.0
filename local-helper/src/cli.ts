@@ -78,11 +78,21 @@ export async function main(argv: readonly string[] = process.argv.slice(2), out:
   out(`  ${app ? 'Player and tools' : 'Tools'} at  ${helper.origin}`);
   out('');
   for (const tool of [tools['yt-dlp'], tools.spotdl, tools.ffmpeg]) {
-    out(`  ${tool.present ? '·' : '!'} ${tool.id.padEnd(8)} ${tool.present ? (tool.version ?? 'present') : 'not installed'}`);
+    const missing = options.autoTools && tool.installable ? 'setting up — verified download' : 'not installed';
+    out(`  ${tool.present ? '·' : '!'} ${tool.id.padEnd(8)} ${tool.present ? (tool.version ?? 'present') : missing}`);
   }
-  if (!tools['yt-dlp'].present) out(`    yt-dlp is the one that matters. The player can fetch it for you from Settings → Platforms.`);
-  if (!tools.ffmpeg.present) out(`    Without FFmpeg nothing can be converted, and the player will say so.`);
+  if (!options.autoTools && !tools['yt-dlp'].present) out(`    yt-dlp is the one that matters. Run without --no-auto-tools and it is set up for you.`);
+  if (!tools.ffmpeg.present && !tools.ffmpeg.installable) out(`    Without FFmpeg nothing can be converted. ${tools.ffmpeg.installHint ?? ''}`.trimEnd());
   out('');
+
+  // Missing tools are set up in the background, one at a time, so the player is usable at once.
+  // Failed ones are retried after six hours; the check also keeps the yt-dlp it set up current.
+  let setupTimer: NodeJS.Timeout | null = null;
+  if (options.autoTools) {
+    void helper.tools.ensure({ ignoreBackoff: true }).catch((error: unknown) => out(`  Tool setup stopped: ${error instanceof Error ? error.message : String(error)}`));
+    setupTimer = setInterval(() => void helper.tools.ensure().catch(() => undefined), 60 * 60 * 1000);
+    setupTimer.unref();
+  }
   if (!app) {
     out(`  Serving the API only. Allowed origins: ${options.allowedOrigins.length ? options.allowedOrigins.join(', ') : 'none yet — add one with --allow-origin'}`);
     out(`  Token (paste it into Settings → Platforms):`);
@@ -99,6 +109,7 @@ export async function main(argv: readonly string[] = process.argv.slice(2), out:
     if (stopping) return;
     stopping = true;
     out('\nStopping.');
+    if (setupTimer) clearInterval(setupTimer);
     try {
       await helper.close();
     } finally {
