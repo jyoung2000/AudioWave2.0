@@ -123,4 +123,62 @@ describe('runTempoPass', () => {
     const result = await runTempoPass({ store, ffmpegPath: 'C:/tools/ffmpeg.exe', resolvePath: () => null, analyze: async () => ({ bpm: 100, confidence: 2 }) });
     expect(result.measured).toBe(0);
   });
+
+  it('an answer for a file that was retagged mid-pass is thrown away, never written over the tag', async () => {
+    await runTempoPass({
+      store,
+      ffmpegPath: 'C:/tools/ffmpeg.exe',
+      resolvePath: (r) => 'C:/music/' + r.relativePath,
+      analyze: async (_deps, file) => {
+        if (file.absolutePath.endsWith('silent.flac')) {
+          // While ffmpeg listens, a scan re-reads the retagged file: new mtime, a tempo from the tag.
+          store.upsertTrack({ ...record({ ...silent, bpm: 140, bpmSource: 'tag' }, 'silent.flac'), mtimeMs: 2 });
+        }
+        return { bpm: 120, confidence: 2 };
+      },
+    });
+    const after = store.findTrack(silent.id)!.track;
+    expect(after.bpm).toBe(140);
+    expect(after.bpmSource).toBe('tag');
+  });
+
+  it('a track deleted mid-pass stays deleted', async () => {
+    await runTempoPass({
+      store,
+      ffmpegPath: 'C:/tools/ffmpeg.exe',
+      resolvePath: (r) => 'C:/music/' + r.relativePath,
+      analyze: async (_deps, file) => {
+        if (file.absolutePath.endsWith('silent.flac')) store.tombstone(silent.id, new Date().toISOString());
+        return { bpm: 120, confidence: 2 };
+      },
+    });
+    const after = store.findTrack(silent.id)!;
+    expect(after.deletedAt).not.toBeNull();
+    expect(after.track.bpm).toBeNull();
+  });
+
+  it('a file that cannot be measured is left alone until the file itself changes', async () => {
+    const failEverything = { store, ffmpegPath: 'C:/tools/ffmpeg.exe', resolvePath: (r: StoredTrack) => 'C:/music/' + r.relativePath };
+    await runTempoPass({ ...failEverything, analyze: async () => null });
+    let asked = 0;
+    await runTempoPass({ ...failEverything, analyze: async () => { asked += 1; return null; } });
+    expect(asked, 'a failed file is not decoded again while unchanged').toBe(0);
+    // The file changes on disk: a rescan writes a new mtime, and the backlog wants it again.
+    store.upsertTrack({ ...record(silent, 'silent.flac'), mtimeMs: 2 });
+    await runTempoPass({ ...failEverything, analyze: async () => { asked += 1; return null; } });
+    expect(asked).toBe(1);
+  });
+
+  it('a store closed mid-pass ends the pass quietly', async () => {
+    const result = await runTempoPass({
+      store,
+      ffmpegPath: 'C:/tools/ffmpeg.exe',
+      resolvePath: (r) => 'C:/music/' + r.relativePath,
+      analyze: async () => {
+        store.close();
+        return { bpm: 120, confidence: 2 };
+      },
+    });
+    expect(result.measured + result.skipped).toBeLessThanOrEqual(3);
+  });
 });

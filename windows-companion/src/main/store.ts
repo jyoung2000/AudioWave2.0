@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS tracks (
   content_hash TEXT,
   updated_at TEXT NOT NULL,
   deleted_at TEXT,
+  tempo_attempted_mtime INTEGER,
   UNIQUE(folder_id, relative_path)
 );
 
@@ -108,6 +109,13 @@ function migrate(db: CompanionDb): void {
     const columns = db.prepare<[], { name: string }>('PRAGMA table_info(folders)').all().map((c) => c.name);
     if (!columns.includes('kind')) db.exec("ALTER TABLE folders ADD COLUMN kind TEXT NOT NULL DEFAULT 'music'");
     db.pragma('user_version = 2');
+  }
+  // Version 3: the tempo pass remembers which file version it already tried, so an unmeasurable
+  // file (silence, spoken word, an undecodable stream) is not decoded again until it changes.
+  if (version < 3) {
+    const columns = db.prepare<[], { name: string }>('PRAGMA table_info(tracks)').all().map((c) => c.name);
+    if (!columns.includes('tempo_attempted_mtime')) db.exec('ALTER TABLE tracks ADD COLUMN tempo_attempted_mtime INTEGER');
+    db.pragma('user_version = 3');
   }
 }
 
@@ -260,12 +268,39 @@ export class CompanionStore {
     })();
   }
 
-  /** Files with no tempo from any source yet — the after-scan measurement pass's backlog. */
+  /**
+   * Files with no tempo from any source yet — the after-scan measurement pass's backlog.
+   * A file the pass already tried at its current mtime is left out: it did not yield a tempo
+   * last time and has not changed since, so decoding it again buys nothing.
+   */
   tracksNeedingTempo(limit: number): StoredTrack[] {
     return this.db
-      .prepare<[number], TrackRow>("SELECT * FROM tracks WHERE deleted_at IS NULL AND json_extract(track, '$.bpm') IS NULL ORDER BY updated_at ASC LIMIT ?")
+      .prepare<[number], TrackRow>(
+        "SELECT * FROM tracks WHERE deleted_at IS NULL AND json_extract(track, '$.bpm') IS NULL AND (tempo_attempted_mtime IS NULL OR tempo_attempted_mtime <> mtime_ms) ORDER BY updated_at ASC LIMIT ?",
+      )
       .all(limit)
       .map(toStoredTrack);
+  }
+
+  /**
+   * Record one measurement outcome, touching nothing else on the row.
+   *
+   * The pass works from a backlog read minutes earlier, so every guard here makes a stale answer
+   * harmless: the row must still be alive, still be the same file (mtime) that was decoded, and
+   * still have no tempo — a tag written by a concurrent rescan wins over a measurement. A null
+   * answer only marks the attempt. Titles never change here, so the search index needs nothing.
+   */
+  recordMeasuredTempo(id: string, mtimeMs: number, bpm: number | null, now: string): boolean {
+    if (bpm === null) {
+      this.db.prepare('UPDATE tracks SET tempo_attempted_mtime = mtime_ms WHERE id = ? AND deleted_at IS NULL AND mtime_ms = ?').run(id, mtimeMs);
+      return false;
+    }
+    const changed = this.db
+      .prepare(
+        "UPDATE tracks SET track = json_set(track, '$.bpm', ?, '$.bpmSource', 'analysis'), updated_at = ?, tempo_attempted_mtime = mtime_ms WHERE id = ? AND deleted_at IS NULL AND mtime_ms = ? AND json_extract(track, '$.bpm') IS NULL",
+      )
+      .run(bpm, now, id, mtimeMs).changes;
+    return changed > 0;
   }
 
   findTrackByPath(folderId: string, relativePath: string): StoredTrack | undefined {

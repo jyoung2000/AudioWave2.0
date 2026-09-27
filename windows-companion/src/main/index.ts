@@ -41,6 +41,7 @@ let backups: BackupManager | null = null;
 let helper: EmbeddedHelper | null = null;
 let awsp: AwspSupervisor | null = null;
 let scanning: AbortController | null = null;
+let tempoPass: AbortController | null = null;
 let watcher: FolderWatcher | null = null;
 let isQuitting = false;
 const transfers = new Map<string, TransferProgress>();
@@ -210,6 +211,8 @@ function showWindow(): void {
 
 async function startScan(folderId?: string): Promise<{ started: boolean; reason: string | null }> {
   if (scanning) return { started: false, reason: 'A scan is already running.' };
+  // A new scan supersedes the previous scan's measurement pass; its leftovers re-queue anyway.
+  tempoPass?.abort();
   const folders = folderId ? [store!.findFolder(folderId)].filter(Boolean) : store!.raw.prepare<[], { id: string; path: string }>('SELECT id, path FROM folders').all();
   if (!folders.length) return { started: false, reason: 'No folders have been added yet.' };
 
@@ -244,17 +247,24 @@ async function startScan(folderId?: string): Promise<{ started: boolean; reason:
       if (scanning === controller) scanning = null;
     }
     // The measurement pass rides behind the scan it belongs to: files that still have no tempo
-    // get one from their own audio, one at a time, and a new scan's controller aborts this one.
+    // get one from their own audio, one at a time. It carries its own controller because the
+    // scan's is already released by now — the next scan, and quitting, abort it through that.
     if (!signal.aborted && store?.isOpen) {
-      const tools = await helper?.checkTools().catch(() => null);
-      const ffmpegPath = tools?.tools.find((t) => t.id === 'ffmpeg' && t.present)?.path ?? null;
-      await runTempoPass({
-        store,
-        ffmpegPath,
-        signal,
-        resolvePath: (record) => absolutePathOf(store!, record.id),
-      });
-      // No invented event: the Library view re-queries whenever it looks (Task 3 pins that).
+      const pass = new AbortController();
+      tempoPass = pass;
+      try {
+        const tools = await helper?.checkTools().catch(() => null);
+        const ffmpegPath = tools?.tools.find((t) => t.id === 'ffmpeg' && t.present)?.path ?? null;
+        await runTempoPass({
+          store,
+          ffmpegPath,
+          signal: pass.signal,
+          resolvePath: (record) => absolutePathOf(store!, record.id),
+        });
+        // No invented event: the Library view re-queries whenever it looks (Task 3 pins that).
+      } finally {
+        if (tempoPass === pass) tempoPass = null;
+      }
     }
   })().catch((err: unknown) => console.error('Library scan stopped:', err));
   return { started: true, reason: null };
@@ -578,6 +588,7 @@ if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow())))
   app.on('before-quit', () => {
     isQuitting = true;
     scanning?.abort();
+    tempoPass?.abort();
     for (const upload of uploads.values()) upload.abort();
     tray?.destroy();
     tray = null;

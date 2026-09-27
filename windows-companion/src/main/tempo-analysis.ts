@@ -101,9 +101,10 @@ export async function runTempoPass(deps: TempoPassDeps): Promise<{ measured: num
   let measured = 0;
   let skipped = 0;
   for (const record of backlog) {
-    if (deps.signal?.aborted) break;
+    if (deps.signal?.aborted || !deps.store.isOpen) break;
     const absolutePath = deps.resolvePath(record);
     if (!absolutePath) {
+      // The folder may be back later (a disconnected drive); no attempt is recorded for it.
       skipped += 1;
       continue;
     }
@@ -113,12 +114,12 @@ export async function runTempoPass(deps: TempoPassDeps): Promise<{ measured: num
     } catch {
       answer = null; // an undecodable file is a fact about the file, not a reason to stop
     }
-    if (!answer) {
-      skipped += 1;
-      continue;
-    }
-    deps.store.upsertTrack({ ...record, track: { ...record.track, bpm: answer.bpm, bpmSource: 'analysis' }, updatedAt: new Date().toISOString() });
-    measured += 1;
+    if (!deps.store.isOpen) break;
+    // The store, not this stale copy, decides whether the answer still applies: the row must be
+    // alive, unchanged on disk and still tempo-less. A null answer marks the attempt so the file
+    // is not decoded again until it changes.
+    if (deps.store.recordMeasuredTempo(record.id, record.mtimeMs, answer?.bpm ?? null, new Date().toISOString())) measured += 1;
+    else skipped += 1;
   }
   return { measured, skipped };
 }

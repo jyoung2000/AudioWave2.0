@@ -163,10 +163,13 @@ describe('migrating a database written by an earlier build', () => {
 
       const upgraded = new CompanionStore(openCompanionDb(file));
       try {
-        // Version 2 added the folder kind; a database from before either migration lands on the current one.
-        expect(upgraded.raw.pragma('user_version', { simple: true })).toBe(2);
+        // Version 2 added the folder kind, version 3 the tempo-attempt marker; a database from
+        // before any migration lands on the current one with every column in place.
+        expect(upgraded.raw.pragma('user_version', { simple: true })).toBe(3);
         const sql = upgraded.raw.prepare<[], { sql: string }>("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'tracks'").get()?.sql;
         expect(sql).not.toMatch(/CASCADE/i);
+        const trackColumns = upgraded.raw.prepare<[], { name: string }>('PRAGMA table_info(tracks)').all().map((c) => c.name);
+        expect(trackColumns).toContain('tempo_attempted_mtime');
         expect(upgraded.searchTracks({ query: 'Survivor', limit: 10, offset: 0 }).items).toHaveLength(1);
 
         upgraded.removeFolder('f', new Date().toISOString());
