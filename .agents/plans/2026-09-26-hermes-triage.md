@@ -420,6 +420,13 @@ rather than weakened.
 | Radio on-air titles (ICY) | player | — | NOT TESTABLE HERE, **claim unbacked** | "The card says it decodes radio titles. No code does." | see below |
 | Android | android | — | NOT TESTABLE HERE | no SDK/emulator/device | — |
 
+**Performance debt (not a defect).** `pnpm build:player` succeeds but Vite warns that a minified
+chunk exceeds 500 kB, and the PWA service worker precaches **36 entries / 2,418 KiB** (≈2.4 MiB) on
+first load. That is a startup-cost observation, not a functional failure: the journey and the
+container run both pass against this build. Worth profiling before optimising — code-splitting a
+bundle that is not yet shown to be the startup cost is the wrong fix. Recorded here so it is not
+mistaken for a green-light or a red-light.
+
 **The unbacked claim.** `design/frontends/airwave-now-playing.html:7578` and the generated
 `music-player/index.html:7491` both tell the user the companion *"decodes the song titles radio
 stations send"*. A search for `streamtitle|icy|somafm|triton|nowplaying` across the player returns
