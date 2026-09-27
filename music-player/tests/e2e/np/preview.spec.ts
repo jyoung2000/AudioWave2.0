@@ -184,6 +184,62 @@ test('reduced motion never arms; the click still works', async ({ browser }) => 
   }
 });
 
+test('switching auditions keeps the main track aside until the last one ends', async ({ page }) => {
+  const second = hubRow({ id: 'spotify:track:def', providerId: 'def', title: 'Silver Hour', previewUrl: 'https://p.scdn.co/mp3-preview/def', canonicalUrl: 'https://open.spotify.com/track/def' });
+  await pairAndOpen(page, [hubRow(), second]);
+  await page.route('https://p.scdn.co/**', (r) => r.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'content-type': 'audio/wav' }, body: silentWav() }));
+  await page.fill('#q', 'Hour');
+  await page.press('#q', 'Enter');
+  await page.waitForSelector('.srch__row[data-i="1"]');
+  // A stand-in engine with the real one's timing: playing() answers false until a resume lands.
+  await page.evaluate(() => {
+    (window as unknown as { NP_PLAYER: unknown }).NP_PLAYER = {
+      _p: true, _resumed: 0,
+      playing() { return (this as { _p: boolean })._p; },
+      pause() { (this as { _p: boolean })._p = false; },
+      resume() { const s = this as { _p: boolean; _resumed: number }; s._resumed += 1; setTimeout(() => { s._p = true; }, 150); },
+    };
+  });
+  await page.click('.srch__row[data-i="0"] button.srch__art');
+  await expect(page.locator('.srch__row[data-i="0"] .srch__art.is-preview')).toHaveCount(1);
+  await page.click('.srch__row[data-i="1"] button.srch__art');
+  await expect(page.locator('.srch__row[data-i="1"] .srch__art.is-preview')).toHaveCount(1);
+  expect(await page.evaluate(() => (window as unknown as { NP_PLAYER: { _resumed: number } }).NP_PLAYER._resumed), 'the main track must not resume under the second audition').toBe(0);
+  await page.click('.srch__row[data-i="1"] button.srch__art');
+  await expect(page.locator('.srch__art.is-preview')).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as { NP_PLAYER: { _resumed: number } }).NP_PLAYER._resumed), 'stopping the last audition hands the stage back').toBe(1);
+});
+
+test('a pointer wandering inside the row still completes the hold', async ({ page }) => {
+  await pairAndOpen(page, [hubRow()]);
+  await page.route('https://p.scdn.co/**', (r) => r.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'content-type': 'audio/wav' }, body: silentWav() }));
+  await page.fill('#q', 'Golden Hour');
+  await page.press('#q', 'Enter');
+  await page.waitForSelector('.srch__row');
+  await page.evaluate(() => ((window as unknown as { NP_SRCH_ARM_MS: number }).NP_SRCH_ARM_MS = 700));
+  const row = page.locator('.srch__row').first();
+  await row.locator('.srch__title').hover();
+  await expect(page.locator('.srch__art.is-arming')).toHaveCount(1);
+  // Crossing child boundaries inside the row must neither cancel nor restart the five seconds.
+  await row.locator('button.srch__art').hover();
+  await expect(page.locator('.srch__art.is-arming')).toHaveCount(1);
+  await row.locator('.srch__sub').hover();
+  await expect(page.locator('.srch__art.is-arming')).toHaveCount(1);
+  await expect(page.locator('.srch__art.is-preview')).toHaveCount(1, { timeout: 3000 });
+});
+
+test('a link that is not a web link never reaches the page from the hub', async ({ page }) => {
+  const evil = 'javascript' + ':alert(1)'; // the attack string under test, split past the lint rule
+  await pairAndOpen(page, [hubRow({ previewUrl: evil, canonicalUrl: evil, artworkUrl: evil })]);
+  await page.fill('#q', 'Golden Hour');
+  await page.press('#q', 'Enter');
+  await page.waitForSelector('.srch__row');
+  // With every URL refused, the row has no playable clip and nothing to open.
+  await expect(page.locator('.srch__row button.srch__art')).toHaveCount(0);
+  await expect(page.locator('.srch__row .srch__art').first()).toHaveAttribute('title', /No preview/);
+  expect(await page.content()).not.toContain(evil);
+});
+
 test('a song added before its tempo arrives is filled in where it now lives', async ({ page }) => {
   await pairAndOpen(page, [hubRow({ bpm: null, bpmSource: null, previewUrl: null })]);
   // Deezer answers late, over JSONP, after the add has already happened.

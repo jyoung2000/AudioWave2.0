@@ -114,8 +114,12 @@ const BUNDLES: Bundle[] = [
      * search module, the hold-to-arm ring and its styles, the genre chip, and the late-tempo
      * bridge into the library — measured, 9 KB, all inside the shell's HTML and none of it new
      * network or first-load script.
+     *
+     * And to 2385 for that listing's review fixes: the URL-scheme guard on hub metadata, the
+     * clip-switch handoff that keeps the main track aside, and the steadier hold — measured,
+     * 1 KB of the same inline shell script.
      */
-    totalBudgetKb: 2383,
+    totalBudgetKb: 2385,
     // Three.js belongs to the constellation and the jewel case; the tag reader only to a scan.
     mustBeSplit: ['three', 'music-metadata'],
   },
