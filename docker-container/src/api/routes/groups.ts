@@ -12,13 +12,16 @@
  */
 import type { FastifyInstance } from 'fastify';
 import { routes } from '@now-playing/contracts';
-import { DomainError } from '@now-playing/domain';
+import { DomainError, type CommandPolicy } from '@now-playing/domain';
 import type { GroupView } from '@now-playing/contracts';
 import type { HubContext } from '../../context.js';
 import { actorDisplayName, actorId, type Principal } from '../../auth/principal.js';
 import { currentItem } from '@now-playing/domain';
 import type { GroupActor, GroupViewData } from '../../group/service.js';
 import { RAW, registerRoute } from '../register.js';
+
+/** Requests from the player: no Discord guild policy applies, so nothing beyond group membership limits them. */
+const WEB_REQUEST_POLICY: CommandPolicy = { djRoleIds: [], adminRoleIds: [], guestsMayRequest: true, voteSkipThreshold: 0, designatedChannelId: null, cooldownSeconds: 0, maxRequestsPerUser: Number.MAX_SAFE_INTEGER };
 
 /** Group membership is by actor, so an admin session and a device credential both map to one. */
 export function groupActor(principal: Principal): GroupActor {
@@ -131,6 +134,33 @@ export function registerGroupRoutes(app: FastifyInstance, ctx: HubContext): void
   registerRoute(app, ctx, routes.groupsQueueCommand, ({ params, body, principal }) =>
     ctx.groups.applyCommand(params.groupId, groupActor(principal), { idempotencyKey: body.idempotencyKey, baseRevision: body.baseRevision, command: body.command }),
   );
+
+  /*
+   * A song asked for by what it is called — "Artist - Title" read off a radio station, or a pasted
+   * link. The same path as Discord's /play (CommandService): the hub finds a playable copy among its
+   * providers and library and appends it; when there is none, the answer says why and nothing moves.
+   * Web requests carry no guild roles, so the group's own membership and roles are the whole check.
+   */
+  registerRoute(app, ctx, routes.groupsRequest, async ({ params, body, principal }) => {
+    // A stranger is refused as one (403), not answered as if the song were the problem.
+    requireReader(params.groupId, principal);
+    const actor = groupActor(principal);
+    const outcome = await ctx.commands.execute({
+      command: 'play',
+      args: body.query,
+      groupId: params.groupId,
+      actor: { id: actor.id, displayName: actor.displayName, kind: actor.kind === 'admin' ? 'admin' : 'device', roleIds: [], isGuildAdmin: false, hasManageGuild: false, isRequesterOfCurrent: false, ...(actor.isHubAdmin ? { isHubAdmin: true } : {}) },
+      policy: WEB_REQUEST_POLICY,
+      transport: 'web',
+      channelId: '',
+      ...(body.idempotencyKey ? { idempotencyKey: body.idempotencyKey } : {}),
+    });
+    const text = (value: string | number | null | undefined): string | null => (typeof value === 'string' && value && value !== '—' ? value : null);
+    const v = outcome.variables;
+    return outcome.ok
+      ? { queued: true, title: text(v['title']), artistName: text(v['artist']), position: typeof v['position'] === 'number' && v['position'] > 0 ? v['position'] : null, reason: null }
+      : { queued: false, title: text(v['title']), artistName: text(v['artist']), position: null, reason: text(v['reason']) ?? 'Nothing that plays here matched that song' };
+  });
 
   /* --------------------------------------------------------------- history */
 

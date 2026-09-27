@@ -26,6 +26,8 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { BACKUP_PARTS, createEstimator, type BackupPart } from './measure.js';
 import { HELPER_DEFAULT_HOSTS, HELPER_PROTOCOL, HELPER_ROUTES, HelperFetchRequest, HelperToolId, type HelperHealth, type HelperInstallResult, type HelperToolId as ToolId, type OutputFormat } from '@now-playing/contracts';
 import { Jobs } from './jobs.js';
+import { readStationTitle } from '@now-playing/domain/radio-node';
+import type { StationNowPlaying } from '@now-playing/contracts';
 import { serveApp, type AppSource } from './app.js';
 import { checkFetchUrl, hostAllowed, originAllowed, tokenMatches, type OriginPolicy } from './security.js';
 import { cachedResolver, installYtDlp, publicTool, type ResolvedTool } from './tools.js';
@@ -42,6 +44,10 @@ export interface HelperOptions {
   timeoutMs: number;
   allowedHosts: readonly string[];
   allowedOrigins: readonly string[];
+  /** Answer pages served from this machine's loopback address on any port (the companion sets this). */
+  loopbackPages?: boolean;
+  /** Reads a station's ICY title; tests inject a fake station. */
+  stationTitle?: (url: string) => Promise<StationNowPlaying>;
   app: AppSource | null;
   configured: { 'yt-dlp'?: string | undefined; spotdl?: string | undefined; ffmpeg?: string | undefined };
   log: (line: string) => void;
@@ -66,8 +72,9 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
   // Settled once the socket is bound: with port 0 the real port is only known then.
   let port = options.port;
   let origin = `http://127.0.0.1:${port}`;
-  let policy: OriginPolicy = { allowed: options.allowedOrigins, self: options.app ? origin : null };
+  let policy: OriginPolicy = { allowed: options.allowedOrigins, self: options.app ? origin : null, loopbackPages: options.loopbackPages === true };
   let installing: Promise<HelperInstallResult> | null = null;
+  const stationCache = new Map<string, { at: number; value: Promise<StationNowPlaying> }>();
   const estimate = createEstimator(options.backup ?? { folders: {}, backupDir: null });
 
   const server = createServer((request, response) => {
@@ -102,6 +109,22 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
       if (request.method !== 'GET' && request.method !== 'HEAD') return fail(response, 405, 'method', 'Only GET is served here.');
       if (!serveApp(options.app, path, options.token, response).served) return fail(response, 404, 'not-found', 'No such file.');
       return;
+    }
+
+    // Radio titles need no token: the route only ever reads a public stream (the reader refuses
+    // private and loopback addresses, on the name and after DNS), and a page opened from the hub
+    // has no way to learn the token. The origin check above still applies.
+    if (path === HELPER_ROUTES.radioNowPlaying && request.method === 'GET') {
+      const station = url.searchParams.get('url') ?? '';
+      if (!station || station.length > 2048) return fail(response, 400, 'bad-request', 'Say which station: ?url=');
+      const now = Date.now();
+      const hit = stationCache.get(station);
+      if (hit && now - hit.at < 15_000) return send(response, 200, await hit.value);
+      const read = options.stationTitle ?? ((u: string) => readStationTitle(u, { timeoutMs: 8000, userAgent: `NowPlaying-helper/${options.version}` }));
+      const value = read(station);
+      if (stationCache.size > 200) stationCache.delete(stationCache.keys().next().value!);
+      stationCache.set(station, { at: now, value });
+      return send(response, 200, await value);
     }
 
     // Everything past here is the API, and everything but health needs the token.
@@ -266,7 +289,7 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
   const address = server.address();
   if (typeof address === 'object' && address) port = address.port;
   origin = `http://127.0.0.1:${port}`;
-  policy = { allowed: options.allowedOrigins, self: options.app ? origin : null };
+  policy = { allowed: options.allowedOrigins, self: options.app ? origin : null, loopbackPages: options.loopbackPages === true };
 
   // Finished jobs that nobody collected still hold disk; drop them on a timer too, not only on demand.
   const sweeper = setInterval(() => void jobs.sweep(), 60_000);

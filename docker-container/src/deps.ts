@@ -1,3 +1,4 @@
+import type { StationNowPlaying } from '@now-playing/contracts';
 import type { Logger } from 'pino';
 import type { HubConfig } from './config.js';
 import type { ProviderAdapter } from './providers/adapter.js';
@@ -35,6 +36,8 @@ export interface HubDeps {
   /** Resolve a hostname to all of its addresses (used for the post-DNS SSRF check). */
   dnsLookup?: (hostname: string) => Promise<string[]>;
   ffmpegLocator?: () => Promise<FfmpegInfo>;
+  /** Read what a radio station is playing from its ICY metadata (tests inject a fake station). */
+  stationTitle?: (url: string) => Promise<StationNowPlaying>;
   /** Additional provider adapters (tests inject fixture providers). */
   extraAdapters?: ProviderAdapter[];
   /** Replace a built-in adapter by id (tests). */

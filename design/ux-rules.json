@@ -60,6 +60,10 @@
       "title": "Finding and hearing music before it is yours"
     },
     {
+      "id": "np-radio",
+      "title": "Radio: the song on the air, and keeping it"
+    },
+    {
       "id": "np-prefs",
       "title": "Player shell — Preferences"
     },
@@ -1499,6 +1503,72 @@
           "type": "test",
           "path": "music-player/tests/e2e/np/preview.spec.ts",
           "name": "a row with no clip says so instead of pretending"
+        }
+      ]
+    },
+    {
+      "id": "NP-RADIO-001",
+      "group": "np-radio",
+      "title": "The song on the air comes from the station, or is not shown",
+      "contract": "The tuned station's song is read from what the station itself publishes: a feed it serves with CORS open, or its stream's ICY metadata read for the page by the paired container or the companion app (a browser never sees ICY). Only the tuned station reads its stream; the station list keeps to feeds, so a list never becomes a stream connection per row. With no feed and nothing to read the stream, the line shows the programme format the directory carries, never an invented title. Private and loopback addresses are never read on a page's behalf.",
+      "example": "",
+      "authority": "adopted",
+      "owners": [
+        "music-player/scripts/make-shell.py",
+        "docker-container/src/api/routes/providers.ts",
+        "local-helper/src/server.ts",
+        "packages/domain/src/radio-node.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/radio-air.spec.ts",
+          "name": "a station with no feed shows the song its stream carries, read by the companion"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/radio-air.spec.ts",
+          "name": "with no companion and no container, a station without a feed invents nothing"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/integration/radio-node.test.ts",
+          "name": "refuses private and loopback addresses unless a test says otherwise"
+        }
+      ]
+    },
+    {
+      "id": "NP-RADIO-002",
+      "group": "np-radio",
+      "title": "A song heard on the radio can be kept",
+      "contract": "Right-clicking a station (a long press on touch) whose song is known adds an “On air” section to its menu: Add Song to Up Next, Add Song to Group Queue, and Add Song to Playlist with New Playlist…. The song becomes a library entry of this player's own — filled in by the same search chain when it finds that song by that artist, labelled Radio when it does not — and it survives a reload. The group item names the group when there is one, lists them when there are several, and is disabled with the reason when the player is unpaired or in no group; the container queues a playable copy by name, the way Discord's /play does, and says why when there is none. A same-titled song by someone else is never taken for it.",
+      "example": "",
+      "authority": "adopted",
+      "owners": [
+        "music-player/scripts/make-shell.py",
+        "docker-container/src/api/routes/groups.ts",
+        "docker-container/src/group/command-service.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/radio-air.spec.ts",
+          "name": "right-click keeps the song: Up Next, a new playlist, and it survives a reload"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/radio-air.spec.ts",
+          "name": "paired: the container reads the title, and the song goes to the group’s queue by name"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/radio-air.spec.ts",
+          "name": "touch: a long press on a station opens the same menu, and the lift does not retune"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/integration/radio-and-requests.test.ts",
+          "name": "never queues a same-titled song by someone else"
         }
       ]
     },

@@ -9,7 +9,7 @@
  * messages itself — it returns a key plus variables, and the caller renders the template.
  */
 import type { DiscordTemplateKey, QueueCommand, SearchResult, TrackRef } from '@now-playing/contracts';
-import { authorizeCommand, DomainError, isDj, uuidv7, type CommandActor, type CommandPolicy, type MusicCommand } from '@now-playing/domain';
+import { authorizeCommand, DomainError, isDj, normalizeArtist, splitOnAir, uuidv7, type CommandActor, type CommandPolicy, type MusicCommand } from '@now-playing/domain';
 import type { GroupActor, GroupService } from './service.js';
 import type { ProviderRegistry } from '../providers/registry.js';
 import type { SearchService } from '../providers/search-service.js';
@@ -88,6 +88,17 @@ export class CommandService {
     }
     const page = await this.search.search({ query: trimmed, scope: 'songs', limit: 10, actorId });
     const playable = page.results.find((r) => r.capabilities.playback === 'available');
+    // "Artist - Title" is how radio stations name a song and how people type one, but search
+    // matches titles. So a miss is asked again by title — and only a copy by that artist counts,
+    // because a same-titled song by someone else is a different song.
+    const named = !playable ? splitOnAir(trimmed) : null;
+    if (named?.artist) {
+      const byTitle = await this.search.search({ query: named.title, scope: 'songs', limit: 25, actorId });
+      const wanted = normalizeArtist(named.artist);
+      const match = byTitle.results.find((r) => r.capabilities.playback === 'available' && normalizeArtist(r.artistName) === wanted);
+      if (match) return { track: this.search.toTrackRef(match), result: match, candidates: byTitle.results, reason: null };
+      return { track: null, result: null, candidates: byTitle.results, reason: `No copy of “${named.title}” by ${named.artist} plays on this hub` };
+    }
     if (!playable) {
       const first = page.results[0];
       return { track: null, result: first ?? null, candidates: page.results, reason: first ? (first.capabilities.reason ?? 'No result can be played here') : 'No results' };

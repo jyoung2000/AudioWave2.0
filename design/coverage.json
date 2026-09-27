@@ -1035,8 +1035,13 @@
         "music-player/src/shell/bridge.ts"
       ],
       "components": ["shell markup (design/frontends/airwave-now-playing.html)"],
-      "states": ["one row", "several rows (marquee)"],
-      "rules": ["NP-MENU-001"],
+      "states": [
+        "one row",
+        "several rows (marquee)",
+        "a station with a known song: the On air section (Up Next, Group Queue, Playlist)",
+        "touch: a long press on a station opens the same menu"
+      ],
+      "rules": ["NP-MENU-001", "NP-RADIO-002"],
       "guideAnchor": "screens",
       "authority": "adopted"
     },
@@ -1114,8 +1119,14 @@
         "music-player/src/shell/bridge.ts"
       ],
       "components": ["shell markup (design/frontends/airwave-now-playing.html)"],
-      "states": ["directory unreachable (offline shelf)", "a station playing", "station list"],
-      "rules": ["NP-LIVE-001"],
+      "states": [
+        "directory unreachable (offline shelf)",
+        "a station playing",
+        "station list",
+        "the song on the air, read from the stream (paired or with the companion)",
+        "no feed and nothing to read the stream: the programme format, no invented title"
+      ],
+      "rules": ["NP-LIVE-001", "NP-RADIO-001", "NP-RADIO-002"],
       "guideAnchor": "screens",
       "authority": "adopted"
     },

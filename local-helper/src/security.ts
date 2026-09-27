@@ -38,6 +38,24 @@ export interface OriginPolicy {
   allowed: readonly string[];
   /** The helper's own origin, when it is serving the player. */
   self: string | null;
+  /**
+   * Answer a page served from this machine's loopback address on any port — the companion's case,
+   * where the player is opened from the hub (127.0.0.1:4546), a dev server or the installed PWA,
+   * never from the helper itself. A remote site still cannot talk to it, and the Host check below
+   * still stops a rebound name.
+   */
+  loopbackPages?: boolean;
+}
+
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]']);
+
+function isLoopbackPage(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    return (url.protocol === 'http:' || url.protocol === 'https:') && LOOPBACK_HOSTS.has(url.hostname) && url.origin === origin;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -56,6 +74,7 @@ export function originAllowed(policy: OriginPolicy, origin: string | undefined):
   if (origin === undefined) return true;
   if (origin === 'null' || origin === '') return false;
   if (policy.self && selfOrigins(policy.self).includes(origin)) return true;
+  if (policy.loopbackPages && isLoopbackPage(origin)) return true;
   return policy.allowed.includes(origin);
 }
 

@@ -6,6 +6,7 @@ const path = (relative: string): string => fileURLToPath(new URL(relative, impor
 
 const alias = {
   '@now-playing/contracts': path('./packages/contracts/src/index.ts'),
+  '@now-playing/domain/radio-node': path('./packages/domain/src/radio-node.ts'),
   '@now-playing/domain': path('./packages/domain/src/index.ts'),
   // Before the bare alias for the same prefix reason as the stylesheets below.
   '@now-playing/audio-core/tempo': path('./packages/audio-core/src/tempo.ts'),
@@ -22,7 +23,9 @@ const alias = {
   'virtual:np-worklet-url': path('./music-player/src/lib/worklet-url.stub.ts'),
 };
 
-const exclude = ['**/node_modules/**', '**/dist/**', '**/build/**', '**/out/**', '**/e2e/**', '**/tests/e2e/**', '**/playwright/**'];
+// .claude/ holds agent worktrees: whole copies of this repository whose tests would run against
+// these packages' sources through the aliases above and fail for reasons that are not theirs.
+const exclude = ['**/node_modules/**', '**/dist/**', '**/build/**', '**/out/**', '**/e2e/**', '**/tests/e2e/**', '**/playwright/**', '**/.claude/**'];
 
 export default defineConfig({
   resolve: { alias },

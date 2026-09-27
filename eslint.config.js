@@ -24,6 +24,8 @@ export default tseslint.config(
       // code nobody in this repository wrote — the run that just failed its own lint because
       // an earlier run's evidence was still on disk. Git-ignored is not the same as lint-ignored.
       '.verify-artifacts/**',
+      // Agent worktrees: complete copies of the repository, linted where they live, not here.
+      '.claude/**',
       // The single-file suite writes its own report and results beside the served one.
       '**/playwright-report-local/**',
       '**/test-results-local/**',

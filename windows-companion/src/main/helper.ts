@@ -98,8 +98,11 @@ export class EmbeddedHelper {
         toolsDir,
         timeoutMs: 900_000,
         allowedHosts: defaultHosts(),
-        // The API only: any page that presents the token may use it. Same as the CLI's default.
+        // The API only, for the player wherever this machine serves it from — the hub on
+        // 127.0.0.1:4546, a dev server, the installed PWA. With no allowed origins and no page of
+        // its own, the helper used to refuse every one of them, even health (403).
         allowedOrigins: [],
+        loopbackPages: true,
         app: null,
         configured: {},
         log: this.options.log,

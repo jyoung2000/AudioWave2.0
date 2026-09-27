@@ -12,3 +12,4 @@ export * from './discord.js';
 export * from './audit.js';
 export * from './canonical.js';
 export * from './shares.js';
+export * from './radio.js';

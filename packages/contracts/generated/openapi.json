@@ -5979,6 +5979,175 @@
         }
       }
     },
+    "/api/v1/radio/now-playing": {
+      "get": {
+        "operationId": "radioNowPlaying",
+        "summary": "The song an internet radio station says it is playing, read from its ICY metadata",
+        "tags": [
+          "search"
+        ],
+        "x-route-name": "radioNowPlaying",
+        "x-auth": "admin-or-device",
+        "x-scopes": [
+          "search:use"
+        ],
+        "x-setup-required": true,
+        "x-rate-limit": "search",
+        "parameters": [
+          {
+            "name": "url",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            }
+          }
+        ],
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "deviceCredential": [
+              "search:use"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "raw": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 500
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "artist": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 300
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "title": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 300
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "station": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "reason": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "raw",
+                    "artist",
+                    "title",
+                    "station",
+                    "reason"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "default": "about:blank",
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "description": "Machine-readable error code",
+                      "type": "string"
+                    },
+                    "correlationId": {
+                      "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated"
+          },
+          "403": {
+            "description": "Forbidden (scope, CSRF, or setup incomplete)"
+          },
+          "429": {
+            "description": "Rate limited; honours Retry-After"
+          }
+        }
+      }
+    },
     "/api/v1/providers/resolve": {
       "get": {
         "operationId": "resolveUrl",
@@ -14684,6 +14853,180 @@
           },
           "429": {
             "description": "Rate limited; honours Retry-After"
+          }
+        }
+      }
+    },
+    "/api/v1/groups/{groupId}/requests": {
+      "post": {
+        "operationId": "requestInGroup",
+        "summary": "Queue a song by what it is called (\"Artist - Title\" or a link): the hub finds a playable copy and appends it, as a Discord /play would",
+        "tags": [
+          "groups"
+        ],
+        "x-route-name": "groupsRequest",
+        "x-auth": "admin-or-device",
+        "x-scopes": [
+          "group:member"
+        ],
+        "x-setup-required": true,
+        "x-rate-limit": "write",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "description": "UUID (v7 preferred; stable across sync)"
+            },
+            "description": "UUID (v7 preferred; stable across sync)"
+          }
+        ],
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "deviceCredential": [
+              "group:member"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "queued": {
+                      "type": "boolean"
+                    },
+                    "title": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "artistName": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "position": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "reason": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "queued",
+                    "title",
+                    "artistName",
+                    "position",
+                    "reason"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "default": "about:blank",
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "description": "Machine-readable error code",
+                      "type": "string"
+                    },
+                    "correlationId": {
+                      "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated"
+          },
+          "403": {
+            "description": "Forbidden (scope, CSRF, or setup incomplete)"
+          },
+          "429": {
+            "description": "Rate limited; honours Retry-After"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 300
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  }
+                },
+                "required": [
+                  "query"
+                ]
+              }
+            }
           }
         }
       }

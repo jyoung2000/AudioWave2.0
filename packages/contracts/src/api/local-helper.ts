@@ -149,6 +149,8 @@ export const HELPER_ROUTES = {
   health: '/helper/v1/health',
   fetch: '/helper/v1/fetch',
   backupEstimate: '/helper/v1/backup/estimate',
+  /** `?url=` — what a radio station says it is playing (StationNowPlaying). No token: it only ever reads a public stream. */
+  radioNowPlaying: '/helper/v1/radio/now-playing',
   install: (tool: HelperToolId): string => `/helper/v1/tools/${tool}/install`,
   job: (id: string): string => `/helper/v1/jobs/${encodeURIComponent(id)}`,
   file: (jobId: string, fileId: string): string => `/helper/v1/jobs/${encodeURIComponent(jobId)}/files/${encodeURIComponent(fileId)}`,

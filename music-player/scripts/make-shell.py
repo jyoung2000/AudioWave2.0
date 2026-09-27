@@ -887,6 +887,347 @@ replace("      var row = tbody.querySelector('tr[data-id=\"' + have.id + '\"]');
         "      }\n"
         "    });")
 
+# ---- radio: the song on the air, from the stream itself (NP-RADIO-001) ------------------------------------------
+# A browser never sees a stream's ICY metadata, so the only titles the page could show were the few
+# stations that publish a feed. The hub (paired) and the companion both read ICY for the page now;
+# the tuned station asks them when it has no feed. Only the tuned station: the list keeps to feeds,
+# because a title per row would mean a stream connection per row.
+
+replace("""    /* What is actually on the air. A stream carries its title in ICY
+       headers, which a browser is never shown, so the only honest sources are
+       the ones a station publishes itself over HTTP with CORS open. SomaFM
+       does; most do not, and inventing a track name would be worse than
+       admitting there isn't one. When there is no track, the programme format
+       the directory carries takes the line, which is at least true. */""",
+        """    /* What is actually on the air. A stream carries its title in ICY
+       metadata, which a browser is never shown. Two honest sources remain: a
+       feed the station publishes over HTTP with CORS open (SomaFM, Triton,
+       radio.co), and the stream's own metadata read for us by the container
+       (when paired) or the companion app (NP-RADIO-001). Inventing a track
+       name would be worse than admitting there isn't one: when neither
+       answers, the programme format the directory carries takes the line. */""")
+
+replace("    window.radioMetaSupported = function (url) { return !!feedFor(url); };",
+        r"""    /* The stream's own title, asked of whoever can read it: the container
+       first when this player is paired with one, the companion app after.
+       Neither is a feed the page could call itself, so neither is offered
+       to the station list (radioMetaSupported stays feed-only). */
+    function icyAsk(url) {
+      var q = '?url=' + encodeURIComponent(url);
+      var ok = function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); };
+      var acct = window.kv && window.kv.get ? window.kv.get('player:hub') : Promise.resolve(null);
+      return acct.then(function (a) {
+        if (!a || !a.base || !a.credentialId || !a.secret) throw new Error('not paired');
+        return fetch(a.base + '/api/v1/radio/now-playing' + q, { headers: { Authorization: 'Bearer ' + a.credentialId + '.' + a.secret }, cache: 'no-store' }).then(ok);
+      }).catch(function () {
+        if (!window.COMPANION) return null;
+        return fetch(String(window.COMPANION).replace(/\/$/, '') + '/helper/v1/radio/now-playing' + q, { cache: 'no-store' }).then(ok);
+      });
+    }
+
+    function icyMeta(url) {
+      var key = 'icy:' + url, now = Date.now(), c = metaCache[key];
+      if (c && c.pending) return c.pending;
+      if (c && now - c.at < 20000) return Promise.resolve(c.val);
+      var pr = icyAsk(url).then(function (d) {
+        var t = d && d.title ? { title: String(d.title), artist: d.artist ? String(d.artist) : '' } : null;
+        metaCache[key] = { at: Date.now(), val: t };
+        return t;
+      }, function () {
+        metaCache[key] = { at: Date.now(), val: null };
+        return null;
+      });
+      metaCache[key] = { at: now, val: c ? c.val : null, pending: pr };
+      return pr;
+    }
+
+    window.radioMetaSupported = function (url) { return !!feedFor(url); };""")
+
+# Only the tuned station reads the stream (radioMeta's second argument); the list asks feeds alone,
+# so forty rows never become forty stream connections.
+replace("    window.radioMeta = function (url) {\n"
+        "      var hit = feedFor(url);\n"
+        "      if (!hit) return Promise.resolve(null);",
+        "    window.radioMeta = function (url, tuned) {\n"
+        "      var hit = feedFor(url);\n"
+        "      if (!hit) return tuned ? icyMeta(url) : Promise.resolve(null);")
+replace("      window.radioMeta(url).then(function (t) {\n"
+        "        if (!station || station.id !== mine || !t) return;  // tuned away meanwhile",
+        "      window.radioMeta(url, true).then(function (t) {\n"
+        "        if (!station || station.id !== mine || !t) return;  // tuned away meanwhile")
+
+# A feed that is down or empty is not the last word either: the stream itself may still say.
+replace("          metaCache[url] = { at: Date.now(), val: null };\n"
+        "          return null;\n"
+        "        });\n"
+        "      metaCache[url] = { at: now, val: c ? c.val : null, pending: pr };",
+        "          metaCache[url] = { at: Date.now(), val: null };\n"
+        "          return null;\n"
+        "        })\n"
+        "        .then(function (t) { return t || (tuned ? icyMeta(url) : null); });\n"
+        "      metaCache[url] = { at: now, val: c ? c.val : null, pending: pr };")
+
+replace("      delete metaCache[url];                              // the point is freshness",
+        "      delete metaCache[url];                              // the point is freshness\n"
+        "      delete metaCache['icy:' + url];")
+
+# ---- menus: more than one submenu per menu ---------------------------------------------------------------------
+# The station menu now carries two (its own lists, and the playlists for the song on the air). The
+# keyboard followed only the first parent and only the first submenu flipped at the edge.
+
+replace("      var parent = ctx.querySelector('.ctx__item--parent');",
+        "      /* Several submenus can share a menu: the parent is the one with focus,\n"
+        "         or the open one that holds it. */\n"
+        "      var ae = document.activeElement;\n"
+        "      var parent = ae && ae.classList && ae.classList.contains('ctx__item--parent') ? ae : (ae && ae.closest ? ae.closest('.ctx__item--parent') : null);")
+
+replace("      var sub = ctx.querySelector('.ctx__sub');\n"
+        "      if (sub) sub.classList.toggle('is-flip', r.right + 210 > innerWidth);",
+        "      Array.prototype.forEach.call(ctx.querySelectorAll('.ctx__sub'), function (sub) {\n"
+        "        sub.classList.toggle('is-flip', r.right + 210 > innerWidth);\n"
+        "      });")
+
+# ---- radio: keep the song you just heard (NP-RADIO-002) --------------------------------------------------------
+# Right-click (or long-press) a station whose song is known: add that song to Up Next, to a group's
+# queue on the container, or to one of your playlists. The song becomes a library entry the way a
+# search result does — found through the same search chain for its album and link — and, unlike a
+# search result, it is kept across reloads, because a playlist that forgets its songs is a lie.
+
+replace("    var state = { starred: {}, saved: {}, playlists: [], queue: [], edits: {}, history: [],\n"
+        "                  stations: {}, videos: {}, lists: {}, plays: [], sessions: [], recShown: [], acts: [] };",
+        "    var state = { starred: {}, saved: {}, playlists: [], queue: [], edits: {}, history: [],\n"
+        "                  stations: {}, videos: {}, lists: {}, plays: [], sessions: [], recShown: [], acts: [], kept: [] };")
+
+replace("        /* A renamed artist has to survive a reload, or the command is a lie. */\n"
+        "        applyEdits();",
+        "        /* Songs kept from the radio are library entries of this player's own. */\n"
+        "        state.kept = (Array.isArray(saved.kept) ? saved.kept : []).filter(function (s) { return s && s.id && s.title; });\n"
+        "        state.kept.forEach(function (s) { if (!song(s.id)) LIB.push(s); });\n"
+        "        /* A renamed artist has to survive a reload, or the command is a lie. */\n"
+        "        applyEdits();")
+
+replace("    function buildItemMenu(sub) {",
+        r"""    /* The song a station is playing, when it is a song: the iHeart feed
+       carries a station description instead, which is not something to keep. */
+    function onAirSong(st) {
+      var t = st && trackByStation[st.id];
+      return t && t.title && !t.about ? t : null;
+    }
+
+    function onAirMenu(sub) {
+      if (sub.view !== 'radio') return '';
+      var t = onAirSong(sub.entry);
+      if (!t) return '';
+      var label = (t.artist ? t.artist + ' — ' : '') + t.title;
+      var lists = state.playlists.length
+        ? state.playlists.map(function (pl) {
+            return '<button class="ctx__item" type="button" role="menuitem" data-act="ls-air-pl" data-pl="' + esc(pl.id) + '">' + esc(pl.name) + '</button>';
+          }).join('')
+        : '<button class="ctx__item" type="button" role="menuitem" disabled>No playlists yet</button>';
+      var hub = window.NP_HUB;
+      var groups = hub ? hub.groups() : null;
+      var groupItem;
+      if (!hub || groups === null) {
+        if (hub) hub.refreshGroups();
+        groupItem = '<button class="ctx__item" type="button" role="menuitem" disabled title="' +
+          esc(hub && hub.paired() ? 'Checking your groups on the container…' : 'Pair with the container to share a queue.') + '">Add Song to Group Queue</button>';
+      } else if (!groups.length) {
+        groupItem = '<button class="ctx__item" type="button" role="menuitem" disabled title="You are not in a group on the container yet.">Add Song to Group Queue</button>';
+      } else if (groups.length === 1) {
+        groupItem = '<button class="ctx__item" type="button" role="menuitem" data-act="ls-air-group" data-g="' + esc(groups[0].id) + '">Add Song to “' + esc(groups[0].name) + '” Queue</button>';
+      } else {
+        groupItem = '<div class="ctx__item ctx__item--parent" role="menuitem" tabindex="0" aria-haspopup="menu" aria-expanded="false" data-act="parent">' +
+          'Add Song to Group Queue<span class="ctx__chev" aria-hidden="true"></span>' +
+          '<div class="ctx__sub" role="menu" aria-label="Groups">' +
+          groups.map(function (g) {
+            return '<button class="ctx__item" type="button" role="menuitem" data-act="ls-air-group" data-g="' + esc(g.id) + '">' + esc(g.name) + '</button>';
+          }).join('') + '</div></div>';
+      }
+      return '<div class="ctx__sep" role="separator"></div>' +
+        '<div class="ctx__head">On air: ' + esc(label) + '</div>' +
+        '<button class="ctx__item" type="button" role="menuitem" data-act="ls-air-next">Add Song to Up Next</button>' +
+        groupItem +
+        '<div class="ctx__item ctx__item--parent" role="menuitem" tabindex="0" aria-haspopup="menu" aria-expanded="false" data-act="parent">' +
+          'Add Song to Playlist<span class="ctx__chev" aria-hidden="true"></span>' +
+          '<div class="ctx__sub" role="menu" aria-label="Song playlists">' + lists +
+            '<div class="ctx__sep" role="separator"></div>' +
+            '<button class="ctx__item" type="button" role="menuitem" data-act="ls-air-new">New Playlist…</button>' +
+          '</div>' +
+        '</div>';
+    }
+
+    /* The song as a library entry: the one already there, or a new one the
+       search chain fills in (album, length, link) when it finds the same
+       song by the same artist. Nothing is guessed from a different artist. */
+    function airSong(t) {
+      function same(s) {
+        return s.title.toLowerCase() === t.title.toLowerCase() &&
+          String(s.artist || '').toLowerCase() === String(t.artist || '').toLowerCase();
+      }
+      for (var i = 0; i < LIB.length; i++) if (same(LIB[i])) return Promise.resolve(LIB[i]);
+      var look = window.NP_FIND
+        ? window.NP_FIND((t.artist ? t.artist + ' ' : '') + t.title).then(function (rows) {
+            for (var k = 0; k < (rows || []).length; k++) {
+              var r = rows[k];
+              if (r && String(r.t || '').toLowerCase() === t.title.toLowerCase() &&
+                  (!t.artist || String(r.a || '').toLowerCase().indexOf(t.artist.toLowerCase()) === 0)) return r;
+            }
+            return null;
+          }, function () { return null; })
+        : Promise.resolve(null);
+      return look.then(function (m) {
+        for (var j = 0; j < LIB.length; j++) if (same(LIB[j])) return LIB[j];   // added meanwhile
+        var sg = {
+          id: 'song-air-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+          kind: 'music',
+          title: String(t.title).slice(0, 120),
+          artist: String(t.artist || '').slice(0, 80),
+          album: m && m.al ? String(m.al).slice(0, 80) : '',
+          duration: m && m.d ? Math.max(0, Math.round(m.d)) : 0,
+          bpm: m && m.bpm ? m.bpm : null,
+          platform: m && m.p ? m.p : 'Radio',     // the badge says where it came from
+          url: m && m.u ? m.u : null,
+        };
+        LIB.push(sg);
+        state.kept.push(sg);
+        render();
+        return sg;
+      });
+    }
+
+    function runAirAction(act, el, sub) {
+      var t = onAirSong(sub.entry);
+      if (!t) { say('The station has moved on — nothing to add'); return; }
+      if (act === 'ls-air-group') {
+        var hub = window.NP_HUB;
+        if (!hub) return;
+        say('Asking the container for “' + t.title + '”…');
+        hub.request(el.dataset.g, (t.artist ? t.artist + ' - ' : '') + t.title).then(function (r) {
+          if (r && r.queued) say('Queued “' + (r.title || t.title) + '”' + (r.position ? ' — number ' + r.position + ' in the group queue' : ''));
+          else say((r && r.reason) || 'The container could not queue that song');
+        });
+        return;
+      }
+      airSong(t).then(function (sg) {
+        if (act === 'ls-air-next') {
+          if (state.queue.indexOf(sg.id) < 0) state.queue.push(sg.id);
+          save();
+          say('Up Next: “' + sg.title + '”');
+          return;
+        }
+        if (act === 'ls-air-pl') {
+          var pl = state.playlists.filter(function (p) { return p.id === el.dataset.pl; })[0];
+          if (!pl) return;
+          if (pl.songs.indexOf(sg.id) < 0) { pl.songs.push(sg.id); logAct('playlistAdd', sg.id); }
+          save();
+          say('Added to “' + pl.name + '”');
+          return;
+        }
+        if (act === 'ls-air-new') {
+          askName().then(function (name) {
+            if (!name) { save(); return; }
+            state.playlists.push({ id: 'pl-' + Date.now().toString(36), name: name, songs: [sg.id] });
+            logAct('playlistAdd', sg.id);
+            save();
+            say('Added to “' + name + '”');
+          });
+        }
+      });
+    }
+
+    function buildItemMenu(sub) {""")
+
+replace("        head + keep +\n",
+        "        head + keep + onAirMenu(sub) +\n")
+
+replace("      if (act === 'ls-open')   { sub.run(); return; }",
+        "      if (act.indexOf('ls-air-') === 0) { runAirAction(act, el, sub); return; }\n"
+        "      if (act === 'ls-open')   { sub.run(); return; }")
+
+# Touch has no right-click: a long press on a station opens the same menu (NP-MENU-002's gesture).
+replace("    if (desktop) {\n"
+        "      radio.addEventListener('contextmenu', function (e) {\n"
+        "        var row = e.target.closest('.rlist tbody tr[data-i]');\n"
+        "        if (!row) return;\n"
+        "        e.preventDefault();\n"
+        "        var lvl = radioLevel();",
+        "    function stationMenu(row, e) {\n"
+        "      {\n"
+        "        var lvl = radioLevel();")
+
+replace("        }, kb ? rr.left + 40 : e.clientX, kb ? rr.bottom - 4 : e.clientY);\n"
+        "      });\n"
+        "    }\n"
+        "\n"
+        "    radio.addEventListener('click', function (e) {",
+        r"""        }, kb ? rr.left + 40 : e.clientX, kb ? rr.bottom - 4 : e.clientY);
+      }
+    }
+    if (desktop) {
+      radio.addEventListener('contextmenu', function (e) {
+        var row = e.target.closest('.rlist tbody tr[data-i]');
+        if (!row) return;
+        e.preventDefault();
+        stationMenu(row, e);
+      });
+    } else {
+      var stPress = 0, stAt = null, stQuietUntil = 0;
+      var stCancel = function () { clearTimeout(stPress); stPress = 0; };
+      radio.addEventListener('pointerdown', function (e) {
+        var row = e.target.closest('.rlist tbody tr[data-i]');
+        if (!row) return;
+        stAt = { x: e.clientX, y: e.clientY };
+        stCancel();
+        stPress = setTimeout(function () {
+          stPress = 0;
+          stQuietUntil = Date.now() + 700;       // the lift that ends the press is not a tap
+          stationMenu(row, { button: -1, clientX: stAt.x, clientY: stAt.y });
+        }, 500);
+      });
+      /* a press that turns into a scroll is a scroll, not a long press */
+      radio.addEventListener('pointermove', function (e) {
+        if (stPress && stAt && (Math.abs(e.clientX - stAt.x) > 10 || Math.abs(e.clientY - stAt.y) > 10)) stCancel();
+      });
+      radio.addEventListener('pointerup', stCancel);
+      radio.addEventListener('pointercancel', stCancel);
+      radio.addEventListener('contextmenu', function (e) { if (e.target.closest('.rlist tbody tr[data-i]')) e.preventDefault(); });
+      radio.addEventListener('click', function (e) {
+        if (Date.now() < stQuietUntil) { e.stopPropagation(); e.preventDefault(); }
+      }, true);
+    }
+
+    radio.addEventListener('click', function (e) {""")
+
+# The container's side of it: which groups this player is in, and "queue this song by name".
+replace("    function canInvite(g) { return (g.myRole === 'owner' || g.myRole === 'admin') && hasScope('group:admin'); }",
+        r"""    window.NP_HUB = {
+      paired: function () { return !!hubAcct; },
+      groups: function () { return hubAcct ? groups : null; },
+      refreshGroups: function () {
+        if (!hubAcct) return Promise.resolve(null);
+        return hubCall('GET', '/groups').then(function (r) {
+          if (r.ok && r.json && Array.isArray(r.json.items)) groups = r.json.items.filter(function (g) { return g.status !== 'archived'; });
+          return groups;
+        }, function () { return groups; });
+      },
+      request: function (groupId, query) {
+        if (!hubAcct) return Promise.resolve({ queued: false, reason: 'Pair with the container first.' });
+        var key = 'air-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+        return hubCall('POST', '/groups/' + encodeURIComponent(groupId) + '/requests', { query: query, idempotencyKey: key }).then(function (r) {
+          if (r.ok && r.json) return r.json;
+          return { queued: false, reason: r.status === 403 ? 'You are no longer in that group, or this player may not add to it.' : r.status === 401 ? 'The container no longer accepts this player.' : r.status === 429 ? 'Too many requests at once. Wait a moment.' : 'No answer from the container.' };
+        }, function () { return { queued: false, reason: 'No answer from the container.' }; });
+      },
+    };
+    /* A tuned station is the moment someone may want to keep a song. */
+    document.addEventListener('radio:station', function () { if (hubAcct && groups === null) window.NP_HUB.refreshGroups(); });
+    function canInvite(g) { return (g.myRole === 'owner' || g.myRole === 'admin') && hasScope('group:admin'); }""")
+
+# The search chain, for the radio menu: the same hub-first, keyless-after lookup a typed search uses.
+replace("    /* ---- pasted links ---- */",
+        "    window.NP_FIND = function (q) { return search(q); };\n\n"
+        "    /* ---- pasted links ---- */")
+
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):
     assert bad not in text, f'left behind: {bad}'

@@ -20,3 +20,4 @@ export * from './playlist-formats.js';
 export * from './errors.js';
 export * from './genres.js';
 export * from './titles.js';
+export * from './icy.js';

@@ -122,6 +122,17 @@ describe('which origins it answers', () => {
     expect(originAllowed({ allowed: [], self: null }, 'http://localhost:17342')).toBe(false);
   });
 
+  it('with loopback pages allowed, answers a player on any port of this machine and nothing further', () => {
+    const companion = { allowed: [], self: null, loopbackPages: true };
+    expect(originAllowed(companion, 'http://127.0.0.1:4174')).toBe(true);
+    expect(originAllowed(companion, 'http://localhost:4546')).toBe(true);
+    expect(originAllowed(companion, 'http://[::1]:5173')).toBe(true);
+    expect(originAllowed(companion, 'https://evil.example')).toBe(false);
+    expect(originAllowed(companion, 'http://127.0.0.1.evil.example:80')).toBe(false);
+    expect(originAllowed(companion, 'http://192.168.1.10:4546')).toBe(false);
+    expect(originAllowed(companion, 'null')).toBe(false);
+  });
+
   it('refuses everything else, including an opaque origin', () => {
     expect(originAllowed(policy, 'https://evil.example')).toBe(false);
     expect(originAllowed(policy, 'null')).toBe(false);

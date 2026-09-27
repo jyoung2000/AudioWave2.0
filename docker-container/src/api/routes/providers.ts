@@ -6,6 +6,8 @@
  * rather than showing as fewer results. And provider secrets are write-only: `PUT config` accepts
  * them, `GET config` returns a masked hint and nothing more.
  */
+import { readStationTitle } from '@now-playing/domain/radio-node';
+import type { StationNowPlaying } from '@now-playing/contracts';
 import type { FastifyInstance } from 'fastify';
 import { routes } from '@now-playing/contracts';
 import { DomainError } from '@now-playing/domain';
@@ -40,6 +42,24 @@ export function registerProviderRoutes(app: FastifyInstance, ctx: HubContext): v
     const result = await ctx.search.resolveUrl(query.url);
     if (!result) throw new DomainError('not-found', 'No provider on this hub recognises that link');
     return result;
+  });
+
+  /*
+   * Radio titles (ICY). Several devices can be listening to the same station, and each polls every
+   * 20 s, so an answer is shared for a few seconds rather than opening one stream connection per
+   * device per poll. The reader itself refuses private addresses on the name and after DNS.
+   */
+  const stationCache = new Map<string, { at: number; value: Promise<StationNowPlaying> }>();
+  const STATION_TTL_MS = 15_000;
+  registerRoute(app, ctx, routes.radioNowPlaying, async ({ query }) => {
+    const now = ctx.clock.now();
+    const hit = stationCache.get(query.url);
+    if (hit && now - hit.at < STATION_TTL_MS) return hit.value;
+    const read = ctx.deps.stationTitle ?? ((url: string) => readStationTitle(url, { timeoutMs: 8000, userAgent: `NowPlaying/${ctx.version}` }));
+    const value = read(query.url);
+    if (stationCache.size > 200) stationCache.delete(stationCache.keys().next().value!);
+    stationCache.set(query.url, { at: now, value });
+    return value;
   });
 
   registerRoute(app, ctx, routes.providersUsage, async () => {
