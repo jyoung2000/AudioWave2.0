@@ -322,8 +322,9 @@ errors**. `eslint.config.js` ignores `test-results/` and `playwright-report/` bu
 for reasons unrelated to any change. That is the worst shape of failure: it buries a real red under
 noise, and makes an unrelated run look broken.
 
-The `format` gate has no such exposure: prettier over the parked artifacts is clean (132 files), so
-the exposure is eslint-only and the `format` failure was entirely the four JSON evidence files.
+The `format` gate has no such exposure: checked directly, `prettier --check .verify-artifacts` is
+clean, so the exposure is eslint-only and the `format` failure was entirely the four JSON evidence
+files. (61 files sit under that directory, 7 of them the minified `.js` bundles eslint objected to.)
 
 **Fix.** `.verify-artifacts/**` added to the eslint ignores (`51065b7`), with a comment naming the
 mechanism. Gate re-verified: `PASS lint 10s`.
