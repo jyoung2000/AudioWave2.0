@@ -309,6 +309,27 @@ for a reason that looks like a product bug.
 
 ---
 
+### D-6 · A failed gate poisons the *next* run's lint · **BROKEN** → `fixed in 51065b7` · impact: medium
+
+**Steps.** Let a browser gate fail once, so `verify.mjs` parks that run's Playwright report under
+`.verify-artifacts/` (the baseline's `test:journey` failure did exactly this). Run `pnpm verify` again.
+
+**Expected.** The new run's `lint` gate judges this repository's own sources.
+
+**Actual.** `eslint .` swept the parked report's minified viewer bundles and reported **9,221
+errors**. `eslint.config.js` ignores `test-results/` and `playwright-report/` but **not**
+`.verify-artifacts/`. Git-ignored is not lint-ignored — so a failed gate in run *N* fails run *N+1*
+for reasons unrelated to any change. That is the worst shape of failure: it buries a real red under
+noise, and makes an unrelated run look broken.
+
+The `format` gate has no such exposure: prettier over the parked artifacts is clean (132 files), so
+the exposure is eslint-only and the `format` failure was entirely the four JSON evidence files.
+
+**Fix.** `.verify-artifacts/**` added to the eslint ignores (`51065b7`), with a comment naming the
+mechanism. Gate re-verified: `PASS lint 10s`.
+
+---
+
 ### Not defects — recorded so they are not later mistaken for them
 
 - **`pnpm verify` reported 26 PASS / 1 FAIL.** The failing gate was `test:journey`, and the cause
@@ -481,13 +502,38 @@ parsing or drop the clause.
 
 ## 7. Closing proof
 
-- `pnpm verify` — **26 PASS, 1 FAIL** (`test:journey`, port 4174 held by a manual preview; operator
-  error, not a defect). Gate re-run clean: `PASS test:journey 24s, Total 25s`.
-- Journey against a fixture-mounted container: **`1 passed (29.1 s)`**.
-- Journey against a stock container: **fails at step 08** — see D-5.
+Three whole-repo runs, each tied to its own code state:
 
-**Not claimed:** that the full suite is green. A clean end-to-end `pnpm verify` has not been re-run
-with 4174 free, so the honest tally stays 26/27-plus-a-rerun rather than 27/27.
+- **Baseline `pnpm verify`** (pre-change code): **26 PASS / 1 FAIL / 1 SEE**. The FAIL was
+  `test:journey`, and the cause was mine — a manual `vite preview` held port 4174 while `verify`
+  exports `CI=1`, so the journey refuses to reuse a running server. Port freed, gate re-run clean:
+  `PASS test:journey 24s, Total 25s`.
+- **First whole-repo run after `6eff1ca`/`3c03404`** (07:51:58–08:44:26 local, 52 m): **23 PASS /
+  4 FAIL / 1 SEE** — `format`, `lint`, `test:integration`, `test:e2e`. The first three were broken by
+  my own commits and are repaired in `51065b7`, each re-verified green in isolation
+  (`format` 1 s, `lint` 10 s, `test:integration` 12 s). The integration failure is worth naming
+  twice over: the suite's Electron stub lacked the two APIs my commits call, so the main process
+  threw at import and the file reported **20 skipped tests** — a failure shape that reads as green.
+- **Journey against the container**: fixture-mounted hub → `1 passed (29.1 s)`; stock container →
+  fails at step 08, which is D-5.
+
+**`test:e2e` assessed, not excused.** The gate failed 4 tests, all in the player's suites, at
+2,738 s against the baseline's 1,356 s:
+
+| Test | Symptom | Isolated re-run, same build |
+|---|---|---|
+| `awsp.spec.ts` — relay-carried playback through the service worker | 20 s poll for `playing` never true | **passed (22.8 s)** |
+| `np/ipod.spec.ts:92`, `:161` | `browserContext.close: Target page, context or browser has been closed` — a crash, not an assertion | **passed** |
+| `np/preview.spec.ts:260` | expected the em dash, received `120` | **passed** |
+
+Every one of the four non-reproduces in isolation on the same build. The targeted re-run of the two
+crash-heavy specs was **20/20 in 3.2 m**; the awsp spec then passed alone. Same bytes, different
+result, a fraction of the duration — the pattern points at machine load, not a deterministic defect.
+Evidence is kept at `.verify-artifacts/2026-09-27T12-51-58-383Z/test-e2e/`.
+
+**That is evidence, not a verdict.** A hypothesis is not a finding, and four isolated passes do not
+clear a gate that failed as a suite. **Tally: 27/27 is not claimed.** The last whole-repo run
+predates the three repairs, and a full re-run is what settles it.
 
 ---
 
