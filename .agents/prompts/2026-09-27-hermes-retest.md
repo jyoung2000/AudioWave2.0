@@ -28,7 +28,7 @@ docker version     # the Server section must answer -> winget install Docker.Doc
 cargo --version    # optional, the AWSP sidecar -> winget install Rustlang.Rustup
 ```
 
-**Do not install ffmpeg, yt-dlp or spotDL yourself.** The companion now sets them up on its own (§3.4);
+**Do not install ffmpeg, yt-dlp or spotDL yourself.** The companion now sets them up on its own (§3, item 5);
 if they are already on PATH from the first pass, note where, because a tool on PATH is used as-is and
 the automatic setup leaves it alone. To test the automatic setup from nothing, run one pass with them
 off PATH (rename the folders, or test from a fresh Windows user) and say which you did.
