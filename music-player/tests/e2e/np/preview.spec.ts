@@ -212,20 +212,37 @@ test('switching auditions keeps the main track aside until the last one ends', a
 
 test('a pointer wandering inside the row still completes the hold', async ({ page }) => {
   await pairAndOpen(page, [hubRow()]);
-  await page.route('https://p.scdn.co/**', (r) => r.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'content-type': 'audio/wav' }, body: silentWav() }));
   await page.fill('#q', 'Golden Hour');
   await page.press('#q', 'Enter');
   await page.waitForSelector('.srch__row');
-  await page.evaluate(() => ((window as unknown as { NP_SRCH_ARM_MS: number }).NP_SRCH_ARM_MS = 700));
+  // The clip must outlive the test's own moves, and the hold must be long enough that the first
+  // check sees it arming. After that, a loaded machine may let the hold complete mid-drift — so
+  // each check accepts "still arming" or "already playing"; only a cancel (neither) fails.
+  await page.route('https://p.scdn.co/**', (r) => r.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'content-type': 'audio/wav' }, body: silentWav(20) }));
+  await page.evaluate(() => ((window as unknown as { NP_SRCH_ARM_MS: number }).NP_SRCH_ARM_MS = 2500));
+  // Every time the hold starts, the art gains is-arming; a cancel-and-re-arm shows up as a second
+  // start even when the row looks armed at each check. Counting starts is timing-free.
+  await page.evaluate(() => {
+    const w = window as unknown as { __armStarts: number };
+    w.__armStarts = 0;
+    new MutationObserver((ms) => {
+      for (const m of ms) {
+        const el = m.target as Element;
+        if (el.classList.contains('is-arming') && !(m.oldValue ?? '').includes('is-arming')) w.__armStarts += 1;
+      }
+    }).observe(document.body, { attributes: true, attributeFilter: ['class'], attributeOldValue: true, subtree: true });
+  });
+  const holding = page.locator('.srch__art.is-arming, .srch__art.is-preview');
   const row = page.locator('.srch__row').first();
   await row.locator('.srch__title').hover();
   await expect(page.locator('.srch__art.is-arming')).toHaveCount(1);
-  // Crossing child boundaries inside the row must neither cancel nor restart the five seconds.
+  // Crossing child boundaries inside the row must neither cancel nor restart the hold.
   await row.locator('button.srch__art').hover();
-  await expect(page.locator('.srch__art.is-arming')).toHaveCount(1);
+  await expect(holding).toHaveCount(1);
   await row.locator('.srch__sub').hover();
-  await expect(page.locator('.srch__art.is-arming')).toHaveCount(1);
-  await expect(page.locator('.srch__art.is-preview')).toHaveCount(1, { timeout: 3000 });
+  await expect(holding).toHaveCount(1);
+  await expect(page.locator('.srch__art.is-preview')).toHaveCount(1, { timeout: 8000 });
+  expect(await page.evaluate(() => (window as unknown as { __armStarts: number }).__armStarts), 'the hold started once, not again at each child boundary').toBe(1);
 });
 
 test('a link that is not a web link never reaches the page from the hub', async ({ page }) => {

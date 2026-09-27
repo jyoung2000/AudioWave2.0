@@ -8273,9 +8273,13 @@ window.AW.startStats = function () {
         return v && v.base && v.credentialId && v.secret ? v : null;
       }, function () { return null; });
     }
-    var hubReady = false;
-    hubAcctFor().then(function (a) { hubReady = !!a; });
-    var HUB_PLATFORM_NAMES = { youtube: 'YouTube', soundcloud: 'SoundCloud', spotify: 'Spotify', bandcamp: 'Bandcamp' };
+    var HUB_PLATFORM_NAMES ={ youtube: 'YouTube', soundcloud: 'SoundCloud', spotify: 'Spotify', bandcamp: 'Bandcamp' };
+    /* Hub metadata comes from provider adapters; only the web's own schemes may travel
+       from it into an href, an audio src or window.open. */
+    function webUrl(u) {
+      if (typeof u !== 'string' || !u) return null;
+      try { var p = new URL(u).protocol; return p === 'https:' || p === 'http:' ? u : null; } catch (e) { return null; }
+    }
     function fromHub(d) {
       var rows = (d && d.results) || [], out = [];
       for (var i = 0; i < rows.length && out.length < 25; i++) {
@@ -8284,8 +8288,8 @@ window.AW.startStats = function () {
         var conf = x.identity && typeof x.identity.matchConfidence === 'number' ? x.identity.matchConfidence : null;
         /* Below 0.5 the hub itself refused to guess; this listing shows the platform's own words. */
         var sure = conf === null || conf >= 0.5;
-        var r = track(x.title, x.artistName || '', sure ? (x.albumName || '') : '', x.artworkUrl || null,
-                      x.previewUrl || null, x.canonicalUrl || null, HUB_PLATFORM_NAMES[x.provider] || null,
+        var r = track(x.title, x.artistName || '', sure ? (x.albumName || '') : '', webUrl(x.artworkUrl),
+                      webUrl(x.previewUrl), webUrl(x.canonicalUrl), HUB_PLATFORM_NAMES[x.provider] || null,
                       x.durationMs > 0 ? x.durationMs / 1000 : 0, x.bpm);
         r.feat = sure && x.featuredArtists && x.featuredArtists.length ? x.featuredArtists.slice(0, 3) : [];
         r.genre = sure && x.genres && x.genres[0] ? String(x.genres[0]) : null;
@@ -8324,8 +8328,9 @@ window.AW.startStats = function () {
     var DEADLINE = 8000;
 
     function search(q) {
-      hubAcctFor().then(function (a) { hubReady = !!a; });
-      var chain = hubReady ? [hubSearch, companionSearch, itunesSearch] : [companionSearch, itunesSearch];
+      /* hubSearch leads unconditionally: it reads the credential itself and rejects at once
+         when unpaired, so the decision is never one search out of date. */
+      var chain = [hubSearch, companionSearch, itunesSearch];
       var sawEmpty = false;
       var walk = (function step(i) {
         if (i >= chain.length) return sawEmpty ? Promise.resolve([]) : Promise.reject(new Error('all failed'));
@@ -8532,6 +8537,9 @@ window.AW.startStats = function () {
       var i = +rowEl.dataset.i, r = visible()[i];
       var el = rowEl.querySelector('button.srch__art');
       if (!r || !r.prev || !el || playing === r) return;
+      /* pointerenter fires again at every child boundary inside the row; an armed row
+         keeps its hold instead of starting the five seconds over */
+      if (armedEl === el) return;
       disarm();
       armedEl = el;
       el.style.setProperty('--arm-ms', (window.NP_SRCH_ARM_MS || ARM_DEFAULT_MS) + 'ms');
@@ -8548,7 +8556,12 @@ window.AW.startStats = function () {
       }, window.NP_SRCH_ARM_MS || ARM_DEFAULT_MS);
     }, true);
     body.addEventListener('pointerleave', function (e) {
-      if (armedEl && e.target && e.target.closest && e.target.closest('.srch__row')) disarm();
+      if (!armedEl || !e.target || !e.target.closest) return;
+      var rowEl = e.target.closest('.srch__row');
+      if (!rowEl || !rowEl.contains(armedEl)) return;
+      /* still inside the armed row (a child boundary): the hold goes on */
+      if (e.relatedTarget && rowEl.contains(e.relatedTarget)) return;
+      disarm();
     }, true);
     body.addEventListener('scroll', disarm, true);
     document.addEventListener('keydown', disarm, true);
@@ -8592,10 +8605,18 @@ window.AW.startStats = function () {
       var r = visible()[i];
       if (!r || !r.prev) return;
       var same = playing === r;
+      /* Switching clips: the main track is already stepped aside — keep it aside rather than
+         let stopPreview resume it under the new audition. (Its engine reports 'playing' only
+         once the element truly starts, so re-checking right after a resume would miss it.)
+         A same-row click is a stop, and that one does resume. */
+      var keepAside = !same && resumeMain;
+      if (keepAside) resumeMain = false;
       stopPreview();
       if (same) return;
       /* One sound at a time: the main track steps aside for the audition and returns after. */
-      if (window.NP_PLAYER && window.NP_PLAYER.playing && window.NP_PLAYER.playing()) {
+      if (keepAside) {
+        resumeMain = true;
+      } else if (window.NP_PLAYER && window.NP_PLAYER.playing && window.NP_PLAYER.playing()) {
         try { window.NP_PLAYER.pause(); resumeMain = true; } catch (e) { resumeMain = false; }
       }
       if (!audio) {

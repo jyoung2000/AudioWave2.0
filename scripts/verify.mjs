@@ -42,7 +42,8 @@ function keepArtifacts(name, dirs) {
   const kept = [];
   for (const dir of dirs) {
     if (!existsSync(dir)) continue;
-    const dest = join(ARTIFACTS_ROOT, name, dir.replace(/[/\\]/g, '__'));
+    // Gate names carry colons (test:e2e), which Windows refuses in a folder name.
+    const dest = join(ARTIFACTS_ROOT, name.replace(/[:*?"<>|]/g, '-'), dir.replace(/[/\\]/g, '__'));
     mkdirSync(dest, { recursive: true });
     cpSync(dir, dest, { recursive: true });
     kept.push(dest);

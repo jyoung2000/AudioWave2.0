@@ -1,22 +1,57 @@
 # Hermes — connect all three Now Playing apps, use them as a real user, grade everything
 
+**Repository:** https://github.com/jyoung2000/AudioWave2.0 — branch `claude/airwave-oneshot-build`
+(browse it at https://github.com/jyoung2000/AudioWave2.0/tree/claude/airwave-oneshot-build).
+**Machine:** the owner's Windows 11 PC. You set up, run and test all three apps here: the hub
+(Docker container), the player (web app / PWA) and the Windows companion (Electron desktop app).
+
 You are Hermes. You have this repository and nothing else. Your job: get the three applications of the
 Now Playing suite running and talking to each other on this Windows machine, use every feature the
 way a paying user would, and deliver a graded account of **what works, what is broken, and what must
 be reworked or redone** — with evidence precise enough that Claude Code can fix each item without
 re-discovering it. You are not here to be kind to the software. You are the first honest user.
 
-## 0. Get the code and read the ground truth
+## 0. Set up Windows, get the code, read the ground truth
+
+**Check the tools first** (PowerShell). Anything missing, install with `winget` and open a new
+terminal afterwards so PATH refreshes:
+
+```
+node -v            # need 22.12+     -> winget install OpenJS.NodeJS.LTS
+pnpm -v            # need 10.x       -> corepack enable   (the repo pins pnpm@10.33.0)
+git --version      #                 -> winget install Git.Git
+docker version     # server must answer -> winget install Docker.DockerDesktop, then start it
+ffmpeg -version    # for companion tempo -> winget install Gyan.FFmpeg
+cargo --version    # optional, AWSP sidecar -> winget install Rustlang.Rustup
+```
+
+Docker Desktop must be **running** (whale icon steady, `docker version` shows a Server section)
+before anything touches the hub. Android (JDK 17 + SDK/emulator) is optional.
+
+**Get the code:**
 
 ```
 git clone https://github.com/jyoung2000/AudioWave2.0.git
 cd AudioWave2.0
 git checkout claude/airwave-oneshot-build
 pnpm install
+pnpm verify        # every release gate; record its summary table before you change anything
 ```
 
-Prerequisites on PATH: Node 22, pnpm, Docker Desktop (running), Git. Optional but wanted: Rust
-(`cargo`) for the AWSP sidecar, JDK 17 + Android SDK/emulator for the Android leg.
+If `pnpm verify` is red on a clean clone, that is your first defect — write it up with the
+failing gate's output before continuing.
+
+**Stand the three apps up** (one terminal each, leave them running):
+
+1. Hub: `cd docker-container; docker compose up -d --build` → open http://127.0.0.1:4546,
+   sign in `admin` / `admin`, change the password when forced.
+2. Player: `pnpm build:player; cd music-player; npx vite preview --port 4174 --host 127.0.0.1`
+   → open http://127.0.0.1:4174 in Chrome or Edge.
+3. Companion: `pnpm dev:windows` → the Now Playing companion window opens on the desktop.
+
+Make a music folder (for example `C:\Music\NowPlayingTest`) with a few real albums in FLAC and
+MP3, and include several files **with no BPM tag** so the companion's tempo measurement has
+work to do.
 
 Read before touching anything: `AGENTS.md`; `.agents/plans/2026-09-21-airwave-oneshot.md` (Step E
 and the 2026-09-26 sections — what is proven, what was found, what is open);
@@ -27,7 +62,7 @@ is a bug). Never read `.env` files back into any report or prompt.
 
 | App | What it is | Run |
 | --- | --- | --- |
-| **Hub** — `docker-container/` | The self-hosted container: Fastify API, React admin GUI, Discord worker. | `cd docker-container && docker compose up -d --build` → http://127.0.0.1:4546. First run: `admin` / `admin`, forced password change. Plain process alternative: `pnpm build:hub` then `node dist/server.js` with `NP_PORT`, `NP_DATA_DIR`. |
+| **Hub** — `docker-container/` | The self-hosted container: Fastify API, React admin GUI, Discord worker. | `cd docker-container; docker compose up -d --build` (reads `compose.yaml`) → http://127.0.0.1:4546. First run: `admin` / `admin`, forced password change. Plain process alternative: `pnpm build:hub` then `node dist/server.js` with `NP_PORT`, `NP_DATA_DIR`. |
 | **Player** — `music-player/` | The PWA. Its shell `music-player/index.html` is **generated** by `music-player/scripts/make-shell.py` from `design/frontends/` — never hand-edit it. | `pnpm build:player` then `cd music-player && npx vite preview --port 4174 --host 127.0.0.1` → http://127.0.0.1:4174 (or `pnpm dev:player`). |
 | **Windows companion** — `windows-companion/` | Electron app + Rust `awsp-server` sidecar. Reads your music folders, pairs with the hub, syncs the library, backs up, streams to the player over AWSP. `local-helper/` is the helper it embeds. | `pnpm dev:windows` to run; `pnpm build:windows` to package. |
 
