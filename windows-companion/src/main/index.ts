@@ -23,6 +23,7 @@ import { EmbeddedHelper } from './helper.js';
 import { AwspSupervisor, findAwspBinary } from './awsp.js';
 import { appUrlGuard, applySessionSecurity, applyWindowSecurity, enforceSingleInstance, guardWebContents, isTrustedSender, openExternally } from './security.js';
 import { CompanionStore, openCompanionDb } from './store.js';
+import { APP_ID } from '../shared/identity.js';
 
 const DEV_SERVER_URL = process.env['NP_DEV_SERVER_URL'] ?? null;
 const INDEX_FILE = join(__dirname, '..', 'renderer', 'index.html');
@@ -514,9 +515,20 @@ function registerHandlers(): void {
 
 /* ------------------------------------------------------------------ startup */
 
+// Windows groups a window, its taskbar button, its Start-menu entry, its jump list and its toasts
+// by an Application User Model ID. electron-builder writes that ID into the installer's shortcuts
+// and registry entries from `appId` (electron-builder.config.cjs); this declares the same string to
+// the shell at runtime. Without it — or with a different value — Windows treats the pinned shortcut
+// and the running window as two different programs, so pinning "doesn't stick" and relaunching
+// from the pin opens a second taskbar button. It is set before anything creates a window, and
+// before the single-instance lock, because the lock is keyed on the userData directory.
+// APP_ID is the one place this string lives; tests/contract/app-identity.test.ts pins it against
+// the builder config so the two cannot drift.
+app.setAppUserModelId(APP_ID);
+
 // Redirect Electron's own caches and state alongside the database, so a portable build really is
-// self-contained rather than leaving a cache folder behind in the profile. This comes before the
-// single-instance lock, which is keyed on the userData directory.
+// self-contained rather than leaving a cache folder behind in the profile. This comes before
+// the single-instance lock, which is keyed on the userData directory.
 {
   const dir = dataDir();
   mkdirSync(dir, { recursive: true });
