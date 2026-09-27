@@ -109,8 +109,13 @@ const BUNDLES: Bundle[] = [
      * And to 2374 for enrichment (docs/PROVIDER_CAPABILITIES.md, Enrichment): the contract fields a
      * track now carries (album, featured artists, genre profile, tempo and where it came from) and
      * three metadata-only rows in the platform table — measured, 2 KB, none of it in the first load.
+     *
+     * And to 2383 for the listing that can be heard (NP-FIND-001): the paired hub leg in the
+     * search module, the hold-to-arm ring and its styles, the genre chip, and the late-tempo
+     * bridge into the library — measured, 9 KB, all inside the shell's HTML and none of it new
+     * network or first-load script.
      */
-    totalBudgetKb: 2374,
+    totalBudgetKb: 2383,
     // Three.js belongs to the constellation and the jewel case; the tag reader only to a scan.
     mustBeSplit: ['three', 'music-metadata'],
   },
