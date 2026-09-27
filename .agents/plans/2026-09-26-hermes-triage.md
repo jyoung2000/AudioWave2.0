@@ -505,6 +505,15 @@ The evidence JSONs contain property names and counts only.
 
 ## 9. Evidence index
 
+**How to read the exit codes in this pass's evidence.** Several evidence commands were wrapped as
+`playwright … > log 2>&1; echo "EXIT=$?"; tail log`. The wrapper's own exit status is the status of
+the **last** command in the pipeline, so a background job can report `exit code 0` while Playwright
+printed `1 failed`. The stale 4546 journey in this session is exactly that case: the job reported
+completion normally while the test had failed. **The authoritative line inside each log is Playwright's
+own `N passed` / `N failed` and the `EXIT=` line captured immediately after it** — never the
+background job's status, and never `docker compose`'s (see D-1). Where this document states a pass or
+a failure, it is quoted from the test runner's own output, not inferred from a wrapper.
+
 Committed under `.agents/evidence/`:
 
 | File | What it proves |
