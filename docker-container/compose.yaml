@@ -1,12 +1,15 @@
-# One command: `docker compose up -d`.
+# One command: `docker compose up -d --build --wait`. --wait returns once the hub answers its health
+# check and exits non-zero when it does not, so a hub that dies on start is never a silent success.
 #
 # Defaults are the safe ones. Inside the container the hub listens on all interfaces (Docker's port
 # forwarding cannot reach the container's loopback), but the port is published to 127.0.0.1 only,
 # so a fresh install is not reachable from the network even before the password is changed. Opening
 # it up is two deliberate edits, described in the comments below.
 #
-# ./data must be writable by uid 1000 (the image's `node` user). `./nowplaying install` takes care of
-# that; if you create the directory yourself, run: sudo chown -R 1000:1000 ./data
+# ./data must be writable by uid 1000 (the image's `node` user). It ships in the repository (empty), so
+# a clone creates it as the cloning user; `./nowplaying install` also prepares it. On Docker Desktop
+# (Windows, macOS) that is all it takes. On Linux, if the hub's first log line says it cannot write
+# there, run: sudo chown -R 1000:1000 ./data
 
 name: now-playing
 

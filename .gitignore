@@ -9,7 +9,8 @@ coverage/
 .env.local
 *.log
 /data/
-docker-container/data/
+docker-container/data/*
+!docker-container/data/.gitkeep
 windows-companion/release/
 music-player/dev-dist/
 playwright-report/

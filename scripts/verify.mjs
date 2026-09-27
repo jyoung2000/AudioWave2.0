@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * `pnpm verify` — runs every non-destructive release gate available on the current platform and prints a table.
- * Gates that cannot run here (Windows packaging, Docker when the daemon is unavailable) are reported as skipped, never as passed.
+ * Gates that cannot run here (Windows packaging off Windows, Docker when the daemon is unavailable) are reported as skipped, never as passed.
  */
 import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
@@ -87,6 +87,21 @@ function check(name, fn) {
   }
   if (detail) console.log(detail);
   results.push({ name, status: detail ? 'FAIL' : 'PASS', detail: detail ?? '', ms: Date.now() - t });
+}
+
+/**
+ * What the unpacked Windows build must contain: the executable under the product's own name, the
+ * app archive, and — when this machine built the streaming server — the sidecar beside it. The
+ * identity itself (appId = the runtime AppUserModelID) is pinned by
+ * windows-companion/tests/contract/app-identity.test.ts; this checks the build carried it out.
+ */
+function windowsPackageContents() {
+  const root = join('windows-companion', 'release', 'win-unpacked');
+  const missing = [];
+  for (const rel of ['Now Playing Companion.exe', join('resources', 'app.asar')]) if (!existsSync(join(root, rel))) missing.push(rel);
+  const sidecarBuilt = existsSync(join('windows-companion', 'awsp-server', 'target', 'release', 'awsp-server.exe'));
+  if (sidecarBuilt && !existsSync(join(root, 'resources', 'awsp-server.exe'))) missing.push(join('resources', 'awsp-server.exe'));
+  return missing.length ? `${root} is missing: ${missing.join(', ')}` : null;
 }
 
 /**
@@ -228,7 +243,13 @@ run('test:e2e', 'pnpm', ['test:e2e'], { skipIf: hasChromium, artifacts: [...['mu
 run('test:journey', 'pnpm', ['test:journey'], { skipIf: hasChromium, artifacts: ['test-results', 'playwright-report'] });
 run('test:awsp', cargoBin ?? 'cargo', ['test', '--release', '--manifest-path', 'windows-companion/awsp-server/Cargo.toml'], { skipIf: hasCargo });
 run('docker-build', 'docker', ['build', '-t', 'now-playing-hub:verify', '-f', 'docker-container/Dockerfile', '.'], { skipIf: hasDocker });
-results.push({ name: 'windows-package', status: process.platform === 'win32' ? 'SEE build:windows' : 'SKIPPED', detail: process.platform === 'win32' ? '' : 'Windows-only; produced by .github/workflows/windows-companion.yml', ms: 0 });
+// Windows packaging, for real, on Windows: an unpacked build (the installer's contents without the
+// NSIS wrapping, minutes faster) and a look inside it. This gate used to print "SEE build:windows"
+// and pass nothing — which is how a missing app identity reached an installed build (the pin that
+// did not stick) with every gate green.
+const notWindows = () => (process.platform === 'win32' ? null : 'Windows-only; produced by .github/workflows/windows-companion.yml');
+run('windows-package', 'pnpm', ['--filter', '@now-playing/windows-companion', 'package:dir'], { skipIf: notWindows });
+if (process.platform === 'win32' && results.at(-1)?.name === 'windows-package' && results.at(-1)?.status === 'PASS') check('windows-package-contents', windowsPackageContents);
 
 console.log('\n\nVerification summary');
 console.log('-'.repeat(72));

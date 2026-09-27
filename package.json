@@ -33,6 +33,7 @@
     "test:a11y": "pnpm --filter @now-playing/music-player test:a11y && pnpm --filter @now-playing/hub test:a11y",
     "test:e2e": "pnpm --filter @now-playing/music-player test:e2e && pnpm --filter @now-playing/hub test:e2e && pnpm --filter @now-playing/aqua-ui test:e2e",
     "test:journey": "playwright test --config tests/journey/playwright.config.ts",
+    "test:journey:container": "node scripts/journey-container.mjs",
     "test:security": "vitest run --project security",
     "verify": "node scripts/verify.mjs",
     "test:dom": "vitest run --project dom",

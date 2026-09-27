@@ -11,11 +11,13 @@
 import { loadConfig } from './config.js';
 import { buildApp } from './app.js';
 import { checkpoint } from './db/connection.js';
+import { ensureWritableDataDir } from './data-dir.js';
 
 const SHUTDOWN_GRACE_MS = 10_000;
 
 async function main(): Promise<void> {
   const config = loadConfig(process.env);
+  ensureWritableDataDir(config.dataDir);
   const version = process.env['NP_VERSION'] ?? '0.1.0';
   const hub = await buildApp({ config, version });
   const { ctx, app } = hub;

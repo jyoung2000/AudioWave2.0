@@ -84,7 +84,9 @@ ensure_data_dir() {
 profiles_file() { printf '%s\n' "$DATA_DIR/.profiles"; }
 saved_profiles() { [ -f "$(profiles_file)" ] && cat "$(profiles_file)" || printf ''; }
 compose_up() {
-  set -- up -d --remove-orphans "$@"
+  # --wait: compose returns only once the hub is healthy, and fails when it is not, so a hub that
+  # dies on start (an unwritable ./data, a bad setting) is an error here rather than a quiet exit 0.
+  set -- up -d --remove-orphans --wait "$@"
   _profiles="$(saved_profiles)"
   if [ -n "$_profiles" ]; then
     # shellcheck disable=SC2086 # deliberate word splitting: one --profile per saved name

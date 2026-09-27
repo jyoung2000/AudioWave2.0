@@ -31,9 +31,10 @@ const HUB_PORT = 4548;
 const PLAYER_PORT = 4174;
 
 /**
- * Set JOURNEY_HUB_URL to run the same pass against a hub that is already up — the Docker container
- * (`docker compose up -d` in docker-container/, then http://127.0.0.1:4546). The hub is then not
- * started here, and it must be at first run: step 01 sets its password.
+ * Set JOURNEY_HUB_URL to run the same pass against a hub that is already up. The hub is then not
+ * started here, and it must be at first run (step 01 sets its password) with the public-domain
+ * fixture library mounted (step 08 plays from it). `pnpm test:journey:container` does all of that
+ * with the Docker image: a disposable hub on 4550 from docker-container/compose.journey.yaml.
  */
 const EXTERNAL_HUB = process.env['JOURNEY_HUB_URL'];
 export const HUB_URL = EXTERNAL_HUB ?? `http://127.0.0.1:${HUB_PORT}`;

@@ -12,7 +12,7 @@
     "./measure": "./src/measure.ts"
   },
   "bin": {
-    "now-playing-helper": "./dist/now-playing-helper.mjs"
+    "now-playing-helper": "./now-playing-helper.mjs"
   },
   "scripts": {
     "build": "pnpm typecheck && node scripts/build.mjs",

@@ -1,0 +1,45 @@
+# A disposable hub for the cross-app journey (tests/journey/), built from the same image as the real
+# one. `pnpm test:journey:container` brings it up, runs the pass against it and removes it again.
+#
+# Separate on purpose, so running the journey can never touch your real hub:
+# - its own project, container name and port (4550), so it runs beside a hub on 4546;
+# - a named volume removed with the container (`down -v`), because the journey needs a hub at first
+#   run — step 01 sets the admin password — and a volume sidesteps ./data permissions entirely;
+# - the repository's public-domain fixture audio mounted read-only as the public-domain library,
+#   which step 08 scans, searches and plays. A stock hub has none, so step 08 could only fail.
+
+name: now-playing-journey
+
+services:
+  hub:
+    build:
+      context: ..
+      dockerfile: docker-container/Dockerfile
+    image: now-playing-hub:latest
+    container_name: now-playing-journey-hub
+    ports:
+      - "127.0.0.1:4550:4546"
+    environment:
+      NP_DATA_DIR: /data
+      NP_PORT: "4546"
+      NP_BIND_MODE: localhost
+      NP_LOG_LEVEL: info
+      NP_PUBLIC_DOMAIN_DIR: /fixtures
+    volumes:
+      - journey-data:/data
+      - ../packages/test-fixtures/generated/audio:/fixtures:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4546/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:size=64m
+
+volumes:
+  journey-data:
