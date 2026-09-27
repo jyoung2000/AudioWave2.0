@@ -1475,11 +1475,31 @@
       "authority": "adopted",
       "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
       "evidence": [
-        { "type": "test", "path": "music-player/tests/e2e/np/preview.spec.ts", "name": "paired, the hub answers first: album, features, genre chip and bpm on the row" },
-        { "type": "test", "path": "music-player/tests/e2e/np/preview.spec.ts", "name": "a click plays up to thirty seconds, and the main track waits its turn" },
-        { "type": "test", "path": "music-player/tests/e2e/np/preview.spec.ts", "name": "resting the pointer on a row arms it, fills the ring, and then plays" },
-        { "type": "test", "path": "music-player/tests/e2e/np/preview.spec.ts", "name": "reduced motion never arms; the click still works" },
-        { "type": "test", "path": "music-player/tests/e2e/np/preview.spec.ts", "name": "a row with no clip says so instead of pretending" }
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/preview.spec.ts",
+          "name": "paired, the hub answers first: album, features, genre chip and bpm on the row"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/preview.spec.ts",
+          "name": "a click plays up to thirty seconds, and the main track waits its turn"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/preview.spec.ts",
+          "name": "resting the pointer on a row arms it, fills the ring, and then plays"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/preview.spec.ts",
+          "name": "reduced motion never arms; the click still works"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/preview.spec.ts",
+          "name": "a row with no clip says so instead of pretending"
+        }
       ]
     },
     {

@@ -728,3 +728,48 @@ rebalanced to keep summing to 1 (tasteMatch/artistAffinity/recency each −0.05)
 Not done, by design: live calls to any platform (no keys in the repo — Hermes §3.6 covers it);
 Spotify audio features (withdrawn for new apps); key/energy analysis; the Providers tab needs no
 code — it renders the registry, and Last.fm's API-key field is the generic one.
+
+## Sub-project 2 — the player's listing and the 30-second hold-to-preview: shipped 2026-09-26/27
+
+Plan `docs/superpowers/plans/2026-09-26-player-listing-preview.md`, executed natively, one commit per
+task; every shell change a recorded `replace()` in `make-shell.py` (85 edits assert clean).
+
+What a person gets: paired, the header search leads with the hub's enriched rows — `Artist feat. X
+— Album`, a genre chip, the tempo — and a match the hub wasn't sure of keeps the platform's own
+words. Any row with a clip plays it: a click, or five seconds of rest under a fine pointer while
+the ring fills in the selection blue; the main track steps aside and returns. A row with no clip
+says why. A song added before its tempo arrived is filled in where it now lives. Unpaired or
+keyless, nothing changed — pinned by its own test (a black-holed hub falls through to iTunes
+inside the deadline). Rule NP-FIND-001 (group np-find), coverage via ledger-shell, styleguide green.
+
+Measured: np/preview.spec.ts 10/10 (plus func 5/5, hdr 2/2, dom 102/102); the journey is now eight
+steps and green twice consecutively (3.2 m each), its step 08 driving the whole paired leg against
+the real hub — operator scan of the keyless fixture library (NP_PUBLIC_DOMAIN_DIR), hub-first
+search, and an audible preview streamed from the hub's signed URL.
+
+Paid-for harness lessons, recorded in the step-08 commit: Playwright's request fixture re-encodes
+percent signs (queries travel as `params`); an index poll behind a live scheduler is 120 s of
+evidence, not a 60 s stopwatch; and a page that streamed audio through the service worker's range
+bridge must be left on about:blank, or `browserContext.close` hangs the full timeout — three runs
+lost ~10 minutes each to that before the trace named it (147 s clean body, 299 s fixture teardown).
+That SW/teardown interaction is worth a look of its own and is written down, not hidden.
+
+Corrections along the way: the styleguide check was once committed red because a pipe swallowed its
+exit code (fixed in the next commit, checked unpiped since); the preview stubs originally served
+undecodable bytes and one assertion passed on a race — they serve a real silent WAV now.
+
+## Sub-project 3 — companion-measured BPM: shipped 2026-09-26
+
+Plan `docs/superpowers/plans/2026-09-26-companion-bpm.md`, executed natively. No network anywhere
+in the feature: files that carry no BPM tag and got no hub answer are measured from their own
+audio — ffmpeg decodes one minute from the middle, the shared `estimateTempo` listens — written as
+`bpmSource: 'analysis'`, ridden to the hub by the ordinary sync, and worn honestly in the Library:
+a tag is plain `128`, a measurement is `≈120` with "Measured from the audio" on hover, and when
+ffmpeg is absent while silent rows exist, one line says "Tempo needs ffmpeg" (NP-PRIN-002).
+
+The pass runs after each scan, one file at a time, lowest priority: the scan's own AbortController
+cancels it, a tagged tempo is never touched (the backlog query only sees nulls), a broken file is a
+missing answer, and without ffmpeg nothing runs but the counts stay honest.
+
+Measured: tempo-analysis 6/6, tempo-pass 4/4, companion integration whole-project 70/70, dom 9/9,
+tsc and lint clean (lint checked unpiped after two pipe-masked misses this week).

@@ -66,6 +66,10 @@ then check the truth at the API or the other app.
    folder; add, rename, delete files and see the hub follow. Run a backup; compare its size/space
    numbers with the player's Backup pane — they must match to the byte. Unpair; pair with a *different*
    hub (a second `NP_DATA_DIR`) — it must refuse to reuse the old credential.
+   **Tempo:** add a folder of music with no BPM tags; after the scan settles, tempos appear in the
+   Library marked ≈ ("Measured from the audio") — a tagged file's number stays plain and is never
+   changed; uninstall/rename ffmpeg and rescan: the view says "Tempo needs ffmpeg" once, nothing
+   errors, and installing it back picks the backlog up on the next scan.
 5. **All three at once.** A track the companion synced appears in the player through the hub; a
    group queue plays it; a transfer companion → hub → player completes and plays; stream a FLAC from
    the PC to the player over AWSP (relay-only, then direct); pause, seek, resume, kill the sidecar
@@ -84,7 +88,15 @@ then check the truth at the API or the other app.
    grade the copy. Known unbacked claim: the Connections card says the companion "decodes the song
    titles radio stations send" — no code does. Report it as a decision for the owner.
 7. **Android** (if an emulator/device exists): install `android/`, pair, stream one track over AWSP.
-8. **Quality sweep, every screen.** Dark mode, phone width, keyboard only, screen-reader names, copy
+8. **The listing you can hear (NP-FIND-001).** Paired: search shows `Artist feat. X — Album`, a
+   genre chip and a tempo on enriched rows; a low-confidence match shows the platform's own words
+   and no chip. Click the artwork: the whole 30-second clip, countdown ring, the main track pauses
+   and resumes. Rest a mouse on a row for five seconds: the ring fills in blue, then it plays;
+   leaving, a key, a scroll, touch or reduced motion must all cancel or never arm. A YouTube row
+   says "No preview — opens on YouTube" on hover. Add a song before its tempo loads: the library
+   row's em dash must become the number by itself. Unpaired, all of it still works keyless through
+   iTunes clips.
+9. **Quality sweep, every screen.** Dark mode, phone width, keyboard only, screen-reader names, copy
    that is wrong or blames the wrong thing, a control that does nothing, a state that lies (the
    screen says Joined, the hub says otherwise), a wait over 3 s with no feedback, a crash you can
    trigger twice.
