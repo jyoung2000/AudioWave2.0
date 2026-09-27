@@ -260,6 +260,14 @@ export class CompanionStore {
     })();
   }
 
+  /** Files with no tempo from any source yet — the after-scan measurement pass's backlog. */
+  tracksNeedingTempo(limit: number): StoredTrack[] {
+    return this.db
+      .prepare<[number], TrackRow>("SELECT * FROM tracks WHERE deleted_at IS NULL AND json_extract(track, '$.bpm') IS NULL ORDER BY updated_at ASC LIMIT ?")
+      .all(limit)
+      .map(toStoredTrack);
+  }
+
   findTrackByPath(folderId: string, relativePath: string): StoredTrack | undefined {
     const row = this.db.prepare<[string, string], TrackRow>('SELECT * FROM tracks WHERE folder_id = ? AND relative_path = ?').get(folderId, relativePath);
     return row ? toStoredTrack(row) : undefined;

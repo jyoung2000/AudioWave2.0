@@ -1,5 +1,6 @@
 import { estimateTempo, type TempoEstimate } from '@now-playing/audio-core/tempo';
 import { spawn } from 'node:child_process';
+import type { CompanionStore, StoredTrack } from './store.js';
 
 /**
  * A tempo measured from the file itself, for music that carries no BPM tag and got no answer from
@@ -73,4 +74,51 @@ function decode(deps: TempoAnalysisDeps, args: string[]): Promise<Uint8Array | n
     child.on('error', () => finish(null));
     child.on('close', (code) => finish(code === 0 && chunks.length ? Buffer.concat(chunks) : null));
   });
+}
+
+export interface TempoPassDeps {
+  store: CompanionStore;
+  /** null when ffmpeg is not installed: the pass does nothing and says so in its counts. */
+  ffmpegPath: string | null;
+  signal?: AbortSignal;
+  /** Where the file actually lives, or null when its folder is gone. */
+  resolvePath: (record: StoredTrack) => string | null;
+  /** Test seam: the measurement itself is Task 1's; the pass's rules are what this file owns. */
+  analyze?: typeof analyzeFileTempo;
+}
+
+const PASS_LIMIT = 500;
+
+/**
+ * The after-scan pass: every file that still has no tempo, one at a time, behind everything else.
+ * A tagged tempo is never touched (the query only sees nulls), a broken file is a missing answer,
+ * and an abort leaves the rest for the next scan to queue again.
+ */
+export async function runTempoPass(deps: TempoPassDeps): Promise<{ measured: number; skipped: number }> {
+  const backlog = deps.store.tracksNeedingTempo(PASS_LIMIT);
+  if (!deps.ffmpegPath) return { measured: 0, skipped: backlog.length };
+  const analyze = deps.analyze ?? analyzeFileTempo;
+  let measured = 0;
+  let skipped = 0;
+  for (const record of backlog) {
+    if (deps.signal?.aborted) break;
+    const absolutePath = deps.resolvePath(record);
+    if (!absolutePath) {
+      skipped += 1;
+      continue;
+    }
+    let answer: TempoEstimate | null = null;
+    try {
+      answer = await analyze({ ffmpegPath: deps.ffmpegPath, ...(deps.signal ? { signal: deps.signal } : {}) }, { absolutePath, durationMs: record.track.durationMs });
+    } catch {
+      answer = null; // an undecodable file is a fact about the file, not a reason to stop
+    }
+    if (!answer) {
+      skipped += 1;
+      continue;
+    }
+    deps.store.upsertTrack({ ...record, track: { ...record.track, bpm: answer.bpm, bpmSource: 'analysis' }, updatedAt: new Date().toISOString() });
+    measured += 1;
+  }
+  return { measured, skipped };
 }

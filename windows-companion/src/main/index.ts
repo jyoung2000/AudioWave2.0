@@ -15,6 +15,7 @@ import { CONTRACTS_VERSION, EqPreset, Playlist, WS_PROTOCOL_VERSION } from '@now
 import { uuidv7 } from '@now-playing/domain';
 import { IPC, Preferences, type AppInfo, type BackupSettingsPatch, type FolderKind, type IpcChannel, type LibraryFolder, type PreferencesPatch, type ScanProgress, type TransferProgress } from '../shared/ipc.js';
 import { absolutePathOf, scanFolder } from './library.js';
+import { runTempoPass } from './tempo-analysis.js';
 import { FolderWatcher } from './watcher.js';
 import { HubClient } from './hub.js';
 import { BackupManager } from './backup.js';
@@ -241,6 +242,19 @@ async function startScan(folderId?: string): Promise<{ started: boolean; reason:
     } finally {
       // Whatever happened, a finished scan must not block the next one.
       if (scanning === controller) scanning = null;
+    }
+    // The measurement pass rides behind the scan it belongs to: files that still have no tempo
+    // get one from their own audio, one at a time, and a new scan's controller aborts this one.
+    if (!signal.aborted && store?.isOpen) {
+      const tools = await helper?.checkTools().catch(() => null);
+      const ffmpegPath = tools?.tools.find((t) => t.id === 'ffmpeg' && t.present)?.path ?? null;
+      await runTempoPass({
+        store,
+        ffmpegPath,
+        signal,
+        resolvePath: (record) => absolutePathOf(store!, record.id),
+      });
+      // No invented event: the Library view re-queries whenever it looks (Task 3 pins that).
     }
   })().catch((err: unknown) => console.error('Library scan stopped:', err));
   return { started: true, reason: null };
