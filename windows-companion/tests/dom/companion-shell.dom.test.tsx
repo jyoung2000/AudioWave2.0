@@ -145,6 +145,51 @@ describe('the shell', () => {
   });
 });
 
+describe("the Library names each tempo's provenance", () => {
+  const NOW = new Date().toISOString();
+  const song = (id: string, title: string, bpm: number | null, bpmSource: 'tag' | 'analysis' | null) => ({
+    id, schemaVersion: 1, createdAt: NOW, updatedAt: NOW, deletedAt: null,
+    title, artistId: null, artistName: 'A', albumId: null, albumName: 'LP', albumArtistName: null,
+    discNumber: null, trackNumber: null, genre: null, genres: [], tags: [], year: null,
+    durationMs: 200_000, bpm, bpmSource, featuredArtists: [], genreProfile: {},
+    identity: { contentHash: null, quickHash: null, isrc: null, musicbrainzRecordingId: null, musicbrainzReleaseId: null, acoustidId: null, providerIds: {} },
+    locators: [], artworkId: null, format: null, rootId: null, unsupportedReason: null, liked: false, explicit: null, popularity: null,
+  });
+  const bridgeWith = (ffmpegPresent: boolean) => installBridge({
+    'app:info': () => ({ version: '0.1.0', electron: '44.1.1', node: '22.0.0', chrome: '132', platform: 'win32', dataDir: 'C:\\x', contractsVersion: '1.0.0', protocolVersion: 1 }),
+    'library:folders': () => ({ items: [] }),
+    'hub:status': () => ({ endpoint: null, hubId: null, hubName: null, hubFingerprint: null, connected: false, reason: 'No hub is paired.', scopes: [], lastSyncAt: null }),
+    'helper:status': () => ({ running: true, port: 17342, origin: 'http://127.0.0.1:17342', reason: null, tools: [{ id: 'ffmpeg', present: ffmpegPresent, version: ffmpegPresent ? '7.1' : null, path: ffmpegPresent ? 'C:\\t\\ffmpeg.exe' : null, advice: null }], checkedAt: NOW }),
+    'library:tracks': () => ({ items: [song('t1', 'Tagged Song', 128, 'tag'), song('t2', 'Measured Song', 120, 'analysis'), song('t3', 'Silent Song', null, null)], total: 3 }),
+  });
+
+  it('a tag is plain, a measurement wears the mark', async () => {
+    bridgeWith(true);
+    render(
+      <Shell>
+        <App />
+      </Shell>,
+    );
+    await screen.findByText('Tagged Song');
+    expect(screen.getByText('128')).toBeTruthy();
+    const measured = screen.getByText('≈120');
+    expect(measured.getAttribute('title')).toMatch(/Measured from the audio/);
+    expect(screen.queryByText('≈128')).toBeNull();
+    expect(screen.queryByText(/Tempo needs ffmpeg/)).toBeNull();
+  });
+
+  it('without ffmpeg, the silent rows are explained once', async () => {
+    bridgeWith(false);
+    render(
+      <Shell>
+        <App />
+      </Shell>,
+    );
+    await screen.findByText('Silent Song');
+    expect(screen.getAllByText(/Tempo needs ffmpeg/).length).toBe(1);
+  });
+});
+
 describe('pairing', () => {
   it('shows the fingerprint to compare, and does not claim to be paired while waiting', async () => {
     let resolveAwait: ((value: unknown) => void) | null = null;

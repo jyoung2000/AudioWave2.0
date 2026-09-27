@@ -9,6 +9,7 @@ export function LibraryView() {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const tracks = useChannel('library:tracks', { query: query.trim() || undefined, limit: 300, offset: 0 });
+  const helper = useChannel('helper:status', undefined, { pollMs: 30_000 });
   const toast = useToast();
   const reveal = useAction(async (trackId: string) => invoke('app:reveal', { trackId }));
   const send = useAction(async (trackIds: string[]) => invoke('transfers:send', { trackIds }));
@@ -34,6 +35,10 @@ export function LibraryView() {
           {selected.size ? `Send ${selected.size} to hub` : 'Send to hub'}
         </Button>
         {tracks.data ? <span className="companion-hint">{tracks.data.total.toLocaleString()} tracks{query ? ' matching' : ''}</span> : null}
+        {/* Unavailable is shown and explained (NP-PRIN-002): silent rows stay silent until the decoder exists. */}
+        {helper.data && !helper.data.tools.some((t) => t.id === 'ffmpeg' && t.present) && items.some((row) => row.bpm === null) ? (
+          <span className="companion-hint">Tempo needs ffmpeg — install it and rescan.</span>
+        ) : null}
       </div>
 
       {items.length ? (
@@ -50,6 +55,14 @@ export function LibraryView() {
             { id: 'album', header: 'Album', cell: (row) => row.albumName ?? '' },
             { id: 'year', header: 'Year', align: 'right', width: 56, cell: (row) => row.year ?? '' },
             { id: 'time', header: 'Time', align: 'right', width: 56, cell: (row) => formatDuration(row.durationMs) },
+            {
+              id: 'tempo',
+              header: 'Tempo',
+              align: 'right',
+              width: 64,
+              // A tag is plain; a measurement wears ≈ and says so, so nobody mistakes one for the other.
+              cell: (row) => (row.bpm ? (row.bpmSource === 'analysis' ? <span title="Measured from the audio">≈{row.bpm}</span> : String(row.bpm)) : '—'),
+            },
             { id: 'format', header: 'Format', width: 96, cell: (row) => row.format?.codec ?? row.format?.container ?? '' },
             {
               id: 'reveal',
