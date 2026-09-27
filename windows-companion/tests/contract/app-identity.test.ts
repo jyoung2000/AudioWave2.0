@@ -71,12 +71,22 @@ describe('the Windows app identity', () => {
     );
   });
 
-  it('bundles the AWSP sidecar that the main process looks for in resources/', () => {
+  it('ships the AWSP sidecar that the main process looks for in resources/', () => {
     // findAwspBinary() (src/main/awsp.ts) tries process.resourcesPath first, which only exists in
     // a packaged app. If the binary is not bundled, an installed copy pairs but can never stream,
     // and Settings is the only place that says so.
     const sidecar = config.extraResources.find((r) => r.to === 'awsp-server.exe');
     expect(sidecar, 'extraResources must carry awsp-server.exe next to the app').toBeDefined();
+  });
+
+  it('declares an author, so CompanyName is not Electron’s default', () => {
+    // Without `author`, electron-builder warns ("author is missed in the package.json") and writes
+    // CompanyName "GitHub, Inc." — Electron's own fallback — into the binary. That string shows in
+    // file Properties, in Add/Remove Programs and in any security prompt, so an installed app
+    // claiming to be a GitHub product is not a cosmetic detail.
+    const pkg = JSON.parse(readFileSync(join(companionRoot, 'package.json'), 'utf8')) as { author?: { name?: string } };
+    expect(pkg.author?.name, 'package.json must name an author').toBeTruthy();
+    expect(pkg.author?.name?.toLowerCase(), 'CompanyName must not be Electron’s default').not.toContain('github');
   });
 });
 
@@ -106,5 +116,55 @@ describe('the main process declares that identity at runtime', () => {
     const showWindow = mainSource.slice(mainSource.indexOf('function showWindow'));
     expect(showWindow).toMatch(/mainWindow\.show\(\)/);
     expect(showWindow, 'the second instance must focus, not merely show').toMatch(/mainWindow\.focus\(\)/);
+  });
+});
+
+/**
+ * The window's own chrome: no File / Edit / View / Window bar.
+ *
+ * These two apps are full of text fields — a pairing code, a hub address, a search box, a right
+ * click for context. Electron's default application menu sits above all of it offering entries
+ * that do nothing useful here (no File > Open, no Window > Minimize) and, worse, its accelerators
+ * are not wired to anything the app owns. Removing it is what makes the window read as a program
+ * rather than a browser frame that happens to have a title.
+ *
+ * `autoHideMenuBar` is NOT the fix: it hides the bar until the user presses Alt, so the menu
+ * still exists and still appears. `setApplicationMenu(null)` removes it.
+ */
+describe('the window has no default application menu', () => {
+  const mainSource = readFileSync(join(companionRoot, 'src', 'main', 'index.ts'), 'utf8');
+
+  it('removes the application menu rather than auto-hiding it', () => {
+    expect(mainSource).toMatch(/Menu\.setApplicationMenu\(\s*null\s*\)/);
+    // autoHideMenuBar only defers the menu to Alt; it leaves it there.
+    expect(mainSource, 'autoHideMenuBar still reveals the menu on Alt').not.toMatch(/autoHideMenuBar/);
+  });
+
+  it('does it before the first window is created, so the bar never flashes in', () => {
+    // A window's menu is fixed when it is constructed, so a later call would not clear the one
+    // already built. This is also why it must not be deferred into whenReady().
+    const removed = mainSource.indexOf('setApplicationMenu');
+    const callSite = mainSource.indexOf('mainWindow = createWindow()');
+    expect(removed).toBeGreaterThan(-1);
+    expect(removed, 'the menu must go before the window exists').toBeLessThan(callSite);
+  });
+
+  it('leaves the tray menu alone — Open, Scan and Quit must survive', () => {
+    // Menu is still imported and still used: the tray context menu is a different object, built
+    // with buildFromTemplate. Clearing the application menu must not touch it, and dropping the
+    // import would break it.
+    expect(mainSource, 'the tray menu is a separate object and must still be built').toMatch(/Menu\.buildFromTemplate\(/);
+    expect(mainSource, 'tray.setContextMenu must remain').toMatch(/tray\.setContextMenu\(/);
+    for (const label of ['Open', 'Scan library now', 'Quit']) {
+      expect(mainSource, `the tray keeps "${label}"`).toContain(`label: '${label}'`);
+    }
+  });
+
+  it('keeps the standard window frame, so minimise/maximise/close still work', () => {
+    // "Remove the window bar" means the Window MENU, not the OS title bar. Going frameless would
+    // delete the native controls and the drag region — a redesign, not a fix — so the absence of
+    // frame:false / titleBarStyle is load-bearing here.
+    expect(mainSource, 'the window must keep its native frame').not.toMatch(/frame:\s*false/);
+    expect(mainSource, 'the title bar must not be hidden').not.toMatch(/titleBarStyle/);
   });
 });

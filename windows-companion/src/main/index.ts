@@ -515,6 +515,24 @@ function registerHandlers(): void {
 
 /* ------------------------------------------------------------------ startup */
 
+// The companion has no use for Electron's default application menu — the File / Edit / View /
+// Window bar. Every one of those entries either opens a window the app does not have, or offers
+// a shortcut to something with no accessible name. Removing the whole bar (rather than the
+// auto-hide option, which still lets Alt bring it back) is what makes the window look like the
+// program it is instead of a browser frame.
+//
+// This is deliberately NOT the title bar. The window keeps the standard frame, so minimise,
+// maximise and close stay where Windows users expect them and the drag region keeps working.
+// A frameless window would be a redesign: custom drag regions, custom window controls, and the
+// accessibility work that goes with them.
+//
+// The TRAY menu is a different object and is untouched — `createTray()` builds it with
+// Menu.buildFromTemplate, and Open / Scan library now / Quit all still work from the tray.
+//
+// It runs before whenReady() so the menu never flashes into existence, and before the first
+// window is created, since a window's menu is fixed when it is constructed.
+Menu.setApplicationMenu(null);
+
 // Windows groups a window, its taskbar button, its Start-menu entry, its jump list and its toasts
 // by an Application User Model ID. electron-builder writes that ID into the installer's shortcuts
 // and registry entries from `appId` (electron-builder.config.cjs); this declares the same string to
