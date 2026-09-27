@@ -110,6 +110,28 @@ exist in a fresh clone (it is untracked). Docker therefore cannot fulfil the mou
 `better-sqlite3` has no file to open. The `SqliteError` is the *symptom*; the mount error is the
 cause, and it is the one an owner sees first.
 
+**The sharper version: compose exits 0 while the hub is already dead.** The command returned
+`EXIT=0`, printed `Container … Started`, and tagged the image — and the container was already gone.
+Compose returns success when the container *starts*, not when it is *healthy*, and it never reports
+the exit of a process that dies a second later. So the obvious script is wrong:
+
+```bash
+# WRONG. Prints "hub is up" for a hub that is already dead.
+docker compose up -d --build && echo "hub is up"
+```
+
+That would have printed success here. The only honest check polls the app:
+
+```bash
+# RIGHT. Poll /healthz; never infer readiness from compose's exit code.
+docker compose up -d --build
+until curl -fsS http://127.0.0.1:4546/healthz; do sleep 1; done
+```
+
+This is the same discipline D-2's replacement gate needs, and it is why D-1 survived a
+green-looking build. A startup path whose only signal is compose's exit code cannot tell its owner
+the difference between "installed" and "running".
+
 `compose.yaml:8-10` does warn about it, but it points at the installer as the fix:
 
 ```
