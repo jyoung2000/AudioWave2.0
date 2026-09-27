@@ -91,8 +91,10 @@ test('the player finds the helper that served it, with nothing configured', asyn
   await expect(facts).toContainText(ORIGIN);
   // The version the tool reported, not a claim that something called yt-dlp exists somewhere.
   await expect(facts).toContainText('yt-dlp 2026.09.01');
-  // FFmpeg is absent here, and the pane says so rather than hiding it.
-  await expect(facts).toContainText('ffmpeg missing');
+  // FFmpeg is whatever this machine has: named by the version it reported when it is on PATH, and
+  // said to be missing when it is not — never hidden. (This used to assume "missing" everywhere,
+  // which held only because ffmpeg was asked `--version`, a flag it rejects; it is asked `-version` now.)
+  await expect(facts).toContainText(/ffmpeg (missing|ffmpeg version \S+)/);
 });
 
 test('fetching a link puts a real track in the library, and it plays from this device', async ({ page }) => {

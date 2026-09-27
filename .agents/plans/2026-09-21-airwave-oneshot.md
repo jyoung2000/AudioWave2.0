@@ -773,3 +773,45 @@ missing answer, and without ffmpeg nothing runs but the counts stay honest.
 
 Measured: tempo-analysis 6/6, tempo-pass 4/4, companion integration whole-project 70/70, dom 9/9,
 tsc and lint clean (lint checked unpiped after two pipe-masked misses this week).
+
+## Round 3 (2026-09-27) — the triage's step 2, radio titles and keeping them, automatic tools
+
+Asked by the owner after Hermes's first pass (`.agents/plans/2026-09-26-hermes-triage.md`, whose
+commits were fast-forwarded in unchanged): do step 2, build the radio song titles, add a station
+menu that keeps the song, and — overriding `docs/DOWNLOADS_AND_LEGAL.md` — make downloader setup
+automatic and seamless. Hermes's next brief is `.agents/prompts/2026-09-27-hermes-retest.md`.
+
+- **Step 2.** D-1: the hub proves it can write its data folder before anything else and says which
+  folder and how to fix it; `./data` ships empty; the installer and the docs use `compose up --wait`.
+  D-2: `windows-package` packages the companion for real on Windows and checks its contents. D-5:
+  `pnpm test:journey:container` runs the journey against a disposable hub on 4550 with the fixtures
+  mounted. The helper's command links on the first install.
+- **NP-RADIO-001.** ICY titles read by the hub (`GET /radio/now-playing`) and the companion's helper,
+  through `@now-playing/domain/radio-node` (http(s) only; private and loopback refused on the name and
+  on every resolved address; redirects re-checked; byte cap, deadline; a raw-socket path for
+  SHOUTcast's `ICY 200 OK`). Only the tuned station reads its stream; the list keeps to feeds.
+- **NP-RADIO-002.** Right-click (long-press on touch) a station with a known song: Up Next, a group's
+  queue on the hub (new `POST /groups/:id/requests`, the Discord `/play` path, artist-matched), or a
+  playlist. Kept songs persist. Menus support several submenus.
+- **Found on the way.** The companion's helper answered every player page 403, even health — it
+  allowed no origins; it now answers pages on this machine's loopback address, and its token-free
+  radio route refuses Origin-less requests so it cannot be used as a relay from any website. The
+  installer-script suite deleted the repository's real `docker-container/data` on every run; it runs
+  on a scratch copy now.
+- **UX-SETUP-001.** yt-dlp, FFmpeg and spotDL set themselves up (built in a worktree by a delegated
+  agent, merged): one GitHub release per tool, verified against GitHub's per-asset SHA-256 or the
+  release's checksum file, refused when neither exists, staged and version-probed before it is moved
+  into place; yt-dlp kept current; the tempo backlog runs when FFmpeg lands; AWSP is handed it.
+- **Independent security review** of the round: no critical findings, no verification bypass,
+  zip-slip or route into the private network. Its three important findings (setup not stopped on
+  helper restart, the radio route as a blind relay, artist matching only after a miss) and six minors
+  were fixed test-first. Left as recorded minors: BtbN's in-place `latest` rebuild can fail a
+  mid-download hash (safe; retried later), and FFmpeg extraction is synchronous in the main process.
+- **Not verified here.** Docker Desktop would not start on this machine during the round, so the
+  container journey and `docker-build` are Hermes's to prove; no real end-to-end tool install has run
+  (fake-GitHub tests only).
+- **Gates.** Full `pnpm verify` on the final code: every gate PASS except two, both fixed and re-run
+  (`test:perf` — the round's 12 KB, budgeted with a history entry; one `helper.spec` assertion that
+  assumed ffmpeg was missing everywhere, true only because ffmpeg had been asked `--version`, a flag
+  it rejects). `docker-build` SKIPPED: the Docker daemon was not running. `windows-package` and
+  `windows-package-contents` PASS — the first time that gate has built anything.

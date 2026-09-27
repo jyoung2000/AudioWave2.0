@@ -118,8 +118,14 @@ const BUNDLES: Bundle[] = [
      * And to 2385 for that listing's review fixes: the URL-scheme guard on hub metadata, the
      * clip-switch handoff that keeps the main track aside, and the steadier hold — measured,
      * 1 KB of the same inline shell script.
+     *
+     * And to 2397 for round 3 (2026-09-27): the song on the air and the station menu that keeps
+     * it (NP-RADIO-001/002 — ICY through the hub or the companion, the On air section, kept songs,
+     * long-press on touch, menus with several submenus) and the "setting up" state of the
+     * companion's downloaders (UX-SETUP-001) — measured, 12 KB, all inline shell script in both
+     * the shell and the single-file build, none of it new network or first-load script.
      */
-    totalBudgetKb: 2385,
+    totalBudgetKb: 2397,
     // Three.js belongs to the constellation and the jewel case; the tag reader only to a scan.
     mustBeSplit: ['three', 'music-metadata'],
   },
