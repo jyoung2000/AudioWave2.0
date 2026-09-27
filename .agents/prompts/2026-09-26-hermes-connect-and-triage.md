@@ -84,14 +84,16 @@ then check the truth at the API or the other app.
    `identity.matchConfidence` and never a guessed album; `GET /api/v1/providers/usage` must list
    `deezer`, `acousticbrainz` and `lastfm`. Judge the *result*: is the album right, are the features
    the real features, is the tempo believable?
-   external tool. If no keys: exercise every refusal and every "sign in through the hub" path and
+   If no keys: exercise every refusal and every "sign in through the hub" path and
    grade the copy. Known unbacked claim: the Connections card says the companion "decodes the song
    titles radio stations send" — no code does. Report it as a decision for the owner.
 7. **Android** (if an emulator/device exists): install `android/`, pair, stream one track over AWSP.
 8. **The listing you can hear (NP-FIND-001).** Paired: search shows `Artist feat. X — Album`, a
    genre chip and a tempo on enriched rows; a low-confidence match shows the platform's own words
    and no chip. Click the artwork: the whole 30-second clip, countdown ring, the main track pauses
-   and resumes. Rest a mouse on a row for five seconds: the ring fills in blue, then it plays;
+   and resumes; click a second row's artwork mid-clip and the main track must stay silent until the
+   last audition ends. Rest a mouse on a row for five seconds: the ring fills in blue, then it plays
+   — and the hand may drift within the row without the hold cancelling or starting over;
    leaving, a key, a scroll, touch or reduced motion must all cancel or never arm. A YouTube row
    says "No preview — opens on YouTube" on hover. Add a song before its tempo loads: the library
    row's em dash must become the number by itself. Unpaired, all of it still works keyless through
