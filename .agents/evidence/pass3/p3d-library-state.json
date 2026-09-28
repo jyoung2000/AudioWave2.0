@@ -1,0 +1,32 @@
+{
+  "startedAt": "2026-09-28T19:07:27.186Z",
+  "steps": [
+    {
+      "step": "library-state-before"
+    },
+    {
+      "step": "on-air",
+      "song": "Rocket Man (I Think It's Going to Be a Long Long Time)",
+      "artist": "Elton John"
+    },
+    {
+      "step": "after-up-next",
+      "toast": "Up Next: “Rocket Man (I Think It's Going to Be a Long Long Time)”",
+      "onAir": {
+        "song": "Rocket Man (I Think It's Going to Be a Long Long Time)",
+        "artist": "Elton John"
+      },
+      "libraryState": {
+        "key": "shell:library:state",
+        "value": "{\"starred\":{},\"saved\":{},\"playlists\":[],\"queue\":[\"song-air-mulmdxjos8v6\"],\"edits\":{},\"history\":[],\"stations\":{},\"videos\":{},\"lists\":{\"radio\":[]},\"plays\":[],\"sessions\":[],\"recShown\":[],\"acts\":[],\"kept\":[{\"id\":\"song-air-mulmdxjos8v6\",\"kind\":\"music\",\"title\":\"Rocket Man (I Think It's Going to Be a Long Long Time)\",\"artist\":\"Elton John\",\"album\":\"Honky Château (Bonus Track Version)\",\"duration\":282,\"bpm\":null,\"platform\":\"Radio\",\"url\":null}]}",
+        "updatedAt": "2026-09-28T19:07:51.444Z"
+      }
+    },
+    {
+      "step": "after-reload",
+      "key": "shell:library:state",
+      "value": "{\"starred\":{},\"saved\":{},\"playlists\":[],\"queue\":[\"song-air-mulmdxjos8v6\"],\"edits\":{},\"history\":[],\"stations\":{},\"videos\":{},\"lists\":{\"radio\":[]},\"plays\":[],\"sessions\":[{\"k\":\"radio\",\"id\":\"b4834687-4c8d-42e2-96d1-e5cd2c0e68f5\",\"name\":\"93.9 Lite FM\",\"meta\":{\"tags\":\"\",\"where\":\"Chicago, IL\",\"country\":\"The United States Of America\",\"codec\":\"AAC\",\"bitrate\":0},\"at\":1790622455495,\"dur\":17}],\"recShown\":[],\"acts\":[],\"kept\":[{\"id\":\"song-air-mulmdxjos8v6\",\"kind\":\"music\",\"title\":\"Rocket Man (I Think It's Going to Be a Long Long Time)\",\"artist\":\"Elton John\",\"album\":\"Honky Château (Bonus Track Version)\",\"duration\":282,\"bpm\":null,\"platform\":\"Radio\",\"url\":null}]}",
+      "updatedAt": "2026-09-28T19:07:53.015Z"
+    }
+  ]
+}

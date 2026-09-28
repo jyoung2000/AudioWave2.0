@@ -1,0 +1,146 @@
+{
+  "startedAt": "2026-09-28T19:06:14.917Z",
+  "steps": [
+    {
+      "step": "shift-f10-open",
+      "at": "2026-09-28T19:06:39.079Z",
+      "head": "On air: Elton John — Rocket Man (I Think It's Going to Be a Long Long Time)",
+      "focusDataAct": "ls-open",
+      "focusText": "Play “WLS 94.7-FM Chicago,",
+      "focusIsParent": false,
+      "parents": [
+        {
+          "label": "Add Song to PlaylistNo p",
+          "ariaExpanded": "false",
+          "isOpen": false,
+          "hasSub": true
+        },
+        {
+          "label": "Add to PlaylistNo playli",
+          "ariaExpanded": "false",
+          "isOpen": false,
+          "hasSub": true
+        }
+      ],
+      "submenusTotal": 2,
+      "submenusRendered": 0,
+      "renderedText": [],
+      "nestedRendered": 0
+    },
+    {
+      "step": "focus-moved-to-parent",
+      "at": "2026-09-28T19:06:40.223Z",
+      "moves": [
+        {
+          "i": 1,
+          "focusDataAct": "ls-keep",
+          "focusText": "Add to Favourites",
+          "isParent": false
+        },
+        {
+          "i": 2,
+          "focusDataAct": "ls-air-next",
+          "focusText": "Add Song to Up Next",
+          "isParent": false
+        },
+        {
+          "i": 3,
+          "focusDataAct": "parent",
+          "focusText": "Add Song to PlaylistNo pla",
+          "isParent": true
+        }
+      ],
+      "landedOn": {
+        "act": "parent",
+        "text": "Add Song to PlaylistNo pla",
+        "isParent": true
+      }
+    },
+    {
+      "step": "arrow-right-on-parent",
+      "at": "2026-09-28T19:06:41.061Z",
+      "before": {
+        "rendered": 0,
+        "parents": [
+          {
+            "label": "Add Song to PlaylistNo p",
+            "ariaExpanded": "false",
+            "isOpen": false,
+            "hasSub": true
+          },
+          {
+            "label": "Add to PlaylistNo playli",
+            "ariaExpanded": "false",
+            "isOpen": false,
+            "hasSub": true
+          }
+        ]
+      },
+      "after": {
+        "rendered": 1,
+        "text": [
+          "No playlists yetNew Playlist…"
+        ],
+        "parents": [
+          {
+            "label": "Add Song to PlaylistNo p",
+            "ariaExpanded": "true",
+            "isOpen": true,
+            "hasSub": true
+          },
+          {
+            "label": "Add to PlaylistNo playli",
+            "ariaExpanded": "false",
+            "isOpen": false,
+            "hasSub": true
+          }
+        ],
+        "focus": "New Playlist…",
+        "nested": 0
+      }
+    },
+    {
+      "step": "arrow-left-back",
+      "at": "2026-09-28T19:06:41.909Z",
+      "rendered": 0,
+      "parents": [
+        {
+          "label": "Add Song to PlaylistNo p",
+          "ariaExpanded": "false",
+          "isOpen": false,
+          "hasSub": true
+        },
+        {
+          "label": "Add to PlaylistNo playli",
+          "ariaExpanded": "false",
+          "isOpen": false,
+          "hasSub": true
+        }
+      ],
+      "focus": "Add Song to PlaylistNo pla"
+    },
+    {
+      "step": "submenu-by-click-control",
+      "at": "2026-09-28T19:06:44.025Z",
+      "rendered": 1,
+      "text": [
+        "No playlists yetNew Playlist…"
+      ],
+      "parents": [
+        {
+          "label": "Add Song to PlaylistNo p",
+          "ariaExpanded": "true",
+          "isOpen": true,
+          "hasSub": true
+        },
+        {
+          "label": "Add to PlaylistNo playli",
+          "ariaExpanded": "false",
+          "isOpen": false,
+          "hasSub": true
+        }
+      ]
+    }
+  ],
+  "pageErrors": []
+}

@@ -1,0 +1,129 @@
+{
+  "startedAt": "2026-09-28T18:59:20.909Z",
+  "steps": [
+    {
+      "step": "before-gesture",
+      "at": "2026-09-28T18:59:27.505Z",
+      "tracks": {
+        "len": 0,
+        "titles": [],
+        "artists": []
+      },
+      "playlists": {
+        "len": 0,
+        "titles": [],
+        "artists": []
+      },
+      "playlistItems": {
+        "len": 0,
+        "titles": [],
+        "artists": []
+      },
+      "events": {
+        "len": 0,
+        "titles": [],
+        "artists": []
+      }
+    },
+    {
+      "step": "tuned",
+      "at": "2026-09-28T18:59:47.809Z",
+      "song": "Material Girl",
+      "artist": "Madonna"
+    },
+    {
+      "step": "after-up-next",
+      "at": "2026-09-28T18:59:50.438Z",
+      "menuHead": "On air: Madonna — Material Girl",
+      "toast": "Up Next: “Material Girl”",
+      "tracks": {
+        "len": 0,
+        "titles": [],
+        "artists": []
+      }
+    },
+    {
+      "step": "no-retune",
+      "at": "2026-09-28T18:59:50.441Z",
+      "playingBefore": "b4834687-4c8d-42e2-96d1-e5cd2c0e68f5",
+      "playingAfter": "3e5220ca-65d0-4410-b274-7ab30f0ac8e7",
+      "unchanged": false
+    },
+    {
+      "step": "after-reload",
+      "at": "2026-09-28T18:59:54.315Z",
+      "tracks": {
+        "len": 0,
+        "titles": [],
+        "artists": []
+      },
+      "playlists": {
+        "len": 0,
+        "titles": [],
+        "artists": []
+      },
+      "playlistItems": {
+        "len": 0,
+        "titles": [],
+        "artists": []
+      },
+      "events": {
+        "len": 0,
+        "titles": [],
+        "artists": []
+      }
+    },
+    {
+      "step": "shift-f10-submenus",
+      "at": "2026-09-28T19:00:01.489Z",
+      "opened": true,
+      "head": "On air: Madonna — Material Girl",
+      "level0": [
+        "Play “WLS 94.7-FM Chicago, IL”",
+        "Add to Favourites",
+        "Add Song to Up Next",
+        "Add Song to Group Queue",
+        "Add Song to PlaylistNo playlis",
+        "Add to PlaylistNo playlists ye",
+        "New Playlist…"
+      ],
+      "level1_afterRight": [
+        "Play “WLS 94.7-FM Chicago, IL”",
+        "Add to Favourites",
+        "Add Song to Up Next",
+        "Add Song to Group Queue",
+        "Add Song to PlaylistNo playlis",
+        "Add to PlaylistNo playlists ye",
+        "New Playlist…"
+      ],
+      "level2_afterRight": [
+        "Play “WLS 94.7-FM Chicago, IL”",
+        "Add to Favourites",
+        "Add Song to Up Next",
+        "Add Song to Group Queue",
+        "Add Song to PlaylistNo playlis",
+        "Add to PlaylistNo playlists ye",
+        "New Playlist…"
+      ],
+      "afterLeft_level1": [
+        "Play “WLS 94.7-FM Chicago, IL”",
+        "Add to Favourites",
+        "Add Song to Up Next",
+        "Add Song to Group Queue",
+        "Add Song to PlaylistNo playlis",
+        "Add to PlaylistNo playlists ye",
+        "New Playlist…"
+      ],
+      "afterLeft_level0": [
+        "Play “WLS 94.7-FM Chicago, IL”",
+        "Add to Favourites",
+        "Add Song to Up Next",
+        "Add Song to Group Queue",
+        "Add Song to PlaylistNo playlis",
+        "Add to PlaylistNo playlists ye",
+        "New Playlist…"
+      ]
+    }
+  ],
+  "pageErrors": []
+}

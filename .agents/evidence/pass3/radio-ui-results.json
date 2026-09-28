@@ -1,0 +1,89 @@
+{
+  "startedAt": "2026-09-28T18:47:33.498Z",
+  "player": "http://127.0.0.1:4175",
+  "steps": [
+    {
+      "step": "pair",
+      "at": "2026-09-28T18:47:40.325Z",
+      "afterSet": true,
+      "afterReload": {
+        "base": "http://127.0.0.1:4546",
+        "hubName": "Now Playing Hub",
+        "hasSecret": true,
+        "scopes": [
+          "search:use",
+          "library:read",
+          "library:share",
+          "playlists:sync",
+          "group:member"
+        ]
+      }
+    },
+    {
+      "step": "search",
+      "at": "2026-09-28T18:47:44.471Z",
+      "rows": 0,
+      "asked": [
+        "http://127.0.0.1:4546/api/v1/search?…",
+        "https://itunes.apple.com/search?…"
+      ],
+      "to8642": 0
+    },
+    {
+      "step": "pasted-link",
+      "at": "2026-09-28T18:47:47.478Z",
+      "to8642": 0,
+      "new": [
+        "https://api.deezer.com/search?limit=1&output=jsonp&q=Someone%20Some%20Song&callback=__srch",
+        "http://127.0.0.1:4546/api/v1/providers/resolve?url=https%3A%2F%2Fsoundcloud.com%2Fsomeone%",
+        "https://soundcloud.com/oembed?format=json&url=https%3A%2F%2Fsoundcloud.com%2Fsomeone%2Fsom",
+        "https://api.deezer.com/track/446000932?output=jsonp&callback=__srchCB2",
+        "https://noembed.com/embed?url=https%3A%2F%2Fsoundcloud.com%2Fsomeone%2Fsome-song"
+      ]
+    },
+    {
+      "step": "radio-directory",
+      "at": "2026-09-28T18:47:49.353Z",
+      "stations": 34,
+      "nowPlayingDuringDirectory": 0
+    },
+    {
+      "step": "tuned",
+      "at": "2026-09-28T18:48:09.500Z",
+      "tunedUrlBefore": "39a9c317-2511-11e8-91bf-52543be04c81",
+      "headline": "More Music, More Variety for Chicago",
+      "rowSong": "Piano Man",
+      "rowArtist": "Billy Joel",
+      "nowPlayingCalls": 0,
+      "nowPlayingUrls": []
+    },
+    {
+      "step": "context-menu",
+      "at": "2026-09-28T18:48:10.311Z",
+      "menuHead": "On air: Billy Joel — Piano Man",
+      "items": [
+        "Play “WLS 94.7-FM Chicago, IL”",
+        "Add to Favourites",
+        "Add Song to Up Next",
+        "Add Song to Group Queue",
+        "Add Song to PlaylistNo playlists yetNew Playlist…",
+        "Add to PlaylistNo playlists yetNew Playlist…",
+        "New Playlist…"
+      ],
+      "groupDisabled": true,
+      "groupTitle": "You are not in a group on the container yet."
+    },
+    {
+      "step": "gesture-no-retune",
+      "at": "2026-09-28T18:48:10.325Z",
+      "tunedUrlBefore": "39a9c317-2511-11e8-91bf-52543be04c81",
+      "playingAfter": "3e5220ca-65d0-4410-b274-7ab30f0ac8e7",
+      "equal": false,
+      "nowPlayingTitleNow": "More Music, More Variety for Chicago"
+    }
+  ],
+  "notes": [],
+  "pageErrors": [],
+  "totalRequests": 43,
+  "requestsTo8642": []
+}

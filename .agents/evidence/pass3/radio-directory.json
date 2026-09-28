@@ -1,0 +1,410 @@
+[
+  {
+    "sid": "39a9c317-2511-11e8-91bf-52543be04c81",
+    "text": "Nexus Radio Charts 128 Chicago",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "3e5220ca-65d0-4410-b274-7ab30f0ac8e7",
+    "text": "WLS 94.7-FM Chicago, IL Piano Man Billy Joel 80 Chicago, IL",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "3d84e338-1226-401e-8184-401b91f81b10",
+    "text": "WFMT Classical AAC 256 Classical 258 Chicago, IL",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "d2dcbe53-1e31-4db0-afec-ad4abd36a4f6",
+    "text": "Moody Radio WMBI 90.1 FM Family Life Today Dave & Ann Wilson 96 Chicago, IL",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "19d879ef-2bb5-4281-989d-46e578e7ae40",
+    "text": "107.5 WGCI The Chi's #1 for Hip Hop & R&B — Chicago, IL",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "b0f9fafa-e387-4c8e-abe9-67678005e353",
+    "text": "WRTE 90.7 FM Jazz 128 Chicago, IL",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "a8e1cfab-79ef-43f1-aeb7-1c98ca4f2eb8",
+    "text": "Smooth Jazz WNUA Chicago Live broadcast 128 Chicago, IL",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "d29b6733-5d61-4e26-9e4e-254dc08df80d",
+    "text": "Smooth Jazz WNUA 95.5 Chicago, IL Oldies 128 Chicago, IL",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "5020fbf7-712b-41a9-9560-8be3fcb56935",
+    "text": "Klove Gospel 63 Chicago, IL",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "e3be401b-96d2-42b2-bbcd-a5d9591941b7",
+    "text": "103.5 KISS FM - WKSC-FM Chicago Chicago's #1 Hit Music Station — Chicago, IL",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "41e71839-121c-46a2-a441-325abd9104e2",
+    "text": "Audio Noir Audio drama 48 Chicago, IL",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "1050ed1a-94d8-433b-b43b-1aa96256835d",
+    "text": "WCHI 95.5 FM - Chicago, IL Chicago's Rock Station — Chicago, IL",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "b4834687-4c8d-42e2-96d1-e5cd2c0e68f5",
+    "text": "93.9 Lite FM Live broadcast — Chicago, IL",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "190e6e20-d641-4a71-9be0-4a731ec15c3d",
+    "text": "fubu radio Dj 192 Chicago",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "a8e597b3-7b13-4ff5-9b7d-d7c000ad9861",
+    "text": "WFMT Classical AAC 128 Classical 130 Chicago, IL",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "29998653-f92f-4ab5-abf3-44c03e3b5a0a",
+    "text": "WGN Radio 720 Live broadcast 64 Chicago, IL",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "3c1215ca-7e64-4a0e-8b24-bda08ae3e6ef",
+    "text": "WLIT 93.9 FM - Chicago, IL Aor / slow rock / soft rock (adult-orientated rock e.g. the eag",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "6f49cfea-01f6-4fa3-87cf-0c316acd1459",
+    "text": "Inspiration 1390 Gospel — Chicago, IL",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "aa9282e9-1821-4b22-8b25-f4fc1b542bcc",
+    "text": "011.fm – House of Hair 80s hard rock 192 Chicago, IL",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "c40d5caf-7668-4544-ae2d-a1d1b627f92e",
+    "text": "Polskie Radio 1030 Chicago Live broadcast 128 Chicago",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "89383a68-f676-4d54-ac28-6333e5afe364",
+    "text": "WCHI-HD2 Big 95.5 FM - Chicago, IL Country — Chicago, IL",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "a5283008-fea8-404d-a59b-fe19ff576126",
+    "text": "WFMT Classical AAC 64 Classical 130 Chicago, IL",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "c545c76c-2d89-45ef-8204-7f37e803aa39",
+    "text": "WCPT 820 AM Willow Springs, IL Progressive talk 64 Chicago, IL",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "bc1db845-b6fe-4a89-a0b8-9c0754ab401e",
+    "text": "Nexus Radio Live broadcast 128 Chicago",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "b6d8d012-15ab-4ae5-bf35-7d3f81c32e58",
+    "text": "Radio Chrystusa Króla Chicago Live broadcast 160 Chicago",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "ed69ed12-cd4b-49d1-87c3-4eb34aacbc0a",
+    "text": "Metaverse Radio Chicago Live broadcast 192 Chicago, IL",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "90e26323-6971-42f3-b6a7-f9880e2b3738",
+    "text": "CRIS Radio Live broadcast 128 Chicago, IL",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "d0e379fe-a121-4aed-a949-6e48a8742f92",
+    "text": "Hot Wax Radio Indie 320 Chicago, IL",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "23acb5ad-df82-4db4-ac74-10c9a18066c8",
+    "text": "WFMT Classical Classical 258 Chicago, IL",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "96709657-40d2-4504-9387-7eb08d4f0d8b",
+    "text": "93.9 Lite FM 1980s 24 Chicago, IL",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "73897cf2-e547-4e81-b27c-622074a46e0c",
+    "text": "Radio DePaul Live broadcast 56 Chicago, IL",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "915f7adc-163e-4d61-9f38-568c34c641e1",
+    "text": "WBEZ FM 91.5 Live broadcast 64 Chicago",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "2d586c58-6547-41cd-8c99-78ad93bcc17a",
+    "text": "WFMT Classical (AAC) Classical 258 Chicago, IL",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  },
+  {
+    "sid": "cb3b7f24-4bcd-4e84-b27f-d3f62af686b6",
+    "text": "Multiverse Radio Variety 128 Chicago, IL",
+    "cells": [
+      "lib-idx",
+      "lib-title",
+      "rlist-song",
+      "lib-col-artist rlist-artist",
+      "lib-num lib-col-bpm",
+      "lib-col-album"
+    ]
+  }
+]

@@ -1,0 +1,37 @@
+{
+  "startedAt": "2026-09-28T18:55:48.828Z",
+  "steps": [
+    {
+      "step": "tuned",
+      "at": "2026-09-28T18:56:15.951Z",
+      "song": "Piano Man",
+      "artist": "Billy Joel"
+    },
+    {
+      "step": "up-next-persistence",
+      "at": "2026-09-28T18:56:22.476Z",
+      "menuHead": "On air: Billy Joel — Piano Man",
+      "toast": "Up Next: “Piano Man”",
+      "beforeGesture": {},
+      "afterClick": {},
+      "afterReload": {},
+      "queueDomAfterReload": null
+    },
+    {
+      "step": "keyboard-submenus",
+      "at": "2026-09-28T18:56:57.466Z",
+      "opened": false,
+      "head": null,
+      "topLevel": [],
+      "afterRight1_visible": false,
+      "afterRight1_items": [],
+      "afterRight2_visible": false,
+      "afterRight2_items": [],
+      "afterLeft_visible": false,
+      "afterLeft_items": []
+    }
+  ],
+  "notes": [],
+  "pageErrors": [],
+  "requestsTo8642": 0
+}

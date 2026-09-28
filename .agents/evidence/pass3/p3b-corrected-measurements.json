@@ -1,0 +1,174 @@
+{
+  "startedAt": "2026-09-28T19:04:37.411Z",
+  "steps": [
+    {
+      "step": "baseline-stores",
+      "at": "2026-09-28T19:04:45.528Z",
+      "artwork": 0,
+      "eqBindings": 0,
+      "eqPresets": 0,
+      "events": 0,
+      "files": 0,
+      "playlistItems": 0,
+      "playlists": 0,
+      "roots": 0,
+      "settings": 1,
+      "tracks": 0
+    },
+    {
+      "step": "tuned",
+      "at": "2026-09-28T19:05:05.542Z",
+      "wlsSid": "3e5220ca-65d0-4410-b274-7ab30f0ac8e7",
+      "playingRow": {
+        "sid": "b4834687-4c8d-42e2-96d1-e5cd2c0e68f5",
+        "text": "93.9 Lite FM More Music, More Variety for Chicago "
+      },
+      "isWlsPlaying": false,
+      "headline": "More Music, More Variety for Chicago"
+    },
+    {
+      "step": "no-retune",
+      "at": "2026-09-28T19:05:06.799Z",
+      "playingBefore": {
+        "sid": "b4834687-4c8d-42e2-96d1-e5cd2c0e68f5",
+        "text": "93.9 Lite FM More Music, More Variety for Chicago "
+      },
+      "playingAfter": {
+        "sid": "b4834687-4c8d-42e2-96d1-e5cd2c0e68f5",
+        "text": "93.9 Lite FM More Music, More Variety for Chicago "
+      },
+      "playingUnchanged": true,
+      "focusBefore": null,
+      "focusAfter": null,
+      "focusMovedOnly": false,
+      "headlineBefore": "More Music, More Variety for Chicago",
+      "headlineAfter": "More Music, More Variety for Chicago",
+      "headlineUnchanged": true
+    },
+    {
+      "step": "persistence",
+      "at": "2026-09-28T19:05:14.984Z",
+      "menuHead": "On air: Phil Collins — In The Air Tonight",
+      "airActions": [
+        "ls-air-next",
+        "ls-air-new"
+      ],
+      "toast": "Up Next: “In The Air Tonight”",
+      "storesChanged": [
+        "settings"
+      ],
+      "delta": {
+        "settings": {
+          "before": [
+            {
+              "key": "shell:nowplaying:pose",
+              "kind": "object",
+              "title": null
+            }
+          ],
+          "after": [
+            {
+              "key": "shell:library:state",
+              "kind": "object",
+              "title": null
+            },
+            {
+              "key": "shell:nowplaying:pose",
+              "kind": "object",
+              "title": null
+            }
+          ]
+        }
+      }
+    },
+    {
+      "step": "keyboard",
+      "at": "2026-09-28T19:05:21.211Z",
+      "opened": true,
+      "head": "On air: Phil Collins — In The Air Tonight",
+      "l0": {
+        "topLevel": 7,
+        "parentsWithSub": 2,
+        "parentStates": [
+          {
+            "label": "Add Song to PlaylistNo",
+            "isOpen": false,
+            "ariaExpanded": "false"
+          },
+          {
+            "label": "Add to PlaylistNo play",
+            "isOpen": false,
+            "ariaExpanded": "false"
+          }
+        ],
+        "submenusTotal": 2,
+        "submenusRendered": 0,
+        "renderedSubText": [],
+        "active": "BUTTON[ls-open]"
+      },
+      "afterRight1": {
+        "topLevel": 7,
+        "parentsWithSub": 2,
+        "parentStates": [
+          {
+            "label": "Add Song to PlaylistNo",
+            "isOpen": false,
+            "ariaExpanded": "false"
+          },
+          {
+            "label": "Add to PlaylistNo play",
+            "isOpen": false,
+            "ariaExpanded": "false"
+          }
+        ],
+        "submenusTotal": 2,
+        "submenusRendered": 0,
+        "renderedSubText": [],
+        "active": "BUTTON[ls-open]"
+      },
+      "afterRight2": {
+        "topLevel": 7,
+        "parentsWithSub": 2,
+        "parentStates": [
+          {
+            "label": "Add Song to PlaylistNo",
+            "isOpen": false,
+            "ariaExpanded": "false"
+          },
+          {
+            "label": "Add to PlaylistNo play",
+            "isOpen": false,
+            "ariaExpanded": "false"
+          }
+        ],
+        "submenusTotal": 2,
+        "submenusRendered": 0,
+        "renderedSubText": [],
+        "active": "BUTTON[ls-open]"
+      },
+      "afterLeft": {
+        "topLevel": 7,
+        "parentsWithSub": 2,
+        "parentStates": [
+          {
+            "label": "Add Song to PlaylistNo",
+            "isOpen": false,
+            "ariaExpanded": "false"
+          },
+          {
+            "label": "Add to PlaylistNo play",
+            "isOpen": false,
+            "ariaExpanded": "false"
+          }
+        ],
+        "submenusTotal": 2,
+        "submenusRendered": 0,
+        "renderedSubText": [],
+        "active": "BUTTON[ls-open]"
+      },
+      "right1_changedRenderedSubmenus": false,
+      "right1_openedAParent": false
+    }
+  ],
+  "pageErrors": []
+}

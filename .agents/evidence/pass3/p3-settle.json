@@ -1,0 +1,93 @@
+{
+  "startedAt": "2026-09-28T19:00:53.047Z",
+  "steps": [
+    {
+      "step": "tune-settled",
+      "at": "2026-09-28T19:01:18.127Z",
+      "wlsSid": "3e5220ca-65d0-4410-b274-7ab30f0ac8e7",
+      "playing": {
+        "sid": "b4834687-4c8d-42e2-96d1-e5cd2c0e68f5",
+        "settledAfter": 1,
+        "stable": true
+      },
+      "isWlsPlaying": false,
+      "title": "More Music, More Variety for Chicago"
+    },
+    {
+      "step": "no-retune-settled",
+      "at": "2026-09-28T19:01:20.311Z",
+      "before": "b4834687-4c8d-42e2-96d1-e5cd2c0e68f5",
+      "after": "3e5220ca-65d0-4410-b274-7ab30f0ac8e7",
+      "unchanged": false,
+      "afterIsWls": true
+    },
+    {
+      "step": "persistence-delta",
+      "at": "2026-09-28T19:01:27.535Z",
+      "toast": "Up Next: “In The Air Tonight”",
+      "storesThatChanged": [
+        "settings"
+      ],
+      "delta": {
+        "settings": {
+          "before": [
+            null
+          ],
+          "after": [
+            null,
+            null
+          ],
+          "grewBy": 1
+        }
+      }
+    },
+    {
+      "step": "keyboard-levels",
+      "at": "2026-09-28T19:01:33.570Z",
+      "opened": true,
+      "lv0": {
+        "items": 7,
+        "parents": [
+          "",
+          ""
+        ],
+        "visibleSubmenus": 2,
+        "active": "BUTTON#"
+      },
+      "afterRight1": {
+        "items": 7,
+        "parents": [
+          "",
+          ""
+        ],
+        "expanded": [],
+        "visibleSubmenus": 2,
+        "submenuText": [
+          "No playlists yetNew Playlist…",
+          "No playlists yetNew Playlist…"
+        ],
+        "active": "BUTTON#"
+      },
+      "afterRight2": {
+        "items": 7,
+        "expanded": [],
+        "visibleSubmenus": 2,
+        "submenuText": [
+          "No playlists yetNew Playlist…",
+          "No playlists yetNew Playlist…"
+        ],
+        "active": "BUTTON#"
+      },
+      "afterLeft": {
+        "items": 7,
+        "visibleSubmenus": 2,
+        "submenuText": [
+          "No playlists yetNew Playlist…",
+          "No playlists yetNew Playlist…"
+        ],
+        "active": "BUTTON#"
+      }
+    }
+  ],
+  "pageErrors": []
+}

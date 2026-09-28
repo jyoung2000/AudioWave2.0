@@ -1,0 +1,56 @@
+{
+  "startedAt": "2026-09-28T18:57:32.491Z",
+  "steps": [
+    {
+      "step": "kv-namespace",
+      "at": "2026-09-28T18:57:39.396Z",
+      "objectStores": [
+        "artwork",
+        "eqBindings",
+        "eqPresets",
+        "events",
+        "files",
+        "playlistItems",
+        "playlists",
+        "roots",
+        "settings",
+        "tracks"
+      ],
+      "keys": {
+        "artwork": [],
+        "eqBindings": [],
+        "eqPresets": [],
+        "events": [],
+        "files": [],
+        "playlistItems": [],
+        "playlists": [],
+        "roots": [],
+        "settings": [
+          "shell:nowplaying:pose"
+        ],
+        "tracks": []
+      }
+    },
+    {
+      "step": "tuned",
+      "at": "2026-09-28T18:58:00.132Z",
+      "song": "Material Girl",
+      "artist": "Madonna"
+    },
+    {
+      "step": "up-next-persistence",
+      "at": "2026-09-28T18:58:06.226Z",
+      "menuHead": "On air: Madonna — Material Girl",
+      "airActions": [
+        "ls-air-next",
+        "ls-air-new"
+      ],
+      "toast": "Up Next: “Material Girl”",
+      "beforeGesture": {},
+      "afterClick": {},
+      "afterReload": {}
+    }
+  ],
+  "notes": [],
+  "failure": "TimeoutError: locator.click: Timeout 30000ms exceeded. | Call log: | \u001b[2m  - waiting for locator('#radioMenu .rlist tbody tr').filter({ hasText: 'WLS 94.7-FM' }).first()\u001b[22m | "
+}
