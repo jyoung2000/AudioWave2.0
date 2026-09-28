@@ -67,38 +67,58 @@ So a future failure of pass 2's flake will say *why*: paired or not, what the dr
 lookups ran. The comment names pass 2's sweep honestly ("one run in five of Hermes's pass-2 sweep saw
 no rows for 60 s and left nothing to explain it").
 
-**The five-run sweep did NOT complete — 3 of 5 attempts, and the outcome is not what the rest of this
-report says.** Recording it precisely rather than rounding it up:
+**The sweep did not run cleanly, and my own first accounting of it was wrong. Correcting that here
+rather than leaving a flattering mistake in the record.**
 
-| Run | Result | Failure mode |
-| --- | --- | --- |
-| 1 | **14 passed** | — |
-| 2 | **1 failed, 13 passed** | **`ERR_CONNECTION_REFUSED` at `http://127.0.0.1:4173/`, inside `boot()`** |
-| 3 | no result line (killed mid-run) | — |
-| 4, 5 | **never started** | the sweep process died |
+The per-run table I originally wrote ("run 1: 14 passed; run 2: `ERR_CONNECTION_REFUSED`; 3 of 5")
+is **not supported by the logs now on disk.** Re-reading every `p3-sweep-*.log` after all processes
+exited:
 
-**The one failure was NOT the pass-2 search flake.** It is the suite's **own webServer dying**:
+| Log | Result | Search diagnostic fired | `ERR_CONNECTION_REFUSED` | hub asked |
+| --- | --- | --- | --- | --- |
+| `run1` | 2 failed, 12 passed | **2×** | 0 | **0** |
+| `run2` | 2 failed, 12 passed | **4×** | 0 | **0** |
+| `run3` | 2 failed, 12 passed | **4×** | 0 | **0** |
+| `run4`, `run5` | no result line | 0 | 0 | 0 |
+
+**Why my numbers moved: two of my own sweep processes were writing the same log paths at the same
+time.** The mtimes prove it — `run3` was written *before* `run2`. **Per-run attribution here is
+therefore unreliable and I claim none.** The diagnostic *content* is consistent across every log
+that contains it, and that much is solid.
+
+**The correction that matters: the new `searchFor()` diagnostic is PROVEN, not unproven, and the
+pass-2 flake DID reproduce.** The message fired — repeatedly, with an identical signature:
 
 ```
-Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4173/
-   at np\_shell.ts:46   (boot → page.goto)
-   at pairAndOpen (preview.spec.ts:64)
-   at preview.spec.ts:233:3
+Error: no search rows for "Golden Hour": {
+  "popover": "Results: 0 songs\n\nClear\nNo matches for “Golden Hour”.\n\nNo results",
+  "paired": false,
+  "asked": ["https://itunes.apple.com/search?media=music&entity=song&limit=25&term=Golden%20Hour"],
+  "typed": "Golden Hour"
+}
 ```
 
-It failed in `boot()`, **before any search ran**, so the new `searchFor()` diagnostic never got a
-chance to fire and no `.srch__row` wait was ever reached. **The diagnostic this section exists to
-produce is therefore still unproven** — not disproven, unproven.
+That is **exactly the evidence pass 2 could not produce**, and it names a cause:
 
-**So the honest §2.2 verdict: the diagnostic code is present and correct, and I could not get a
-failure to exercise it, because the port-4173 webServer kept dying underneath the suite.** Across
-this pass that webServer died **three** times (once killing a whole sweep between runs, once inside
-run 2). That instability is itself a finding, and it is a *harness* problem, not a product one.
+- `paired: false` — **`player:hub` was absent when the search ran** (`paired:false` × 5,
+  `paired:true` × **0**)
+- `asked` contains **only the iTunes lookup**; the hub was **never asked** (`hubAsked=0`)
+- iTunes is stubbed to return empty by `pairAndOpen`, hence "0 songs / No matches"
 
-**What the evidence does support:** the pass-2 flake did **not** reproduce in the runs that
-completed — `test:e2e` passed all **162** tests in 1542 s during `verify`, and sweep run 1 passed
-**14/14** including `a pointer wandering inside the row still completes the hold`. Two clean data
-points, not five, and not from a completed sweep.
+**So the chain behaved correctly given what it was told.** With no credential, the shell's
+`hubAcctFor()` returns null (`make-shell.py:600-605`), the paired branch is skipped, and the
+keyless iTunes chain answers — which the test has stubbed to nothing. The product did not fail; the
+**test's pairing did not survive to the search.**
+
+**What I did not resolve, and will not claim:** whether that lost pairing is a *test-harness* race
+(the `kv.set` → `page.goto('about:blank')` → re-`boot()` sequence at `preview.spec.ts:56-66`) or a
+*product* bug where pairing is dropped across a reload. The diagnostic points at the boundary; it
+does not decide it. **That is now a real, named, one-line question — "does the player's pairing
+survive a reload?" — rather than "a flaky test"**, which is precisely what §2.2 was built to deliver.
+
+**Also retained, and still true:** `test:e2e` passed all **162** tests in 1542 s during `verify`, so
+this is not a constant failure. And the port-4173 webServer *did* die three times across this pass
+(defect #5), which is why the sweep's bookkeeping is a mess at all.
 
 ### §2.3 FFmpeg's verification is on record — **WORKS (all three digests verified)**
 
@@ -413,7 +433,7 @@ got it wrong and wasted an invocation).
 
 | Item | Why |
 | --- | --- |
-| **§2.2 five-run `preview.spec.ts` sweep** | **did not complete — 3 of 5 attempts.** The suite's own port-4173 webServer died three times this pass (killing one whole sweep between runs, and once inside run 2 at `boot()`). Run 1 passed 14/14; run 2 failed on that webServer, not on the search. The new diagnostic is therefore **unproven, not disproven**. |
+| **§2.2 five-run `preview.spec.ts` sweep** | **ran, but the bookkeeping is unreliable: two of my own sweep processes wrote the same log paths**, so per-run attribution is impossible and I claim none. What *is* solid: the new diagnostic **fired and named a cause** — `"paired": false` in every instance, the hub never asked, only the stubbed-empty iTunes lookup. The flake therefore **did** reproduce, and §2.2 did its job. Unresolved: whether the lost pairing is a test race or a product bug across reload. |
 | **§3.1's three setups as three isolated states** | I ran paired + companion-connected. Player-alone and hub-paired/companion-closed were not separated. |
 | **Independent station-site cross-check** | `radioparadise.com/now-loading` and `kexp.org/radio` both 404; the SomaFM scrape returned nothing. Titles are ICY from each station's own stream — the right source, **not** an independent second opinion. This is why §3.1 is a 4 and not a 5. |
 | **Talk / between-song / HLS-AAC degradation** | 011.fm (no feed, no ICY) degraded correctly to the programme format, which covers the *no-metadata* case. A talk station and an HLS stream were not separately identified. |
