@@ -251,6 +251,9 @@ describe('installing FFmpeg', () => {
     expect(readFileSync(join(toolsDir, 'ffprobe.exe')).equals(ffprobe)).toBe(true);
     expect(existsSync(join(toolsDir, 'ffplay.exe'))).toBe(false);
     expect(leftovers()).toEqual([]);
+    // What was verified is the archive — the thing GitHub publishes a digest for — and it is named,
+    // so a person can compare it with the release page after the archive itself is gone.
+    expect(outcome.verified).toEqual({ asset: 'ffmpeg-master-latest-win64-gpl.zip', sha256: sha(archive) });
   });
 
   it('uses the release’s checksums.sha256 when the asset has no digest', async () => {

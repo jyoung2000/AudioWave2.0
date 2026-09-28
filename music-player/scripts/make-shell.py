@@ -660,7 +660,19 @@ replace("    var DEADLINE = 8000;",
 replace("      var chain = [companionSearch, itunesSearch];",
         "      /* hubSearch leads unconditionally: it reads the credential itself and rejects at once\n"
         "         when unpaired, so the decision is never one search out of date. */\n"
-        "      var chain = [hubSearch, companionSearch, itunesSearch];")
+        "      var chain = [hubSearch, itunesSearch];")
+
+# ---- search: no hard-coded local companion (docs/DEVIATIONS.md) ----------------------------------------------
+# The frontend asked http://127.0.0.1:8642 for searches and pasted links. Nothing in this suite serves
+# that port (the companion's helper is found and paired on 17342+), so the lookup reached whatever
+# else happened to listen there — on the owner's PC, an unrelated agent gateway — and told it every
+# query. DEVIATIONS.md already records this assumption as removed; now it is.
+replace("    var COMPANION = 'http://127.0.0.1:8642';",
+        "    var COMPANION = null;   // no hard-coded local companion: see docs/DEVIATIONS.md")
+replace("    function companionSearch(q) {\n",
+        "    function companionSearch(q) {\n"
+        "      if (!COMPANION) return Promise.reject(new Error('no local companion search'));\n")
+# (the pasted-link resolver's companion step is removed at the end, after the hub step is put in front of it)
 
 replace("        return chain[i](q).then(function (rows) {\n"
         "          if (rows && rows.length) return rows;",
@@ -1200,7 +1212,8 @@ replace("        }, kb ? rr.left + 40 : e.clientX, kb ? rr.bottom - 4 : e.client
 
 # The container's side of it: which groups this player is in, and "queue this song by name".
 replace("    function canInvite(g) { return (g.myRole === 'owner' || g.myRole === 'admin') && hasScope('group:admin'); }",
-        r"""    window.NP_HUB = {
+        r"""    /* Added to the bridge's NP_HUB (which carries status()), never put in its place. */
+    window.NP_HUB = Object.assign(window.NP_HUB || {}, {
       paired: function () { return !!hubAcct; },
       groups: function () { return hubAcct ? groups : null; },
       refreshGroups: function () {
@@ -1218,7 +1231,7 @@ replace("    function canInvite(g) { return (g.myRole === 'owner' || g.myRole ==
           return { queued: false, reason: r.status === 403 ? 'You are no longer in that group, or this player may not add to it.' : r.status === 401 ? 'The container no longer accepts this player.' : r.status === 429 ? 'Too many requests at once. Wait a moment.' : 'No answer from the container.' };
         }, function () { return { queued: false, reason: 'No answer from the container.' }; });
       },
-    };
+    });
     /* A tuned station is the moment someone may want to keep a song. */
     document.addEventListener('radio:station', function () { if (hubAcct && groups === null) window.NP_HUB.refreshGroups(); });
     function canInvite(g) { return (g.myRole === 'owner' || g.myRole === 'admin') && hasScope('group:admin'); }""")
@@ -1242,6 +1255,18 @@ replace("        span.className = t.present ? 'conn__good' : 'conn__warn';\n"
         "          : ' missing');\n"
         "        if (coming) span.title = 'The companion is downloading and verifying ' + t.id + '.';\n"
         "        else if (!t.present) { missing++; span.title = (t.setup && t.setup.reason) || t.installHint || ''; }")
+
+# The pasted-link resolver's local-companion step goes too (docs/DEVIATIONS.md; see the search section).
+replace("        function () {\n"
+        "          return getJSON(COMPANION + '/resolve?q=' + enc, false, 20000).then(function (d) {\n"
+        "            var e = d && d.results && d.results[0];\n"
+        "            if (!e || !e.t) throw new Error('empty');\n"
+        "            return { t: e.t, a: e.a, art: e.art, d: e.d };\n"
+        "          });\n"
+        "        },\n",
+        "")
+replace("       browser; the companion beats both when it's running */",
+        "       browser; a paired container, when there is one, beats both */")
 
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):

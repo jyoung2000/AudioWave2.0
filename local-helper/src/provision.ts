@@ -35,6 +35,8 @@ interface ToolRecord {
   lastError?: string | null;
   lastUpdateCheckAt?: string;
   tag?: string | null;
+  /** The asset and SHA-256 the installed copy was verified against (for FFmpeg, the zip). */
+  verified?: { asset: string; sha256: string } | null;
 }
 
 type StateFile = { version: 1; tools: Partial<Record<HelperToolId, ToolRecord>> };
@@ -134,6 +136,7 @@ export async function ensureTools(options: EnsureOptions): Promise<EnsureResult>
             if (outcome.installed) {
               record.lastUpdateCheckAt = new Date(now()).toISOString();
               record.tag = outcome.tag ?? latest.tag;
+              record.verified = outcome.verified ?? null;
               options.onInstalled?.(id, outcome);
             } else log(`yt-dlp update refused: ${outcome.reason ?? 'unknown'}`);
           }
@@ -163,6 +166,7 @@ export async function ensureTools(options: EnsureOptions): Promise<EnsureResult>
     if (outcome.installed) {
       record.lastError = null;
       record.tag = outcome.tag ?? null;
+      if (outcome.installed) record.verified = outcome.verified ?? null;
       if (id === 'yt-dlp') record.lastUpdateCheckAt = record.lastAttemptAt;
       log(`set up ${id} ${outcome.version ?? ''}`.trim());
       report(id, { state: 'ready' });

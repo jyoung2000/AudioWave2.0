@@ -36,6 +36,11 @@ export interface InstallOutcome {
   reason: string | null;
   /** The release tag that was installed (or tried), when one was read. */
   tag?: string | null;
+  /**
+   * What was checked: the release asset and the SHA-256 it matched. For FFmpeg that is the zip the
+   * two executables were taken out of, so this is what to compare with the release page.
+   */
+  verified?: { asset: string; sha256: string } | null;
 }
 
 export interface InstallOptions {
@@ -183,7 +188,7 @@ export async function installTool(id: HelperToolId, options: InstallOptions): Pr
         throw new Refusal(describeWriteError(id, error));
       }
     }
-    return { installed: true, version, reason: null, tag };
+    return { installed: true, version, reason: null, tag, verified: { asset: asset.name, sha256: expected } };
   } catch (error) {
     return { installed: false, version: null, reason: explain(error, id, options.signal, timeout, limitMs), tag };
   } finally {

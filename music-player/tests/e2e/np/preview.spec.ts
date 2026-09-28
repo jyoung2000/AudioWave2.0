@@ -65,10 +65,42 @@ async function pairAndOpen(page: Page, rows: unknown[]): Promise<string[]> {
   return asked;
 }
 
+/**
+ * Type a query and wait for result rows. If none come, the failure says what the dropdown showed
+ * instead, whether this player was still paired, and which lookups the page actually made — one run
+ * in five of Hermes's pass-2 sweep saw no rows for 60 s and left nothing to explain it.
+ */
+async function searchFor(page: Page, q: string, timeout = 15_000): Promise<void> {
+  await page.fill('#q', q);
+  await page.press('#q', 'Enter');
+  try {
+    await expect(page.locator('.srch__row').first()).toBeVisible({ timeout });
+  } catch (err) {
+    const why = await page.evaluate(async () => {
+      const pop = document.getElementById('srch');
+      const kv = (window as unknown as { kv: { get(k: string): Promise<unknown> } }).kv;
+      const paired = await kv.get('player:hub').then((v) => !!(v && (v as { secret?: string }).secret), () => 'unreadable');
+      const asked = performance.getEntriesByType('resource').map((e) => e.name).filter((n) => /api\/v1|itunes|:8642|deezer/.test(n));
+      return { popover: pop ? (pop.hidden ? '(closed)' : pop.innerText.slice(0, 300)) : '(missing)', paired, asked, typed: (document.getElementById('q') as HTMLInputElement | null)?.value ?? null };
+    });
+    throw new Error(`no search rows for "${q}": ${JSON.stringify(why)}`, { cause: err });
+  }
+}
+
+test('a search and a pasted link never go to a hard-coded local port (docs/DEVIATIONS.md)', async ({ page }) => {
+  const local: string[] = [];
+  page.on('request', (r) => { if (/127\.0\.0\.1:8642|localhost:8642/.test(r.url())) local.push(r.url()); });
+  await pairAndOpen(page, [hubRow()]);
+  await searchFor(page, 'Golden Hour');
+  await page.fill('#q', 'https://soundcloud.com/someone/some-song');
+  await page.press('#q', 'Enter');
+  await page.waitForTimeout(1500);
+  expect(local, 'whatever happens to listen on 8642 is not the companion, and is not told what you search for').toEqual([]);
+});
+
 test('paired, the hub answers first: album, features, genre chip and bpm on the row', async ({ page }) => {
   const asked = await pairAndOpen(page, [hubRow()]);
-  await page.fill('#q', 'Golden Hour');
-  await page.press('#q', 'Enter');
+  await searchFor(page, 'Golden Hour');
   const row = page.locator('.srch__row').first();
   await expect(row.locator('.srch__title')).toHaveText('Golden Hour');
   await expect(row.locator('.srch__sub')).toContainText('Artist feat. Guest — Album');
@@ -79,8 +111,7 @@ test('paired, the hub answers first: album, features, genre chip and bpm on the 
 
 test('a low-confidence row keeps the platform’s own words: no album, no chip', async ({ page }) => {
   await pairAndOpen(page, [hubRow({ albumName: 'Guessed Album', identity: { matchConfidence: 0.3 }, genres: [], genreProfile: {}, genre: null, featuredArtists: [] })]);
-  await page.fill('#q', 'Golden Hour');
-  await page.press('#q', 'Enter');
+  await searchFor(page, 'Golden Hour');
   const row = page.locator('.srch__row').first();
   await expect(row.locator('.srch__title')).toHaveText('Golden Hour');
   await expect(row.locator('.srch__sub')).not.toContainText('Guessed Album');
@@ -99,16 +130,14 @@ test('a hub that never answers leaves the chain to iTunes inside the deadline', 
   }, ACCT);
   await page.goto('about:blank');
   await boot(page);
-  await page.fill('#q', 'Fallback');
-  await page.press('#q', 'Enter');
+  await searchFor(page, 'Fallback');
   await expect(page.locator('.srch__row .srch__title').first()).toHaveText('Fallback Song', { timeout: 12_000 });
 });
 
 test('a click plays up to thirty seconds, and the main track waits its turn', async ({ page }) => {
   await pairAndOpen(page, [hubRow()]);
   await page.route('https://p.scdn.co/**', (r) => r.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'content-type': 'audio/wav' }, body: silentWav() }));
-  await page.fill('#q', 'Golden Hour');
-  await page.press('#q', 'Enter');
+  await searchFor(page, 'Golden Hour');
   expect(await page.evaluate(() => (window as unknown as { NP_SRCH_CLIP?: number }).NP_SRCH_CLIP ?? null), 'the clip length the module exposes').toBe(30);
   const art = page.locator('.srch__row button.srch__art').first();
   await expect(art).toHaveAttribute('aria-label', /30 seconds/);
@@ -120,8 +149,7 @@ test('a click plays up to thirty seconds, and the main track waits its turn', as
 
 test('a row with no clip says so instead of pretending', async ({ page }) => {
   await pairAndOpen(page, [hubRow({ provider: 'youtube', providerId: 'v1', id: 'youtube:track:v1', previewUrl: null, canonicalUrl: 'https://youtu.be/v1' })]);
-  await page.fill('#q', 'Golden Hour');
-  await page.press('#q', 'Enter');
+  await searchFor(page, 'Golden Hour');
   await expect(page.locator('.srch__row button.srch__art')).toHaveCount(0);
   await expect(page.locator('.srch__row .srch__art').first()).toHaveAttribute('title', /No preview/);
 });
@@ -129,9 +157,7 @@ test('a row with no clip says so instead of pretending', async ({ page }) => {
 test('resting the pointer on a row arms it, fills the ring, and then plays', async ({ page }) => {
   await pairAndOpen(page, [hubRow()]);
   await page.route('https://p.scdn.co/**', (r) => r.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'content-type': 'audio/wav' }, body: silentWav() }));
-  await page.fill('#q', 'Golden Hour');
-  await page.press('#q', 'Enter');
-  await page.waitForSelector('.srch__row');
+  await searchFor(page, 'Golden Hour');
   await page.evaluate(() => ((window as unknown as { NP_SRCH_ARM_MS: number }).NP_SRCH_ARM_MS = 300));
   await page.locator('.srch__row').first().hover();
   await expect(page.locator('.srch__art.is-arming')).toHaveCount(1);
@@ -141,9 +167,7 @@ test('resting the pointer on a row arms it, fills the ring, and then plays', asy
 
 test('leaving the row mid-hold cancels; nothing plays', async ({ page }) => {
   await pairAndOpen(page, [hubRow()]);
-  await page.fill('#q', 'Golden Hour');
-  await page.press('#q', 'Enter');
-  await page.waitForSelector('.srch__row');
+  await searchFor(page, 'Golden Hour');
   await page.evaluate(() => ((window as unknown as { NP_SRCH_ARM_MS: number }).NP_SRCH_ARM_MS = 800));
   await page.locator('.srch__row').first().hover();
   await expect(page.locator('.srch__art.is-arming')).toHaveCount(1);
@@ -155,9 +179,7 @@ test('leaving the row mid-hold cancels; nothing plays', async ({ page }) => {
 
 test('a key press cancels the hold too', async ({ page }) => {
   await pairAndOpen(page, [hubRow()]);
-  await page.fill('#q', 'Golden Hour');
-  await page.press('#q', 'Enter');
-  await page.waitForSelector('.srch__row');
+  await searchFor(page, 'Golden Hour');
   await page.evaluate(() => ((window as unknown as { NP_SRCH_ARM_MS: number }).NP_SRCH_ARM_MS = 800));
   await page.locator('.srch__row').first().hover();
   await expect(page.locator('.srch__art.is-arming')).toHaveCount(1);
@@ -171,9 +193,7 @@ test('reduced motion never arms; the click still works', async ({ browser }) => 
   try {
     await pairAndOpen(p2, [hubRow()]);
     await p2.route('https://p.scdn.co/**', (r) => r.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'content-type': 'audio/wav' }, body: silentWav() }));
-    await p2.fill('#q', 'Golden Hour');
-    await p2.press('#q', 'Enter');
-    await p2.waitForSelector('.srch__row');
+    await searchFor(p2, 'Golden Hour');
     await p2.locator('.srch__row').first().hover();
     await p2.waitForTimeout(500);
     await expect(p2.locator('.srch__art.is-arming')).toHaveCount(0);
@@ -188,8 +208,7 @@ test('switching auditions keeps the main track aside until the last one ends', a
   const second = hubRow({ id: 'spotify:track:def', providerId: 'def', title: 'Silver Hour', previewUrl: 'https://p.scdn.co/mp3-preview/def', canonicalUrl: 'https://open.spotify.com/track/def' });
   await pairAndOpen(page, [hubRow(), second]);
   await page.route('https://p.scdn.co/**', (r) => r.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'content-type': 'audio/wav' }, body: silentWav() }));
-  await page.fill('#q', 'Hour');
-  await page.press('#q', 'Enter');
+  await searchFor(page, 'Hour');
   await page.waitForSelector('.srch__row[data-i="1"]');
   // A stand-in engine with the real one's timing: playing() answers false until a resume lands.
   await page.evaluate(() => {
@@ -212,9 +231,7 @@ test('switching auditions keeps the main track aside until the last one ends', a
 
 test('a pointer wandering inside the row still completes the hold', async ({ page }) => {
   await pairAndOpen(page, [hubRow()]);
-  await page.fill('#q', 'Golden Hour');
-  await page.press('#q', 'Enter');
-  await page.waitForSelector('.srch__row');
+  await searchFor(page, 'Golden Hour');
   // The clip must outlive the test's own moves, and the hold must be long enough that the first
   // check sees it arming. After that, a loaded machine may let the hold complete mid-drift — so
   // each check accepts "still arming" or "already playing"; only a cancel (neither) fails.
@@ -248,9 +265,7 @@ test('a pointer wandering inside the row still completes the hold', async ({ pag
 test('a link that is not a web link never reaches the page from the hub', async ({ page }) => {
   const evil = 'javascript' + ':alert(1)'; // the attack string under test, split past the lint rule
   await pairAndOpen(page, [hubRow({ previewUrl: evil, canonicalUrl: evil, artworkUrl: evil })]);
-  await page.fill('#q', 'Golden Hour');
-  await page.press('#q', 'Enter');
-  await page.waitForSelector('.srch__row');
+  await searchFor(page, 'Golden Hour');
   // With every URL refused, the row has no playable clip and nothing to open.
   await expect(page.locator('.srch__row button.srch__art')).toHaveCount(0);
   await expect(page.locator('.srch__row .srch__art').first()).toHaveAttribute('title', /No preview/);
@@ -269,9 +284,7 @@ test('a song added before its tempo arrives is filled in where it now lives', as
     await new Promise((res) => setTimeout(res, 700));
     await r.fulfill({ status: 200, contentType: 'text/javascript', body: `${cb}(${JSON.stringify(payload)})` });
   });
-  await page.fill('#q', 'Golden Hour');
-  await page.press('#q', 'Enter');
-  await page.waitForSelector('.srch__row');
+  await searchFor(page, 'Golden Hour');
   await page.click('.srch__row[data-i="0"] .srch__add');
   const cell = page.locator('#libraryRows tr', { hasText: 'Golden Hour' }).first().locator('.lib-col-bpm');
   await expect(cell).toHaveText('—');

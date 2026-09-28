@@ -149,8 +149,8 @@ for the user" — and this is the posture now:
   one at a time, with no prompt. FFmpeg is fetched on Windows only (BtbN's GPL build); on macOS and
   Linux the helper says which package-manager command installs it, because the system's own copy is
   the better one there. Nothing waits for setup: the window opens and the player connects at once,
-  and Settings ▸ Downloaders shows each tool's progress ("Setting up… 42%"), "Ready — Set up
-  automatically", or "Couldn't set up: <reason>" with Try Again. A failure is retried on the next
+  and Settings ▸ Downloaders shows each tool's progress ("Setting up… 42%"), "Ready", or
+  "Couldn't set up: <reason>" with Try Again. A failure is retried on the next
   start or after six hours.
 - **Every file is verified, and an unverifiable one is refused.** Each tool comes from its own
   project's GitHub release — `yt-dlp/yt-dlp`, `spotDL/spotify-downloader`, `BtbN/FFmpeg-Builds` —
@@ -159,6 +159,13 @@ for the user" — and this is the posture now:
   for an older release without one, the checksum file published in that same release
   (`SHA2-256SUMS`, `checksums.sha256`). If neither exists, nothing is installed. A verified file must
   then answer its version flag before it is used. See `local-helper/src/install.ts`.
+- **What was verified is written down.** `setup-state.json` in the tools folder records, per tool, the
+  release asset and the SHA-256 it matched. For yt-dlp and spotDL that asset *is* the installed
+  executable, so hashing `yt-dlp.exe` gives the same value. For FFmpeg it is the zip
+  (`ffmpeg-master-latest-win64-gpl.zip`): the zip is what GitHub publishes a digest for, it is
+  verified before anything is unpacked, and then `ffmpeg.exe` and `ffprobe.exe` are taken out of it
+  and the zip is deleted. Those two files have no published digest of their own, so check the value
+  in `setup-state.json` against the release page instead.
 - **An app-owned folder, and your own copies left alone.** The tools go into
   `<userData>\helper\tools` in the companion (`%LOCALAPPDATA%\NowPlaying\tools`, or the XDG / Library
   equivalent, for the standalone helper). A yt-dlp, spotDL or FFmpeg already on PATH, or named on the

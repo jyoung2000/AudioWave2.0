@@ -8103,7 +8103,7 @@ window.AW.startStats = function () {
     var CLIP = 30;                 // seconds of preview \u2014 the whole clip a platform serves
     window.NP_SRCH_CLIP = CLIP;    /* read by tests; one constant drives label, ring and cutoff */
     var TAIL = 0.7;                // seconds of volume ramp before the cut
-    var COMPANION = 'http://127.0.0.1:8642';
+    var COMPANION = null;   // no hard-coded local companion: see docs/DEVIATIONS.md
     var results = [], page = 0, hot = -1, state = 'idle', lastQ = '', seq = 0;
 
     var HOSTS = /^(www\.)?(youtube\.com|music\.youtube\.com|youtu\.be|soundcloud\.com|on\.soundcloud\.com|bandcamp\.com|[a-z0-9-]+\.bandcamp\.com)$/i;
@@ -8223,6 +8223,7 @@ window.AW.startStats = function () {
        is not running. A long probe here is pure dead time in front of the
        user, because every later provider is queued behind it. */
     function companionSearch(q) {
+      if (!COMPANION) return Promise.reject(new Error('no local companion search'));
       return getJSON(COMPANION + '/search?q=' + encodeURIComponent(q), false, 2000)
         .then(fromCompanion);
     }
@@ -8331,7 +8332,7 @@ window.AW.startStats = function () {
     function search(q) {
       /* hubSearch leads unconditionally: it reads the credential itself and rejects at once
          when unpaired, so the decision is never one search out of date. */
-      var chain = [hubSearch, companionSearch, itunesSearch];
+      var chain = [hubSearch, itunesSearch];
       var sawEmpty = false;
       var walk = (function step(i) {
         if (i >= chain.length) return sawEmpty ? Promise.resolve([]) : Promise.reject(new Error('all failed'));
@@ -8408,7 +8409,7 @@ window.AW.startStats = function () {
     /* the site's own oEmbed goes first because it's authoritative, but
        neither YouTube's nor SoundCloud's sends CORS headers, so in practice
        noembed.com (which relays them with ACAO *) does the real work in a
-       browser; the companion beats both when it's running */
+       browser; a paired container, when there is one, beats both */
     function resolveLink(r) {
       var enc = encodeURIComponent(r.u);
       var tries = [
@@ -8426,13 +8427,6 @@ window.AW.startStats = function () {
               if (rr.al) r.al = rr.al;
               return { t: rr.t, a: rr.a, art: rr.art, d: rr.d };
             });
-          });
-        },
-        function () {
-          return getJSON(COMPANION + '/resolve?q=' + enc, false, 20000).then(function (d) {
-            var e = d && d.results && d.results[0];
-            if (!e || !e.t) throw new Error('empty');
-            return { t: e.t, a: e.a, art: e.art, d: e.d };
           });
         },
         function () {
@@ -15969,7 +15963,8 @@ window.AW.startStats = function () {
       });
     }
     function hasScope(s) { return !!(hubAcct && hubAcct.scopes && hubAcct.scopes.indexOf(s) >= 0); }
-    window.NP_HUB = {
+    /* Added to the bridge's NP_HUB (which carries status()), never put in its place. */
+    window.NP_HUB = Object.assign(window.NP_HUB || {}, {
       paired: function () { return !!hubAcct; },
       groups: function () { return hubAcct ? groups : null; },
       refreshGroups: function () {
@@ -15987,7 +15982,7 @@ window.AW.startStats = function () {
           return { queued: false, reason: r.status === 403 ? 'You are no longer in that group, or this player may not add to it.' : r.status === 401 ? 'The container no longer accepts this player.' : r.status === 429 ? 'Too many requests at once. Wait a moment.' : 'No answer from the container.' };
         }, function () { return { queued: false, reason: 'No answer from the container.' }; });
       },
-    };
+    });
     /* A tuned station is the moment someone may want to keep a song. */
     document.addEventListener('radio:station', function () { if (hubAcct && groups === null) window.NP_HUB.refreshGroups(); });
     function canInvite(g) { return (g.myRole === 'owner' || g.myRole === 'admin') && hasScope('group:admin'); }

@@ -22365,7 +22365,7 @@ async function installTool(id, options) {
         throw new Refusal(describeWriteError(id, error61));
       }
     }
-    return { installed: true, version: version2, reason: null, tag };
+    return { installed: true, version: version2, reason: null, tag, verified: { asset: asset.name, sha256: expected } };
   } catch (error61) {
     return { installed: false, version: null, reason: explain(error61, id, options.signal, timeout, limitMs), tag };
   } finally {
@@ -22513,6 +22513,7 @@ async function ensureTools(options) {
             if (outcome2.installed) {
               record2.lastUpdateCheckAt = new Date(now()).toISOString();
               record2.tag = outcome2.tag ?? latest.tag;
+              record2.verified = outcome2.verified ?? null;
               options.onInstalled?.(id, outcome2);
             } else log(`yt-dlp update refused: ${outcome2.reason ?? "unknown"}`);
           }
@@ -22538,6 +22539,7 @@ async function ensureTools(options) {
     if (outcome.installed) {
       record2.lastError = null;
       record2.tag = outcome.tag ?? null;
+      if (outcome.installed) record2.verified = outcome.verified ?? null;
       if (id === "yt-dlp") record2.lastUpdateCheckAt = record2.lastAttemptAt;
       log(`set up ${id} ${outcome.version ?? ""}`.trim());
       report(id, { state: "ready" });

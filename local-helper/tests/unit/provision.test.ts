@@ -32,7 +32,7 @@ const install = async (id: HelperToolId, options: { onProgress?: (r: number, t: 
   options.onProgress?.(50, 100);
   if (failing.has(id)) return { installed: false, version: null, reason: `${id} refused: no SHA-256`, tag: 'v1' };
   world[id] = { origin: 'installed', version: '2026.09.20' };
-  return { installed: true, version: '2026.09.20', reason: null, tag: '2026.09.20' };
+  return { installed: true, version: '2026.09.20', reason: null, tag: '2026.09.20', verified: { asset: `${id}.asset`, sha256: 'a'.repeat(64) } };
 };
 
 const options = (extra: Partial<EnsureOptions> = {}): EnsureOptions => ({
@@ -86,7 +86,10 @@ describe('setting the tools up', () => {
     failing.add('spotdl');
     const first = await ensureTools(options());
     expect(first.setup.spotdl).toEqual({ state: 'failed', reason: 'spotdl refused: no SHA-256' });
-    expect(JSON.parse(readFileSync(join(toolsDir, STATE_FILE), 'utf8')).tools.spotdl.lastError).toBe('spotdl refused: no SHA-256');
+    const saved = JSON.parse(readFileSync(join(toolsDir, STATE_FILE), 'utf8')).tools;
+    expect(saved.spotdl.lastError).toBe('spotdl refused: no SHA-256');
+    // A tool that did land keeps the asset and the SHA-256 it was checked against, for anyone to compare.
+    expect(saved['yt-dlp'].verified).toEqual({ asset: 'yt-dlp.asset', sha256: 'a'.repeat(64) });
 
     installs = [];
     clock += RETRY_AFTER_MS - 1000;
