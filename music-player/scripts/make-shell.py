@@ -1256,6 +1256,22 @@ replace("        span.className = t.present ? 'conn__good' : 'conn__warn';\n"
         "        if (coming) span.title = 'The companion is downloading and verifying ' + t.id + '.';\n"
         "        else if (!t.present) { missing++; span.title = (t.setup && t.setup.reason) || t.installHint || ''; }")
 
+# ---- kv.set returns its write ---------------------------------------------------------------------------------
+# It started the database write and returned nothing, so `await kv.set(...)` waited for nothing. A reload
+# straight after could beat the write — Hermes's pass-3 diagnostic caught the preview suite doing exactly
+# that ("paired": false). Most keys are rescued by the bridge's localStorage journal; the hub pairing
+# deliberately is not (its secret stays out of localStorage). The promise still never rejects, so the
+# callers that ignore it are unchanged.
+replace("          if (art) { var p = art.set(key, json); if (p && p.catch) p.catch(function () {}); }\n"
+        "          else if (ls) ls.setItem(key, json);\n"
+        "        } catch (e) { /* quota or sandbox — memory copy still holds */ }\n"
+        "      },",
+        "          if (art) { var p = art.set(key, json); if (p && p.catch) return p.catch(function () {}); }\n"
+        "          else if (ls) ls.setItem(key, json);\n"
+        "        } catch (e) { /* quota or sandbox — memory copy still holds */ }\n"
+        "        return Promise.resolve();\n"
+        "      },")
+
 # The pasted-link resolver's local-companion step goes too (docs/DEVIATIONS.md; see the search section).
 replace("        function () {\n"
         "          return getJSON(COMPANION + '/resolve?q=' + enc, false, 20000).then(function (d) {\n"

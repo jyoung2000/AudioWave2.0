@@ -815,3 +815,19 @@ automatic and seamless. Hermes's next brief is `.agents/prompts/2026-09-27-herme
   assumed ffmpeg was missing everywhere, true only because ffmpeg had been asked `--version`, a flag
   it rejects). `docker-build` SKIPPED: the Docker daemon was not running. `windows-package` and
   `windows-package-contents` PASS — the first time that gate has built anything.
+
+## Round 4 (2026-09-28/29) — closing out Hermes's passes 2 and 3
+
+- Hermes's pass-2 and pass-3 reports are on the branch (`.agents/plans/2026-09-27-hermes-retest.md`,
+  `2026-09-28-hermes-pass3.md`); a copy of the owner's PATH was left out of pass 2's evidence.
+- The player no longer sends searches or pasted links to a hard-coded `127.0.0.1:8642`
+  (docs/DEVIATIONS.md had recorded it as removed; on the owner's PC an unrelated gateway listens there).
+- The flaky preview test, root-caused by pass 3's new diagnostic (`"paired": false`): the shell's
+  `kv.set` returned nothing, so `await kv.set(...)` then a reload could beat the save of the one key
+  with no localStorage journal — the hub pairing. It returns its write now; a test saves and reloads
+  five times. Two hold-ring tests that checked a class at one instant, and a batch-counting flaw in the
+  tests' class watcher, were fixed along the way (the product's hold → preview sequence was correct).
+- The installer records the asset and SHA-256 each tool was verified against (for FFmpeg, the zip);
+  the downloads doc says so.
+- Hermes's final brief: `.agents/prompts/2026-09-28-hermes-final.md` — companion↔hub pairing first,
+  then everything it gates, ending in a per-app release verdict and one consolidated open ledger.

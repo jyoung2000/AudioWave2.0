@@ -8023,9 +8023,10 @@ window.AW.startStats = function () {
         mem[key] = value;
         try {
           var json = JSON.stringify(value);
-          if (art) { var p = art.set(key, json); if (p && p.catch) p.catch(function () {}); }
+          if (art) { var p = art.set(key, json); if (p && p.catch) return p.catch(function () {}); }
           else if (ls) ls.setItem(key, json);
         } catch (e) { /* quota or sandbox — memory copy still holds */ }
+        return Promise.resolve();
       },
     };
   })();

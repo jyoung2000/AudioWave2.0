@@ -87,6 +87,25 @@ async function searchFor(page: Page, q: string, timeout = 15_000): Promise<void>
   }
 }
 
+test('a pairing that kv.set has finished saving survives an immediate reload, every time', async ({ page }) => {
+  // Pass 3's diagnostic caught the flaky search with "paired": false — kv.set returned nothing, so
+  // `await kv.set(...)` waited for nothing and a reload could beat the database write. The pairing
+  // has no localStorage journal (its secret is kept out of it), so nothing else rescued it.
+  // The stub hub answers, so a paired boot is not left waiting on an address that does not exist.
+  await wireHub(page, []);
+  await boot(page);
+  for (let i = 0; i < 5; i++) {
+    const acct = { ...ACCT, hubName: `TOWER-${i}` };
+    await page.evaluate(async (a) => {
+      await (window as unknown as { kv: { set(k: string, v: unknown): Promise<void> } }).kv.set('player:hub', a);
+    }, acct);
+    await page.goto('about:blank');
+    await boot(page);
+    const saved = await page.evaluate(() => (window as unknown as { kv: { get(k: string): Promise<{ hubName?: string } | null> } }).kv.get('player:hub'));
+    expect(saved?.hubName, `round ${i}`).toBe(`TOWER-${i}`);
+  }
+});
+
 test('a search and a pasted link never go to a hard-coded local port (docs/DEVIATIONS.md)', async ({ page }) => {
   const local: string[] = [];
   page.on('request', (r) => { if (/127\.0\.0\.1:8642|localhost:8642/.test(r.url())) local.push(r.url()); });
@@ -154,27 +173,57 @@ test('a row with no clip says so instead of pretending', async ({ page }) => {
   await expect(page.locator('.srch__row .srch__art').first()).toHaveAttribute('title', /No preview/);
 });
 
+/**
+ * Counts every time a hold starts (is-arming added) and every time an audition starts (is-preview
+ * added). Checking the classes at one instant raced the timer on a loaded machine: a short hold could
+ * arm and play between two checks, and a short clip could end before the next one looked.
+ */
+async function watchHold(page: Page): Promise<() => Promise<{ arms: number; plays: number }>> {
+  await page.evaluate(() => {
+    const w = window as unknown as { __hold: { arms: number; plays: number } };
+    w.__hold = { arms: 0, plays: 0 };
+    // One batch can hold several changes to one element; each record's value after is the next
+    // record's value before (the last one's is the element's class now). Comparing every record
+    // with the final class counted "arming → preview" as two starts.
+    new MutationObserver((ms) => {
+      ms.forEach((m, i) => {
+        const el = m.target as Element;
+        const next = ms.slice(i + 1).find((n) => n.target === el);
+        const before = m.oldValue ?? '';
+        const after = next ? (next.oldValue ?? '') : el.className;
+        const gained = (c: string): boolean => after.split(/\s+/).includes(c) && !before.split(/\s+/).includes(c);
+        if (gained('is-arming')) w.__hold.arms += 1;
+        if (gained('is-preview')) w.__hold.plays += 1;
+      });
+    }).observe(document.body, { attributes: true, attributeFilter: ['class'], attributeOldValue: true, subtree: true });
+  });
+  return () => page.evaluate(() => (window as unknown as { __hold: { arms: number; plays: number } }).__hold);
+}
+
 test('resting the pointer on a row arms it, fills the ring, and then plays', async ({ page }) => {
   await pairAndOpen(page, [hubRow()]);
-  await page.route('https://p.scdn.co/**', (r) => r.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'content-type': 'audio/wav' }, body: silentWav() }));
+  await page.route('https://p.scdn.co/**', (r) => r.fulfill({ status: 200, headers: { 'access-control-allow-origin': '*', 'content-type': 'audio/wav' }, body: silentWav(20) }));
   await searchFor(page, 'Golden Hour');
   await page.evaluate(() => ((window as unknown as { NP_SRCH_ARM_MS: number }).NP_SRCH_ARM_MS = 300));
+  const hold = await watchHold(page);
   await page.locator('.srch__row').first().hover();
-  await expect(page.locator('.srch__art.is-arming')).toHaveCount(1);
-  await expect(page.locator('.srch__art.is-preview')).toHaveCount(1, { timeout: 3000 });
+  await expect.poll(async () => (await hold()).plays, { timeout: 8000 }).toBe(1);
+  expect((await hold()).arms, 'it armed first, once').toBe(1);
   await expect(page.locator('.srch__art.is-arming')).toHaveCount(0);
 });
 
 test('leaving the row mid-hold cancels; nothing plays', async ({ page }) => {
   await pairAndOpen(page, [hubRow()]);
   await searchFor(page, 'Golden Hour');
-  await page.evaluate(() => ((window as unknown as { NP_SRCH_ARM_MS: number }).NP_SRCH_ARM_MS = 800));
+  // Long enough that leaving always lands inside the hold, however slow the machine.
+  await page.evaluate(() => ((window as unknown as { NP_SRCH_ARM_MS: number }).NP_SRCH_ARM_MS = 4000));
+  const hold = await watchHold(page);
   await page.locator('.srch__row').first().hover();
-  await expect(page.locator('.srch__art.is-arming')).toHaveCount(1);
+  await expect.poll(async () => (await hold()).arms, { timeout: 3000 }).toBe(1);
   await page.mouse.move(10, 10);
   await expect(page.locator('.srch__art.is-arming')).toHaveCount(0);
-  await page.waitForTimeout(900);
-  await expect(page.locator('.srch__art.is-preview')).toHaveCount(0);
+  await page.waitForTimeout(4500);
+  expect((await hold()).plays, 'the cancelled hold never played').toBe(0);
 });
 
 test('a key press cancels the hold too', async ({ page }) => {
@@ -242,11 +291,14 @@ test('a pointer wandering inside the row still completes the hold', async ({ pag
   await page.evaluate(() => {
     const w = window as unknown as { __armStarts: number };
     w.__armStarts = 0;
+    // Each record compared with the element's class right after it (see watchHold).
     new MutationObserver((ms) => {
-      for (const m of ms) {
+      ms.forEach((m, i) => {
         const el = m.target as Element;
-        if (el.classList.contains('is-arming') && !(m.oldValue ?? '').includes('is-arming')) w.__armStarts += 1;
-      }
+        const next = ms.slice(i + 1).find((n) => n.target === el);
+        const after = next ? (next.oldValue ?? '') : el.className;
+        if (after.split(/\s+/).includes('is-arming') && !(m.oldValue ?? '').split(/\s+/).includes('is-arming')) w.__armStarts += 1;
+      });
     }).observe(document.body, { attributes: true, attributeFilter: ['class'], attributeOldValue: true, subtree: true });
   });
   const holding = page.locator('.srch__art.is-arming, .srch__art.is-preview');
