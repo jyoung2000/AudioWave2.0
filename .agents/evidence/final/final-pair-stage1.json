@@ -1,0 +1,175 @@
+{
+  "stage": "stage1",
+  "startedAt": "2026-09-29T05:57:24.473Z",
+  "steps": [
+    {
+      "step": "launched",
+      "at": "2026-09-29T05:57:27.945Z",
+      "title": "Now Playing Companion"
+    },
+    {
+      "step": "panel-before-typing",
+      "at": "2026-09-29T05:57:29.210Z",
+      "body": "Now Playing Companion Now Playing Companion Scan Sync Library Live TV Remote Settings Stream to your devices Play this PC’s music on your phone, anywhere. Devices connect to this PC directly where the network allows, or through an encrypted relay where it does not; the hub is never in the way, and only devices you pair here can connect. Let paired devices stream from this PC Off PAIRED DEVICES No devices paired A paired device can play this PC's music from anywhere. Pair one above. NETWORK Fixed port (optional) Leave empty to let Windows choose. Fix it only if your router forwards a UDP port to this PC. Connect to a hub A hub is optional. Pairing with one lets this computer's library appear on your other devices, lets you send files to them, and keeps playlists in step. Nothing about this computer is shared until you pair, and even then only what the next screen lists. Hub address For example http://192.168.1.20:4546 Pairing code Create one in the hub's admin page, under Devices. Pair Transfers Nothing is transferring Pair a hub to send files to your other devices. No hub paired 0 tracks in 0 folders · helper on 127.0.0.1:17342 v0.1.0",
+      "fields": [
+        {
+          "tag": "BUTTON",
+          "label": null,
+          "ph": null,
+          "value": "",
+          "hint": null,
+          "text": "Scan",
+          "disabled": false,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "label": null,
+          "ph": null,
+          "value": "",
+          "hint": null,
+          "text": "Sync",
+          "disabled": true,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "label": null,
+          "ph": null,
+          "value": "",
+          "hint": null,
+          "text": "Library",
+          "disabled": false,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "label": null,
+          "ph": null,
+          "value": "",
+          "hint": null,
+          "text": "Live TV",
+          "disabled": false,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "label": null,
+          "ph": null,
+          "value": "",
+          "hint": null,
+          "text": "Remote",
+          "disabled": false,
+          "type": "button"
+        },
+        {
+          "tag": "BUTTON",
+          "label": null,
+          "ph": null,
+          "value": "",
+          "hint": null,
+          "text": "Settings",
+          "disabled": false,
+          "type": "button"
+        },
+        {
+          "tag": "INPUT",
+          "label": "Let paired devices stream from this PC",
+          "ph": null,
+          "value": "on",
+          "hint": null,
+          "text": "",
+          "disabled": false,
+          "type": "checkbox"
+        },
+        {
+          "tag": "INPUT",
+          "label": "Fixed port (optional)",
+          "ph": null,
+          "value": "",
+          "hint": null,
+          "text": "",
+          "disabled": false,
+          "type": null
+        },
+        {
+          "tag": "INPUT",
+          "label": "Hub address",
+          "ph": null,
+          "value": "http://localhost:4546",
+          "hint": null,
+          "text": "",
+          "disabled": false,
+          "type": null
+        },
+        {
+          "tag": "INPUT",
+          "label": "Pairing code",
+          "ph": null,
+          "value": "",
+          "hint": null,
+          "text": "",
+          "disabled": false,
+          "type": null
+        },
+        {
+          "tag": "BUTTON",
+          "label": null,
+          "ph": null,
+          "value": "",
+          "hint": null,
+          "text": "Pair",
+          "disabled": true,
+          "type": "button"
+        }
+      ]
+    },
+    {
+      "step": "form-inputs",
+      "at": "2026-09-29T05:57:29.212Z",
+      "count": 2
+    },
+    {
+      "step": "typed",
+      "at": "2026-09-29T05:57:29.636Z",
+      "disabledStates": [
+        {
+          "t": "Scan",
+          "disabled": false
+        },
+        {
+          "t": "Sync",
+          "disabled": true
+        },
+        {
+          "t": "Library",
+          "disabled": false
+        },
+        {
+          "t": "Live TV",
+          "disabled": false
+        },
+        {
+          "t": "Remote",
+          "disabled": false
+        },
+        {
+          "t": "Settings",
+          "disabled": false
+        },
+        {
+          "t": "Pair",
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "step": "challenge",
+      "at": "2026-09-29T05:57:34.698Z",
+      "verificationFingerprint": "BEEA-1546-E2E9",
+      "hubFingerprintFromText": "95ED-94B0-2217-9C64-352B-6BBD-B662-1BEA",
+      "waitingForApproval": true,
+      "body": "Now Playing Companion Now Playing Companion Scan Sync Library Live TV Remote Settings Stream to your devices Play this PC’s music on your phone, anywhere. Devices connect to this PC directly where the network allows, or through an encrypted relay where it does not; the hub is never in the way, and only devices you pair here can connect. Let paired devices stream from this PC Off PAIRED DEVICES No devices paired A paired device can play this PC's music from anywhere. Pair one above. NETWORK Fixed port (optional) Leave empty to let Windows choose. Fix it only if your router forwards a UDP port to this PC. Connect to a hub A hub is optional. Pairing with one lets this computer's library appear "
+    }
+  ]
+}

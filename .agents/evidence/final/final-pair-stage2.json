@@ -1,0 +1,28 @@
+{
+  "stage": "stage2",
+  "startedAt": "2026-09-29T06:03:15.571Z",
+  "steps": [
+    {
+      "step": "launched",
+      "at": "2026-09-29T06:03:19.101Z",
+      "title": "Now Playing Companion"
+    },
+    {
+      "step": "connected-state",
+      "at": "2026-09-29T06:03:21.113Z",
+      "body": "Now Playing Companion Now Playing Companion Scan Sync Library Live TV Remote Settings Folders The folders on this PC that Now Playing plays from. The companion reads music where it already is — nothing is copied or moved — and folder locations stay on this computer: a hub is told a folder’s name and what is in it, never where it lives. Scan all music folders SAVED MUSIC No music folders yet Add the folder your music is in. The companion indexes it in place; your files are never copied or moved. Add Folder… SAVED TV No TV folders yet A TV folder is kept for the backup and the Live TV tab. It is not indexed as music. Add Folder… SAVED MOVIES No movie folders yet A movies folder is kept for the backup. It is not indexed as music. Add Folder… Music Send to hub 0 tracks No music indexed yet Add a folder and scan it. No hub paired 0 tracks in 0 folders · helper on 127.0.0.1:17342 v0.1.0",
+      "hub": "is told a folder’s name and what is in it, never where it lives. Scan all music folders SAVED MUSIC No music folders yet",
+      "status": null,
+      "fingerprint": null,
+      "may": null,
+      "lastSync": null,
+      "forgetVisible": false,
+      "shareCheckboxVisible": false
+    },
+    {
+      "step": "permissions",
+      "at": "2026-09-29T06:03:21.137Z",
+      "checkboxes": []
+    }
+  ]
+}

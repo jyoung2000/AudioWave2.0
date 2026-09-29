@@ -1,0 +1,96 @@
+{
+  "startedAt": "2026-09-29T06:04:26.435Z",
+  "steps": [
+    {
+      "step": "hub-session",
+      "at": "2026-09-29T06:04:26.544Z",
+      "ok": true
+    },
+    {
+      "step": "hub-created-session",
+      "at": "2026-09-29T06:04:26.572Z",
+      "sessionId": "01a0ebc3-b439-707b-bed2-200e0b01db2b",
+      "codeLen": 11,
+      "expiresAt": "2026-09-29T06:14:26.553Z"
+    },
+    {
+      "step": "companion-launched",
+      "at": "2026-09-29T06:04:30.105Z",
+      "title": "Now Playing Companion"
+    },
+    {
+      "step": "companion-panel-copy",
+      "at": "2026-09-29T06:04:31.080Z",
+      "copy": "Now Playing Companion Now Playing Companion Scan Sync Library Live TV Remote Settings Stream to your devices Play this PC’s music on your phone, anywhere. Devices connect to this PC directly where the network allows, or through an encrypted relay where it does not; the hub is never in the way, and only devices you pair here can connect. Let paired devices stream from this PC Off PAIRED DEVICES No devices paired A paired device can play this PC's music from anywhere. Pair one above. NETWORK Fixed port (optional) Leave empty to let Windows choose. Fix it only if your router forwards a UDP port to this PC. Connect to a hub A hub is optional. Pairing with one lets this computer's library appear on your other devices, lets you send files to them, and keeps playlists in step. Nothing about this computer is shared until you pair, and even then only what the next screen lists. Hub address For ex"
+    },
+    {
+      "step": "form-inputs",
+      "at": "2026-09-29T06:04:31.084Z",
+      "count": 2
+    },
+    {
+      "step": "typed",
+      "at": "2026-09-29T06:04:31.121Z",
+      "button": [
+        {
+          "text": "Pair",
+          "disabled": false
+        }
+      ]
+    },
+    {
+      "step": "challenge",
+      "at": "2026-09-29T06:04:32.188Z",
+      "verificationFingerprint": "73E5-9163-C4AB",
+      "waitedSeconds": 1
+    },
+    {
+      "step": "hub-confirmed",
+      "at": "2026-09-29T06:04:32.570Z",
+      "status": 200,
+      "body": "{\"ok\":true}"
+    },
+    {
+      "step": "companion-connected-state",
+      "at": "2026-09-29T06:04:33.575Z",
+      "pending": false,
+      "body": "Now Playing Companion Now Playing Companion Scan Sync Library Live TV Remote Settings Stream to your devices Play this PC’s music on your phone, anywhere. Devices connect to this PC directly where the network allows, or through an encrypted relay where it does not; the hub is never in the way, and only devices you pair here can connect. Let paired devices stream from this PC Off PAIRED DEVICES No devices paired A paired device can play this PC's music from anywhere. Pair one above. NETWORK Fixed port (optional) Leave empty to let Windows choose. Fix it only if your router forwards a UDP port to this PC. Hub Hub Now Playing Hub at http://127.0.0.1:4546 Status Connected Fingerprint 95ED-94B0-2",
+      "hub": "is never in the way, and only devices you pair here can connect. Let paired devices stream from this PC Off PAIRED DEVICES No devices paired",
+      "status": "Connected Fingerprint 95ED-94B0-2217-9C64-352B-6BBD-B662-1BEA This computer may library:read, library:share, playlists:sync, transfers:recei",
+      "fingerprint": "95ED-94B0-2217-9C64-352B-6BBD-B662-1BEA This computer may library:read, library:share, playlists:sync, transfers:receive, files:serve Last s",
+      "may": "library:read, library:share, playlists:sync, transfers:receive, files:serve Last sync never Sync now Forget this hub WHAT IS SHARED Let the",
+      "lastSync": "never Sync now Forget this hub WHAT IS SHARED Let the hub see what music is on this computer What is sent: titles, artists, albums, duration"
+    },
+    {
+      "step": "permissions",
+      "at": "2026-09-29T06:04:33.577Z",
+      "checkboxes": [
+        {
+          "checked": false,
+          "label": "Let paired devices stream from this PC"
+        },
+        {
+          "checked": false,
+          "label": "Let the hub see what music is on this computer"
+        }
+      ]
+    },
+    {
+      "step": "hub-devices",
+      "at": "2026-09-29T06:04:33.640Z",
+      "count": 1,
+      "device": {
+        "name": "JALON companion",
+        "kind": "companion",
+        "scopes": [
+          "library:read",
+          "library:share",
+          "playlists:sync",
+          "transfers:receive",
+          "files:serve"
+        ],
+        "platform": "windows"
+      }
+    }
+  ]
+}

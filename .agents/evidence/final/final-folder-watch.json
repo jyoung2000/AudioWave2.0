@@ -1,0 +1,109 @@
+{
+  "startedAt": "2026-09-29T06:07:49.195Z",
+  "steps": [
+    {
+      "step": "folder-before",
+      "at": "2026-09-29T06:07:49.280Z",
+      "files": [
+        "01_kick_100bpm.flac",
+        "01_kick_120bpm.flac",
+        "02_kick_120bpm.flac",
+        "02_kick_90bpm.flac",
+        "05_pure_tone_120bpm.flac"
+      ]
+    },
+    {
+      "step": "folders-tab",
+      "at": "2026-09-29T06:07:54.613Z",
+      "copy": "Now Playing Companion Now Playing Companion Scan Sync Library Live TV Remote Settings Folders The folders on this PC that Now Playing plays from. The companion reads music where it already is — nothing is copied or moved — and folder locations stay on this computer: a hub is told a folder’s name and what is in it, never where it lives. Scan all music folders SAVED MUSIC No music folders yet Add the folder your music is in. The companion indexes it in place; your files are never copied or moved. Add Folder… SAVED TV No TV folders yet A TV folder is kept for the backup and the Live TV tab. It is not indexed as music. Add Folder… SAVED MOVIES No movie folders yet A movies folder is kept for the"
+    },
+    {
+      "step": "add-folder-button",
+      "at": "2026-09-29T06:07:54.702Z",
+      "found": true,
+      "text": "Add Folder…"
+    },
+    {
+      "step": "folder-inputs",
+      "at": "2026-09-29T06:07:54.719Z",
+      "inputs": [
+        {
+          "type": "search",
+          "value": "",
+          "ph": "Search titles, artists and albums"
+        }
+      ]
+    },
+    {
+      "step": "share-tick",
+      "at": "2026-09-29T06:08:30.493Z",
+      "before": false,
+      "after": true
+    },
+    {
+      "step": "hub-device-after-tick",
+      "at": "2026-09-29T06:08:59.292Z",
+      "count": 1,
+      "first": {
+        "name": "JALON companion",
+        "libraryVisible": null,
+        "scopes": [
+          "library:read",
+          "library:share",
+          "playlists:sync",
+          "transfers:receive",
+          "files:serve"
+        ]
+      },
+      "rawKeys": [
+        "id",
+        "schemaVersion",
+        "createdAt",
+        "updatedAt",
+        "deletedAt",
+        "kind",
+        "name",
+        "platform",
+        "publicKeyFingerprint",
+        "publicKey",
+        "appVersion",
+        "protocolVersion",
+        "scopes",
+        "lastSeenAt",
+        "revokedAt",
+        "hubUserId",
+        "online",
+        "latencyMs",
+        "connectedGroupId",
+        "connectedAt",
+        "ipDisplay",
+        "syncDriftMs",
+        "transferState",
+        "credentialCount"
+      ]
+    },
+    {
+      "step": "hub-library",
+      "at": "2026-09-29T06:08:59.333Z",
+      "ok": true,
+      "count": null,
+      "sample": []
+    },
+    {
+      "step": "renamed-in-sandbox",
+      "at": "2026-09-29T06:08:59.334Z",
+      "from": "01_kick_120bpm.flac",
+      "to": "renamed_probe_120bpm.flac"
+    },
+    {
+      "step": "sync-clicked",
+      "at": "2026-09-29T06:09:04.885Z"
+    },
+    {
+      "step": "hub-library-after-rename",
+      "at": "2026-09-29T06:10:09.306Z",
+      "count": null,
+      "sample": []
+    }
+  ]
+}
