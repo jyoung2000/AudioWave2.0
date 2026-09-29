@@ -57,8 +57,9 @@ the `searchFor` diagnostic message it prints.
 ## 3. Companion ↔ hub — the gate nobody has opened (do this first)
 
 In the companion's own window: **Remote ▸ Hub connection.** Pair it with the hub the way a person
-would (the hub shows the device and its verification code in its Devices tab; the permissions ticked
-there must stick). `.agents/evidence/pass3/companion-pair.mjs` is a Playwright-Electron starting point
+would, following what the two windows ask for (codes or fingerprints to compare, approval in the hub's
+Devices tab). Grade whether a first-time owner could do it from the screens alone; any permissions
+ticked on the hub must stick. `.agents/evidence/pass3/companion-pair.mjs` is a Playwright-Electron starting point
 if you drive it by script; either way the pairing must go through the companion's UI, not an API call.
 Then:
 
