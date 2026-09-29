@@ -1,0 +1,84 @@
+{
+  "startedAt": "2026-09-29T06:20:39.679Z",
+  "steps": [
+    {
+      "step": "setup-player-alone",
+      "at": "2026-09-29T06:20:42.038Z",
+      "paired": false,
+      "companionPresent": false
+    },
+    {
+      "step": "directory",
+      "at": "2026-09-29T06:20:46.314Z",
+      "count": 34,
+      "callsWhileVisible": 0
+    },
+    {
+      "step": "candidates",
+      "at": "2026-09-29T06:20:46.314Z",
+      "resolved": [
+        {
+          "key": "talk-wbez",
+          "why": "talk station, \"Live broadcast\"",
+          "text": "WBEZ FM 91.5 Live broadcast 64 Chicago"
+        },
+        {
+          "key": "talk-wgn",
+          "why": "talk station, \"Live broadcast\"",
+          "text": "WGN Radio 720 Live broadcast 64 Chicago, IL"
+        },
+        {
+          "key": "nofeed-011",
+          "why": "no metadata - pass 3 control",
+          "text": "011.fm – House of Hair 80s hard rock 192 Chicago, IL"
+        }
+      ]
+    },
+    {
+      "step": "station",
+      "at": "2026-09-29T06:21:03.018Z",
+      "key": "talk-wbez",
+      "why": "talk station, \"Live broadcast\"",
+      "directoryRow": "WBEZ FM 91.5 Live broadcast 64 Chicago",
+      "programmeFormatBefore": "Live broadcast",
+      "artistBefore": "",
+      "programmeFormatAfter": "Live broadcast",
+      "artistAfter": "",
+      "headline": "No group session",
+      "nowPlayingCalls": 0,
+      "contextMenu": "Play “93.9 Lite FM” Add to Favourites Add to Playlist New Playlist…"
+    },
+    {
+      "step": "station",
+      "at": "2026-09-29T06:21:20.096Z",
+      "key": "talk-wgn",
+      "why": "talk station, \"Live broadcast\"",
+      "directoryRow": "WGN Radio 720 Live broadcast 64 Chicago, IL",
+      "programmeFormatBefore": "Live broadcast",
+      "artistBefore": "",
+      "programmeFormatAfter": "Live broadcast",
+      "artistAfter": "",
+      "headline": "Classical",
+      "nowPlayingCalls": 0,
+      "contextMenu": "Play “WFMT Classical AAC 128” Add to Favourites Add to Playlist New Playlist…"
+    },
+    {
+      "step": "station",
+      "at": "2026-09-29T06:21:37.179Z",
+      "key": "nofeed-011",
+      "why": "no metadata - pass 3 control",
+      "directoryRow": "011.fm – House of Hair 80s hard rock 192 Chicago, IL",
+      "programmeFormatBefore": "80s hard rock",
+      "artistBefore": "",
+      "programmeFormatAfter": "80s hard rock",
+      "artistAfter": "",
+      "headline": "80s hard rock",
+      "nowPlayingCalls": 0,
+      "contextMenu": "Play “011.fm – House of Hair” Add to Favourites Add to Playlist New Playlist…"
+    }
+  ],
+  "notes": [],
+  "pageErrors": [],
+  "totalNowPlayingCalls": 0,
+  "note": "Unpaired + no companion: any title shown must come from the directory, not a stream read."
+}

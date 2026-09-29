@@ -21,12 +21,19 @@
  * clicked in a browser. The report says so.
  */
 import { _electron as electron } from '@playwright/test';
+
+// Machine paths come from the environment so no committed file hardcodes the owner's
+// username (§5 forbids machine inventories in committed files).
+const NP_SCRATCH = process.env.NP_SCRATCH;
+const NP_CLONE  = process.env.NP_CLONE;
+if (!NP_SCRATCH || !NP_CLONE) { console.error('set NP_SCRATCH and NP_CLONE (see the report)'); process.exit(2); }
+
 import { writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 
 // The hub's admin password was changed earlier in this pass (first-run requires it) and lives
 // ONLY in scratch. My first version hardcoded "admin" and got a 401; that was my bug, not a
 // product one. Never commit it, never echo it.
-const HUB_PW = readFileSync('C:/Users/jalon/AppData/Local/hermes/cache/scratch/final.pw', 'utf8').trim();
+const HUB_PW = readFileSync(`${NP_SCRATCH}/final.pw`, 'utf8').trim();
 
 const EV = '.agents/evidence/final';
 const HUB = 'http://127.0.0.1:4546';
@@ -72,7 +79,7 @@ try {
   // 2. the companion, driven through its own UI
   app = await electron.launch({
     args: ['.'],
-    cwd: 'C:/Users/jalon/AudioWave2.0-final/windows-companion',
+    cwd: `${NP_CLONE}/windows-companion`,
     env: { ...process.env, PORTABLE_EXECUTABLE_DIR: SANDBOX, NODE_ENV: 'development' },
   });
   const win = await app.firstWindow();

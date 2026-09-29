@@ -43,7 +43,8 @@ cannot pass its own release gate. That is fixable and is the first ledger row.
 | Sharing is off until a person opts in | companion | **5** | **WORKS** | "Both 'let the hub see my music' and 'stream from this PC' start off, and stay off." | `final-pairing-once.json`, `final-hub-restart.json` |
 | The lost-pairing defect from pass 3 | player | **5** | **WORKS** | "Five runs, fifteen tests each, no 'search rows' failures. The pairing outlives the reload now." | `final-preview-runs/summary.txt`, fix `4fc6af7` |
 | `pnpm verify` on a clean clone of the tip | repo | **2** | **BROKEN** | "I checked out your branch and it does not build. Your own gate fails before it starts." | `final-install-verify.log` |
-| Folder watch (add/rename/delete → hub) | companion, hub | — | **NOT DONE** | not reached this pass | — |
+| Radio degradation: talk + no-metadata stations, player alone | player | **4** | **WORKS** | "I tune a talk station and it says 'Live broadcast' rather than making something up. That is the right answer." | `final-radio-degradation.json` |
+| Folder watch (add/rename/delete → hub) | companion, hub | — | **NOT DONE** | `Add Folder…` opens a native picker; the app's store is not reachable past it (§5.4) | — |
 | Tempo accuracy vs the known corpus | companion | — | **NOT DONE** | not reached this pass | — |
 | Backup byte parity, second-hub credential refusal | companion, hub | — | **NOT DONE** | not reached this pass | — |
 | §4 all three at once, AWSP, groups, radio-into-group-queue | all | — | **NOT DONE** | not reached this pass | — |
@@ -130,6 +131,39 @@ accuracy, backup byte parity, and the second-hub credential refusal.
 | 20 | Independent station cross-check (station sites 404) | pass 3 | low | NOT DONE — external |
 | 21 | 406 MB left in the owner's real companion profile by pass 2 | pass 2 | none (owner's call) | owner action (§4) |
 | 22 | §7 delegation to Claude Code | pass 2–4 | none | `total_cost_usd: 0.00` — nothing dispatched |
+
+### §5.1 — radio degradation: **WORKS** (grade 4)
+
+Run **player alone** — unpaired, no companion (`paired: false`, `companionPresent: false`) — which is
+one of the three setups the brief asks for, and the one where a fallback *must* appear rather than a
+live title. Stations were read from the **running directory** (34 rows, resolved at run time), never
+from the brief's list or memory — pass 3's mistake was assuming those were the same.
+
+| Station | Directory format | Row shows | Artist | Invented title? | `now-playing` calls |
+| --- | --- | --- | --- | --- | --- |
+| **WBEZ FM 91.5** (talk) | Live broadcast | `Live broadcast` | *(empty)* | **no** | **0** |
+| **WGN Radio 720** (talk) | Live broadcast | `Live broadcast` | *(empty)* | **no** | **0** |
+| **011.fm** (no metadata) | 80s hard rock | `80s hard rock` | *(empty)* | **no** | **0** |
+
+**The NP-RADIO-001 degradation contract holds**: a station that publishes no title of its own shows
+the programme format the directory carries, with **no artist invented** and **no stream read** while
+unpaired — `nowPlayingCalls: 0` on every station, i.e. the page did not try to read a stream it had no
+credential for. The headline agreed (`80s hard rock` for 011.fm), and each station's context menu
+carried **no "On air" section** — correct, because no title is known to keep.
+
+**Two honesty notes on this test, neither of which I will paper over:**
+
+- The `headline` for the two talk stations read `No group session` and `Classical` — neither is the
+  programme format. The **row** is correct in all three cases, and the row is what NP-RADIO-001
+  specifies; but the headline's behaviour for a talk station is **unexplained and unverified**, and I
+  am not claiming it as a pass.
+- `contextMenu` named a *different* station than the one I double-clicked (`Play "93.9 Lite FM"` while
+  tuning WBEZ). That is consistent with my right-click gesture landing on a neighbouring row rather
+  than a product fault, but I did not verify it, so it stays a note.
+
+**Still `NOT DONE` in §5:** the *other* two setups (companion-connected, paired-with-companion-closed),
+a continuous session watching one title change to the next, and an HLS/AAC stream. Providers, the
+quality sweep and Android were not reached.
 
 ---
 

@@ -7,6 +7,13 @@
  * and reads the KeyValueList rows the component actually renders (Hub.tsx:29-39).
  */
 import { _electron as electron } from '@playwright/test';
+
+// Machine paths come from the environment so no committed file hardcodes the owner's
+// username (§5 forbids machine inventories in committed files).
+const NP_SCRATCH = process.env.NP_SCRATCH;
+const NP_CLONE  = process.env.NP_CLONE;
+if (!NP_SCRATCH || !NP_CLONE) { console.error('set NP_SCRATCH and NP_CLONE (see the report)'); process.exit(2); }
+
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { readdirSync } from 'node:fs';
 
@@ -26,7 +33,7 @@ try {
 
   app = await electron.launch({
     args: ['.'],
-    cwd: 'C:/Users/jalon/AudioWave2.0-final/windows-companion',
+    cwd: `${NP_CLONE}/windows-companion`,
     env: { ...process.env, PORTABLE_EXECUTABLE_DIR: SANDBOX, NODE_ENV: 'development' },
   });
   const win = await app.firstWindow();

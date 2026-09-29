@@ -1,51 +1,18 @@
 {
-  "startedAt": "2026-09-29T06:05:08.828Z",
+  "startedAt": "2026-09-29T06:23:55.866Z",
   "steps": [
     {
       "step": "folder-before",
-      "at": "2026-09-29T06:05:08.829Z",
+      "at": "2026-09-29T06:23:55.867Z",
       "folder": "C:\\np-final\\music",
       "files": [
         "01_kick_100bpm.flac",
-        "01_kick_120bpm.flac",
         "02_kick_120bpm.flac",
         "02_kick_90bpm.flac",
-        "05_pure_tone_120bpm.flac"
-      ]
-    },
-    {
-      "step": "relaunched",
-      "at": "2026-09-29T06:05:13.428Z",
-      "title": "Now Playing Companion"
-    },
-    {
-      "step": "hub-state-after-restart",
-      "at": "2026-09-29T06:05:14.788Z",
-      "rows": {
-        "Hub": "Now Playing Hub at http://127.0.0.1:4546",
-        "Status": "Connected",
-        "Fingerprint": "95ED-94B0-2217-9C64-352B-6BBD-B662-1BEA",
-        "This computer may": "library:read, library:share, playlists:sync, transfers:receive, files:serve",
-        "Last sync": "never"
-      },
-      "body": "Now Playing Companion Now Playing Companion Scan Sync Library Live TV Remote Settings Stream to your devices Play this PC’s music on your phone, anywhere. Devices connect to this PC directly where the network allows, or through an encrypted relay where it does not; the hub is never in the way, and only devices you pair here can connect. Let paired devices stream from this PC Off PAIRED DEVICES No devices paired A paired device can play this PC's music from anywhere. Pair one above. NETWORK Fixed port (optional) Leave empty to let Windows choose. Fix it only if your router forwards a UDP port t",
-      "isConnectedView": true,
-      "seesForgetButton": true,
-      "seesShareCheckbox": true
-    },
-    {
-      "step": "permissions-after-restart",
-      "at": "2026-09-29T06:05:14.807Z",
-      "checkboxes": [
-        {
-          "checked": false,
-          "label": "Let paired devices stream from this PC"
-        },
-        {
-          "checked": false,
-          "label": "Let the hub see what music is on this computer"
-        }
+        "05_pure_tone_120bpm.flac",
+        "renamed_probe_120bpm.flac"
       ]
     }
-  ]
+  ],
+  "failure": "Error: electron.launch: Failed to launch: Error: spawn C:\\WINDOWS\\system32\\cmd.exe ENOENT | Call log: | \u001b[2m  - <launching> \"C:\\Users\\jalon\\AudioWave2.0-final\\node_modules\\electron\\dist\\electron.exe\" \"-r\" \"C:\\Users\\jalon\\AudioWave2.0-final\\node_modules\\playwright-core\\lib\\server\\electron\\loader.js\" \"--inspect=0\" \"--remote-debugging-port=0\" \".\"\u001b[22m | \u001b[2m  - [pid=N/A] starting temporary directories cleanup\u001b[22m"
 }

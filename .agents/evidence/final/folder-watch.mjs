@@ -11,13 +11,25 @@
  * The sandbox folder C:\np-final\music is mine; the owner's corpus is only ever read.
  */
 import { _electron as electron } from '@playwright/test';
+
+// Machine paths come from the environment so no committed file hardcodes the owner's
+// username (§5 forbids machine inventories in committed files).
+const NP_SCRATCH = process.env.NP_SCRATCH;
+const NP_CLONE  = process.env.NP_CLONE;
+if (!NP_SCRATCH || !NP_CLONE) { console.error('set NP_SCRATCH and NP_CLONE (see the report)'); process.exit(2); }
+
 import { writeFileSync, mkdirSync, readdirSync, renameSync } from 'node:fs';
 
 const EV = '.agents/evidence/final';
 const SANDBOX = 'C:\\np-final';
 const FOLDER = 'C:\\np-final\\music';
 const HUB = 'http://127.0.0.1:4546';
-const HUB_PW = (await import('node:fs')).readFileSync('C:/Users/jalon/AppData/Local/hermes/cache/scratch/final.pw', 'utf8').trim();
+// Scratch dir comes from the environment so no committed file hardcodes the owner's username (§5).
+// Usage: NP_SCRATCH=... node radio-degradation.mjs
+const SCRATCH = process.env.NP_SCRATCH || NP_SCRATCH;
+// The hub admin password is read at RUN TIME from scratch and is never committed. It was changed
+// during first-run setup, so "admin" no longer works - that 401 was my bug, not a product one.
+const HUB_PW = (await import('node:fs')).readFileSync(`${NP_SCRATCH}/final.pw`, 'utf8').trim();
 mkdirSync(EV, { recursive: true });
 
 const out = { startedAt: new Date().toISOString(), steps: [] };
@@ -41,7 +53,7 @@ try {
 
   app = await electron.launch({
     args: ['.'],
-    cwd: 'C:/Users/jalon/AudioWave2.0-final/windows-companion',
+    cwd: `${NP_CLONE}/windows-companion`,
     env: { ...process.env, PORTABLE_EXECUTABLE_DIR: SANDBOX, NODE_ENV: 'development' },
   });
   const win = await app.firstWindow();

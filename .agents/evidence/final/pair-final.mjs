@@ -15,10 +15,17 @@
  * The code is passed in from scratch and never written to evidence.
  */
 import { _electron as electron } from '@playwright/test';
+
+// Machine paths come from the environment so no committed file hardcodes the owner's
+// username (§5 forbids machine inventories in committed files).
+const NP_SCRATCH = process.env.NP_SCRATCH;
+const NP_CLONE  = process.env.NP_CLONE;
+if (!NP_SCRATCH || !NP_CLONE) { console.error('set NP_SCRATCH and NP_CLONE (see the report)'); process.exit(2); }
+
 import { writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 
 const EV = '.agents/evidence/final';
-const SCRATCH = 'C:/Users/jalon/AppData/Local/hermes/cache/scratch';
+const SCRATCH = NP_SCRATCH;
 const SANDBOX = 'C:\\np-final';
 const stage = process.argv[2] ?? 'stage1';
 mkdirSync(EV, { recursive: true });
@@ -27,13 +34,13 @@ const out = { stage, startedAt: new Date().toISOString(), steps: [] };
 const log = (s, d) => { out.steps.push({ step: s, at: new Date().toISOString(), ...d }); console.log(`[${s}]`, JSON.stringify(d).slice(0, 460)); };
 
 // The pairing code is read from scratch at run time; never echoed, never persisted to evidence.
-const code = readFileSync(`${SCRATCH}/final-pair-code.txt`, 'utf8').trim();
+const code = readFileSync(`${NP_SCRATCH}/final-pair-code.txt`, 'utf8').trim();
 
 let app, win;
 try {
   app = await electron.launch({
     args: ['.'],
-    cwd: 'C:/Users/jalon/AudioWave2.0-final/windows-companion',
+    cwd: `${NP_CLONE}/windows-companion`,
     env: { ...process.env, PORTABLE_EXECUTABLE_DIR: SANDBOX, NODE_ENV: 'development' },
   });
   win = await app.firstWindow();
