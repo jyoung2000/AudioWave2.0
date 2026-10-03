@@ -208,6 +208,22 @@ describe('General and Downloads', () => {
     expect(called(invoked, 'app:open-release')[0]?.request).toBeUndefined();
   });
 
+  it('asks GitHub at once when the new-version check is turned on, and says what it found', async () => {
+    const { invoked } = installBridge({
+      ...fresh(),
+      'app:preferences:get': () => ({ ...PREFS, checkForUpdates: false }),
+      'app:update-status': () => ({ current: '0.1.0', latest: null, available: false, checkedAt: null, reason: null, enabled: false }),
+      'app:check-update': () => ({ current: '0.1.0', latest: null, available: false, checkedAt: NOW, reason: 'No version has been published yet.', enabled: true }),
+    });
+    await openSettings();
+    expect(await screen.findByText(/Not checked: the companion contacts nothing about updates while that is off/)).toBeTruthy();
+    const box = screen.getByRole('checkbox', { name: 'Check for new versions of the companion' }) as HTMLInputElement;
+    await waitFor(() => expect(box.disabled).toBe(false));
+    await userEvent.click(box);
+    await waitFor(() => expect(called(invoked, 'app:preferences:set')[0]?.request).toEqual({ checkForUpdates: true }));
+    await waitFor(() => expect(called(invoked, 'app:check-update')).toHaveLength(1));
+  });
+
   it('the notification switch and “When one finishes” are one preference', async () => {
     const { invoked } = installBridge(fresh());
     await openSettings();

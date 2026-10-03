@@ -303,7 +303,21 @@ export function SettingsView({ helper, prefs, say }: { helper: Resource<HelperSt
             <Check checked={data?.autoSync ?? false} disabled={!data} onChange={(event) => setPref({ autoSync: event.currentTarget.checked })}>
               Sync with the hub when the companion starts
             </Check>
-            <Check checked={data?.checkForUpdates ?? true} disabled={!data} onChange={(event) => setPref({ checkForUpdates: event.currentTarget.checked })}>
+            <Check
+              checked={data?.checkForUpdates ?? true}
+              disabled={!data}
+              onChange={(event) => {
+                const on = event.currentTarget.checked;
+                // Turned on, it asks now rather than leaving the line unanswered until tomorrow.
+                void save.run({ checkForUpdates: on }).then(async (next) => {
+                  if (!next) return;
+                  prefs.reload();
+                  say('Saved. Settings are kept on this PC.');
+                  if (on) await checkUpdate.run();
+                  update.reload();
+                });
+              }}
+            >
               Check for new versions of the companion
             </Check>
             <Check checked={(data?.downloadDone ?? 'nothing') === 'notify'} disabled={!data} onChange={(event) => setPref({ downloadDone: event.currentTarget.checked ? 'notify' : 'nothing' })}>
