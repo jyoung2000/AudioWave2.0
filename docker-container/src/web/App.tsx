@@ -20,7 +20,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { BRANDING, type NetworkConfig, type OverviewMetrics, type SessionInfo } from '@now-playing/contracts';
 import { api, setCsrfToken } from './lib/api.js';
-import { useAction, useResource, useStoredState } from './lib/hooks.js';
+import { useAction, useResource, useStoredState, type Resource } from './lib/hooks.js';
+import { OVERVIEW_POLL_MS, OverviewProvider } from './lib/overview.js';
 import { ActionError, count, errorSentence, Field, HubUiProvider, Note, Push } from './ui.js';
 import { TAB_ICONS } from './icons.js';
 import { ViewBoundary } from './ViewBoundary.js';
@@ -30,6 +31,7 @@ import { GroupsView } from './views/Groups.js';
 import { ProvidersView } from './views/Providers.js';
 import { LibraryView } from './views/Library.js';
 import { DownloadsView } from './views/Downloads.js';
+import { LiveTvView } from './views/LiveTv.js';
 import { ProfilesView } from './views/Profiles.js';
 import { SharesView } from './views/Shares.js';
 import { DiscordView } from './views/Discord.js';
@@ -410,7 +412,14 @@ function sectionBody(id: ViewId): ReactNode {
     case 'library':
       return <LibraryView />;
     case 'downloads':
-      return <DownloadsView />;
+      // The design draws "Live TV from the companion" straight after Downloads, in the same tab. It
+      // is part of this section (and its ledger entry) until the coverage ledger gives it its own.
+      return (
+        <>
+          <DownloadsView />
+          <LiveTvView />
+        </>
+      );
     case 'shares':
       return <SharesView />;
     case 'profiles':
@@ -486,7 +495,8 @@ function AdminShell({ session, onSessionChanged }: { session: SessionInfo; onSes
   }, [target, tab]);
 
   const hub = useResource('hubIdentity');
-  const overview = useResource('metricsOverview', {}, { pollMs: 10_000 });
+  // The one reading of the overview: the badge, the lamp and the Overview tab's lists all use it.
+  const overview = useResource('metricsOverview', {}, { pollMs: OVERVIEW_POLL_MS }) as Resource<OverviewMetrics>;
   const network = useResource('networkGet', {}, { pollMs: 30_000 });
 
   // The moment the password is set, what the overview says about setup is out of date.
@@ -503,7 +513,7 @@ function AdminShell({ session, onSessionChanged }: { session: SessionInfo; onSes
     onSessionChanged();
   }, [logout, onSessionChanged]);
 
-  const metrics = overview.data as OverviewMetrics | null;
+  const metrics = overview.data;
   const net = network.data as NetworkConfig | null;
   const identity = hub.data as { name?: string; version?: string } | null;
   const alerts = useMemo(() => metrics?.alerts ?? [], [metrics]);
@@ -526,6 +536,7 @@ function AdminShell({ session, onSessionChanged }: { session: SessionInfo; onSes
   const current = TABS.find((t) => t.id === tab) ?? TABS[0]!;
 
   return (
+    <OverviewProvider value={overview}>
     <HubUiProvider gated={gated}>
       {({ message, sheet, sheetOpen }) => (
         <Window tools={tools} sheet={sheet} sheetOpen={sheetOpen} status={<StatusLine kind={worst} text={statusText} right={counts} message={message} />}>
@@ -551,5 +562,6 @@ function AdminShell({ session, onSessionChanged }: { session: SessionInfo; onSes
         </Window>
       )}
     </HubUiProvider>
+    </OverviewProvider>
   );
 }

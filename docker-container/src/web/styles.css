@@ -351,6 +351,34 @@ a.push:active {
   display: block;
   margin: 6px 0 2px;
 }
+/* A detail opened under its own row: one cell across the table, the tile inside it. */
+.tbl tr.detail-row,
+.tbl tr.detail-row:nth-child(even) {
+  background: var(--content);
+}
+.tbl tr.detail-row > td {
+  padding: 2px 8px 10px;
+  overflow: visible;
+  text-overflow: clip;
+}
+.tbl tr.detail-row .detail {
+  margin-top: 0;
+  text-align: left;
+}
+.tbl tr.is-open > td {
+  font-weight: 600;
+}
+.detail h3:focus {
+  outline: none;
+}
+.detail h3:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+.field--time {
+  width: 84px;
+  text-align: left;
+}
 
 /* ---------------------------------------------------------------- groups */
 .big--track {

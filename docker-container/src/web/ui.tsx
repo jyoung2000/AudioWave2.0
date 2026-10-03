@@ -139,7 +139,7 @@ export function Push({ primary, busy, busyLabel, reason, disabled, children, cla
   );
 }
 
-export function Field({ className, mono, numeric, invalid, ...rest }: InputHTMLAttributes<HTMLInputElement> & { mono?: boolean; numeric?: boolean; invalid?: boolean }) {
+export function Field({ className, mono, numeric, invalid, ...rest }: InputHTMLAttributes<HTMLInputElement> & { mono?: boolean; numeric?: boolean; invalid?: boolean; ref?: Ref<HTMLInputElement> }) {
   return <input className={['field', mono && 'mono', numeric && 'num', invalid && 'bad-field', className].filter(Boolean).join(' ')} aria-invalid={invalid || undefined} spellCheck={false} autoComplete="off" {...rest} />;
 }
 

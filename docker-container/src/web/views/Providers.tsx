@@ -7,8 +7,13 @@
  * hub. Whether a provider is on is read from the hub, never assumed — the external media tool is on
  * or off because the hub says so. And secrets are write-only: the form shows a hint of what is
  * stored and never the value, and a blank secret field keeps the stored one rather than clearing it.
+ *
+ * Details and Set Up open under their own row, not below the table: the row's button says it is
+ * expanded, the caret moves into the details, Escape or Close shuts them and puts the caret back on
+ * the button. Requests and limits lists the providers in use (switched on and set up, or asked for
+ * something lately); Show All Providers lists the rest.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import type { ProviderAppConfigView, ProviderDescriptor, ProviderHealth } from '@now-playing/contracts';
 import { api } from '../lib/api.js';
 import { useAction, useResource } from '../lib/hooks.js';
@@ -36,14 +41,27 @@ export function ProvidersView() {
   const providers = useResource('providersList', {}, { pollMs: 20_000 });
   const usage = useResource('providersUsage', {}, { pollMs: 15_000 });
   const [selected, setSelected] = useState<string | null>(null);
+  const [allUsage, setAllUsage] = useState(false);
+  // Each row's Details button, so closing the details can put the caret back where it was.
+  const openers = useRef(new Map<string, HTMLButtonElement>());
+  const close = useCallback((provider: string) => {
+    setSelected(null);
+    openers.current.get(provider)?.focus();
+  }, []);
 
   const data = providers.data as { items: ProviderDescriptor[]; health: ProviderHealth[] } | null;
   const state = listState(providers, (d) => (d as { items: ProviderDescriptor[] }).items.length === 0, 'No providers.');
   const healthOf = (id: string): ProviderHealth | undefined => data?.health.find((h) => h.provider === id);
   const nameOf = (id: string): string => data?.items.find((p) => p.provider === id)?.displayName ?? id;
   const usageItems = (usage.data as { items: Usage[] } | null)?.items ?? [];
-  const usageState = listState(usage, (d) => (d as { items: Usage[] }).items.length === 0, 'Nothing has been asked of any provider yet.');
-  const picked = data?.items.find((p) => p.provider === selected) ?? null;
+  const inUse = usageItems.filter((row) => {
+    const descriptor = data?.items.find((p) => p.provider === row.provider);
+    const busy = row.budget.usedMinute > 0 || row.budget.usedDay > 0 || row.concurrency.inFlight > 0 || Object.values(row.queueDepth).some((n) => n > 0);
+    return busy || Boolean(descriptor?.enabled && descriptor.configured);
+  });
+  const shownUsage = allUsage ? usageItems : inUse;
+  const hiddenUsage = usageItems.length - inUse.length;
+  const usageState = listState(usage, () => shownUsage.length === 0, 'No provider is in use yet.');
 
   return (
     <Group title="Providers" hint="Used through their own APIs and within their terms. What each can do is what its terms allow, not what would be convenient.">
@@ -75,8 +93,10 @@ export function ProvidersView() {
                   const status = PROVIDER_STATUS[healthOf(p.provider)?.status ?? (p.enabled ? 'ok' : 'disabled')] ?? PROVIDER_STATUS.down;
                   // Set Up only where there is a key or an app to enter; everything else is ready as it is.
                   const needsSetup = p.authType === 'api-key' || p.authType === 'oauth-pkce' || p.authType === 'oauth-client-credentials' || !p.configured;
+                  const open = selected === p.provider;
                   return (
-                    <tr key={p.provider}>
+                    <Fragment key={p.provider}>
+                    <tr className={open ? 'is-open' : undefined}>
                       <td title={status.word}>
                         <Sdot kind={status.dot} label={status.word} inline />
                         <b>{p.displayName}</b>
@@ -90,33 +110,45 @@ export function ProvidersView() {
                         </span>
                       </td>
                       <td className="acts">
-                        <Push aria-label={`${needsSetup ? 'Set up' : 'Details of'} ${p.displayName}`} aria-expanded={selected === p.provider} onClick={() => setSelected(selected === p.provider ? null : p.provider)}>
+                        <Push
+                          ref={(node) => {
+                            if (node) openers.current.set(p.provider, node);
+                            else openers.current.delete(p.provider);
+                          }}
+                          aria-label={`${needsSetup ? 'Set up' : 'Details of'} ${p.displayName}`}
+                          aria-expanded={open}
+                          aria-controls={open ? `prov-detail-${p.provider}` : undefined}
+                          onClick={() => setSelected(open ? null : p.provider)}
+                        >
                           {needsSetup ? 'Set Up' : 'Details'}
                         </Push>
                       </td>
                     </tr>
+                    {open ? (
+                      <tr className="detail-row">
+                        <td colSpan={4}>
+                          <ProviderDetail
+                            descriptor={p}
+                            health={healthOf(p.provider)}
+                            onClose={() => close(p.provider)}
+                            onSaved={() => {
+                              providers.reload();
+                              usage.reload();
+                            }}
+                          />
+                        </td>
+                      </tr>
+                    ) : null}
+                    </Fragment>
                   );
                 })}
           </tbody>
         </table>
       </div>
 
-      {picked ? (
-        <ProviderDetail
-          key={picked.provider}
-          descriptor={picked}
-          health={healthOf(picked.provider)}
-          onClose={() => setSelected(null)}
-          onSaved={() => {
-            providers.reload();
-            usage.reload();
-          }}
-        />
-      ) : null}
-
       <SubHead>Requests and limits</SubHead>
       <div className="well">
-        <table className="tbl" aria-label="Requests and limits">
+        <table className="tbl" id="usage-table" aria-label="Requests and limits">
           <colgroup>
             <col />
             <col style={{ width: '20%' }} />
@@ -141,7 +173,7 @@ export function ProvidersView() {
             {usageState ? <EmptyCells columns={5} {...usageState} /> : null}
             {usageState
               ? null
-              : usageItems.map((row) => (
+              : shownUsage.map((row) => (
                   <tr key={row.provider} title={row.budget.shedding.length ? 'Busy: the hub is putting off the less urgent requests.' : undefined}>
                     <td>{nameOf(row.provider)}</td>
                     <td>
@@ -155,6 +187,13 @@ export function ProvidersView() {
           </tbody>
         </table>
       </div>
+      {hiddenUsage > 0 || allUsage ? (
+        <div className="barrow">
+          <Push aria-expanded={allUsage} aria-controls="usage-table" onClick={() => setAllUsage(!allUsage)}>
+            {allUsage ? 'Show Providers in Use' : `Show All Providers (${hiddenUsage} more)`}
+          </Push>
+        </div>
+      ) : null}
     </Group>
   );
 }
@@ -216,15 +255,32 @@ function ProviderDetail({ descriptor, health, onClose, onSaved }: { descriptor: 
 
   const status = PROVIDER_STATUS[health?.status ?? (descriptor.enabled ? 'ok' : 'disabled')] ?? PROVIDER_STATUS.down;
   const id = `prov-${provider}`;
-  // Opened from a row that may be far up the table: bring it into view.
+  // Opened under its row: bring it into view and move the caret to its heading, so the next Tab
+  // reaches its first field and a screen reader says what opened.
   const box = useRef<HTMLDivElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     box.current?.scrollIntoView?.({ block: 'nearest' });
+    heading.current?.focus();
   }, []);
 
   return (
-    <div className="tile detail" ref={box} role="region" aria-label={`${descriptor.displayName} details`}>
-      <h3>
+    // Escape closes the details from anywhere inside them, as it closes the sheet.
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
+    <div
+      className="tile detail"
+      ref={box}
+      id={`prov-detail-${provider}`}
+      role="region"
+      aria-label={`${descriptor.displayName} details`}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.stopPropagation();
+          onClose();
+        }
+      }}
+    >
+      <h3 ref={heading} tabIndex={-1}>
         {descriptor.displayName} <span className="sub">· {PROVIDER_ROLES[descriptor.role] ?? descriptor.role} · {status.word}</span>
       </h3>
       {descriptor.capabilities.reason ? <p className="detail__text">{descriptor.capabilities.reason}</p> : null}

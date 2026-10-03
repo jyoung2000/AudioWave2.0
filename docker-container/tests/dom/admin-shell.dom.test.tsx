@@ -218,6 +218,17 @@ describe('signed in', () => {
     expect(within(health).getByText('Working')).toBeTruthy();
   });
 
+  it('draws the badge and the Needs attention list from one reading, so they always agree', async () => {
+    const fetchMock = mockFetch(SIGNED_IN);
+    vi.stubGlobal('fetch', fetchMock);
+    render(<App />);
+    const attention = await screen.findByRole('list', { name: 'Needs attention' });
+    await waitFor(() => expect(within(attention).getAllByRole('listitem')).toHaveLength(1));
+    expect(screen.getByRole('tab', { name: /^Overview/ }).textContent).toContain('1');
+    // One request for the overview, not one for the badge and another for the list.
+    expect(fetchMock.mock.calls.filter((call) => String(call[0]).includes('/metrics/overview'))).toHaveLength(1);
+  });
+
   it('shows the hub fingerprint on the overview, so it can be compared during pairing', async () => {
     vi.stubGlobal('fetch', mockFetch(SIGNED_IN));
     render(<App />);

@@ -7,8 +7,9 @@
  * that they are off, rather than showing a number nobody can vouch for.
  */
 import type { ReactNode } from 'react';
-import type { DeviceView, LibraryRoot, OverviewMetrics, ProviderDescriptor } from '@now-playing/contracts';
+import type { DeviceView, LibraryRoot, ProviderDescriptor } from '@now-playing/contracts';
 import { useResource } from '../lib/hooks.js';
+import { useOverview } from '../lib/overview.js';
 import { PROVIDER_STATUS } from '../lib/words.js';
 import { Ago, count, EmptyRow, errorSentence, formatBytes, formatUptime, Group, Sdot, useHubUi, type DotKind } from '../ui.js';
 
@@ -18,13 +19,14 @@ const GATEWAY: Record<string, string> = { connected: 'Online', connecting: 'Conn
 
 export function OverviewView() {
   const { gated } = useHubUi();
-  const overview = useResource('metricsOverview', {}, { pollMs: 5_000 });
+  // The same reading the window's badge and lamp use, so this list and the badge always agree.
+  const overview = useOverview();
   // The provider list is one of the few routes the server answers before setup; it carries the names.
   const providers = useResource('providersList', {}, { pollMs: 60_000 });
   const devices = useResource('devicesList', {}, { pollMs: 15_000, enabled: !gated });
   const roots = useResource('libraryRoots', {}, { pollMs: 30_000, enabled: !gated });
 
-  const data = overview.data as OverviewMetrics | null;
+  const data = overview.data;
   const names = new Map(((providers.data as { items: ProviderDescriptor[] } | null)?.items ?? []).map((p) => [p.provider, p.displayName]));
   const nameOf = (id: string): string => names.get(id) ?? id;
   const paired = ((devices.data as { items: DeviceView[] } | null)?.items ?? null)?.filter((d) => !d.revokedAt) ?? null;
