@@ -171,6 +171,13 @@ body {
   text-wrap: balance;
 }
 
+.sg__h4 {
+  margin: 14px 0 6px;
+  color: var(--sg-ink-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .sg__h3 {
   margin: 26px 0 8px;
   color: var(--sg-ink-2);

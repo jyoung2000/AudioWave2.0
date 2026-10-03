@@ -21,4 +21,9 @@ declare const __STYLEGUIDE_BUILD__: {
   notes: string[];
   problems: number;
   scheme: Array<{ name: string; light: string; dark: string }>;
+  /** Read from the products' source at build time: see `usage()` in vite.config.ts. */
+  usage: {
+    library: Array<{ name: string; player: boolean; hub: boolean; companion: boolean }>;
+    kits: { hub: string[]; companion: string[] };
+  };
 };

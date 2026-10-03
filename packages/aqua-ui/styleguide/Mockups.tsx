@@ -13,13 +13,14 @@
  *
  * **A way in, not a drawing.** The token editor reads the custom properties the stylesheets actually
  * define — not a hand-kept list, which would drift — and writes changes into every open frame at
- * once. What you get out is the CSS the products already read, so the round trip from "that blue is
- * wrong" to "the apps have a different blue" is paste one block and rebuild.
+ * once. What you get out says where each change belongs: the component library's properties go in
+ * `overrides.css`; the Airwave windows' stylesheets are generated, so theirs go in the design files.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Checkbox, SegmentedControl, StatusDot, TextField } from '../src/index.js';
 import { DEVICES, DeviceFrame, EMPTY_FIT, type FitReport } from './DeviceFrame.js';
-import { PRODUCTS, PRODUCT_CSS, SCREENS, type ProductId } from './screens.js';
+import { AIRWAVE_TOKEN_SOURCES } from './airwave-screens.js';
+import { PRODUCTS, PRODUCT_CSS, SCREENS, type ProductId, type ProductSpec } from './screens.js';
 
 /* ------------------------------------------------------------------ tokens */
 
@@ -30,7 +31,7 @@ export interface TokenDef {
 }
 
 const GROUPS: Array<{ prefix: string; label: string }> = [
-  { prefix: '--aqua-', label: 'Window skin' },
+  { prefix: '--aqua-', label: 'Aqua library (earlier window skin)' },
   { prefix: '--np-', label: 'Page skin' },
   { prefix: '--lib-', label: 'The list' },
   { prefix: '--srch-', label: 'Search popover' },
@@ -75,6 +76,27 @@ export function readRootTokens(doc: Document): TokenDef[] {
     .sort((a, b) => a.group.localeCompare(b.group) || a.name.localeCompare(b.name));
 }
 
+/**
+ * The Airwave windows' custom properties, read from the stylesheets the hub and the companion load.
+ *
+ * Those sheets are not on this page — they would restyle it — so they are read as text: every
+ * declaration in a top-level rule whose selector names `:root`. A name the component library also
+ * defines stays the library's.
+ */
+export function readAirwaveTokens(known: ReadonlySet<string>): TokenDef[] {
+  const found = new Map<string, TokenDef>();
+  for (const source of AIRWAVE_TOKEN_SOURCES) {
+    const text = source.css.replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const rule of text.matchAll(/(?:^|\})\s*([^{}@]*:root[^{}]*)\{([^{}]*)\}/g)) {
+      for (const declaration of rule[2]!.matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/gi)) {
+        const name = declaration[1]!;
+        if (!known.has(name) && !found.has(name)) found.set(name, { name, value: declaration[2]!.trim(), group: source.label });
+      }
+    }
+  }
+  return [...found.values()].sort((a, b) => a.group.localeCompare(b.group) || a.name.localeCompare(b.name));
+}
+
 const COLOUR = /^(#|rgb|hsl|color\()/i;
 
 /**
@@ -85,19 +107,28 @@ const COLOUR = /^(#|rgb|hsl|color\()/i;
  * wherever it is imported from, instead of depending on which stylesheet a product happens to load
  * last. Overrides that only work in some import orders are worse than no overrides.
  */
-export function overridesCss(edits: Readonly<Record<string, string>>): string {
-  const names = Object.keys(edits).sort();
-  if (!names.length) return '/* Nothing overridden yet. */\n';
-  const body = names.map((name) => `  ${name}: ${edits[name]!};`).join('\n');
-  return `/*\n * Written from the styleguide's token editor.\n *\n * Save this over packages/aqua-ui/src/styles/overrides.css and rebuild: every product reads these,\n * because every product imports that stylesheet through the component library.\n */\n:root:root {\n${body}\n}\n`;
+export function overridesCss(edits: Readonly<Record<string, string>>, airwave: ReadonlySet<string> = new Set()): string {
+  const all = Object.keys(edits).sort();
+  if (!all.length) return '/* Nothing overridden yet. */\n';
+  const line = (name: string): string => `  ${name}: ${edits[name]!};`;
+  const windowNames = all.filter((name) => airwave.has(name));
+  const names = all.filter((name) => !airwave.has(name));
+  // The Airwave windows never load overrides.css: their stylesheets are generated from the designs.
+  const windowBlock = windowNames.length
+    ? `/*\n * Airwave window properties (hub, companion). These do not go in overrides.css: the window\n * stylesheets are generated. Change the same properties in the :root block of\n * design/frontends/airwave-companion.html and airwave-hub.html, then run pnpm build:window-css.\n * (--ink-quiet, --success-ink, --danger-ink and --link are the hub's, in docker-container/src/web/styles.css.)\n */\n:root {\n${windowNames.map(line).join('\n')}\n}\n`
+    : '';
+  if (!names.length) return windowBlock;
+  const body = names.map(line).join('\n');
+  return `/*\n * Written from the styleguide's token editor.\n *\n * Save this over packages/aqua-ui/src/styles/overrides.css and rebuild: whatever imports the\n * component library reads these — the player's React interface, the gallery and this guide. The\n * Airwave windows (hub, companion) do not load that stylesheet.\n */\n:root:root {\n${body}\n}\n${windowBlock ? `\n${windowBlock}` : ''}`;
 }
 
 /* ------------------------------------------------------------------ frames */
 
-function FitLine({ report, touch }: { report: FitReport; touch: boolean }) {
+function FitLine({ report, touch, touchFloors = true }: { report: FitReport; touch: boolean; touchFloors?: boolean }) {
+  const held = touch && touchFloors;
   const cut = report.overflowPx > 0;
-  const small = report.smallestTextPx < (touch ? 12 : 10);
-  const tight = touch && report.smallestTargetPx < 44;
+  const small = report.smallestTextPx < (held ? 12 : 10);
+  const tight = held && report.smallestTargetPx < 44;
   // The offenders decide as much as the three numbers do: something clipped by a window never makes
   // the page any wider, so a screen can lose a control entirely and still read as "nothing off the
   // side" if the summary is all you look at.
@@ -109,6 +140,7 @@ function FitLine({ report, touch }: { report: FitReport; touch: boolean }) {
         <span>{cut ? `${report.overflowPx}px off the side` : 'nothing off the side'}</span>
         <span>· smallest text {Number.isFinite(report.smallestTextPx) ? `${Math.round(report.smallestTextPx)}px` : '—'}</span>
         {touch ? <span>· smallest target {Number.isFinite(report.smallestTargetPx) ? `${Math.round(report.smallestTargetPx)}px` : '—'}</span> : null}
+        {touch && !touchFloors ? <span className="sg-dim">· desktop density, not held to 44px (DEC-027)</span> : null}
       </span>
       {report.offenders.length ? (
         <ul className="sg-fit__list">
@@ -125,6 +157,7 @@ function FitLine({ report, touch }: { report: FitReport; touch: boolean }) {
 
 export function Mockups() {
   const [product, setProduct] = useState<ProductId>('player');
+  const spec: ProductSpec = PRODUCTS.find((item) => item.id === product) ?? PRODUCTS[0]!;
   const screensFor = SCREENS.filter((screen) => screen.product === product);
   const [screenId, setScreenId] = useState(screensFor[0]?.id ?? '');
   const screen = screensFor.find((item) => item.id === screenId) ?? screensFor[0];
@@ -135,20 +168,26 @@ export function Mockups() {
   const [filter, setFilter] = useState('');
   const [revision, setRevision] = useState(0);
 
-  const tokens = useMemo(() => (typeof document === 'undefined' ? [] : readRootTokens(document)), []);
+  const tokens = useMemo(() => {
+    const library = typeof document === 'undefined' ? [] : readRootTokens(document);
+    return [...library, ...readAirwaveTokens(new Set(library.map((token) => token.name)))];
+  }, []);
+  const airwaveNames = useMemo(() => new Set(tokens.filter((token) => token.group.startsWith('Airwave')).map((token) => token.name)), [tokens]);
   const shown = useMemo(() => {
     const needle = filter.trim().toLowerCase();
     if (!needle) return [] as TokenDef[];
     return tokens.filter((token) => token.name.includes(needle) || token.group.toLowerCase().includes(needle)).slice(0, 60);
   }, [tokens, filter]);
 
-  const devices = DEVICES.filter((device) => deviceIds.includes(device.id));
+  const offered = DEVICES.filter((device) => spec.devices.includes(device.id));
+  const devices = offered.filter((device) => deviceIds.includes(device.id));
   const report = useCallback((id: string) => (next: FitReport) => setFit((all) => (sameFit(all[id], next) ? all : { ...all, [id]: next })), []);
 
   const chooseProduct = (next: string): void => {
     const id = next as ProductId;
     setProduct(id);
     setScreenId(SCREENS.find((item) => item.product === id)?.id ?? '');
+    setDeviceIds([...(PRODUCTS.find((item) => item.id === id)?.shown ?? ['phone', 'laptop'])]);
     setFit({});
   };
 
@@ -163,7 +202,7 @@ export function Mockups() {
   return (
     <div className="sg-mockups">
       <p className="sg-print-only sg-note">
-        In print, every screen is shown at the laptop and phone sizes with the fit measured inside each frame. The interactive version — every size, the product switch and the
+        In print, every screen is shown at two of its product’s sizes with the fit measured inside each frame. The interactive version — every size, the product switch and the
         token editor — is <code>docs/design/styleguide.html</code>.
       </p>
       {printing ? <PrintMatrix /> : null}
@@ -180,11 +219,15 @@ export function Mockups() {
 
         <fieldset className="sg-mockups__devices">
           <legend>Sizes</legend>
-          {DEVICES.map((device) => (
+          {offered.map((device) => (
             <Checkbox
               key={device.id}
               checked={deviceIds.includes(device.id)}
-              onChange={(event) => setDeviceIds((all) => (event.currentTarget.checked ? [...all, device.id] : all.filter((id) => id !== device.id)))}
+              onChange={(event) => {
+                // Read the box here, not inside the updater: React has released the event by the time a queued updater runs.
+                const on = event.currentTarget.checked;
+                setDeviceIds((all) => (on ? [...all.filter((id) => id !== device.id), device.id] : all.filter((id) => id !== device.id)));
+              }}
             >
               {`${device.label} · ${device.width}`}
             </Checkbox>
@@ -192,6 +235,9 @@ export function Mockups() {
         </fieldset>
       </div>
 
+      <p className="sg-note sg-mockups__note">
+        <b>{spec.skin}.</b> {spec.note}
+      </p>
       {screen ? <p className="sg-note sg-mockups__note">{screen.note}</p> : null}
 
       <div className="sg-mockups__frames">
@@ -201,10 +247,10 @@ export function Mockups() {
               <strong>{device.label}</strong> <span className="sg-dim">{device.width} × {device.height}</span>
               {device.touch ? <span className="sg-tag">touch layer emulated</span> : null}
             </figcaption>
-            <DeviceFrame device={device} scale={scaleFor(device.width)} tokens={edits} css={PRODUCT_CSS[product]} revision={revision} onFit={report(`${device.id}-${screen?.id ?? ''}`)}>
+            <DeviceFrame device={device} scale={scaleFor(device.width)} tokens={edits} css={PRODUCT_CSS[product]} isolated={spec.isolated} prepare={spec.prepare} touchFloors={spec.touchFloors} revision={revision} onFit={report(`${device.id}-${screen?.id ?? ''}`)}>
               {screen?.render()}
             </DeviceFrame>
-            <FitLine report={fit[`${device.id}-${screen?.id ?? ''}`] ?? EMPTY_FIT} touch={device.touch} />
+            <FitLine report={fit[`${device.id}-${screen?.id ?? ''}`] ?? EMPTY_FIT} touch={device.touch} touchFloors={spec.touchFloors} />
             {device.note ? <p className="sg-dim sg-mockups__why">{device.note}</p> : null}
           </figure>
         ))}
@@ -261,7 +307,7 @@ export function Mockups() {
           <Button disabled={!Object.keys(edits).length} onClick={() => setEdits({})}>
             Reset everything
           </Button>
-          <Button variant="default" disabled={!Object.keys(edits).length} onClick={() => void copy(overridesCss(edits))}>
+          <Button variant="default" disabled={!Object.keys(edits).length} onClick={() => void copy(overridesCss(edits, airwaveNames))}>
             Copy the CSS
           </Button>
         </div>
@@ -269,9 +315,10 @@ export function Mockups() {
         {Object.keys(edits).length ? (
           <>
             <p className="sg-note">
-              Save this over <code>packages/aqua-ui/src/styles/overrides.css</code> and run <code>pnpm build</code>. Every product reads it, because every product imports the component library.
+              Component-library properties go in <code>packages/aqua-ui/src/styles/overrides.css</code>, which whatever imports the library reads. Airwave window properties go in the
+              design files, because <code>airwave-window.css</code> and <code>airwave-hub.css</code> are generated from them (<code>pnpm build:window-css</code>). The block below says which is which.
             </p>
-            <pre className="sg-editor__out">{overridesCss(edits)}</pre>
+            <pre className="sg-editor__out">{overridesCss(edits, airwaveNames)}</pre>
           </>
         ) : null}
       </div>
@@ -282,19 +329,26 @@ export function Mockups() {
 /**
  * Every screen, for the PDF.
  *
- * Paper cannot hold a picker, so print gets the whole matrix instead: each screen on its own page,
- * the laptop frame across the top and the phone frame under it, both measured the same way as on
- * screen. The page is marked ready only when every frame has reported, so the export never prints
+ * Paper cannot hold a picker, so print gets the whole matrix instead: each screen on its own page at
+ * two of its product's sizes — the laptop frame across the top and the phone frame under it for the
+ * player and the hub, the window as it opens and at its smallest for the companion — both measured
+ * the same way as on screen. The page is marked ready only when every frame has reported, so the export never prints
  * a frame that has not laid out yet.
  */
-const PRINT_SIZES = [
-  { deviceId: 'laptop', scale: 0.53 },
-  { deviceId: 'phone', scale: 0.56 },
-] as const;
+const PRINT_SCALES: Readonly<Record<string, number>> = { laptop: 0.53, phone: 0.56, window: 0.62, 'window-min': 0.62 };
+
+/** The wide frame first, as the page lays them out. */
+function printSizes(product: ProductSpec | undefined): Array<{ deviceId: string; scale: number }> {
+  const ids = [...(product?.shown ?? ['phone', 'laptop'])].sort((a, b) => (DEVICES.find((d) => d.id === b)?.width ?? 0) - (DEVICES.find((d) => d.id === a)?.width ?? 0));
+  return ids.map((deviceId) => ({ deviceId, scale: PRINT_SCALES[deviceId] ?? 0.5 }));
+}
+
+/** One object for every print frame, so a re-render does not look like a token change. */
+const NO_TOKENS: Readonly<Record<string, string>> = {};
 
 function PrintMatrix() {
   const [reports, setReports] = useState<Record<string, FitReport>>({});
-  const expected = SCREENS.length * PRINT_SIZES.length;
+  const expected = SCREENS.length * 2;
   const report = useCallback((key: string) => (next: FitReport) => setReports((all) => (sameFit(all[key], next) ? all : { ...all, [key]: next })), []);
 
   useEffect(() => {
@@ -315,12 +369,12 @@ function PrintMatrix() {
               <span>{screen.note}</span>
             </figcaption>
             <div className="sg-print-screen__frames">
-              {PRINT_SIZES.map(({ deviceId, scale }) => {
+              {printSizes(product).map(({ deviceId, scale }) => {
                 const device = DEVICES.find((item) => item.id === deviceId)!;
                 const key = `${screen.id}-${device.id}`;
                 return (
-                  <div key={key} className={`sg-print-screen__frame sg-print-screen__frame--${device.id}`}>
-                    <DeviceFrame device={device} scale={scale} tokens={{}} css={PRODUCT_CSS[screen.product]} onFit={report(key)}>
+                  <div key={key} className={`sg-print-screen__frame sg-print-screen__frame--${device.id === 'laptop' ? 'laptop' : 'phone'}`}>
+                    <DeviceFrame device={device} scale={scale} tokens={NO_TOKENS} css={PRODUCT_CSS[screen.product]} isolated={product?.isolated} prepare={product?.prepare} touchFloors={product?.touchFloors} onFit={report(key)}>
                       {screen.render()}
                     </DeviceFrame>
                     <div className="sg-print-screen__meta">
@@ -329,7 +383,7 @@ function PrintMatrix() {
                         {device.width} × {device.height}, shown at {Math.round(scale * 100)}%
                       </span>
                       {device.touch ? <span className="sg-tag">touch layer emulated</span> : null}
-                      <FitLine report={reports[key] ?? EMPTY_FIT} touch={device.touch} />
+                      <FitLine report={reports[key] ?? EMPTY_FIT} touch={device.touch} touchFloors={product?.touchFloors} />
                     </div>
                   </div>
                 );

@@ -1,18 +1,22 @@
 /**
- * The styleguide.
+ * The Airwave Style Guide: one guide for the player, the hub and the companion.
  *
- * It explains the system in prose and shows it with the system's own components, so the two cannot
- * drift apart: every swatch is read from tokens.json at build time, every control on the page is the
- * real one wearing the real stylesheet, and the page's own chrome is a source list and a work area
- * because that is how this system navigates.
+ * It explains the system in prose and shows it with the system's own parts, so the two cannot drift
+ * apart: every swatch is read from tokens.json at build time; the Airwave windows are drawn with the
+ * generated stylesheets, AquaArt and the products' own kits; the component library's controls are
+ * the real ones wearing the real stylesheet; and which product uses what is read from the products'
+ * imports when the page is built.
  */
 import { useEffect, useMemo, type ReactNode } from 'react';
+import { BRANDING } from '@now-playing/contracts';
 import tokens from '../src/styles/tokens.json';
 import { AquaProvider, ToastProvider, Button, Checkbox, PopUpMenu, ProgressBar, SearchField, SegmentedControl, SourceList, SourceIcon, Glyph, TrackScrubber, BarSearch, Slider, StatusDot, MusicList } from '../src/index.js';
 import { Card, ControlsDemo, IconsDemo, OverlaysDemo, PageDemo, ResultsDemo, ShellDemo, StatesDemo, makeRows, makeTracks } from '../gallery/specimens.js';
 import { ContextMenuSpecimen, EqualizerSpecimen, PageFurnitureSpecimen, SearchPopoverSpecimen, ShareStripSpecimen, SheetSpecimen, ToastSpecimen } from './page-specimens.js';
 import { ConstellationField, SpectrumSpecimen } from './visualisers.js';
 import { Mockups } from './Mockups.js';
+import { DeviceFrame, type DeviceSpec } from './DeviceFrame.js';
+import { AirwaveKitSpecimen, HUB_CSS, prepareAirwaveDocument } from './airwave-screens.js';
 import { Brand, Coverage, DarkScheme, Discord, Governance, Interaction, Journeys, Platforms, Principles, PrintContents, PrintCover, Screens, type NavGroup } from './Governance.js';
 
 /* ------------------------------------------------------------------ data */
@@ -20,6 +24,22 @@ import { Brand, Coverage, DarkScheme, Discord, Governance, Interaction, Journeys
 type Palette = Record<string, string>;
 const colour = tokens.color as Palette;
 const page = tokens.page as Palette;
+const airwave = tokens.airwave as Palette;
+
+const AIRWAVE_GROUPS: Array<{ title: string; keys: string[] }> = [
+  { title: 'Window and content', keys: ['desktop', 'winOutline', 'winBody', 'content', 'contentMuted', 'rowStripe', 'rowDivider', 'wellEdge'] },
+  { title: 'Chrome and headers', keys: ['chromeTop', 'chromeUpper', 'chromeLower', 'chromeBottom', 'chromeSep', 'chromeHi', 'headTop', 'headBot', 'headRule', 'headInk'] },
+  { title: 'Selection and focus', keys: ['selTop', 'selMid', 'selBot', 'selBorder', 'selInk', 'focus', 'aqRing'] },
+  { title: 'Aqua gel', keys: ['aquaSpec', 'aquaTop', 'aquaMid', 'aquaLower', 'aquaBot', 'aquaRim'] },
+  { title: 'Ink', keys: ['ink', 'ink2', 'ink3', 'aqInk', 'aqInkOff'] },
+  { title: 'Status and the first-run gate', keys: ['success', 'warning', 'danger', 'warnBg', 'warnEdge'] },
+  { title: 'LCD plate', keys: ['lcdTop', 'lcdBot', 'lcdInk'] },
+  { title: 'Faces and tracks', keys: ['btnTop', 'btnMid', 'btnBot', 'btnEdge', 'trackEdge', 'trackLo', 'trackHi'] },
+  { title: 'Contrast inks (hub web, DEC-022)', keys: ['inkQuiet', 'successInk', 'dangerInk', 'link', 'capOffInk'] },
+];
+
+/** The frame the Airwave window kit is shown in: a browser tab's worth of the hub's own page. */
+const KIT_FRAME: DeviceSpec = { id: 'airwave-kit', label: 'The Airwave window kit', width: 820, height: 820, touch: false };
 
 const WINDOW_GROUPS: Array<{ title: string; keys: string[] }> = [
   { title: 'Window and content', keys: ['desktop', 'windowOutline', 'windowBody', 'content', 'contentMuted', 'rowStripe', 'rowDivider'] },
@@ -43,14 +63,12 @@ const PAGE_GROUPS: Array<{ title: string; keys: string[] }> = [
   { title: 'Marks', keys: ['live', 'star'] },
 ];
 
-/** Which product imports which element today, read from each product's imports. */
-const PRODUCT_MAP: Array<{ name: string; player: boolean; hub: boolean; companion: boolean }> = [
-  ...['PageBar', 'BarSearch', 'BarClock', 'ModeSwitch', 'ProfileButton', 'SectionStrip', 'Hero', 'HeroArt', 'JewelStage', 'TrackScrubber', 'KeyTransport', 'KeyButton', 'LevelSlider', 'MusicList', 'ButtonLink', 'IconButton', 'InlineValidation', 'SegmentedControl', 'Sheet', 'Slider'].map((name) => ({ name, player: true, hub: false, companion: false })),
-  ...['AquaTable', 'Button', 'Checkbox', 'EmptyState', 'Glyph', 'KeyValueList', 'Panel', 'PanelSection', 'PopUpMenu', 'ProgressBar', 'SourceBadge', 'StatusDot', 'TextField', 'ToastProvider', 'useToast'].map((name) => ({ name, player: true, hub: true, companion: true })),
-  ...['LoadingState'].map((name) => ({ name, player: true, hub: true, companion: false })),
-  ...['AquaWindow', 'Toolbar', 'SourceList', 'WorkArea', 'Content', 'BottomBar', 'SearchField'].map((name) => ({ name, player: false, hub: true, companion: true })),
-  ...['ErrorState'].map((name) => ({ name, player: false, hub: true, companion: false })),
-];
+/** Which product imports what, read from each product's source when the page is built (vite.config.ts). */
+const USAGE = __STYLEGUIDE_BUILD__.usage;
+const LIBRARY_IN_PLAYER = USAGE.library.filter((item) => item.player);
+const LIBRARY_UNUSED = USAGE.library.filter((item) => !item.player && !item.hub && !item.companion);
+const LIBRARY_IN_WINDOWS = USAGE.library.filter((item) => item.hub || item.companion);
+const KIT_NAMES = [...new Set([...USAGE.kits.hub, ...USAGE.kits.companion])].sort();
 
 const rows = makeRows(24);
 
@@ -105,7 +123,7 @@ function Section({ id, title, chapter = false, children }: { id: string; title: 
 
 /** One list for the rail on screen and the contents page in print. */
 const NAV: NavGroup[] = [
-  { group: 'Principles', items: [{ href: '#rules', label: 'The four rules' }, { href: '#brand', label: 'Brand and voice' }, { href: '#skins', label: 'Two skins' }] },
+  { group: 'Principles', items: [{ href: '#rules', label: 'The four rules' }, { href: '#brand', label: 'Brand and voice' }, { href: '#skins', label: 'Three apps, one system' }] },
   {
     group: 'Foundations',
     items: [
@@ -121,8 +139,9 @@ const NAV: NavGroup[] = [
     group: 'Elements',
     items: [
       { href: '#page', label: 'The page (player)' },
-      { href: '#window', label: 'The window (hub, companion)' },
-      { href: '#controls', label: 'Controls' },
+      { href: '#window', label: 'The Airwave window (hub, companion)' },
+      { href: '#library-window', label: 'The earlier window skin' },
+      { href: '#controls', label: 'Library controls' },
       { href: '#overlays', label: 'Overlays' },
       { href: '#states', label: 'States' },
       { href: '#results', label: 'Results and grid' },
@@ -171,7 +190,7 @@ export function Styleguide() {
         <div className="sg">
           <nav className="sg__rail" aria-label="Sections">
             <div className="sg__brand">
-              Now Playing
+              {BRANDING.suiteName} Style Guide
               <small>AQUA_PROFILE={tokens.profile}</small>
             </div>
             {NAV.map((group) => (
@@ -190,16 +209,17 @@ export function Styleguide() {
             <PrintCover />
             <PrintContents nav={NAV} />
             <header className="sg__opening">
-              <h1 className="sg__h1">Now Playing styleguide</h1>
+              <h1 className="sg__h1">{BRANDING.suiteName} Style Guide</h1>
               <div className="sg__stamp">
-                {tokens.profile} · {Object.keys(colour).length + Object.keys(page).length} colours · two skins · {__STYLEGUIDE_BUILD__.summary.surfaces} surfaces · source{' '}
+                {tokens.profile} · three apps · {__STYLEGUIDE_BUILD__.summary.tokensChecked} tokens checked · {__STYLEGUIDE_BUILD__.summary.surfaces} surfaces · source{' '}
                 {__STYLEGUIDE_BUILD__.fingerprint}
               </div>
               <p className="sg__lede">
-                A reconstruction of Apple's 2009–2010 interface, built as one design system and shared by every part of Now Playing: the music player (a page, also inside the
-                Android app), the hub's admin GUI and the Windows companion (both windows), and the words the Discord bot uses. Every value here is read from{' '}
-                <code>tokens.json</code> as this page is built, every control on it is the real component wearing the real stylesheet, and every rule, screen and journey is read
-                from <code>design/</code> — so the page cannot describe one thing and show another.
+                One guide for the three apps of {BRANDING.suiteName} — {BRANDING.products.player}, the player (a page, also inside the Android app); {BRANDING.products.hub}, the
+                admin window the container serves; and {BRANDING.products.companion}, the Windows app — and for the words the Discord bot uses. All three are a reconstruction of
+                Apple's 2009–2010 interface, and each is built from a design file in <code>design/frontends/</code>. Every value here is read from <code>tokens.json</code> as this
+                page is built, the windows are drawn with the stylesheets and kits the products ship, and every rule, screen and journey is read from <code>design/</code> — so the
+                page cannot describe one thing and show another.
               </p>
             </header>
 
@@ -212,19 +232,81 @@ export function Styleguide() {
               <Brand />
             </Section>
 
-            <Section id="skins" title="Two skins, one system">
+            <Section id="skins" title="Three apps, one system">
               <p>
-                The same profile in two arrangements. A window frame drawn inside a browser viewport is a picture of a window rather than a window, and a 196 px source list is
-                simply unavailable on a phone — so the player is a page while the desktop products stay windows. Controls are shared verbatim between them.
+                One period, one set of rules, three apps — and each app's interface comes from its own design file in <code>design/frontends/</code>. The design file is the
+                authority for how its app looks; this guide is the authority for what the three share: the rules, the words, the ledger of screens, and the checks that keep them
+                in step.
               </p>
+              <table className="sg-table">
+                <thead>
+                  <tr>
+                    <th scope="col">App</th>
+                    <th scope="col">Design</th>
+                    <th scope="col">What it wears</th>
+                    <th scope="col">Where to look here</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <b>{BRANDING.products.player}</b>
+                      <span className="sg-dim sg-block">music-player · android · local-helper</span>
+                    </td>
+                    <td>
+                      <code>airwave-now-playing.html</code>
+                    </td>
+                    <td>
+                      The design file itself, served as the shell: <code>music-player/index.html</code> is generated from it by <code>make-shell.py</code>, with its own custom
+                      properties, its own script for the drawn controls, and <code>src/shell/bridge.ts</code> behind its seams (DEC-019). It imports nothing from the component
+                      library.
+                    </td>
+                    <td>
+                      The <code>player-shell-*</code> rows in Every screen and the <code>NP-*</code> rules. The page skin in Elements is the component library's version of the
+                      same look, kept in <code>music-player/src</code> but not served.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <b>{BRANDING.products.hub}</b>
+                      <span className="sg-dim sg-block">docker-container/src/web</span>
+                    </td>
+                    <td>
+                      <code>airwave-hub.html</code>
+                    </td>
+                    <td>
+                      <code>airwave-window.css</code> and <code>airwave-hub.css</code> (generated from the designs by <code>pnpm build:window-css</code>), AquaArt's drawings, its own
+                      kit <code>ui.tsx</code>, and <code>styles.css</code> for what the design left to its script.
+                    </td>
+                    <td>The Airwave window in Elements, and its screens in the mockups.</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <b>{BRANDING.products.companion}</b>
+                      <span className="sg-dim sg-block">windows-companion/src/renderer</span>
+                    </td>
+                    <td>
+                      <code>airwave-companion.html</code>
+                    </td>
+                    <td>
+                      <code>airwave-window.css</code>, the same AquaArt, its own kit <code>ui.tsx</code>, and <code>styles.css</code> for what a real window needs (it fills its
+                      frame; its chrome is the title bar).
+                    </td>
+                    <td>The Airwave window in Elements, and its screens in the mockups.</td>
+                  </tr>
+                </tbody>
+              </table>
               <div className="sg__groups">
                 <div className="sg__grp">
-                  <b>Window skin</b>
-                  <p>--aqua-* · aqua.css, aqua-window.css, aqua-media.css · Lucida Grande · hub admin GUI, Windows companion</p>
+                  <b>The Airwave window</b>
+                  <p>--win-*, --chrome-*, --ink*, --aq-* · airwave-window.css, airwave-hub.css · Lucida Grande · light only (DEC-003) · {BRANDING.products.hub}, {BRANDING.products.companion}</p>
                 </div>
                 <div className="sg__grp">
-                  <b>Page skin</b>
-                  <p>--np-*, --lib-* · now-playing.css · Helvetica, the iPod's face · music player PWA</p>
+                  <b>The component library</b>
+                  <p>
+                    --aqua-*, --np-*, --lib-* · aqua.css, aqua-window.css, aqua-media.css, now-playing.css · <code>packages/aqua-ui</code> React components · imported by the player's
+                    React source, the gallery and this guide; no served product (DEC-026)
+                  </p>
                 </div>
               </div>
             </Section>
@@ -232,20 +314,31 @@ export function Styleguide() {
             <Section id="colour" title="Colour" chapter>
               <p>
                 Chosen by role, never by picking a hex. Blue means <em>selected</em>, <em>active</em>, or <em>the default action</em> — it is not a brand colour and it is never
-                decoration. Two palettes follow, straight from the token file: the window skin's, then the page skin's.
+                decoration. Three palettes follow, straight from the token file: the Airwave window's (what the hub and the companion wear), then the component library's two.
               </p>
-              <h3 className="sg__h3" style={{ marginTop: 30 }}>Window skin — {Object.keys(colour).length} tokens</h3>
+              <h3 className="sg__h3" style={{ marginTop: 30 }}>The Airwave window — {Object.values(airwave).filter((v) => v.startsWith('#')).length} colours</h3>
+              <p className="sg__note">
+                Owned by the design files: <code>airwave-window.css</code> and <code>airwave-hub.css</code> are generated from them, and <code>tokens.json</code> records the values
+                so <code>pnpm styleguide:check</code> notices when a design changes one. The last group is the hub's own: the design's <code>--ink-3</code>, <code>--success</code>{' '}
+                and <code>--danger</code> fail 4.5:1 as text on white, so the hub reads sentences in darker inks of the same hues (DEC-022).
+              </p>
+              <Swatches palette={airwave} groups={AIRWAVE_GROUPS} />
+              <h3 className="sg__h3" style={{ marginTop: 30 }}>Component library, window skin — {Object.keys(colour).length} tokens</h3>
               <Swatches palette={colour} groups={WINDOW_GROUPS} />
-              <h3 className="sg__h3" style={{ marginTop: 30 }}>Page skin — {Object.values(page).filter((v) => v.startsWith('#')).length} tokens</h3>
+              <h3 className="sg__h3" style={{ marginTop: 30 }}>Component library, page skin — {Object.values(page).filter((v) => v.startsWith('#')).length} tokens</h3>
               <Swatches palette={page} groups={PAGE_GROUPS} />
               <h3 className="sg__h3">Dark</h3>
               <p className="sg__note">
-                The page skin has a full dark palette and it is opt-out: every dark rule is guarded <code>@media (prefers-color-scheme: dark) {'{'} :root:not([data-np-theme='light']) {'{'} … {'}'} {'}'}</code>, so the system preference wins unless a page pins itself light. Redefine <em>only</em> tokens inside that block. The window skin has no dark palette, because Snow Leopard had none.
+                The page skin has a full dark palette and it is opt-out: every dark rule is guarded <code>@media (prefers-color-scheme: dark) {'{'} :root:not([data-np-theme='light']) {'{'} … {'}'} {'}'}</code>, so the system preference wins unless a page pins itself light. Redefine <em>only</em> tokens inside that block. Neither the Airwave window nor the library's window skin has a dark palette, because Snow Leopard had none (DEC-003); the player's shell carries its own dark values (NPD-002).
               </p>
               <DarkScheme />
             </Section>
 
             <Section id="highlights" title="Aqua highlights — where the blue is allowed to shine">
+              <p className="sg__note">
+                The specimens from here to Motion are the component library's controls. The principles are the Airwave window's too — the same light source, the same restraint
+                about blue — but its controls are AquaArt's drawings, shown under The Airwave window.
+              </p>
               <p>
                 Snow Leopard had flattened most of Aqua's gel by 2009, but not all of it: selection, the default action, the scroller and a few controls kept the glass. Those are
                 exactly the places this system keeps it, and this is each one, live.
@@ -313,7 +406,8 @@ export function Styleguide() {
 
             <Section id="type" title="Type">
               <p>
-                Two families, one scale. The window skin sets Lucida Grande, as OS X did. The page skin sets <strong>Helvetica</strong> — the face the iPod classic drew its Now
+                Two families, one scale. The window skin — the Airwave window and the library's alike — sets Lucida Grande, as OS X did; the Airwave window runs 12px body text
+                with 11px secondary lines and 10px chips. The page skin sets <strong>Helvetica</strong> — the face the iPod classic drew its Now
                 Playing screen in, which is what the hero is modelled on — with Arial as its metric-compatible stand-in where Helvetica is absent. Each specimen is at its true size.
               </p>
               <h3 className="sg__h3">Page skin · Helvetica</h3>
@@ -334,7 +428,7 @@ export function Styleguide() {
                   <div key={step.key} className="sg__scale-row">
                     <span className="sg__px">{step.px}</span>
                     <span style={{ fontFamily: 'var(--aqua-font)', fontSize: step.px, fontWeight: step.key === 'system' ? 700 : 400 }}>
-                      {step.key === 'system' ? 'Now Playing' : step.key === 'view' ? 'Copper Meridian — Orbital Cartographers' : step.key === 'small' ? '1,240 songs, 2.6 hours, 245 MB' : step.key === 'label' ? 'LIBRARY · PLAYLISTS · CONNECTED' : 'Mini controls only'}
+                      {step.key === 'system' ? BRANDING.products.hub : step.key === 'view' ? 'Copper Meridian — Orbital Cartographers' : step.key === 'small' ? '1,240 songs, 2.6 hours, 245 MB' : step.key === 'label' ? 'LIBRARY · PLAYLISTS · CONNECTED' : 'Mini controls only'}
                     </span>
                     <span className="sg__use">--aqua-font-{step.key}</span>
                   </div>
@@ -541,35 +635,103 @@ box-shadow:
               </p>
             </Section>
 
-            <Section id="window" title="The window — what the hub and the companion are made of">
+            <Section id="window" title="The Airwave window — what the hub and the companion are made of" chapter>
               <p>
-                The desktop skin: a framed window with traffic lights, a unified toolbar carrying the transport and the LCD, a source list, a work area with a table, and a bottom
-                bar. The hub's admin GUI and the Windows companion are both built from this.
+                A centred Snow Leopard window: one sheet of chrome carrying the title and a row of icon tools, a pane that scrolls beneath it, and a status strip at the foot. {BRANDING.products.hub}{' '}
+                has six tools (Overview, Devices, Music, Groups, Sharing, System) and {BRANDING.products.companion} four (Library, Live TV, Remote, Settings). There is no source
+                list, no traffic lights and no media toolbar: the tools are the navigation, a roving-tabindex tab strip (<code>UX-KEY-001</code>).
+              </p>
+              <p className="sg__note">
+                The frame below is not a drawing of it. It holds exactly what the hub's page loads — <code>airwave-window.css</code>, <code>airwave-hub.css</code> and the hub's{' '}
+                <code>styles.css</code>, with none of the component library's stylesheets — AquaArt is installed in it as the products' <code>main.tsx</code> installs it, and the
+                controls are the hub's own kit.
+              </p>
+              <DeviceFrame device={KIT_FRAME} css={HUB_CSS} isolated prepare={prepareAirwaveDocument}>
+                <AirwaveKitSpecimen />
+              </DeviceFrame>
+              <h3 className="sg__h3">Where each part comes from</h3>
+              <ul className="sg__plain">
+                <li>
+                  <strong>The stylesheets are generated.</strong> <code>packages/aqua-ui/scripts/make-window-css.py</code> copies the <code>&lt;style&gt;</code> of{' '}
+                  <code>airwave-companion.html</code> into <code>airwave-window.css</code> and every rule the hub design adds into <code>airwave-hub.css</code>. Change the design
+                  file and run <code>pnpm build:window-css</code>; never edit the two by hand.
+                </li>
+                <li>
+                  <strong>The controls are drawings.</strong> AquaArt (<code>packages/aqua-ui/src/airwave/aqua-art.ts</code>, imported as{' '}
+                  <code>@now-playing/aqua-ui/airwave-art</code>) draws the Snow Leopard push button and the 10.4 pop-up and checkbox as SVG and publishes them as custom properties
+                  (<code>--aq-btn-22</code>, <code>--aq-def-22</code>, <code>--aq-pop-22</code>, <code>--aq-cb-14</code> and their pressed, disabled and checked forms). One
+                  implementation, shared by both products (NPD-021, DEC-026).
+                </li>
+                <li>
+                  <strong>The kits are per product.</strong> <code>docker-container/src/web/ui.tsx</code> and <code>windows-companion/src/renderer/ui.tsx</code> write the same
+                  classes — <code>.push</code>, <code>.field</code>, <code>.pop</code>, <code>.chk</code>, <code>.well</code>, <code>.rows</code>, <code>.sdot</code> — with different
+                  props and, for the sheet, different markup, so they are not one component (DEC-026). By product, below, lists what each exports.
+                </li>
+                <li>
+                  <strong>Each product's <code>styles.css</code> is the remainder.</strong> The hub's holds the layout the design wrote inline, the states it never drew (sign-in, the
+                  sheet, loading and failed lists) and the contrast inks. The companion's makes the window fill its frame, makes the chrome the title bar and drag region (DEC-020),
+                  and adds the song list and the sheet.
+                </li>
+              </ul>
+              <h3 className="sg__h3">States every list and action owes</h3>
+              <ul className="sg__plain">
+                <li>
+                  <strong>Loading, empty and failed are one quiet line inside the well</strong> — never an illustration, so nothing jumps when rows arrive (<code>UX-STATE-001</code>).
+                  A failed list offers Try Again in the same row.
+                </li>
+                <li>
+                  <strong>A failed action says what to do</strong> in a sentence under the control that failed (<code>.note--bad</code>), not in a toast.
+                </li>
+                <li>
+                  <strong>A disabled button says why</strong> on hover and to assistive technology; a busy one keeps its width.
+                </li>
+                <li>
+                  <strong>Anything that cannot be undone asks first, in a sheet</strong> that drops over the pane, with Cancel as the safe default (<code>UX-SAFE-001</code>, DEC-021).
+                  Both sheets are in the mockups.
+                </li>
+                <li>
+                  <strong>Colour never carries the meaning alone:</strong> every status lamp has its word beside it or in its accessible name.
+                </li>
+              </ul>
+            </Section>
+
+            <Section id="library-window" title="The earlier window skin — in the library, worn by no product">
+              <p>
+                Before the Airwave designs, the hub and the companion were built from this: a framed window with traffic lights, a unified toolbar carrying the transport and the
+                LCD, a source list, a work area with a table, and a bottom bar. The components are still in <code>packages/aqua-ui</code> and still tested, and nothing was deleted,
+                but no product renders this window any more (DEC-026). It is shown so the library stays documented, not as a pattern to build on.
               </p>
               <ShellDemo rows={rows} />
               <p className="sg__note">
-                Every part of that window is a component: <code>AquaWindow</code>, <code>Toolbar</code>, <code>TrafficLights</code>, <code>Transport</code>, <code>LcdDisplay</code>,{' '}
+                Every part of that window is a library component: <code>AquaWindow</code>, <code>Toolbar</code>, <code>TrafficLights</code>, <code>Transport</code>, <code>LcdDisplay</code>,{' '}
                 <code>Scrubber</code>, <code>VolumeSlider</code>, <code>SearchField</code>, <code>SegmentedControl</code>, <code>AvatarButton</code>, <code>SourceList</code>,{' '}
                 <code>WorkArea</code>, <code>Content</code>, <code>AquaTable</code>, <code>Marquee</code>, <code>NowPlayingGlyph</code>, <code>BottomBar</code>, <code>IconButton</code>.
               </p>
             </Section>
 
-            <Section id="controls" title="Controls">
-              <p>Shared by both skins and all three products, verbatim.</p>
+            <Section id="controls" title="Library controls">
+              <p>
+                The component library's controls, in both of its skins. The player's React source imports them; the hub and the companion do not — their controls are the Airwave
+                window's, above.
+              </p>
               <div style={{ display: 'grid', gap: 12 }}>
                 <ControlsDemo />
               </div>
             </Section>
 
             <Section id="overlays" title="Overlays">
-              <p>Sheets attach to their window; alerts stand alone; menus open where they are asked for and return focus to what asked. Press the buttons.</p>
+              <p>
+                Sheets attach to their window; alerts stand alone; menus open where they are asked for and return focus to what asked. Press the buttons. These are the component
+                library's overlays; the Airwave windows' confirmation sheets are drawn in the mockups.
+              </p>
               <OverlaysDemo />
             </Section>
 
             <Section id="states" title="States — the group people skip">
               <p>
                 Every screen owes an answer for empty, loading, offline, partial, refused and out-of-date. <code>UnavailableCapabilityState</code> exists so that “this cannot work here” is a
-                designed state carrying its reason, rather than a blank pane.
+                designed state carrying its reason, rather than a blank pane. These are the component library's state panels; in the Airwave windows the same answers are one quiet
+                line inside the list's well (see The Airwave window).
               </p>
               <div style={{ display: 'grid', gap: 12 }}>
                 <StatesDemo />
@@ -585,12 +747,16 @@ box-shadow:
             </Section>
 
             <Section id="results" title="Results and grid">
-              <p>The window skin's results popover — the same idea as the page's, at the toolbar's height — and the artwork grid.</p>
+              <p>The library window skin's results popover — the same idea as the page's, at the toolbar's height — and the artwork grid. No product renders either today.</p>
               <ResultsDemo />
             </Section>
 
             <Section id="icons" title="Icons">
-              <p>Three families: sixteen-pixel colour source icons for the sidebar, single-colour glyphs for everything else, and the avatar set.</p>
+              <p>
+                Three families in the component library: sixteen-pixel colour source icons for the sidebar, single-colour glyphs for everything else, and the avatar set. The
+                Airwave windows draw their own: six 26-pixel tools for the hub (<code>docker-container/src/web/icons.tsx</code>) and four tools and three row glyphs for the
+                companion (<code>windows-companion/src/renderer/icons.tsx</code>), as their designs drew them; both sets are in the mockups.
+              </p>
               <IconsDemo />
               <Card label="A page-skin glyph, at the transport's size">
                 {/* .np-app is a flex column, so the row direction has to be said out loud here. */}
@@ -610,23 +776,27 @@ box-shadow:
 
             <Section id="products" title="By product">
               <p>
-                Which element each product imports today, read from its source. The player is the page skin plus the shared controls; the hub and the companion are the window skin
-                plus the same controls.
+                What each product is built from today, read from its source when this page was built — so a product that moves on cannot leave a tick behind.
               </p>
+              <h3 className="sg__h3">The Airwave window kits</h3>
               <table className="sg__map">
                 <thead>
                   <tr>
-                    <th scope="col">Element</th>
-                    <th scope="col">Player (PWA)</th>
-                    <th scope="col">Hub admin</th>
-                    <th scope="col">Companion</th>
+                    <th scope="col">Piece</th>
+                    <th scope="col">{BRANDING.products.hub}</th>
+                    <th scope="col">{BRANDING.products.companion}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {PRODUCT_MAP.map((row) => (
+                  {[
+                    { name: 'airwave-window.css (generated)', hub: true, companion: true },
+                    { name: 'airwave-hub.css (generated)', hub: true, companion: false },
+                    { name: 'AquaArt — @now-playing/aqua-ui/airwave-art', hub: true, companion: true },
+                    ...KIT_NAMES.map((name) => ({ name, hub: USAGE.kits.hub.includes(name), companion: USAGE.kits.companion.includes(name) })),
+                  ].map((row) => (
                     <tr key={row.name}>
                       <td>{row.name}</td>
-                      {[row.player, row.hub, row.companion].map((used, i) => (
+                      {[row.hub, row.companion].map((used, i) => (
                         <td key={i}>{used ? <span className="sg__tick">●</span> : <span className="sg__dash">–</span>}</td>
                       ))}
                     </tr>
@@ -634,8 +804,34 @@ box-shadow:
                 </tbody>
               </table>
               <p className="sg__note">
-                The player also draws the search popover, the New Playlist sheet, the toast and the equalizer window with the page skin's classes (shown above) rather than through a
-                component; their stylesheet block is the reference's own.
+                Rows after the first three are what each product's <code>ui.tsx</code> exports. A name in both columns is two components that write the same classes, not one
+                shared component: <code>Push</code> takes <code>primary</code> in the hub and <code>isDefault</code> in the companion, <code>Check</code> reports a boolean in one
+                and passes input props through in the other, and the confirmation sheet is a <code>role="alertdialog"</code> layer in the hub and a modal{' '}
+                <code>&lt;dialog&gt;</code> in the companion (DEC-026).
+              </p>
+              <h3 className="sg__h3">The component library</h3>
+              <p>
+                <code>packages/aqua-ui</code> exports {USAGE.library.length} components.{' '}
+                {LIBRARY_IN_WINDOWS.length ? <b>{LIBRARY_IN_WINDOWS.length} are imported by the hub or the companion. </b> : 'The hub and the companion import none of them. '}
+                {LIBRARY_IN_PLAYER.length} are imported by the player's React source in <code>music-player/src</code>, which is kept and tested but is not what the player serves
+                (DEC-019); {LIBRARY_UNUSED.length} are imported by no product at all.
+              </p>
+              <h4 className="sg__h4">Still used by the player's React source ({LIBRARY_IN_PLAYER.length})</h4>
+              <p className="sg-paths">
+                {LIBRARY_IN_PLAYER.map((item) => (
+                  <code key={item.name}>{item.name}</code>
+                ))}
+              </p>
+              <h4 className="sg__h4">Unused legacy — imported by no product ({LIBRARY_UNUSED.length})</h4>
+              <p className="sg-paths">
+                {LIBRARY_UNUSED.map((item) => (
+                  <code key={item.name}>{item.name}</code>
+                ))}
+              </p>
+              <p className="sg__note">
+                Unused does not mean deleted: the library, its stylesheets and its tests stay as they are, and the gallery and this guide still render them. It means a change to
+                one of these reaches no running product. The player's shell also draws its search popover, sheets, toast and equalizer window from its own markup rather than
+                through a component.
               </p>
             </Section>
 
@@ -647,8 +843,8 @@ box-shadow:
               <p>Not bolted on afterwards. These are parts of the design.</p>
               <ul className="sg__plain">
                 <li>
-                  <strong>One tab stop per group, arrows to move.</strong> The section strip, the mode switch, the music list and the context menu all use a roving <code>tabIndex</code>, and the
-                  focus ring travels with the selection.
+                  <strong>One tab stop per group, arrows to move.</strong> The section strip, the mode switch, the music list, the context menu and the tools of an Airwave window all
+                  use a roving <code>tabIndex</code>, and the focus ring travels with the selection.
                 </li>
                 <li>
                   <strong>Focus is always visible.</strong> An end-to-end test tabs the whole page and fails on any element that shows no indicator.
@@ -662,6 +858,10 @@ box-shadow:
                 </li>
                 <li>
                   <strong>Colour is never the only signal.</strong> The playing row has a glyph as well as a tint; status dots carry text.
+                </li>
+                <li>
+                  <strong>Text meets 4.5:1.</strong> Where the Airwave design's status colours fall short as text on white, the hub reads sentences in darker inks of the same hues
+                  (DEC-022); an axe pass runs on every hub tab, the sign-in window and the confirmation sheet.
                 </li>
               </ul>
             </Section>
@@ -684,14 +884,16 @@ box-shadow:
 
             <Section id="mockups" title="Every product, every size — and editable" chapter>
               <p className="sg__note">
-                Each frame below is an iframe with its own viewport, so a 320px column is a real 320px viewport and this system's media queries behave exactly as they do on a
-                phone. The screens inside are built from the components on this page, so they are 1:1 with the products by construction rather than by somebody keeping two
-                drawings in step. Under each one is a measurement taken <em>inside</em> that frame: what runs off the side, the smallest text, the smallest thing you could tap.
+                Each frame below is an iframe with its own viewport, so a 320px column is a real 320px viewport and the media queries behave exactly as they do on a phone. The
+                hub's and the companion's frames hold only what those products load — the generated Airwave stylesheets, their own <code>styles.css</code>, AquaArt and their own
+                kits — and the player's hold the component library's page skin. Under each one is a measurement taken <em>inside</em> that frame: what runs off the side, the
+                smallest text, the smallest thing you could tap.
               </p>
               <p className="sg__note">
-                A frame marked <em>touch layer emulated</em> has this system's <code>(pointer: coarse)</code> rules re-applied inside it, read back out of the real stylesheets —
-                an iframe inherits the desktop's pointer, so without that a phone frame would quietly show desktop sizes. At the bottom you can edit any custom property the
-                stylesheets define and watch every frame repaint at once; what you copy out is a block the three products already read.
+                A frame marked <em>touch layer emulated</em> has its <code>(pointer: coarse)</code> rules re-applied inside it, read back out of the real stylesheets — an iframe
+                inherits the desktop's pointer, so without that a phone frame would quietly show desktop sizes. The Airwave window has almost no touch layer (list rows and the
+                round minus grow; buttons do not), so the hub's phone frames report their target sizes without being failed on them (DEC-027). At the bottom you can edit any
+                custom property the stylesheets define and watch every frame repaint at once; what you copy out says which file each change belongs in.
               </p>
               <Mockups />
             </Section>
@@ -703,13 +905,20 @@ box-shadow:
             <Section id="extend" title="Changing any of this">
               <ul className="sg__plain">
                 <li>
-                  <strong>Tokens first.</strong> A new colour or size goes in <code>tokens.json</code>, then into the stylesheet as a custom property. A literal hex in a component is a bug.
+                  <strong>Tokens first.</strong> In the component library a new colour or size goes in <code>tokens.json</code>, then into the stylesheet as a custom property. In the Airwave
+                  window it goes in the design file's <code>:root</code>, then in the <code>airwave</code> group of <code>tokens.json</code>, which the check compares with the
+                  generated stylesheet. A literal hex in a component is a bug.
                 </li>
                 <li>
                   <strong>Both schemes.</strong> Light on bare <code>:root</code>; redefine only what changes inside the dark guard.
                 </li>
                 <li>
-                  <strong>Both skins, if it is a control.</strong> Button, Slider and friends are shared by three products.
+                  <strong>The Airwave window changes in its design file.</strong> Edit <code>design/frontends/airwave-companion.html</code> or <code>airwave-hub.html</code>, run{' '}
+                  <code>pnpm build:window-css</code>, and carry any change to the design's <code>AquaArt</code> script into <code>src/airwave/aqua-art.ts</code>. The player's
+                  shell changes in <code>airwave-now-playing.html</code> and is rebuilt by <code>make-shell.py</code>.
+                </li>
+                <li>
+                  <strong>Both skins, if it is a library control.</strong> Button, Slider and friends are drawn in the window skin and the page skin.
                 </li>
                 <li>
                   <strong>Say why in the CSS.</strong> Every unobvious value carries a comment explaining what it reconstructs.
@@ -719,7 +928,7 @@ box-shadow:
                   lot. A deviation is legitimate; an undocumented one is not.
                 </li>
                 <li>
-                  <strong>Rebuild this page.</strong> <code>pnpm styleguide:build</code> regenerates <code>docs/design/styleguide.html</code> from the same source the products use,{' '}
+                  <strong>Rebuild this page.</strong> <code>pnpm styleguide:build</code> regenerates <code>docs/design/styleguide.html</code> from the same sources the products use,{' '}
                   <code>pnpm styleguide:check</code> fails if it no longer matches its sources, and <code>pnpm styleguide:pdf</code> prints it.
                 </li>
               </ul>

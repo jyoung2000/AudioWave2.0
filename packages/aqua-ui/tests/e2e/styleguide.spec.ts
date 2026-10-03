@@ -116,7 +116,11 @@ test('a control a window has clipped is reported, though the page never widened'
     if (!planted || !doc) throw new Error('no frame');
     planted.textContent = 'planted';
     planted.style.cssText = 'width:900px;height:10px;flex:none';
-    doc.querySelector('.aqua-toolbar__secondary')?.appendChild(planted);
+    // The Airwave window clips what overflows it (`.win { overflow: hidden }`); its status strip is
+    // a row that does not scroll.
+    const strip = doc.querySelector('.win > .status');
+    if (!strip) throw new Error('the hub frame has no status strip');
+    strip.appendChild(planted);
   });
   await page.getByRole('button', { name: 'Re-check fit' }).click();
   const [first] = await fitRows(page);
@@ -141,7 +145,7 @@ test('editing a property repaints every frame, and exports what the products rea
     )
     .toEqual(['rgb(214, 74, 68)', 'rgb(214, 74, 68)']);
 
-  // What comes out is a block for the one stylesheet every product imports, not a note to self.
+  // What comes out is a block for the stylesheet the library's consumers import, not a note to self.
   await expect(page.locator('.sg-editor__out')).toContainText('--np-accent: rgb(214, 74, 68);');
   await expect(page.locator('.sg-editor__out')).toContainText('overrides.css');
 
@@ -149,4 +153,46 @@ test('editing a property repaints every frame, and exports what the products rea
   await expect
     .poll(async () => page.evaluate(() => document.querySelector<HTMLIFrameElement>('.sg-mockups__frame iframe')?.contentDocument?.documentElement.style.getPropertyValue('--np-accent') ?? ''))
     .toBe('');
+});
+
+test('the Airwave windows wear the design’s stylesheets and AquaArt, and nothing from the library', async ({ page }) => {
+  await open(page);
+  for (const index of [1, 2]) {
+    await products(page).nth(index).click();
+    await page.waitForTimeout(800);
+    const frame = await page.evaluate(() => {
+      const doc = document.querySelector<HTMLIFrameElement>('.sg-mockups__frame iframe')?.contentDocument;
+      const root = doc?.documentElement;
+      const push = doc?.querySelector('.push');
+      return {
+        sheets: doc ? Array.from(doc.querySelectorAll('style')).map((style) => style.id || 'cloned') : [],
+        button: root?.style.getPropertyValue('--aq-btn-22').slice(0, 24) ?? '',
+        worn: push ? (doc?.defaultView?.getComputedStyle(push).borderImageSource ?? '') : '',
+        libraryToken: root ? (doc?.defaultView?.getComputedStyle(root).getPropertyValue('--aqua-focus') ?? '') : 'missing',
+        window: Boolean(doc?.querySelector('.win > .chrome .toolbar [role="tab"]')),
+      };
+    });
+    // Only the reset and the product's own stylesheet: none of the host page's sheets were cloned in.
+    expect(frame.sheets.filter((id) => id === 'cloned')).toHaveLength(1);
+    expect(frame.sheets).toContain('np-product-css');
+    expect(frame.libraryToken.trim()).toBe('');
+    expect(frame.button).toContain('url("data:image/svg+xml');
+    expect(frame.worn).toContain('data:image/svg+xml');
+    expect(frame.window).toBe(true);
+  }
+});
+
+test('an Airwave window property is edited in the frames and exported as a design change, not an override', async ({ page }) => {
+  await open(page);
+  await products(page).nth(1).click();
+  await page.getByLabel('Find a property').fill('--win-body');
+  const field = page.getByRole('textbox', { name: '--win-body value' });
+  await expect(field).toBeVisible();
+  await field.fill('#dddddd');
+  await expect
+    .poll(async () => page.evaluate(() => document.querySelector<HTMLIFrameElement>('.sg-mockups__frame iframe')?.contentDocument?.documentElement.style.getPropertyValue('--win-body') ?? ''))
+    .toBe('#dddddd');
+  await expect(page.locator('.sg-editor__out')).toContainText('--win-body: #dddddd;');
+  await expect(page.locator('.sg-editor__out')).toContainText('pnpm build:window-css');
+  await expect(page.locator('.sg-editor__out')).not.toContainText(':root:root');
 });
