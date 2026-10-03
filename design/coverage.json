@@ -185,7 +185,7 @@
         "music-player/src/views/Search.tsx",
         "music-player/src/components/SearchPopover.tsx"
       ],
-      "components": ["BarSearch", "ResultsPopover", "EmptyState", "LoadingState"],
+      "components": ["BarSearch", "AquaTable", "EmptyState", "LoadingState"],
       "states": [
         "prompt (device only / with hub)",
         "searching hub",
@@ -370,7 +370,7 @@
       "title": "Search popover",
       "entry": "(React specimen, not served — DEC-019) typing in the status-bar search",
       "sourcePaths": ["music-player/src/components/SearchPopover.tsx"],
-      "components": ["ResultsPopover"],
+      "components": ["ProviderMark"],
       "states": ["counting", "results", "none", "dismissed (arrow brings back)"],
       "rules": ["UX-FEED-001", "UX-KEY-001"],
       "guideAnchor": "overlays",
@@ -401,7 +401,7 @@
       "title": "Row context menu",
       "entry": "(React specimen, not served — DEC-019) right-click or the row's menu key",
       "sourcePaths": ["packages/aqua-ui/src/components/music-list-behaviours.tsx"],
-      "components": ["RowMenu", "Menu"],
+      "components": ["RowMenu"],
       "states": ["open", "disabled items with reason"],
       "rules": ["UX-KEY-001", "UX-PRIN-004"],
       "guideAnchor": "overlays",

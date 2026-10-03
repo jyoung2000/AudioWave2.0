@@ -180,10 +180,9 @@
       "id": "UX-KEY-001",
       "group": "input",
       "title": "One tab stop per group; arrows move inside it",
-      "contract": "Source lists, the section strip, the mode switch, tab strips, tables and menus use a roving tabIndex. Home/End jump, Enter activates, type-ahead selects. Focus travels with the selection. The tools of an Airwave window are such a strip: arrows, Home and End move the selection, and a locked tool is skipped.",
+      "contract": "The section strip, the mode switch, tab strips, tables and menus use a roving tabIndex. Home/End jump, Enter activates, type-ahead selects. Focus travels with the selection. The tools of an Airwave window are such a strip: arrows, Home and End move the selection, and a locked tool is skipped.",
       "authority": "adopted",
       "owners": [
-        "packages/aqua-ui/src/components/SourceList.tsx",
         "packages/aqua-ui/src/components/SectionStrip.tsx",
         "packages/aqua-ui/src/components/AquaTable.tsx",
         "packages/aqua-ui/src/components/MusicList.tsx",
@@ -195,11 +194,6 @@
           "type": "test",
           "path": "docker-container/tests/e2e/a11y.spec.ts",
           "name": "@a11y the tab strip is navigable with the keyboard alone"
-        },
-        {
-          "type": "test",
-          "path": "packages/aqua-ui/tests/dom/source-list.test.tsx",
-          "name": "has one tab stop, moves with arrows, Home/End, selects with Enter and supports type-ahead"
         },
         {
           "type": "test",
@@ -320,7 +314,7 @@
       "id": "UX-STATE-001",
       "group": "feedback",
       "title": "Every data view answers empty, loading and error",
-      "contract": "A view that fetches says it is loading, says what failed and offers a retry, and when it has nothing says what to do next. In the Airwave windows each of those is one quiet line inside the list’s well, so nothing jumps when rows arrive (listState, EmptyRow and EmptyCells in the hub’s kit; LoadingRow and EmptyRow in the companion’s); a section that throws is caught by the hub’s ViewBoundary and the window stays up. In the component library they are LoadingState, ErrorState and EmptyState. Blank panes are defects.",
+      "contract": "A view that fetches says it is loading, says what failed and offers a retry, and when it has nothing says what to do next. In the Airwave windows each of those is one quiet line inside the list’s well, so nothing jumps when rows arrive (listState, EmptyRow and EmptyCells in the hub’s kit; LoadingRow and EmptyRow in the companion’s); a section that throws is caught by the hub’s ViewBoundary and the window stays up. In the component library they are LoadingState and EmptyState; a failure is said in the view’s own words with its retry. Blank panes are defects.",
       "authority": "adopted",
       "owners": [
         "docker-container/src/web/views/common.tsx",
@@ -469,15 +463,15 @@
       "contract": "A rail that cannot be dragged is role=img, not a slider that refuses changes. Icon buttons have names. The playing row has a glyph as well as a tint; status dots carry text.",
       "authority": "adopted",
       "owners": [
-        "packages/aqua-ui/src/components/Scrubber.tsx",
+        "packages/aqua-ui/src/components/Hero.tsx",
         "packages/aqua-ui/src/components/IconButton.tsx",
         "packages/aqua-ui/src/components/Badge.tsx"
       ],
       "evidence": [
         {
           "type": "test",
-          "path": "packages/aqua-ui/tests/dom/controls.test.tsx",
-          "name": "live scrubber is not a slider and shows the LIVE marker"
+          "path": "packages/aqua-ui/tests/dom/page-chrome.test.tsx",
+          "name": "goes read-only for a live broadcast and says why"
         },
         {
           "type": "test",
@@ -529,7 +523,7 @@
         {
           "type": "test",
           "path": "packages/aqua-ui/tests/dom/controls.test.tsx",
-          "title": "marks the destructive item, separates it, and never puts it first"
+          "name": "marks the destructive action, separates it from the default, and words it as what it does"
         },
         {
           "type": "doc",

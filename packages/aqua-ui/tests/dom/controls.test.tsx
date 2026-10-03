@@ -2,16 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SegmentedControl } from '../../src/components/SegmentedControl.js';
-import { SearchField } from '../../src/components/SearchField.js';
-import { Transport } from '../../src/components/Transport.js';
-import { Scrubber } from '../../src/components/Scrubber.js';
 import { ProgressBar } from '../../src/components/ProgressBar.js';
 import { Slider } from '../../src/components/Slider.js';
 import { IconButton } from '../../src/components/IconButton.js';
 import { Button } from '../../src/components/Button.js';
 import { TextField } from '../../src/components/TextField.js';
 import { Checkbox } from '../../src/components/Checkbox.js';
-import { Menu } from '../../src/components/Menu.js';
+import { Sheet } from '../../src/components/Sheet.js';
 import { useState } from 'react';
 import './setup.js';
 
@@ -32,62 +29,7 @@ describe('SegmentedControl', () => {
   });
 });
 
-describe('SearchField', () => {
-  it('shows the clear button only with text, Escape clears then closes', async () => {
-    const user = userEvent.setup();
-    const onEscape = vi.fn();
-    function Demo() {
-      const [v, setV] = useState('');
-      return <SearchField value={v} onChange={setV} onEscape={onEscape} />;
-    }
-    render(<Demo />);
-    expect(screen.queryByRole('button', { name: 'Clear search' })).toBeNull();
-    const input = screen.getByRole('searchbox', { name: 'Search' });
-    await user.type(input, 'blue');
-    expect(screen.getByRole('button', { name: 'Clear search' })).toBeTruthy();
-    await user.keyboard('{Escape}');
-    expect((input as HTMLInputElement).value).toBe('');
-    expect(onEscape).not.toHaveBeenCalled();
-    await user.keyboard('{Escape}');
-    expect(onEscape).toHaveBeenCalled();
-  });
-});
-
-describe('Transport', () => {
-  it('swaps the play/pause name and exposes aria-pressed', async () => {
-    const user = userEvent.setup();
-    const onPlayPause = vi.fn();
-    const { rerender } = render(<Transport playing={false} onPlayPause={onPlayPause} onPrevious={() => undefined} onNext={() => undefined} />);
-    const play = screen.getByRole('button', { name: 'Play' });
-    expect(play.getAttribute('aria-pressed')).toBe('false');
-    await user.click(play);
-    expect(onPlayPause).toHaveBeenCalled();
-    rerender(<Transport playing onPlayPause={onPlayPause} onPrevious={() => undefined} onNext={() => undefined} />);
-    expect(screen.getByRole('button', { name: 'Pause' }).getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getByRole('group', { name: 'Playback controls' })).toBeTruthy();
-  });
-});
-
-describe('Scrubber and sliders', () => {
-  it('seeks with the keyboard and exposes aria-valuetext', async () => {
-    const user = userEvent.setup();
-    const onSeek = vi.fn();
-    render(<Scrubber positionMs={10_000} durationMs={200_000} onSeek={onSeek} />);
-    const slider = screen.getByRole('slider', { name: 'Seek' });
-    expect(slider.getAttribute('aria-valuetext')).toBe('0:10 of 3:20');
-    slider.focus();
-    await user.keyboard('{ArrowRight}');
-    expect(onSeek).toHaveBeenCalledWith(15_000);
-    await user.keyboard('{Shift>}{ArrowLeft}{/Shift}');
-    expect(onSeek).toHaveBeenCalledWith(0);
-    await user.keyboard('{End}');
-    expect(onSeek).toHaveBeenCalledWith(200_000);
-  });
-  it('live scrubber is not a slider and shows the LIVE marker', () => {
-    render(<Scrubber positionMs={1000} durationMs={null} onSeek={() => undefined} live />);
-    expect(screen.queryByRole('slider')).toBeNull();
-    expect(screen.getByRole('status').textContent).toContain('LIVE');
-  });
+describe('Slider', () => {
   it('generic slider clamps and supports editable value', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
@@ -206,34 +148,51 @@ describe('§ the state ladder', () => {
 });
 
 /**
- * "Destructive actions clearly worded and separated", which `docs/AQUA_CONFORMANCE.md` also cited
- * to this file before anything here checked it.
+ * "Destructive actions clearly worded and separated", which `docs/AQUA_CONFORMANCE.md` cites to
+ * this file. The library's place for a destructive choice is a sheet's left-hand group: apart from
+ * the default action, and marked so the stylesheet can colour it rather than the markup.
  */
 describe('§ destructive actions', () => {
-  const entries = [
-    { kind: 'item' as const, id: 'play', label: 'Play next', onSelect: () => undefined },
-    { kind: 'item' as const, id: 'info', label: 'Get info', onSelect: () => undefined },
-    { kind: 'separator' as const, id: 'sep' },
-    { kind: 'item' as const, id: 'remove', label: 'Remove from library…', onSelect: () => undefined, destructive: true },
-  ];
+  function Confirm({ onRemove = () => undefined, onCancel = () => undefined }: { onRemove?: () => void; onCancel?: () => void }) {
+    return (
+      <Sheet
+        open
+        standalone
+        title="Remove “Road Trip”?"
+        message="The playlist will be removed. Songs stay in your library."
+        onCancel={onCancel}
+        leftActions={[{ id: 'remove', label: 'Remove Playlist', variant: 'destructive', onSelect: onRemove }]}
+        actions={[{ id: 'cancel', label: 'Cancel', variant: 'default', onSelect: onCancel }]}
+      />
+    );
+  }
 
-  it('marks the destructive item, separates it, and never puts it first', () => {
-    render(<Menu open entries={entries} anchor={{ x: 0, y: 0 }} onClose={() => undefined} label="Track actions" />);
-    const items = screen.getAllByRole('menuitem');
-    const destructive = screen.getByRole('menuitem', { name: /Remove from library/ });
+  it('marks the destructive action, separates it from the default, and words it as what it does', () => {
+    render(<Confirm />);
+    const destructive = screen.getByRole('button', { name: 'Remove Playlist' });
+    const safe = screen.getByRole('button', { name: 'Cancel' });
 
-    // Named by a class, so the colour lives in the stylesheet rather than in the markup.
-    expect(destructive.className).toContain('aqua-menu__item--destructive');
-    // Never the first thing the pointer lands on.
-    expect(items[0]).not.toBe(destructive);
-    // And something stands between it and the ordinary items.
-    expect(screen.getAllByRole('separator').length).toBeGreaterThan(0);
-    // Worded as what it does, with an ellipsis because it asks first.
+    // Named by an attribute, so the colour lives in the stylesheet rather than in the markup.
+    expect(destructive.getAttribute('data-variant')).toBe('destructive');
+    expect(safe.getAttribute('data-variant')).toBeNull();
+    // Never the default: Enter belongs to the safe answer.
+    expect(destructive.getAttribute('data-default')).toBeNull();
+    expect(safe.getAttribute('data-default')).toBe('true');
+    // Separated: its own group, on the other side of a split row from the default action.
+    expect(destructive.parentElement).not.toBe(safe.parentElement);
+    expect(destructive.closest('.aqua-sheet__actions')?.classList.contains('aqua-sheet__actions--split')).toBe(true);
+    // Worded as the consequence, not "OK".
     expect(destructive.textContent).toMatch(/Remove/);
   });
 
-  it('leaves an ordinary item unmarked', () => {
-    render(<Menu open entries={entries} anchor={{ x: 0, y: 0 }} onClose={() => undefined} label="Track actions" />);
-    expect(screen.getByRole('menuitem', { name: 'Play next' }).className).not.toContain('destructive');
+  it('leaves an ordinary action unmarked, and Escape takes the safe way out', async () => {
+    const user = userEvent.setup();
+    const onRemove = vi.fn();
+    const onCancel = vi.fn();
+    render(<Confirm onRemove={onRemove} onCancel={onCancel} />);
+    expect(screen.getByRole('button', { name: 'Cancel' }).getAttribute('data-variant')).toBeNull();
+    await user.keyboard('{Escape}');
+    expect(onCancel).toHaveBeenCalled();
+    expect(onRemove).not.toHaveBeenCalled();
   });
 });
