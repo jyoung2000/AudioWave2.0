@@ -46,6 +46,13 @@ h1.titlebar {
 /* ---------------------------------------------------------------- window parts */
 .win {
   position: relative;
+  /* Never scrolled itself: only the pane scrolls, so the title bar and tabs cannot be pushed out. */
+  overflow: clip;
+}
+/* Screen-reader text (.sr) is absolutely placed; inside the pane it belongs to the pane, not to the
+   window, or a long pane makes the window itself taller than it is. */
+.pane {
+  position: relative;
 }
 .pane-host {
   position: relative;
@@ -375,8 +382,10 @@ a.push:active {
   outline: 2px solid var(--link);
   outline-offset: 2px;
 }
-.field--time {
-  width: 84px;
+.field.field--time {
+  width: 112px;
+  min-width: 112px;
+  flex: none;
   text-align: left;
 }
 

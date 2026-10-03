@@ -478,7 +478,10 @@ function AdminShell({ session, onSessionChanged }: { session: SessionInfo; onSes
     // The sections above it grow as their data arrives, so the target is kept at the top until the
     // pane has settled or the person scrolls for themselves.
     const align = (): void => {
-      host.scrollTop = Math.max(0, node.offsetTop - host.offsetTop - 12);
+      host.scrollTop = Math.max(0, host.scrollTop + node.getBoundingClientRect().top - host.getBoundingClientRect().top - 12);
+      // The browser's own jump to `#section` also scrolls the window's clipped parts, which would
+      // push the title bar and tabs out of the frame. Only the pane scrolls.
+      for (let el = host.parentElement; el; el = el.parentElement) if (el.scrollTop) el.scrollTop = 0;
     };
     align();
     if (typeof ResizeObserver === 'undefined') return;
@@ -500,9 +503,12 @@ function AdminShell({ session, onSessionChanged }: { session: SessionInfo; onSes
   const network = useResource('networkGet', {}, { pollMs: 30_000 });
 
   // The moment the password is set, what the overview says about setup is out of date.
+  // Only on that change: at first sight the overview is being read already.
   const reloadOverview = overview.reload;
+  const wasGated = useRef(gated);
   useEffect(() => {
-    if (!gated) reloadOverview();
+    if (wasGated.current && !gated) reloadOverview();
+    wasGated.current = gated;
   }, [gated, reloadOverview]);
 
   const logout = useAction(async () => api('authLogout'));
