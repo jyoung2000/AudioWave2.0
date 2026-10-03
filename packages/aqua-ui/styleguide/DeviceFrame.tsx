@@ -6,10 +6,10 @@
  * this system stays switched off and the mockup shows a desktop layout in a phone-shaped hole. The
  * one thing in a browser that has its own viewport is an iframe, so that is what a frame is here.
  *
- * The screen inside is not a copy. The parent's stylesheets are cloned in and the real component
- * tree is portalled into the iframe's body, so what you are looking at is the same React and the
- * same CSS the product ships — 1:1 because it is the same thing, not because somebody kept two
- * drawings in step.
+ * The screen inside is not a copy. The stylesheets are the ones the product loads — the component
+ * library's, cloned from this page, for the page skin; the design's generated sheets alone for the
+ * Airwave windows (`isolated`) — and the React tree is portalled into the iframe's body, so what
+ * you are looking at wears the CSS the product ships rather than a second drawing kept in step.
  *
  * **Touch is emulated, and that is worth knowing.** An iframe inherits the host's pointer, so on a
  * desktop `@media (pointer: coarse)` never matches however narrow the frame is — and this system
@@ -36,7 +36,9 @@ export const DEVICES: readonly DeviceSpec[] = [
   { id: 'small-phone', label: 'Small phone', width: 320, height: 568, touch: true, note: 'The narrowest screen still in use. If anything is going to overflow, it overflows here.' },
   { id: 'phone', label: 'Phone', width: 390, height: 844, touch: true, note: 'What most people are holding.' },
   { id: 'tablet', label: 'Tablet', width: 768, height: 1024, touch: true, note: 'Touch, but wide enough that the phone layout would look empty.' },
-  { id: 'laptop', label: 'Laptop', width: 1280, height: 800, touch: false, note: 'The density the window skin was drawn for.' },
+  { id: 'window-min', label: 'Smallest window', width: 520, height: 440, touch: false, note: 'As small as the companion’s window can be made.' },
+  { id: 'window', label: 'As it opens', width: 640, height: 760, touch: false, note: 'The companion’s window at the size it opens.' },
+  { id: 'laptop', label: 'Laptop', width: 1280, height: 800, touch: false, note: 'The density the windows were drawn for.' },
   { id: 'desktop', label: 'Desktop', width: 1680, height: 1050, touch: false, note: 'Where a layout that only stretches starts to look thin.' },
 ];
 
@@ -164,10 +166,13 @@ function isOrnament(element: Element, root: Element): boolean {
  * on purpose and take their taps from one; and an element inside its own scroller or clip is not
  * blamed for the page's edge, because its own container is what decides where it ends.
  */
-export function measureFit(doc: Document, touch: boolean): FitReport {
+export function measureFit(doc: Document, touch: boolean, touchFloors = true): FitReport {
   const root = doc.documentElement;
-  const minText = touch ? 12 : 10;
-  const minTarget = touch ? 44 : 0;
+  // A product with no touch layer keeps its desktop sizes under a finger. Its targets are still
+  // measured and reported; they are only not counted as failures (design/decisions.md DEC-027).
+  const held = touch && touchFloors;
+  const minText = held ? 12 : 10;
+  const minTarget = held ? 44 : 0;
   const offenders: string[] = [];
   let smallestTextPx = Infinity;
   let smallestTargetPx = Infinity;
@@ -204,7 +209,7 @@ export function measureFit(doc: Document, touch: boolean): FitReport {
     }
   }
 
-  if (minTarget > 0) {
+  if (touch) {
     for (const element of Array.from(doc.body.querySelectorAll<HTMLElement>(INTERACTIVE))) {
       const style = view.getComputedStyle(element);
       if (style.visibility === 'hidden' || style.display === 'none') continue;
@@ -225,7 +230,7 @@ export function measureFit(doc: Document, touch: boolean): FitReport {
       );
       if (!Number.isFinite(reach) || reach <= 0) continue;
       smallestTargetPx = Math.min(smallestTargetPx, reach);
-      if (reach < minTarget) offenders.push(`${describe(target as HTMLElement)} is only ${Math.round(reach)}px to hit, under the ${minTarget}px floor`);
+      if (minTarget > 0 && reach < minTarget) offenders.push(`${describe(target as HTMLElement)} is only ${Math.round(reach)}px to hit, under the ${minTarget}px floor`);
     }
   }
 
@@ -247,6 +252,18 @@ export interface DeviceFrameProps {
   tokens?: Readonly<Record<string, string>>;
   /** The product's own stylesheet, verbatim — including the `body` rules that only make sense here. */
   css?: string;
+  /**
+   * Leave the host page's stylesheets out, so the frame holds only `css`.
+   *
+   * The Airwave windows (hub, companion) load the design's generated stylesheets and nothing from
+   * the component library; cloning the library's sheets in beside them would show a window no
+   * product renders. The player's page skin is the library's, so its frames keep the default.
+   */
+  isolated?: boolean;
+  /** Runs once the frame's document exists: what the product's own entry point does before it renders. */
+  prepare?: (doc: Document) => void;
+  /** Whether a touch frame is held to the 44px target and 12px text floors. Defaults to true. */
+  touchFloors?: boolean;
   onFit?: (report: FitReport) => void;
   /** Bumped by the parent to ask for a fresh measurement; the content itself is not comparable. */
   revision?: number;
@@ -265,7 +282,7 @@ export interface DeviceFrameProps {
  */
 const BODY_RESET = 'html,body{margin:0;padding:0;background:none;color:inherit;font:inherit;-webkit-font-smoothing:auto}';
 
-export function DeviceFrame({ device, scale = 1, tokens, css, onFit, revision = 0, children }: DeviceFrameProps) {
+export function DeviceFrame({ device, scale = 1, tokens, css, isolated = false, prepare, touchFloors = true, onFit, revision = 0, children }: DeviceFrameProps) {
   const [mount, setMount] = useState<HTMLElement | null>(null);
 
   /*
@@ -283,7 +300,7 @@ export function DeviceFrame({ device, scale = 1, tokens, css, onFit, revision = 
     doc.open();
     doc.write('<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>');
     doc.close();
-    for (const node of Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))) doc.head.appendChild(node.cloneNode(true));
+    if (!isolated) for (const node of Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))) doc.head.appendChild(node.cloneNode(true));
     const reset = doc.createElement('style');
     reset.textContent = BODY_RESET;
     doc.head.appendChild(reset);
@@ -294,7 +311,12 @@ export function DeviceFrame({ device, scale = 1, tokens, css, onFit, revision = 
     root.id = 'root';
     doc.body.appendChild(root);
     setMount(root);
-  }, []);
+  }, [isolated]);
+
+  /* What the product's `main.tsx` does before its first render — for the Airwave windows, AquaArt. */
+  useEffect(() => {
+    if (mount) prepare?.(mount.ownerDocument);
+  }, [mount, prepare]);
 
   /*
    * Tokens and the touch layer are written into the live document rather than baked in at build
@@ -359,13 +381,13 @@ export function DeviceFrame({ device, scale = 1, tokens, css, onFit, revision = 
     const view = mount.ownerDocument.defaultView ?? window;
     let second = 0;
     const first = view.requestAnimationFrame(() => {
-      second = view.requestAnimationFrame(() => onFit(measureFit(mount.ownerDocument, device.touch)));
+      second = view.requestAnimationFrame(() => onFit(measureFit(mount.ownerDocument, device.touch, touchFloors)));
     });
     return () => {
       view.cancelAnimationFrame(first);
       if (second) view.cancelAnimationFrame(second);
     };
-  }, [mount, onFit, device.touch, tokens, css, revision]);
+  }, [mount, onFit, device.touch, touchFloors, tokens, css, revision]);
 
   return (
     <div className="sg-frame" style={{ width: device.width * scale, height: device.height * scale }}>

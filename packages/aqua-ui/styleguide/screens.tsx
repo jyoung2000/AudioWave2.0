@@ -1,62 +1,58 @@
 /**
  * Whole screens, for looking at rather than for reading about.
  *
- * Everything here is assembled from the same components and the same stylesheets the three products
- * import — `AquaWindow` here is the `AquaWindow` the hub renders, `MusicList` here is the one the
- * player renders. That is the sense in which these are 1:1, and it is the sense that survives: a
- * token change or a component fix lands in these screens the moment it lands in the products,
- * because there is nothing in between to keep in step.
+ * Three products, drawn from what each one actually wears:
+ *
+ *   - **Airwave Hub** and **Airwave Companion** are the Airwave windows. Their frames hold the
+ *     design's generated stylesheets and each product's own `styles.css`, AquaArt's drawings, and the
+ *     products' own window kits and icons — see `./airwave-screens.tsx`.
+ *   - **Airwave**, the player, is served as a shell generated from
+ *     `design/frontends/airwave-now-playing.html` (design/decisions.md DEC-019). That shell is one
+ *     large document with its own scripts and cannot be portalled into a frame, so the player's
+ *     screens here are the component library's page skin — the React interface in
+ *     `music-player/src`, which shares the shell's look and is kept but no longer served. The frames
+ *     say so on screen.
  *
  * What these are *not* is each product's own view file executed verbatim. Those are wired to a
  * database, a playback engine and, in the companion's case, Electron's IPC, and dragging that into a
  * styleguide would buy a little more fidelity at the cost of a page that breaks whenever a store
- * does. The navigation, the panels and the furniture are taken from the real views; the data behind
- * them is fixture data, and the frames say so on screen so nobody mistakes one for the other.
+ * does. The arrangement and the words are taken from the real views; the data behind them is
+ * fixture data.
  */
 import { useState, type ReactNode } from 'react';
-import {
-  AquaTable,
-  AquaWindow,
-  BottomBar,
-  Button,
-  Checkbox,
-  Content,
-  EmptyState,
-  Glyph,
-  IconButton,
-  KeyValueList,
-  Panel,
-  PanelSection,
-  ProgressBar,
-  SearchField,
-  SegmentedControl,
-  SourceBadge,
-  SourceIcon,
-  SourceList,
-  StatusDot,
-  TextField,
-  Toolbar,
-  TrafficLights,
-  WorkArea,
-  type ColumnDef,
-} from '../src/index.js';
-import { PageDemo, makeRows } from '../gallery/specimens.js';
+import { BRANDING } from '@now-playing/contracts';
+import { AquaTable, Button, Checkbox, KeyValueList, Panel, PanelSection, SegmentedControl, SourceBadge, SourceIcon, StatusDot, TextField, type ColumnDef } from '../src/index.js';
+import { PageDemo } from '../gallery/specimens.js';
 import { CONSTELLATION_ALBUMS, ConstellationField, SpectrumSpecimen, type FixtureAlbum } from './visualisers.js';
+import {
+  COMPANION_CSS,
+  CompanionConfirmScreen,
+  CompanionLibraryScreen,
+  CompanionLiveTvScreen,
+  CompanionRemoteScreen,
+  CompanionSettingsScreen,
+  HUB_CSS,
+  HubConfirmScreen,
+  HubDownloadsScreen,
+  HubFirstRunScreen,
+  HubOverviewScreen,
+  HubProvidersScreen,
+  HubSignInScreen,
+  prepareAirwaveDocument,
+} from './airwave-screens.js';
 /*
- * Each product's own stylesheet, as a string rather than as a page style.
+ * The player's own stylesheet, as a string rather than as a page style.
  *
- * These carry the rules a component library cannot: what `body` looks like, how the app fills the
- * window, and the product-specific classes the real views use. Imported here so a frame can put them
- * inside itself, where they belong — loading them onto the styleguide's own page would give it the
- * player's background and, thanks to the companion, an unscrollable document.
+ * It carries the rules a component library cannot: what `body` looks like, how the app fills the
+ * window, and the product-specific classes the real views use. Imported here so a frame can put it
+ * inside itself, where it belongs — loading it onto the styleguide's own page would give the page
+ * the player's background. The hub's and the companion's are assembled in ./airwave-screens.tsx.
  */
 import playerCss from '../../../music-player/src/styles.css?inline';
-import hubCss from '../../../docker-container/src/web/styles.css?inline';
-import companionCss from '../../../windows-companion/src/renderer/styles.css?inline';
 
 export type ProductId = 'player' | 'hub' | 'companion';
 
-export const PRODUCT_CSS: Readonly<Record<ProductId, string>> = { player: playerCss, hub: hubCss, companion: companionCss };
+export const PRODUCT_CSS: Readonly<Record<ProductId, string>> = { player: playerCss, hub: HUB_CSS, companion: COMPANION_CSS };
 
 export interface Screen {
   id: string;
@@ -67,233 +63,62 @@ export interface Screen {
   render: () => ReactNode;
 }
 
-export const PRODUCTS: Array<{ id: ProductId; label: string; skin: string; note: string }> = [
-  { id: 'player', label: 'Music player', skin: 'Page skin', note: 'A web page, installed or not, from a 320px phone to a desktop window.' },
-  { id: 'hub', label: 'Hub admin', skin: 'Window skin', note: 'Served by the container on port 4546 and opened in a browser — often, in practice, on a phone.' },
-  { id: 'companion', label: 'Windows companion', skin: 'Window skin', note: 'An Electron window. It cannot be resized to a phone, but it is the same skin as the hub and shares its rules.' },
-];
-
-/* ------------------------------------------------------------------ window */
-
-/** The shell the hub and the companion are both made of, minus the media toolbar the player uses. */
-function WindowScreen({ title, groups, selected, onSelect, children, status, wide = false }: { title: string; groups: Parameters<typeof SourceList>[0]['groups']; selected: string; onSelect: (id: string) => void; children: ReactNode; status: string; wide?: boolean }) {
-  const [query, setQuery] = useState('');
-  const current = groups.flatMap((group) => group.items).find((item) => item.id === selected)?.label ?? title;
-  return (
-    // `flush` and nothing else, exactly as the hub and the companion render it: both mount into a
-    // `#root` their own stylesheet gives the full height, and that stylesheet is inside the frame.
-    <AquaWindow title={title} active flush>
-      <Toolbar
-        windowControls={<TrafficLights onClose={() => undefined} onMinimize={() => undefined} onZoom={() => undefined} />}
-        secondary={wide ? <Button size="small">Check for updates</Button> : undefined}
-        search={<SearchField value={query} onChange={setQuery} />}
-      />
-      <WorkArea sidebar={<SourceList groups={groups} selectedId={selected} onSelect={onSelect} />} currentSourceName={current}>
-        <Content>{children}</Content>
-        <BottomBar left={<IconButton variant="plain" icon="reconnect" label="Refresh" />} status={status} right={<IconButton variant="plain" icon="gear" label="Settings" />} />
-      </WorkArea>
-    </AquaWindow>
-  );
+export interface ProductSpec {
+  id: ProductId;
+  label: string;
+  skin: string;
+  note: string;
+  /**
+   * True for the Airwave windows: the frame holds only the product's own stylesheets (none of the
+   * component library's), and AquaArt is installed in it before anything is drawn.
+   */
+  isolated: boolean;
+  prepare?: (doc: Document) => void;
+  /** The sizes this product is really seen at, smallest first; the first two are shown to begin with and in print. */
+  devices: readonly string[];
+  shown: readonly [string, string];
+  /**
+   * Whether the 44px touch-target and 12px touch-text floors are held. The page skin has a touch
+   * layer and is held to them. The Airwave windows keep the design's desktop density at every
+   * pointer, so their sizes are measured and printed but not failed (design/decisions.md DEC-027).
+   */
+  touchFloors: boolean;
 }
 
-/** The hub's own navigation, from docker-container/src/web/App.tsx. */
-const HUB_GROUPS = [
-  { id: 'status', label: 'Hub', items: [{ id: 'overview', label: 'Overview', icon: <Glyph name="info" /> }, { id: 'devices', label: 'Devices', icon: <Glyph name="device" />, count: 3 }, { id: 'groups', label: 'Groups', icon: <Glyph name="group" /> }] },
+export const PRODUCTS: readonly ProductSpec[] = [
   {
-    id: 'music',
-    label: 'Music',
-    items: [
-      { id: 'library', label: 'Library', icon: <Glyph name="note" />, count: 1240 },
-      { id: 'providers', label: 'Providers', icon: <Glyph name="cloud" /> },
-      { id: 'downloads', label: 'Downloads', icon: <Glyph name="download" /> },
-      { id: 'shares', label: 'Shared links', icon: <Glyph name="link" /> },
-      { id: 'recommendations', label: 'Recommendations', icon: <Glyph name="star" /> },
-    ],
+    id: 'player',
+    label: BRANDING.products.player,
+    skin: 'Page skin (component library)',
+    note: 'The player. These screens are the library’s page skin — the React interface kept in music-player/src. The served player is the shell generated from design/frontends/airwave-now-playing.html, which has the same look and is recorded surface by surface under Every screen.',
+    isolated: false,
+    devices: ['small-phone', 'phone', 'tablet', 'laptop', 'desktop'],
+    shown: ['phone', 'laptop'],
+    touchFloors: true,
   },
-  { id: 'integrations', label: 'Integrations', items: [{ id: 'discord', label: 'Discord', icon: <Glyph name="share" />, status: 'not configured', disabled: true }] },
-  { id: 'system', label: 'System', items: [{ id: 'network', label: 'Network', icon: <Glyph name="reconnect" /> }, { id: 'backup', label: 'Backup', icon: <Glyph name="folder" /> }, { id: 'diagnostics', label: 'Diagnostics', icon: <Glyph name="gear" /> }] },
+  {
+    id: 'hub',
+    label: BRANDING.products.hub,
+    skin: 'Airwave window',
+    note: 'Served by the container on port 4546 and opened in a browser — often, in practice, on a phone. Below 640px the tools scroll sideways, tiles go two-up and tables drop their secondary columns.',
+    isolated: true,
+    prepare: prepareAirwaveDocument,
+    devices: ['small-phone', 'phone', 'tablet', 'laptop', 'desktop'],
+    shown: ['phone', 'laptop'],
+    touchFloors: false,
+  },
+  {
+    id: 'companion',
+    label: BRANDING.products.companion,
+    skin: 'Airwave window',
+    note: 'An Electron window on Windows: 640 × 760 as it opens, never smaller than 520 × 440. Its chrome is its title bar; Windows draws minimise, maximise and close over the top-right corner, which a frame on a page cannot show.',
+    isolated: true,
+    prepare: prepareAirwaveDocument,
+    devices: ['window-min', 'window', 'laptop'],
+    shown: ['window-min', 'window'],
+    touchFloors: false,
+  },
 ];
-
-/** The companion's own navigation, from windows-companion/src/renderer/App.tsx. */
-const COMPANION_GROUPS = [
-  { id: 'library', label: 'Library', items: [{ id: 'folders', label: 'Folders', icon: <Glyph name="folder" />, count: 4 }, { id: 'library', label: 'Music', icon: <Glyph name="note" />, count: 8412 }] },
-  { id: 'hub', label: 'Hub', items: [{ id: 'hub', label: 'Connection', icon: <Glyph name="link" />, status: 'Living room' }, { id: 'transfers', label: 'Transfers', icon: <Glyph name="upload" /> }] },
-  { id: 'system', label: 'This computer', items: [{ id: 'backup', label: 'Backup', icon: <Glyph name="download" /> }, { id: 'about', label: 'About', icon: <Glyph name="info" /> }] },
-];
-
-/* ------------------------------------------------------------------- hub */
-
-function HubOverview() {
-  return (
-    <>
-      <Panel title="This hub">
-        <PanelSection>
-          <KeyValueList
-            items={[
-              { key: 'Name', value: 'Living room' },
-              { key: 'Address', value: 'https://living-room.local:4546' },
-              { key: 'Version', value: '1.0.0' },
-              { key: 'Library', value: '1,240 tracks · 96 albums · 42.1 GB' },
-              { key: 'Uptime', value: '6 days, 4 hours' },
-            ]}
-          />
-        </PanelSection>
-      </Panel>
-      <Panel title="Health">
-        <PanelSection>
-          <ul className="sg-stack">
-            <li>
-              <StatusDot kind="ok" label="Database" /> 42 MB, last backup 4 hours ago
-            </li>
-            <li>
-              <StatusDot kind="ok" label="Storage" /> 310 GB free of 931 GB
-            </li>
-            <li>
-              <StatusDot kind="warning" label="FFmpeg" /> present, but without the FLAC encoder
-            </li>
-            <li>
-              <StatusDot kind="neutral" label="Discord" /> not configured
-            </li>
-          </ul>
-        </PanelSection>
-      </Panel>
-    </>
-  );
-}
-
-function HubProviders() {
-  interface ProviderRow {
-    id: string;
-    name: string;
-    state: string;
-    tone: 'ok' | 'warning' | 'neutral';
-    detail: string;
-  }
-  const rows: ProviderRow[] = [
-    { id: 'local', name: 'Local library', state: 'Available', tone: 'ok', detail: 'Serving 1,240 tracks by byte range' },
-    { id: 'musicbrainz', name: 'MusicBrainz', state: 'Available', tone: 'ok', detail: '1 request/second, 24 h cache' },
-    { id: 'soundcloud', name: 'SoundCloud', state: 'Sign in', tone: 'warning', detail: 'App registered; no user has authorised yet' },
-    { id: 'youtube', name: 'YouTube', state: 'Not configured', tone: 'neutral', detail: 'Needs an API key restricted to this hub' },
-    { id: 'spotify', name: 'Spotify', state: 'Not configured', tone: 'neutral', detail: 'Development mode allows a fixed list of users' },
-    { id: 'external-tool', name: 'External tool', state: 'Off', tone: 'neutral', detail: 'yt-dlp 2026.08.19 present — enable to use it' },
-  ];
-  return (
-    <Panel title="Providers">
-      <PanelSection>
-        <p className="sg-note">Every action a result offers is rendered from the capability state below, never assumed. A stream URL never implies a download.</p>
-        <AquaTable
-          label="Providers"
-          rows={rows}
-          rowKey={(row) => row.id}
-          columns={
-            [
-              { id: 'name', header: 'Provider', primary: true, cell: (row) => <span className="sg-inline"><SourceBadge provider={row.id} /> {row.name}</span>, stackText: (row) => row.detail },
-              { id: 'state', header: 'State', width: 132, cell: (row) => <StatusDot kind={row.tone} label={row.state} /> },
-              { id: 'detail', header: 'Detail', cell: (row) => row.detail },
-            ] as ColumnDef<ProviderRow>[]
-          }
-        />
-      </PanelSection>
-    </Panel>
-  );
-}
-
-function HubDownloads() {
-  return (
-    <>
-      <Panel title="In progress">
-        <PanelSection>
-          <div className="sg-stack">
-            <div>
-              <strong>Long Wave Sessions, Vol. 2</strong> — converting to FLAC
-              <ProgressBar value={72} label="Converting" />
-            </div>
-            <div>
-              <strong>Quiet Arithmetic</strong> — waiting for the tool
-              <ProgressBar label="Queued" />
-            </div>
-          </div>
-        </PanelSection>
-      </Panel>
-      <Panel title="Rights">
-        <PanelSection>
-          <p className="sg-note">Each job records why the person who asked for it is entitled to the file. A job without one is refused before a process starts.</p>
-          <KeyValueList
-            items={[
-              { key: 'Basis', value: 'Content I own' },
-              { key: 'Requested by', value: 'Kitchen (device)' },
-              { key: 'Host', value: 'archive.org' },
-            ]}
-          />
-        </PanelSection>
-      </Panel>
-    </>
-  );
-}
-
-/* ------------------------------------------------------------- companion */
-
-function CompanionFolders() {
-  interface FolderRow {
-    id: string;
-    path: string;
-    tracks: string;
-    state: string;
-    tone: 'ok' | 'warning';
-  }
-  const rows: FolderRow[] = [
-    { id: 'a', path: 'D:\\Music\\Albums', tracks: '6,204', state: 'Watching', tone: 'ok' },
-    { id: 'b', path: 'D:\\Music\\Live sets', tracks: '1,880', state: 'Watching', tone: 'ok' },
-    { id: 'c', path: 'E:\\Archive\\Vinyl rips', tracks: '328', state: 'Drive not connected', tone: 'warning' },
-    { id: 'd', path: 'C:\\Users\\You\\Music', tracks: '0', state: 'Empty', tone: 'ok' },
-  ];
-  return (
-    <Panel title="Folders">
-      <PanelSection>
-        <p className="sg-note">The companion indexes where files already are. Nothing is copied or moved, and a folder that goes away is reported rather than quietly dropped.</p>
-        <AquaTable
-          label="Folders"
-          rows={rows}
-          rowKey={(row) => row.id}
-          columns={
-            [
-              { id: 'path', header: 'Folder', primary: true, cell: (row) => row.path, stackText: (row) => `${row.tracks} tracks` },
-              { id: 'tracks', header: 'Tracks', width: 90, align: 'right', cell: (row) => row.tracks },
-              { id: 'state', header: 'State', width: 190, cell: (row) => <StatusDot kind={row.tone} label={row.state} /> },
-            ] as ColumnDef<FolderRow>[]
-          }
-        />
-        <div className="sg-row">
-          <Button variant="default">Add a folder…</Button>
-          <Button>Rescan</Button>
-        </div>
-      </PanelSection>
-    </Panel>
-  );
-}
-
-function CompanionTransfers() {
-  return (
-    <>
-      <Panel title="To the hub">
-        <PanelSection>
-          <div className="sg-stack">
-            <div>
-              <strong>Midnight Set, Side B</strong> — sending to Living room
-              <ProgressBar value={38} label="Sending" />
-            </div>
-          </div>
-          <p className="sg-note">The hub verifies a SHA-256 before it accepts anything, so a transfer that arrives damaged is refused rather than filed.</p>
-        </PanelSection>
-      </Panel>
-      <Panel title="Waiting for you">
-        <PanelSection>
-          <EmptyState title="Nothing to authorise" text="A hub can ask this computer for a file it holds. Requests appear here, and nothing leaves until you say so." inline />
-        </PanelSection>
-      </Panel>
-    </>
-  );
-}
 
 /* ---------------------------------------------------------------- player */
 
@@ -360,8 +185,6 @@ function PlayerSettings() {
 
 /* --------------------------------------------------------------- screens */
 
-const rows = makeRows(18);
-
 export const SCREENS: readonly Screen[] = [
   {
     id: 'player-now-playing',
@@ -392,39 +215,81 @@ export const SCREENS: readonly Screen[] = [
     render: () => <ConstellationScreen />,
   },
   {
+    id: 'hub-sign-in',
+    product: 'hub',
+    label: 'Sign in',
+    note: 'Not signed in: the same window with every tab locked and the form in the pane. There is no separate sign-in page.',
+    render: () => <HubSignInScreen />,
+  },
+  {
+    id: 'hub-first-run',
+    product: 'hub',
+    label: 'First run',
+    note: 'Signed in with the first-run password: the amber gate on Overview, the other five tabs locked. The tiles that depend on gated routes say they are off instead of showing a number.',
+    render: () => <HubFirstRunScreen />,
+  },
+  {
     id: 'hub-overview',
     product: 'hub',
     label: 'Overview',
-    note: 'The window skin with a source list. Below about 700px the sidebar gives way and the current source is named in the toolbar instead.',
-    render: () => <HubScreen initial="overview" />,
+    note: 'Six tiles, what needs attention, each provider’s health as a word, and the hub’s own facts. Below 640px the tiles go two-up and the key–value list stacks.',
+    render: () => <HubOverviewScreen />,
   },
   {
     id: 'hub-providers',
     product: 'hub',
-    label: 'Providers',
-    note: 'A table inside a window. On a phone the table stacks rather than scrolling sideways.',
-    render: () => <HubScreen initial="providers" />,
+    label: 'Music ▸ Providers',
+    note: 'A table inside a well. Below 640px the Role column and the two request counters are dropped rather than scrolled sideways.',
+    render: () => <HubProvidersScreen />,
   },
   {
     id: 'hub-downloads',
     product: 'hub',
-    label: 'Downloads',
-    note: 'Progress and a rights basis. Both are text that has to stay readable when the window is half its width.',
-    render: () => <HubScreen initial="downloads" />,
+    label: 'Music ▸ Downloads',
+    note: 'Every state a job can be in, as words or a bar; the formats this hub can write, struck through where it cannot; and the storage line.',
+    render: () => <HubDownloadsScreen />,
+  },
+  {
+    id: 'hub-confirm-sheet',
+    product: 'hub',
+    label: 'Confirmation sheet',
+    note: 'A destructive action asks in a sheet that drops over the pane. Cancel has the focus, Escape cancels, and the window behind it is inert. This is the hub kit’s own sheet, asked for real.',
+    render: () => <HubConfirmScreen />,
   },
   {
     id: 'companion-folders',
     product: 'companion',
-    label: 'Folders',
-    note: 'The same window skin the hub uses, on a desktop where it is never narrow — which is exactly why it is worth checking that it still holds up when it is.',
-    render: () => <CompanionScreen initial="folders" />,
+    label: 'Library',
+    note: 'Saved Music, Saved TV and Saved Movies, then the songs found. A folder whose drive is away is said so in its row and under the list.',
+    render: () => <CompanionLibraryScreen />,
+  },
+  {
+    id: 'companion-live-tv',
+    product: 'companion',
+    label: 'Live TV',
+    note: 'A kept link, one that stopped answering (Check Again), one being checked, and a refused one: the reason under the field, the typed text left in it.',
+    render: () => <CompanionLiveTvScreen />,
   },
   {
     id: 'companion-transfers',
     product: 'companion',
-    label: 'Transfers',
-    note: 'Progress, and an empty state that has to say something useful rather than apologise.',
-    render: () => <CompanionScreen initial="transfers" />,
+    label: 'Remote',
+    note: 'Pairing a device, the hub connection and what is shared, and transfers. Untick sharing and Sync Now is disabled with its reason.',
+    render: () => <CompanionRemoteScreen />,
+  },
+  {
+    id: 'companion-settings',
+    product: 'companion',
+    label: 'Settings',
+    note: 'A downloader that is ready, one that could not be set up (amber, Try Again, a badge on the tool) and one still being set up; then the preference rows and the pane’s foot.',
+    render: () => <CompanionSettingsScreen />,
+  },
+  {
+    id: 'companion-confirm-sheet',
+    product: 'companion',
+    label: 'Confirmation sheet',
+    note: 'The companion’s sheet is a modal dialog. For a destructive action Cancel is the default button, so Return never removes anything. This is the companion kit’s own sheet, asked for real.',
+    render: () => <CompanionConfirmScreen />,
   },
 ];
 
@@ -531,33 +396,6 @@ function EngineScreen() {
         </div>
       </div>
     </div>
-  );
-}
-
-function HubScreen({ initial }: { initial: string }) {
-  const [selected, setSelected] = useState(initial);
-  const content = selected === 'providers' ? <HubProviders /> : selected === 'downloads' ? <HubDownloads /> : <HubOverview />;
-  return (
-    <WindowScreen title="Now Playing Hub" groups={HUB_GROUPS} selected={selected} onSelect={setSelected} status="1,240 tracks · 3 devices paired" wide>
-      {content}
-    </WindowScreen>
-  );
-}
-
-function CompanionScreen({ initial }: { initial: string }) {
-  const [selected, setSelected] = useState(initial);
-  const content =
-    selected === 'transfers' ? (
-      <CompanionTransfers />
-    ) : selected === 'library' ? (
-      <AquaTable label="Music" rows={rows} rowKey={(row) => row.id} columns={[{ id: 'title', header: 'Name', primary: true, cell: (row) => row.title, stackText: (row) => row.artist }, { id: 'artist', header: 'Artist', cell: (row) => row.artist }, { id: 'album', header: 'Album', cell: (row) => row.album }] as ColumnDef<(typeof rows)[number]>[]} />
-    ) : (
-      <CompanionFolders />
-    );
-  return (
-    <WindowScreen title="Now Playing Companion" groups={COMPANION_GROUPS} selected={selected} onSelect={setSelected} status="8,412 tracks · paired with Living room">
-      {content}
-    </WindowScreen>
   );
 }
 

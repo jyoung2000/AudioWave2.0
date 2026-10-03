@@ -8,6 +8,7 @@
     "paths": {
       "@now-playing/contracts": ["../../../packages/contracts/src/index.ts"],
       "@now-playing/domain": ["../../../packages/domain/src/index.ts"],
+      "@now-playing/aqua-ui/airwave-art": ["../../../packages/aqua-ui/src/airwave/aqua-art.ts"],
       "@now-playing/aqua-ui": ["../../../packages/aqua-ui/src/index.ts"]
     },
     "exactOptionalPropertyTypes": false

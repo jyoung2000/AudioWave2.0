@@ -1,11 +1,14 @@
 {
   "schemaVersion": 1,
-  "about": "How each value in packages/aqua-ui/src/styles/tokens.json reaches the stylesheets. tokens.json documents the values; the four stylesheets mirror them by hand. scripts/styleguide-check.mjs compares every token with the light-scheme :root value of its custom property. A token not listed here uses the default name (see defaults). `literal` entries have no custom property and are checked for presence in the named file only, which is weaker. `exception` entries are known differences, recorded rather than hidden; adding one needs a reason and a decision in design/decisions.md.",
+  "about": "How each value in packages/aqua-ui/src/styles/tokens.json reaches the stylesheets. tokens.json documents the values. The four library stylesheets (aqua*.css, now-playing.css) mirror them by hand. The `airwave` group runs the other way: airwave-window.css and airwave-hub.css are generated from design/frontends (pnpm build:window-css), the design files own those values, and tokens.json records them so this check notices when a design changes one. The hub’s four contrast inks are in docker-container/src/web/styles.css (DEC-022). scripts/styleguide-check.mjs compares every token with the light-scheme :root value of its custom property. A token not listed here uses the default name (see defaults). `literal` entries have no custom property and are checked for presence in the named file only, which is weaker. `exception` entries are known differences, recorded rather than hidden; adding one needs a reason and a decision in design/decisions.md.",
   "stylesheets": [
     "packages/aqua-ui/src/styles/aqua.css",
     "packages/aqua-ui/src/styles/aqua-window.css",
     "packages/aqua-ui/src/styles/aqua-media.css",
-    "packages/aqua-ui/src/styles/now-playing.css"
+    "packages/aqua-ui/src/styles/now-playing.css",
+    "packages/aqua-ui/src/styles/airwave-window.css",
+    "packages/aqua-ui/src/styles/airwave-hub.css",
+    "docker-container/src/web/styles.css"
   ],
   "defaults": {
     "color": ["--aqua-"],
@@ -13,7 +16,8 @@
     "space": ["--aqua-space-"],
     "size": ["--aqua-"],
     "motion": ["--aqua-motion-"],
-    "font": ["--aqua-font-"]
+    "font": ["--aqua-font-"],
+    "airwave": ["--"]
   },
   "map": {
     "color.rowStripe": {
@@ -337,6 +341,17 @@
     },
     "color.dangerInk": {
       "var": "--aqua-danger-ink"
+    },
+    "airwave.ink2": {
+      "var": "--ink-2"
+    },
+    "airwave.ink3": {
+      "var": "--ink-3"
+    },
+    "airwave.capOffInk": {
+      "literal": "#6b6b6b",
+      "file": "docker-container/src/web/styles.css",
+      "note": ".cap--no text: the design’s #9a9a9a on #eee is 2.4:1 (DEC-022)"
     }
   }
 }

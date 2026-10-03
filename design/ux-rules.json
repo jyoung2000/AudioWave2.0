@@ -16,6 +16,10 @@
       "title": "States, feedback and motion"
     },
     {
+      "id": "window",
+      "title": "The Airwave window"
+    },
+    {
       "id": "safety",
       "title": "Trust, safety and destructive actions"
     },
@@ -113,7 +117,9 @@
       "authority": "adopted",
       "owners": [
         "packages/aqua-ui/src/components/PageBar.tsx",
-        "packages/aqua-ui/src/components/States.tsx"
+        "packages/aqua-ui/src/components/States.tsx",
+        "windows-companion/src/renderer/views/Library.tsx",
+        "windows-companion/src/renderer/views/Hub.tsx"
       ],
       "evidence": [
         {
@@ -125,6 +131,11 @@
           "type": "test",
           "path": "music-player/tests/e2e/np/livevol.spec.ts",
           "name": "the radio transport: Previous and Next read as unavailable, Play does not, and they say why"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-shell.dom.test.tsx",
+          "name": "with no hub paired, Send to Hub says where to pair one"
         }
       ]
     },
@@ -169,14 +180,15 @@
       "id": "UX-KEY-001",
       "group": "input",
       "title": "One tab stop per group; arrows move inside it",
-      "contract": "Source lists, the section strip, the mode switch, tab strips, tables and menus use a roving tabIndex. Home/End jump, Enter activates, type-ahead selects. Focus travels with the selection.",
+      "contract": "Source lists, the section strip, the mode switch, tab strips, tables and menus use a roving tabIndex. Home/End jump, Enter activates, type-ahead selects. Focus travels with the selection. The tools of an Airwave window are such a strip: arrows, Home and End move the selection, and a locked tool is skipped.",
       "authority": "adopted",
       "owners": [
         "packages/aqua-ui/src/components/SourceList.tsx",
         "packages/aqua-ui/src/components/SectionStrip.tsx",
         "packages/aqua-ui/src/components/AquaTable.tsx",
         "packages/aqua-ui/src/components/MusicList.tsx",
-        "docker-container/src/web/App.tsx"
+        "docker-container/src/web/App.tsx",
+        "windows-companion/src/renderer/App.tsx"
       ],
       "evidence": [
         {
@@ -198,6 +210,16 @@
           "type": "test",
           "path": "packages/aqua-ui/tests/dom/page-chrome.test.tsx",
           "name": "has one tab stop, moves with arrows and Home/End, chooses with Enter, and answers type-ahead"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/admin-shell.dom.test.tsx",
+          "name": "moves between tabs with the arrow keys, Home and End, keeping one tab stop"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-shell.dom.test.tsx",
+          "name": "moves along the tools with the arrow keys, choosing as it goes"
         }
       ]
     },
@@ -225,7 +247,11 @@
       "title": "Every action is reachable with the keyboard alone",
       "contract": "Every section and every transport control can be reached and operated without a pointer. Space toggles playback without scrolling the page.",
       "authority": "adopted",
-      "owners": ["music-player/src/App.tsx", "docker-container/src/web/App.tsx"],
+      "owners": [
+        "music-player/src/App.tsx",
+        "docker-container/src/web/App.tsx",
+        "windows-companion/src/renderer/App.tsx"
+      ],
       "evidence": [
         {
           "type": "test",
@@ -294,12 +320,14 @@
       "id": "UX-STATE-001",
       "group": "feedback",
       "title": "Every data view answers empty, loading and error",
-      "contract": "A view that fetches renders LoadingState while waiting, ErrorState with a retry when it fails, and an EmptyState that says what to do next. Blank panes are defects.",
+      "contract": "A view that fetches says it is loading, says what failed and offers a retry, and when it has nothing says what to do next. In the Airwave windows each of those is one quiet line inside the list’s well, so nothing jumps when rows arrive (listState, EmptyRow and EmptyCells in the hub’s kit; LoadingRow and EmptyRow in the companion’s); a section that throws is caught by the hub’s ViewBoundary and the window stays up. In the component library they are LoadingState, ErrorState and EmptyState. Blank panes are defects.",
       "authority": "adopted",
       "owners": [
         "docker-container/src/web/views/common.tsx",
         "docker-container/src/web/ViewBoundary.tsx",
-        "packages/aqua-ui/src/components/States.tsx"
+        "packages/aqua-ui/src/components/States.tsx",
+        "docker-container/src/web/ui.tsx",
+        "windows-companion/src/renderer/ui.tsx"
       ],
       "evidence": [
         {
@@ -311,6 +339,16 @@
           "type": "test",
           "path": "music-player/tests/e2e/player.spec.ts",
           "name": "opens with no music, says so, and raises no errors"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/admin-shell.dom.test.tsx",
+          "name": "keeps the window alive when a section fails to render"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-shell.dom.test.tsx",
+          "name": "shows no sample channels: two empty lists in the design’s words"
         }
       ]
     },
@@ -342,17 +380,26 @@
       "id": "UX-FEED-001",
       "group": "feedback",
       "title": "Progress says what is happening in words",
-      "contract": "Progress bars carry a name and a value; an indeterminate bar is aria-busy and has text. Live regions are polite and carry one sentence.",
+      "contract": "Progress bars carry a name and a value; an indeterminate bar is aria-busy and has text. Live regions are polite and carry one sentence. The Airwave windows have no toast: what the window just did is said in the status strip (hub) or at the foot of the pane and beside the control (companion).",
       "authority": "adopted",
       "owners": [
         "packages/aqua-ui/src/components/ProgressBar.tsx",
-        "packages/aqua-ui/src/components/Toast.tsx"
+        "packages/aqua-ui/src/components/Toast.tsx",
+        "docker-container/src/web/ui.tsx",
+        "windows-companion/src/renderer/ui.tsx",
+        "docker-container/src/web/views/Downloads.tsx",
+        "windows-companion/src/renderer/views/Transfers.tsx"
       ],
       "evidence": [
         {
           "type": "test",
           "path": "packages/aqua-ui/tests/dom/controls.test.tsx",
           "name": "progress has a name and value; indeterminate is busy with text"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-shell.dom.test.tsx",
+          "name": "writes a preference back as it changes, and says so at the foot of the pane"
         }
       ]
     },
@@ -360,8 +407,8 @@
       "id": "UX-SETUP-001",
       "group": "feedback",
       "title": "Downloaders set themselves up and say how far along they are",
-      "contract": "yt-dlp, spotDL and (on Windows) FFmpeg are set up without a prompt, in the background, into the app's own tools folder, and only after the file matches the SHA-256 its project published for that release. Each downloader row reads Setting up… with a named progress bar, Ready (adding \"Set up automatically\" when the app installed it), or Couldn’t set up: <reason> beside a Try Again button; the manual install advice appears only when the tool cannot be set up on this machine. Only failed or unsupported tools count as missing — in the companion's Settings badge and on the player's Connections card, where a tool on its way reads \"setting up\". Where FFmpeg's absence explains an empty Tempo column, the Library says whether it is on its way or could not be set up.",
-      "example": "Settings ▸ Downloaders: “ffmpeg — Setting up… 42%” with a progress bar; “spotdl — Couldn’t set up: GitHub did not answer (503).” and Try Again. Music: “Setting up ffmpeg — tempos appear once it finishes.”",
+      "contract": "yt-dlp, spotDL and (on Windows) FFmpeg are set up without a prompt, in the background, into the app's own tools folder, and only after the file matches the SHA-256 its project published for that release. Each downloader row reads Setting up… with a named progress bar, Ready (adding \"Set up automatically\" when the app installed it), or Couldn’t set up: <reason> beside a Try Again button; the manual install advice appears only when the tool cannot be set up on this machine. Tools are set up one at a time, and one waiting its turn behind another also reads Setting up… — it is queued, not missing, so it shows no install advice and no badge. Only failed or unsupported tools count as missing — in the companion's Settings badge and on the player's Connections card, where a tool on its way reads \"setting up\". Where FFmpeg's absence explains an empty Tempo column, the Library says whether it is on its way or could not be set up.",
+      "example": "Settings ▸ Downloaders: “FFmpeg — Setting up… 42%” with a progress bar; “spotDL — Couldn’t set up: GitHub did not answer (503).” and Try Again. Music: “Setting up FFmpeg — tempos appear once it finishes.”",
       "authority": "adopted",
       "owners": [
         "local-helper/src/provision.ts",
@@ -407,6 +454,11 @@
           "type": "test",
           "path": "local-helper/tests/unit/provision.test.ts",
           "name": "records a failure and waits six hours before trying again, unless told to try now"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-shell.dom.test.tsx",
+          "name": "a tool setup has not reached yet is on its way, not missing: no badge, no install advice"
         }
       ]
     },
@@ -453,12 +505,25 @@
       "id": "UX-SAFE-001",
       "group": "safety",
       "title": "Destructive actions are worded plainly and confirmed",
-      "contract": "The button names the consequence (“Forget this hub”, “Remove folder”), sits apart from the default action, and the hub and companion ask before doing it.",
+      "contract": "The button names the consequence (“Forget This Hub…”, “Remove Folder”, “Revoke”), sits apart from the default action, and the hub and the companion ask before doing it — in a sheet over the window it belongs to, never a second window. The safe answer has the keyboard: Cancel takes the focus in the hub, and is the default button for a destructive action in the companion; Escape cancels and focus returns to what asked (DEC-021).",
       "authority": "adopted",
       "owners": [
         "packages/aqua-ui/src/components/Sheet.tsx",
         "docker-container/src/web/views/Devices.tsx",
-        "windows-companion/src/renderer/views/Folders.tsx"
+        "windows-companion/src/renderer/views/Folders.tsx",
+        "docker-container/src/web/ui.tsx",
+        "windows-companion/src/renderer/ui.tsx",
+        "docker-container/src/web/views/Backup.tsx",
+        "docker-container/src/web/views/Discord.tsx",
+        "docker-container/src/web/views/Downloads.tsx",
+        "docker-container/src/web/views/Groups.tsx",
+        "docker-container/src/web/views/Library.tsx",
+        "docker-container/src/web/views/Profiles.tsx",
+        "docker-container/src/web/views/Shares.tsx",
+        "windows-companion/src/renderer/App.tsx",
+        "windows-companion/src/renderer/views/Backup.tsx",
+        "windows-companion/src/renderer/views/Hub.tsx",
+        "windows-companion/src/renderer/views/Streaming.tsx"
       ],
       "evidence": [
         {
@@ -473,6 +538,31 @@
         {
           "type": "reviewer",
           "note": "Each new destructive action is reviewed for wording and confirmation."
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/admin-shell.dom.test.tsx",
+          "name": "asks before revoking a device, and Cancel leaves it alone"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/e2e/a11y.spec.ts",
+          "name": "@a11y the confirmation sheet has no detectable violations, holds the keyboard, and Escape cancels"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-shell.dom.test.tsx",
+          "name": "asks before removing one, says the files are not touched, and does nothing on Cancel"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-shell.dom.test.tsx",
+          "name": "asks before forgetting the hub, and says the music stays"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-shell.dom.test.tsx",
+          "name": "asks before restoring the defaults"
         }
       ]
     },
@@ -480,7 +570,7 @@
       "id": "UX-SAFE-002",
       "group": "safety",
       "title": "The bootstrap password must be replaced before anything else",
-      "contract": "admin/admin signs in once, straight into Change password. Every setup-gated screen refuses until then, and the hub stays on loopback outside a container.",
+      "contract": "admin/admin signs in once, into the same window: Overview, with the amber gate asking for a real password and the other five tabs locked with the reason. Every setup-gated route refuses until then, and the hub stays on loopback outside a container.",
       "authority": "adopted",
       "owners": ["docker-container/src/web/App.tsx", "docker-container/src/auth/service.ts"],
       "evidence": [
@@ -493,6 +583,16 @@
           "type": "test",
           "path": "docker-container/tests/e2e/a11y.spec.ts",
           "name": "@a11y the sign-in screen has no detectable violations"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/admin-shell.dom.test.tsx",
+          "name": "shows the gate in the window, with only Overview open and the other tabs locked with the reason"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/admin-shell.dom.test.tsx",
+          "name": "explains what stays off until the password is changed"
         }
       ]
     },
@@ -531,6 +631,132 @@
           "type": "test",
           "path": "music-player/tests/e2e/player.spec.ts",
           "name": "loads nothing from outside its own origin, including three.js"
+        }
+      ]
+    },
+    {
+      "id": "UX-TV-001",
+      "group": "safety",
+      "title": "A Live TV link is read before it is kept",
+      "contract": "A pasted M3U or XMLTV link is never kept on the strength of how it is spelled. The companion’s main process reads it — http(s) only, public addresses only, redirects re-checked, a deadline, size caps on the wire and after unpacking — and keeps it only when a playlist holds channels or a guide holds programmes. Until that answer arrives the row reads “checking…”; a refusal is a sentence under the field, with what was typed left in it and nothing added. A kept link that stops answering keeps what it last held, says so, and offers Check Again. What is kept is served to the player on this PC through the helper’s read-only routes /helper/v1/tv/channels and /helper/v1/tv/guide.",
+      "example": "“✓ 112 channels” · “That address is on this PC or your own network. Live TV links need an address on the internet.”",
+      "authority": "adopted",
+      "owners": [
+        "windows-companion/src/main/live-tv/index.ts",
+        "windows-companion/src/main/live-tv/fetch.ts",
+        "windows-companion/src/main/live-tv/m3u.ts",
+        "windows-companion/src/main/live-tv/xmltv.ts",
+        "local-helper/src/server.ts",
+        "windows-companion/src/renderer/views/LiveTv.tsx"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "windows-companion/tests/integration/live-tv.test.ts",
+          "name": "reads the link, keeps it with how many channels it holds, and remembers it"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/integration/live-tv.test.ts",
+          "name": "refuses what is not a playlist, in a sentence, and keeps nothing"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/integration/live-tv.test.ts",
+          "name": "refuses this PC and the home network before anything is connected"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/integration/live-tv.test.ts",
+          "name": "is refused by the reader itself, not only by the form in front of it"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/integration/live-tv.test.ts",
+          "name": "stops at the size cap, on the wire and after unpacking"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/integration/live-tv.test.ts",
+          "name": "keeps what a link last held when it stops answering, says so, and recovers"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/integration/live-tv.test.ts",
+          "name": "serves both through the helper’s routes, in the contract’s shape"
+        },
+        {
+          "type": "test",
+          "path": "local-helper/tests/integration/helper-tv.test.ts",
+          "name": "gives a player page the channel list the companion keeps, in the contract’s shape, with no token"
+        },
+        {
+          "type": "test",
+          "path": "local-helper/tests/integration/helper-tv.test.ts",
+          "name": "is read-only: nothing but GET is served on these routes"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-shell.dom.test.tsx",
+          "name": "says why a link was not kept, keeps what was typed, and adds nothing"
+        }
+      ]
+    },
+    {
+      "id": "UX-CHROME-001",
+      "group": "window",
+      "title": "One sheet of chrome: the product’s name and its tools",
+      "contract": "An Airwave window has one sheet of chrome carrying the product’s name, from BRANDING, and a row of tools — nothing else. The window is the same in every state: signed out and on first run the hub draws its form or its gate inside it, with the tools it cannot open locked and the reason said. In the companion the chrome is the title bar: the operating system’s own is hidden but the frame is kept, Windows draws minimise, maximise and close over the top-right corner, the chrome is the drag region and the tools are not, and the application menu is removed (DEC-020).",
+      "example": "“Airwave Companion” over Library · Live TV · Remote · Settings; “Airwave Hub” over six tools, five of them locked until a real password is set.",
+      "authority": "adopted",
+      "owners": [
+        "docker-container/src/web/App.tsx",
+        "windows-companion/src/renderer/App.tsx",
+        "windows-companion/src/renderer/styles.css",
+        "windows-companion/src/main/index.ts",
+        "windows-companion/src/shared/identity.ts",
+        "packages/aqua-ui/src/styles/airwave-window.css"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "windows-companion/tests/contract/app-identity.test.ts",
+          "name": "hides the OS title bar but never the frame"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/contract/app-identity.test.ts",
+          "name": "asks Windows to draw its buttons over the chrome, at the height of the design’s title strip"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/contract/app-identity.test.ts",
+          "name": "names the window once, from the shared constant"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/contract/app-identity.test.ts",
+          "name": "makes the chrome the drag region and leaves the tools clickable"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/contract/app-identity.test.ts",
+          "name": "wears the design’s stylesheet, not a copy of it"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-shell.dom.test.tsx",
+          "name": "has one title, four tools and nothing else in its chrome"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/admin-shell.dom.test.tsx",
+          "name": "renders the window with the six tabs, the status strip and Sign Out"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/admin-shell.dom.test.tsx",
+          "name": "is drawn inside the same window, with every tab locked and the reason said"
         }
       ]
     },
@@ -588,9 +814,13 @@
       "id": "UX-DISCORD-003",
       "group": "shared",
       "title": "The bot never goes silent without a reason",
-      "contract": "A track the bot cannot play is skipped with the reason recorded; a failed decode advances as an error; the admin panel shows the voice state and last error.",
+      "contract": "A track the bot cannot play is skipped with the reason recorded; a failed decode advances as an error; the hub’s Discord section (Sharing tab) shows the voice state and last error.",
       "authority": "adopted",
-      "owners": ["docker-container/src/discord/voice.ts", "docker-container/src/discord/worker.ts"],
+      "owners": [
+        "docker-container/src/discord/voice.ts",
+        "docker-container/src/discord/worker.ts",
+        "docker-container/src/web/views/Discord.tsx"
+      ],
       "evidence": [
         {
           "type": "test",
@@ -608,17 +838,25 @@
       "id": "VOICE-001",
       "group": "voice",
       "title": "Empty states say what to do next",
-      "contract": "Title names the situation in a few plain words (“Nothing queued”); text gives the next action or the reason. No apologies, no exclamation marks.",
-      "example": "“Nothing queued — Play something from your library and it will appear here.”",
+      "contract": "An empty list says what is missing and what to do next, in a few plain words: one sentence inside the list in the Airwave windows, a title and a line in the component library (“Nothing queued”). No apologies, no exclamation marks.",
+      "example": "“No folders yet — add the one this PC keeps these in.” · “No guides yet — the guide will list channels without programmes.”",
       "authority": "observed",
       "owners": [
         "music-player/src/views/Queue.tsx",
-        "windows-companion/src/renderer/views/Transfers.tsx"
+        "windows-companion/src/renderer/views/Transfers.tsx",
+        "windows-companion/src/renderer/views/Folders.tsx",
+        "windows-companion/src/renderer/views/LiveTv.tsx",
+        "windows-companion/src/renderer/views/Library.tsx"
       ],
       "evidence": [
         {
           "type": "source",
           "path": "music-player/src/views/Queue.tsx"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-shell.dom.test.tsx",
+          "name": "shows no sample channels: two empty lists in the design’s words"
         }
       ]
     },
@@ -643,13 +881,14 @@
       "id": "VOICE-003",
       "group": "voice",
       "title": "One product name, set in one place",
-      "contract": "“Now Playing” and the product names come from BRANDING in TypeScript. Native resources that cannot import it (Android strings.xml, the SVG icons' aria-labels, the Electron builder config) repeat it and must be changed together.",
+      "contract": "The suite is Airwave and its apps are Airwave, Airwave Hub and Airwave Companion; the names come from BRANDING in TypeScript, and “Now Playing” is the name of the player’s home page only (DEC-025). Native resources that cannot import BRANDING (Android strings.xml, the SVG icons' aria-labels, the Electron builder config) repeat it and must be changed together. Machine identifiers keep their spelling.",
       "authority": "adopted",
       "owners": [
         "packages/contracts/src/branding.ts",
         "android/app/src/main/res/values/strings.xml",
         "music-player/public/icon.svg",
-        "windows-companion/resources/icon.svg"
+        "windows-companion/resources/icon.svg",
+        "windows-companion/src/shared/identity.ts"
       ],
       "evidence": [
         {
@@ -660,6 +899,11 @@
         {
           "type": "source",
           "path": "packages/contracts/src/branding.ts"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/contract/app-identity.test.ts",
+          "name": "names the window once, from the shared constant"
         }
       ]
     },

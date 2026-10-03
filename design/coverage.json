@@ -413,43 +413,142 @@
       "product": "hub",
       "platform": "web",
       "title": "Sign in",
-      "entry": "any admin URL without a session",
+      "entry": "any admin URL without a session — drawn in the same window, every tab locked",
       "sourcePaths": ["docker-container/src/web/App.tsx"],
       "symbols": ["LoginScreen"],
-      "components": ["TextField", "Button", "InlineValidation"],
-      "states": ["first run (admin/admin hint)", "wrong password", "rate limited"],
-      "rules": ["UX-SAFE-002", "VOICE-002"],
+      "components": [
+        "Field",
+        "Push",
+        "Note",
+        "ActionError",
+        ".signin form",
+        ".pref rows",
+        "window chrome with locked tools"
+      ],
+      "states": [
+        "connecting to the hub",
+        "hub not answering (Try Again)",
+        "first run (admin / admin hint)",
+        "set up (no hint)",
+        "username or password missing",
+        "wrong password (the hub’s sentence)",
+        "rate limited"
+      ],
+      "rules": ["UX-SAFE-002", "VOICE-002", "UX-CHROME-001"],
       "guideAnchor": "screens",
-      "authority": "adopted"
+      "authority": "adopted",
+      "mockup": "hub-sign-in",
+      "decision": "DEC-017"
     },
     {
       "id": "hub-change-password",
       "kind": "screen",
       "product": "hub",
       "platform": "web",
-      "title": "Change the bootstrap password",
-      "entry": "first sign-in",
+      "title": "First-run gate: choose a real password",
+      "entry": "first sign-in — the amber gate at the top of Overview, the other five tabs locked",
       "sourcePaths": ["docker-container/src/web/App.tsx"],
       "symbols": ["ChangePasswordScreen"],
-      "components": ["TextField", "Button", "InlineValidation"],
-      "states": ["weak password refused", "saved"],
-      "rules": ["UX-SAFE-002"],
+      "components": [
+        "Field",
+        "Push",
+        "Note",
+        "ActionError",
+        ".gate",
+        "window chrome with locked tools"
+      ],
+      "states": [
+        "new password asked twice (the current one is remembered from sign-in)",
+        "current password asked for too, after a reload",
+        "under twelve characters refused",
+        "the two entries differ",
+        "refused by the hub (its sentence)",
+        "saved: every tab unlocks"
+      ],
+      "rules": ["UX-SAFE-002", "UX-CHROME-001"],
       "guideAnchor": "screens",
-      "authority": "adopted"
+      "authority": "adopted",
+      "mockup": "hub-first-run",
+      "decision": "DEC-017"
     },
     {
       "id": "hub-view-error",
       "kind": "feedback",
       "product": "hub",
       "platform": "web",
-      "title": "View error boundary",
-      "entry": "any admin view that throws",
+      "title": "Section error boundary",
+      "entry": "any section that throws while rendering",
       "sourcePaths": ["docker-container/src/web/ViewBoundary.tsx"],
-      "components": ["ErrorState"],
-      "states": ["error with retry"],
+      "components": ["ViewBoundary", "Push", ".rows list in a .well"],
+      "states": [
+        "one sentence where the section would have been, with Try Again; the window, tools and status strip stay up"
+      ],
       "rules": ["UX-STATE-001"],
       "guideAnchor": "screens",
       "authority": "adopted"
+    },
+    {
+      "id": "hub-window",
+      "kind": "chrome",
+      "product": "hub",
+      "platform": "web",
+      "title": "The window: title, six tools, pane and status strip",
+      "entry": "every admin URL, in every state",
+      "sourcePaths": [
+        "docker-container/src/web/App.tsx",
+        "docker-container/src/web/icons.tsx",
+        "docker-container/src/web/styles.css",
+        "packages/aqua-ui/src/styles/airwave-window.css",
+        "packages/aqua-ui/src/styles/airwave-hub.css",
+        "packages/aqua-ui/src/airwave/aqua-art.ts"
+      ],
+      "symbols": ["AdminShell", "TAB_ICONS", "installAquaArt"],
+      "components": [
+        ".win",
+        ".chrome",
+        ".titlebar",
+        ".toolbar of .tool tabs",
+        ".pane",
+        ".status",
+        "AquaArt drawings"
+      ],
+      "states": [
+        "signed out (every tool locked)",
+        "first run (only Overview open; the rest locked with the reason)",
+        "signed in (six tools; arrows, Home and End move between them)",
+        "a section opened by its #id in the address",
+        "attention badge on Overview",
+        "status strip: hub name, bind address and reach; what the window just did replaces it for a few seconds",
+        "below 640px: tools scroll sideways, tiles two-up, tables drop secondary columns"
+      ],
+      "rules": ["UX-CHROME-001", "UX-KEY-001", "UX-KEY-002", "UX-FEED-001"],
+      "guideAnchor": "window",
+      "mockup": "hub-overview",
+      "authority": "adopted",
+      "decision": "DEC-017"
+    },
+    {
+      "id": "hub-confirm-sheet",
+      "kind": "overlay",
+      "product": "hub",
+      "platform": "web",
+      "title": "Confirmation sheet",
+      "entry": "any destructive action: revoke, remove, restore, import, withdraw, archive, cancel a download, remove the bot token",
+      "sourcePaths": ["docker-container/src/web/ui.tsx", "docker-container/src/web/styles.css"],
+      "symbols": ["ConfirmSheet", "HubUiProvider"],
+      "components": ["ConfirmSheet", "Push", ".sheet over an inert window"],
+      "states": [
+        "open: the question, what will happen, Cancel and the verb",
+        "Cancel has the focus",
+        "Tab moves between the two buttons only",
+        "Escape cancels",
+        "focus returns to the button that asked"
+      ],
+      "rules": ["UX-SAFE-001", "UX-FOCUS-001"],
+      "guideAnchor": "window",
+      "mockup": "hub-confirm-sheet",
+      "authority": "adopted",
+      "decision": "DEC-021"
     },
     {
       "id": "hub-overview",
@@ -462,14 +561,17 @@
         "docker-container/src/web/views/Overview.tsx",
         "docker-container/src/web/views/common.tsx"
       ],
-      "components": ["AquaWindow", "Toolbar", "Panel", "KeyValueList", "StatusDot"],
+      "components": ["Ago", "EmptyRow", "Group", "Sdot", ".rows list in a .well", ".tiles", ".kv"],
       "states": [
-        "loading",
-        "loaded (tiles: hub, connections, groups, providers, storage, jobs)",
-        "error",
-        "alerts (count on the Overview tab)"
+        "loading (tiles read — and Loading…)",
+        "loaded (tiles: hub, devices, groups, library, providers, storage)",
+        "first run (Devices, Groups and Library read Off, with the reason)",
+        "error (tiles read Not available; Try Again in Needs attention)",
+        "alerts (count on the Overview tool)",
+        "nothing needs you",
+        "signed-in line and Sign Out at the foot"
       ],
-      "rules": ["UX-STATE-001", "UX-KEY-001"],
+      "rules": ["UX-STATE-001", "UX-KEY-001", "UX-CHROME-001"],
       "guideAnchor": "screens",
       "mockup": "hub-overview",
       "authority": "adopted"
@@ -482,16 +584,37 @@
       "title": "Devices and pairing",
       "entry": "Devices tab → Devices",
       "sourcePaths": ["docker-container/src/web/views/Devices.tsx"],
-      "components": ["AquaTable", "Button", "Panel", "StatusDot"],
+      "components": [
+        "ActionError",
+        "Ago",
+        "Check",
+        "EmptyCells",
+        "EmptyRow",
+        "Field",
+        "Group",
+        "Pop",
+        "Push",
+        "Sdot",
+        "SubHead",
+        ".tbl table in a .well",
+        ".rows list in a .well",
+        ".pref rows",
+        ".lcd plate",
+        "confirmation sheet"
+      ],
       "states": [
         "no devices",
-        "pairing code shown",
-        "claim waiting for fingerprint",
-        "revoke (confirm)"
+        "permissions ticked before a code is made",
+        "pairing code shown on the LCD plate (with QR)",
+        "code expired",
+        "claim waiting for the verification code",
+        "pending pairing refused",
+        "revoke (confirm sheet)"
       ],
       "rules": ["UX-SAFE-001", "UX-SAFE-003", "UX-STATE-001"],
       "guideAnchor": "screens",
-      "authority": "adopted"
+      "authority": "adopted",
+      "mockup": "hub-confirm-sheet"
     },
     {
       "id": "hub-groups",
@@ -501,18 +624,37 @@
       "title": "Groups",
       "entry": "Groups tab",
       "sourcePaths": ["docker-container/src/web/views/Groups.tsx"],
-      "components": ["AquaTable", "Panel"],
+      "components": [
+        "ActionError",
+        "EmptyCells",
+        "EmptyRow",
+        "Field",
+        "Group",
+        "Note",
+        "Pop",
+        "Push",
+        "SubHead",
+        ".tbl table in a .well",
+        ".rows list in a .well",
+        ".tile",
+        ".pref rows",
+        ".bar",
+        "confirmation sheet"
+      ],
       "states": [
         "no groups",
-        "group with queue",
+        "group with queue and members (drift per device)",
         "archived",
         "new group",
         "invite made (code shown once)",
-        "invite withdrawn (confirm)"
+        "invite listed by who it is for, its role and state (never its code)",
+        "invite withdrawn (confirm sheet)",
+        "archive (confirm sheet)"
       ],
       "rules": ["UX-SHARED-001", "UX-STATE-001"],
       "guideAnchor": "screens",
-      "authority": "adopted"
+      "authority": "adopted",
+      "decision": "DEC-017"
     },
     {
       "id": "hub-providers",
@@ -522,8 +664,33 @@
       "title": "Providers",
       "entry": "Music tab → Providers",
       "sourcePaths": ["docker-container/src/web/views/Providers.tsx"],
-      "components": ["AquaTable", "SourceBadge", "StatusDot", "TextField"],
-      "states": ["available", "sign in needed", "not configured", "off", "test result"],
+      "components": [
+        "ActionError",
+        "Check",
+        "EmptyCells",
+        "Field",
+        "Group",
+        "Note",
+        "Push",
+        "Sdot",
+        "SubHead",
+        ".tbl table in a .well",
+        ".tile",
+        ".pref rows",
+        ".cap chips"
+      ],
+      "states": [
+        "working",
+        "limited",
+        "needs setting up",
+        "off",
+        "down",
+        "details open (capabilities, limits, credit)",
+        "set-up form (secrets write-only; blank keeps what is stored)",
+        "saved and tested (result beside the button)",
+        "external tool on without setup (DEC-024)",
+        "requests and limits"
+      ],
       "rules": ["UX-PRIN-002", "UX-A11Y-001"],
       "guideAnchor": "screens",
       "mockup": "hub-providers",
@@ -537,9 +704,28 @@
       "title": "Library",
       "entry": "Music tab → Library",
       "sourcePaths": ["docker-container/src/web/views/Library.tsx"],
-      "components": ["AquaTable", "Button", "EmptyState"],
-      "states": ["no roots", "scanning", "tracks"],
-      "rules": ["UX-STATE-001"],
+      "components": [
+        "ActionError",
+        "Ago",
+        "EmptyCells",
+        "Field",
+        "Group",
+        "Note",
+        "Push",
+        "Sdot",
+        "SubHead",
+        ".tbl table in a .well",
+        "confirmation sheet"
+      ],
+      "states": [
+        "no folders",
+        "folder scanning",
+        "folder scan failed",
+        "tracks",
+        "no matches",
+        "remove folder (confirm sheet)"
+      ],
+      "rules": ["UX-STATE-001", "UX-SAFE-001"],
       "guideAnchor": "screens",
       "authority": "adopted"
     },
@@ -551,16 +737,31 @@
       "title": "Downloads",
       "entry": "Music tab → Downloads",
       "sourcePaths": ["docker-container/src/web/views/Downloads.tsx"],
-      "components": ["AquaTable", "ProgressBar", "KeyValueList"],
+      "components": [
+        "ActionError",
+        "EmptyCells",
+        "Group",
+        "Note",
+        "Push",
+        ".tbl table in a .well",
+        ".pref rows",
+        ".cap chips",
+        ".bar",
+        "confirmation sheet"
+      ],
       "states": [
-        "queued",
-        "running",
+        "none (who asks for one)",
+        "waiting",
+        "running (stage as words or a bar)",
         "paused",
         "failed with reason",
-        "completed",
-        "formats unavailable without FFmpeg"
+        "cancelled",
+        "done",
+        "cancel (confirm sheet)",
+        "formats this hub cannot write struck through, with why",
+        "storage line"
       ],
-      "rules": ["UX-FEED-001", "UX-PRIN-002"],
+      "rules": ["UX-FEED-001", "UX-PRIN-002", "UX-SAFE-001"],
       "guideAnchor": "screens",
       "mockup": "hub-downloads",
       "authority": "adopted"
@@ -573,8 +774,18 @@
       "title": "Profiles",
       "entry": "Devices tab → Profiles",
       "sourcePaths": ["docker-container/src/web/views/Profiles.tsx"],
-      "components": ["AquaTable", "Button", "TextField"],
-      "states": ["none", "listed", "renaming", "name taken", "remove picture (confirm)"],
+      "components": [
+        "ActionError",
+        "Ago",
+        "EmptyCells",
+        "Field",
+        "Group",
+        "Note",
+        "Push",
+        ".tbl table in a .well",
+        "confirmation sheet"
+      ],
+      "states": ["none", "listed", "renaming", "name taken", "remove picture (confirm sheet)"],
       "rules": ["UX-SAFE-001", "UX-FEED-001"],
       "guideAnchor": "screens",
       "authority": "adopted"
@@ -587,11 +798,27 @@
       "title": "Shared links",
       "entry": "Sharing tab → Shared links",
       "sourcePaths": ["docker-container/src/web/views/Shares.tsx"],
-      "components": ["AquaTable", "Button"],
-      "states": ["none", "active", "revoked (confirm)"],
+      "components": [
+        "ActionError",
+        "EmptyCells",
+        "Group",
+        "Note",
+        "Push",
+        "Sdot",
+        ".tbl table in a .well",
+        "confirmation sheet"
+      ],
+      "states": [
+        "none",
+        "active (expiry in words)",
+        "revoked",
+        "revoke (confirm sheet)",
+        "no form to create one: links are made in the player (DEC-017)"
+      ],
       "rules": ["UX-SAFE-001"],
       "guideAnchor": "screens",
-      "authority": "adopted"
+      "authority": "adopted",
+      "decision": "DEC-017"
     },
     {
       "id": "hub-recommendations",
@@ -601,7 +828,16 @@
       "title": "Recommendations",
       "entry": "Music tab → Recommendations",
       "sourcePaths": ["docker-container/src/web/views/Recommendations.tsx"],
-      "components": ["Panel", "Slider"],
+      "components": [
+        "ActionError",
+        "Field",
+        "Group",
+        "Note",
+        "Push",
+        "SubHead",
+        ".tbl table in a .well",
+        ".pref rows"
+      ],
       "states": ["defaults", "edited"],
       "rules": ["UX-PRIN-003"],
       "guideAnchor": "screens",
@@ -618,17 +854,29 @@
         "docker-container/src/web/views/Discord.tsx",
         "docker-container/src/discord/service-interface.ts"
       ],
-      "components": ["Panel", "TextField", "Button", "StatusDot"],
+      "components": [
+        "ActionError",
+        "Check",
+        "Field",
+        "Group",
+        "Note",
+        "Pop",
+        "Push",
+        "Sdot",
+        ".pref rows",
+        "confirmation sheet"
+      ],
       "states": [
         "no token",
-        "configured but disabled",
+        "has a token, switched off",
         "worker not running",
         "connected",
         "voice playing",
         "last error",
-        "template preview"
+        "template preview",
+        "remove token (confirm sheet)"
       ],
-      "rules": ["UX-PRIN-002", "UX-DISCORD-003", "VOICE-002"],
+      "rules": ["UX-PRIN-002", "UX-DISCORD-003", "VOICE-002", "UX-SAFE-001"],
       "guideAnchor": "discord",
       "authority": "adopted"
     },
@@ -640,7 +888,17 @@
       "title": "Network",
       "entry": "System tab → Network",
       "sourcePaths": ["docker-container/src/web/views/Network.tsx"],
-      "components": ["Panel", "KeyValueList", "PopUpMenu"],
+      "components": [
+        "ActionError",
+        "Field",
+        "Group",
+        "Note",
+        "Pop",
+        "SubHead",
+        ".tbl table in a .well",
+        ".kv",
+        ".pref rows"
+      ],
       "states": ["localhost", "lan", "remote (restart required)"],
       "rules": ["UX-SAFE-002"],
       "guideAnchor": "screens",
@@ -654,19 +912,36 @@
       "title": "Backup",
       "entry": "System tab → Backup",
       "sourcePaths": ["docker-container/src/web/views/Backup.tsx"],
-      "components": ["AquaTable", "Button"],
+      "components": [
+        "ActionError",
+        "Ago",
+        "EmptyCells",
+        "Group",
+        "Note",
+        "Push",
+        ".tbl table in a .well",
+        ".rows list in a .well",
+        ".pref rows",
+        ".bar",
+        ".spacebar",
+        "confirmation sheet"
+      ],
       "states": [
         "no backups",
         "list",
-        "restore (confirm)",
+        "Back Up Now (said in the status strip)",
+        "restore (confirm sheet)",
         "restore failed with reason",
+        "import: checked first, then confirmed in a sheet",
         "space measured",
         "space unknown",
-        "next backup will not fit"
+        "next backup will not fit",
+        "no path, schedule or include controls: no route sets them (DEC-017)"
       ],
       "rules": ["UX-SAFE-001", "UX-STATE-001"],
       "guideAnchor": "screens",
-      "authority": "adopted"
+      "authority": "adopted",
+      "decision": "DEC-017"
     },
     {
       "id": "hub-diagnostics",
@@ -676,7 +951,7 @@
       "title": "Diagnostics",
       "entry": "System tab → Diagnostics",
       "sourcePaths": ["docker-container/src/web/views/Diagnostics.tsx"],
-      "components": ["Panel", "KeyValueList"],
+      "components": ["ActionError", "Group", "Note", "Pop", "Push", ".pref rows", ".log"],
       "states": ["loaded"],
       "rules": ["UX-STATE-001"],
       "guideAnchor": "screens",
@@ -703,12 +978,21 @@
       "kind": "screen",
       "product": "companion",
       "platform": "windows",
-      "title": "Folders",
-      "entry": "Library tab → Folders (Saved Music · Saved TV · Saved Movies)",
+      "title": "Folders (Saved Music, Saved TV, Saved Movies)",
+      "entry": "Library tab → Saved Music · Saved TV · Saved Movies",
       "sourcePaths": ["windows-companion/src/renderer/views/Folders.tsx"],
-      "components": ["AquaWindow", "AquaTable", "StatusDot", "EmptyState"],
-      "states": ["no folders", "watching", "drive not connected", "remove (confirm)"],
-      "rules": ["UX-SAFE-001", "VOICE-001"],
+      "components": ["EmptyRow", "LoadingRow", "Push", "Remove", "Rows", "confirmation sheet"],
+      "states": [
+        "no folders (one line per kind)",
+        "loading (the list holds its place)",
+        "watched / kept / N songs",
+        "scanning (n of m)",
+        "drive not connected (kept in the list, said under it)",
+        "couldn’t scan (reason)",
+        "added (said beside the button)",
+        "remove (confirm sheet; files untouched)"
+      ],
+      "rules": ["UX-SAFE-001", "VOICE-001", "UX-STATE-001"],
       "guideAnchor": "screens",
       "mockup": "companion-folders",
       "authority": "adopted"
@@ -718,41 +1002,70 @@
       "kind": "screen",
       "product": "companion",
       "platform": "windows",
-      "title": "Music",
-      "entry": "Library tab → Music",
+      "title": "Music on This PC",
+      "entry": "Library tab → Music on This PC",
       "sourcePaths": ["windows-companion/src/renderer/views/Library.tsx"],
-      "components": ["AquaTable", "SearchField", "EmptyState"],
+      "components": ["Push", ".tbl table in a .well", "search field"],
       "states": [
-        "nothing indexed",
+        "nothing indexed: no music folder yet",
+        "nothing indexed: the scan is still reading",
         "no matches",
         "tracks",
-        "tempo waiting: ffmpeg being set up",
-        "tempo unavailable: ffmpeg could not be set up (try again in Settings)",
-        "tempo unavailable: no ffmpeg (install it and rescan)"
+        "selection: click, Ctrl/Shift-click, arrows, Space, Ctrl+A; Enter or double-click shows the file",
+        "Scan Now disabled with reason (no music folder)",
+        "Send to Hub disabled with reason (no hub paired / nothing chosen)",
+        "Send to Hub: queued, progress under Remote ▸ Transfers",
+        "a tempo read from a tag is plain; a measured one wears ≈",
+        "tempo waiting: Setting up FFmpeg",
+        "tempo unavailable: FFmpeg could not be set up (Try again in Settings)",
+        "tempo unavailable: no FFmpeg (install it and scan again)"
       ],
-      "rules": ["UX-STATE-001", "VOICE-001", "NP-PRIN-002", "UX-SETUP-001"],
+      "rules": [
+        "UX-STATE-001",
+        "VOICE-001",
+        "NP-PRIN-002",
+        "UX-SETUP-001",
+        "UX-KEY-001",
+        "UX-PRIN-002"
+      ],
       "guideAnchor": "screens",
-      "authority": "adopted"
+      "authority": "adopted",
+      "mockup": "companion-folders"
     },
     {
       "id": "companion-hub",
       "kind": "screen",
       "product": "companion",
       "platform": "windows",
-      "title": "Connection",
+      "title": "Hub connection and what is shared",
       "entry": "Remote tab → Hub connection",
       "sourcePaths": ["windows-companion/src/renderer/views/Hub.tsx"],
-      "components": ["Panel", "TextField", "Button", "KeyValueList"],
-      "states": [
-        "not paired",
-        "pairing (fingerprint)",
-        "connected",
-        "plain-http warning",
-        "forget (confirm)"
+      "components": [
+        "Check",
+        "Push",
+        "Status",
+        ".pref rows",
+        ".lcd plate",
+        ".plainlist",
+        "confirmation sheet"
       ],
-      "rules": ["UX-SAFE-001", "UX-SAFE-003"],
+      "states": [
+        "not paired (address and pairing code)",
+        "pairing (verification code on the LCD plate; waiting for the hub to confirm)",
+        "pairing refused (the hub’s sentence)",
+        "connected",
+        "paired but not reachable",
+        "sharing on from pairing when the hub grants it (DEC-023)",
+        "sharing as it was left, not “off” each time the window opens",
+        "sharing off: Sync Now disabled with reason",
+        "plain-http warning (notice bar)",
+        "forget (confirm sheet; turns sharing off for the next hub)"
+      ],
+      "rules": ["UX-SAFE-001", "UX-SAFE-003", "UX-PRIN-002"],
       "guideAnchor": "screens",
-      "authority": "adopted"
+      "authority": "adopted",
+      "mockup": "companion-transfers",
+      "decision": "DEC-023"
     },
     {
       "id": "companion-transfers",
@@ -762,8 +1075,15 @@
       "title": "Transfers",
       "entry": "Remote tab → Transfers",
       "sourcePaths": ["windows-companion/src/renderer/views/Transfers.tsx"],
-      "components": ["AquaTable", "ProgressBar", "EmptyState"],
-      "states": ["nothing transferring (paired / not paired)", "uploading", "cancelled", "failed"],
+      "components": ["EmptyRow", "LoadingRow", "Progress", "Push", "Rows"],
+      "states": [
+        "nothing moving (paired / not paired)",
+        "sending (bar and bytes)",
+        "waiting",
+        "sent",
+        "cancelled",
+        "didn’t send (reason under the list)"
+      ],
       "rules": ["UX-FEED-001", "VOICE-001"],
       "guideAnchor": "screens",
       "mockup": "companion-transfers",
@@ -777,15 +1097,27 @@
       "title": "Backup",
       "entry": "Settings tab → Backup",
       "sourcePaths": ["windows-companion/src/renderer/views/Backup.tsx"],
-      "components": ["Panel", "Checkbox", "PopUpMenu", "ProgressBar", "AquaTable", "Button"],
+      "components": [
+        "Check",
+        "EmptyRow",
+        "LoadingRow",
+        "Pop",
+        "Progress",
+        "Push",
+        "Remove",
+        "Rows",
+        ".pref rows",
+        ".spacebar",
+        "confirmation sheet"
+      ],
       "states": [
         "no folder chosen (Back Up Now disabled, reason shown)",
         "measuring",
         "fits / does not fit (space bar: used · this backup · free)",
         "running with progress",
         "archives listed",
-        "restore (confirm)",
-        "delete (confirm)"
+        "restore (confirm sheet)",
+        "delete (confirm sheet)"
       ],
       "rules": ["UX-SAFE-001", "VOICE-002"],
       "guideAnchor": "screens",
@@ -799,7 +1131,7 @@
       "title": "About",
       "entry": "Settings tab → About",
       "sourcePaths": ["windows-companion/src/renderer/views/About.tsx"],
-      "components": ["Panel", "KeyValueList"],
+      "components": ["Push", "Status", ".pref rows"],
       "states": ["loaded"],
       "rules": ["VOICE-003"],
       "guideAnchor": "screens",
@@ -813,11 +1145,21 @@
       "guideAnchor": "screens",
       "authority": "adopted",
       "title": "Live TV",
-      "entry": "Live TV tab",
+      "entry": "Live TV tab → Channel playlists (M3U) · Programme guides (EPG)",
       "sourcePaths": ["windows-companion/src/renderer/views/LiveTv.tsx"],
-      "components": ["Panel", "StatusDot"],
-      "states": ["not available yet (amber, no sample channels)", "TV folders listed"],
-      "rules": ["UX-PRIN-001"]
+      "components": ["EmptyRow", "LoadingRow", "Push", "Remove", "Rows"],
+      "states": [
+        "no links (two empty lists, in the design’s words)",
+        "checking…",
+        "kept: ✓ N channels / ✓ N-day guide",
+        "refused (the reason under the field; what was typed is kept; nothing added)",
+        "stopped answering (keeps what it last held; Check Again)",
+        "remove (the round minus)",
+        "Add disabled with reason until a link is pasted"
+      ],
+      "rules": ["UX-TV-001", "UX-STATE-001", "VOICE-001", "UX-PRIN-001"],
+      "mockup": "companion-live-tv",
+      "decision": "DEC-018"
     },
     {
       "id": "companion-settings",
@@ -829,18 +1171,32 @@
       "title": "Settings",
       "entry": "Settings tab → Settings",
       "sourcePaths": ["windows-companion/src/renderer/views/Settings.tsx"],
-      "components": ["Panel", "Checkbox", "KeyValueList", "StatusDot", "TextField"],
+      "components": [
+        "Check",
+        "LoadingRow",
+        "Progress",
+        "Push",
+        "Rows",
+        ".pref rows",
+        ".dl downloader row"
+      ],
       "states": [
         "downloader setting up (progress bar and %)",
+        "downloader waiting its turn (Setting up…)",
         "downloader ready (set up automatically, or found on this PC)",
-        "downloader couldn't be set up (amber, reason, Try Again)",
+        "downloader couldn't be set up (amber, reason, Try Again; badge on the Settings tool)",
         "downloader cannot be set up on this PC (amber, with what to install)",
         "downloaders not looked at yet: found / missing (helper not running)",
+        "Check All (last checked …)",
+        "a preference written back as it changes, said at the foot of the pane",
         "helper running / not running with reason",
         "port invalid",
-        "token shown / hidden"
+        "token shown / hidden / copied",
+        "restore defaults (confirm)"
       ],
-      "rules": ["UX-PRIN-001", "UX-FEED-001", "UX-SETUP-001"]
+      "rules": ["UX-PRIN-001", "UX-FEED-001", "UX-SETUP-001", "UX-SAFE-001"],
+      "mockup": "companion-settings",
+      "decision": "DEC-018"
     },
     {
       "id": "companion-notice-bar",
@@ -850,11 +1206,76 @@
       "title": "Notice bar",
       "entry": "any main-process notice",
       "sourcePaths": ["windows-companion/src/renderer/views/NoticeBar.tsx"],
-      "components": [],
-      "states": ["info", "warning"],
+      "components": [".notices"],
+      "states": ["info", "warning", "error (announced at once)", "dismiss"],
       "rules": ["VOICE-002"],
       "guideAnchor": "screens",
       "authority": "adopted"
+    },
+    {
+      "id": "companion-window",
+      "kind": "chrome",
+      "product": "companion",
+      "platform": "windows",
+      "title": "The window: title bar chrome, four tools, pane and status line",
+      "entry": "the app window",
+      "sourcePaths": [
+        "windows-companion/src/renderer/App.tsx",
+        "windows-companion/src/renderer/icons.tsx",
+        "windows-companion/src/renderer/styles.css",
+        "windows-companion/src/main/index.ts",
+        "packages/aqua-ui/src/styles/airwave-window.css",
+        "packages/aqua-ui/src/airwave/aqua-art.ts"
+      ],
+      "symbols": ["Companion", "Outside", "installAquaArt"],
+      "components": [
+        ".win",
+        ".chrome (the title bar and drag region)",
+        ".titlebar",
+        ".toolbar of .tool tabs",
+        ".pane",
+        ".status",
+        "AquaArt drawings"
+      ],
+      "states": [
+        "four tools (arrows, Home and End move between them, choosing as they go)",
+        "a pane is built the first time its tool is chosen, then kept",
+        "attention badge on Settings (downloaders that need the person)",
+        "status line: connected and last synced / can’t reach the hub / no hub paired; folders, playlists, guides and devices counted",
+        "opened in a browser, without the bridge: says so and offers nothing",
+        "Windows draws minimise, maximise and close over the chrome’s top-right corner"
+      ],
+      "rules": ["UX-CHROME-001", "UX-KEY-001", "VOICE-003"],
+      "guideAnchor": "window",
+      "mockup": "companion-folders",
+      "authority": "adopted",
+      "decision": "DEC-020"
+    },
+    {
+      "id": "companion-confirm-sheet",
+      "kind": "overlay",
+      "product": "companion",
+      "platform": "windows",
+      "title": "Confirmation sheet",
+      "entry": "removing a folder, forgetting the hub, revoking a device, restoring or deleting a backup, restoring the defaults",
+      "sourcePaths": [
+        "windows-companion/src/renderer/ui.tsx",
+        "windows-companion/src/renderer/styles.css"
+      ],
+      "symbols": ["ConfirmProvider", "useConfirm"],
+      "components": ["ConfirmProvider", "Push", "dialog.sheet (modal)"],
+      "states": [
+        "destructive: the action, then Cancel as the default button",
+        "not destructive: Cancel, then the action as the default button",
+        "Escape cancels",
+        "a second question answers the first with no",
+        "focus returns to where it was"
+      ],
+      "rules": ["UX-SAFE-001", "UX-FOCUS-001"],
+      "guideAnchor": "window",
+      "mockup": "companion-confirm-sheet",
+      "authority": "adopted",
+      "decision": "DEC-021"
     },
     {
       "id": "discord-replies",
@@ -1163,9 +1584,11 @@
       "states": [
         "no playlist loaded (empty guide)",
         "channels from a loaded M3U",
-        "a channel playing (LIVE)"
+        "a channel playing (LIVE)",
+        "channels and guide from the companion (now and next where a guide has them; Live where it has none)",
+        "no companion, or one with no playlists: the guide is as it was"
       ],
-      "rules": ["NP-LIVE-002"],
+      "rules": ["NP-LIVE-002", "NP-TV-001"],
       "guideAnchor": "screens",
       "authority": "adopted"
     },
@@ -1412,23 +1835,39 @@
       "guideAnchor": "screens",
       "authority": "adopted",
       "id": "companion-streaming",
-      "title": "Stream to your devices",
+      "title": "Stream to your devices (Pair a device)",
       "entry": "Remote tab → Stream to your devices",
       "sourcePaths": [
         "windows-companion/src/renderer/views/Streaming.tsx",
         "windows-companion/src/main/awsp.ts"
       ],
-      "components": ["Panel", "Checkbox", "AquaTable", "PopUpMenu", "StatusDot", "TextField"],
+      "components": [
+        "EmptyRow",
+        "LoadingRow",
+        "Option",
+        "Pop",
+        "Push",
+        "Remove",
+        "Rows",
+        "Status",
+        ".pref rows",
+        ".lcd plate",
+        ".remote-grid",
+        "confirmation sheet"
+      ],
       "states": [
-        "off (default)",
+        "off (default; the pairing controls say so)",
         "starting",
-        "running: ticket, QR and pairing code",
+        "running: pairing code on the LCD plate with its time left, ticket and QR",
+        "code expired",
         "sidecar missing or crashed (reason, restarting)",
-        "devices paired, each direct / relay-carried / not connected",
-        "revoke (confirm)",
+        "devices paired, each direct / through a relay / not connected, with its quality cap",
+        "revoke (confirm sheet)",
         "port invalid"
       ],
-      "rules": ["UX-SAFE-001", "UX-FEED-001", "UX-PRIN-002"]
+      "rules": ["UX-SAFE-001", "UX-FEED-001", "UX-PRIN-002"],
+      "mockup": "companion-transfers",
+      "decision": "DEC-018"
     }
   ],
   "flows": [
@@ -1437,20 +1876,23 @@
       "title": "First run of the hub",
       "preconditions": "A fresh data volume; the container is up on 127.0.0.1:4546.",
       "steps": [
-        "Open the admin page",
+        "Open the admin page: the window, every tool locked, the sign-in form in the pane",
         "Sign in with admin / admin",
+        "Overview opens with the amber gate; the other five tools stay locked",
         "Choose a real password",
-        "Every section unlocks"
+        "Every tool unlocks"
       ],
       "failures": [
-        "Weak password refused with the reason",
-        "Login rate-limited after repeated failures"
+        "Fewer than twelve characters, or two entries that differ: refused in a sentence",
+        "Login rate-limited after repeated failures",
+        "A deep link to a locked tab is ignored"
       ],
-      "surfaces": ["hub-login", "hub-change-password", "hub-overview"],
-      "rules": ["UX-SAFE-002"],
+      "surfaces": ["hub-window", "hub-login", "hub-change-password", "hub-overview"],
+      "rules": ["UX-SAFE-002", "UX-CHROME-001"],
       "evidence": [
         "docker-container/tests/integration/setup-and-pairing.test.ts",
-        "docker-container/tests/e2e/first-run.setup.ts"
+        "docker-container/tests/e2e/first-run.setup.ts",
+        "docker-container/tests/dom/admin-shell.dom.test.tsx"
       ]
     },
     {
@@ -1458,11 +1900,11 @@
       "title": "Pair a player or the companion",
       "preconditions": "Setup complete; the device can reach the hub.",
       "steps": [
-        "Admin creates a pairing code (Devices)",
-        "Device enters the code",
-        "Both screens show the same fingerprint",
-        "Admin confirms",
-        "Device receives a scoped credential"
+        "Admin ticks the permissions and starts pairing (Devices): a code on the LCD plate",
+        "Device enters the hub’s address and the code",
+        "Both screens show the same verification code",
+        "Admin types it and confirms",
+        "Device receives a scoped credential; a companion granted library:share starts sharing (DEC-023)"
       ],
       "failures": [
         "Code expired",
@@ -1471,7 +1913,11 @@
       ],
       "surfaces": ["hub-devices", "player-shell-settings-sources", "companion-hub"],
       "rules": ["UX-SAFE-003"],
-      "evidence": ["docker-container/tests/integration/setup-and-pairing.test.ts"]
+      "evidence": [
+        "docker-container/tests/integration/setup-and-pairing.test.ts",
+        "windows-companion/tests/integration/companion-and-hub.test.ts",
+        "windows-companion/tests/dom/companion-shell.dom.test.tsx"
+      ]
     },
     {
       "id": "flow-stream-from-pc",
@@ -1617,12 +2063,16 @@
       "title": "Send files from Windows to the hub",
       "preconditions": "Companion paired; a folder indexed.",
       "steps": [
-        "Add a folder",
-        "Select tracks in Music",
-        "Send to the hub",
-        "Transfers shows progress; cancel stops it"
+        "Add a music folder (Library)",
+        "Choose songs in Music on This PC",
+        "Send to Hub",
+        "Remote ▸ Transfers shows progress; Cancel stops it"
       ],
-      "failures": ["Drive not connected", "Hub unreachable: upload fails with the reason"],
+      "failures": [
+        "Drive not connected",
+        "No hub paired, or nothing chosen: Send to Hub is disabled and says why",
+        "Hub unreachable: the transfer fails with the reason under the list"
+      ],
       "surfaces": ["companion-folders", "companion-library", "companion-transfers"],
       "rules": ["UX-FEED-001"],
       "evidence": ["windows-companion/tests/integration/companion-and-hub.test.ts"]
@@ -1658,18 +2108,47 @@
       ]
     },
     {
+      "id": "flow-live-tv",
+      "title": "Add a Live TV playlist and watch the guide fill in",
+      "preconditions": "The companion is running on the PC the player is opened on.",
+      "steps": [
+        "Companion ▸ Live TV: paste an M3U link and choose Add",
+        "The row reads checking… while the main process reads the link",
+        "Kept: the row reads ✓ and how many channels it holds",
+        "Paste an XMLTV link the same way for now and next",
+        "Open the player’s Live TV: the guide lists the companion’s channels, with what is on and what follows"
+      ],
+      "failures": [
+        "Not a playlist, not a guide, too large or on this PC’s own network: refused in a sentence under the field; what was typed stays; nothing is kept",
+        "A kept link stops answering: it keeps what it last held, says so, and offers Check Again",
+        "No companion, or one with no playlists: the player’s guide is as it was"
+      ],
+      "surfaces": ["companion-live-tv", "player-shell-live-tv"],
+      "rules": ["UX-TV-001", "NP-TV-001"],
+      "evidence": [
+        "music-player/tests/e2e/np/live-tv.spec.ts",
+        "windows-companion/tests/integration/live-tv.test.ts",
+        "local-helper/tests/integration/helper-tv.test.ts",
+        "windows-companion/tests/dom/companion-shell.dom.test.tsx"
+      ]
+    },
+    {
       "id": "flow-backup",
       "title": "Back up and restore",
       "preconditions": "Setup complete.",
       "steps": [
-        "Backup → Create",
-        "Restore → confirm",
-        "The hub reports success or the reason it failed"
+        "Hub: System ▸ Backup → Back Up Now",
+        "Restore → confirm in the sheet",
+        "The hub reports success or the reason it failed",
+        "Companion: Settings ▸ Backup → choose a folder, Back Up Now; restore and delete ask first"
       ],
       "failures": ["Invalid backup refused", "Swap failed: previous database put back"],
       "surfaces": ["hub-backup", "companion-backup"],
       "rules": ["UX-SAFE-001"],
-      "evidence": ["docker-container/tests/integration/backup-and-search-cursor.test.ts"]
+      "evidence": [
+        "docker-container/tests/integration/backup-and-search-cursor.test.ts",
+        "windows-companion/tests/integration/backup.test.ts"
+      ]
     },
     {
       "id": "flow-fetch",

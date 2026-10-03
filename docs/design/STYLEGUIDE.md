@@ -1,24 +1,27 @@
-# Now Playing — UI styleguide
+# Airwave Style Guide
 
 `AQUA_PROFILE=snow-leopard-itunes-9`
 
-This is how the suite looks and why. It is written from the code: every value here is one you can
-find in [`tokens.json`](../../packages/aqua-ui/src/styles/tokens.json) or in the stylesheets beside
-it, and if the two ever disagree the code is right and this page is stale.
+One guide for the three apps of Airwave — **Airwave** (the player), **Airwave Hub** and **Airwave
+Companion** — and why they look the way they do. It is written from the code: every value here is
+one you can find in [`tokens.json`](../../packages/aqua-ui/src/styles/tokens.json) or in the
+stylesheets beside it, and if the two ever disagree the code is right and this page is stale.
+("Now Playing" is the name of the player's home page, and of nothing else.)
 
 The rendered companion to this page is [`styleguide.html`](styleguide.html), and it is not a
-drawing of the system: it is **built from the components** — every control on it is the real one
-wearing the real stylesheet, every swatch is read from `tokens.json` at build time, and it covers
-every element the player, the hub's admin GUI and the Windows companion import, mapped to the
-product that uses it. Open it in a browser; regenerate it with `pnpm build:styleguide`.
+drawing of the system. The hub's and the companion's windows are drawn with the stylesheets and the
+kits those products ship; every control of the component library is the real one wearing the real
+stylesheet; every swatch is read from `tokens.json` at build time; and which product uses what is
+read from the products' imports when the page is built. Open it in a browser; regenerate it with
+`pnpm styleguide:build`.
 
 It also carries a **mockup of each product at each screen size, at 1:1, that you can edit** —
 [§10](#10-the-mockups) explains what that means and where it stops being true.
 
 Three things are *not* here. The component API is in
 [`packages/aqua-ui/README.md`](../../packages/aqua-ui/README.md); the rendered specimen of every
-component is the gallery (`pnpm --filter @now-playing/aqua-ui dev`); and the reasoning behind the
-2010 page shell — what moved where, and what the reference gave us — is in
+library component is the gallery (`pnpm --filter @now-playing/aqua-ui dev`); and the reasoning
+behind the 2010 page shell — what moved where, and what the reference gave us — is in
 [UI_REDESIGN.md](../UI_REDESIGN.md).
 
 ---
@@ -48,20 +51,60 @@ its accessible name, not only in a tooltip.
 
 ---
 
-## 2. Two skins, one system
+## 2. Three apps, one system
+
+Each app's interface comes from its own design file in [`design/frontends/`](../../design/frontends/).
+The design file is the authority for how its app looks; this guide and the ledgers in `design/` are
+the authority for what the three share — the rules, the words, every screen, and the checks.
+
+| | Airwave (player) | Airwave Hub | Airwave Companion |
+|---|---|---|---|
+| Design | `airwave-now-playing.html` | `airwave-hub.html` | `airwave-companion.html` |
+| How it reaches the product | served as the shell: `make-shell.py` writes `music-player/index.html` from it | `pnpm build:window-css` writes `airwave-window.css` + `airwave-hub.css` from it | `pnpm build:window-css` writes `airwave-window.css` from it |
+| Controls | the design's own script, inside the shell | AquaArt (`@now-playing/aqua-ui/airwave-art`) + `docker-container/src/web/ui.tsx` | AquaArt + `windows-companion/src/renderer/ui.tsx` |
+| Its own styles | inline in the shell | `docker-container/src/web/styles.css` | `windows-companion/src/renderer/styles.css` |
+| Shape | a sticky bar over a hero and a list | a window: title and six tools on one chrome sheet, a pane, a status strip | the same window with four tools; its chrome is the title bar |
+| Dark | follows the system | light only | light only |
+
+### The Airwave window (hub, companion)
+
+A centred Snow Leopard window with no source list and no traffic lights: the tools are the
+navigation. Everything it wears is one of three things.
+
+- **Generated stylesheets.** `airwave-window.css` is the companion design's `<style>`, whole;
+  `airwave-hub.css` is every rule the hub design adds (tiles, tables, capability chips, the gate).
+  Never edit them: change the design file and run `pnpm build:window-css`. Their `:root` values
+  are recorded in `tokens.json` under `airwave`, and `pnpm styleguide:check` compares the two.
+- **AquaArt.** The push button (Snow Leopard's), the pop-up and the checkbox (10.4's) are SVG
+  drawings published as custom properties and worn through `border-image`. One module,
+  `packages/aqua-ui/src/airwave/aqua-art.ts`, shared by both products.
+- **A kit per product.** Each product's `ui.tsx` writes the design's markup — `.push`, `.field`,
+  `.pop`, `.chk`, `.well`, `.rows`, `.sdot` — and its `styles.css` adds what the design left to
+  its script: the hub's sign-in, sheet, quiet states and contrast inks (DEC-022); the companion's
+  full-frame window, title-bar chrome (DEC-020), song list and sheet. The two kits are not one
+  component library, on purpose (DEC-026).
+
+What every Airwave window owes: loading, empty and failed are one quiet line inside the list's
+well; a failed action says what to do under the control that failed; a disabled button says why;
+anything that cannot be undone asks first in a sheet, with Cancel as the safe default (DEC-021).
+
+### The component library
+
+`packages/aqua-ui` also holds the React component library the three products were first built
+from, in two skins:
 
 | | Window skin | Page skin |
 |---|---|---|
 | Token prefix | `--aqua-*` | `--np-*`, `--lib-*` |
 | Stylesheets | `aqua.css`, `aqua-window.css`, `aqua-media.css` | `now-playing.css` |
 | Type | Lucida Grande | Helvetica — the iPod's face |
-| Used by | hub admin GUI, Windows companion | the music player PWA |
+| Imported by | no product | the player's React source in `music-player/src` (kept, not served — DEC-019) |
 | Shape | a framed desktop window with a source list | a sticky bar over a hero and a list |
 
-Both are the same profile — the same light source, the same hairline rims, the same restraint about
-where blue is allowed. They differ in *arrangement*, because a window frame drawn inside a browser
-viewport is a picture of a window rather than a window, and a 196 px source list is unavailable on a
-phone. Controls (`Button`, `Checkbox`, `Slider`, `PopUpMenu`) are shared verbatim.
+It is kept, tested and documented below (§3–§9 describe it), and the rendered guide lists which
+of its components the player's React source still imports and which no product imports at all.
+Nothing was deleted when the products moved to the Airwave designs. The page skin and the player's
+shell are the same look, drawn twice: the shell is what is served.
 
 ---
 
@@ -226,7 +269,7 @@ every small button 30 px tall inside a block that asked for 44.
 `music-player/tests/e2e/responsive.spec.ts` measures all of this at 320, 390 and 768 px, and
 asserts the desktop still gets its 18 px row of 11 px text. A screenshot would catch none of it.
 `packages/aqua-ui/tests/e2e/styleguide.spec.ts` then measures every screen of all three products at
-all five sizes, and fails on the first thing that is too small or cut off.
+every size each is shown at, and fails on the first thing that is too small or cut off.
 
 ## 6. Shape and material
 
@@ -328,13 +371,16 @@ the 3D stage stops its idle drift. Two variables carry most of it — `--aqua-an
 
 Everything is exported from `@now-playing/aqua-ui`. Reach for one of these before writing a `<div>`.
 
-The rendered page maps each element to the product that imports it; the short version:
+These are the component library's. The hub and the companion import none of them (their kits are
+in §2); the player's React source imports the page shell and most of the controls; the window
+shell is imported by no product. The rendered page reads the exact lists from the products'
+imports each time it is built; the short version:
 
-| | Player (PWA) | Hub admin | Companion |
+| | Player's React source | Hub | Companion |
 |---|---|---|---|
 | Page shell (`PageBar` … `LevelSlider`) | ● | – | – |
-| Window shell (`AquaWindow` … `BottomBar`, `SearchField`) | – | ● | ● |
-| Controls, structure, states, toasts | ● | ● | ● |
+| Window shell (`AquaWindow` … `BottomBar`, `SearchField`) | – | – | – |
+| Controls, structure, states, toasts | ● | – | – |
 | The 3D stage, the list, popover, menu, sheet, toast, equalizer (page-skin classes) | ● | – | – |
 
 **Page shell** — `PageBar`, `BarSearch`, `BarClock`, `ModeSwitch`, `ProfileButton`, `SectionStrip`,
@@ -406,14 +452,16 @@ with a measurement of how well it fits underneath.
 phone-shaped hole. An iframe is the one thing in a browser with a viewport of its own, so a 390 px
 frame really is a 390 px viewport and the layout inside it is the layout a phone gets.
 
-**What is in the frame is the product, not a copy of it.** The host page's stylesheets are cloned
-in, the product's own stylesheet is appended after them — including the `body` and `#root` rules a
-component library cannot carry — and the real component tree is portalled into the frame's `#root`.
-So the `MusicList` in the mockup is the `MusicList` the player renders, wearing the same CSS. It is
-1:1 because it is the same thing, not because somebody kept two drawings in step.
+**What is in the frame is what the product loads.** For the hub and the companion that is the
+generated Airwave stylesheets and the product's own `styles.css` — and nothing from the component
+library — with AquaArt installed in the frame as the product's `main.tsx` installs it, and the
+product's own kit and icons portalled into the frame's `#root`. For the player it is the component
+library's page skin: the host page's stylesheets cloned in, the player's own stylesheet after them,
+and the library's components — the React interface, not the served shell, which is one document
+with its own scripts and cannot be portalled into a frame. The frames say which they are.
 
-**Where that stops.** The screens are assembled from each product's real navigation, panels and
-furniture, but they are not the product's own view files executed verbatim — those are wired to a
+**Where that stops.** The screens are arranged as each product's views arrange them, in the views'
+own words, but they are not the product's own view files executed verbatim — those are wired to a
 database, a playback engine and, for the companion, Electron's IPC. The data is fixture data. So the
 *visual and responsive* behaviour is exact and the *content* is representative, which is the trade
 that keeps the page from breaking whenever a store changes.
@@ -426,6 +474,12 @@ Derived from the shipped CSS, never written twice. A frame that silently failed 
 show desktop sizes in a phone and report them as passing, so there is a test that asserts a 44 px
 column header inside the phone frame and something smaller inside the laptop one.
 
+**Each product is shown at the sizes it is really seen at.** The player and the hub at 320, 390,
+768, 1280 and 1680 px; the companion at 520 × 440 (its smallest window), 640 × 760 (as it opens)
+and a laptop. The Airwave window has almost no touch layer — list rows and the round minus grow,
+buttons do not — so the hub's phone frames print their target sizes without being failed on the
+44 px floor. That is an open question, not a pass: DEC-027.
+
 ### The line under each frame
 
 | It says | It means |
@@ -436,9 +490,9 @@ column header inside the phone frame and something smaller inside the laptop one
 | `… runs *n* px past the edge` | Something extends past the viewport. Not reported for anything inside a horizontal scroller — the section strip scrolls on purpose — nor inside a mask-faded marquee, which is that fade's job. |
 | `… is cut off *n* px short of its end` | Something extends past a container that **clips**. This is the serious one: the content is not off the side of the screen, it is gone, and there is nothing to scroll to reach it. |
 
-That last row is not hypothetical. At 390 px the hub's toolbar ran its last two columns off the
+That last row is not hypothetical. At 390 px the earlier hub window's toolbar ran its last two columns off the
 side, and because a window clips, the search field was not merely cramped — it did not exist, while
-the page reported itself as fitting perfectly. The toolbar now gives the search a row of its own
+the page reported itself as fitting perfectly. The library's toolbar now gives the search a row of its own
 below 600 px, the display column truncates instead of pushing, and a secondary group that will not
 fit wraps.
 
@@ -449,31 +503,38 @@ from the stylesheets themselves rather than from `tokens.json`, so it can never 
 page does not actually use. Type part of a property name, change the value, and every open frame
 repaints as you type, at every size at once.
 
-**Copy the CSS** gives you a `:root:root { … }` block. Save it over
-[`packages/aqua-ui/src/styles/overrides.css`](../../packages/aqua-ui/src/styles/overrides.css) and
-run `pnpm build`: every product reads it, because every product imports the component library and
-that file is imported last. The doubled `:root:root` selects the same element and carries one more
-point of specificity, so the block wins regardless of which stylesheet a given product happens to
-load last — an override that only works in some import orders is worse than none.
+**Copy the CSS** says where each change belongs. Component-library properties come out as a
+`:root:root { … }` block to save over
+[`packages/aqua-ui/src/styles/overrides.css`](../../packages/aqua-ui/src/styles/overrides.css):
+whatever imports the library reads it — the player's React source, the gallery and this guide —
+because that file is imported last. The doubled `:root:root` selects the same element and carries
+one more point of specificity, so the block wins regardless of import order. Airwave window
+properties come out as a separate block with a note: the hub and the companion do not load
+`overrides.css`, and their stylesheets are generated, so those values are changed in the `:root`
+of the design files and rebuilt with `pnpm build:window-css`.
 
 That file is empty in the repository, and should usually stay that way: an override is a way to try
-something on all three products in one go, and the place for a value you have decided to keep is
-`tokens.json` and the stylesheet, per [§11](#11-changing-any-of-this).
+something, and the place for a value you have decided to keep is `tokens.json` and the stylesheet
+(or the design file, for an Airwave window), per [§11](#11-changing-any-of-this).
 
 ### The gates
 
 `pnpm verify` rebuilds the page (`build:styleguide`), checks that the committed copy matches
 (`styleguide-up-to-date`, the same arrangement as the single-file player), and runs
-`packages/aqua-ui/tests/e2e/styleguide.spec.ts` — which walks every product, every screen and all
-five sizes and fails with the full list of anything too small or cut off.
+`packages/aqua-ui/tests/e2e/styleguide.spec.ts` — which walks every product, every screen and every
+size that product is shown at, and fails with the full list of anything too small or cut off.
 
 ## 11. Changing any of this
 
-1. **Tokens first.** A new colour or size goes in `tokens.json` and then into the stylesheet as a
-   custom property. A literal hex in a component is a bug.
+1. **Tokens first.** In the component library a new colour or size goes in `tokens.json` and then
+   into the stylesheet as a custom property. In an Airwave window it goes in the design file's
+   `:root`, then `pnpm build:window-css`, then the `airwave` group of `tokens.json`. A literal hex
+   in a component is a bug.
 2. **Both schemes.** Define the light value on bare `:root`; redefine only what changes inside the
    dark guard.
-3. **Both skins, if it is a control.** `Button`, `Slider` and friends are shared by three products.
+3. **The right source.** An Airwave window changes in its design file (and AquaArt in
+   `src/airwave/aqua-art.ts`, kept line for line with the designs' script); the player's shell
+   changes in `airwave-now-playing.html`; a library control changes in both of its skins.
 4. **Say why in the CSS.** Every unobvious value in these stylesheets carries a comment explaining
    what it is reconstructing. Keep that up — it is what made the Snow Leopard button correction
    findable.
@@ -492,7 +553,8 @@ The visual system above is one half of the design authority. The other half live
 [`design/`](../../design/) and is rendered into the same page:
 
 - [`design/ux-rules.json`](../../design/ux-rules.json) — interaction and content rules with stable
-  IDs (`UX-PRIN-001` … `VOICE-003`), the code that owns each one and the test that proves it.
+  IDs (`UX-PRIN-001` … `VOICE-003`, and `NP-*` for the player's shell), the code that owns each one
+  and the test that proves it.
 - [`design/coverage.json`](../../design/coverage.json) — every screen, overlay and journey of the
   player, the hub, the companion, the Android shell, the local helper and the Discord bot.
 - [`design/token-map.json`](../../design/token-map.json) — which custom property carries each value

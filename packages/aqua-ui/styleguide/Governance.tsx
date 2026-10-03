@@ -78,12 +78,18 @@ const FLOWS = coverageFile.flows as Flow[];
 const EXCLUSIONS = coverageFile.exclusions;
 const RUNTIME = manifestFile.verification.runtime as RuntimeRecord[];
 const BLOCKED = (manifestFile.verification as { blocked?: Record<string, string> }).blocked ?? {};
+/** Records of interfaces that have since been replaced: kept as history, never counted as seen. */
+const SUPERSEDED = ((manifestFile.verification as { superseded?: Array<RuntimeRecord & { why: string }> }).superseded ?? []) as Array<RuntimeRecord & { why: string }>;
 const BUILD = __STYLEGUIDE_BUILD__;
 
 const PRODUCTS: Array<{ id: string; label: string; note: string }> = [
-  { id: 'player', label: 'Music player', note: 'Page skin. The PWA, the single-file build, the Android app and the local helper all show this.' },
-  { id: 'hub', label: 'Hub admin and public pages', note: 'Window skin, served by the container on port 4546.' },
-  { id: 'companion', label: 'Windows companion', note: 'Window skin in an Electron window.' },
+  {
+    id: 'player',
+    label: `${BRANDING.products.player} — the player`,
+    note: 'The shell generated from design/frontends/airwave-now-playing.html: the PWA, the single-file build, the Android app and the local helper all show it. Its surfaces are the player-shell rows (adopted). The rows marked proposed are the React interface in music-player/src, which is kept and tested but no longer served (DEC-019).',
+  },
+  { id: 'hub', label: `${BRANDING.products.hub} — admin window and public pages`, note: 'The Airwave window of design/frontends/airwave-hub.html, served by the container on port 4546. Sign-in and the first-run gate are drawn in the same window.' },
+  { id: 'companion', label: `${BRANDING.products.companion} — Windows`, note: 'The Airwave window of design/frontends/airwave-companion.html in an Electron window whose chrome is its title bar.' },
   { id: 'discord', label: 'Discord bot', note: 'Messages rendered from templates the operator can edit.' },
   { id: 'android', label: 'Android shell', note: 'A WebView around the player, plus system UI.' },
   { id: 'local-helper', label: 'Local helper', note: 'A console program that serves the player and runs download tools.' },
@@ -135,10 +141,11 @@ export function PrintCover() {
   return (
     <div className="sg-print-only sg-cover">
       <img className="sg-cover__mark" src={svgSource(playerIcon)} alt="" width={96} height={96} />
-      <p className="sg-cover__kicker">{BRANDING.suiteName}</p>
-      <h1 className="sg-cover__title">Design and behaviour guide</h1>
+      <p className="sg-cover__kicker">Design and behaviour guide</p>
+      <h1 className="sg-cover__title">{BRANDING.suiteName} Style Guide</h1>
       <p className="sg-cover__lede">
-        The music player, the hub, the Windows companion, the Android app and the Discord bot: one Aqua system, its rules, every screen, and how to keep it true.
+        {BRANDING.products.player}, {BRANDING.products.hub} and {BRANDING.products.companion}, with the Android app and the Discord bot: one Aqua system, its rules, every screen,
+        and how to keep it true.
       </p>
       <dl className="sg-cover__facts">
         <div>
@@ -211,7 +218,8 @@ export function Principles() {
 /* --------------------------------------------------------------- brand */
 
 const TERMS: Array<{ term: string; use: string; avoid: string }> = [
-  { term: 'Now Playing', use: 'The suite. Its parts are “the player”, “the hub” and “the companion”.', avoid: 'Other product names invented per screen' },
+  { term: BRANDING.suiteName, use: `The suite, and the player’s own name. The other two apps are ${BRANDING.products.hub} and ${BRANDING.products.companion}; in running text, “the player”, “the hub” and “the companion”.`, avoid: 'Now Playing as a product name; names invented per screen' },
+  { term: 'Now Playing', use: 'The player’s home page: what is playing now. Nothing else.', avoid: 'The suite, the hub or the companion' },
   { term: 'Solo / Shared listening', use: 'The two modes on the status bar.', avoid: 'Party mode, sync mode' },
   { term: 'Group', use: 'People listening to one shared queue on a hub.', avoid: 'Room, session' },
   { term: 'Pair', use: 'Connecting a device to a hub, confirmed by a fingerprint.', avoid: 'Log in, register a device' },
@@ -221,10 +229,10 @@ const TERMS: Array<{ term: string; use: string; avoid: string }> = [
 ];
 
 const QUOTES: Array<[string, string, string]> = [
-  ['Nothing queued', 'Play something from your library and it will appear here.', 'Player · Queue'],
-  ['No folders yet', 'Add the folder your music is in. The companion indexes it in place; your files are never copied or moved.', 'Companion · Folders'],
-  ['Nothing to show yet', 'Play some music and this fills in. Everything here is worked out on this device from a log that never leaves it.', 'Player · Listening history'],
-  ['Search your music', 'Searches the music on this device. Pair a hub in Settings to search connected services too.', 'Player · Search'],
+  ['No folders yet', '— add the one this PC keeps these in.', 'Companion · Library ▸ Saved Music'],
+  ['Nothing needs you.', 'The whole of an empty “Needs attention” list.', 'Hub · Overview'],
+  ['A link that doesn’t answer', 'keeps what it last held, and is tried again by itself.', 'Companion · Live TV'],
+  ['A stream never implies a download.', 'Where a provider doesn’t allow saving, there’s no button — not one that fails.', 'Hub · Music ▸ Downloads'],
 ];
 
 export function Brand() {
@@ -397,8 +405,8 @@ export function Screens() {
         <code>design/coverage.json</code>.
       </p>
       <p className="sg__note">
-        <b>Seen running</b>: opened in the running product for this revision (see Coverage). <b>Mockup only</b>: rendered at every size in the mockups from the real components with
-        fixture data. <b>Not run here</b>: the product could not be started where this guide was built. <b>Source only</b>: checked against the code, not looked at.
+        <b>Seen running</b>: opened in the running product for this revision (see Coverage). <b>Mockup only</b>: rendered at every size in the mockups with fixture data — the hub
+        and the companion from their own stylesheets and kits, the player from the component library’s page skin. <b>Not run here</b>: the product could not be started where this guide was built. <b>Source only</b>: checked against the code, not looked at.
       </p>
       {PRODUCTS.map((product) => {
         const surfaces = SURFACES.filter((surface) => surface.product === product.id);
@@ -460,7 +468,7 @@ export function Journeys() {
   return (
     <>
       <p>
-        The ten things people come to do, from where they start to where they can fail. Each step list is what the code does today; each failure is one the product answers in
+        The {FLOWS.length} things people come to do, from where they start to where they can fail. Each step list is what the code does today; each failure is one the product answers in
         words.
       </p>
       <div className="sg-flows">
@@ -643,23 +651,25 @@ export function Platforms() {
         <h3 className="sg__h3">Web and PWA — player and hub admin</h3>
         <ul className="sg__plain">
           <li>
-            <b>Breakpoints follow content, not a device list.</b> The page skin changes at 480, 560, 620, 720 and 900px; the window skin at 479, 599 and 759px, where the source list
-            gives way and the current source is named in the toolbar. Check at the mockup sizes: 320, 390, 768, 1280 and 1680px.
+            <b>Breakpoints follow content, not a device list.</b> The Airwave window changes at 640px — the tools scroll sideways, tiles go two-up, the key–value list stacks and
+            tables drop their secondary columns — and at 560px, where side-by-side groups stack. The library’s page skin changes at 480, 560, 620, 720 and 900px. Check at the
+            mockup sizes: 320, 390, 768, 1280 and 1680px.
           </li>
           <li>
             <b>The pointer decides density, not the width.</b> <code>(pointer: coarse)</code> switches the touch layer on at any width; a narrow desktop window keeps desktop density
-            (<a className="sg-id" href="#UX-TOUCH-001">UX-TOUCH-001</a>).
+            (<a className="sg-id" href="#UX-TOUCH-001">UX-TOUCH-001</a>). The Airwave window’s touch layer is small — list rows and the round minus grow, buttons do not — which is
+            an open question for the hub on a phone (DEC-027).
           </li>
           <li>
             <b>Installable and offline.</b> The player ships a manifest, icons and a service worker, opens with the network off once it has loaded online, and loads nothing from
             another origin. The single-file build, <code>now-playing.html</code>, runs straight from disk.
           </li>
           <li>
-            <b>Themes.</b> The page skin follows the system colour scheme; a page can pin itself light with <code>data-np-theme="light"</code>. The window skin is light only
-            (DEC-003).
+            <b>Themes.</b> The player follows the system colour scheme. The Airwave window is light only, in both OS appearances (DEC-003).
           </li>
           <li>
-            <b>Keyboard.</b> Space toggles playback, the section strip and source lists move with the arrow keys, and Escape closes a popover without losing what was typed.
+            <b>Keyboard.</b> In the player, Space toggles playback and Escape closes a popover without losing what was typed. In the Airwave window the tools are one tab stop:
+            arrows, Home and End move the selection, and locked tools are skipped (<a className="sg-id" href="#UX-KEY-001">UX-KEY-001</a>).
           </li>
         </ul>
       </div>
@@ -681,11 +691,20 @@ export function Platforms() {
         <h3 className="sg__h3">Windows companion — Electron</h3>
         <ul className="sg__plain">
           <li>
-            One window with a source list, and a tray icon (<code>resources/tray.svg</code>) whose menu has Open and Quit. With the “minimize to tray” preference on, closing the
-            window keeps the companion running.
+            One window with four tools, 640 × 760 as it opens and never smaller than 520 × 440. Its chrome is its title bar: the operating system’s own is hidden, the page draws
+            the title, Windows draws minimise, maximise and close over the top-right corner, and the chrome is the drag region while the tools stay clickable (DEC-020,{' '}
+            <a className="sg-id" href="#UX-CHROME-001">UX-CHROME-001</a>).
+          </li>
+          <li>
+            A tray icon (<code>resources/tray.svg</code>) whose menu has Open, Scan Library Now and Quit. With “Keep running in the notification area when the window closes” on,
+            closing the window keeps the companion running.
           </li>
           <li>It is the only product that reads the filesystem; its copy says so and never implies files are copied or uploaded in the background.</li>
-          <li>Pairing shows the hub’s fingerprint and warns when the hub address is plain http off the local network.</li>
+          <li>Pairing shows the hub’s fingerprint, and a notice warns when the hub address is plain http off the local network.</li>
+          <li>
+            Live TV links are read by the main process, never by the page: public addresses only, with a size cap and a deadline, and kept only when they hold channels or
+            programmes (<a className="sg-id" href="#UX-TV-001">UX-TV-001</a>).
+          </li>
         </ul>
       </div>
       <div className="sg-platform">
@@ -700,8 +719,9 @@ export function Platforms() {
         <p className="sg__note">Docker is how the hub is delivered, not a design surface. What it means for a design change:</p>
         <ul className="sg__plain">
           <li>
-            The image (<code>docker-container/Dockerfile</code>) builds the admin GUI with the same <code>@now-playing/aqua-ui</code>, so a token or component change reaches the hub
-            only when the image is rebuilt: <code>docker compose up -d --build</code> or <code>./nowplaying update</code>.
+            The image (<code>docker-container/Dockerfile</code>) builds the admin window from <code>docker-container/src/web</code> with the generated Airwave stylesheets and
+            AquaArt from <code>@now-playing/aqua-ui</code>, so a design change reaches the hub only when the image is rebuilt: <code>docker compose up -d --build</code> or{' '}
+            <code>./nowplaying update</code>.
           </li>
           <li>
             The hub listens on port 4546, published to <code>127.0.0.1</code> by default, with <code>/healthz</code> for the health check. Host names other than IP addresses,
@@ -835,6 +855,19 @@ export function Coverage() {
       ) : (
         <p className="sg__note">Nothing has been recorded as seen in a running product for this revision.</p>
       )}
+      {SUPERSEDED.length ? (
+        <>
+          <h3 className="sg__h3">Earlier records, superseded</h3>
+          <p className="sg__note">What was seen running before an interface was replaced. Kept as history; these surfaces are not counted as seen.</p>
+          <ul className="sg__plain">
+            {SUPERSEDED.map((record) => (
+              <li key={`${record.date}-${record.scenario}`}>
+                <b>{record.date}</b> · {record.scenario} <span className="sg-dim">{record.why}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
 
       <h3 className="sg__h3">Decisions and exceptions</h3>
       <table className="sg-table">

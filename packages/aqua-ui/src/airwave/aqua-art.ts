@@ -1,14 +1,23 @@
 /**
- * Aqua controls: the Snow Leopard push button and the 10.4 pop-up and checkbox.
+ * AquaArt: the Airwave window's drawn controls — the Snow Leopard push button and the 10.4 pop-up
+ * and checkbox.
  *
- * A port of the `AquaArt` script in `design/frontends/airwave-hub.html`, kept line for line with it:
- * each control is drawn as an SVG from colour profiles sampled row by row from the reference and
- * handed to CSS as a `border-image` source on `:root` (`--aq-btn-22`, `--aq-pop-22`, `--aq-cb-14`
- * and their `-down`, `-off` and `-on` forms). The window stylesheet only chooses which drawing a
- * control wears, so without this module every `.push`, `.pop` and `.box` is an empty rectangle.
+ * One port of the `AquaArt` script that `design/frontends/airwave-hub.html` and
+ * `airwave-companion.html` both carry, kept line for line with it: each control is drawn as an SVG
+ * from colour profiles sampled row by row from the reference and handed to CSS as a `border-image`
+ * source on `:root` (`--aq-btn-22`, `--aq-def-22`, `--aq-pop-22`, `--aq-cb-14` and their `-down`,
+ * `-off` and `-on` forms). `airwave-window.css` only chooses which drawing a control wears, so
+ * without this module every `.push`, `.pop` and `.box` is an empty rectangle.
+ *
+ * The hub admin GUI and the Windows companion each used to keep their own copy; the two drew the
+ * same bytes, and both now import this one as `@now-playing/aqua-ui/airwave-art`. It is a subpath
+ * and not part of the package index because the index loads the older Aqua stylesheet, which the
+ * Airwave windows do not wear. (The player's shell carries the design's own script in its
+ * generated `index.html`.)
  *
  * A material is its gradient, so the sampled rows travel together here rather than as tokens
- * (design/decisions.md NPD-021). The drawings are data: URIs, which the hub's CSP allows for images.
+ * (design/decisions.md NPD-021). The drawings are data: URIs, which both products' content security
+ * policies allow for images.
  */
 type Rgb = readonly [number, number, number];
 

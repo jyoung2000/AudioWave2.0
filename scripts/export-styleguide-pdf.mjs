@@ -69,7 +69,7 @@ async function main() {
     });
     if (failures.length) throw new Error(`The styleguide reported errors while rendering:\n${[...new Set(failures)].join('\n')}`);
 
-    const label = escapeHtml(`Now Playing styleguide · source ${fingerprint}`);
+    const label = escapeHtml(`Airwave Style Guide · source ${fingerprint}`);
     const footer = `<div style="font:8px Helvetica,Arial,sans-serif;color:#6b7075;width:100%;margin:0 15mm;display:flex;justify-content:space-between"><span>${label}</span><span><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>`;
     const bytes = await page.pdf({
       format: 'A4',

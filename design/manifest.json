@@ -1,12 +1,42 @@
 {
   "schemaVersion": 1,
-  "name": "Now Playing styleguide",
+  "name": "Airwave Style Guide",
   "profile": "snow-leopard-itunes-9",
-  "about": "Where the design authority for the Now Playing suite lives, what is generated from it, and how to check it. Read this before changing any UI or UX.",
+  "about": "Where the design authority for Airwave lives — Airwave (the player), Airwave Hub and Airwave Companion — what is generated from it, and how to check it. One guide for the three apps. Read this before changing any UI or UX.",
   "sources": {
+    "designs": {
+      "paths": [
+        "design/frontends/airwave-now-playing.html",
+        "design/frontends/airwave-hub.html",
+        "design/frontends/airwave-companion.html"
+      ],
+      "owns": "How each app looks. The player is the first file served as a shell (music-player/scripts/make-shell.py writes music-player/index.html from it); the hub and the companion are drawn with stylesheets generated from the other two."
+    },
+    "windowStylesheets": {
+      "paths": [
+        "packages/aqua-ui/src/styles/airwave-window.css",
+        "packages/aqua-ui/src/styles/airwave-hub.css"
+      ],
+      "owns": "What the hub and the companion wear: the window designs’ own CSS, copied out by packages/aqua-ui/scripts/make-window-css.py (pnpm build:window-css). Generated — change the design file, never these."
+    },
+    "windowArt": {
+      "path": "packages/aqua-ui/src/airwave/aqua-art.ts",
+      "owns": "AquaArt: the drawn push button, pop-up and checkbox both windows wear, published as --aq-* custom properties. One module, imported as @now-playing/aqua-ui/airwave-art."
+    },
+    "windowKits": {
+      "paths": [
+        "docker-container/src/web/ui.tsx",
+        "docker-container/src/web/icons.tsx",
+        "docker-container/src/web/styles.css",
+        "windows-companion/src/renderer/ui.tsx",
+        "windows-companion/src/renderer/icons.tsx",
+        "windows-companion/src/renderer/styles.css"
+      ],
+      "owns": "Each window’s own kit, icons and remaining styles: the design’s markup as components, the states the designs never drew, and (hub) the contrast inks. Per product on purpose (DEC-026)."
+    },
     "tokens": {
       "path": "packages/aqua-ui/src/styles/tokens.json",
-      "owns": "Documented values: colour, type, space, size, shadow, motion, page skin."
+      "owns": "Documented values: colour, type, space, size, shadow, motion and the page skin for the component library; the `airwave` group records the Airwave window’s palette, which the design files own."
     },
     "stylesheets": {
       "paths": [
@@ -15,7 +45,7 @@
         "packages/aqua-ui/src/styles/aqua-media.css",
         "packages/aqua-ui/src/styles/now-playing.css"
       ],
-      "owns": "The custom properties every product reads (light scheme on :root, dark and touch layers after it). Mirrors tokens.json by hand; see tokenMap."
+      "owns": "The component library’s custom properties (light scheme on :root, dark and touch layers after it). Mirror tokens.json by hand; see tokenMap. Loaded by the player’s React source, the gallery and this guide — not by the hub or the companion."
     },
     "tokenMap": {
       "path": "design/token-map.json",
@@ -23,11 +53,11 @@
     },
     "overrides": {
       "path": "packages/aqua-ui/src/styles/overrides.css",
-      "owns": "Temporary cross-product trials written by the styleguide's token editor. Empty in the repository."
+      "owns": "Temporary trials written by the styleguide’s token editor, for the component library only. Empty in the repository."
     },
     "components": {
       "path": "packages/aqua-ui/src",
-      "owns": "Every shared control, shell, overlay and state. Imported by the player, the hub admin GUI and the Windows companion."
+      "owns": "The component library: every shared React control, shell, overlay and state. Imported by the player’s React source in music-player/src (kept, not served — DEC-019), the gallery and this guide. The hub and the companion import only the Airwave stylesheets and AquaArt from this package; the styleguide lists which components no product imports (DEC-026)."
     },
     "rules": {
       "path": "design/ux-rules.json",
@@ -91,27 +121,41 @@
       "packages/domain/src/visualisers/spectrum.ts",
       "packages/domain/src/visualisers/constellation-layout.ts",
       "docker-container/src/web/styles.css",
-      "windows-companion/src/renderer/styles.css"
+      "windows-companion/src/renderer/styles.css",
+      "packages/aqua-ui/src/styles/airwave-window.css",
+      "packages/aqua-ui/src/styles/airwave-hub.css",
+      "packages/aqua-ui/src/airwave/aqua-art.ts",
+      "docker-container/src/web/ui.tsx",
+      "docker-container/src/web/icons.tsx",
+      "windows-companion/src/renderer/ui.tsx",
+      "windows-companion/src/renderer/icons.tsx"
     ]
   },
   "consumers": [
     {
       "product": "player",
       "path": "music-player",
-      "imports": ["@now-playing/aqua-ui", "@now-playing/aqua-ui/now-playing.css"],
-      "skin": "page"
+      "imports": [
+        "design/frontends/airwave-now-playing.html, served as music-player/index.html: imports nothing from aqua-ui",
+        "@now-playing/aqua-ui and @now-playing/aqua-ui/now-playing.css: the React source in music-player/src, kept but not served (DEC-019)"
+      ],
+      "skin": "the Airwave player shell (a page)"
     },
     {
       "product": "hub",
       "path": "docker-container/src/web",
-      "imports": ["@now-playing/aqua-ui"],
-      "skin": "window"
+      "imports": [
+        "@now-playing/aqua-ui/airwave-window.css",
+        "@now-playing/aqua-ui/airwave-hub.css",
+        "@now-playing/aqua-ui/airwave-art"
+      ],
+      "skin": "Airwave window"
     },
     {
       "product": "companion",
       "path": "windows-companion/src/renderer",
-      "imports": ["@now-playing/aqua-ui"],
-      "skin": "window"
+      "imports": ["@now-playing/aqua-ui/airwave-window.css", "@now-playing/aqua-ui/airwave-art"],
+      "skin": "Airwave window"
     },
     {
       "product": "android",
@@ -133,15 +177,24 @@
     }
   ],
   "commands": {
+    "build:window-css": "pnpm build:window-css — regenerates airwave-window.css and airwave-hub.css from design/frontends/airwave-companion.html and airwave-hub.html.",
     "styleguide:build": "pnpm styleguide:build — rebuilds docs/design/styleguide.html from the sources above (same as pnpm build:styleguide).",
-    "styleguide:check": "pnpm styleguide:check — sources and evidence exist, rule IDs are unique, every discovered screen is in the ledger, tokens.json matches the stylesheets, and the committed HTML was built from the current sources.",
-    "styleguide:pdf": "pnpm styleguide:pdf — prints the committed HTML to docs/design/styleguide.pdf with Playwright's Chromium (set NP_STYLEGUIDE_BROWSER to use another Chromium).",
+    "styleguide:check": "pnpm styleguide:check — sources and evidence exist, rule IDs are unique, every discovered screen is in the ledger, tokens.json matches the stylesheets (the library’s and the Airwave window’s), and the committed HTML was built from the current sources.",
+    "styleguide:pdf": "pnpm styleguide:pdf — prints the committed HTML to docs/design/styleguide.pdf with Playwright’s Chromium (set NP_STYLEGUIDE_BROWSER to use an installed Chrome or Edge).",
     "e2e": "pnpm --filter @now-playing/aqua-ui test:e2e — measures every mockup at every size.",
     "conformance": "pnpm test:unit — includes packages/aqua-ui/tests/unit/aqua-conformance.test.ts and design-sources.test.ts."
   },
   "verification": {
-    "note": "Filled in by whoever last verified the guide at runtime. Source checks are automatic (styleguide:check); these entries record what was seen in a running product.",
-    "runtime": [
+    "note": "Filled in by whoever last verified the guide at runtime. Source checks are automatic (styleguide:check); `runtime` records what was seen in a running product as it is now, and `superseded` keeps earlier records of interfaces that have since been replaced, which no longer count.",
+    "runtime": [],
+    "blocked": {
+      "companion": "Electron-only; its renderer needs the preload bridge. Covered by its DOM and contract tests and the mockups.",
+      "android": "No Android SDK or JDK 17 on the machine that built this revision.",
+      "discord": "Needs a bot token and a Discord server; covered by the voice and parity tests.",
+      "local-helper": "Console output was not captured for this revision; covered by its integration tests.",
+      "hub": "Not opened in a running hub since the Airwave window replaced the earlier admin GUI. Covered by its DOM, e2e, a11y and journey suites, and by the mockups."
+    },
+    "superseded": [
       {
         "date": "2026-09-16",
         "scenario": "Player dev server, empty library, no hub: each section, Settings, search with no match, the Shared segment (toast by pointer and keyboard), and one token change (--np-accent) seen in the player and the rebuilt guide, then reverted.",
@@ -157,7 +210,8 @@
           "player-settings",
           "player-search-popover",
           "player-notice-bar"
-        ]
+        ],
+        "why": "These are the React interface’s surfaces, served then and not now: the player serves the Airwave shell (DEC-019)."
       },
       {
         "date": "2026-09-16",
@@ -166,14 +220,9 @@
         "viewports": ["1024×768"],
         "theme": "light",
         "method": "Claude browser pane",
-        "surfaces": ["hub-login"]
+        "surfaces": ["hub-login"],
+        "why": "The sign-in screen seen here was replaced by the Airwave Hub window, which draws sign-in inside the window (DEC-017)."
       }
-    ],
-    "blocked": {
-      "companion": "Electron-only; its renderer needs the preload bridge. Covered by DOM tests and the mockups.",
-      "android": "No Android SDK or JDK 17 on the machine that built this revision.",
-      "discord": "Needs a bot token and a Discord server; covered by the voice and parity tests.",
-      "local-helper": "Console output was not captured for this revision; covered by its integration tests."
-    }
+    ]
   }
 }
