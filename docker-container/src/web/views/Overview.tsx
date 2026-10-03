@@ -1,160 +1,189 @@
 /**
  * The overview: what an operator needs to see in five seconds.
  *
- * Alerts come first because they are the only part that ever demands action, and each one is
- * phrased as a sentence with the remedy in it rather than a status code.
+ * Six tiles, then what needs attention, then every provider's health as a word. Alerts are the
+ * only part that ever demands action, and each one is a sentence with the remedy in it. Everything
+ * is read from the hub; while the first-run gate is up the tiles that depend on gated routes say
+ * that they are off, rather than showing a number nobody can vouch for.
  */
 import type { ReactNode } from 'react';
-import { AquaTable, Panel, PanelSection, KeyValueList } from '@now-playing/aqua-ui';
-import type { OverviewMetrics, ProviderHealth } from '@now-playing/contracts';
+import type { DeviceView, LibraryRoot, OverviewMetrics, ProviderDescriptor } from '@now-playing/contracts';
 import { useResource } from '../lib/hooks.js';
-import { Ago, AsyncPanel, Bytes, Health } from './common.js';
+import { PROVIDER_STATUS } from '../lib/words.js';
+import { Ago, count, EmptyRow, errorSentence, formatBytes, formatUptime, Group, Sdot, useHubUi, type DotKind } from '../ui.js';
+
+const REACH = { localhost: 'this machine only', lan: 'your network', remote: 'the internet' } as const;
+const ALERT_DOT: Record<string, DotKind> = { error: 'bad', warning: 'warn', info: 'off' };
+const GATEWAY: Record<string, string> = { connected: 'Online', connecting: 'Connecting', reconnecting: 'Reconnecting', disconnected: 'Not connected', stopped: 'Not running', error: 'Stopped by an error' };
 
 export function OverviewView() {
+  const { gated } = useHubUi();
   const overview = useResource('metricsOverview', {}, { pollMs: 5_000 });
+  // The provider list is one of the few routes the server answers before setup; it carries the names.
+  const providers = useResource('providersList', {}, { pollMs: 60_000 });
+  const devices = useResource('devicesList', {}, { pollMs: 15_000, enabled: !gated });
+  const roots = useResource('libraryRoots', {}, { pollMs: 30_000, enabled: !gated });
+
+  const data = overview.data as OverviewMetrics | null;
+  const names = new Map(((providers.data as { items: ProviderDescriptor[] } | null)?.items ?? []).map((p) => [p.provider, p.displayName]));
+  const nameOf = (id: string): string => names.get(id) ?? id;
+  const paired = ((devices.data as { items: DeviceView[] } | null)?.items ?? null)?.filter((d) => !d.revokedAt) ?? null;
+  const folders = (roots.data as { items: LibraryRoot[] } | null)?.items ?? null;
+
+  if (!data) {
+    return (
+      <>
+        <div className="tiles" aria-busy={!overview.error}>
+          {['Hub', 'Devices', 'Groups', 'Library', 'Providers', 'Storage'].map((heading) => (
+            <Tile key={heading} heading={heading} big="—" small={overview.error ? 'Not available' : 'Loading…'} />
+          ))}
+        </div>
+        <Group title="Needs attention" last>
+          <div className="well">
+            <ul className="rows" aria-label="Needs attention">
+              <EmptyRow text={overview.error ? errorSentence(overview.error) : 'Loading…'} retry={overview.error ? overview.reload : undefined} />
+            </ul>
+          </div>
+        </Group>
+      </>
+    );
+  }
+
+  const good = data.providers.filter((p) => p.status === 'ok');
+  const playing = data.groups.filter((g) => g.status === 'playing').length;
+  const online = paired?.filter((d) => d.online).length ?? 0;
+  const tracks = folders?.reduce((sum, f) => sum + f.trackCount, 0) ?? 0;
+  const lastScan = folders?.map((f) => f.lastScanAt).filter((t): t is string => Boolean(t)).sort().at(-1) ?? null;
+  const workingNames = good.map((p) => nameOf(p.provider));
 
   return (
-    <AsyncPanel resource={overview} title="Overview">
-      {(raw) => {
-        const data = raw as OverviewMetrics;
-        const good = data.providers.filter((p) => p.status === 'ok').length;
-        const playing = data.groups.filter((g) => g.status === 'playing').length;
-        return (
-          <>
-            <div className="admin-tiles">
-              <Tile heading="Hub" dot="ok" big={data.hub.version} small={`Up ${formatUptime(data.uptimeSeconds)} · ${data.hub.bindMode}`} />
-              <Tile heading="Connections" dot={data.connections.active ? 'ok' : null} big={String(data.connections.active)} small={`${data.connections.players} players · ${data.connections.companions} companions`} />
-              <Tile
-                heading="Groups"
-                dot={playing ? 'ok' : null}
-                big={data.groups.length ? `${playing} playing` : 'None'}
-                small={data.groups.length ? `${data.groups.length} ${data.groups.length === 1 ? 'group' : 'groups'}` : 'No group has been made yet'}
-              />
-              <Tile heading="Providers" dot={data.providers.length === 0 ? null : good < data.providers.length ? 'warning' : 'ok'} big={`${good} of ${data.providers.length} working`} small={data.providers.map((p) => p.provider).join(', ') || 'None configured'} />
-              <Tile
-                heading="Storage"
-                dot={null}
-                big={data.storage.freeBytes === null ? 'Unknown' : <><Bytes value={data.storage.freeBytes} /> free</>}
-                small={data.database.lastBackupAt ? <>Last backup <Ago iso={data.database.lastBackupAt} /></> : 'Never backed up'}
-              />
-              <Tile heading="Jobs" dot={data.jobs.failed ? 'error' : data.jobs.running ? 'ok' : null} big={`${data.jobs.running} running`} small={`${data.jobs.queued} queued · ${data.jobs.failed} failed`} />
-            </div>
-            {data.alerts.length ? (
-              <PanelSection title="Attention">
-                <ul className="admin-alerts">
-                  {data.alerts.map((alert, i) => (
-                    <li key={i} data-level={alert.level}>
-                      {alert.message}
-                    </li>
-                  ))}
-                </ul>
-              </PanelSection>
-            ) : null}
+    <>
+      <div className="tiles">
+        <Tile heading="Hub" dot="ok" big={`v${data.hub.version}`} small={`Up ${formatUptime(data.uptimeSeconds)} · ${REACH[data.hub.bindMode]}`} />
+        {gated ? (
+          <Tile heading="Devices" big="Off" small="Pairing starts once a password is set" />
+        ) : (
+          <Tile heading="Devices" dot={online ? 'ok' : undefined} big={paired ? `${paired.length} paired` : '—'} small={paired ? `${online} online now` : 'Loading…'} />
+        )}
+        {gated ? (
+          <Tile heading="Groups" big="Off" small="Starts once a password is set" />
+        ) : (
+          <Tile heading="Groups" dot={playing ? 'ok' : undefined} big={`${playing} playing`} small={data.groups.length ? count(data.groups.length, 'group') : 'No groups yet'} />
+        )}
+        {gated ? (
+          <Tile heading="Library" big="Off" small="Shown once a password is set" />
+        ) : (
+          <Tile
+            heading="Library"
+            big={folders ? count(tracks, 'track') : '—'}
+            small={
+              !folders ? (
+                'Loading…'
+              ) : folders.length === 0 ? (
+                'No folders yet'
+              ) : (
+                <>
+                  {count(folders.length, 'folder')} · {lastScan ? <>scanned <Ago iso={lastScan} /></> : 'not scanned yet'}
+                </>
+              )
+            }
+          />
+        )}
+        <Tile
+          heading="Providers"
+          dot={data.providers.length === 0 ? undefined : good.length < data.providers.length ? 'warn' : 'ok'}
+          big={`${good.length} of ${data.providers.length} working`}
+          small={workingNames.length === 0 ? 'None working yet' : workingNames.length <= 2 ? workingNames.join(' and ') : `${workingNames.slice(0, 2).join(', ')} and more`}
+        />
+        <Tile
+          heading="Storage"
+          big={data.storage.freeBytes === null ? 'Unknown' : `${formatBytes(data.storage.freeBytes)} free`}
+          small={data.database.lastBackupAt ? <>Last backup <Ago iso={data.database.lastBackupAt} /></> : 'Never backed up'}
+        />
+      </div>
 
-            <PanelSection title="Hub">
-              <KeyValueList
-                items={[
-                  { key: 'Version', value: `${data.hub.version} (contracts ${data.hub.contractsVersion}, protocol ${data.hub.protocolVersion})` },
-                  { key: 'Uptime', value: formatUptime(data.uptimeSeconds) },
-                  { key: 'Bind mode', value: data.hub.bindMode },
-                  { key: 'Public endpoint', value: data.hub.publicEndpoint ?? 'none — pairing and share links only work locally' },
-                  { key: 'Fingerprint', value: <code>{data.hub.fingerprint}</code> },
-                  { key: 'Memory', value: <Bytes value={data.memoryRssBytes} /> },
-                ]}
-              />
-            </PanelSection>
+      <Group title="Needs attention">
+        <div className="well">
+          <ul className="rows" aria-label="Needs attention">
+            {data.alerts.length === 0 ? <EmptyRow text="Nothing needs you." /> : null}
+            {data.alerts.map((alert, i) => (
+              <li key={i}>
+                <Sdot kind={ALERT_DOT[alert.level] ?? 'off'} />
+                <span className="grow">{alert.message}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </Group>
 
-            <PanelSection title="Connections">
-              <KeyValueList
-                items={[
-                  { key: 'Active', value: `${data.connections.active} (${data.connections.players} players, ${data.connections.companions} companions)` },
-                  { key: 'Reconnects', value: data.connections.reconnects },
-                  { key: 'Realtime errors', value: data.connections.wsErrors },
-                  { key: 'Pending pairings', value: data.pairing.pending },
-                ]}
-              />
-            </PanelSection>
+      <Group title="Provider health">
+        <div className="well">
+          <ul className="rows" aria-label="Provider health">
+            {data.providers.length === 0 ? <EmptyRow text="No providers yet." /> : null}
+            {data.providers.map((p) => {
+              const status = PROVIDER_STATUS[p.status] ?? PROVIDER_STATUS.down;
+              return (
+                <li key={p.provider} title={p.lastError}>
+                  <Sdot kind={status.dot} />
+                  <span className="name">
+                    <b>{nameOf(p.provider)}</b>
+                  </span>
+                  <span className="meta">{status.word}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </Group>
 
-            <PanelSection title="Providers">
-              <AquaTable
-                label="Provider health"
-                rowKey={(row: ProviderHealth) => row.provider}
-                rows={data.providers}
-                columns={[
-                  { id: 'provider', header: 'Provider', primary: true, cell: (row) => row.provider },
-                  { id: 'status', header: 'Status', cell: (row) => <Health status={row.status} /> },
-                  { id: 'circuit', header: 'Circuit', cell: (row) => row.circuit },
-                  { id: 'quota', header: 'Quota', cell: (row) => (row.quota ? `${row.quota.used} / ${row.quota.budget} ${row.quota.unit}` : '—') },
-                  { id: 'latency', header: 'Latency', align: 'right', cell: (row) => (row.latencyMs === undefined ? '—' : `${Math.round(row.latencyMs)} ms`) },
-                  { id: 'reason', header: 'Note', cell: (row) => row.lastError ?? '' },
-                ]}
-              />
-            </PanelSection>
-
-            {data.groups.length ? (
-              <PanelSection title="Groups">
-                <AquaTable
-                  label="Groups"
-                  rowKey={(row) => row.groupId}
-                  rows={data.groups}
-                  columns={[
-                    { id: 'name', header: 'Name', primary: true, cell: (row) => row.name },
-                    { id: 'status', header: 'Status', cell: (row) => row.status },
-                    { id: 'queue', header: 'Queue', align: 'right', cell: (row) => row.queueLength },
-                    { id: 'listeners', header: 'Listeners', align: 'right', cell: (row) => row.listeners },
-                  ]}
-                />
-              </PanelSection>
-            ) : null}
-
-            <PanelSection title="Storage and jobs">
-              <KeyValueList
-                items={[
-                  { key: 'Data directory', value: <code>{data.storage.dataDir}</code> },
-                  { key: 'Free space', value: data.storage.freeBytes === null ? 'unknown on this filesystem' : <><Bytes value={data.storage.freeBytes} /> of <Bytes value={data.storage.totalBytes} /></> },
-                  { key: 'Database', value: <><Bytes value={data.database.sizeBytes} /> · schema v{data.database.migrationVersion}{data.database.walMode ? ' · WAL' : ''}</> },
-                  { key: 'Last backup', value: <Ago iso={data.database.lastBackupAt} /> },
-                  { key: 'Jobs', value: `${data.jobs.running} running, ${data.jobs.queued} queued, ${data.jobs.failed} failed, ${data.jobs.completed} completed` },
-                ]}
-              />
-            </PanelSection>
-
-            <PanelSection title="Discord">
-              <KeyValueList
-                items={[
-                  { key: 'Bot', value: data.discord.configured ? (data.discord.enabled ? data.discord.gateway : 'configured but disabled') : 'no token installed' },
-                  { key: 'Commands', value: data.discord.commandsRegistered ? `registered ${data.discord.commandsRegisteredAt ? new Date(data.discord.commandsRegisteredAt).toLocaleString() : ''}` : 'not registered' },
-                  { key: 'Message Content intent', value: data.discord.messageContentIntent },
-                ]}
-              />
-            </PanelSection>
-          </>
-        );
-      }}
-    </AsyncPanel>
+      <Group title="This hub" last>
+        <dl className="kv">
+          <dt>Name</dt>
+          <dd>{data.hub.name}</dd>
+          <dt>Fingerprint</dt>
+          <dd>
+            <span className="mono">{data.hub.fingerprint}</span>
+            <span className="sub"> · compare it with what a device shows while pairing</span>
+          </dd>
+          <dt>Public address</dt>
+          <dd>{data.hub.publicEndpoint ? <span className="mono">{data.hub.publicEndpoint}</span> : 'None, so pairing and shared links only work on your network'}</dd>
+          <dt>Connected now</dt>
+          <dd>
+            {count(data.connections.players, 'player')} and {count(data.connections.companions, 'companion')}
+            {data.pairing.pending ? ` · ${count(data.pairing.pending, 'pairing')} waiting` : ''}
+          </dd>
+          <dt>Jobs</dt>
+          <dd>
+            {data.jobs.running} running · {data.jobs.queued} waiting · {data.jobs.failed} failed · {data.jobs.completed} done
+          </dd>
+          <dt>Database</dt>
+          <dd>
+            {formatBytes(data.database.sizeBytes)} in <span className="mono">{data.storage.dataDir}</span>
+          </dd>
+          <dt>Memory</dt>
+          <dd>{formatBytes(data.memoryRssBytes)}</dd>
+          <dt>Discord bot</dt>
+          <dd>{!data.discord.configured ? 'No token yet' : !data.discord.enabled ? 'Has a token, switched off' : (GATEWAY[data.discord.gateway] ?? 'Not running')}</dd>
+          <dt>Versions</dt>
+          <dd>
+            Hub {data.hub.version} · contracts {data.hub.contractsVersion} · protocol {data.hub.protocolVersion}
+          </dd>
+        </dl>
+      </Group>
+    </>
   );
 }
 
-/** One of the mockup's overview tiles: a heading with an optional status dot, a large figure, a line under it. */
-function Tile({ heading, dot, big, small }: { heading: string; dot: 'ok' | 'warning' | 'error' | null; big: ReactNode; small: ReactNode }) {
+/** One of the design's overview tiles: a heading with an optional status lamp, a large figure, a line under it. */
+function Tile({ heading, dot, big, small }: { heading: string; dot?: DotKind | undefined; big: ReactNode; small: ReactNode }) {
   return (
-    <div className="admin-tile">
-      <h3 className="admin-tile__heading">
-        {dot ? <span className="aqua-status-dot" data-kind={dot} aria-hidden="true" /> : null}
+    <div className="tile">
+      <h3>
+        {dot ? <Sdot kind={dot} inline /> : null}
         {heading}
       </h3>
-      <span className="admin-tile__big">{big}</span>
-      <span className="admin-tile__small">{small}</span>
+      <span className="big">{big}</span>
+      <span className="sm">{small}</span>
     </div>
   );
 }
-
-function formatUptime(seconds: number): string {
-  if (seconds < 60) return `${Math.round(seconds)}s`;
-  const days = Math.floor(seconds / 86400);
-  const hours = Math.floor((seconds % 86400) / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  return [days ? `${days}d` : null, hours ? `${hours}h` : null, `${minutes}m`].filter(Boolean).join(' ');
-}
-
-export { Panel };

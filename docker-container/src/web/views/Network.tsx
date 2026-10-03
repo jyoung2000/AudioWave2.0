@@ -1,149 +1,195 @@
 /**
  * Network and remote access.
  *
- * The truth table at the bottom is the same one in docs/REMOTE_ACCESS.md, rendered against the
- * hub's *current* settings so an operator can see which row they are on. It says plainly what the
- * hub does not do — no UPnP, no hole punching, no relay service — because the alternative is
- * someone assuming remote access works and finding out it does not.
+ * The design's preference pane, then "What works where" drawn against the hub's current settings so
+ * an operator can see which column they are in. It says plainly what the hub does not do — no UPnP,
+ * no hole punching, no relay service — because the alternative is someone assuming remote access
+ * works and finding out it does not.
  */
 import { useState } from 'react';
-import { AquaTable, Button, Checkbox, KeyValueList, Panel, PanelSection, PopUpMenu, StatusDot, TextField, useToast } from '@now-playing/aqua-ui';
 import type { NetworkConfig } from '@now-playing/contracts';
 import { api } from '../lib/api.js';
 import { useAction, useResource } from '../lib/hooks.js';
-import { AsyncPanel, InlineError } from './common.js';
+import { ActionError, errorSentence, Field, Group, Note, Pop, SubHead, useHubUi } from '../ui.js';
 
-interface Row {
-  id: string;
-  scenario: string;
-  works: string;
-  requires: string;
-}
+type Need = 'yes' | 'lan' | 'remote' | 'endpoint';
+const WHERE: ReadonlyArray<readonly [string, readonly [Need, Need, Need]]> = [
+  ['Player and companion', ['yes', 'lan', 'remote']],
+  ['Pairing', ['yes', 'lan', 'remote']],
+  ['Group listening', ['yes', 'lan', 'remote']],
+  ['Shared links', ['yes', 'lan', 'endpoint']],
+  ['Admin (this page)', ['yes', 'lan', 'remote']],
+];
+const BIND_NOTES = {
+  localhost: 'Only this computer can reach the hub.',
+  lan: 'Devices on your home network can reach it. Also publish the port in compose.yaml.',
+  remote: 'Needs a public https address and a proxy or tunnel you run.',
+} as const;
 
 export function NetworkView() {
   const network = useResource('networkGet', {}, { pollMs: 30_000 });
   const hub = useResource('hubIdentity', {}, { pollMs: 30_000 });
-  const toast = useToast();
+  const { say } = useHubUi();
   const update = useAction(async (body: Record<string, unknown>) => api('networkPut', { body }));
 
   const [endpoint, setEndpoint] = useState<string | null>(null);
   const [proxies, setProxies] = useState<string | null>(null);
+  const [endpointBad, setEndpointBad] = useState(false);
 
-  const identity = hub.data as { setupComplete: boolean; codeOnlyPairingAvailable: boolean } | null;
+  const c = network.data as NetworkConfig | null;
+  const identity = hub.data as { codeOnlyPairingAvailable: boolean } | null;
 
-  const rows: Row[] = [
-    { id: 'lan', scenario: 'Player and hub on the same network', works: 'Yes', requires: 'Bind mode "lan" and the container port published beyond 127.0.0.1' },
-    { id: 'same-machine', scenario: 'Player in a browser on the hub machine', works: 'Yes', requires: 'Nothing; this is the default' },
-    { id: 'remote-proxy', scenario: 'Player somewhere else, through your own reverse proxy', works: 'Yes', requires: 'Bind mode "remote", a public endpoint over HTTPS, and the proxy CIDR listed as trusted' },
-    { id: 'remote-direct', scenario: 'Player somewhere else, no proxy, no port forwarding', works: 'No', requires: 'The hub never opens a port for you: no UPnP, no NAT hole punching, no relay service. Forward a port or run a proxy yourself.' },
-    { id: 'offline', scenario: 'Player offline, no hub at all', works: 'Yes', requires: 'The player works standalone; hub features are simply unavailable and say so' },
-  ];
+  const put = (body: Record<string, unknown>, done: string): void =>
+    void update.run(body).then((r) => {
+      if (!r) return;
+      network.reload();
+      hub.reload();
+      say(done);
+    });
+
+  if (!c) {
+    return (
+      <Group title="Network">
+        <Note bad={Boolean(network.error)}>{network.error ? errorSentence(network.error) : 'Loading…'}</Note>
+      </Group>
+    );
+  }
+
+  const level = { localhost: 0, lan: 1, remote: 2 }[c.bindMode];
+  const hasEndpoint = Boolean(c.publicEndpoint);
+  const works = (need: Need): boolean => need === 'yes' || (need === 'lan' && level >= 1) || (need === 'remote' && level >= 2) || (need === 'endpoint' && level >= 2 && hasEndpoint);
 
   return (
-    <>
-      <AsyncPanel resource={network} title="Network">
-        {(raw) => {
-          const c = raw as NetworkConfig;
-          return (
-            <div className="admin-form">
-              {!identity?.setupComplete ? (
-                <p className="admin-hint admin-hint--warning">
-                  The hub is bound to localhost and will stay there until the admin password is changed, whatever is set here.
-                </p>
-              ) : null}
-              <PopUpMenu
-                label="Bind mode"
-                value={c.bindMode}
-                onChange={(e) =>
-                  void update.run({ bindMode: e.currentTarget.value }).then((r) => {
-                    if (r) {
-                      network.reload();
-                      toast.show('Bind mode saved. Restart the container for it to take effect.', { kind: 'warning' });
-                    }
-                  })
-                }
-                options={[
-                  { value: 'localhost', label: 'localhost — this machine only' },
-                  { value: 'lan', label: 'lan — reachable on your local network' },
-                  { value: 'remote', label: 'remote — behind a reverse proxy you control' },
-                ]}
-              />
-              <TextField
-                label="Public endpoint"
-                value={endpoint ?? c.publicEndpoint ?? ''}
-                placeholder="https://music.example.com"
-                onChange={(e) => setEndpoint(e.currentTarget.value)}
-                onBlur={() => {
-                  if (endpoint !== null && endpoint !== (c.publicEndpoint ?? '')) {
-                    void update.run({ publicEndpoint: endpoint.trim() || null }).then((r) => r && network.reload());
-                  }
-                }}
-                hint="The address other people use. Pairing links, share links and OAuth redirects are unreachable without it."
-              />
-              <TextField
-                label="Trusted proxy CIDRs"
-                value={proxies ?? c.trustedProxyCidrs.join(', ')}
-                placeholder="172.18.0.0/16"
-                onChange={(e) => setProxies(e.currentTarget.value)}
-                onBlur={() => {
-                  if (proxies !== null) {
-                    void update.run({ trustedProxyCidrs: proxies.split(',').map((s) => s.trim()).filter(Boolean) }).then((r) => r && network.reload());
-                  }
-                }}
-                hint="Only list a proxy you control. Trusting an untrusted one lets a caller forge its own address in your logs and rate limits."
-              />
-              <PopUpMenu
-                label="IP addresses in logs"
-                value={c.ipLogging.mode}
-                onChange={(e) => void update.run({ ipLogging: { mode: e.currentTarget.value, retentionDays: c.ipLogging.retentionDays } }).then((r) => r && network.reload())}
-                options={[
-                  { value: 'truncated', label: 'Truncated (default) — 192.168.1.x' },
-                  { value: 'hashed', label: 'Hashed — a stable identifier, not an address' },
-                  { value: 'full', label: 'Full — the complete address' },
-                ]}
-              />
-              {c.warnings.length ? (
-                <ul className="admin-alerts">
-                  {c.warnings.map((w, i) => (
-                    <li key={i} data-level="warning">
-                      {w}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-              {c.restartRequired ? <p className="admin-hint admin-hint--warning">Restart the container to apply the bind change.</p> : null}
-              <InlineError error={update.error} />
-              <KeyValueList
-                items={[
-                  { key: 'Listening on', value: `${c.bindAddress}:${c.port}` },
-                  { key: 'TLS', value: c.tlsTerminatedByProxy ? 'terminated by your proxy' : 'none — plain HTTP' },
-                  { key: 'Code-only pairing', value: identity?.codeOnlyPairingAvailable ? 'available' : 'unavailable without a reachable public endpoint' },
-                ]}
-              />
-            </div>
-          );
-        }}
-      </AsyncPanel>
-
-      <Panel title="What works where">
-        <PanelSection>
-          <AquaTable
-            label="Remote access"
-            rowKey={(row: Row) => row.id}
-            rows={rows}
-            columns={[
-              { id: 'scenario', header: 'Scenario', primary: true, cell: (row) => row.scenario },
-              { id: 'works', header: 'Works', cell: (row) => <StatusDot kind={row.works === 'Yes' ? 'ok' : 'error'} label={row.works} /> },
-              { id: 'requires', header: 'What it takes', cell: (row) => row.requires },
-            ]}
+    <Group title="Network">
+      <div className="pref">
+        <label className="k" htmlFor="bind">
+          Reachable from:
+        </label>
+        <div className="v">
+          <Pop id="bind" value={c.bindMode} disabled={update.busy} onChange={(e) => put({ bindMode: e.currentTarget.value }, 'Saved. Restart the container for it to take effect.')}>
+            <option value="localhost">This machine only</option>
+            <option value="lan">Your network</option>
+            <option value="remote">The internet</option>
+          </Pop>
+          <span className="sub">
+            {BIND_NOTES[c.bindMode]}
+            {c.restartRequired ? ' Restart the container to apply the change.' : ''}
+          </span>
+        </div>
+        <label className="k" htmlFor="endpoint">
+          Public address:
+        </label>
+        <div className="v">
+          <Field
+            id="endpoint"
+            mono
+            placeholder="https://music.example.com"
+            value={endpoint ?? c.publicEndpoint ?? ''}
+            invalid={endpointBad}
+            onChange={(e) => setEndpoint(e.currentTarget.value)}
+            onBlur={() => {
+              if (endpoint === null) return;
+              const next = endpoint.trim();
+              if (next === (c.publicEndpoint ?? '')) return;
+              const bad = next !== '' && !/^https:\/\/\S+$/.test(next);
+              setEndpointBad(bad);
+              if (!bad) put({ publicEndpoint: next || null }, next ? 'Saved the public address.' : 'Removed the public address.');
+            }}
           />
-          <p className="admin-hint">
-            This hub does not configure your router and never will. There is no built-in tunnel, relay or discovery service — nothing about your setup is sent anywhere.
-          </p>
-        </PanelSection>
-      </Panel>
-    </>
+          {endpointBad ? (
+            <span className="note note--bad note--row" role="alert">
+              Use an https address.
+            </span>
+          ) : (
+            <span className="sub">The address other people use. Pairing links and shared links can’t be reached from outside without it.</span>
+          )}
+        </div>
+        <label className="k" htmlFor="proxies">
+          Trusted proxies:
+        </label>
+        <div className="v">
+          <Field
+            id="proxies"
+            mono
+            placeholder="Leave empty unless a proxy you run sits in front"
+            value={proxies ?? c.trustedProxyCidrs.join(', ')}
+            onChange={(e) => setProxies(e.currentTarget.value)}
+            onBlur={() => {
+              if (proxies === null) return;
+              const list = proxies
+                .split(',')
+                .map((s) => s.trim())
+                .filter(Boolean);
+              if (list.join(',') !== c.trustedProxyCidrs.join(',')) put({ trustedProxyCidrs: list }, 'Saved the trusted proxies.');
+            }}
+          />
+          <span className="sub">Address ranges such as 172.18.0.0/16. Only list a proxy you control: a trusted proxy can say a request came from anywhere.</span>
+        </div>
+        <label className="k" htmlFor="iplog">
+          IPs in logs:
+        </label>
+        <div className="v">
+          <Pop id="iplog" value={c.ipLogging.mode} disabled={update.busy} onChange={(e) => put({ ipLogging: { mode: e.currentTarget.value, retentionDays: c.ipLogging.retentionDays } }, 'Saved how addresses are logged.')}>
+            <option value="truncated">Truncated</option>
+            <option value="hashed">Hashed</option>
+            <option value="full">Full</option>
+          </Pop>
+        </div>
+      </div>
+      <ActionError error={update.error} />
+      {c.warnings.map((w, i) => (
+        <Note key={i}>{w}</Note>
+      ))}
+
+      <SubHead>What works where</SubHead>
+      <div className="well">
+        <table className="tbl" aria-label="What works where">
+          <colgroup>
+            <col />
+            <col style={{ width: '20%' }} />
+            <col style={{ width: '20%' }} />
+            <col style={{ width: '20%' }} />
+          </colgroup>
+          <thead>
+            <tr>
+              <th scope="col">
+                <span className="sr">Feature</span>
+              </th>
+              <th scope="col">This machine</th>
+              <th scope="col">Your network</th>
+              <th scope="col">Internet</th>
+            </tr>
+          </thead>
+          <tbody>
+            {WHERE.map(([feature, needs]) => (
+              <tr key={feature}>
+                <th scope="row" className="rowhead">
+                  {feature}
+                </th>
+                {needs.map((need, i) => (
+                  <td key={i} className={works(need) ? 'ok' : 'sub'}>
+                    <span aria-hidden="true">{works(need) ? '✓' : '—'}</span>
+                    <span className="sr">{works(need) ? 'Works' : 'Does not work'}</span>
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Note>
+        The hub never opens a port for you: no UPnP, no NAT hole punching, no relay service. Changing the published port in <span className="mono">compose.yaml</span> is up to you.
+      </Note>
+      <dl className="kv kv--after">
+        <dt>Listening on</dt>
+        <dd className="mono">
+          {c.bindAddress}:{c.port}
+        </dd>
+        <dt>Encryption</dt>
+        <dd>{c.tlsTerminatedByProxy ? 'https, handled by your proxy' : 'None: plain http'}</dd>
+        <dt>Pairing with a code alone</dt>
+        <dd>{identity?.codeOnlyPairingAvailable ? 'Works' : 'Needs a public address the device can reach'}</dd>
+      </dl>
+    </Group>
   );
 }
-
-export { Button, Checkbox };

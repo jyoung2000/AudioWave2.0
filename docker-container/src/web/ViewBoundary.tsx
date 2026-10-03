@@ -1,13 +1,14 @@
 /**
- * One panel must never take the whole interface down.
+ * One section must never take the whole window down.
  *
  * Without this, a single unexpected response — a field the hub added, a null where an object was
  * expected — unmounts the entire React tree and leaves an operator staring at a blank page with no
- * way to reach Diagnostics and find out why. The boundary keeps the shell, the navigation and the
- * status bar alive, and shows what failed where the panel would have been.
+ * way to reach Diagnostics and find out why. The boundary keeps the window, the tabs and the status
+ * strip alive, and says what failed where the section would have been, in the same list box every
+ * other quiet state uses.
  */
 import { Component, type ErrorInfo, type ReactNode } from 'react';
-import { ErrorState } from '@now-playing/aqua-ui';
+import { Push } from './ui.js';
 
 interface Props {
   /** Changing this resets the boundary — used to retry when the operator switches views. */
@@ -39,12 +40,19 @@ export class ViewBoundary extends Component<Props, State> {
   override render(): ReactNode {
     if (!this.state.error) return this.props.children;
     return (
-      <ErrorState
-        title="This panel could not be displayed"
-        text={this.state.error.message}
-        details={{ summary: 'Technical detail', text: this.state.error.stack ?? this.state.error.message }}
-        actions={[{ id: 'retry', label: 'Try again', variant: 'default', onSelect: () => this.setState({ error: null }) }]}
-      />
+      <fieldset>
+        <legend>
+          <h2 className="legend-h">This panel could not be displayed</h2>
+        </legend>
+        <div className="well" role="alert">
+          <ul className="rows">
+            <li>
+              <span className="grow">The hub sent something this page did not expect. The rest of the window still works.</span>
+              <Push onClick={() => this.setState({ error: null })}>Try Again</Push>
+            </li>
+          </ul>
+        </div>
+      </fieldset>
     );
   }
 }

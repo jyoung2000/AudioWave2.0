@@ -7,112 +7,142 @@
  * to know what a profile holds.
  */
 import { useState } from 'react';
-import { AquaTable, Button, StatusDot, TextField } from '@now-playing/aqua-ui';
 import type { ProfileAdminView } from '@now-playing/contracts';
-import { api, ApiError } from '../lib/api.js';
+import { api } from '../lib/api.js';
 import { useAction, useResource } from '../lib/hooks.js';
-import { Ago, AsyncPanel, ConfirmButton } from './common.js';
+import { ActionError, Ago, EmptyCells, Field, Group, listState, Note, Push, useHubUi } from '../ui.js';
 
 export function ProfilesView() {
   const profiles = useResource('profilesAdminList', {}, { pollMs: 30_000 });
+  const { say, confirm } = useHubUi();
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
-  const [problem, setProblem] = useState<string | null>(null);
   const rename = useAction(async (id: string, displayName: string) => api('profilesAdminRename', { params: { id }, body: { displayName } }));
   const removePicture = useAction(async (id: string) => api('profilesAdminAvatarDelete', { params: { id } }));
 
   const save = async (): Promise<void> => {
     if (!editing) return;
-    setProblem(null);
-    try {
-      await api('profilesAdminRename', { params: { id: editing.id }, body: { displayName: editing.name } });
+    const done = await rename.run(editing.id, editing.name);
+    if (done) {
+      say(`Renamed to “${editing.name.trim()}”.`);
       setEditing(null);
       profiles.reload();
-    } catch (err) {
-      // Said as it is: the hub refused, and this is why. Nothing was renamed.
-      setProblem(err instanceof ApiError ? err.message : 'The name was not saved.');
     }
   };
 
+  const items = (profiles.data as { items: ProfileAdminView[] } | null)?.items ?? [];
+  const state = listState(profiles, (d) => (d as { items: ProfileAdminView[] }).items.length === 0, 'Nobody has a profile yet. One appears when a device is paired.');
+
   return (
-    <AsyncPanel
-      resource={profiles}
-      title="Profiles"
-      emptyWhen={(d) => (d as { items: ProfileAdminView[] }).items.length === 0}
-      emptyTitle="Nobody has a profile yet"
-      emptyText="A profile appears when a device is paired. Its owner picks a username, a picture and the playlists to share from the player's Settings ▸ Profile."
-    >
-      {(raw) => (
-        <>
-          <AquaTable
-            label="Profiles"
-            rowKey={(row: ProfileAdminView) => row.id}
-            rows={(raw as { items: ProfileAdminView[] }).items}
-            columns={[
-              {
-                id: 'name',
-                header: 'Name',
-                primary: true,
-                cell: (row) =>
-                  editing?.id === row.id ? (
-                    <TextField
-                      label={`New name for ${row.displayName}`}
-                      hideLabel
-                      value={editing.name}
-                      maxLength={40}
-                      onChange={(event) => setEditing({ id: row.id, name: event.currentTarget.value })}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') void save();
-                        if (event.key === 'Escape') setEditing(null);
-                      }}
-                    />
-                  ) : (
-                    row.displayName
-                  ),
-              },
-              { id: 'claimed', header: 'Username', cell: (row) => <StatusDot kind={row.claimed ? 'ok' : 'neutral'} label={row.claimed ? 'chosen' : 'device name'} /> },
-              { id: 'picture', header: 'Picture', cell: (row) => (row.avatarUrl ? 'yes' : 'none') },
-              { id: 'playlists', header: 'Playlists', align: 'right', cell: (row) => row.playlistCount },
-              { id: 'changed', header: 'Last change', cell: (row) => <Ago iso={row.updatedAt} /> },
-              {
-                id: 'actions',
-                header: '',
-                headerLabel: 'Actions',
-                cell: (row) =>
-                  editing?.id === row.id ? (
-                    <>
-                      <Button size="small" variant="default" busy={rename.busy} onClick={() => void save()}>
-                        Save
-                      </Button>{' '}
-                      <Button size="small" onClick={() => (setEditing(null), setProblem(null))}>
-                        Cancel
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button size="small" onClick={() => (setEditing({ id: row.id, name: row.displayName }), setProblem(null))}>
-                        Rename
-                      </Button>{' '}
-                      {row.avatarUrl ? (
-                        <ConfirmButton
-                          label="Remove picture"
-                          confirmLabel={`Remove the picture from "${row.displayName}"? Its owner can upload another.`}
-                          busy={removePicture.busy}
-                          onConfirm={() => void removePicture.run(row.id).then(() => profiles.reload())}
-                        />
-                      ) : null}
-                    </>
-                  ),
-              },
-            ]}
-          />
-          {problem ? (
-            <p className="admin-hint admin-hint--warning" role="alert">
-              {problem}
-            </p>
-          ) : null}
-          <p className="admin-hint">Every device paired with this hub can see these names, pictures and shared playlists. Nobody outside it can.</p>
-        </>
-      )}
-    </AsyncPanel>
+    <Group title="Profiles" hint="What each paired person is called here. You can rename a profile or remove its picture; its playlists stay its owner’s." last>
+      <div className="well">
+        <table className="tbl" aria-label="Profiles">
+          <colgroup>
+            <col />
+            <col style={{ width: '18%' }} className="hide-sm" />
+            <col style={{ width: '12%' }} />
+            <col style={{ width: '16%' }} className="hide-sm" />
+            <col style={{ width: 196 }} />
+          </colgroup>
+          <thead>
+            <tr>
+              <th scope="col">Name</th>
+              <th scope="col" className="hide-sm">
+                Username
+              </th>
+              <th scope="col" className="num">
+                Playlists
+              </th>
+              <th scope="col" className="hide-sm">
+                Changed
+              </th>
+              <th scope="col">
+                <span className="sr">Actions</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {state ? <EmptyCells columns={5} {...state} /> : null}
+            {state
+              ? null
+              : items.map((row) => {
+                  const isEditing = editing?.id === row.id;
+                  return (
+                    <tr key={row.id}>
+                      <td>
+                        {isEditing ? (
+                          <Field
+                            className="field--cell"
+                            aria-label={`New name for ${row.displayName}`}
+                            value={editing.name}
+                            maxLength={40}
+                            // The row just turned into a field because Rename was pressed.
+                            // eslint-disable-next-line jsx-a11y/no-autofocus
+                            autoFocus
+                            onChange={(event) => setEditing({ id: row.id, name: event.currentTarget.value })}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter') void save();
+                              if (event.key === 'Escape') setEditing(null);
+                            }}
+                          />
+                        ) : (
+                          row.displayName
+                        )}
+                      </td>
+                      <td className="hide-sm">{row.claimed ? 'Chosen' : 'From the device'}</td>
+                      <td className="num">{row.playlistCount}</td>
+                      <td className="hide-sm">
+                        <Ago iso={row.updatedAt} />
+                      </td>
+                      <td className="acts">
+                        {isEditing ? (
+                          <>
+                            <Push primary busy={rename.busy} disabled={editing.name.trim().length < 3} reason="A name has at least 3 characters." onClick={() => void save()}>
+                              Save
+                            </Push>
+                            <Push
+                              onClick={() => {
+                                setEditing(null);
+                                rename.clearError();
+                              }}
+                            >
+                              Cancel
+                            </Push>
+                          </>
+                        ) : (
+                          <>
+                            <Push
+                              aria-label={`Rename ${row.displayName}`}
+                              onClick={() => {
+                                setEditing({ id: row.id, name: row.displayName });
+                                rename.clearError();
+                              }}
+                            >
+                              Rename
+                            </Push>
+                            {row.avatarUrl ? (
+                              <Push
+                                busy={removePicture.busy}
+                                aria-label={`Remove the picture from ${row.displayName}`}
+                                onClick={() =>
+                                  void confirm({ title: `Remove the picture from “${row.displayName}”?`, text: 'Its owner can upload another one.', verb: 'Remove Picture' }).then((go) => {
+                                    if (go) void removePicture.run(row.id).then(() => profiles.reload());
+                                  })
+                                }
+                              >
+                                Remove Picture
+                              </Push>
+                            ) : null}
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+          </tbody>
+        </table>
+      </div>
+      <ActionError error={rename.error ?? removePicture.error} />
+      <Note>Every device paired with this hub can see these names, pictures and shared playlists. Nobody outside it can.</Note>
+    </Group>
   );
 }

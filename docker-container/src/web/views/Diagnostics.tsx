@@ -1,15 +1,13 @@
 /**
  * Logs and the support bundle.
  *
- * The bundle is downloadable because handing one to someone else is the point — so it lists its own
- * redactions above the download button, and an operator can read exactly what is and is not in it
- * before sending it anywhere.
+ * The design's pane: a log level, Support Bundle…, and the log. The bundle is made to be handed to
+ * someone else, so what it leaves out is said beside the button, before anything is downloaded.
  */
 import { useState } from 'react';
-import { AquaTable, Button, Panel, PanelSection, PopUpMenu, useToast } from '@now-playing/aqua-ui';
 import { api } from '../lib/api.js';
 import { useAction, useResource } from '../lib/hooks.js';
-import { Ago, AsyncPanel } from './common.js';
+import { ActionError, errorSentence, Group, Note, Pop, Push, useHubUi } from '../ui.js';
 
 interface LogLine {
   time: string;
@@ -17,14 +15,20 @@ interface LogLine {
   msg: string;
   correlationId: string | null;
   module: string | null;
-  data: Record<string, unknown>;
+}
+
+type Level = 'debug' | 'info' | 'warn' | 'error';
+
+function clock(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '--:--:--' : d.toLocaleTimeString('en-GB', { hour12: false });
 }
 
 export function DiagnosticsView() {
-  const [level, setLevel] = useState<'debug' | 'info' | 'warn' | 'error'>('info');
+  const [level, setLevel] = useState<Level>('info');
   const logs = useResource('logsList', { query: { level, limit: 300 } }, { pollMs: 5_000 });
   const bundle = useResource('diagnosticsBundle');
-  const toast = useToast();
+  const { say } = useHubUi();
 
   const download = useAction(async () => {
     const data = await api('diagnosticsBundle');
@@ -32,73 +36,57 @@ export function DiagnosticsView() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `now-playing-diagnostics-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    link.download = `airwave-hub-support-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
     link.click();
     URL.revokeObjectURL(url);
     return data;
   });
 
-  return (
-    <>
-      <AsyncPanel resource={bundle} title="Support bundle">
-        {(raw) => {
-          const data = raw as { redactions: string[]; generatedAt: string };
-          return (
-            <PanelSection>
-              <p className="admin-hint">A JSON file describing this hub's versions, configuration state, provider health and counters. Safe to send to someone else: it never contains any of the following.</p>
-              <ul className="admin-list">
-                {data.redactions.map((r, i) => (
-                  <li key={i}>{r}</li>
-                ))}
-              </ul>
-              <div className="admin-actions">
-                <Button variant="default" busy={download.busy} onClick={() => void download.run().then(() => toast.show('Bundle downloaded'))}>
-                  Download bundle
-                </Button>
-              </div>
-            </PanelSection>
-          );
-        }}
-      </AsyncPanel>
+  const lines = (logs.data as { items: LogLine[] } | null)?.items ?? null;
+  const redactions = (bundle.data as { redactions: string[] } | null)?.redactions ?? [];
 
-      <AsyncPanel
-        resource={logs}
-        title="Logs"
-        actions={
-          <PopUpMenu
-            label="Level"
-            size="small"
-            value={level}
-            onChange={(e) => setLevel(e.currentTarget.value as typeof level)}
-            options={[
-              { value: 'debug', label: 'Debug and above' },
-              { value: 'info', label: 'Info and above' },
-              { value: 'warn', label: 'Warnings and errors' },
-              { value: 'error', label: 'Errors only' },
-            ]}
-          />
-        }
-        emptyWhen={(d) => (d as { items: LogLine[] }).items.length === 0}
-        emptyTitle="Nothing logged at this level"
-      >
-        {(raw) => (
-          <AquaTable
-            label="Log lines"
-            rowHeight={22}
-            rowKey={(row: LogLine, ) => `${row.time}-${row.msg}`}
-            rows={[...(raw as { items: LogLine[] }).items].reverse()}
-            columns={[
-              { id: 'time', header: 'When', width: 96, cell: (row) => <Ago iso={row.time} /> },
-              { id: 'level', header: 'Level', width: 64, cell: (row) => row.level },
-              { id: 'module', header: 'Module', width: 96, cell: (row) => row.module ?? '' },
-              { id: 'msg', header: 'Message', primary: true, cell: (row) => row.msg },
-              { id: 'cid', header: 'Correlation', width: 110, cell: (row) => (row.correlationId ? <code>{row.correlationId.slice(0, 8)}</code> : '') },
-            ]}
-          />
-        )}
-      </AsyncPanel>
-    </>
+  return (
+    <Group title="Diagnostics" last>
+      <div className="pref">
+        <label className="k" htmlFor="lvl">
+          Log level:
+        </label>
+        <div className="v">
+          <Pop id="lvl" value={level} onChange={(e) => setLevel(e.currentTarget.value as Level)}>
+            <option value="error">Errors only</option>
+            <option value="warn">Warnings and errors</option>
+            <option value="info">Info and above</option>
+            <option value="debug">Everything</option>
+          </Pop>
+          <Push busy={download.busy} onClick={() => void download.run().then((r) => r && say('Saved the support bundle to your downloads.'))}>
+            Support Bundle…
+          </Push>
+          <span className="sub" title={redactions.length ? `Left out: ${redactions.join('; ')}.` : undefined}>
+            The bundle describes this hub’s versions, settings and provider health for a bug report. Passwords, tokens, keys, full addresses and listening history are left out.
+          </span>
+        </div>
+      </div>
+      <ActionError error={download.error} />
+      <div className="well well--after">
+        {/* The log scrolls inside its box, so it takes the keyboard like any other scrolling region. */}
+        {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
+        <pre className="log" aria-label="Log lines" tabIndex={0}>
+          {lines === null ? (
+            <span className="quiet">{logs.error ? errorSentence(logs.error) : 'Loading…'}</span>
+          ) : lines.length === 0 ? (
+            <span className="quiet">Nothing logged at this level.</span>
+          ) : (
+            lines.map((line, i) => (
+              <span key={`${line.time}-${i}`} className={line.level === 'warn' ? 'w' : line.level === 'error' || line.level === 'fatal' ? 'e' : undefined} title={line.correlationId ? `Request ${line.correlationId}` : undefined}>
+                {clock(line.time)} {line.level.toUpperCase().padEnd(5)} {line.module ? `${line.module}: ` : ''}
+                {line.msg}
+                {'\n'}
+              </span>
+            ))
+          )}
+        </pre>
+      </div>
+      <Note>The newest lines are at the bottom. Addresses in them are shortened as set under Network.</Note>
+    </Group>
   );
 }
-
-export { Panel };

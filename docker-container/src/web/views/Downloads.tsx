@@ -1,138 +1,186 @@
 /**
  * Downloads.
  *
- * The format table is generated from the FFmpeg build actually installed in this container, and
- * every unavailable format says why. The lossy/lossless note is there because converting a lossy
- * source to FLAC makes a bigger file, not a better one, and the UI should say so rather than let
- * someone discover it later.
+ * The jobs table is the design's: item, where it came from, format, progress. The output formats
+ * are read from the FFmpeg build actually installed in this container — a format the hub cannot
+ * write is struck through and says why — and the storage line is what the data volume reports.
+ * Nothing here is a setting the hub does not have.
  */
-import { AquaTable, Panel, PanelSection, ProgressBar, StatusDot, useToast } from '@now-playing/aqua-ui';
-import type { DownloadJob, FormatAvailability } from '@now-playing/contracts';
+import type { DownloadJob, FormatAvailability, ProviderDescriptor } from '@now-playing/contracts';
 import { api } from '../lib/api.js';
 import { useAction, useResource } from '../lib/hooks.js';
-import { Ago, AsyncPanel, Bytes, ConfirmButton } from './common.js';
+import { ActionError, EmptyCells, errorSentence, formatBytes, Group, listState, Note, Push, useHubUi } from '../ui.js';
 
 const BASIS_LABELS: Record<string, string> = {
-  'user-owned': 'Content the requester owns',
-  'creator-download': 'The creator enabled downloads',
+  'user-owned': 'The requester owns it',
+  'creator-download': 'The artist allows downloads',
   'purchased-export': 'Exported from a purchase',
   'public-domain': 'Public domain',
   licensed: 'Licensed',
-  'hub-hosted': 'Already hosted by this hub',
+  'hub-hosted': 'Already on this hub',
 };
+
+const FORMAT_LABELS: Record<string, string> = { original: 'Original', mp3: 'MP3', aac: 'AAC', opus: 'Opus', flac: 'FLAC' };
+const STAGES: Record<string, string> = { preflight: 'Checking', downloading: 'Downloading', verifying: 'Verifying', converting: 'Converting', finalizing: 'Finishing', transferring: 'Sending', done: 'Done' };
+
+type JobAction = 'cancel' | 'pause' | 'resume' | 'retry';
 
 export function DownloadsView() {
   const jobs = useResource('downloadsList', {}, { pollMs: 3_000 });
   const formats = useResource('downloadsFormats');
   const storage = useResource('downloadsStorage', {}, { pollMs: 30_000 });
-  const act = useAction(async (jobId: string, action: 'cancel' | 'pause' | 'resume' | 'retry') => api('downloadsAction', { params: { jobId, action } }));
-  const toast = useToast();
+  const providers = useResource('providersList');
+  const act = useAction(async (jobId: string, action: JobAction) => api('downloadsAction', { params: { jobId, action } }));
+  const { confirm } = useHubUi();
+
+  const items = (jobs.data as { items: DownloadJob[] } | null)?.items ?? [];
+  const state = listState(jobs, (d) => (d as { items: DownloadJob[] }).items.length === 0, 'No downloads. A player or the companion asks for one.');
+  const names = new Map(((providers.data as { items: ProviderDescriptor[] } | null)?.items ?? []).map((p) => [p.provider, p.displayName]));
+  const formatData = formats.data as { formats: FormatAvailability[]; ffmpeg: { available: boolean; version: string | null; encoders: string[] } } | null;
+  const store = storage.data as { dataDir: string; freeBytes: number | null; totalBytes: number | null; usedByDownloadsBytes: number; partialFiles: number; cleanupPolicy: { keepFailedDays: number; keepPartialHours: number } } | null;
+
+  const run = (job: DownloadJob, action: JobAction): void => void act.run(job.id, action).then(() => jobs.reload());
 
   return (
-    <>
-      <AsyncPanel
-        resource={jobs}
-        title="Download jobs"
-        emptyWhen={(d) => (d as { items: DownloadJob[] }).items.length === 0}
-        emptyTitle="No downloads"
-        emptyText="Downloads are requested from a player or the companion, and only for content whose rights basis the requester states."
-      >
-        {(raw) => (
-          <AquaTable
-            label="Downloads"
-            rowKey={(row: DownloadJob) => row.id}
-            rows={(raw as { items: DownloadJob[] }).items}
-            columns={[
-              { id: 'title', header: 'Title', primary: true, cell: (row) => row.source.title ?? row.source.providerTrackId ?? row.source.url ?? row.id.slice(0, 8) },
-              { id: 'provider', header: 'Source', cell: (row) => row.source.provider },
-              { id: 'basis', header: 'Rights basis', cell: (row) => BASIS_LABELS[row.authorization.basis] ?? row.authorization.basis },
-              { id: 'state', header: 'State', cell: (row) => <StatusDot kind={row.state === 'completed' ? 'ok' : row.state === 'failed' ? 'error' : row.state === 'running' ? 'info' : 'neutral'} label={row.state} /> },
-              {
-                id: 'progress',
-                header: 'Progress',
-                cell: (row) =>
-                  row.state === 'running' || row.state === 'retrying' ? (
-                    <ProgressBar value={row.progress.percent ?? null} label={`${row.progress.stage}${row.progress.percent !== null ? ` ${Math.round(row.progress.percent)}%` : ''}`} />
-                  ) : (
-                    row.progress.stage
-                  ),
-              },
-              { id: 'size', header: 'Size', align: 'right', cell: (row) => <Bytes value={row.resultSizeBytes ?? row.progress.bytesDone} /> },
-              { id: 'error', header: 'Note', cell: (row) => row.error ?? '' },
-              {
-                id: 'actions',
-                header: '',
-                headerLabel: 'Actions',
-                cell: (row) => {
-                  const action = row.state === 'failed' || row.state === 'cancelled' ? 'retry' : row.state === 'paused' ? 'resume' : row.state === 'running' || row.state === 'queued' ? 'pause' : null;
-                  if (!action) return null;
+    <Group title="Downloads">
+      <div className="well">
+        <table className="tbl" aria-label="Downloads">
+          <colgroup>
+            <col />
+            <col className="hide-sm" style={{ width: '18%' }} />
+            <col style={{ width: '12%' }} />
+            <col style={{ width: '20%' }} />
+            <col style={{ width: 132 }} />
+          </colgroup>
+          <thead>
+            <tr>
+              <th scope="col">Item</th>
+              <th scope="col" className="hide-sm">
+                From
+              </th>
+              <th scope="col">Format</th>
+              <th scope="col">Progress</th>
+              <th scope="col">
+                <span className="sr">Actions</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {state ? <EmptyCells columns={5} {...state} /> : null}
+            {state
+              ? null
+              : items.map((job) => {
+                  const title = [job.source.title, job.source.artistName].filter(Boolean).join(' — ') || job.source.url || 'Untitled';
+                  const percent = job.progress.percent === null ? null : Math.round(job.progress.percent);
+                  const stage = STAGES[job.progress.stage] ?? 'Working';
                   return (
-                    <ConfirmButton
-                      label={action === 'retry' ? 'Retry' : action === 'resume' ? 'Resume' : 'Pause'}
-                      confirmLabel={`${action[0]!.toUpperCase()}${action.slice(1)} this download?`}
-                      danger={false}
-                      busy={act.busy}
-                      onConfirm={() => void act.run(row.id, action).then(() => jobs.reload())}
-                    />
+                    <tr key={job.id}>
+                      <td title={`${title} · ${BASIS_LABELS[job.authorization.basis] ?? 'Allowed'}`}>{title}</td>
+                      <td className="hide-sm">{names.get(job.source.provider) ?? job.source.provider}</td>
+                      <td>{FORMAT_LABELS[job.target.format] ?? job.target.format}</td>
+                      <td>
+                        {job.state === 'completed' ? (
+                          <span className="ok" title={job.resultSizeBytes ? formatBytes(job.resultSizeBytes) : undefined}>
+                            ✓ Done
+                          </span>
+                        ) : job.state === 'queued' ? (
+                          <span className="sub">Waiting</span>
+                        ) : job.state === 'paused' ? (
+                          <span className="sub">Paused{percent === null ? '' : ` at ${percent}%`}</span>
+                        ) : job.state === 'failed' ? (
+                          <span className="bad" title={job.error ?? undefined}>
+                            Failed
+                          </span>
+                        ) : job.state === 'cancelled' ? (
+                          <span className="sub">Cancelled</span>
+                        ) : percent === null ? (
+                          <span className="sub">{stage}…</span>
+                        ) : (
+                          <div className="bar" role="progressbar" aria-label={`${stage}, ${percent}%`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} title={`${stage} · ${percent}%`}>
+                            <i style={{ width: `${percent}%` }} />
+                          </div>
+                        )}
+                      </td>
+                      <td className="acts">
+                        {job.state === 'failed' || job.state === 'cancelled' ? (
+                          <Push busy={act.busy} aria-label={`Retry ${title}`} onClick={() => run(job, 'retry')}>
+                            Retry
+                          </Push>
+                        ) : null}
+                        {job.state === 'paused' ? (
+                          <Push busy={act.busy} aria-label={`Resume ${title}`} onClick={() => run(job, 'resume')}>
+                            Resume
+                          </Push>
+                        ) : null}
+                        {job.state === 'running' || job.state === 'queued' || job.state === 'retrying' ? (
+                          <Push busy={act.busy} aria-label={`Pause ${title}`} onClick={() => run(job, 'pause')}>
+                            Pause
+                          </Push>
+                        ) : null}
+                        {job.state === 'running' || job.state === 'queued' || job.state === 'retrying' || job.state === 'paused' ? (
+                          <Push
+                            busy={act.busy}
+                            aria-label={`Cancel ${title}`}
+                            onClick={() =>
+                              void confirm({ title: 'Cancel this download?', text: `“${title}” stops and what was fetched so far is thrown away.`, verb: 'Cancel Download' }).then((go) => {
+                                if (go) run(job, 'cancel');
+                              })
+                            }
+                          >
+                            Cancel
+                          </Push>
+                        ) : null}
+                      </td>
+                    </tr>
                   );
-                },
-              },
-            ]}
-          />
-        )}
-      </AsyncPanel>
+                })}
+          </tbody>
+        </table>
+      </div>
+      {items.some((j) => j.state === 'failed' && j.error) ? <Note>{items.find((j) => j.state === 'failed' && j.error)?.error}</Note> : null}
+      <ActionError error={act.error} />
 
-      <AsyncPanel resource={formats} title="Output formats">
-        {(raw) => {
-          const data = raw as { formats: FormatAvailability[]; ffmpeg: { available: boolean; version: string | null; encoders: string[] } };
-          return (
+      <div className="pref pref--after">
+        <span className="k top">Output formats:</span>
+        <div className="v">
+          {formatData ? (
             <>
-              <p className="admin-hint">
-                {data.ffmpeg.available
-                  ? `FFmpeg ${data.ffmpeg.version ?? ''} is installed with ${data.ffmpeg.encoders.length} of the encoders this hub looks for.`
-                  : 'FFmpeg is not available in this build, so files can only be copied byte for byte. That is lossless, but no conversion is possible.'}
-              </p>
-              <AquaTable
-                label="Formats"
-                rowKey={(row: FormatAvailability) => row.format}
-                rows={data.formats}
-                columns={[
-                  { id: 'format', header: 'Format', primary: true, cell: (row) => row.format },
-                  { id: 'available', header: 'Available', cell: (row) => <StatusDot kind={row.available ? 'ok' : 'neutral'} label={row.available ? 'yes' : 'no'} /> },
-                  { id: 'lossy', header: 'Lossy', cell: (row) => (row.lossy ? 'yes' : 'no') },
-                  { id: 'quality', header: 'Quality', cell: (row) => row.qualityNote },
-                  { id: 'reason', header: 'Why not', cell: (row) => row.reason ?? '' },
-                ]}
-              />
+              <span className="caps">
+                {formatData.formats.map((f) => (
+                  <span key={f.format} className={`cap ${f.available ? 'cap--yes' : 'cap--no'}`} title={f.available ? f.qualityNote : (f.reason ?? 'Not available in this build')}>
+                    {FORMAT_LABELS[f.format] ?? f.format}
+                    <span className="sr">: {f.available ? 'available' : 'not available'}</span>
+                  </span>
+                ))}
+              </span>
+              <span className="sub">
+                {formatData.ffmpeg.available
+                  ? 'Converted with the FFmpeg in this container. Turning a lossy file into FLAC makes it bigger, not better.'
+                  : 'This container has no FFmpeg, so files are saved as they are and nothing is converted.'}
+              </span>
             </>
-          );
-        }}
-      </AsyncPanel>
-
-      <AsyncPanel resource={storage} title="Storage">
-        {(raw) => {
-          const data = raw as { dataDir: string; freeBytes: number | null; totalBytes: number | null; usedByDownloadsBytes: number; partialFiles: number; cleanupPolicy: { keepFailedDays: number; keepPartialHours: number } };
-          return (
-            <PanelSection>
-              <ul className="admin-list">
-                <li>
-                  Data volume <code>{data.dataDir}</code>: {data.freeBytes === null ? 'free space unknown on this filesystem' : <><Bytes value={data.freeBytes} /> free of <Bytes value={data.totalBytes} /></>}
-                </li>
-                <li>
-                  Downloaded content: <Bytes value={data.usedByDownloadsBytes} />
-                </li>
-                <li>Unfinished uploads: {data.partialFiles}</li>
-                <li>
-                  Cleanup: failed jobs are dropped after {data.cleanupPolicy.keepFailedDays} days, unfinished files after {data.cleanupPolicy.keepPartialHours} hours.
-                </li>
-              </ul>
-            </PanelSection>
-          );
-        }}
-      </AsyncPanel>
-      <div hidden>{toast ? '' : ''}</div>
-    </>
+          ) : (
+            <span className="sub">{formats.error ? errorSentence(formats.error) : 'Loading…'}</span>
+          )}
+        </div>
+        <span className="k top">Storage:</span>
+        <div className="v">
+          {store ? (
+            <>
+              <span>
+                <span className="path">{store.dataDir}</span> · {formatBytes(store.usedByDownloadsBytes)} used by downloads · {store.freeBytes === null ? 'free space unknown' : `${formatBytes(store.freeBytes)} free`}
+              </span>
+              <span className="sub">
+                Failed downloads are cleared after {store.cleanupPolicy.keepFailedDays} days, unfinished files after {store.cleanupPolicy.keepPartialHours} hours.
+                {store.partialFiles ? ` ${store.partialFiles} unfinished now.` : ''}
+              </span>
+            </>
+          ) : (
+            <span className="sub">{storage.error ? errorSentence(storage.error) : 'Loading…'}</span>
+          )}
+        </div>
+      </div>
+      <Note>A stream never implies a download. Where a provider doesn’t allow saving, there’s no button — not one that fails.</Note>
+    </Group>
   );
 }
-
-export { Panel, Ago };
