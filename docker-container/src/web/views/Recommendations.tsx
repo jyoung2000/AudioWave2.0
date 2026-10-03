@@ -1,15 +1,15 @@
 /**
- * Recommendation configuration.
+ * Recommendation settings.
  *
- * The weights are shown as what they are: numbers an operator can change, with the behaviour each
- * one produces spelled out. The panel also states plainly what the recommender is not — no model,
- * no GPU, no external service — because "recommendations" usually implies otherwise.
+ * The three numbers the design shows, and under them what the hub also lets an operator change:
+ * what each listening action is worth. Nothing takes effect until Save, and Revert puts back what
+ * the hub has. The notes say plainly what the recommender is not — no model, no outside service —
+ * because "recommendations" usually implies otherwise.
  */
 import { useState } from 'react';
-import { AquaTable, Button, Panel, PanelSection, TextField, useToast } from '@now-playing/aqua-ui';
 import { api } from '../lib/api.js';
 import { useAction, useResource } from '../lib/hooks.js';
-import { AsyncPanel, InlineError } from './common.js';
+import { ActionError, errorSentence, Field, Group, Note, Push, SubHead, useHubUi } from '../ui.js';
 
 const ACTION_LABELS: Record<string, string> = {
   immediateSkip: 'Skipped within a few seconds',
@@ -25,114 +25,120 @@ const ACTION_LABELS: Record<string, string> = {
 
 export function RecommendationsView() {
   const config = useResource('recommendationsConfigGet');
-  const toast = useToast();
+  const { say } = useHubUi();
   const save = useAction(async (body: Record<string, unknown>) => api('recommendationsConfigPut', { body }));
   const [draft, setDraft] = useState<Record<string, unknown> | null>(null);
 
+  const stored = config.data as Record<string, unknown> | null;
+  const current = draft ?? stored;
+  const weights = ((current?.['actionWeights'] ?? {}) as Record<string, number>) ?? {};
+  const set = (key: string, value: number): void => setDraft({ ...(current ?? {}), [key]: value });
+  const number = (key: string, fallback: number): string => String(current?.[key] ?? fallback);
+
   return (
-    <>
-      <Panel title="How recommendations work here">
-        <PanelSection>
-          <ul className="admin-list">
-            <li>Everything runs on this hub. No model is downloaded, no GPU is used, and no listening data is sent anywhere.</li>
-            <li>Personalization needs the <code>history:events</code> permission on a device. Without it, a person still gets recommendations — from the catalogue and their explicit seeds, not their history.</li>
-            <li>Group taste comparison uses aggregate profiles only, shared by opt-in, and needs at least three participants before it shows anything.</li>
-            <li>Availability is checked against the providers this hub is actually configured for, so a recommendation is never something nobody here can play.</li>
-          </ul>
-        </PanelSection>
-      </Panel>
+    <Group title="Recommendations" hint="The same engine, names and limits as the player’s Settings ▸ Recommendations; these are the hub’s defaults for everyone." last>
+      {!current ? (
+        <Note bad={Boolean(config.error)}>{config.error ? errorSentence(config.error) : 'Loading…'}</Note>
+      ) : (
+        <>
+          <div className="pref">
+            <label className="k" htmlFor="rExp">
+              Exploration (0–1):
+            </label>
+            <div className="v">
+              <Field id="rExp" numeric type="number" min={0} max={1} step={0.05} value={number('exploration', 0.2)} onChange={(e) => set('exploration', Number(e.currentTarget.value))} />
+              <span className="sub">How much of each list is deliberately unfamiliar.</span>
+            </div>
+            <label className="k" htmlFor="rHalf">
+              Half-life (days):
+            </label>
+            <div className="v">
+              <Field id="rHalf" numeric type="number" min={1} max={365} value={number('halfLifeDays', 45)} onChange={(e) => set('halfLifeDays', Number(e.currentTarget.value))} />
+              <span className="sub">How quickly older listening fades: after this many days it counts half as much.</span>
+            </div>
+            <label className="k" htmlFor="rMax">
+              Most tracks per artist:
+            </label>
+            <div className="v">
+              <Field id="rMax" numeric type="number" min={1} max={20} value={number('maxPerArtist', 2)} onChange={(e) => set('maxPerArtist', Number(e.currentTarget.value))} />
+              <span className="sub">Stops one artist filling a list.</span>
+            </div>
+          </div>
 
-      <AsyncPanel resource={config} title="Weights and behaviour">
-        {(raw) => {
-          const current = (draft ?? raw) as Record<string, unknown>;
-          const weights = (current['actionWeights'] ?? {}) as Record<string, number>;
-          const setWeight = (key: string, value: number) => setDraft({ ...current, actionWeights: { ...weights, [key]: value } });
-          return (
+          {Object.keys(weights).length ? (
             <>
-              <PanelSection title="What each listening action is worth">
-                <AquaTable
-                  label="Action weights"
-                  rowKey={(row: { key: string }) => row.key}
-                  rows={Object.entries(weights).map(([key, value]) => ({ key, value }))}
-                  columns={[
-                    { id: 'action', header: 'Action', primary: true, cell: (row) => ACTION_LABELS[row.key] ?? row.key },
-                    {
-                      id: 'weight',
-                      header: 'Weight',
-                      align: 'right',
-                      width: 120,
-                      cell: (row) => (
-                        <input
-                          className="aqua-input aqua-input--number"
-                          type="number"
-                          step="0.5"
-                          value={row.value}
-                          aria-label={`Weight for ${ACTION_LABELS[row.key] ?? row.key}`}
-                          onChange={(e) => setWeight(row.key, Number(e.currentTarget.value))}
-                        />
-                      ),
-                    },
-                    { id: 'effect', header: 'Effect', cell: (row) => (row.value < 0 ? 'Discourages this track' : row.value === 0 ? 'No effect' : 'Encourages similar music') },
-                  ]}
-                />
-                <p className="admin-hint">
-                  A single skip lowers only that track, never the artist or the genre — one bad night for one song should not remove a favourite artist from someone's recommendations.
-                </p>
-              </PanelSection>
-
-              <PanelSection title="Decay and diversity">
-                <div className="admin-form">
-                  <TextField
-                    label="Half-life (days)"
-                    type="number"
-                    value={String(current['halfLifeDays'] ?? 45)}
-                    onChange={(e) => setDraft({ ...current, halfLifeDays: Number(e.currentTarget.value) })}
-                    hint="How quickly older listening fades. At 45 days, music from six weeks ago counts half as much as today's."
-                  />
-                  <TextField
-                    label="Maximum tracks per artist"
-                    type="number"
-                    value={String(current['maxPerArtist'] ?? 2)}
-                    onChange={(e) => setDraft({ ...current, maxPerArtist: Number(e.currentTarget.value) })}
-                    hint="Stops one artist filling a list."
-                  />
-                  <TextField
-                    label="Exploration (0–1)"
-                    type="number"
-                    step="0.05"
-                    value={String(current['exploration'] ?? 0.2)}
-                    onChange={(e) => setDraft({ ...current, exploration: Number(e.currentTarget.value) })}
-                    hint="How much of each list is deliberately unfamiliar."
-                  />
-                </div>
-              </PanelSection>
-
-              <div className="admin-actions">
-                <Button
-                  variant="default"
-                  busy={save.busy}
-                  disabled={draft === null}
-                  onClick={() =>
-                    void save.run(current).then((r) => {
-                      if (r) {
-                        setDraft(null);
-                        config.reload();
-                        toast.show('Saved', { kind: 'success' });
-                      }
-                    })
-                  }
-                >
-                  Save
-                </Button>
-                <Button disabled={draft === null} onClick={() => setDraft(null)}>
-                  Discard changes
-                </Button>
+              <SubHead>What each listening action is worth</SubHead>
+              <div className="well">
+                <table className="tbl" aria-label="What each listening action is worth">
+                  <colgroup>
+                    <col />
+                    <col style={{ width: 92 }} />
+                    <col style={{ width: '34%' }} className="hide-sm" />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th scope="col">When a track is…</th>
+                      <th scope="col" className="num">
+                        Weight
+                      </th>
+                      <th scope="col" className="hide-sm">
+                        Effect
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(weights).map(([key, value]) => (
+                      <tr key={key}>
+                        <td>{ACTION_LABELS[key] ?? key}</td>
+                        <td className="num">
+                          <Field
+                            numeric
+                            className="field--cell"
+                            type="number"
+                            step={0.5}
+                            value={String(value)}
+                            aria-label={`Weight for ${ACTION_LABELS[key] ?? key}`}
+                            onChange={(e) => setDraft({ ...current, actionWeights: { ...weights, [key]: Number(e.currentTarget.value) } })}
+                          />
+                        </td>
+                        <td className="hide-sm">{value < 0 ? 'Fewer tracks like it' : value === 0 ? 'No effect' : 'More music like it'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              <InlineError error={save.error} />
             </>
-          );
-        }}
-      </AsyncPanel>
-    </>
+          ) : null}
+
+          <div className="barrow">
+            <Push
+              primary
+              busy={save.busy}
+              disabled={draft === null}
+              reason="Nothing has changed."
+              onClick={() =>
+                void save.run(current).then((r) => {
+                  if (r) {
+                    setDraft(null);
+                    config.reload();
+                    say('Saved the recommendation settings.');
+                  }
+                })
+              }
+            >
+              Save
+            </Push>
+            <Push disabled={draft === null} reason="Nothing has changed." onClick={() => setDraft(null)}>
+              Revert
+            </Push>
+          </div>
+          <ActionError error={save.error} />
+          <Note>
+            Everything runs on this hub: no model is downloaded and no listening leaves it. A single skip lowers only that track, never its artist. Personal picks need the “Send each play” permission on a device; without
+            it people still get recommendations, from the catalogue and what they choose.
+          </Note>
+        </>
+      )}
+    </Group>
   );
 }

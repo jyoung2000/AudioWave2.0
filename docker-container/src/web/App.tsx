@@ -1,27 +1,27 @@
 /**
- * The admin GUI shell.
+ * The Airwave Hub window.
  *
- * Three states, in order of precedence:
+ * One window, always: the centred Snow Leopard window `design/frontends/airwave-hub.html` draws — a
+ * title bar and six icon tabs on one chrome sheet, the pane scrolling under it, a status strip at
+ * the foot. What changes with the session is what the window lets through:
  *
- * 1. **Not signed in** — the login screen, which also explains the first-run credentials rather
- *    than leaving someone guessing.
- * 2. **Signed in but the bootstrap password is still in place** — the password gate, with no way
- *    past it. Nothing else is reachable, mirroring the server's own gate rather than duplicating a
- *    rule the API might not enforce.
- * 3. **Signed in and set up** — the full interface.
+ * 1. **Not signed in** — the same window with its tabs locked and the sign-in form in the pane.
+ * 2. **Signed in, bootstrap password still in place** — the Overview pane with the design's amber
+ *    gate asking for a real password. The other five tabs are visible but locked, with the reason:
+ *    the server refuses every gated route until the password is changed, so there is nothing true
+ *    to show behind them. Overview itself reads only routes the server allows before setup.
+ * 3. **Signed in and set up** — everything.
  *
- * The window is the one `design/frontends/airwave-hub.html` drew: a title bar and a row of six
- * icon tabs on one chrome sheet, the pane scrolling under it, a status strip at the foot. The
- * thirteen sections the hub had as a source list now live inside those tabs (Overview · Devices ·
- * Music · Groups · Sharing · System); each keeps its own data flow and its own ledger entry, and a
- * link to a section still lands on the right tab. The tab strip is a roving-tabindex group
- * (UX-KEY-001), the same contract the source list honoured.
+ * The thirteen sections the hub has always had live inside the six tabs (design/decisions.md
+ * DEC-017); each keeps its own data flow, its own `#section-id` anchor and its own ledger entry. The
+ * tab strip is a roving-tabindex group (UX-KEY-001): one tab stop, arrows and Home/End move the
+ * selection, locked tabs are skipped.
  */
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AquaWindow, BottomBar, Button, Content, Glyph, LoadingState, StatusDot, TextField, Toolbar, ToolTabs, useToast, type GlyphName } from '@now-playing/aqua-ui';
-import type { NetworkConfig, OverviewMetrics, SessionInfo } from '@now-playing/contracts';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
+import { BRANDING, type NetworkConfig, type OverviewMetrics, type SessionInfo } from '@now-playing/contracts';
 import { api, setCsrfToken } from './lib/api.js';
 import { useAction, useResource, useStoredState } from './lib/hooks.js';
+import { ActionError, count, errorSentence, Field, HubUiProvider, Note, Push } from './ui.js';
 import { ViewBoundary } from './ViewBoundary.js';
 import { OverviewView } from './views/Overview.js';
 import { DevicesView } from './views/Devices.js';
@@ -37,6 +37,8 @@ import { DiagnosticsView } from './views/Diagnostics.js';
 import { BackupView } from './views/Backup.js';
 import { RecommendationsView } from './views/Recommendations.js';
 
+const PRODUCT = BRANDING.products.hub;
+
 /** The sections. Each is a screen in design/coverage.json; the tab it lives in is below. */
 export type ViewId = 'overview' | 'devices' | 'groups' | 'profiles' | 'providers' | 'library' | 'downloads' | 'shares' | 'recommendations' | 'discord' | 'network' | 'diagnostics' | 'backup';
 
@@ -45,10 +47,58 @@ export type TabId = 'overview' | 'devices' | 'music' | 'groups' | 'sharing' | 's
 interface TabSpec {
   id: TabId;
   label: string;
-  icon: GlyphName;
+  icon: ReactNode;
+  /** The sentence under the toolbar, where the design has one. */
+  lead?: string;
   /** In the order they stack down the pane. */
   sections: ViewId[];
 }
+
+/* The six toolbar icons, as drawn in the design file. */
+const ICONS: Record<TabId, ReactNode> = {
+  overview: (
+    <svg viewBox="0 0 26 26" aria-hidden="true">
+      <rect x="3" y="4" width="20" height="16" rx="2" fill="#e9eef3" stroke="#4c637c" strokeWidth="1.1" />
+      <rect x="6" y="13" width="3" height="4" fill="#7d97b3" />
+      <rect x="11.5" y="9" width="3" height="8" fill="#7d97b3" />
+      <rect x="17" y="7" width="3" height="10" fill="#4c637c" />
+      <path d="M9 23h8" stroke="#4c637c" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  ),
+  devices: (
+    <svg viewBox="0 0 26 26" aria-hidden="true">
+      <rect x="8" y="3" width="10" height="20" rx="2" fill="#5b6770" stroke="#39424a" strokeWidth="1.1" />
+      <rect x="9.6" y="5.5" width="6.8" height="13" rx=".6" fill="#9fd2ee" />
+      <circle cx="13" cy="20.8" r=".9" fill="#dfe6ea" />
+    </svg>
+  ),
+  music: (
+    <svg viewBox="0 0 26 26" aria-hidden="true">
+      <path d="M20 3.5 10 5.8a1 1 0 0 0-.8 1v10.3a3.2 3.2 0 1 0 1.7 2.8V10.2l7.7-1.8v6.1a3.2 3.2 0 1 0 1.7 2.8V4.4a.8.8 0 0 0-1-.9z" fill="#7d97b3" stroke="#4c637c" strokeWidth=".9" />
+    </svg>
+  ),
+  groups: (
+    <svg viewBox="0 0 26 26" aria-hidden="true">
+      <circle cx="8" cy="9" r="3.2" fill="#9fb3c8" stroke="#4c637c" />
+      <circle cx="18" cy="9" r="3.2" fill="#9fb3c8" stroke="#4c637c" />
+      <circle cx="13" cy="11" r="3.6" fill="#7d97b3" stroke="#4c637c" />
+      <path d="M3 21c.5-4 3-6 5-6M23 21c-.5-4-3-6-5-6M6.5 22c.6-4.6 3.4-7 6.5-7s5.9 2.4 6.5 7z" fill="#7d97b3" stroke="#4c637c" strokeLinejoin="round" />
+    </svg>
+  ),
+  sharing: (
+    <svg viewBox="0 0 26 26" aria-hidden="true">
+      <path d="M11 15a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4L12.8 6.8" fill="none" stroke="#4c637c" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M15 11a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.4-1.4" fill="none" stroke="#7d97b3" strokeWidth="2.2" strokeLinecap="round" />
+    </svg>
+  ),
+  system: (
+    <svg viewBox="0 0 26 26" aria-hidden="true">
+      <circle cx="13" cy="13" r="8.3" fill="none" stroke="#4c637c" strokeWidth="3.4" strokeDasharray="3.26 3.26" />
+      <circle cx="13" cy="13" r="6.6" fill="#7d97b3" stroke="#4c637c" strokeWidth="1.1" />
+      <circle cx="13" cy="13" r="2.4" fill="#e3e3e3" stroke="#4c637c" />
+    </svg>
+  ),
+};
 
 /**
  * Profiles sit with Devices: a profile is what a paired device's person looks like to other
@@ -56,17 +106,52 @@ interface TabSpec {
  * hub's defaults for the same engine the player's Settings ▸ Recommendations edits.
  */
 const TABS: readonly TabSpec[] = [
-  { id: 'overview', label: 'Overview', icon: 'info', sections: ['overview'] },
-  { id: 'devices', label: 'Devices', icon: 'device', sections: ['devices', 'profiles'] },
-  { id: 'music', label: 'Music', icon: 'note', sections: ['library', 'providers', 'downloads', 'recommendations'] },
-  { id: 'groups', label: 'Groups', icon: 'group', sections: ['groups'] },
-  { id: 'sharing', label: 'Sharing', icon: 'link', sections: ['shares', 'discord'] },
-  { id: 'system', label: 'System', icon: 'gear', sections: ['network', 'backup', 'diagnostics'] },
+  { id: 'overview', label: 'Overview', icon: ICONS.overview, sections: ['overview'] },
+  {
+    id: 'devices',
+    label: 'Devices',
+    icon: ICONS.devices,
+    lead: 'Players and companion apps that may use this hub. Each gets only the permissions you tick when you pair it.',
+    sections: ['devices', 'profiles'],
+  },
+  {
+    id: 'music',
+    label: 'Music',
+    icon: ICONS.music,
+    lead: 'What the hub plays from, where it looks things up, and what it may save. Everything here is shared by every paired device.',
+    sections: ['library', 'providers', 'downloads', 'recommendations'],
+  },
+  {
+    id: 'groups',
+    label: 'Groups',
+    icon: ICONS.groups,
+    lead: 'Listening together: one queue, one clock, every member kept in step. Drift is how far each device is from the group’s clock.',
+    sections: ['groups'],
+  },
+  { id: 'sharing', label: 'Sharing', icon: ICONS.sharing, sections: ['shares', 'discord'] },
+  { id: 'system', label: 'System', icon: ICONS.system, sections: ['network', 'backup', 'diagnostics'] },
 ];
 
 const TAB_IDS: ReadonlySet<string> = new Set(TABS.map((t) => t.id));
 
 const SECTION_TAB: Record<ViewId, TabId> = Object.fromEntries(TABS.flatMap((t) => t.sections.map((s) => [s, t.id]))) as Record<ViewId, TabId>;
+
+/** What each section is called: the landmark a screen reader lists. */
+const SECTION_TITLES: Record<ViewId, string> = {
+  overview: 'Overview',
+  devices: 'Devices',
+  profiles: 'Profiles',
+  library: 'Library',
+  providers: 'Providers',
+  downloads: 'Downloads',
+  recommendations: 'Recommendations',
+  groups: 'Groups',
+  shares: 'Shared links',
+  discord: 'Discord',
+  network: 'Network',
+  backup: 'Backup',
+  diagnostics: 'Diagnostics',
+};
 
 /** A stored id from an older build (a section id from the source-list days, or a hand edit) is
  * mapped onto its tab rather than rendering an empty pane. */
@@ -80,10 +165,21 @@ function tabFor(value: unknown): TabId | null {
   return null;
 }
 
+function hashId(): string {
+  return window.location.hash.replace(/^#/, '');
+}
+
 /** `#system` or `#diagnostics` in the address opens that tab, so a log message can point at one. */
 function tabFromHash(): TabId | null {
-  return tabFor(window.location.hash.replace(/^#/, ''));
+  return tabFor(hashId());
 }
+
+/**
+ * The password typed at sign-in, kept in memory only while the first-run gate is up, so the gate
+ * can ask for the new password alone (as the design does) and still send the current one the
+ * server requires. It is never stored, and it is dropped the moment the password changes.
+ */
+let passwordJustTyped: string | null = null;
 
 export function App() {
   const session = useResource('authSession', {}, { pollMs: 60_000 });
@@ -93,29 +189,141 @@ export function App() {
     setCsrfToken(info?.csrfToken ?? null);
   }, [info?.csrfToken]);
 
-  if (session.initial && session.loading) return <Centred><LoadingState title="Connecting to the hub" /></Centred>;
-  if (!info?.authenticated) return <LoginScreen onSignedIn={session.reload} setupComplete={info?.setupComplete ?? false} />;
-  if (info.mustChangePassword) return <ChangePasswordScreen onDone={session.reload} />;
-  return <AdminShell session={info} onSignedOut={session.reload} />;
+  if (!info) {
+    return (
+      <Window locked="Connecting to the hub." status={<StatusLine kind="off" text="Connecting to the hub…" />}>
+        <div className="pane" aria-busy={!session.error}>
+          {session.error ? (
+            <>
+              <Note bad>{errorSentence(session.error)}</Note>
+              <div className="barrow">
+                <Push onClick={session.reload}>Try Again</Push>
+              </div>
+            </>
+          ) : (
+            <p className="lead">Connecting to the hub…</p>
+          )}
+        </div>
+      </Window>
+    );
+  }
+  if (!info.authenticated) return <SignIn onSignedIn={session.reload} setupComplete={info.setupComplete} />;
+  return <AdminShell session={info} onSessionChanged={session.reload} />;
 }
 
-function Centred({ children }: { children: ReactNode }) {
-  // aqua-root is what carries the design system's typography; without it this screen
-  // renders in whatever the browser considers a default, which is a serif at 16px.
-  return <div className="aqua-root admin-centred">{children}</div>;
+/* ------------------------------------------------------------------ the window */
+
+interface ToolState {
+  selected: TabId | null;
+  onSelect: (tab: TabId) => void;
+  /** Tabs that are shown but cannot be opened. */
+  lockedTabs: ReadonlySet<TabId>;
+  lockedReason: string;
+  badges: Partial<Record<TabId, { count: number; label: string }>>;
 }
 
-function LoginScreen({ onSignedIn, setupComplete }: { onSignedIn: () => void; setupComplete: boolean }) {
+function Window({ tools, locked, status, sheet, sheetOpen, children }: { tools?: ToolState; locked?: string; status: ReactNode; sheet?: ReactNode; sheetOpen?: boolean; children: ReactNode }) {
+  const state: ToolState = tools ?? { selected: null, onSelect: () => undefined, lockedTabs: new Set(TABS.map((t) => t.id)), lockedReason: locked ?? '', badges: {} };
+  const open = TABS.filter((t) => !state.lockedTabs.has(t.id));
+
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+    if (!open.length) return;
+    const at = open.findIndex((t) => t.id === state.selected);
+    const next = { ArrowRight: open[(at + 1) % open.length], ArrowLeft: open[(at - 1 + open.length) % open.length], Home: open[0], End: open[open.length - 1] }[event.key];
+    if (!next) return;
+    event.preventDefault();
+    state.onSelect(next.id);
+    document.getElementById(`tab-${next.id}`)?.focus();
+  };
+
+  return (
+    <div className="frame">
+      <main className="win" aria-label={PRODUCT}>
+        <div className="chrome" inert={sheetOpen}>
+          <h1 className="titlebar">{PRODUCT}</h1>
+          {/* The arrow keys belong to the tab strip, not to a control inside it. */}
+          {/* eslint-disable-next-line jsx-a11y/interactive-supports-focus */}
+          <div className="toolbar" role="tablist" aria-label="Sections" onKeyDown={onKeyDown}>
+            {TABS.map((tab) => {
+              const isLocked = state.lockedTabs.has(tab.id);
+              const isSelected = state.selected === tab.id;
+              const badge = state.badges[tab.id];
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  className={`tool${isLocked ? ' locked' : ''}`}
+                  role="tab"
+                  id={`tab-${tab.id}`}
+                  aria-selected={isSelected}
+                  aria-controls={isSelected ? `pane-${tab.id}` : undefined}
+                  aria-disabled={isLocked || undefined}
+                  aria-describedby={isLocked ? 'tools-locked' : undefined}
+                  tabIndex={isSelected ? 0 : -1}
+                  onClick={() => {
+                    if (!isLocked) state.onSelect(tab.id);
+                  }}
+                >
+                  {tab.icon}
+                  {tab.label}
+                  {badge ? (
+                    <>
+                      <span className="gear-badge" aria-hidden="true">
+                        {badge.count}
+                      </span>
+                      <span className="sr">, {badge.label}</span>
+                    </>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+          {state.lockedTabs.size ? (
+            <span className="sr" id="tools-locked">
+              {state.lockedReason}
+            </span>
+          ) : null}
+        </div>
+        <div className="pane-host" inert={sheetOpen}>
+          {children}
+        </div>
+        {sheet}
+        <div className="status" inert={sheetOpen}>
+          {status}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function StatusLine({ kind, text, right, message }: { kind: 'ok' | 'warn' | 'bad' | 'off'; text: string; right?: string | null; message?: string | null }) {
+  return (
+    <>
+      <span className={`dot${kind === 'ok' ? '' : ` dot--${kind}`}`} aria-hidden="true" />
+      {/* One live region: what the window just did replaces the standing line for a few seconds. */}
+      <span id="hubLine" role="status" aria-live="polite">
+        {message ?? text}
+      </span>
+      <span className="spacer" />
+      {right ? <span id="countLine">{right}</span> : null}
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ sign-in */
+
+function SignIn({ onSignedIn, setupComplete }: { onSignedIn: () => void; setupComplete: boolean }) {
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('');
   const login = useAction(async (u: string, p: string) => api('authLogin', { body: { username: u, password: p } }));
 
   const submit = useCallback(
-    async (event: React.FormEvent) => {
+    async (event: FormEvent) => {
       event.preventDefault();
-      const result = await login.run(username, password);
+      const result = (await login.run(username, password)) as SessionInfo | null;
       if (result) {
-        setCsrfToken((result as SessionInfo).csrfToken ?? null);
+        setCsrfToken(result.csrfToken ?? null);
+        passwordJustTyped = result.mustChangePassword ? password : null;
         onSignedIn();
       }
     },
@@ -123,94 +331,103 @@ function LoginScreen({ onSignedIn, setupComplete }: { onSignedIn: () => void; se
   );
 
   return (
-    <Centred>
-      <form className="admin-login" onSubmit={submit}>
-        <h1>Now Playing Hub</h1>
-        {!setupComplete ? (
-          <p className="admin-login__hint">
-            First run: sign in with <strong>admin</strong> / <strong>admin</strong>. You will be asked to choose a real password before anything else is enabled.
-          </p>
-        ) : null}
-        <TextField label="Username" value={username} autoComplete="username" onChange={(e) => setUsername(e.currentTarget.value)} />
-        <TextField
-          label="Password"
-          type="password"
-          value={password}
-          autoComplete="current-password"
-          onChange={(e) => setPassword(e.currentTarget.value)}
-          {...(login.error ? { validation: { kind: 'error' as const, message: login.error.message } } : {})}
-        />
-        <Button type="submit" variant="default" busy={login.busy} wide>
-          Sign in
-        </Button>
-      </form>
-    </Centred>
+    <Window locked="Sign in first." status={<StatusLine kind="off" text="Not signed in" />}>
+      <div className="pane">
+        <form className="signin" onSubmit={submit} noValidate>
+          <fieldset className="group--last">
+            <legend>Sign in</legend>
+            <p className="hint">
+              {setupComplete ? (
+                'Sign in with the admin password to manage this hub.'
+              ) : (
+                <>
+                  First run: sign in with <b>admin</b> / <b>admin</b>. You’ll choose a real password before anything else is switched on.
+                </>
+              )}
+            </p>
+            <div className="pref signin__pref">
+              <label className="k" htmlFor="signin-user">
+                Username:
+              </label>
+              <div className="v">
+                <Field id="signin-user" value={username} autoComplete="username" onChange={(e) => setUsername(e.currentTarget.value)} />
+              </div>
+              <label className="k" htmlFor="signin-pass">
+                Password:
+              </label>
+              <div className="v">
+                {/* The form is the whole pane and exists to be typed into, so the caret starts in it. */}
+                {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
+                <Field id="signin-pass" type="password" value={password} autoComplete="current-password" autoFocus invalid={Boolean(login.error)} onChange={(e) => setPassword(e.currentTarget.value)} />
+              </div>
+            </div>
+            <ActionError error={login.error} />
+          </fieldset>
+          <Push type="submit" primary busy={login.busy} disabled={!username || !password} reason="Type the username and password first.">
+            Sign In
+          </Push>
+        </form>
+      </div>
+    </Window>
   );
 }
+
+/* ------------------------------------------------------------------ the first-run gate */
 
 /**
- * The first-run gate, in the mockup's amber voice. It is still a screen of its own and not a
- * banner over a live interface: the server refuses every gated route until this is done, so a
- * disabled interface behind it would only be a picture of one.
+ * The design's amber gate. It asks for the new password twice; the current one is what was just
+ * typed at sign-in, and is asked for here only when the page was reloaded in between.
  */
-function ChangePasswordScreen({ onDone }: { onDone: () => void }) {
+function PasswordGate({ onDone }: { onDone: () => void }) {
+  const remembered = passwordJustTyped;
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
-  const [confirm, setConfirm] = useState('');
+  const [again, setAgain] = useState('');
+  const [problem, setProblem] = useState<string | null>(null);
   const change = useAction(async (c: string, n: string) => api('authChangePassword', { body: { currentPassword: c, newPassword: n } }));
-  const mismatch = confirm.length > 0 && next !== confirm;
 
-  const submit = useCallback(
-    async (event: React.FormEvent) => {
-      event.preventDefault();
-      if (mismatch) return;
-      const result = await change.run(current, next);
-      if (result) {
-        setCsrfToken((result as SessionInfo).csrfToken ?? null);
-        onDone();
-      }
-    },
-    [change, current, next, mismatch, onDone],
-  );
+  const submit = async (event: FormEvent): Promise<void> => {
+    event.preventDefault();
+    const currentPassword = remembered ?? current;
+    const why = !currentPassword ? 'Type the current password too.' : next.length < 12 ? 'Use at least 12 characters.' : next !== again ? 'The two don’t match.' : null;
+    setProblem(why);
+    if (why) return;
+    const result = (await change.run(currentPassword, next)) as SessionInfo | null;
+    if (result) {
+      passwordJustTyped = null;
+      setCsrfToken(result.csrfToken ?? null);
+      onDone();
+    }
+  };
 
   return (
-    <Centred>
-      <form className="admin-login admin-login--gate" onSubmit={submit}>
-        <div className="admin-gate">
-          <Glyph name="warning" className="admin-gate__icon" aria-hidden="true" />
-          <div className="admin-gate__body">
-            <h1>Choose a password</h1>
-            <p className="admin-login__hint">
-              You’re signed in as <strong>admin / admin</strong>. Until this is done the hub stays on this machine only: pairing, providers, group listening, the Discord bot and remote access are all
-              disabled. The server enforces this, not this page. Use a passphrase of several unrelated words, or a password manager.
-            </p>
-          </div>
-        </div>
-        <TextField label="Current password" type="password" value={current} autoComplete="current-password" onChange={(e) => setCurrent(e.currentTarget.value)} />
-        <TextField
-          label="New password"
-          type="password"
-          value={next}
-          autoComplete="new-password"
-          hint="At least 12 characters."
-          onChange={(e) => setNext(e.currentTarget.value)}
-          {...(change.error ? { validation: { kind: 'error' as const, message: change.error.message } } : {})}
-        />
-        <TextField
-          label="Repeat new password"
-          type="password"
-          value={confirm}
-          autoComplete="new-password"
-          onChange={(e) => setConfirm(e.currentTarget.value)}
-          {...(mismatch ? { validation: { kind: 'error' as const, message: 'The two passwords do not match' } } : {})}
-        />
-        <Button type="submit" variant="default" busy={change.busy} disabled={mismatch || next.length === 0} wide>
-          Set password
-        </Button>
-      </form>
-    </Centred>
+    <div className="gate" role="region" aria-labelledby="gateH">
+      <svg className="gate__icon" viewBox="0 0 26 26" aria-hidden="true">
+        <path d="M13 2.5 24 22H2z" fill="#f2c14e" stroke="#9a6a08" strokeLinejoin="round" />
+        <path d="M13 9v6.5" stroke="#3b2a05" strokeWidth="2.2" strokeLinecap="round" />
+        <circle cx="13" cy="18.8" r="1.3" fill="#3b2a05" />
+      </svg>
+      <div className="gate__body">
+        <h2 id="gateH">Choose a real password</h2>
+        <p>
+          You’re signed in as <b>admin / admin</b>. Until you change it, the hub stays on this machine: no pairing, no providers, no group listening, no Discord bot and no remote access. The server enforces this, not
+          this page.
+        </p>
+        <form className="barrow" onSubmit={(event) => void submit(event)} noValidate>
+          {remembered ? null : <Field type="password" placeholder="Current password" aria-label="Current password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.currentTarget.value)} />}
+          <Field type="password" placeholder="New password" aria-label="New password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.currentTarget.value)} />
+          <Field type="password" placeholder="Again" aria-label="New password again" autoComplete="new-password" value={again} onChange={(e) => setAgain(e.currentTarget.value)} />
+          <Push type="submit" primary busy={change.busy}>
+            Set Password
+          </Push>
+        </form>
+        {problem ? <Note bad>{problem}</Note> : <ActionError error={change.error} />}
+      </div>
+    </div>
   );
 }
+
+/* ------------------------------------------------------------------ signed in */
 
 function sectionBody(id: ViewId): ReactNode {
   switch (id) {
@@ -243,27 +460,45 @@ function sectionBody(id: ViewId): ReactNode {
   }
 }
 
-function AdminShell({ session, onSignedOut }: { session: SessionInfo; onSignedOut: () => void }) {
+const GATED_TABS: ReadonlySet<TabId> = new Set(TABS.filter((t) => t.id !== 'overview').map((t) => t.id));
+const NO_TABS: ReadonlySet<TabId> = new Set();
+const REACH = { localhost: 'this machine only', lan: 'your network', remote: 'the internet' } as const;
+
+function AdminShell({ session, onSessionChanged }: { session: SessionInfo; onSessionChanged: () => void }) {
+  const gated = Boolean(session.mustChangePassword);
   const [storedTab, setStoredTab] = useStoredState<TabId>('np.admin.tab', 'overview', isTabId);
-  const [tab, setTabState] = useState<TabId>(() => tabFromHash() ?? storedTab);
+  const [chosen, setTabState] = useState<TabId>(() => tabFromHash() ?? storedTab);
+  const tab: TabId = gated ? 'overview' : chosen;
+  // A link to `#diagnostics` opens System and brings that section into view.
+  const [target, setTarget] = useState<string | null>(() => (hashId() in SECTION_TAB ? hashId() : null));
+
   const setTab = useCallback(
     (next: TabId) => {
       setTabState(next);
       setStoredTab(next);
+      setTarget(null);
       if (window.location.hash && window.location.hash !== `#${next}`) history.replaceState(null, '', window.location.pathname + window.location.search);
     },
     [setStoredTab],
   );
   useEffect(() => {
-    const onHash = () => {
+    const onHash = (): void => {
       const next = tabFromHash();
-      if (next) setTab(next);
+      if (!next) return;
+      setTabState(next);
+      setStoredTab(next);
+      setTarget(hashId() in SECTION_TAB ? hashId() : null);
     };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
-  }, [setTab]);
+  }, [setStoredTab]);
 
-  const toast = useToast();
+  const pane = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const node = target ? document.getElementById(target) : null;
+    if (node && pane.current) pane.current.scrollTop = Math.max(0, node.offsetTop - pane.current.offsetTop - 12);
+  }, [target, tab]);
+
   const hub = useResource('hubIdentity');
   const overview = useResource('metricsOverview', {}, { pollMs: 10_000 });
   const network = useResource('networkGet', {}, { pollMs: 30_000 });
@@ -271,102 +506,58 @@ function AdminShell({ session, onSignedOut }: { session: SessionInfo; onSignedOu
   const logout = useAction(async () => api('authLogout'));
   const signOut = useCallback(async () => {
     await logout.run();
+    passwordJustTyped = null;
     setCsrfToken(null);
-    onSignedOut();
-  }, [logout, onSignedOut]);
+    onSessionChanged();
+  }, [logout, onSessionChanged]);
 
   const metrics = overview.data as OverviewMetrics | null;
-  const alerts = metrics?.alerts ?? [];
-  const worst = alerts.some((a) => a.level === 'error') ? 'error' : alerts.some((a) => a.level === 'warning') ? 'warning' : 'ok';
-  const tabItems = useMemo(
-    () => TABS.map((t) => (t.id === 'overview' && alerts.length ? { id: t.id, label: t.label, icon: t.icon, badge: alerts.length, badgeLabel: `${alerts.length} ${alerts.length === 1 ? 'alert' : 'alerts'}` } : { id: t.id, label: t.label, icon: t.icon })),
-    [alerts.length],
-  );
-
-  const identity = hub.data as { name?: string; version?: string; fingerprint?: string } | null;
-  const current = TABS.find((t) => t.id === tab) ?? TABS[0]!;
   const net = network.data as NetworkConfig | null;
+  const identity = hub.data as { name?: string; version?: string } | null;
+  const alerts = useMemo(() => metrics?.alerts ?? [], [metrics]);
+  const worst: 'ok' | 'warn' | 'bad' = overview.error && !metrics ? 'bad' : alerts.some((a) => a.level === 'error') ? 'bad' : alerts.some((a) => a.level === 'warning') || gated ? 'warn' : 'ok';
+  const attention = alerts.length;
 
-  // The status line reads the real bind and port, never a constant: "Hub running · 0.0.0.0:4546 ·
-  // reachable from your network". Until the network config has answered it says only what it knows.
-  const reach = { localhost: 'this machine only', lan: 'your network', remote: 'the internet' } as const;
-  const statusLine = [
-    `${identity?.name ?? 'Hub'} ${identity?.version ?? ''}`.trim(),
-    net ? `${net.bindAddress}:${net.port}` : null,
-    net ? `reachable from ${reach[net.bindMode]}` : null,
-    `signed in as ${session.username ?? 'admin'}`,
-  ]
-    .filter(Boolean)
-    .join(' · ');
-  const counts = metrics
-    ? `${metrics.connections.active} connected · ${metrics.groups.filter((g) => g.status === 'playing').length} playing`
-    : null;
+  const tools: ToolState = {
+    selected: tab,
+    onSelect: setTab,
+    lockedTabs: gated ? GATED_TABS : NO_TABS,
+    lockedReason: 'Choose a real password first.',
+    badges: attention ? { overview: { count: attention, label: `${count(attention, 'thing')} ${attention === 1 ? 'needs' : 'need'} attention` } } : {},
+  };
+
+  // The status line reads the real bind address and port, never a constant: "Hub running ·
+  // 127.0.0.1:4546 · reachable from this machine only". Until the hub has answered it says only
+  // what it knows.
+  const statusText = overview.error && !metrics ? errorSentence(overview.error) : [`${identity?.name ?? 'Hub'} running`, net ? `${net.bindAddress}:${net.port}` : null, net ? `reachable from ${REACH[net.bindMode]}` : null].filter(Boolean).join(' · ');
+  const counts = metrics ? `${metrics.connections.active} connected · ${metrics.groups.filter((g) => g.status === 'playing').length} playing` : null;
+  const current = TABS.find((t) => t.id === tab) ?? TABS[0]!;
 
   return (
-    <AquaWindow active title={identity?.name ?? 'Now Playing Hub'} flush className="admin-window">
-      <div className="admin-chrome">
-        <Toolbar
-          display={<div className="admin-toolbar__title">{identity?.name ?? 'Now Playing Hub'}</div>}
-          secondary={
-            <>
-              <Button
-                size="small"
-                icon="refresh"
-                onClick={() => {
-                  overview.reload();
-                  network.reload();
-                  toast.show('Refreshed');
-                }}
-              >
-                Refresh
-              </Button>
-              <Button size="small" icon="lock" busy={logout.busy} onClick={() => void signOut()}>
-                Sign out
-              </Button>
-            </>
-          }
-        />
-        <ToolTabs tabs={tabItems} value={tab} onChange={setTab} label="Sections" idPrefix="admin" />
-      </div>
-      <Content className="admin-pane" id={`admin-pane-${current.id}`} role="tabpanel" aria-labelledby={`admin-tab-${current.id}`}>
-        {current.sections.map((section) => (
-          <section key={section} className="admin-section" id={section} aria-label={SECTION_TITLES[section]}>
-            <ViewBoundary resetKey={section}>{sectionBody(section)}</ViewBoundary>
-          </section>
-        ))}
-      </Content>
-      <BottomBar
-        left={<StatusDot kind={worst === 'ok' ? 'ok' : worst} label={worst === 'ok' ? 'Healthy' : `${alerts.length} ${alerts.length === 1 ? 'alert' : 'alerts'}`} />}
-        status={statusLine}
-        right={
-          <>
-            {counts ? <span className="admin-counts">{counts}</span> : null}
-            {identity?.fingerprint ? (
-              <span className="admin-fingerprint" title="Compare this with the fingerprint a device shows while pairing">
-                {identity.fingerprint}
-              </span>
+    <HubUiProvider gated={gated}>
+      {({ message, sheet, sheetOpen }) => (
+        <Window tools={tools} sheet={sheet} sheetOpen={sheetOpen} status={<StatusLine kind={worst} text={statusText} right={counts} message={message} />}>
+          <div className="pane" ref={pane} key={current.id} id={`pane-${current.id}`} role="tabpanel" aria-labelledby={`tab-${current.id}`}>
+            {gated ? <PasswordGate onDone={onSessionChanged} /> : null}
+            {current.lead ? <p className="lead">{current.lead}</p> : null}
+            {current.sections.map((section) => (
+              <section key={section} id={section} aria-label={SECTION_TITLES[section]}>
+                <ViewBoundary resetKey={section}>{sectionBody(section)}</ViewBoundary>
+              </section>
+            ))}
+            {current.id === 'overview' ? (
+              <div className="panefoot">
+                <p className="note">
+                  Signed in as <b>{session.username ?? 'admin'}</b>.
+                </p>
+                <Push busy={logout.busy} onClick={() => void signOut()}>
+                  Sign Out
+                </Push>
+              </div>
             ) : null}
-          </>
-        }
-      />
-    </AquaWindow>
+          </div>
+        </Window>
+      )}
+    </HubUiProvider>
   );
 }
-
-/** What each section is called when a tab stacks several. The views keep their own panel titles;
- * these are the landmarks a screen reader lists. */
-const SECTION_TITLES: Record<ViewId, string> = {
-  overview: 'Overview',
-  devices: 'Devices',
-  profiles: 'Profiles',
-  library: 'Library',
-  providers: 'Providers',
-  downloads: 'Downloads',
-  recommendations: 'Recommendations',
-  groups: 'Groups',
-  shares: 'Shared links',
-  discord: 'Discord',
-  network: 'Network',
-  backup: 'Backup',
-  diagnostics: 'Diagnostics',
-};
