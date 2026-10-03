@@ -20,6 +20,10 @@ const handlers = new Map<string, (event: unknown, request: unknown) => Promise<u
 const appEvents = new Map<string, Array<(...args: unknown[]) => void>>();
 const windowEvents = new Map<string, Array<(event: { preventDefault: () => void }) => void>>();
 const openedExternally: string[] = [];
+const openedPaths: string[] = [];
+/** What each window was made with, and what the tray was told: the chrome is part of the contract. */
+const windowOptions: Array<Record<string, unknown>> = [];
+const trayToolTips: string[] = [];
 /** What the next open-file dialog returns; null means the person cancelled. */
 const dialogPick: { path: string | null } = { path: null };
 
@@ -28,6 +32,9 @@ const APP_PAGE = pathToFileURL(fileURLToPath(new URL('../../src/renderer/index.h
 
 vi.mock('electron', () => {
   class FakeWindow {
+    constructor(options: Record<string, unknown>) {
+      windowOptions.push(options);
+    }
     webContents = { on: () => undefined, setWindowOpenHandler: () => undefined, send: () => undefined };
     once(_event: string, fn: () => void) {
       fn();
@@ -90,9 +97,15 @@ vi.mock('electron', () => {
         openedExternally.push(url);
       },
       showItemInFolder: () => undefined,
+      openPath: async (path: string) => {
+        openedPaths.push(path);
+        return '';
+      },
     },
     Tray: class {
-      setToolTip() {}
+      setToolTip(text: string) {
+        trayToolTips.push(text);
+      }
       setContextMenu() {}
       on() {}
       destroy() {}
@@ -166,6 +179,33 @@ describe('startup', () => {
   });
 });
 
+describe('the window', () => {
+  it('is the design’s: its own title strip, with Windows’ buttons drawn over it', () => {
+    expect(windowOptions).toHaveLength(1);
+    const options = windowOptions[0]!;
+    // The page draws the title; Windows draws minimise, maximise and close over the chrome.
+    expect(options['titleBarStyle']).toBe('hidden');
+    expect(options['titleBarOverlay']).toMatchObject({ height: 26, color: '#00000000' });
+    // It keeps its frame: resizing, snapping and the system menu stay Windows' own.
+    expect(options['frame']).toBeUndefined();
+    expect(options['title']).toBe('Airwave Companion');
+    expect(options['width']).toBe(640);
+    expect(Number(options['minWidth'])).toBeLessThanOrEqual(640);
+    expect(Number(options['minHeight'])).toBeLessThan(Number(options['height']));
+  });
+
+  it('is called Airwave Companion in the notification area too', () => {
+    expect(trayToolTips).toEqual(['Airwave Companion']);
+  });
+
+  it('opens its own data folder in Explorer, and takes no path from the page to do it', async () => {
+    openedPaths.length = 0;
+    await expect(call('app:open-data-folder', undefined)).resolves.toEqual({ ok: true, reason: null });
+    expect(openedPaths).toEqual([dataDir]);
+    await expect(call('app:open-data-folder', { path: 'C:/Windows' })).rejects.toThrow();
+  });
+});
+
 describe('the boundary validates both directions', () => {
   it('refuses a request that does not match the channel’s schema', async () => {
     await expect(call('library:tracks', { limit: 99_999, offset: 0 })).rejects.toThrow();
@@ -191,6 +231,12 @@ describe('preferences', () => {
     expect(next).toMatchObject({ autoSync: true, minimizeToTray: false, theme: 'light' });
     expect(await call('app:preferences:get', undefined)).toMatchObject({ autoSync: true, minimizeToTray: false, theme: 'light' });
     await call('app:preferences:set', { minimizeToTray: true, autoSync: false });
+  });
+
+  it('goes back to how a new install has them, on request', async () => {
+    await call('app:preferences:set', { minimizeToTray: false, autoSync: true });
+    expect(await call('app:preferences:reset', undefined)).toMatchObject({ launchAtLogin: false, minimizeToTray: true, watchFolders: true, autoSync: false, helperPort: 17342 });
+    expect(await call('app:preferences:get', undefined)).toMatchObject({ minimizeToTray: true, autoSync: false });
   });
 
   it('refuses a preference the main process never agreed to, such as a filesystem path', async () => {
@@ -292,6 +338,39 @@ describe('the embedded helper and the backup channels', () => {
     await expect(call('backup:settings:set', { keep: 4 })).rejects.toThrow(/keep/);
     await expect(call('backup:settings:set', { dir: 'C:\\anywhere' })).rejects.toThrow();
     expect(await call('backup:settings:set', { include: { tv: true }, keep: 3 })).toMatchObject({ include: { tv: true, music: true }, keep: 3 });
+  });
+});
+
+describe('live tv', () => {
+  it('starts with no links, and the helper answers the player with empty lists', async () => {
+    expect(await call('tv:links', undefined)).toEqual({ m3u: [], epg: [] });
+    const status = (await call('helper:status', undefined)) as { origin: string };
+    const page = { origin: 'http://127.0.0.1:4546' };
+    const channels = await fetch(`${status.origin}/helper/v1/tv/channels`, { headers: page });
+    expect(channels.status).toBe(200);
+    expect(await channels.json()).toEqual({ channels: [] });
+    const guide = (await (await fetch(`${status.origin}/helper/v1/tv/guide`, { headers: page })).json()) as { generatedAt: string; guide: unknown[] };
+    expect(guide.guide).toEqual([]);
+    expect(Date.parse(guide.generatedAt)).toBeGreaterThan(0);
+    // No Origin and no token: not a page the helper has vetted.
+    expect((await fetch(`${status.origin}/helper/v1/tv/channels`)).status).toBe(403);
+  });
+
+  it('checks a link in the main process and refuses one that is not public, before connecting to anything', async () => {
+    expect(await call('tv:add', { kind: 'm3u', url: 'http://192.168.1.20/channels.m3u' })).toEqual({ link: null, reason: 'That address is on this PC or your own network. Live TV links need an address on the internet.' });
+    expect(await call('tv:add', { kind: 'epg', url: 'not a link' })).toEqual({ link: null, reason: 'That doesn’t look like a link — it should start with https:// or http://.' });
+    expect(await call('tv:links', undefined)).toEqual({ m3u: [], epg: [] });
+    await expect(call('tv:add', { kind: 'radio', url: 'https://tv.example.com/x.m3u' })).rejects.toThrow();
+    expect(await call('tv:remove', { id: 'nope' })).toEqual({ ok: false });
+    expect(await call('tv:refresh', { id: 'nope' })).toMatchObject({ link: null });
+  });
+});
+
+describe('sharing with a hub', () => {
+  it('is off until it is turned on, and cannot be turned on without a hub that allows it', async () => {
+    expect(await call('hub:sharing', undefined)).toEqual({ enabled: false });
+    expect(await call('hub:share-library', { enabled: true })).toMatchObject({ enabled: false, reason: expect.stringContaining('permission') });
+    expect(await call('hub:sharing', undefined)).toEqual({ enabled: false });
   });
 });
 

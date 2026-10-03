@@ -155,16 +155,63 @@ describe('the window has no default application menu', () => {
     // import would break it.
     expect(mainSource, 'the tray menu is a separate object and must still be built').toMatch(/Menu\.buildFromTemplate\(/);
     expect(mainSource, 'tray.setContextMenu must remain').toMatch(/tray\.setContextMenu\(/);
-    for (const label of ['Open', 'Scan library now', 'Quit']) {
+    for (const label of ['Open', 'Scan Library Now', 'Quit']) {
       expect(mainSource, `the tray keeps "${label}"`).toContain(`label: '${label}'`);
     }
   });
+});
 
-  it('keeps the standard window frame, so minimise/maximise/close still work', () => {
-    // "Remove the window bar" means the Window MENU, not the OS title bar. Going frameless would
-    // delete the native controls and the drag region — a redesign, not a fix — so the absence of
-    // frame:false / titleBarStyle is load-bearing here.
-    expect(mainSource, 'the window must keep its native frame').not.toMatch(/frame:\s*false/);
-    expect(mainSource, 'the title bar must not be hidden').not.toMatch(/titleBarStyle/);
+/**
+ * The title bar is the design's, and the window is still Windows'.
+ *
+ * `design/frontends/airwave-companion.html` draws the title and the four tools on one sheet of
+ * chrome with nothing above it. A second, operating-system title bar over that — the same name
+ * twice — was the most visible way the app differed from its design. So the OS title bar is hidden
+ * and the page draws the title. What must not be lost in doing that is everything Windows users
+ * expect of a window: real minimise / maximise / close buttons where they always are, Snap Layouts
+ * on the maximise button, dragging by the title, resizing by the edges. `titleBarOverlay` keeps all
+ * of it; `frame: false` would throw it away.
+ */
+describe('the title bar is the page’s chrome, with Windows’ own buttons over it', () => {
+  const mainSource = readFileSync(join(companionRoot, 'src', 'main', 'index.ts'), 'utf8');
+  const rendererDir = join(companionRoot, 'src', 'renderer');
+  const styles = readFileSync(join(rendererDir, 'styles.css'), 'utf8');
+  const appSource = readFileSync(join(rendererDir, 'App.tsx'), 'utf8');
+
+  it('hides the OS title bar but never the frame', () => {
+    expect(mainSource).toMatch(/titleBarStyle:\s*'hidden'/);
+    expect(mainSource, 'a frameless window loses Snap, resizing and the native buttons').not.toMatch(/frame:\s*false/);
+  });
+
+  it('asks Windows to draw its buttons over the chrome, at the height of the design’s title strip', () => {
+    expect(mainSource).toMatch(/titleBarOverlay:\s*\{[^}]*height:\s*TITLE_BAR_HEIGHT[^}]*\}/);
+    expect(mainSource).toMatch(/const TITLE_BAR_HEIGHT = 26;/);
+    // The design's `.titlebar` is 26px tall; the overlay and the strip must be the same strip.
+    const sheet = readFileSync(join(companionRoot, '..', 'packages', 'aqua-ui', 'src', 'styles', 'airwave-window.css'), 'utf8');
+    expect(/\.titlebar\s*\{[^}]*height:\s*26px/.test(sheet), 'the design’s title strip is 26px').toBe(true);
+  });
+
+  it('names the window once, from the shared constant', () => {
+    expect(mainSource).toMatch(/title:\s*PRODUCT_NAME/);
+    expect(mainSource).toMatch(/tray\.setToolTip\(PRODUCT_NAME\)/);
+    expect(appSource).toMatch(/PRODUCT_NAME/);
+    // The page's own <title> is what Windows shows in the taskbar and Alt+Tab.
+    const html = readFileSync(join(rendererDir, 'index.html'), 'utf8');
+    expect(/<title>([^<]*)<\/title>/.exec(html)?.[1]).toBe(PRODUCT_NAME);
+    for (const source of [mainSource, appSource, html]) expect(source).not.toContain('Now Playing Companion');
+  });
+
+  it('makes the chrome the drag region and leaves the tools clickable', () => {
+    expect(styles).toMatch(/\.chrome\s*\{[^}]*-webkit-app-region:\s*drag/);
+    expect(styles).toMatch(/\.tool\s*\{[^}]*-webkit-app-region:\s*no-drag/);
+    // The window fills its frame: no desktop backdrop, no margin, no second outline.
+    expect(styles).toMatch(/body\s*\{[^}]*padding:\s*0/);
+    expect(styles).toMatch(/\.win\s*\{[^}]*border:\s*0/);
+  });
+
+  it('wears the design’s stylesheet, not a copy of it', () => {
+    const main = readFileSync(join(rendererDir, 'main.tsx'), 'utf8');
+    expect(main).toContain("import '@now-playing/aqua-ui/airwave-window.css'");
+    expect(main).toMatch(/installAquaArt\(\)/);
   });
 });

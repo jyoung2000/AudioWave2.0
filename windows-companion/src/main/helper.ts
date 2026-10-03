@@ -19,7 +19,7 @@
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { defaultHosts, resolveAll, startHelper, type Helper } from '@now-playing/local-helper';
+import { defaultHosts, resolveAll, startHelper, type Helper, type HelperOptions } from '@now-playing/local-helper';
 import type { BackupPart } from '@now-playing/local-helper/measure';
 import type { HelperStatus, HelperTool } from '../shared/ipc.js';
 import type { CompanionStore } from './store.js';
@@ -36,8 +36,8 @@ const RECHECK_MS = 60 * 60 * 1000;
  */
 const ADVICE: Record<HelperTool['id'], string> = {
   'yt-dlp': 'Install yt-dlp (winget install yt-dlp) or put yt-dlp.exe on the PATH. Sites change often; an out-of-date copy is the usual reason a download fails.',
-  spotdl: 'Install spotDL with pipx install spotdl. It runs only here, never in the container.',
-  ffmpeg: 'Install ffmpeg (winget install ffmpeg). Without it downloads keep their original format and cannot be converted.',
+  spotdl: 'Install spotDL with pipx install spotdl. It runs only on this PC, never on the hub.',
+  ffmpeg: 'Install FFmpeg (winget install ffmpeg). Without it downloads keep their original format and cannot be converted.',
 };
 
 export interface SecretBox {
@@ -58,6 +58,8 @@ export interface EmbeddedHelperOptions {
   onToolInstalled?: (id: ToolId) => void;
   /** How setup reaches GitHub. Tests pass a fake; the app does not. */
   fetchImpl?: typeof fetch;
+  /** Live TV for the player: the channels and now/next the Live TV tab keeps. */
+  tv?: NonNullable<HelperOptions['tv']>;
 }
 
 export class EmbeddedHelper {
@@ -129,6 +131,7 @@ export class EmbeddedHelper {
         log: this.options.log,
         backup,
         ...(this.options.fetchImpl ? { fetchImpl: this.options.fetchImpl } : {}),
+        ...(this.options.tv ? { tv: this.options.tv } : {}),
         onToolInstalled: (id) => {
           void this.checkTools().then(() => this.options.onToolInstalled?.(id));
         },

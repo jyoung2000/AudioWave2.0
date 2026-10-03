@@ -1,35 +1,27 @@
 /**
- * Backup, as the mockup drew it and the main process now does it: where archives go, how much
- * room that has (used · this backup · free after it), what to include, how often, how many to keep,
- * and the archives that are there.
+ * Backup, as the design drew it and the main process does it: where archives go, how much room that
+ * has (in use · this backup · free after it), what to include, how often, how many to keep, and the
+ * archives that are there.
  *
  * Every number is measured by the main process with the same code the helper's estimate route
  * uses, so this pane and the player's Backup pane agree by construction. Back Up Now is disabled
  * with the reason whenever the backup could not run — no folder chosen, a folder that could not be
- * measured, or not enough room — rather than failing after the click. Sizes are decimal units
+ * measured, not enough room — rather than failing after the click. Sizes are decimal units
  * (1 GB = 10⁹ bytes), as the player shows them.
  */
 import { useState } from 'react';
-import { AquaTable, Button, Checkbox, EmptyState, Panel, PanelSection, PopUpMenu, ProgressBar, useToast } from '@now-playing/aqua-ui';
 import type { BackupArchive, BackupProgress, BackupSettings } from '../../shared/ipc.js';
 import { invoke } from '../bridge.js';
+import { dateTime, formatDecimal, plural } from '../format.js';
 import { useAction, useChannel, useEvent } from '../hooks.js';
+import { Check, EmptyRow, LoadingRow, Pop, Progress, Push, Remove, Rows, useConfirm } from '../ui.js';
 
-/** Decimal units, as the player's Backup pane shows them. */
-export function formatDecimal(bytes: number | null | undefined): string {
-  if (bytes === null || bytes === undefined) return '—';
-  const units = ['B', 'kB', 'MB', 'GB', 'TB'];
-  let value = bytes;
-  let index = 0;
-  while (value >= 1000 && index < units.length - 1) {
-    value /= 1000;
-    index += 1;
-  }
-  return `${value < 10 && index > 0 ? value.toFixed(1) : Math.round(value)} ${units[index]}`;
-}
+export { formatDecimal };
 
-const INCLUDE: ReadonlyArray<{ key: keyof BackupSettings['include']; label: string; note?: string }> = [
-  { key: 'music', label: 'Music', note: 'copies every music folder into the archive' },
+type Part = keyof BackupSettings['include'];
+
+const INCLUDE: ReadonlyArray<{ key: Part; label: string }> = [
+  { key: 'music', label: 'Music' },
   { key: 'tv', label: 'TV' },
   { key: 'movies', label: 'Movies' },
   { key: 'playlists', label: 'Playlists' },
@@ -37,20 +29,39 @@ const INCLUDE: ReadonlyArray<{ key: keyof BackupSettings['include']; label: stri
   { key: 'settings', label: 'These settings' },
 ];
 
-export function BackupView() {
-  const toast = useToast();
+const PART_WORDS: Record<Part, string> = { music: 'Music', tv: 'TV', movies: 'Movies', playlists: 'Playlists', presets: 'EQ presets', settings: 'Settings' };
+
+const SCHEDULE_WORDS: Record<BackupSettings['schedule'], string> = { manual: 'when you click', daily: 'every day', weekly: 'every week' };
+
+function drive(path: string): string {
+  const root = /^[A-Za-z]:/.exec(path)?.[0];
+  return root ? root.toUpperCase() : path;
+}
+
+function phaseWords(progress: BackupProgress, dir: string | null): string {
+  if (progress.phase === 'measuring') return 'Measuring what to copy…';
+  if (progress.phase === 'pruning') return 'Tidying old backups…';
+  if (progress.phase === 'writing') return 'Writing playlists and settings…';
+  const pct = progress.bytesTotal ? ` ${Math.min(100, Math.round((progress.bytesDone / progress.bytesTotal) * 100))}%` : '';
+  return `Backing up${dir ? ` to ${dir}` : ''}…${pct}`;
+}
+
+export function BackupView({ say }: { say: (text: string) => void }) {
+  const confirm = useConfirm();
   const settings = useChannel('backup:settings:get', undefined);
   const estimate = useChannel('backup:estimate', undefined, { pollMs: 60_000 });
   const archives = useChannel('backup:list', undefined, { pollMs: 30_000 });
   const [progress, setProgress] = useState<BackupProgress | null>(null);
 
+  const refresh = () => {
+    settings.reload();
+    estimate.reload();
+    archives.reload();
+  };
+
   useEvent('event:backup-progress', (p) => {
     setProgress(p);
-    if (p.phase === 'done' || p.phase === 'failed') {
-      archives.reload();
-      estimate.reload();
-      settings.reload();
-    }
+    if (p.phase === 'done' || p.phase === 'failed') refresh();
   });
 
   const update = useAction(async (patch: Parameters<typeof invoke<'backup:settings:set'>>[1]) => invoke('backup:settings:set', patch));
@@ -62,221 +73,220 @@ export function BackupView() {
 
   const s = settings.data;
   const e = estimate.data;
-  const refresh = () => {
-    settings.reload();
-    estimate.reload();
-    archives.reload();
-  };
-  const patch = (p: Parameters<typeof invoke<'backup:settings:set'>>[1]) => void update.run(p).then(refresh);
+  const patch = (p: Parameters<typeof invoke<'backup:settings:set'>>[1]) =>
+    void update.run(p).then((next) => {
+      if (next) say('Saved. Settings are kept on this PC.');
+      refresh();
+    });
 
-  const running = progress && progress.phase !== 'done' && progress.phase !== 'failed';
+  const running = Boolean(progress && progress.phase !== 'done' && progress.phase !== 'failed') || create.busy;
   const dest = e?.destination ?? null;
-  const used = dest && dest.totalBytes !== null && dest.freeBytes !== null ? dest.totalBytes - dest.freeBytes : null;
-  const fits = dest?.freeBytes === null || dest?.freeBytes === undefined || !e ? null : dest.freeBytes >= e.expectedBytes;
-  const pct = (bytes: number) => (dest?.totalBytes ? `${Math.min(100, (bytes / dest.totalBytes) * 100)}%` : '0%');
+  const known = dest && dest.totalBytes !== null && dest.freeBytes !== null && dest.totalBytes > 0 ? { free: dest.freeBytes, total: dest.totalBytes } : null;
+  const used = known ? known.total - known.free : null;
+  const short = Boolean(known && e?.complete && e.expectedBytes > known.free);
+  const share = (bytes: number) => (known ? `${Math.max(0, Math.min(100, (bytes / known.total) * 100))}%` : '0%');
+  const anything = s ? Object.values(s.include).some(Boolean) : false;
+
+  const backUp = () =>
+    void create.run().then((result) => {
+      if (result?.backup) say(`Backed up ${formatDecimal(result.backup.sizeBytes)} to ${result.backup.path}.`);
+      else if (result?.reason) say(result.reason);
+      refresh();
+    });
+
+  const restoreArchive = async (row: BackupArchive) => {
+    const yes = await confirm({ title: `Restore the backup from ${dateTime(row.createdAt)}?`, detail: 'Playlists, EQ presets and settings come back. Newer versions already on this PC are kept, and copied music stays in the backup folder.', action: 'Restore' });
+    if (!yes) return;
+    const result = await restore.run(row.id);
+    if (result?.restored) say('Restored. Playlists, EQ presets and settings are back.');
+    else if (result?.reason) say(result.reason);
+    refresh();
+  };
+
+  const removeArchive = async (row: BackupArchive) => {
+    const yes = await confirm({ title: `Delete the backup from ${dateTime(row.createdAt)}?`, detail: `${row.path} is removed from the backup folder. This can’t be undone.`, action: 'Delete Backup', destructive: true });
+    if (!yes) return;
+    const result = await remove.run(row.id);
+    if (result?.reason) say(result.reason);
+    refresh();
+  };
+
+  const restoreFile = () =>
+    void restore.run().then((result) => {
+      if (result?.restored) say('Restored. Playlists and EQ presets are back.');
+      else if (result?.reason) say(result.reason);
+      refresh();
+    });
+
+  const exportAll = () =>
+    void exportPlaylists.run().then((result) => {
+      if (result?.path) say(`Exported ${plural(result.count, 'playlist')} to ${result.path}.`);
+      else if (result?.reason) say(result.reason);
+    });
+
+  const stateLine =
+    running && progress && progress.phase !== 'done' && progress.phase !== 'failed'
+      ? phaseWords(progress, s?.dir ?? null)
+      : running
+        ? 'Starting…'
+        : e?.blocked
+          ? e.blocked
+          : s?.lastRunError
+            ? `The last backup didn’t finish: ${s.lastRunError}`
+            : !anything && s
+              ? 'Tick something to back up.'
+              : e?.complete
+                ? `About ${formatDecimal(e.expectedBytes)} · ${SCHEDULE_WORDS[s?.schedule ?? 'manual']}${s?.lastRunAt ? ` · last backed up ${dateTime(s.lastRunAt)}` : ''}`
+                : ' ';
 
   return (
-    <Panel title="Backup">
-      <PanelSection>
-        <div className="companion-pref">
-          <span className="companion-pref__k" id="backup-dir-k">
-            Back up to:
-          </span>
-          <div className="companion-pref__v">
-            {s?.dir ? <code className="companion-path" aria-labelledby="backup-dir-k">{s.dir}</code> : <span className="companion-hint">Not chosen yet.</span>}
-            <Button size="small" busy={pick.busy} onClick={() => void pick.run().then(refresh)} ellipsis>
-              Choose
-            </Button>
-            <span className="companion-hint companion-pref__sub">A folder on this PC or a drive you plug in. The hub keeps its own backups.</span>
-          </div>
-
-          <span className="companion-pref__k">Space:</span>
-          <div className="companion-pref__v companion-pref__v--stack">
-            {e && dest ? (
-              <>
-                <span>
-                  {e.complete ? `This backup: ${formatDecimal(e.expectedBytes)}` : 'This backup: size unknown until every folder is measured'}
-                  {dest.freeBytes !== null ? ` · ${formatDecimal(dest.freeBytes)} free of ${formatDecimal(dest.totalBytes)}` : ' · free space unknown'}
-                </span>
-                <div className={['companion-space', fits === false && 'companion-space--short'].filter(Boolean).join(' ')} role="img" aria-label={`${formatDecimal(used)} used, ${formatDecimal(e.expectedBytes)} for this backup, ${formatDecimal(dest.freeBytes !== null ? Math.max(0, dest.freeBytes - e.expectedBytes) : null)} free after it`}>
-                  {used !== null ? <i className="companion-space__used" style={{ width: pct(used) }} /> : null}
-                  {e.complete ? <i className="companion-space__this" style={{ width: pct(e.expectedBytes) }} /> : null}
-                </div>
-                <span className="companion-hint">
-                  Used · this backup · free after it{fits === false ? ` — ${e.blocked}` : ''}
-                </span>
-              </>
-            ) : (
-              <span className="companion-hint">{s?.dir ? (estimate.error ?? 'Measuring…') : 'Choose a folder to see how much room it has.'}</span>
-            )}
-          </div>
-
-          <span className="companion-pref__k">What:</span>
-          <div className="companion-pref__v companion-pref__v--stack">
-            {INCLUDE.map((item) => (
-              <Checkbox key={item.key} checked={s?.include[item.key] ?? false} disabled={!s || Boolean(running)} onChange={(ev) => patch({ include: { [item.key]: ev.currentTarget.checked } })}>
-                {item.label}
-                {item.key === 'music' || item.key === 'tv' || item.key === 'movies' ? (
-                  <span className="companion-hint"> {e?.parts[item.key] ? `— ${formatDecimal(e.parts[item.key]!.bytes)} in ${e.parts[item.key]!.files.toLocaleString()} files` : item.note ? `— ${item.note}` : ''}</span>
-                ) : null}
-              </Checkbox>
-            ))}
-          </div>
-
-          <label className="companion-pref__k" htmlFor="backup-when">
-            How often:
-          </label>
-          <div className="companion-pref__v">
-            <PopUpMenu
-              id="backup-when"
-              label="How often"
-              hideLabel
-              value={s?.schedule ?? 'manual'}
-              disabled={!s}
-              onChange={(ev) => patch({ schedule: ev.currentTarget.value as BackupSettings['schedule'] })}
-              options={[
-                { value: 'manual', label: 'Only when I click Back Up Now' },
-                { value: 'daily', label: 'Every day, while the companion is open' },
-                { value: 'weekly', label: 'Every week, while the companion is open' },
-              ]}
-            />
-          </div>
-
-          <label className="companion-pref__k" htmlFor="backup-keep">
-            Keep:
-          </label>
-          <div className="companion-pref__v">
-            <PopUpMenu
-              id="backup-keep"
-              label="Keep"
-              hideLabel
-              value={String(s?.keep ?? 5)}
-              disabled={!s}
-              onChange={(ev) => patch({ keep: Number(ev.currentTarget.value) as BackupSettings['keep'] })}
-              options={[
-                { value: '3', label: 'The last 3 backups' },
-                { value: '5', label: 'The last 5 backups' },
-                { value: '10', label: 'The last 10 backups' },
-                { value: '0', label: 'Every backup' },
-              ]}
-            />
-          </div>
-
-          <span className="companion-pref__k" />
-          <div className="companion-pref__v">
-            <Button
-              variant="default"
-              busy={create.busy || Boolean(running)}
-              disabled={!e || Boolean(e.blocked) || Boolean(running)}
-              title={e?.blocked ?? undefined}
-              onClick={() =>
-                void create.run().then((result) => {
-                  if (result?.backup) toast.show(`Backed up ${formatDecimal(result.backup.sizeBytes)} to ${result.backup.path}`, { kind: 'success' });
-                  else if (result?.reason) toast.show(result.reason, { kind: 'warning' });
-                  refresh();
-                })
-              }
-            >
-              Back Up Now
-            </Button>
-            <span className="companion-hint" role="status">
-              {running && progress
-                ? `${progress.phase === 'copying' ? 'Copying' : progress.phase === 'measuring' ? 'Measuring' : progress.phase === 'pruning' ? 'Tidying old backups' : 'Writing'}${progress.currentName ? ` — ${progress.currentName}` : ''}`
-                : e?.blocked
-                  ? e.blocked
-                  : s?.lastRunError
-                    ? `Last attempt failed: ${s.lastRunError}`
-                    : s?.lastRunAt
-                      ? `Last backup ${new Date(s.lastRunAt).toLocaleString()}`
-                      : 'No backup has been made yet.'}
+    <fieldset>
+      <legend>Backup</legend>
+      <div className="pref">
+        <span className="k top" id="backup-dir-k">
+          Back up to:
+        </span>
+        <div className="v">
+          {s?.dir ? (
+            <span className="path" id="backup-dir" aria-labelledby="backup-dir-k backup-dir">
+              {s.dir}
             </span>
-          </div>
+          ) : (
+            <span className="dim">{s ? 'Not chosen yet' : ' '}</span>
+          )}
+          <Push busy={pick.busy} disabled={running} onClick={() => void pick.run().then(refresh)}>
+            Choose…
+          </Push>
+          <span className="sub">A folder on this PC or a drive you plug in. The hub keeps its own backups.</span>
         </div>
-        {running && progress ? <ProgressBar value={progress.bytesTotal ? (progress.bytesDone / progress.bytesTotal) * 100 : null} label="Backing up" /> : null}
-      </PanelSection>
 
-      <PanelSection title="Backups">
-        {archives.data?.items.length ? (
-          <AquaTable
-            label="Backups"
-            rowKey={(row: BackupArchive) => row.id}
-            rows={archives.data.items}
-            columns={[
-              { id: 'when', header: 'Archive', primary: true, cell: (row) => new Date(row.createdAt).toLocaleString(), stackText: (row) => row.id },
-              { id: 'parts', header: 'Holds', cell: (row) => (row.restorable ? row.parts.join(', ') : 'unreadable — no manifest') },
-              { id: 'size', header: 'Size', align: 'right', width: 88, cell: (row) => (row.restorable ? formatDecimal(row.sizeBytes) : '—') },
-              {
-                id: 'actions',
-                header: '',
-                headerLabel: 'Actions',
-                width: 160,
-                cell: (row) => (
-                  <span className="companion-row-actions">
-                    <Button
-                      size="mini"
-                      disabled={!row.restorable || restore.busy}
-                      onClick={() => {
-                        if (window.confirm('Restore playlists, presets and settings from this backup?\n\nNewer versions already on this PC are kept. Copied music stays in the backup folder.')) {
-                          void restore.run(row.id).then((r) => {
-                            if (r?.restored) toast.show('Restored.', { kind: 'success' });
-                            else if (r?.reason) toast.show(r.reason, { kind: 'warning' });
-                            refresh();
-                          });
-                        }
-                      }}
-                    >
-                      Restore
-                    </Button>
-                    <Button
-                      size="mini"
-                      variant="destructive"
-                      disabled={remove.busy}
-                      onClick={() => {
-                        if (window.confirm(`Delete this backup?\n\n${row.path}\n\nThis cannot be undone.`)) void remove.run(row.id).then(refresh);
-                      }}
-                    >
-                      Delete
-                    </Button>
+        <span className="k top">Space:</span>
+        <div className="v stack" style={{ gap: 3 }}>
+          {e && dest ? (
+            <>
+              <span>
+                {known ? (
+                  <>
+                    <b>{formatDecimal(known.free)} free</b> of {formatDecimal(known.total)} on {drive(dest.path)}
+                  </>
+                ) : (
+                  'Free space on that drive isn’t known'
+                )}
+                {anything ? (e.complete ? ` · this backup needs about ${formatDecimal(e.expectedBytes)}` : ' · still measuring this backup') : ''}
+                {short ? (
+                  <>
+                    {' · '}
+                    <b className="short">not enough space</b>
+                  </>
+                ) : null}
+              </span>
+              <div className={short ? 'spacebar is-short' : 'spacebar'} role="img" aria-label={known ? `${formatDecimal(used)} used, this backup ${formatDecimal(e.expectedBytes)}, ${formatDecimal(known.free)} free` : 'Free space unknown'}>
+                {known && used !== null ? <i className="used" style={{ width: share(used) }} /> : null}
+                {known && used !== null && e.complete && anything ? <i className="this" style={{ left: share(used), width: share(Math.min(e.expectedBytes, known.free)) }} /> : null}
+              </div>
+              <span className="sub">{short ? 'Choose a bigger drive, or untick Movies or TV.' : known && e.complete ? `Grey is in use, blue is this backup; ${formatDecimal(Math.max(0, known.free - e.expectedBytes))} stays free after it.` : 'Grey is in use, blue is this backup.'}</span>
+            </>
+          ) : (
+            <span className="dim">{s?.dir ? (estimate.error ? 'That folder couldn’t be measured. Choose it again.' : 'Measuring…') : s ? 'Choose a folder to see how much room it has.' : ' '}</span>
+          )}
+        </div>
+
+        <span className="k top">What:</span>
+        <div className="v stack">
+          {INCLUDE.map((item) => {
+            const measured = item.key === 'music' || item.key === 'tv' || item.key === 'movies' ? e?.parts[item.key] : undefined;
+            return (
+              <Check key={item.key} checked={s?.include[item.key] ?? false} disabled={!s || running} onChange={(event) => patch({ include: { [item.key]: event.currentTarget.checked } })}>
+                {item.label}
+                {measured ? (
+                  <span className="sub">
+                    {' '}
+                    — {formatDecimal(measured.bytes)} in {plural(measured.files, 'file')}
                   </span>
-                ),
-              },
+                ) : null}
+              </Check>
+            );
+          })}
+        </div>
+
+        <label className="k" htmlFor="backup-when">
+          How often:
+        </label>
+        <div className="v">
+          <Pop
+            id="backup-when"
+            value={s?.schedule ?? 'manual'}
+            disabled={!s}
+            onChange={(event) => patch({ schedule: event.currentTarget.value as BackupSettings['schedule'] })}
+            options={[
+              { value: 'manual', label: 'Only when I click Back Up Now' },
+              { value: 'daily', label: 'Every day, while the companion is open' },
+              { value: 'weekly', label: 'Every week, while the companion is open' },
             ]}
           />
-        ) : (
-          <EmptyState title="No backups here yet" text={s?.dir ? 'Back Up Now writes the first one into the folder above.' : 'Choose where backups go, then Back Up Now.'} />
-        )}
-      </PanelSection>
-
-      <PanelSection title="Files from another companion">
-        <div className="companion-actions">
-          <Button
-            busy={restore.busy}
-            onClick={() =>
-              void restore.run().then((result) => {
-                if (result?.restored) toast.show('Restored.', { kind: 'success' });
-                else if (result?.reason) toast.show(result.reason, { kind: 'warning' });
-                refresh();
-              })
-            }
-            ellipsis
-          >
-            Restore from a file
-          </Button>
-          <Button
-            busy={exportPlaylists.busy}
-            onClick={() =>
-              void exportPlaylists.run().then((result) => {
-                if (result?.path) toast.show(`Exported ${result.count} playlist${result.count === 1 ? '' : 's'}`, { kind: 'success' });
-                else if (result?.reason) toast.show(result.reason, { kind: 'info' });
-              })
-            }
-            ellipsis
-          >
-            Export playlists
-          </Button>
         </div>
-        <p className="companion-hint">A backup&rsquo;s data.json, or a playlist export from this or another companion. Folders are never restored from a file: their locations are specific to each computer.</p>
-      </PanelSection>
-    </Panel>
+
+        <label className="k" htmlFor="backup-keep">
+          Keep:
+        </label>
+        <div className="v">
+          <Pop
+            id="backup-keep"
+            value={String(s?.keep ?? 5)}
+            disabled={!s}
+            onChange={(event) => patch({ keep: Number(event.currentTarget.value) as BackupSettings['keep'] })}
+            options={[
+              { value: '3', label: 'The last 3 backups' },
+              { value: '5', label: 'The last 5 backups' },
+              { value: '10', label: 'The last 10 backups' },
+              { value: '0', label: 'Every backup' },
+            ]}
+          />
+        </div>
+
+        <span className="k top" />
+        <div className="v">
+          <Push busy={running} disabled={!e || Boolean(e.blocked)} reason={e?.blocked ?? null} onClick={backUp}>
+            Back Up Now
+          </Push>
+          <span className="note" style={{ margin: 0 }} role="status">
+            {stateLine}
+          </span>
+          {running && progress?.phase === 'copying' ? <Progress label="Backing up" value={progress.bytesTotal ? (progress.bytesDone / progress.bytesTotal) * 100 : null} /> : null}
+        </div>
+      </div>
+
+      <Rows label="Backups" className="well--gap">
+        {!archives.data ? (
+          <LoadingRow />
+        ) : archives.data.items.length ? (
+          archives.data.items.map((row) => (
+            <li key={row.id}>
+              <span className="name" title={row.path}>
+                <b>{dateTime(row.createdAt)}</b>
+                {'  '}
+                {row.restorable ? row.parts.map((part) => PART_WORDS[part]).join(', ') : 'Can’t be read — its contents list is missing'}
+              </span>
+              <span className="meta">{row.restorable ? formatDecimal(row.sizeBytes) : ''}</span>
+              <Push className="push--row" disabled={!row.restorable || restore.busy || running} reason={!row.restorable ? 'This backup can’t be read, so it can’t be restored.' : null} onClick={() => void restoreArchive(row)}>
+                Restore…
+              </Push>
+              <Remove label={`Delete the backup from ${dateTime(row.createdAt)}`} disabled={remove.busy || running} onClick={() => void removeArchive(row)} />
+            </li>
+          ))
+        ) : (
+          <EmptyRow>No backups yet.</EmptyRow>
+        )}
+      </Rows>
+      <div className="barrow">
+        <Push busy={restore.busy} disabled={running} onClick={restoreFile}>
+          Restore from a File…
+        </Push>
+        <Push busy={exportPlaylists.busy} onClick={exportAll}>
+          Export Playlists…
+        </Push>
+      </div>
+      <p className="note">A file is a backup’s data.json, or a playlist export from any companion. Folders are never restored from a file: where they are is particular to each PC.</p>
+    </fieldset>
   );
 }

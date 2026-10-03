@@ -1,158 +1,135 @@
 /**
- * The folders on this computer: Saved Music, Saved TV and Saved Movies, as the mockup's Library tab
- * groups them. Music is indexed; TV and movie folders are kept, watched and backed up, not indexed.
+ * The folders on this PC: Saved Music, Saved TV and Saved Movies, as the design's Library tab draws
+ * them — a well of paths with a round minus on each, and Add Folder… beneath, which opens Windows'
+ * own folder picker. Music is indexed; TV and movie folders are kept, watched and backed up.
  *
- * A folder that has become unavailable — an unplugged drive, a disconnected share — is shown as
- * unavailable with its tracks still listed, because they are not gone, they are just not reachable
- * right now. Emptying the library on a temporary disconnection would be wrong and alarming.
+ * A folder that has become unavailable — an unplugged drive, a disconnected share — stays in the
+ * list and says so, with its tracks still indexed, because they are not gone, only out of reach.
+ * Emptying the library on a temporary disconnection would be wrong and alarming.
  */
 import { useState } from 'react';
-import { AquaTable, Button, EmptyState, Panel, PanelSection, ProgressBar, StatusDot, useToast } from '@now-playing/aqua-ui';
 import type { FolderKind, LibraryFolder, ScanProgress } from '../../shared/ipc.js';
 import { invoke } from '../bridge.js';
-import { useAction, useChannel, useEvent } from '../hooks.js';
+import { plural } from '../format.js';
+import { useAction, useEvent, type Resource } from '../hooks.js';
+import { FolderIcon } from '../icons.js';
+import { EmptyRow, LoadingRow, Push, Remove, Rows, useConfirm } from '../ui.js';
 
-const KINDS: ReadonlyArray<{ kind: FolderKind; title: string; noun: string; empty: string }> = [
-  { kind: 'music', title: 'Saved Music', noun: 'music', empty: 'Add the folder your music is in. The companion indexes it in place; your files are never copied or moved.' },
-  { kind: 'tv', title: 'Saved TV', noun: 'TV', empty: 'A TV folder is kept for the backup and the Live TV tab. It is not indexed as music.' },
-  { kind: 'movies', title: 'Saved Movies', noun: 'movie', empty: 'A movies folder is kept for the backup. It is not indexed as music.' },
+const KINDS: ReadonlyArray<{ kind: FolderKind; legend: string; label: string }> = [
+  { kind: 'music', legend: 'Saved Music', label: 'Music folders' },
+  { kind: 'tv', legend: 'Saved TV', label: 'TV folders' },
+  { kind: 'movies', legend: 'Saved Movies', label: 'Movie folders' },
 ];
 
-export function FoldersView({ onFoldersChanged }: { onFoldersChanged: () => void }) {
-  const folders = useChannel('library:folders', undefined, { pollMs: 4_000 });
-  const toast = useToast();
+/** The few words at the end of a folder's row. */
+function rowState(folder: LibraryFolder, live: ScanProgress | undefined): { text: string; bad?: boolean } {
+  if (live && !live.done) return { text: live.found ? `scanning ${(live.indexed + live.skipped).toLocaleString()} of ${live.found.toLocaleString()}` : 'scanning…' };
+  if (!folder.available) return { text: 'not connected', bad: true };
+  if (folder.lastScanError) return { text: 'couldn’t scan', bad: true };
+  if (folder.kind === 'music' && folder.trackCount) return { text: plural(folder.trackCount, 'song') };
+  return { text: folder.watch ? 'watched' : 'kept' };
+}
+
+export function FoldersView({ folders }: { folders: Resource<{ items: LibraryFolder[] }> }) {
+  const confirm = useConfirm();
   const [progress, setProgress] = useState<Record<string, ScanProgress>>({});
+  const [said, setSaid] = useState<Partial<Record<FolderKind, { text: string; bad?: boolean }>>>({});
+  const [adding, setAdding] = useState<FolderKind | null>(null);
 
-  useEvent('event:scan-progress', (payload) => setProgress((current) => ({ ...current, [payload.folderId]: payload })));
+  useEvent('event:scan-progress', (payload) => {
+    setProgress((current) => ({ ...current, [payload.folderId]: payload }));
+    if (payload.done) folders.reload();
+  });
 
-  const add = useAction(async (kind: FolderKind) => invoke('library:add-folder', { kind }));
   const remove = useAction(async (folderId: string) => invoke('library:remove-folder', { folderId }));
-  const scan = useAction(async (folderId?: string) => invoke('library:scan', folderId ? { folderId } : {}));
+  const scan = useAction(async (folderId: string) => invoke('library:scan', { folderId }));
 
   const items = folders.data?.items ?? [];
-  const changed = () => {
-    folders.reload();
-    onFoldersChanged();
+  const say = (kind: FolderKind, text: string | null, bad = false) => setSaid((current) => ({ ...current, [kind]: text ? { text, bad } : undefined }));
+
+  const add = async (kind: FolderKind) => {
+    setAdding(kind);
+    say(kind, null);
+    try {
+      const result = await invoke('library:add-folder', { kind });
+      if (result.folder) say(kind, kind === 'music' ? `Added ${result.folder.displayName}. Scanning it now.` : `Added ${result.folder.displayName}.`);
+      else if (result.reason) say(kind, result.reason, true);
+      folders.reload();
+    } catch (err) {
+      say(kind, err instanceof Error ? err.message : String(err), true);
+    } finally {
+      setAdding(null);
+    }
   };
-  const addFolder = (kind: FolderKind) =>
-    void add.run(kind).then((result) => {
-      if (result?.folder) {
-        toast.show(kind === 'music' ? `Added ${result.folder.displayName}. Scanning…` : `Added ${result.folder.displayName}.`, { kind: 'success' });
-        changed();
-      } else if (result?.reason) {
-        toast.show(result.reason, { kind: 'warning' });
-      }
+
+  const ask = async (folder: LibraryFolder) => {
+    const yes = await confirm({
+      title: `Stop using “${folder.displayName}”?`,
+      detail: 'Your files aren’t touched. Only Airwave’s record of the folder is removed, and its songs leave the library.',
+      action: 'Remove Folder',
+      destructive: true,
     });
+    if (!yes) return;
+    await remove.run(folder.id);
+    say(folder.kind, `Removed ${folder.displayName}. Its files are where they were.`);
+    folders.reload();
+  };
 
   return (
-    <Panel title="Folders">
-      <PanelSection>
-        <p className="companion-hint">
-          The folders on this PC that Now Playing plays from. The companion reads music where it already is — nothing is copied or moved — and folder locations stay on this computer: a hub is told a
-          folder&rsquo;s name and what is in it, never where it lives.
-        </p>
-        <div className="companion-actions">
-          <Button busy={scan.busy} disabled={!items.some((f) => f.kind === 'music')} onClick={() => void scan.run().then((r) => r?.reason && toast.show(r.reason, { kind: 'info' }))}>
-            Scan all music folders
-          </Button>
-        </div>
-        {add.error ? <p className="companion-hint companion-hint--error">{add.error}</p> : null}
-      </PanelSection>
-
-      {KINDS.map(({ kind, title, noun, empty }) => {
+    <>
+      {KINDS.map(({ kind, legend, label }) => {
         const rows = items.filter((f) => f.kind === kind);
+        const away = rows.filter((f) => !f.available);
+        const failed = rows.filter((f) => f.available && f.lastScanError);
+        const note = said[kind];
         return (
-          <PanelSection key={kind} title={title}>
-            {rows.length ? (
-              <FolderTable label={`${title} folders`} rows={rows} progress={progress} indexed={kind === 'music'} onScan={(id) => void scan.run(id)} onRemove={(row) => void remove.run(row.id).then(changed)} />
-            ) : (
-              <EmptyState title={`No ${noun} folders yet`} text={empty} />
-            )}
-            <div className="companion-actions">
-              <Button variant={kind === 'music' && !rows.length ? 'default' : 'neutral'} busy={add.busy} onClick={() => addFolder(kind)} ellipsis>
-                Add Folder
-              </Button>
+          <fieldset key={kind}>
+            <legend>{legend}</legend>
+            <Rows label={label}>
+              {!folders.data ? (
+                <LoadingRow />
+              ) : rows.length ? (
+                rows.map((folder) => {
+                  const state = rowState(folder, progress[folder.id]);
+                  return (
+                    <li key={folder.id}>
+                      <FolderIcon />
+                      <span className="name" title={folder.path}>
+                        {folder.path}
+                      </span>
+                      <span className={state.bad ? 'meta bad' : 'meta'}>{state.text}</span>
+                      {kind === 'music' ? (
+                        <button type="button" className="rm rm--again" aria-label={`Scan ${folder.path} again`} title={folder.available ? 'Scan Again' : 'Reconnect this folder’s drive to scan it'} disabled={!folder.available || scan.busy || Boolean(progress[folder.id] && !progress[folder.id]!.done)} onClick={() => void scan.run(folder.id)}>
+                          ↻
+                        </button>
+                      ) : null}
+                      <Remove label={`Remove ${folder.path}`} disabled={remove.busy} onClick={() => void ask(folder)} />
+                    </li>
+                  );
+                })
+              ) : (
+                <EmptyRow>No folders yet — add the one this PC keeps these in.</EmptyRow>
+              )}
+            </Rows>
+            <div className="barrow">
+              <Push busy={adding === kind} disabled={adding !== null} onClick={() => void add(kind)}>
+                Add Folder…
+              </Push>
+              {note ? (
+                <span className={note.bad ? 'note note--bad' : 'note'} style={{ margin: 0 }} role="status">
+                  {note.text}
+                </span>
+              ) : null}
             </div>
-          </PanelSection>
+            {away.length ? <p className="note">{away.length === 1 ? 'One folder isn’t' : `${away.length} folders aren’t`} connected right now. What was found there stays listed — reconnect the drive and it is picked up again.</p> : null}
+            {failed.map((folder) => (
+              <p key={folder.id} className="note note--bad">
+                {folder.displayName} couldn’t be scanned: {folder.lastScanError}
+              </p>
+            ))}
+          </fieldset>
         );
       })}
-
-      {items.some((f) => !f.available) ? (
-        <PanelSection>
-          <p className="companion-hint companion-hint--warning">
-            Some folders are not reachable right now. Their tracks are still listed, because they are not gone — reconnect the drive or the network share and rescan.
-          </p>
-        </PanelSection>
-      ) : null}
-    </Panel>
+    </>
   );
-}
-
-function FolderTable({ label, rows, progress, indexed, onScan, onRemove }: { label: string; rows: LibraryFolder[]; progress: Record<string, ScanProgress>; indexed: boolean; onScan: (id: string) => void; onRemove: (row: LibraryFolder) => void }) {
-  return (
-    <AquaTable
-      label={label}
-      rowKey={(row: LibraryFolder) => row.id}
-      rows={rows}
-      columns={[
-        { id: 'name', header: 'Folder', primary: true, cell: (row) => row.displayName, stackText: (row) => row.path },
-        { id: 'path', header: 'Location', cell: (row) => <code className="companion-path">{row.path}</code> },
-        {
-          id: 'status',
-          header: 'Status',
-          width: 150,
-          cell: (row) => {
-            const live = progress[row.id];
-            if (live && !live.done) return <ProgressBar value={live.found ? ((live.indexed + live.skipped) / live.found) * 100 : null} label={`Scanning — ${live.indexed + live.skipped} of ${live.found}`} />;
-            if (!row.available) return <StatusDot kind="warning" label="Unavailable" />;
-            if (row.lastScanError) return <StatusDot kind="error" label="Problem" />;
-            return <StatusDot kind="ok" label={indexed ? 'Ready' : 'Kept'} />;
-          },
-        },
-        ...(indexed
-          ? [
-              { id: 'tracks', header: 'Tracks', align: 'right' as const, width: 72, cell: (row: LibraryFolder) => row.trackCount.toLocaleString() },
-              { id: 'size', header: 'Size', align: 'right' as const, width: 88, cell: (row: LibraryFolder) => formatBytes(row.sizeBytes) },
-              { id: 'scanned', header: 'Last scanned', cell: (row: LibraryFolder) => (row.lastScanError ? row.lastScanError : row.lastScanAt ? new Date(row.lastScanAt).toLocaleString() : 'never') },
-            ]
-          : []),
-        {
-          id: 'actions',
-          header: '',
-          headerLabel: 'Actions',
-          width: 150,
-          cell: (row) => (
-            <span className="companion-row-actions">
-              {indexed ? (
-                <Button size="mini" disabled={!row.available} onClick={() => onScan(row.id)}>
-                  Rescan
-                </Button>
-              ) : null}
-              <Button
-                size="mini"
-                variant="destructive"
-                onClick={() => {
-                  if (window.confirm(`Stop using ${row.displayName}?\n\nYour files are not touched — only this app's record of the folder is removed.`)) onRemove(row);
-                }}
-              >
-                Remove
-              </Button>
-            </span>
-          ),
-        },
-      ]}
-    />
-  );
-}
-
-export function formatBytes(bytes: number): string {
-  if (!bytes) return '—';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  let value = bytes;
-  let index = 0;
-  while (value >= 1024 && index < units.length - 1) {
-    value /= 1024;
-    index += 1;
-  }
-  return `${value < 10 && index > 0 ? value.toFixed(1) : Math.round(value)} ${units[index]}`;
 }

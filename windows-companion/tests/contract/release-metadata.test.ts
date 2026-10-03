@@ -12,11 +12,11 @@ import { ReleaseMetadata } from '@now-playing/contracts';
 import { buildReleaseManifest, classifyArtifact } from '../../scripts/release-metadata.mjs';
 
 const FILES = [
-  { filename: 'Now Playing Companion Setup 0.1.0 x64.exe', sizeBytes: 82_000_000, sha256: 'a'.repeat(64) },
-  { filename: 'Now Playing Companion Setup 0.1.0 arm64.exe', sizeBytes: 79_000_000, sha256: 'b'.repeat(64) },
-  { filename: 'Now Playing Companion Portable 0.1.0 x64.exe', sizeBytes: 90_000_000, sha256: 'c'.repeat(64) },
+  { filename: 'Airwave Companion Setup 0.1.0 x64.exe', sizeBytes: 82_000_000, sha256: 'a'.repeat(64) },
+  { filename: 'Airwave Companion Setup 0.1.0 arm64.exe', sizeBytes: 79_000_000, sha256: 'b'.repeat(64) },
+  { filename: 'Airwave Companion Portable 0.1.0 x64.exe', sizeBytes: 90_000_000, sha256: 'c'.repeat(64) },
   // Files electron-builder leaves beside the artifacts and that must not be published as downloads.
-  { filename: 'Now Playing Companion Setup 0.1.0 x64.exe.blockmap', sizeBytes: 90_000, sha256: 'd'.repeat(64) },
+  { filename: 'Airwave Companion Setup 0.1.0 x64.exe.blockmap', sizeBytes: 90_000, sha256: 'd'.repeat(64) },
   { filename: 'latest.yml', sizeBytes: 300, sha256: 'e'.repeat(64) },
   { filename: 'builder-debug.yml', sizeBytes: 900, sha256: 'f'.repeat(64) },
 ];
@@ -36,7 +36,7 @@ describe('release manifest', () => {
   });
 
   it('ignores blockmaps and builder metadata', () => {
-    expect(classifyArtifact('Now Playing Companion Setup 0.1.0 x64.exe.blockmap')).toBeNull();
+    expect(classifyArtifact('Airwave Companion Setup 0.1.0 x64.exe.blockmap')).toBeNull();
     expect(classifyArtifact('latest.yml')).toBeNull();
     expect(classifyArtifact('builder-debug.yml')).toBeNull();
   });

@@ -1,18 +1,19 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ToastProvider } from '@now-playing/aqua-ui';
-// The companion is a framed window, so it loads the window chrome (the hub does the same).
-import '@now-playing/aqua-ui/window.css';
-import { App } from './App.js';
+// The window is the design's: its stylesheet, copied verbatim from design/frontends/airwave-companion.html.
+import '@now-playing/aqua-ui/airwave-window.css';
 import './styles.css';
+import { installAquaArt } from './aqua-art.js';
+import { App } from './App.js';
 
 const container = document.getElementById('root');
 if (!container) throw new Error('The companion needs a #root element');
 
+// The design's push buttons, pop-ups and checkboxes are drawings; they must exist before anything wears them.
+installAquaArt();
+
 createRoot(container).render(
   <StrictMode>
-    <ToastProvider>
-      <App />
-    </ToastProvider>
+    <App />
   </StrictMode>,
 );

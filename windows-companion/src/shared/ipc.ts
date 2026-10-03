@@ -246,6 +246,33 @@ export const HelperStatus = z.object({
 });
 export type HelperStatus = z.infer<typeof HelperStatus>;
 
+/* ------------------------------------------------------------------- live tv */
+
+/** A channel playlist (M3U) or a programme guide (XMLTV). */
+export const TvLinkKind = z.enum(['m3u', 'epg']);
+export type TvLinkKind = z.infer<typeof TvLinkKind>;
+
+/**
+ * A link kept in the Live TV tab. It is only ever kept after the main process has read it and found
+ * what it claims to hold; `failed` means it held that once and did not answer the last time it was
+ * looked at, and what it last held is still served.
+ */
+export const TvLink = z.object({
+  id: z.string().min(1).max(80),
+  kind: TvLinkKind,
+  url: z.string().min(1).max(2048),
+  state: z.enum(['ok', 'failed', 'checking']),
+  /** A few words for the row: “112 channels”, “7-day guide”, or what is wrong (“unreachable”). */
+  summary: z.string().nullable(),
+  /** Why the last look failed, in a sentence; null when it did not. */
+  error: z.string().nullable(),
+  checkedAt: z.iso.datetime({ offset: true }).nullable(),
+});
+export type TvLink = z.infer<typeof TvLink>;
+
+export const TvLinks = z.object({ m3u: z.array(TvLink), epg: z.array(TvLink) });
+export type TvLinks = z.infer<typeof TvLinks>;
+
 /* -------------------------------------------------------------------- system */
 
 export const AppInfo = z.object({
@@ -301,8 +328,12 @@ export const IPC = {
   'app:info': { request: z.void(), response: AppInfo },
   'app:preferences:get': { request: z.void(), response: Preferences },
   'app:preferences:set': { request: PreferencesPatch, response: Preferences },
+  /** Every preference back to how a fresh install has it. Folders, links and pairings are not preferences. */
+  'app:preferences:reset': { request: z.void(), response: Preferences },
   'app:open-external': { request: z.object({ url: z.string().url() }), response: z.object({ opened: z.boolean(), reason: z.string().nullable() }) },
   'app:reveal': { request: z.object({ trackId: z.uuid() }), response: z.object({ ok: z.boolean(), reason: z.string().nullable() }) },
+  /** Opens the folder the companion keeps its own data in. Takes no path: the renderer cannot name one. */
+  'app:open-data-folder': { request: z.void(), response: z.object({ ok: z.boolean(), reason: z.string().nullable() }) },
 
   'library:folders': { request: z.void(), response: z.object({ items: z.array(LibraryFolder) }) },
   'library:add-folder': { request: z.object({ kind: FolderKind.default('music') }).default({ kind: 'music' }), response: z.object({ folder: LibraryFolder.nullable(), reason: z.string().nullable() }) },
@@ -318,6 +349,8 @@ export const IPC = {
   'hub:forget': { request: z.void(), response: HubConnection },
   'hub:sync-now': { request: z.void(), response: z.object({ started: z.boolean(), reason: z.string().nullable() }) },
   'hub:share-library': { request: z.object({ enabled: z.boolean() }), response: z.object({ enabled: z.boolean(), reason: z.string().nullable() }) },
+  /** Whether sharing is on, so the checkbox shows what was chosen rather than starting off every time. */
+  'hub:sharing': { request: z.void(), response: z.object({ enabled: z.boolean() }) },
 
   'transfers:list': { request: z.void(), response: z.object({ items: z.array(TransferProgress) }) },
   'transfers:send': { request: z.object({ trackIds: z.array(z.uuid()).min(1).max(500) }), response: z.object({ queued: z.number().int(), reason: z.string().nullable() }) },
@@ -349,6 +382,11 @@ export const IPC = {
   /** The helper's token, for pasting into a player this app does not serve. Shown, never logged. */
   'helper:token': { request: z.void(), response: z.object({ token: z.string().nullable() }) },
 
+  'tv:links': { request: z.void(), response: TvLinks },
+  /** Reads the link in the main process and keeps it only if it holds a playlist or a guide. */
+  'tv:add': { request: z.object({ kind: TvLinkKind, url: z.string().min(1).max(2048) }), response: z.object({ link: TvLink.nullable(), reason: z.string().nullable() }) },
+  'tv:remove': { request: z.object({ id: z.string().min(1).max(80) }), response: z.object({ ok: z.boolean() }) },
+  'tv:refresh': { request: z.object({ id: z.string().min(1).max(80) }), response: z.object({ link: TvLink.nullable(), reason: z.string().nullable() }) },
 } as const satisfies Record<IpcChannel, { request: z.ZodType; response: z.ZodType }>;
 
 export type IpcRequest<C extends IpcChannel> = z.infer<(typeof IPC)[C]['request']>;
@@ -361,6 +399,7 @@ export const IPC_EVENTS = {
   'event:transfer-progress': TransferProgress,
   'event:backup-progress': BackupProgress,
   'event:awsp-status': AwspStatus,
+  'event:tv-links': TvLinks,
   'event:notice': z.object({ kind: z.enum(['info', 'warning', 'error']), message: z.string() }),
 } as const satisfies Record<IpcEvent, z.ZodType>;
 

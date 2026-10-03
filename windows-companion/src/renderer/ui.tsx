@@ -1,0 +1,275 @@
+/**
+ * The design's controls, as components.
+ *
+ * Each of these is the markup `design/frontends/airwave-companion.html` writes by hand — a `.push`
+ * button, a `.chk` checkbox with its drawn `.box`, a `.pop` pop-up, the `.rm` round minus, a `.well`
+ * of `.rows` — styled by the design's own stylesheet (`@now-playing/aqua-ui/airwave-window.css`).
+ * Nothing here has a look of its own; the components exist so a view cannot get the markup subtly
+ * wrong, and so the few rules the design leaves to its script (a busy button stays its size, a
+ * disabled one says why) live in one place.
+ *
+ * They are written here rather than in `@now-playing/aqua-ui` because that package carries the
+ * design's stylesheet but not yet its components; they should move there when it does.
+ */
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react';
+
+function cx(...names: Array<string | false | null | undefined>): string {
+  return names.filter(Boolean).join(' ');
+}
+
+/* ------------------------------------------------------------------ buttons */
+
+export interface PushProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  /** The window's default button: blue while its form is being typed into, as the design draws it. */
+  isDefault?: boolean;
+  /** Working: disabled, same words, same width — the result arrives beside it, not inside it. */
+  busy?: boolean;
+  /** Why it is disabled, in a sentence. Shown as the button's tooltip and read with it. */
+  reason?: string | null | undefined;
+}
+
+export function Push({ isDefault, busy, reason, className, disabled, type, children, ...rest }: PushProps) {
+  const off = disabled || busy;
+  return (
+    <button {...rest} type={type ?? 'button'} className={cx('push', isDefault && 'push--default', className)} disabled={off} aria-busy={busy || undefined} title={off && reason ? reason : rest.title}>
+      {children}
+    </button>
+  );
+}
+
+/** The era's round minus: removing is a real command, named for what it removes. */
+export function Remove({ label, ...rest }: { label: string } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'aria-label'>) {
+  return (
+    <button {...rest} type="button" className="rm" aria-label={label} title={label}>
+      –
+    </button>
+  );
+}
+
+/* --------------------------------------------------------------- checkboxes */
+
+export interface CheckProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> {
+  children: ReactNode;
+  /** A second, quieter line under the label. */
+  note?: ReactNode;
+}
+
+export function Check({ children, note, className, ...rest }: CheckProps) {
+  return (
+    <label className={cx('chk', rest.disabled && 'is-off', className)}>
+      <input {...rest} type="checkbox" />
+      <span className="box" />
+      <span>
+        {children}
+        {note ? (
+          <>
+            <br />
+            <span className="note" style={{ margin: 0 }}>
+              {note}
+            </span>
+          </>
+        ) : null}
+      </span>
+    </label>
+  );
+}
+
+/** A checkbox row with a bold name and a line of explanation, as the Remote tab draws its options. */
+export function Option({ title, children, ...rest }: Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'title'> & { title: ReactNode; children: ReactNode }) {
+  return (
+    <label className={cx('optrow', rest.disabled && 'is-off')}>
+      <input {...rest} type="checkbox" />
+      <span className="box" />
+      <span className="lbl">
+        <b>{title}</b>
+        <span>{children}</span>
+      </span>
+    </label>
+  );
+}
+
+/* ------------------------------------------------------------------ pop-ups */
+
+export function Pop({ options, className, ...rest }: SelectHTMLAttributes<HTMLSelectElement> & { options: ReadonlyArray<{ value: string; label: string }> }) {
+  return (
+    <select {...rest} className={cx('pop', className)}>
+      {options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/* -------------------------------------------------------------------- lists */
+
+/** The bezelled well that holds every list. */
+export function Rows({ label, children, live, className }: { label: string; children: ReactNode; live?: boolean; className?: string }) {
+  return (
+    <div className={cx('well', className)}>
+      <ul className="rows" aria-label={label} aria-live={live ? 'polite' : undefined}>
+        {children}
+      </ul>
+    </div>
+  );
+}
+
+/** A quiet line inside a list that has nothing in it: one sentence, what to do next. */
+export function EmptyRow({ children }: { children: ReactNode }) {
+  return (
+    <li>
+      <span className="empty">{children}</span>
+    </li>
+  );
+}
+
+/** Holds the list's place while the first answer is on its way, so the pane does not jump. */
+export function LoadingRow() {
+  return (
+    <li aria-hidden="true">
+      <span className="empty">&nbsp;</span>
+    </li>
+  );
+}
+
+export type DotKind = 'ok' | 'warn' | 'bad' | 'busy' | 'off';
+
+/** The design's status light, with its words: colour never carries the meaning alone. */
+export function Status({ kind, children }: { kind: DotKind; children: ReactNode }) {
+  return (
+    <span className="state">
+      <span className={cx('sdot', kind !== 'off' && `sdot--${kind}`)} aria-hidden="true" />
+      <span>{children}</span>
+    </span>
+  );
+}
+
+/** A thin bar: the design's space bar, used for progress as well as for room on a disk. */
+export function Progress({ label, value }: { label: string; value: number | null }) {
+  const known = value !== null && Number.isFinite(value);
+  const pct = known ? Math.max(0, Math.min(100, Math.round(value))) : null;
+  return (
+    <div className={cx('spacebar', 'progress', !known && 'is-waiting')} role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} {...(pct !== null ? { 'aria-valuenow': pct } : {})}>
+      <i className="this" style={{ left: 0, width: pct !== null ? `${pct}%` : '100%' }} />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------- confirmation */
+
+export interface ConfirmRequest {
+  /** What is about to happen, as a question. */
+  title: string;
+  /** What it does and does not touch. */
+  detail?: string;
+  /** The button that does it, named for what it does: “Remove”, “Forget This Hub”. */
+  action: string;
+  /** A destructive action leaves Cancel as the default, as the Mac did. */
+  destructive?: boolean;
+}
+
+type Confirm = (request: ConfirmRequest) => Promise<boolean>;
+
+const ConfirmContext = createContext<Confirm | null>(null);
+
+/**
+ * Asks before something that cannot be taken back. Outside a provider — a view rendered on its own
+ * in a test — it falls back to the browser's own question rather than doing the thing unasked.
+ */
+export function useConfirm(): Confirm {
+  const provided = useContext(ConfirmContext);
+  return useMemo<Confirm>(() => provided ?? (async (request) => window.confirm([request.title, request.detail].filter(Boolean).join('\n\n'))), [provided]);
+}
+
+/**
+ * The question, as a sheet: it comes down from under the toolbar over the window it belongs to, as
+ * Snow Leopard asked, rather than as a second window. It is a modal `<dialog>`, so focus is held
+ * inside it, Escape cancels, and focus returns to where it was when it closes.
+ */
+export function ConfirmProvider({ children }: { children: ReactNode }) {
+  const [request, setRequest] = useState<ConfirmRequest | null>(null);
+  const resolver = useRef<((answer: boolean) => void) | null>(null);
+  const dialog = useRef<HTMLDialogElement | null>(null);
+  const titleId = useId();
+  const detailId = useId();
+
+  const confirm = useCallback<Confirm>((next) => {
+    // A second question while one is open answers the first with "no".
+    resolver.current?.(false);
+    setRequest(next);
+    return new Promise<boolean>((resolve) => {
+      resolver.current = resolve;
+    });
+  }, []);
+
+  const answer = useCallback((value: boolean) => {
+    const resolve = resolver.current;
+    resolver.current = null;
+    setRequest(null);
+    resolve?.(value);
+  }, []);
+
+  useEffect(() => {
+    const element = dialog.current;
+    if (!request || !element || element.open) return;
+    if (typeof element.showModal === 'function') element.showModal();
+    else element.setAttribute('open', '');
+  }, [request]);
+
+  // Unmounting with a question open answers it "no" rather than leaving its asker waiting.
+  useEffect(() => () => resolver.current?.(false), []);
+
+  return (
+    <ConfirmContext.Provider value={confirm}>
+      {children}
+      {request ? (
+        <dialog
+          ref={dialog}
+          className="sheet"
+          aria-labelledby={titleId}
+          aria-describedby={request.detail ? detailId : undefined}
+          onCancel={(event) => {
+            event.preventDefault();
+            answer(false);
+          }}
+        >
+          <form
+            className="sheet__body"
+            method="dialog"
+            onSubmit={(event) => {
+              event.preventDefault();
+              answer(!request.destructive);
+            }}
+          >
+            <h2 id={titleId}>{request.title}</h2>
+            {request.detail ? (
+              <p className="hint" id={detailId}>
+                {request.detail}
+              </p>
+            ) : null}
+            <div className="sheet__acts">
+              {request.destructive ? (
+                <>
+                  <Push onClick={() => answer(true)}>{request.action}</Push>
+                  {/* eslint-disable-next-line jsx-a11y/no-autofocus -- a sheet's safe answer takes the keyboard, as the platform's own do */}
+                  <Push type="submit" isDefault autoFocus>
+                    Cancel
+                  </Push>
+                </>
+              ) : (
+                <>
+                  <Push onClick={() => answer(false)}>Cancel</Push>
+                  {/* eslint-disable-next-line jsx-a11y/no-autofocus -- a sheet's default answer takes the keyboard, as the platform's own do */}
+                  <Push type="submit" isDefault autoFocus>
+                    {request.action}
+                  </Push>
+                </>
+              )}
+            </div>
+          </form>
+        </dialog>
+      ) : null}
+    </ConfirmContext.Provider>
+  );
+}

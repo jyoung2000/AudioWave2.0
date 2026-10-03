@@ -96,7 +96,7 @@ describe('the content security policy', () => {
 });
 
 describe('the window only ever shows the app', () => {
-  const indexFile = process.platform === 'win32' ? 'C:\\Program Files\\Now Playing Companion\\resources\\app.asar\\dist\\renderer\\index.html' : '/opt/companion/resources/app.asar/dist/renderer/index.html';
+  const indexFile = process.platform === 'win32' ? 'C:\\Program Files\\Airwave Companion\\resources\\app.asar\\dist\\renderer\\index.html' : '/opt/companion/resources/app.asar/dist/renderer/index.html';
   const indexUrl = pathToFileURL(indexFile).href;
 
   it('allows the bundled index.html, with or without a fragment', () => {

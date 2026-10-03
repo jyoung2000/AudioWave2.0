@@ -13,7 +13,7 @@ import { writeFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { CONTRACTS_VERSION, EqPreset, Playlist, WS_PROTOCOL_VERSION } from '@now-playing/contracts';
 import { uuidv7 } from '@now-playing/domain';
-import { IPC, Preferences, type AppInfo, type BackupSettingsPatch, type FolderKind, type IpcChannel, type LibraryFolder, type PreferencesPatch, type ScanProgress, type TransferProgress } from '../shared/ipc.js';
+import { IPC, Preferences, type AppInfo, type BackupSettingsPatch, type FolderKind, type IpcChannel, type LibraryFolder, type PreferencesPatch, type ScanProgress, type TransferProgress, type TvLinkKind } from '../shared/ipc.js';
 import { absolutePathOf, scanFolder } from './library.js';
 import { runTempoPass } from './tempo-analysis.js';
 import { FolderWatcher } from './watcher.js';
@@ -23,7 +23,9 @@ import { EmbeddedHelper } from './helper.js';
 import { AwspSupervisor, findAwspBinary } from './awsp.js';
 import { appUrlGuard, applySessionSecurity, applyWindowSecurity, enforceSingleInstance, guardWebContents, isTrustedSender, openExternally } from './security.js';
 import { CompanionStore, openCompanionDb } from './store.js';
-import { APP_ID } from '../shared/identity.js';
+import { LiveTv } from './live-tv/index.js';
+import { resolveDataDir } from './data-dir.js';
+import { APP_ID, PRODUCT_NAME } from '../shared/identity.js';
 
 const DEV_SERVER_URL = process.env['NP_DEV_SERVER_URL'] ?? null;
 const INDEX_FILE = join(__dirname, '..', 'renderer', 'index.html');
@@ -41,6 +43,7 @@ let hub: HubClient | null = null;
 let backups: BackupManager | null = null;
 let helper: EmbeddedHelper | null = null;
 let awsp: AwspSupervisor | null = null;
+let liveTv: LiveTv | null = null;
 let scanning: AbortController | null = null;
 let tempoPass: AbortController | null = null;
 let watcher: FolderWatcher | null = null;
@@ -64,8 +67,8 @@ let preferencesCache: Preferences | null = null;
  * Installed builds use the normal per-user application-data folder.
  */
 function dataDir(): string {
-  const portableRoot = process.env['PORTABLE_EXECUTABLE_DIR'];
-  return portableRoot ? join(portableRoot, 'NowPlayingCompanion-data') : app.getPath('userData');
+  // The rule, including which folder names never change, is in `data-dir.ts`.
+  return resolveDataDir({ portableRoot: process.env['PORTABLE_EXECUTABLE_DIR'], userData: app.getPath('userData'), appData: app.getPath('appData'), exists: existsSync });
 }
 
 function send<T>(channel: string, payload: T): void {
@@ -124,15 +127,30 @@ function iconOption(): { icon?: string } {
   return icon ? { icon } : {};
 }
 
+/**
+ * The window is the one `design/frontends/airwave-companion.html` drew: a title and four tools on
+ * one sheet of chrome, with nothing above it. So the operating system's title bar is hidden and the
+ * page draws the title itself — but the window keeps its frame: `titleBarOverlay` has Windows draw
+ * its own minimise, maximise and close over the top-right of that chrome, with Snap Layouts, the
+ * system menu and resizing all still Windows' own. The overlay is clear, so the chrome's gradient
+ * runs under the buttons unbroken, and its height is the design's title strip (`.titlebar`, 26px).
+ * The page marks the chrome as the drag region (`styles.css`).
+ */
+const TITLE_BAR_HEIGHT = 26;
+
 function createWindow(): BrowserWindow {
   const window = new BrowserWindow({
-    width: 1180,
-    height: 780,
-    minWidth: 860,
-    minHeight: 560,
+    // The design's proportions: a narrow preferences window, taller than it is wide.
+    width: 640,
+    height: 760,
+    minWidth: 520,
+    minHeight: 440,
+    useContentSize: true,
     show: false,
-    backgroundColor: '#e8e8e8',
-    title: 'Now Playing Companion',
+    backgroundColor: '#ececec',
+    title: PRODUCT_NAME,
+    titleBarStyle: 'hidden',
+    titleBarOverlay: { color: '#00000000', symbolColor: '#3f4245', height: TITLE_BAR_HEIGHT },
     ...iconOption(),
     webPreferences: {
       preload: join(__dirname, 'preload.cjs'),
@@ -182,11 +200,11 @@ function createTray(): void {
   const iconPath = resourcePath('tray.ico') ?? resourcePath('tray-32.png');
   const icon = iconPath ? nativeImage.createFromPath(iconPath) : nativeImage.createEmpty();
   tray = new Tray(icon);
-  tray.setToolTip('Now Playing Companion');
+  tray.setToolTip(PRODUCT_NAME);
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label: 'Open', click: () => showWindow() },
-      { label: 'Scan library now', click: () => void startScan() },
+      { label: 'Scan Library Now', click: () => void startScan() },
       { type: 'separator' },
       {
         label: 'Quit',
@@ -379,8 +397,19 @@ function registerHandlers(): void {
     app.setLoginItemSettings({ openAtLogin: next.launchAtLogin });
     return next;
   });
+  handle('app:preferences:reset', () => {
+    savePreferences(DEFAULT_PREFERENCES);
+    app.setLoginItemSettings({ openAtLogin: DEFAULT_PREFERENCES.launchAtLogin });
+    return DEFAULT_PREFERENCES;
+  });
 
   handle('app:open-external', async (request) => openExternally((request as { url: string }).url));
+
+  // The folder is the app's own and is named here, not by the page: there is no path in the request.
+  handle('app:open-data-folder', async () => {
+    const failure = await shell.openPath(dataDir());
+    return failure ? { ok: false, reason: 'Windows could not open that folder. Its location is shown above.' } : { ok: true, reason: null };
+  });
 
   handle('app:reveal', (request) => {
     const path = absolutePathOf(store!, (request as { trackId: string }).trackId);
@@ -394,7 +423,7 @@ function registerHandlers(): void {
   handle('library:add-folder', async (request) => {
     const kind = (request as { kind: FolderKind }).kind;
     const titles: Record<FolderKind, string> = { music: 'Choose a music folder', tv: 'Choose a TV folder', movies: 'Choose a movies folder' };
-    const result = await dialog.showOpenDialog(mainWindow!, { title: titles[kind], properties: ['openDirectory'], buttonLabel: 'Add folder' });
+    const result = await dialog.showOpenDialog(mainWindow!, { title: titles[kind], properties: ['openDirectory'], buttonLabel: 'Add Folder' });
     if (result.canceled || !result.filePaths[0]) return { folder: null, reason: null };
     const path = result.filePaths[0];
     if (store!.findFolderByPath(path)) return { folder: null, reason: 'That folder has already been added.' };
@@ -440,6 +469,7 @@ function registerHandlers(): void {
     store!.set('shareLibrary', enabled, new Date().toISOString());
     return { enabled, reason: null };
   });
+  handle('hub:sharing', () => ({ enabled: store!.get<boolean>('shareLibrary', false) === true }));
 
   handle('transfers:list', () => ({ items: [...transfers.values()] }));
 
@@ -520,6 +550,11 @@ function registerHandlers(): void {
   handle('helper:install-tools', () => helper!.installTools());
   handle('helper:token', () => ({ token: helper!.token() }));
 
+  handle('tv:links', () => liveTv!.list());
+  handle('tv:add', (request) => liveTv!.add((request as { kind: TvLinkKind }).kind, (request as { url: string }).url));
+  handle('tv:remove', (request) => liveTv!.remove((request as { id: string }).id));
+  handle('tv:refresh', (request) => liveTv!.refresh((request as { id: string }).id));
+
   handle('backup:export-playlists', async () => {
     const playlists = store!.listPlaylists();
     if (!playlists.length) return { path: null, count: 0, reason: 'There are no playlists to export.' };
@@ -539,10 +574,9 @@ function registerHandlers(): void {
 // auto-hide option, which still lets Alt bring it back) is what makes the window look like the
 // program it is instead of a browser frame.
 //
-// This is deliberately NOT the title bar. The window keeps the standard frame, so minimise,
-// maximise and close stay where Windows users expect them and the drag region keeps working.
-// A frameless window would be a redesign: custom drag regions, custom window controls, and the
-// accessibility work that goes with them.
+// This is not the title bar. The window keeps its frame — it is never made frameless — so
+// minimise, maximise and close are Windows' own buttons, drawn over the page's chrome by the
+// title-bar overlay (see createWindow), where Windows users expect them.
 //
 // The TRAY menu is a different object and is untouched — `createTray()` builds it with
 // Menu.buildFromTemplate, and Open / Scan library now / Quit all still work from the tray.
@@ -595,6 +629,13 @@ if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow())))
       onProgress: (progress) => send('event:backup-progress', progress),
       onNotice: notice,
     });
+    liveTv = new LiveTv({
+      store,
+      cacheDir: join(dataDir(), 'live-tv'),
+      version: app.getVersion(),
+      log: (line) => console.info(line),
+      onChange: (links) => send('event:tv-links', links),
+    });
     helper = new EmbeddedHelper({
       store,
       secretBox: safeStorage,
@@ -603,6 +644,8 @@ if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow())))
       log: (line) => console.info(`[helper] ${line}`),
       backup: () => ({ folders: backups!.folders(), backupDir: backups!.settings().dir }),
       onToolInstalled,
+      // The player reads its channels and its now/next from here (GET /helper/v1/tv/…).
+      tv: { channels: () => liveTv!.channels(), guide: () => liveTv!.guide() },
     });
     applySessionSecurity(session.defaultSession, DEV_SERVER_URL);
     registerHandlers();
@@ -611,6 +654,7 @@ if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow())))
     void hub.refresh();
     void helper.start(preferences().helperPort);
     backups.start();
+    liveTv.start();
     awsp = new AwspSupervisor({
       store,
       secretBox: safeStorage,
@@ -647,6 +691,7 @@ if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow())))
   // The database closes last: windows are closed (and their close handlers have run) by now.
   app.on('will-quit', () => {
     backups?.stop();
+    liveTv?.stop();
     void helper?.stop();
     void awsp?.stop();
     void watcher?.close();
