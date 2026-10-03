@@ -159,9 +159,9 @@ export class LibraryService {
 
   addRoot(relativePath: string, displayName: string, meta: RequestMeta, actor: { id: string; displayName: string }): LibraryRoot {
     const cleaned = relativePath.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-    if (!cleaned || !isSafeRelativePath(cleaned)) throw new DomainError('validation', 'relativePath must be a safe path inside the data volume library directory');
+    if (!cleaned || !isSafeRelativePath(cleaned)) throw new DomainError('validation', 'That folder isn’t inside the hub’s library directory. Type a folder name such as “music” or “music/jazz”.');
     const abs = joinInsideRoot(this.libraryDir(), cleaned);
-    if (!abs) throw new DomainError('validation', 'relativePath escapes the library directory');
+    if (!abs) throw new DomainError('validation', 'That folder is outside the hub’s library directory.');
     const previous = this.repo.findRootByPath(cleaned);
     if (previous && !previous.deletedAt) throw new DomainError('conflict', 'A root for this path already exists');
     mkdirSync(abs, { recursive: true });

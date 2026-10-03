@@ -113,13 +113,15 @@ export class MetricsService {
     const ctx = this.ctx();
     const out: Array<{ level: 'info' | 'warning' | 'error'; message: string }> = [];
 
-    if (!ctx.auth.setupComplete()) out.push({ level: 'error', message: 'Setup is not complete: the default password is still in place and remote features stay disabled until it is changed.' });
+    if (!ctx.auth.setupComplete()) out.push({ level: 'error', message: 'The admin password is still “admin”. Most of the hub is off until it’s changed.' });
 
+    // People know a provider by its name, not its id.
+    const named = (id: string): string => (ctx.providers.has(id) ? ctx.providers.get(id).descriptor().displayName : id);
     for (const p of input.providers) {
-      if (p.status === 'down') out.push({ level: 'error', message: `${p.provider} is not responding${p.lastError ? `: ${p.lastError}` : ''}.` });
-      else if (p.status === 'degraded') out.push({ level: 'warning', message: `${p.provider} is degraded${p.lastError ? `: ${p.lastError}` : ''}.` });
+      if (p.status === 'down') out.push({ level: 'error', message: `${named(p.provider)} isn’t responding${p.lastError ? `: ${p.lastError}` : ''}.` });
+      else if (p.status === 'degraded') out.push({ level: 'warning', message: `${named(p.provider)} is working, with problems${p.lastError ? `: ${p.lastError}` : ''}.` });
       if (p.quota && p.quota.used / p.quota.budget >= 0.8) {
-        out.push({ level: 'warning', message: `${p.provider} has used ${Math.round((p.quota.used / p.quota.budget) * 100)}% of its daily ${p.quota.unit} budget${p.quota.resetsAt ? `; it resets at ${p.quota.resetsAt}` : ''}.` });
+        out.push({ level: 'warning', message: `${named(p.provider)} has used ${Math.round((p.quota.used / p.quota.budget) * 100)}% of its daily ${p.quota.unit} budget${p.quota.resetsAt ? `; it resets at ${p.quota.resetsAt}` : ''}.` });
       }
     }
 
@@ -131,15 +133,15 @@ export class MetricsService {
       else if (freeRatio < 0.15) out.push({ level: 'warning', message: `The data volume is ${Math.round((1 - freeRatio) * 100)}% full.` });
     }
 
-    if (!input.database.lastBackupAt) out.push({ level: 'info', message: 'No backup has been taken yet. Admin → Backup writes one into the data volume.' });
+    if (!input.database.lastBackupAt) out.push({ level: 'info', message: 'No backup has been taken yet. System ▸ Backup makes one.' });
 
     if (input.connections.wsErrors > 0 && input.connections.wsErrors > this.registry.counter('ws.connections') * 0.1) {
-      out.push({ level: 'warning', message: `${input.connections.wsErrors} realtime connections have errored. Check Diagnostics → Logs.` });
+      out.push({ level: 'warning', message: `${input.connections.wsErrors} live connections have failed. The log under System says why.` });
     }
 
     const network = ctx.network.current;
     if (network.bindMode === 'remote' && !network.publicEndpoint) {
-      out.push({ level: 'warning', message: 'Remote bind mode is on but no public endpoint is configured, so pairing links and share links will not be reachable.' });
+      out.push({ level: 'warning', message: 'The hub accepts connections from the internet but has no public address set, so pairing links and shared links won’t open. Set one under System ▸ Network.' });
     }
     return out;
   }
