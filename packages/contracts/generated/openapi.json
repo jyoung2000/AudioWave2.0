@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Now Playing Hub API",
+    "title": "Airwave Hub API",
     "version": "1.0.0",
     "description": "Generated from packages/contracts. Do not edit by hand."
   },

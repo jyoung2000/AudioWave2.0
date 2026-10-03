@@ -3,7 +3,7 @@
  *
  * Small on purpose: Node's own `http`, no framework, one routing table you can read in a minute.
  * The hub has Fastify because it is a server with accounts, rate limits and a hundred routes; this
- * has five routes and runs on the machine it serves, so every dependency it does not have is a
+ * has a handful of routes and runs on the machine it serves, so every dependency it does not have is a
  * dependency nobody has to trust.
  *
  * The parts that are not obvious:
@@ -24,7 +24,7 @@
 import { createReadStream, statSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { BACKUP_PARTS, createEstimator, type BackupPart } from './measure.js';
-import { HELPER_DEFAULT_HOSTS, HELPER_PROTOCOL, HELPER_ROUTES, HelperFetchRequest, HelperToolId, type HelperHealth, type HelperInstallResult, type HelperToolId as ToolId, type OutputFormat } from '@now-playing/contracts';
+import { HELPER_DEFAULT_HOSTS, HELPER_PROTOCOL, HELPER_ROUTES, HelperFetchRequest, HelperToolId, type HelperHealth, type HelperInstallResult, type HelperToolId as ToolId, type HelperTvChannel, type HelperTvChannels, type HelperTvGuide, type HelperTvGuideEntry, type OutputFormat } from '@now-playing/contracts';
 import { Jobs } from './jobs.js';
 import { readStationTitle } from '@now-playing/domain/radio-node';
 import type { StationNowPlaying } from '@now-playing/contracts';
@@ -62,6 +62,11 @@ export interface HelperOptions {
   onToolInstalled?: (id: ToolId) => void;
   /** Called whenever a tool's setup status changes. */
   onToolSetupChange?: () => void;
+  /**
+   * Live TV, when something keeps it. The companion passes the channels and guides from its Live TV
+   * tab; the standalone helper keeps none, and its two TV routes answer with empty lists.
+   */
+  tv?: { channels: () => Promise<HelperTvChannel[]> | HelperTvChannel[]; guide: () => Promise<HelperTvGuideEntry[]> | HelperTvGuideEntry[] };
 }
 
 export interface Helper {
@@ -159,6 +164,21 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
       if (stationCache.size >= 200) stationCache.delete(stationCache.keys().next().value!);
       stationCache.set(station, { at: now, value });
       return send(response, 200, await value);
+    }
+
+    // Live TV is read by the same pages for the same reason: a player opened from the hub cannot
+    // learn the token. Both routes only hand back what the companion already keeps — nothing here
+    // reaches the network — and the rule is the radio route's: a vetted page, or the token.
+    if ((path === HELPER_ROUTES.tvChannels || path === HELPER_ROUTES.tvGuide) && request.method === 'GET') {
+      if (origin_ === undefined && !tokenMatches(options.token, header(request, 'x-helper-token'))) {
+        return fail(response, 403, 'origin', 'This origin may not talk to the helper.');
+      }
+      if (path === HELPER_ROUTES.tvChannels) {
+        const channels: HelperTvChannels = { channels: options.tv ? await options.tv.channels() : [] };
+        return send(response, 200, channels);
+      }
+      const guide: HelperTvGuide = { generatedAt: new Date().toISOString(), guide: options.tv ? await options.tv.guide() : [] };
+      return send(response, 200, guide);
     }
 
     // Everything past here is the API, and everything but health needs the token.

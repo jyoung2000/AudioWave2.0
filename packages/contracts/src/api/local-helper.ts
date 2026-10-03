@@ -159,10 +159,61 @@ export const HelperBackupEstimate = z.object({
 });
 export type HelperBackupEstimate = z.infer<typeof HelperBackupEstimate>;
 
+/**
+ * One Live TV channel, as the companion read it out of the M3U playlists kept in its Live TV tab.
+ *
+ * `id` is stable for a stream address, so a favourite survives the playlist being refreshed.
+ * `number` is the playlist's own channel number (`tvg-chno`) when it has one that is free, and the
+ * next free number otherwise — always present, never repeated. `tvgId` is what joins a channel to
+ * its programmes in `HelperTvGuide`; null when the playlist names none.
+ */
+export const HelperTvChannel = z.object({
+  id: z.string().min(1).max(80),
+  name: z.string().min(1).max(200),
+  number: z.number().int().positive(),
+  group: z.string().max(200).nullable(),
+  logo: z.string().max(2048).nullable(),
+  url: z.string().min(1).max(2048),
+  tvgId: z.string().max(200).nullable(),
+});
+export type HelperTvChannel = z.infer<typeof HelperTvChannel>;
+
+/** `GET /helper/v1/tv/channels`. The standalone helper keeps no playlists and answers with none. */
+export const HelperTvChannels = z.object({ channels: z.array(HelperTvChannel) });
+export type HelperTvChannels = z.infer<typeof HelperTvChannels>;
+
+export const HelperTvProgramme = z.object({
+  title: z.string().max(300),
+  start: IsoDateTime,
+  stop: IsoDateTime,
+  description: z.string().max(600).nullable(),
+});
+export type HelperTvProgramme = z.infer<typeof HelperTvProgramme>;
+
+/** What is on a channel and what follows. Either may be null: a guide has gaps, and it ends. */
+export const HelperTvGuideEntry = z.object({
+  /** The channel's `tvgId`, spelled as `HelperTvChannel.tvgId` spells it. */
+  tvgId: z.string().min(1).max(200),
+  now: HelperTvProgramme.nullable(),
+  next: HelperTvProgramme.nullable(),
+});
+export type HelperTvGuideEntry = z.infer<typeof HelperTvGuideEntry>;
+
+/**
+ * `GET /helper/v1/tv/guide`: now and next for every channel that has a `tvgId` and a programme in
+ * the stored XMLTV guides. A channel with neither a current nor a following programme is absent.
+ */
+export const HelperTvGuide = z.object({ generatedAt: IsoDateTime, guide: z.array(HelperTvGuideEntry) });
+export type HelperTvGuide = z.infer<typeof HelperTvGuide>;
+
 export const HELPER_ROUTES = {
   health: '/helper/v1/health',
   fetch: '/helper/v1/fetch',
   backupEstimate: '/helper/v1/backup/estimate',
+  /** The merged Live TV channel list (HelperTvChannels). No token, same rule as the radio route: a vetted page only. */
+  tvChannels: '/helper/v1/tv/channels',
+  /** Now and next per channel (HelperTvGuide). No token, same rule as the radio route. */
+  tvGuide: '/helper/v1/tv/guide',
   /** `?url=` — what a radio station says it is playing (StationNowPlaying). No token: it only ever reads a public stream. */
   radioNowPlaying: '/helper/v1/radio/now-playing',
   install: (tool: HelperToolId): string => `/helper/v1/tools/${tool}/install`,

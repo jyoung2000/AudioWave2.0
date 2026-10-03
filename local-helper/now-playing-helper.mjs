@@ -20723,10 +20723,37 @@ var HelperBackupEstimate = external_exports.object({
   parts: external_exports.partialRecord(HelperBackupPart, external_exports.object({ bytes: external_exports.number().int().nonnegative(), files: external_exports.number().int().nonnegative(), measuredAt: IsoDateTime })),
   destination: external_exports.object({ path: external_exports.string(), freeBytes: external_exports.number().int().nonnegative().nullable(), totalBytes: external_exports.number().int().nonnegative().nullable() }).nullable()
 });
+var HelperTvChannel = external_exports.object({
+  id: external_exports.string().min(1).max(80),
+  name: external_exports.string().min(1).max(200),
+  number: external_exports.number().int().positive(),
+  group: external_exports.string().max(200).nullable(),
+  logo: external_exports.string().max(2048).nullable(),
+  url: external_exports.string().min(1).max(2048),
+  tvgId: external_exports.string().max(200).nullable()
+});
+var HelperTvChannels = external_exports.object({ channels: external_exports.array(HelperTvChannel) });
+var HelperTvProgramme = external_exports.object({
+  title: external_exports.string().max(300),
+  start: IsoDateTime,
+  stop: IsoDateTime,
+  description: external_exports.string().max(600).nullable()
+});
+var HelperTvGuideEntry = external_exports.object({
+  /** The channel's `tvgId`, spelled as `HelperTvChannel.tvgId` spells it. */
+  tvgId: external_exports.string().min(1).max(200),
+  now: HelperTvProgramme.nullable(),
+  next: HelperTvProgramme.nullable()
+});
+var HelperTvGuide = external_exports.object({ generatedAt: IsoDateTime, guide: external_exports.array(HelperTvGuideEntry) });
 var HELPER_ROUTES = {
   health: "/helper/v1/health",
   fetch: "/helper/v1/fetch",
   backupEstimate: "/helper/v1/backup/estimate",
+  /** The merged Live TV channel list (HelperTvChannels). No token, same rule as the radio route: a vetted page only. */
+  tvChannels: "/helper/v1/tv/channels",
+  /** Now and next per channel (HelperTvGuide). No token, same rule as the radio route. */
+  tvGuide: "/helper/v1/tv/guide",
   /** `?url=` — what a radio station says it is playing (StationNowPlaying). No token: it only ever reads a public stream. */
   radioNowPlaying: "/helper/v1/radio/now-playing",
   install: (tool) => `/helper/v1/tools/${tool}/install`,
@@ -22728,6 +22755,17 @@ async function startHelper(options) {
       if (stationCache.size >= 200) stationCache.delete(stationCache.keys().next().value);
       stationCache.set(station, { at: now, value });
       return send(response, 200, await value);
+    }
+    if ((path === HELPER_ROUTES.tvChannels || path === HELPER_ROUTES.tvGuide) && request.method === "GET") {
+      if (origin_ === void 0 && !tokenMatches(options.token, header(request, "x-helper-token"))) {
+        return fail(response, 403, "origin", "This origin may not talk to the helper.");
+      }
+      if (path === HELPER_ROUTES.tvChannels) {
+        const channels = { channels: options.tv ? await options.tv.channels() : [] };
+        return send(response, 200, channels);
+      }
+      const guide = { generatedAt: (/* @__PURE__ */ new Date()).toISOString(), guide: options.tv ? await options.tv.guide() : [] };
+      return send(response, 200, guide);
     }
     if (path !== HELPER_ROUTES.health && !tokenMatches(options.token, header(request, "x-helper-token"))) {
       return fail(response, 401, "token", "This request needs the helper\u2019s token. It is printed when the helper starts.");
