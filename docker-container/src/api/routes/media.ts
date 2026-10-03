@@ -132,6 +132,13 @@ export function registerMediaRoutes(app: FastifyInstance, ctx: HubContext): void
     return { jobId: job.id, roots: ctx.library.listRoots().length };
   });
 
+  registerRoute(app, ctx, routes.libraryScanRoot, ({ params }) => {
+    // Refuse an unknown or removed folder now, rather than queueing a job that can only fail.
+    if (!ctx.library.listRoots().some((r) => r.id === params.rootId)) throw new DomainError('not-found', 'That folder isn’t in the library any more.');
+    const job = ctx.jobs.enqueue({ userId: 'admin', kind: 'sync-library', priority: 'P2', payload: { provider: 'hub', rootId: params.rootId } });
+    return { jobId: job.id, roots: 1 };
+  });
+
   registerRoute(app, ctx, routes.libraryStream, ({ params, req, reply }) => {
     let stream: ReturnType<typeof ctx.library.openRange>;
     try {

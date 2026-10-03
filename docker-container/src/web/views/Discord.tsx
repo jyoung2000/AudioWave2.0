@@ -147,13 +147,12 @@ export function DiscordView() {
               {live?.configured ? (
                 <span className="sub">
                   {live.commandsRegistered ? 'Slash commands are registered.' : 'Slash commands are not registered yet.'}
-                  {live.messageContentIntent === 'disabled' ? ' Prefix commands need the Message Content intent, switched on in Discord’s Developer Portal.' : ''}
                 </span>
               ) : null}
+              {/* The hub words its warnings as sentences that name the control to use; shown as they come. */}
               {(live?.warnings ?? []).map((w, i) => (
                 <span className="sub" key={i}>
-                  {/* The hub writes commands between backticks; here they are set in the mono face. */}
-                  {w.split('`').map((part, j) => (j % 2 ? <span className="mono" key={j}>{part}</span> : part))}
+                  {w}
                 </span>
               ))}
             </div>

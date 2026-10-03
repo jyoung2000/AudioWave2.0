@@ -31,6 +31,7 @@ import type { TransferService } from './sync/transfers.js';
 import type { ShareService } from './shares/service.js';
 import type { MetricsService } from './metrics/service.js';
 import type { BackupService } from './backup/service.js';
+import type { LiveTvService } from './live-tv/service.js';
 import type { ProfileService } from './profiles/service.js';
 import type { ReleaseService } from './releases/service.js';
 import type { JobScheduler } from './jobs/scheduler.js';
@@ -97,6 +98,7 @@ export interface HubContext {
   shares: ShareService;
   metricsService: MetricsService;
   backup: BackupService;
+  liveTv: LiveTvService;
   profiles: ProfileService;
   releases: ReleaseService;
   jobs: JobScheduler;

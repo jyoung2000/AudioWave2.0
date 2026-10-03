@@ -40,11 +40,29 @@ function actionLabel(key: string): string {
   return ACTION_LABELS[key] ?? spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
+/** The limits the hub holds the three numbers to, said before anything is sent. */
+const LIMITS: ReadonlyArray<readonly [string, string, number, number]> = [
+  ['exploration', 'Exploration', 0, 1],
+  ['halfLifeDays', 'Half-life', 1, 365],
+  ['maxPerArtist', 'Most tracks per artist', 1, 20],
+];
+
+export function recommendationProblem(values: Record<string, unknown>): string | null {
+  for (const [key, label, min, max] of LIMITS) {
+    const n = values[key];
+    if (typeof n !== 'number' || !Number.isFinite(n) || n < min || n > max) return `${label} must be between ${min} and ${max}.`;
+  }
+  const weights = (values['actionWeights'] ?? {}) as Record<string, unknown>;
+  for (const [key, w] of Object.entries(weights)) if (typeof w !== 'number' || !Number.isFinite(w)) return `Give “${actionLabel(key)}” a number.`;
+  return null;
+}
+
 export function RecommendationsView() {
   const config = useResource('recommendationsConfigGet');
   const { say } = useHubUi();
   const save = useAction(async (body: Record<string, unknown>) => api('recommendationsConfigPut', { body }));
   const [draft, setDraft] = useState<Record<string, unknown> | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
 
   const stored = config.data as Record<string, unknown> | null;
   const current = draft ?? stored;
@@ -133,23 +151,34 @@ export function RecommendationsView() {
               busy={save.busy}
               disabled={draft === null}
               reason="Nothing has changed."
-              onClick={() =>
+              onClick={() => {
+                const why = recommendationProblem(current);
+                setProblem(why);
+                if (why) return;
                 void save.run(current).then((r) => {
                   if (r) {
                     setDraft(null);
                     config.reload();
                     say('Saved the recommendation settings.');
                   }
-                })
-              }
+                });
+              }}
             >
               Save
             </Push>
-            <Push disabled={draft === null} reason="Nothing has changed." onClick={() => setDraft(null)}>
+            <Push
+              disabled={draft === null}
+              reason="Nothing has changed."
+              onClick={() => {
+                setDraft(null);
+                setProblem(null);
+                save.clearError();
+              }}
+            >
               Revert
             </Push>
           </div>
-          <ActionError error={save.error} />
+          {problem ? <Note bad>{problem}</Note> : <ActionError error={save.error} />}
           <Note>
             Everything runs on this hub: no model is downloaded and no listening leaves it. A single skip lowers only that track, never its artist. Personal picks need the “Send each play” permission on a device; without
             it people still get recommendations, from the catalogue and what they choose.

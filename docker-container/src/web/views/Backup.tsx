@@ -1,17 +1,17 @@
 /**
  * Backup, restore, export and import.
  *
- * The design's pane, with only what the hub really has: where backups go and how much room is
- * there (measured, never guessed), the archives, and Back Up Now. The design also draws a path
- * field, an Include list, a schedule and a per-archive Download; the hub has no settings or routes
- * for those, so they are not drawn. Restore and Import ask first and say what they will do, because
- * they are the two actions here that replace data.
+ * The design's pane: where backups go (a folder inside the data volume) and how much room is there
+ * (measured, never guessed), what each backup holds, how often one is taken and how many are kept,
+ * then the archives with Download and Restore, and Back Up Now. The settings change nothing until
+ * Save; Revert puts back what the hub has. Restore and Import ask first and say what they will do,
+ * because they are the two actions here that replace data.
  */
 import { useCallback, useState } from 'react';
-import type { BackupSpace } from '@now-playing/contracts';
-import { api } from '../lib/api.js';
+import type { BackupSettings, BackupSettingsView, BackupSpace } from '@now-playing/contracts';
+import { api, apiUrl } from '../lib/api.js';
 import { useAction, useResource } from '../lib/hooks.js';
-import { ActionError, Ago, count, EmptyCells, formatBytes, Group, listState, Note, Push, useHubUi } from '../ui.js';
+import { ActionError, Ago, Check, count, EmptyCells, Field, formatBytes, Group, listState, Note, Pop, Push, useHubUi } from '../ui.js';
 
 interface BackupEntry {
   id: string;
@@ -26,6 +26,14 @@ interface ImportReport {
   errors: string[];
 }
 
+const PARTS: ReadonlyArray<readonly [keyof BackupSettings['include'], string]> = [
+  ['credentials', 'Provider sign-ins and the Discord bot token'],
+  ['activity', 'The audit log and the hub’s statistics'],
+  ['caches', 'Looked-up details, which the hub can fetch again'],
+];
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const KEEP_CHOICES = [4, 8, 10, 20, 0];
+
 function saveFile(data: unknown, name: string): void {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -36,16 +44,35 @@ function saveFile(data: unknown, name: string): void {
   URL.revokeObjectURL(url);
 }
 
+/** What a draft says is wrong, or null. The hub checks the folder again when it saves. */
+export function backupProblem(draft: BackupSettings & { folder: string }, dataDir: string): string | null {
+  const folder = draft.folder.trim().replaceAll('\\', '/');
+  const relative = folder.startsWith(`${dataDir}/`) ? folder.slice(dataDir.length + 1) : folder;
+  if (!relative || relative === dataDir || relative.startsWith('/') || /^[a-z]:/i.test(relative) || relative.split('/').includes('..')) return `Use a folder inside the data volume, such as ${dataDir}/backups.`;
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(draft.schedule.time)) return 'Use a time such as 03:00.';
+  return null;
+}
+
+function whenText(view: BackupSettingsView): string {
+  if (view.schedule.frequency === 'off') return 'Only when you click Back Up Now.';
+  if (!view.nextRunAt) return 'Not scheduled.';
+  return `Next one ${new Date(view.nextRunAt).toLocaleString(undefined, { weekday: 'long', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}.`;
+}
+
 export function BackupView() {
   const backups = useResource('backupList', {}, { pollMs: 30_000 });
   const space = useResource('backupSpace', {}, { pollMs: 60_000 });
+  const settings = useResource('backupSettingsGet');
   const { say, confirm } = useHubUi();
   const create = useAction(async () => api('backupCreate'));
   const restore = useAction(async (backupId: string) => api('backupRestore', { params: { backupId }, body: { confirm: true } }));
   const importAll = useAction(async (payload: { schemaVersion: number; data: Record<string, unknown> }, dryRun: boolean) => api('importAll', { query: { dryRun }, body: payload }));
+  const saveSettings = useAction(async (body: Partial<BackupSettings>) => api('backupSettingsPut', { body }));
   const [report, setReport] = useState<ImportReport | null>(null);
   const [fileProblem, setFileProblem] = useState<string | null>(null);
   const [restarting, setRestarting] = useState<string | null>(null);
+  const [draft, setDraft] = useState<(BackupSettings & { folder: string }) | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
 
   const exportNow = useAction(async () => {
     const data = await api('exportAll');
@@ -85,6 +112,16 @@ export function BackupView() {
   const items = (backups.data as { items: BackupEntry[] } | null)?.items ?? [];
   const state = listState(backups, (d) => (d as { items: BackupEntry[] }).items.length === 0, 'No backups yet.');
   const sp = space.data as BackupSpace | null;
+  const view = settings.data as BackupSettingsView | null;
+  const dataDir = (view?.dataDir ?? '/data').replaceAll('\\', '/').replace(/\/+$/, '');
+  const stored = view ? { location: view.location, include: view.include, schedule: view.schedule, keep: view.keep, folder: `${dataDir}/${view.location}` } : null;
+  const current = draft ?? stored;
+  const edit = (patch: Partial<BackupSettings & { folder: string }>): void => {
+    if (!current) return;
+    setDraft({ ...current, ...patch });
+    setProblem(null);
+  };
+
   const known = sp !== null && sp.freeBytes !== null && sp.totalBytes !== null && sp.totalBytes > 0;
   const next = sp?.lastArchiveBytes ?? 0;
   const used = known ? sp.totalBytes! - sp.freeBytes! : 0;
@@ -92,13 +129,41 @@ export function BackupView() {
   const usedPercent = known ? (used / sp.totalBytes!) * 100 : 0;
   const nextPercent = known ? Math.max(0.6, Math.min(100 - usedPercent, (next / sp.totalBytes!) * 100)) : 0;
 
+  const save = async (): Promise<void> => {
+    if (!draft) return;
+    const why = backupProblem(draft, dataDir);
+    setProblem(why);
+    if (why) return;
+    const folder = draft.folder.trim().replaceAll('\\', '/');
+    const body: Partial<BackupSettings> = { include: draft.include, schedule: draft.schedule, keep: draft.keep };
+    if (!view?.locationFixed) body.location = folder.startsWith(`${dataDir}/`) ? folder.slice(dataDir.length + 1) : folder;
+    const saved = (await saveSettings.run(body)) as BackupSettingsView | null;
+    if (!saved) return;
+    setDraft(null);
+    settings.reload();
+    space.reload();
+    backups.reload();
+    say(`Saved. ${whenText(saved)}`);
+  };
+
   return (
     <Group title="Backup">
       <div className="pref">
-        <span className="k">Backups go to:</span>
+        <label className="k" htmlFor="bkPath">
+          Save backups to:
+        </label>
         <div className="v">
-          <span className="path">{sp?.path ?? '…'}</span>
-          <span className="sub">Inside the container’s data volume, so whatever backs up the volume backs these up too.</span>
+          {view?.locationFixed ? (
+            <>
+              <span className="path">{view.path}</span>
+              <span className="sub">Set by NP_BACKUP_DIR in the container’s environment, so it is changed there.</span>
+            </>
+          ) : (
+            <>
+              <Field id="bkPath" mono value={current?.folder ?? ''} disabled={!current} invalid={Boolean(problem?.startsWith('Use a folder'))} placeholder={`${dataDir}/backups`} onChange={(e) => edit({ folder: e.currentTarget.value })} />
+              <span className="sub">A folder inside the container’s data volume, so whatever backs up the volume backs these up too. Archives already in the old folder stay there.</span>
+            </>
+          )}
         </div>
         <span className="k top">Space:</span>
         <div className="v stack">
@@ -121,24 +186,83 @@ export function BackupView() {
             <span className="sub">{sp ? 'The free space here could not be measured. The folder may not exist yet.' : space.error ? 'The free space could not be read.' : 'Measuring…'}</span>
           )}
         </div>
-        {sp?.keep ? (
-          <>
-            <span className="k">Keep:</span>
-            <div className="v">
-              <span>The last {sp.keep} automatic backups</span>
-              <span className="sub">Ones you make here are yours to keep or delete.</span>
-            </div>
-          </>
-        ) : null}
+        <span className="k top">Include:</span>
+        <div className="v stack" role="group" aria-label="What each backup includes">
+          <Check checked disabled onChange={() => undefined}>
+            Settings, devices, groups, playlists, profiles and the library index
+          </Check>
+          {PARTS.map(([part, label]) => (
+            <Check key={part} checked={current?.include[part] ?? true} disabled={!current} onChange={(on) => current && edit({ include: { ...current.include, [part]: on } })}>
+              {label}
+            </Check>
+          ))}
+        </div>
+        <label className="k" htmlFor="bkWhen">
+          How often:
+        </label>
+        <div className="v">
+          <Pop id="bkWhen" value={current?.schedule.frequency ?? 'daily'} disabled={!current} onChange={(e) => current && edit({ schedule: { ...current.schedule, frequency: e.currentTarget.value as BackupSettings['schedule']['frequency'] } })}>
+            <option value="off">Only when I click Back Up Now</option>
+            <option value="daily">Every day</option>
+            <option value="weekly">Every week</option>
+          </Pop>
+          {current && current.schedule.frequency === 'weekly' ? (
+            <Pop aria-label="On" value={String(current.schedule.weekday)} onChange={(e) => edit({ schedule: { ...current.schedule, weekday: Number(e.currentTarget.value) } })}>
+              {WEEKDAYS.map((day, i) => (
+                <option key={day} value={i}>
+                  on {day}
+                </option>
+              ))}
+            </Pop>
+          ) : null}
+          {current && current.schedule.frequency !== 'off' ? (
+            <>
+              <span className="note note--inline">at</span>
+              <Field aria-label="At" type="time" className="num field--time" value={current.schedule.time} invalid={Boolean(problem?.startsWith('Use a time'))} onChange={(e) => edit({ schedule: { ...current.schedule, time: e.currentTarget.value } })} />
+            </>
+          ) : null}
+          <span className="sub">{view ? `${whenText(view)} Times are on the hub’s clock.` : ''}</span>
+        </div>
+        <label className="k" htmlFor="bkKeep">
+          Keep:
+        </label>
+        <div className="v">
+          <Pop id="bkKeep" value={String(current?.keep ?? 10)} disabled={!current} onChange={(e) => edit({ keep: Number(e.currentTarget.value) })}>
+            {[...new Set([...KEEP_CHOICES, current?.keep ?? 10])].map((n) => (
+              <option key={n} value={n}>
+                {n === 0 ? 'All of them' : `The last ${n}`}
+              </option>
+            ))}
+          </Pop>
+          <span className="sub">Of the scheduled backups; the oldest go first. Ones you make with Back Up Now are kept until you remove them from the folder.</span>
+        </div>
+        <span className="k" />
+        <div className="v">
+          <Push primary busy={saveSettings.busy} disabled={draft === null} reason="Nothing has changed." onClick={() => void save()}>
+            Save
+          </Push>
+          <Push
+            disabled={draft === null}
+            reason="Nothing has changed."
+            onClick={() => {
+              setDraft(null);
+              setProblem(null);
+              saveSettings.clearError();
+            }}
+          >
+            Revert
+          </Push>
+        </div>
       </div>
+      {problem ? <Note bad>{problem}</Note> : <ActionError error={saveSettings.error ?? (settings.error && !view ? settings.error : null)} />}
 
       <div className="well well--after">
         <table className="tbl" aria-label="Backups">
           <colgroup>
             <col />
             <col style={{ width: '18%' }} className="hide-sm" />
-            <col style={{ width: '16%' }} />
-            <col style={{ width: 98 }} />
+            <col style={{ width: '14%' }} />
+            <col style={{ width: 196 }} />
           </colgroup>
           <thead>
             <tr>
@@ -168,6 +292,9 @@ export function BackupView() {
                     </td>
                     <td className="num">{formatBytes(row.sizeBytes)}</td>
                     <td className="acts">
+                      <a className="push push--link" href={apiUrl('backupDownload', { backupId: row.id })} download={`${row.id}.sqlite`} aria-label={`Download ${row.id}`}>
+                        Download
+                      </a>
                       <Push
                         busy={restore.busy}
                         aria-label={`Restore ${row.id}`}
@@ -246,6 +373,7 @@ export function BackupView() {
           </ul>
         </div>
       ) : null}
+      {view?.include.credentials ? <Note>Provider sign-ins in a backup are encrypted with this hub’s installation key, which is not in the backup. Restore on this hub, or keep the key file with the archive and treat both like a password.</Note> : null}
       <Note>A backup is the hub’s whole database, taken while it keeps running. An export is a portable copy with no passwords, tokens or provider credentials, so it is safe to move between machines.</Note>
     </Group>
   );

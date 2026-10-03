@@ -20,21 +20,28 @@ import type { HubContext } from '../../context.js';
 import { actorDisplayName, actorId, hasScope } from '../../auth/principal.js';
 import { RangeNotSatisfiableError } from '../../library/service.js';
 import { safeSourceUrl } from '../../shares/service.js';
+import { playlistShare, shareSources } from '../../shares/sources.js';
 import { escapeHtml } from '../../util.js';
 import { RAW, registerRoute } from '../register.js';
 
 export function registerShareRoutes(app: FastifyInstance, ctx: HubContext): void {
+  registerRoute(app, ctx, routes.sharesSources, () => shareSources(ctx));
+
   registerRoute(app, ctx, routes.sharesCreate, ({ body, principal, ip, userAgent, correlationId, reply }) => {
+    // The admin window names a playlist synced to the hub; the hub builds its item list the way a
+    // device would have. A device still sends its own list, exactly as before.
+    const synced = body.kind === 'playlist' && !body.items && principal.kind === 'admin' ? playlistShare(ctx, body.targetId) : null;
+    const items = body.items ?? synced?.items;
     const result = ctx.shares.create(
       {
         kind: body.kind,
         targetId: body.targetId,
-        title: body.title,
+        title: body.title ?? synced?.title,
         allowStream: body.allowStream,
         allowDownload: body.allowDownload,
         expiresInSeconds: body.expiresInSeconds,
         maxAccesses: body.maxAccesses,
-        ...(body.items ? { items: body.items } : {}),
+        ...(items ? { items } : {}),
       },
       { id: actorId(principal), displayName: actorDisplayName(principal), canReadHubLibrary: hasScope(principal, 'library:read') },
       { ip, userAgent, correlationId },

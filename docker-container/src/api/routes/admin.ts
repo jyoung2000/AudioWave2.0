@@ -6,12 +6,13 @@
  * carries no tokens, no full IP addresses, no raw listening history, no audio and no user
  * filesystem paths. What it does carry is versions, counters, capability state and health.
  */
+import { createReadStream } from 'node:fs';
 import type { FastifyInstance } from 'fastify';
-import { CONTRACTS_VERSION, routes, SCHEMA_VERSIONS, WS_MIN_SUPPORTED_PROTOCOL_VERSION, WS_PROTOCOL_VERSION } from '@now-playing/contracts';
+import { CONTRACTS_VERSION, HUB_LIVE_TV_MAX_BYTES, routes, SCHEMA_VERSIONS, WS_MIN_SUPPORTED_PROTOCOL_VERSION, WS_PROTOCOL_VERSION } from '@now-playing/contracts';
 import { DomainError } from '@now-playing/domain';
 import type { HubContext } from '../../context.js';
 import { actorDisplayName, actorId } from '../../auth/principal.js';
-import { registerRoute } from '../register.js';
+import { RAW, registerRoute } from '../register.js';
 
 const REDACTIONS = [
   'Provider client secrets and API keys (never stored in plaintext, never included)',
@@ -120,6 +121,56 @@ export function registerAdminRoutes(app: FastifyInstance, ctx: HubContext): void
   registerRoute(app, ctx, routes.backupRestore, async ({ params, principal, ip, userAgent, correlationId }) =>
     ctx.backup.restore(params.backupId, { id: actorId(principal), displayName: actorDisplayName(principal) }, { ip, userAgent, correlationId }),
   );
+
+  registerRoute(app, ctx, routes.backupDownload, ({ params, principal, ip, correlationId, reply }) => {
+    // Only an archive the hub lists, by the name it gave it: no path ever comes from the request.
+    const archive = ctx.backup.archive(params.backupId);
+    ctx.audit.record({
+      actor: { kind: 'admin', id: actorId(principal), displayName: actorDisplayName(principal) },
+      action: 'backup.download',
+      outcome: 'success',
+      target: { kind: 'backup', id: params.backupId },
+      ip,
+      correlationId,
+    });
+    reply
+      .header('Content-Type', 'application/vnd.sqlite3')
+      .header('Content-Length', String(archive.sizeBytes))
+      .header('Content-Disposition', `attachment; filename="${archive.fileName}"`)
+      .header('Cache-Control', 'no-store')
+      .header('X-Content-Type-Options', 'nosniff')
+      .send(createReadStream(archive.path));
+    return RAW;
+  });
+
+  registerRoute(app, ctx, routes.backupSettingsGet, () => ctx.backup.settingsView());
+
+  registerRoute(app, ctx, routes.backupSettingsPut, ({ body, principal, ip, userAgent, correlationId }) =>
+    ctx.backup.updateSettings(body, { id: actorId(principal), displayName: actorDisplayName(principal) }, { ip, userAgent, correlationId }),
+  );
+
+  /* -------------------------------------------------------------- live tv */
+
+  registerRoute(app, ctx, routes.liveTvGet, () => ctx.liveTv.get());
+
+  registerRoute(app, ctx, routes.liveTvSummary, () => ctx.liveTv.summary());
+
+  registerRoute(
+    app,
+    ctx,
+    routes.liveTvPut,
+    ({ body, principal, ip, correlationId }) => {
+      // Only a companion keeps Live TV: a player or another hub has no channel list of its own to send.
+      if (principal.kind !== 'device' || principal.device.kind !== 'companion') throw new DomainError('forbidden', 'Only a paired companion can send Live TV to the hub.');
+      return ctx.liveTv.put(body, { deviceId: principal.deviceId, name: principal.displayName }, { ip, correlationId });
+    },
+    { bodyLimit: HUB_LIVE_TV_MAX_BYTES },
+  );
+
+  registerRoute(app, ctx, routes.liveTvDelete, ({ principal, ip, correlationId }) => {
+    ctx.liveTv.clear(principal.kind === 'device' ? { deviceId: principal.deviceId, name: principal.displayName } : null, { ip, correlationId, actorName: actorDisplayName(principal) });
+    return { ok: true as const };
+  });
 
   registerRoute(app, ctx, routes.exportAll, () => ctx.backup.exportAll());
 

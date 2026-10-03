@@ -94,7 +94,8 @@ export class JobScheduler {
     this.register({ name: 'discovery.cachePurge', intervalMs: 60 * 60_000, run: () => ctx().platformSync.maintenance() });
     this.register({ name: 'audit.purge', intervalMs: 12 * 60 * 60_000, run: () => ctx().audit.maintenance() });
     this.register({ name: 'releases.refresh', intervalMs: 6 * 60 * 60_000, runAtStart: false, run: () => ctx().releases.refresh() });
-    this.register({ name: 'backup.daily', intervalMs: 24 * 60 * 60_000, run: () => ctx().backup.create(null, null, 'auto') });
+    // Wakes every minute and takes a backup when the operator's schedule (System ▸ Backup) says one is due.
+    this.register({ name: 'backup.schedule', intervalMs: 60_000, run: () => ctx().backup.runScheduled() });
     // Token refresh is scheduled as a *job* rather than done inline, so it is retried and
     // priority-ordered like any other per-user work.
     this.register({ name: 'accounts.scheduleRefresh', intervalMs: 5 * 60_000, run: () => this.scheduleTokenRefreshes() });
@@ -279,7 +280,10 @@ export class JobScheduler {
       const provider = typeof job.payload['provider'] === 'string' ? job.payload['provider'] : null;
       if (!provider) return;
       if (provider === 'hub') {
-        await ctx.library.scanAll();
+        // One folder when the job names one (the Scan button on a folder's row), otherwise all of them.
+        const rootId = typeof job.payload['rootId'] === 'string' ? job.payload['rootId'] : null;
+        if (rootId) await ctx.library.scanRoot(rootId);
+        else await ctx.library.scanAll();
         return;
       }
       await ctx.platformSync.syncLibrary(job.userId, provider);

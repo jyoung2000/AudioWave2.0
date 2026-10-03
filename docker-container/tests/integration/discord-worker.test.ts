@@ -90,12 +90,12 @@ describe('discord worker alongside the hub', () => {
   });
 
   it('shows the worker’s live status in the hub', () => {
-    expect(hub.ctx.discord.status().warnings.join(' ')).toContain('worker is not running');
+    expect(hub.ctx.discord.status().warnings.join(' ')).toContain('Discord service isn’t running');
     const live: DiscordStatus = { ...hub.ctx.discord.status(), gateway: 'connected', voice: 'playing', currentVoiceChannelId: '222', currentTrackTitle: 'Signal Fade', warnings: [] };
     worker.ctx.discord.publishWorkerStatus(live);
     const seen = hub.ctx.discord.status();
     expect(seen).toMatchObject({ gateway: 'connected', voice: 'playing', currentTrackTitle: 'Signal Fade' });
-    expect(seen.warnings.join(' ')).not.toContain('worker is not running');
+    expect(seen.warnings.join(' ')).not.toContain('Discord service isn’t running');
 
     hub.clock.advance(60_000);
     expect(hub.ctx.discord.status().gateway).toBe('stopped');
@@ -103,7 +103,7 @@ describe('discord worker alongside the hub', () => {
 
   it('hands admin actions to the worker and reports its answer', async () => {
     hub.ctx.repos.settings.set('discord.token', hub.ctx.sealer.seal('x'.repeat(59), 'discord:token'), new Date().toISOString());
-    await expect(hub.ctx.discord.act('stop', ADMIN, META)).rejects.toThrow(/worker is not running/);
+    await expect(hub.ctx.discord.act('stop', ADMIN, META)).rejects.toThrow(/Discord service isn’t running/);
 
     worker.ctx.discord.publishWorkerStatus(hub.ctx.discord.status());
     const pending = hub.ctx.discord.act('stop', ADMIN, META);

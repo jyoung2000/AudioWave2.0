@@ -43,6 +43,7 @@ import {
   StationNowPlaying,
 } from '../entities/index.js';
 import { HistoryImportReport } from '../formats/history-csv.js';
+import { HubLiveTv, HubLiveTvSummary, HubLiveTvUpload } from './live-tv.js';
 import { ReleaseMetadata } from '../formats/release-metadata.js';
 import { SyncDeltaRequest, SyncDeltaResponse, SyncManifest, SyncStatus } from '../formats/sync-manifest.js';
 
@@ -379,6 +380,62 @@ export const BackupSpace = z.object({
 });
 export type BackupSpace = z.infer<typeof BackupSpace>;
 
+/* ---------- backup settings ---------- */
+
+/**
+ * The parts of a backup an operator may leave out. Everything else (settings, devices, groups,
+ * playlists, profiles, the library index) is always in it, because a backup without them would not
+ * restore a working hub.
+ *
+ * - `credentials`: provider keys and secrets, signed-in provider accounts and the Discord bot token.
+ *   All are encrypted with the installation key, which is not in the backup.
+ * - `activity`: the audit log and the hub's own statistics.
+ * - `caches`: looked-up details and discovery results, which the hub fetches again when needed.
+ */
+export const BackupParts = z.object({ credentials: z.boolean(), activity: z.boolean(), caches: z.boolean() });
+export type BackupParts = z.infer<typeof BackupParts>;
+
+export const BackupFrequency = z.enum(['off', 'daily', 'weekly']);
+export type BackupFrequency = z.infer<typeof BackupFrequency>;
+
+/** When scheduled backups run, on the hub's own clock. `weekday` is 0 (Sunday) to 6 and only matters weekly. */
+export const BackupSchedule = z.object({
+  frequency: BackupFrequency,
+  time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use a time such as 03:00'),
+  weekday: z.number().int().min(0).max(6),
+});
+export type BackupSchedule = z.infer<typeof BackupSchedule>;
+
+export const BackupSettings = z.object({
+  /** A folder inside the data volume, relative to it ("backups", "archive/hub"). */
+  location: z.string().min(1).max(300),
+  include: BackupParts,
+  schedule: BackupSchedule,
+  /** How many scheduled backups to keep; 0 keeps every one. Backups made by hand are never pruned. */
+  keep: z.number().int().min(0).max(100),
+});
+export type BackupSettings = z.infer<typeof BackupSettings>;
+
+export const BackupSettingsView = BackupSettings.extend({
+  /** Where backups are written, as the container sees it. */
+  path: z.string(),
+  /** The data volume the location is relative to. */
+  dataDir: z.string(),
+  /** True when NP_BACKUP_DIR sets the folder, which the admin window cannot change. */
+  locationFixed: z.boolean(),
+  nextRunAt: IsoDateTime.nullable(),
+  lastRunAt: IsoDateTime.nullable(),
+});
+export type BackupSettingsView = z.infer<typeof BackupSettingsView>;
+
+/* ---------- things the admin window can share ---------- */
+
+export const ShareSources = z.object({
+  playlists: z.array(z.object({ id: Uuid, name: z.string(), trackCount: z.number().int().nonnegative() })),
+  albums: z.array(z.object({ id: z.string().min(1).max(200), title: z.string(), artistName: z.string().nullable(), trackCount: z.number().int().nonnegative() })),
+});
+export type ShareSources = z.infer<typeof ShareSources>;
+
 /* ---------- route table ---------- */
 
 const groupParams = z.object({ groupId: Uuid });
@@ -501,6 +558,7 @@ export const routes = {
   libraryRootAdd: defineRoute({ method: 'POST', path: '/library/roots', operationId: 'addLibraryRoot', summary: 'Register a directory inside the mounted data volume', tags: ['library'], auth: 'admin', rateLimit: 'write', body: z.object({ relativePath: z.string().min(1).max(500), displayName: z.string().min(1).max(200) }), response: LibraryRoot, responseStatus: 201 }),
   libraryRootRemove: defineRoute({ method: 'DELETE', path: '/library/roots/:rootId', operationId: 'removeLibraryRoot', summary: 'Remove a root without deleting files', tags: ['library'], auth: 'admin', params: z.object({ rootId: Uuid }), response: Ok }),
   libraryScan: defineRoute({ method: 'POST', path: '/library/scan', operationId: 'scanLibrary', summary: 'Rescan hub roots', tags: ['library'], auth: 'admin', rateLimit: 'write', response: z.object({ jobId: Uuid, roots: z.number().int() }) }),
+  libraryScanRoot: defineRoute({ method: 'POST', path: '/library/roots/:rootId/scan', operationId: 'scanLibraryRoot', summary: 'Rescan one hub root', tags: ['library'], auth: 'admin', rateLimit: 'write', params: z.object({ rootId: Uuid }), response: z.object({ jobId: Uuid, roots: z.number().int() }) }),
   libraryStream: defineRoute({ method: 'GET', path: '/library/stream/:trackId', operationId: 'streamTrack', summary: 'Range-capable audio stream of an authorized hub track (bearer credential, admin session, or a `sig` from POST /library/stream-urls)', tags: ['library'], auth: 'admin-or-device', scopes: ['library:read'], params: z.object({ trackId: Uuid }), response: z.unknown(), responseContentType: 'audio/*' }),
   libraryStreamUrls: defineRoute({ method: 'POST', path: '/library/stream-urls', operationId: 'libraryStreamUrls', summary: 'Short-lived signed stream URLs for media elements, which cannot send a bearer credential', tags: ['library'], auth: 'device', scopes: ['library:read'], body: z.object({ trackIds: z.array(Uuid).min(1).max(50) }), response: z.object({ items: z.array(z.object({ trackId: Uuid, url: z.string() })), expiresAt: IsoDateTime }) }),
   libraryArtwork: defineRoute({ method: 'GET', path: '/library/artwork/:artworkId', operationId: 'getArtwork', summary: 'Artwork bytes', tags: ['library'], auth: 'admin-or-device', params: z.object({ artworkId: z.string().max(200) }), response: z.unknown(), responseContentType: 'image/*' }),
@@ -535,6 +593,12 @@ export const routes = {
   discordTemplatesReset: defineRoute({ method: 'POST', path: '/discord/templates/reset', operationId: 'resetDiscordTemplates', summary: 'Reset to defaults', tags: ['discord'], auth: 'admin', response: DiscordTemplates }),
   discordCommandTest: defineRoute({ method: 'POST', path: '/discord/commands/test', operationId: 'testDiscordCommand', summary: 'Run a command through the shared command service without Discord (fixture testing)', tags: ['discord'], auth: 'admin', body: z.object({ command: z.string().min(1).max(40), args: z.string().max(500).default(''), guildId: z.string(), channelId: z.string(), userId: z.string(), roleIds: z.array(z.string()).default([]), transport: z.enum(['slash', 'prefix']).default('slash') }), response: z.object({ ok: z.boolean(), templateKey: z.string(), content: z.string(), embedTitle: z.string().nullable(), embedDescription: z.string().nullable(), ephemeral: z.boolean() }) }),
 
+  /* Live TV kept for players that cannot reach the companion's own helper */
+  liveTvGet: defineRoute({ method: 'GET', path: '/live-tv', operationId: 'getLiveTv', summary: 'Channels and now/next a paired companion keeps on the hub', tags: ['live-tv'], auth: 'admin-or-device', scopes: ['library:read'], response: HubLiveTv }),
+  liveTvPut: defineRoute({ method: 'PUT', path: '/live-tv', operationId: 'putLiveTv', summary: 'A paired companion replaces the hub copy of its Live TV (http(s) addresses only, at most 50,000 channels)', tags: ['live-tv'], auth: 'device', scopes: ['library:share'], rateLimit: 'write', body: HubLiveTvUpload, response: HubLiveTvSummary }),
+  liveTvDelete: defineRoute({ method: 'DELETE', path: '/live-tv', operationId: 'deleteLiveTv', summary: 'Remove the hub copy of Live TV (the admin, or the companion that sent it)', tags: ['live-tv'], auth: 'admin-or-device', scopes: ['library:share'], response: Ok }),
+  liveTvSummary: defineRoute({ method: 'GET', path: '/live-tv/summary', operationId: 'getLiveTvSummary', summary: 'Where the hub copy of Live TV came from, how many channels and when', tags: ['live-tv'], auth: 'admin', response: HubLiveTvSummary }),
+
   /* network, logs, diagnostics, backup, updates, releases */
   networkGet: defineRoute({ method: 'GET', path: '/network', operationId: 'getNetwork', summary: 'Bind mode and remote access configuration', tags: ['network'], auth: 'admin', setupRequired: false, response: NetworkConfig }),
   networkPut: defineRoute({ method: 'PUT', path: '/network', operationId: 'putNetwork', summary: 'Change bind mode / public endpoint / trusted proxies / IP logging (setup must be complete)', tags: ['network'], auth: 'admin', rateLimit: 'write', body: NetworkConfig.omit({ restartRequired: true, warnings: true, port: true, bindAddress: true }).partial(), response: NetworkConfig }),
@@ -544,6 +608,9 @@ export const routes = {
   backupSpace: defineRoute({ method: 'GET', path: '/backup/space', operationId: 'backupSpace', summary: 'Room at the backup location and the size of the newest archive', tags: ['backup'], auth: 'admin-or-device', scopes: ['backup:read'], response: BackupSpace }),
   backupList: defineRoute({ method: 'GET', path: '/backup', operationId: 'listBackups', summary: 'Backups on the data volume', tags: ['backup'], auth: 'admin', response: z.object({ items: z.array(z.object({ id: z.string(), createdAt: IsoDateTime, sizeBytes: z.number().int(), relativePath: z.string() })) }) }),
   backupRestore: defineRoute({ method: 'POST', path: '/backup/:backupId/restore', operationId: 'restoreBackup', summary: 'Restore (a safety backup is taken first; restart required)', tags: ['backup'], auth: 'admin', rateLimit: 'write', params: z.object({ backupId: z.string() }), body: z.object({ confirm: z.literal(true) }), response: z.object({ ok: z.literal(true), safetyBackupId: z.string(), restartRequired: z.literal(true) }) }),
+  backupDownload: defineRoute({ method: 'GET', path: '/backup/:backupId/download', operationId: 'downloadBackup', summary: 'Download one backup archive the hub lists', tags: ['backup'], auth: 'admin', params: z.object({ backupId: z.string().min(1).max(80) }), response: z.unknown(), responseContentType: 'application/vnd.sqlite3' }),
+  backupSettingsGet: defineRoute({ method: 'GET', path: '/backup/settings', operationId: 'getBackupSettings', summary: 'Where backups go, what they hold, when they run and how many are kept', tags: ['backup'], auth: 'admin', response: BackupSettingsView }),
+  backupSettingsPut: defineRoute({ method: 'PUT', path: '/backup/settings', operationId: 'putBackupSettings', summary: 'Change the backup location (inside the data volume), parts, schedule and how many to keep', tags: ['backup'], auth: 'admin', rateLimit: 'write', body: BackupSettings.partial(), response: BackupSettingsView }),
   exportAll: defineRoute({ method: 'GET', path: '/export', operationId: 'exportAll', summary: 'JSON export of groups, history, playlists, presets, devices (no secrets)', tags: ['backup'], auth: 'admin', response: z.object({ schemaVersion: z.number().int(), exportedAt: IsoDateTime, data: z.record(z.string(), z.unknown()) }) }),
   importAll: defineRoute({ method: 'POST', path: '/import', operationId: 'importAll', summary: 'Validate and import a JSON export (dry run supported)', tags: ['backup'], auth: 'admin', rateLimit: 'write', query: z.object({ dryRun: z.coerce.boolean().default(false) }), body: z.object({ schemaVersion: z.number().int(), data: z.record(z.string(), z.unknown()) }), response: z.object({ dryRun: z.boolean(), applied: z.record(z.string(), z.number().int()), errors: z.array(z.string()) }) }),
   updatesGet: defineRoute({ method: 'GET', path: '/updates', operationId: 'getUpdates', summary: 'Version compatibility matrix', tags: ['updates'], auth: 'admin', setupRequired: false, response: z.object({ currentVersion: z.string(), contractsVersion: z.string(), protocolVersion: z.number().int(), minSupportedProtocolVersion: z.number().int(), migrationVersion: z.number().int(), compatibility: z.array(z.object({ product: z.string(), minVersion: z.string(), protocolVersion: z.number().int() })), companionRelease: ReleaseMetadata.nullable() }) }),
@@ -552,6 +619,7 @@ export const routes = {
 
   /* shareable links (hub-served; revocable; token hashed at rest) */
   sharesCreate: defineRoute({ method: 'POST', path: '/shares', operationId: 'createShare', summary: 'Create a shareable link for a track, album, playlist or library', tags: ['shares'], auth: 'admin-or-device', scopes: ['shares:create'], rateLimit: 'write', body: z.object({ kind: ShareKind, targetId: z.string().min(1).max(200), title: z.string().max(300).optional(), allowStream: z.boolean().default(true), allowDownload: z.boolean().default(false), expiresInSeconds: z.number().int().min(60).max(365 * 86400).nullable().default(null), maxAccesses: z.number().int().positive().nullable().default(null), /** For library/playlist shares the creator uploads the item list (the hub cannot see browser-local libraries otherwise). */ items: z.array(z.object({ trackId: Uuid, title: z.string().max(300), artistName: z.string().max(300), albumName: z.string().max(300).nullable().default(null), durationMs: z.number().int().nullable().default(null), contentHash: z.string().regex(/^[a-f0-9]{64}$/).nullable().default(null), openAtSourceUrl: z.string().url().nullable().default(null) })).max(5000).optional() }), response: z.object({ share: ShareLinkView, token: z.string().describe('Returned exactly once') }), responseStatus: 201 }),
+  sharesSources: defineRoute({ method: 'GET', path: '/shares/sources', operationId: 'listShareSources', summary: 'Hub playlists and albums the admin window can make a link to', tags: ['shares'], auth: 'admin', response: ShareSources }),
   sharesList: defineRoute({ method: 'GET', path: '/shares', operationId: 'listShares', summary: 'Links created by the caller (admin sees all)', tags: ['shares'], auth: 'admin-or-device', response: z.object({ items: z.array(ShareLinkView) }) }),
   sharesRevoke: defineRoute({ method: 'DELETE', path: '/shares/:shareId', operationId: 'revokeShare', summary: 'Revoke a link', tags: ['shares'], auth: 'admin-or-device', params: z.object({ shareId: Uuid }), response: Ok }),
   shareResolve: defineRoute({ method: 'GET', path: '/shares/resolve/:token', operationId: 'resolveShare', summary: 'Public: metadata for a shared link (rate limited; counts an access)', tags: ['shares'], auth: 'none', setupRequired: false, rateLimit: 'search', params: z.object({ token: z.string().min(16).max(64) }), response: SharePayload }),

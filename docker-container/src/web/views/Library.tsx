@@ -3,8 +3,8 @@
  *
  * A folder is a path relative to the data volume, never an absolute one — the hub cannot and must
  * not reach outside its volume, and the form says so rather than offering a file picker that would
- * lie. Scanning is one job over every folder, so it is one button under the table, not a button per
- * row that would all do the same thing.
+ * lie. Each folder's row has its own Scan, which indexes that folder alone; Scan Now under the table
+ * does every folder.
  */
 import { useState, type FormEvent } from 'react';
 import type { LibraryRoot, Track } from '@now-playing/contracts';
@@ -37,6 +37,17 @@ export function LibraryView() {
   const addRoot = useAction(async (relativePath: string, displayName: string) => api('libraryRootAdd', { body: { relativePath, displayName } }));
   const removeRoot = useAction(async (rootId: string) => api('libraryRootRemove', { params: { rootId } }));
   const scan = useAction(async () => api('libraryScan'));
+  const scanOne = useAction(async (rootId: string) => api('libraryScanRoot', { params: { rootId } }));
+  const [scanningId, setScanningId] = useState<string | null>(null);
+  const scanFolder = (row: LibraryRoot): void => {
+    setScanningId(row.id);
+    void scanOne.run(row.id).then((r) => {
+      setScanningId(null);
+      if (!r) return;
+      say(`Scanning ${row.displayName}.`);
+      roots.reload();
+    });
+  };
 
   const add = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
@@ -79,7 +90,7 @@ export function LibraryView() {
             <col style={{ width: '32%' }} />
             <col className="hide-sm" />
             <col style={{ width: 72 }} />
-            <col style={{ width: 84 }} />
+            <col style={{ width: 150 }} />
           </colgroup>
           <thead>
             <tr>
@@ -113,6 +124,9 @@ export function LibraryView() {
                       </td>
                       <td className="num">{row.trackCount.toLocaleString('en-US')}</td>
                       <td className="acts">
+                        <Push busy={scanningId === row.id || row.status === 'scanning'} busyLabel="Scanning…" aria-label={`Scan ${row.displayName}`} onClick={() => scanFolder(row)}>
+                          Scan
+                        </Push>
                         <Push
                           busy={removeRoot.busy}
                           aria-label={`Remove ${row.displayName}`}
@@ -154,7 +168,7 @@ export function LibraryView() {
           Scan Now
         </Push>
       </form>
-      {problem ? <Note bad>{problem}</Note> : <ActionError error={addRoot.error ?? removeRoot.error ?? scan.error} />}
+      {problem ? <Note bad>{problem}</Note> : <ActionError error={addRoot.error ?? removeRoot.error ?? scan.error ?? scanOne.error} />}
 
       <SubHead>Tracks</SubHead>
       <div className="barrow barrow--above">

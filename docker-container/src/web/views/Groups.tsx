@@ -8,9 +8,10 @@
  *
  * One thing differs from the design on purpose (design/decisions.md DEC-017): the invites table
  * shows who an invite is for and its state, not its code. The hub keeps only a code's hash, so the
- * code is shown once, when made.
+ * code is shown once, when made — under the new invite's own row, which says it is expanded and
+ * can be folded away with its button or Escape.
  */
-import { useState, type FormEvent } from 'react';
+import { Fragment, useEffect, useRef, useState, type FormEvent } from 'react';
 import type { GroupHistoryEntry, GroupView, InviteView } from '@now-playing/contracts';
 import { api, apiUrl } from '../lib/api.js';
 import { useAction, useResource } from '../lib/hooks.js';
@@ -196,7 +197,14 @@ function GroupInvites({ groupId, groupName }: { groupId: string; groupName: stri
   const now = useNow();
   const [ttl, setTtl] = useState<string>('86400');
   const [role, setRole] = useState<InviteRole>('member');
-  const [made, setMade] = useState<{ code: string; expiresAt: string; role: InviteRole; ttlLabel: string } | null>(null);
+  const [made, setMade] = useState<{ inviteId: string; code: string; expiresAt: string; role: InviteRole; ttlLabel: string } | null>(null);
+  // Whether the new invite's link is unfolded under its row.
+  const [shown, setShown] = useState(false);
+  const toggle = useRef<HTMLButtonElement>(null);
+  const linkField = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (shown) linkField.current?.focus();
+  }, [shown, made?.inviteId]);
   // The hub does not serve the player, so it cannot know where people open it. Remembered per browser.
   const [playerAddress, setPlayerAddress] = useState<string>(() => {
     try {
@@ -261,8 +269,9 @@ function GroupInvites({ groupId, groupName }: { groupId: string; groupName: stri
             onClick={() =>
               void make.run().then((result) => {
                 if (!result) return;
-                const r = result as { inviteCode: string; expiresAt: string };
-                setMade({ code: r.inviteCode, expiresAt: r.expiresAt, role, ttlLabel: INVITE_TTLS.find((t) => t.value === ttl)?.label ?? '' });
+                const r = result as { inviteCode: string; expiresAt: string; inviteId: string };
+                setMade({ inviteId: r.inviteId, code: r.inviteCode, expiresAt: r.expiresAt, role, ttlLabel: INVITE_TTLS.find((t) => t.value === ttl)?.label ?? '' });
+                setShown(true);
                 invites.reload();
               })
             }
@@ -272,44 +281,13 @@ function GroupInvites({ groupId, groupName }: { groupId: string; groupName: stri
         </div>
       </div>
       <ActionError error={make.error} />
-      {made ? (
-        <div className="tile detail">
-          <span className="sm">New invite · works once · {made.ttlLabel}. The code is shown here only; the hub can’t look it up again.</span>
-          <span className="invcode">{made.code}</span>
-          <div className="pref detail__form">
-            <label className="k" htmlFor="invPlayer">
-              Players open Airwave at:
-            </label>
-            <div className="v">
-              <Field id="invPlayer" mono placeholder="https://music.example.com/" value={playerAddress} onChange={(event) => rememberPlayerAddress(event.currentTarget.value)} />
-              {link ? null : <span className="sub">Enter the address to get a link. Without one, send the code: it can be typed into the player’s Profile tab.</span>}
-            </div>
-          </div>
-          <div className="barrow">
-            <Field mono readOnly aria-label="Invite link" value={link ?? ''} onFocus={(event) => event.currentTarget.select()} />
-            <Push
-              primary
-              disabled={!link}
-              reason="Enter where players open Airwave first."
-              onClick={() =>
-                void navigator.clipboard.writeText(link ?? '').then(
-                  () => say(`Copied the invite link for ${groupName}.`),
-                  () => say('The browser would not copy it. Select the link and copy it by hand.'),
-                )
-              }
-            >
-              Copy Link
-            </Push>
-          </div>
-        </div>
-      ) : null}
       <div className="well well--after">
         <table className="tbl" aria-label={`Invites to ${groupName}`}>
           <colgroup>
             <col style={{ width: '28%' }} />
             <col style={{ width: '14%' }} />
             <col />
-            <col style={{ width: 98 }} />
+            <col style={{ width: 186 }} />
           </colgroup>
           <thead>
             <tr>
@@ -326,13 +304,19 @@ function GroupInvites({ groupId, groupName }: { groupId: string; groupName: stri
             {state
               ? null
               : items.map((row) => (
-                  <tr key={row.inviteId}>
+                  <Fragment key={row.inviteId}>
+                  <tr>
                     <td>{row.toName ?? (row.toProfileId ? 'A removed profile' : 'Anyone with the link')}</td>
                     <td>{GROUP_ROLES[row.role] ?? capitalise(row.role)}</td>
                     <td>
                       {inviteStateLabel(row, now)} · made by {row.createdBy}
                     </td>
                     <td className="acts">
+                      {made?.inviteId === row.inviteId && row.state === 'open' ? (
+                        <Push ref={toggle} aria-expanded={shown} aria-controls={shown ? `invite-${row.inviteId}` : undefined} onClick={() => setShown(!shown)}>
+                          {shown ? 'Hide Link' : 'Show Link'}
+                        </Push>
+                      ) : null}
                       {row.state === 'open' ? (
                         <Push
                           busy={withdraw.busy}
@@ -347,6 +331,53 @@ function GroupInvites({ groupId, groupName }: { groupId: string; groupName: stri
                       ) : null}
                     </td>
                   </tr>
+                    {made && shown && made.inviteId === row.inviteId ? (
+                      <tr className="detail-row">
+                        <td colSpan={4}>
+                          {/* Escape folds the link away and puts the caret back on Hide Link. */}
+                          {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+                          <div
+                            className="tile detail"
+                            id={`invite-${row.inviteId}`}
+                            onKeyDown={(event) => {
+                              if (event.key !== 'Escape') return;
+                              event.stopPropagation();
+                              setShown(false);
+                              toggle.current?.focus();
+                            }}
+                          >
+                            <span className="sm">New invite · works once · {made.ttlLabel}. The code is shown here only; the hub can’t look it up again.</span>
+                            <span className="invcode">{made.code}</span>
+                            <div className="pref detail__form">
+                              <label className="k" htmlFor="invPlayer">
+                                Players open Airwave at:
+                              </label>
+                              <div className="v">
+                                <Field id="invPlayer" mono placeholder="https://music.example.com/" value={playerAddress} onChange={(event) => rememberPlayerAddress(event.currentTarget.value)} />
+                                {link ? null : <span className="sub">Enter the address to get a link. Without one, send the code: it can be typed into the player’s Profile tab.</span>}
+                              </div>
+                            </div>
+                            <div className="barrow">
+                              <Field ref={linkField} mono readOnly aria-label="Invite link" value={link ?? ''} onFocus={(event) => event.currentTarget.select()} />
+                              <Push
+                                primary
+                                disabled={!link}
+                                reason="Enter where players open Airwave first."
+                                onClick={() =>
+                                  void navigator.clipboard.writeText(link ?? '').then(
+                                    () => say(`Copied the invite link for ${groupName}.`),
+                                    () => say('The browser would not copy it. Select the link and copy it by hand.'),
+                                  )
+                                }
+                              >
+                                Copy Link
+                              </Push>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
                 ))}
           </tbody>
         </table>

@@ -15,11 +15,13 @@
  * password hashes, no sealed tokens, no credential secrets, no pairing codes.
  */
 import { createHash } from 'node:crypto';
-import { copyFileSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs';
-import { join, sep } from 'node:path';
+import { accessSync, constants as fsConstants, copyFileSync, existsSync, mkdirSync, readdirSync, realpathSync, renameSync, rmSync, statSync } from 'node:fs';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { Logger } from 'pino';
+import { BackupSettings, type BackupSettingsView } from '@now-playing/contracts';
 import { DomainError } from '@now-playing/domain';
 import { diskUsage } from '../disk-usage.js';
+import { nextScheduledRun } from './schedule.js';
 import type { AuditService } from '../auth/audit.js';
 import type { RequestMeta } from '../auth/service.js';
 import type { HubConfig } from '../config.js';
@@ -44,11 +46,42 @@ export interface ImportReport {
 
 const EXPORT_SCHEMA_VERSION = 1;
 /**
- * Keep this many automatic backups of each kind (scheduled `-auto`, pre-restore `-safety`); the
- * operator's own backups (no suffix) are never pruned.
+ * Keep this many pre-restore (`-safety`) backups. Scheduled (`-auto`) backups follow the operator's
+ * Keep setting; the operator's own backups (no suffix) are never pruned.
  */
-const KEEP_BACKUPS = 10;
+const KEEP_SAFETY_BACKUPS = 10;
 const BACKUP_NAME_RE = /^backup-(\d{8}T\d{6}Z)(-safety|-auto)?\.sqlite$/;
+const SETTINGS_KEY = 'backup.settings';
+/** When the schedule was last saved or last ran: the next run is the first slot after it. */
+const ANCHOR_KEY = 'backup.schedule.anchor';
+const LAST_RUN_KEY = 'backup.schedule.lastRunAt';
+/** First segments a backup folder may not use: the installation key lives in `keys/`. */
+const RESERVED_FOLDERS = new Set(['keys']);
+
+/** What a hub has before anyone changes it: what it always did — every night, the last 10 kept. */
+export const DEFAULT_BACKUP_SETTINGS: BackupSettings = {
+  location: 'backups',
+  include: { credentials: true, activity: true, caches: true },
+  schedule: { frequency: 'daily', time: '03:00', weekday: 0 },
+  keep: 10,
+};
+
+/**
+ * What each optional part removes from the archive (never from the live database). Columns are
+ * cleared rather than rows deleted where other rows depend on them, so a restored hub keeps its
+ * accounts and only has to sign in to them again.
+ */
+const STRIP: Record<keyof BackupSettings['include'], string[]> = {
+  credentials: [
+    'UPDATE provider_app_configs SET client_secret_sealed = NULL, api_key_sealed = NULL',
+    'UPDATE provider_accounts SET access_token_sealed = NULL, refresh_token_sealed = NULL',
+    'UPDATE platform_connections SET access_token_sealed = NULL, refresh_token_sealed = NULL',
+    'DELETE FROM oauth_states',
+    "DELETE FROM settings WHERE key = 'discord.token'",
+  ],
+  activity: ['DELETE FROM audit_events', 'DELETE FROM metrics_samples'],
+  caches: ['DELETE FROM metadata_cache', 'DELETE FROM discovery_cache'],
+};
 
 export type BackupKind = 'manual' | 'auto' | 'safety';
 
@@ -74,7 +107,158 @@ export class BackupService {
   }
 
   private dir(): string {
-    return this.config.backupDir ?? join(this.config.dataDir, 'backups');
+    return this.config.backupDir ?? join(this.config.dataDir, ...this.settings().location.split('/'));
+  }
+
+  /* ------------------------------------------------------------ settings */
+
+  /** The stored settings, with anything missing or unreadable taken from the defaults. */
+  settings(): BackupSettings {
+    const stored = this.repos.settings.get<Partial<BackupSettings>>(SETTINGS_KEY) ?? {};
+    const merged = BackupSettings.safeParse({
+      ...DEFAULT_BACKUP_SETTINGS,
+      ...stored,
+      include: { ...DEFAULT_BACKUP_SETTINGS.include, ...(stored.include ?? {}) },
+      schedule: { ...DEFAULT_BACKUP_SETTINGS.schedule, ...(stored.schedule ?? {}) },
+    });
+    return merged.success ? merged.data : DEFAULT_BACKUP_SETTINGS;
+  }
+
+  settingsView(): BackupSettingsView {
+    const settings = this.settings();
+    const anchor = this.anchorMs();
+    const next = nextScheduledRun(settings.schedule, anchor ?? this.clock.now());
+    return {
+      ...settings,
+      path: this.dir(),
+      dataDir: this.config.dataDir,
+      locationFixed: this.config.backupDir !== null,
+      nextRunAt: next === null ? null : new Date(next).toISOString(),
+      lastRunAt: this.repos.settings.get<string>(LAST_RUN_KEY) ?? null,
+    };
+  }
+
+  /**
+   * Change where backups go, what they hold, when they run and how many are kept. The folder must be
+   * inside the data volume — typed relative to it ("backups") or as the container sees it
+   * ("/data/backups") — and is created and checked for writing before it is stored, so a typo fails
+   * here rather than at 03:00.
+   */
+  updateSettings(patch: { [K in keyof BackupSettings]?: BackupSettings[K] | undefined }, actor: { id: string; displayName: string }, meta: RequestMeta): BackupSettingsView {
+    const current = this.settings();
+    const next: BackupSettings = {
+      location: current.location,
+      keep: patch.keep ?? current.keep,
+      include: { ...current.include, ...(patch.include ?? {}) },
+      schedule: { ...current.schedule, ...(patch.schedule ?? {}) },
+    };
+    if (patch.location !== undefined) {
+      const location = this.normaliseLocation(patch.location);
+      if (this.config.backupDir !== null && location !== current.location) {
+        throw new DomainError('validation', 'The backup folder is set by NP_BACKUP_DIR in the container’s environment. Change it there.');
+      }
+      next.location = location;
+    }
+    const scheduleChanged = JSON.stringify(next.schedule) !== JSON.stringify(current.schedule);
+    const now = this.nowIso();
+    this.repos.settings.transaction(() => {
+      this.repos.settings.set(SETTINGS_KEY, next, now);
+      // A new schedule counts from now: changing "weekly" to "daily" at 02:59 does not mean a
+      // backup at 03:00 for every day that was missed.
+      if (scheduleChanged) this.repos.settings.set(ANCHOR_KEY, now, now);
+    });
+    this.prune();
+    this.audit.record({
+      actor: { kind: 'admin', id: actor.id, displayName: actor.displayName },
+      action: 'backup.settings',
+      outcome: 'success',
+      target: { kind: 'backup', id: 'settings' },
+      ip: meta.ip,
+      correlationId: meta.correlationId,
+      details: { location: next.location, frequency: next.schedule.frequency, keep: String(next.keep), credentials: String(next.include.credentials), activity: String(next.include.activity), caches: String(next.include.caches) },
+    });
+    return this.settingsView();
+  }
+
+  /** A folder inside the data volume, as the stored relative form, or a validation error that says why not. */
+  private normaliseLocation(typed: string): string {
+    const dataDir = resolve(this.config.dataDir);
+    const shown = dataDir.replaceAll('\\', '/').replace(/\/+$/, '');
+    const refuse = (): never => {
+      throw new DomainError('validation', `Use a folder inside the data volume, such as ${shown}/backups.`);
+    };
+    let text = typed.trim().replaceAll('\\', '/');
+    if (!text) refuse();
+    if (text === shown) refuse();
+    if (text.startsWith(`${shown}/`)) text = text.slice(shown.length + 1);
+    else if (isAbsolute(text) || /^[a-z]:/i.test(text)) refuse();
+    const segments = text.split('/').filter(Boolean);
+    if (!segments.length || segments.some((s) => s === '.' || s === '..' || !/^[A-Za-z0-9 ._-]{1,80}$/.test(s))) refuse();
+    if (RESERVED_FOLDERS.has(segments[0]!.toLowerCase())) {
+      throw new DomainError('validation', `${shown}/${segments[0]} holds the installation key. Choose another folder.`);
+    }
+    const location = segments.join('/');
+    const absolute = resolve(dataDir, ...segments);
+    const inside = (root: string, path: string): boolean => {
+      const rel = relative(root, path);
+      return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel);
+    };
+    if (!inside(dataDir, absolute)) refuse();
+    try {
+      mkdirSync(absolute, { recursive: true });
+      // A link inside the volume that points out of it is still outside it.
+      if (!inside(realpathSync(dataDir), realpathSync(absolute))) refuse();
+      accessSync(absolute, fsConstants.W_OK);
+    } catch (err) {
+      if (err instanceof DomainError) throw err;
+      throw new DomainError('validation', `The hub can’t write to ${shown}/${location}. Check the folder’s permissions.`);
+    }
+    return location;
+  }
+
+  private anchorMs(): number | null {
+    const iso = this.repos.settings.get<string>(ANCHOR_KEY);
+    const ms = iso ? Date.parse(iso) : Number.NaN;
+    return Number.isFinite(ms) ? ms : null;
+  }
+
+  /**
+   * Called every minute by the scheduler: take a scheduled backup when its slot has come. A hub that
+   * was off at the slot takes it when it next starts. Returns the backup taken, if any.
+   */
+  async runScheduled(): Promise<BackupEntry | null> {
+    const settings = this.settings();
+    if (settings.schedule.frequency === 'off') return null;
+    const now = this.clock.now();
+    const anchor = this.anchorMs();
+    if (anchor === null) {
+      // First run of a fresh hub: count from now rather than from the epoch.
+      this.repos.settings.set(ANCHOR_KEY, new Date(now).toISOString(), new Date(now).toISOString());
+      return null;
+    }
+    const due = nextScheduledRun(settings.schedule, anchor);
+    if (due === null || now < due) return null;
+    // Move the anchor first: a backup that fails waits for its next slot instead of retrying every minute.
+    this.repos.settings.set(ANCHOR_KEY, new Date(now).toISOString(), new Date(now).toISOString());
+    const entry = await this.create(null, null, 'auto');
+    this.repos.settings.set(LAST_RUN_KEY, entry.createdAt, entry.createdAt);
+    return entry;
+  }
+
+  /**
+   * The file for one archive this hub lists, for downloading. Only names the hub itself writes are
+   * accepted, and only from the folder it lists, so no request can reach any other file.
+   */
+  archive(backupId: string): { path: string; sizeBytes: number; fileName: string } {
+    if (!BACKUP_NAME_RE.test(`${backupId}.sqlite`)) throw new DomainError('not-found', 'No such backup');
+    const entry = this.list().find((b) => b.id === backupId);
+    if (!entry) throw new DomainError('not-found', 'No such backup');
+    return { path: join(this.dir(), `${entry.id}.sqlite`), sizeBytes: entry.sizeBytes, fileName: `${entry.id}.sqlite` };
+  }
+
+  private relativePathOf(fileName: string): string {
+    const rel = relative(resolve(this.config.dataDir), join(this.dir(), fileName)).replaceAll('\\', '/');
+    return rel.startsWith('..') || isAbsolute(rel) ? fileName : rel;
   }
 
   /**
@@ -94,7 +278,7 @@ export class BackupService {
     } catch {
       lastArchiveBytes = null;
     }
-    return { path: forDevice && !inside ? 'host folder' : dir, freeBytes: volume.freeBytes, totalBytes: volume.totalBytes, lastArchiveBytes, keep: KEEP_BACKUPS };
+    return { path: forDevice && !inside ? 'host folder' : dir, freeBytes: volume.freeBytes, totalBytes: volume.totalBytes, lastArchiveBytes, keep: this.settings().keep || null };
   }
 
   private nowIso(): string {
@@ -108,10 +292,15 @@ export class BackupService {
   async create(actor: { id: string; displayName: string } | null, meta: RequestMeta | null, kind: BackupKind = 'manual'): Promise<BackupEntry> {
     if (this.dbFile === ':memory:') throw new DomainError('unsupported', 'This hub is running against an in-memory database, so there is nothing to back up');
     const id = `backup-${this.stamp()}${kind === 'manual' ? '' : `-${kind}`}`;
+    mkdirSync(this.dir(), { recursive: true });
     const file = join(this.dir(), `${id}.sqlite`);
     // Checkpoint first so the backup contains everything the WAL is holding.
     checkpoint(this.db);
     await this.db.backup(file);
+    // A safety backup is taken before a restore and must hold everything; the others hold what the
+    // operator chose.
+    const left = kind === 'safety' ? [] : this.leftOut();
+    if (left.length) this.strip(file, left);
     const sizeBytes = statSync(file).size;
     this.metrics.increment('backup.created');
     if (actor && meta) {
@@ -122,20 +311,47 @@ export class BackupService {
         target: { kind: 'backup', id },
         ip: meta.ip,
         correlationId: meta.correlationId,
-        details: { sizeBytes: String(sizeBytes) },
+        details: { sizeBytes: String(sizeBytes), leftOut: left.join(',') || 'nothing' },
       });
     }
     this.prune();
-    return { id, createdAt: this.nowIso(), sizeBytes, relativePath: `backups/${id}.sqlite` };
+    return { id, createdAt: this.nowIso(), sizeBytes, relativePath: this.relativePathOf(`${id}.sqlite`) };
+  }
+
+  /** The optional parts the settings leave out of a backup. */
+  private leftOut(): Array<keyof BackupSettings['include']> {
+    const include = this.settings().include;
+    return (Object.keys(STRIP) as Array<keyof BackupSettings['include']>).filter((part) => !include[part]);
+  }
+
+  /** Remove the parts left out from a freshly written archive, then compact it so they are gone from the file too. */
+  private strip(file: string, parts: ReadonlyArray<keyof BackupSettings['include']>): void {
+    const archive = openDatabase({ file });
+    try {
+      archive.transaction(() => {
+        for (const part of parts) for (const sql of STRIP[part]) archive.exec(sql);
+      })();
+      archive.exec('VACUUM');
+      checkpoint(archive);
+    } catch (err) {
+      archive.close();
+      rmSync(file, { force: true });
+      for (const suffix of ['-wal', '-shm']) rmSync(`${file}${suffix}`, { force: true });
+      throw new DomainError('unavailable', `The backup could not leave out what was asked (${err instanceof Error ? err.message : String(err)}), so it was not kept.`);
+    }
+    archive.close();
+    for (const suffix of ['-wal', '-shm']) rmSync(`${file}${suffix}`, { force: true });
   }
 
   list(): BackupEntry[] {
-    return readdirSync(this.dir(), { withFileTypes: true })
+    const dir = this.dir();
+    if (!existsSync(dir)) return [];
+    return readdirSync(dir, { withFileTypes: true })
       .filter((e) => e.isFile() && BACKUP_NAME_RE.test(e.name))
       .map((e) => {
         const id = e.name.replace(/\.sqlite$/, '');
         const s = statSync(join(this.dir(), e.name));
-        return { id, createdAt: new Date(s.mtimeMs).toISOString(), sizeBytes: s.size, relativePath: `backups/${e.name}` };
+        return { id, createdAt: new Date(s.mtimeMs).toISOString(), sizeBytes: s.size, relativePath: this.relativePathOf(e.name) };
       })
       // Newest first, by the stamp in the name (mtime resolution varies by filesystem), then mtime.
       .sort((a, b) => {
@@ -150,11 +366,17 @@ export class BackupService {
     return this.list()[0]?.createdAt ?? null;
   }
 
-  /** Prune scheduled and safety backups, newest first; manual backups are the operator's to delete. */
+  /**
+   * Prune scheduled backups to the Keep setting (0 keeps them all) and safety backups to ten, oldest
+   * first; manual backups are the operator's to delete.
+   */
   private prune(): void {
     const all = this.list();
-    for (const suffix of ['-auto', '-safety']) {
-      for (const stale of all.filter((b) => b.id.endsWith(suffix)).slice(KEEP_BACKUPS)) rmSync(join(this.dir(), `${stale.id}.sqlite`), { force: true });
+    const keep = this.settings().keep;
+    const limits: Array<[string, number]> = [['-safety', KEEP_SAFETY_BACKUPS]];
+    if (keep > 0) limits.push(['-auto', keep]);
+    for (const [suffix, limit] of limits) {
+      for (const stale of all.filter((b) => b.id.endsWith(suffix)).slice(limit)) rmSync(join(this.dir(), `${stale.id}.sqlite`), { force: true });
     }
   }
 

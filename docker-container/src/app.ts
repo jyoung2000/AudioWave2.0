@@ -23,6 +23,7 @@ import { AuditService } from './auth/audit.js';
 import { DeviceAuthService } from './auth/device-auth.js';
 import { AuthService } from './auth/service.js';
 import { BackupService } from './backup/service.js';
+import { LiveTvService } from './live-tv/service.js';
 import { ProfileService } from './profiles/service.js';
 import type { HubConfig } from './config.js';
 import type { HubContext, HubIdentityState, LifecycleState } from './context.js';
@@ -221,6 +222,7 @@ export async function buildApp(deps: HubDeps): Promise<HubApp> {
 
   const metricsService = new MetricsService(metrics, repos.metrics, clock, getCtx);
   const backup = new BackupService(db, dbFile, config, repos, audit, metrics, clock, migration.to, log, deps.exit);
+  const liveTv = new LiveTvService(repos.settings, audit, metrics, clock);
   const profiles = new ProfileService(db, ffmpeg, audit, metrics, clock);
   groups.attachProfileNames((id) => profiles.displayName(id));
   const releases = new ReleaseService(repos.settings, http, metrics, clock);
@@ -286,6 +288,7 @@ export async function buildApp(deps: HubDeps): Promise<HubApp> {
     shares,
     metricsService,
     backup,
+    liveTv,
     profiles,
     releases,
     jobs,
