@@ -11891,7 +11891,9 @@ window.AW.startStats = function () {
                stays empty rather than reporting a slot boundary as if it were
                a junction. */
             '<td class="lib-col-album">' +
-              (it.channel.run ? esc(clockOf(lvl.at + SLOT)) : '') + '</td>' +
+              (it.channel.guide && it.channel.guide.now && it.channel.guide.now.stop
+                ? esc(clockOf(Date.parse(it.channel.guide.now.stop)))
+                : it.channel.run ? esc(clockOf(lvl.at + SLOT)) : '') + '</td>' +
           '</tr>';
         }).join('') + '</tbody></table>';
     }

@@ -1383,6 +1383,12 @@ replace("              'The companion app can fetch it instead.';\n",
 replace("              hubSave(); paintHubPair(); paintProfileTab(); loadMe();",
         "              hubSave().then(function () { if (window.companionTv) window.companionTv(); }); paintHubPair(); paintProfileTab(); loadMe();")
 
+# A guide entry from the companion or the hub knows when the programme ends: Until says so (NP-TV-001).
+replace("              (it.channel.run ? esc(clockOf(lvl.at + SLOT)) : '') + '</td>' +",
+        "              (it.channel.guide && it.channel.guide.now && it.channel.guide.now.stop\n"
+        "                ? esc(clockOf(Date.parse(it.channel.guide.now.stop)))\n"
+        "                : it.channel.run ? esc(clockOf(lvl.at + SLOT)) : '') + '</td>' +")
+
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):
     assert bad not in text, f'left behind: {bad}'

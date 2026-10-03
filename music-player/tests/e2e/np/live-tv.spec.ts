@@ -49,6 +49,10 @@ test('the companion’s channels fill the guide, with what is on and what follow
 
   await page.click('.tb__btn[data-view="live-tv"]');
   await expect(page.locator('#mediaMenu .rlist tbody tr')).toHaveCount(2);
+  // Until is when the programme on now ends, in the guide's own words.
+  const until = await page.$$eval('#mediaMenu .rlist tbody tr', (n) => n.map((r) => r.querySelectorAll('td')[5]?.textContent?.trim() ?? ''));
+  expect(until[0], 'the guide says when it ends').toMatch(/^\d{1,2}:\d{2} (AM|PM)$/);
+  expect(until[1], 'a channel with no guide says nothing about it').toBe('');
   expect(await guideRows(page)).toEqual([
     ['1', 'Channel One', 'Morning Report', 'The Late Review'],
     // No guide entry: the channel is on, and nothing is invented about what it shows.
