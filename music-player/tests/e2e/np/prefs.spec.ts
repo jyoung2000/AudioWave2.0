@@ -284,13 +284,13 @@ test('it is a page at both widths, and a section has its own address', async ({ 
   expect(await page.textContent('#prefsBackLbl'), 'and the back button names where it returns to').toBe('Settings');
   await page.click('#prefsBack'); await page.waitForTimeout(400);
   expect(await page.evaluate(() => (document.getElementById('prefs') as HTMLElement).dataset['level']), 'back goes up one level, not out').toBe('index');
-  expect(await page.textContent('#prefsBackLbl'), 'and now offers the way out').toBe('Now Playing');
+  expect(await page.textContent('#prefsBackLbl'), 'and now offers the way out').toBe('Airwave');
   await page.goBack(); await page.waitForTimeout(400);
   expect(await page.evaluate(() => location.hash), 'the browser Back button walks the same history').toBe('#settings/player');
 
   await page.setViewportSize({ width: 1280, height: 900 }); await page.waitForTimeout(500);
   expect(await page.isVisible('.prefs__tabs') && await page.isVisible('#pp-player'), 'widening brings the toolbar back and keeps the section').toBe(true);
-  expect(await page.textContent('#prefsBackLbl'), 'where back means out again').toBe('Now Playing');
+  expect(await page.textContent('#prefsBackLbl'), 'where back means out again').toBe('Airwave');
   await leavePrefs(page);
   expect(!(await prefsShown(page)) && !(await page.evaluate(() => (document.querySelector('.player') as HTMLElement).hidden)), 'and leaving gives the player back').toBe(true);
 
