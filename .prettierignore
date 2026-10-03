@@ -28,6 +28,8 @@ docs/design
 *.yml
 # Per-machine tool settings, written by the tool in its own style.
 .claude
+# Evidence from test passes: raw results kept as they were written, never reformatted.
+.agents/evidence
 playwright-report-local/
 test-results-local/
 

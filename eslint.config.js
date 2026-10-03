@@ -24,6 +24,9 @@ export default tseslint.config(
       // code nobody in this repository wrote — the run that just failed its own lint because
       // an earlier run's evidence was still on disk. Git-ignored is not the same as lint-ignored.
       '.verify-artifacts/**',
+      // Test passes keep their driver scripts and raw results here as evidence. They are records of
+      // what was run, not product source: linting them turned a tester's notes into a red gate.
+      '.agents/evidence/**',
       // Agent worktrees: complete copies of the repository, linted where they live, not here.
       '.claude/**',
       // The single-file suite writes its own report and results beside the served one.
