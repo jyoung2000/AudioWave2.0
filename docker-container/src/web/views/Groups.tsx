@@ -1,96 +1,151 @@
 /**
- * Groups: who is listening together, what is queued, and what the hub can honestly sync.
+ * Groups: who is listening together, what is queued, and how closely the hub can keep them in step.
  *
- * The sync grade shown per group is the reviewed provider capability, not a guess: "exact" only
- * when everyone plays the same seekable file, down to "not synchronised" for sources that cannot
- * be aligned at all. An operator seeing "best effort" knows why the timing drifts.
+ * Laid out as the design draws it: the groups table with its New Group row, then the open group —
+ * state and transport on the left with members and drift under it, queue and recent history on the
+ * right — and its invites below. The grade beside each group is the reviewed capability of what is
+ * playing, not a guess: an operator who reads "best effort" knows why the timing drifts.
+ *
+ * One thing differs from the design on purpose (design/decisions.md DEC-017): the invites table
+ * shows who an invite is for and its state, not its code. The hub keeps only a code's hash, so the
+ * code is shown once, when made.
  */
-import { useState } from 'react';
-import { AquaTable, Button, KeyValueList, Panel, PanelSection, PopUpMenu, StatusDot, TextField, useToast } from '@now-playing/aqua-ui';
+import { useState, type FormEvent } from 'react';
 import type { GroupHistoryEntry, GroupView, InviteView } from '@now-playing/contracts';
 import { api, apiUrl } from '../lib/api.js';
 import { useAction, useResource } from '../lib/hooks.js';
-import { Ago, AsyncPanel, ConfirmButton, Duration } from './common.js';
+import { capitalise, GROUP_ROLES, SYNC_GRADES } from '../lib/words.js';
+import { ActionError, agoText, EmptyCells, EmptyRow, Field, formatClock, Group, listState, Note, Pop, Push, SubHead, useHubUi, useNow } from '../ui.js';
+
+const PLAYBACK_WORDS: Record<string, string> = { idle: 'Nothing playing', preparing: 'Getting ready', playing: 'Playing', paused: 'Paused', ended: 'Finished' };
+const OUTCOMES: Record<string, string> = { completed: 'played', skipped: 'skipped', failed: 'failed', stopped: 'stopped', unavailable: 'could not be played', playing: 'playing now' };
+
+function Eqz() {
+  return (
+    <span className="eqz" aria-hidden="true">
+      <i />
+      <i />
+      <i />
+    </span>
+  );
+}
 
 export function GroupsView() {
   const groups = useResource('groupsList', {}, { pollMs: 8_000 });
   const [selected, setSelected] = useState<string | null>(null);
 
+  const items = (groups.data as { items: GroupView[] } | null)?.items ?? [];
+  const state = listState(groups, (d) => (d as { items: GroupView[] }).items.length === 0, 'No groups yet. Name one below.');
+  // The design opens the first group; so does this, once there is one.
+  const open = items.find((g) => g.id === selected) ?? null;
+
   return (
     <>
-      <NewGroup
-        onCreated={(id) => {
-          groups.reload();
-          setSelected(id);
-        }}
-      />
-      <AsyncPanel
-        resource={groups}
-        title="Groups"
-        emptyWhen={(d) => (d as { items: GroupView[] }).items.length === 0}
-        emptyTitle="No groups yet"
-        emptyText="Name a group above, or create one from a player or the Discord bot; the hub keeps its queue and timeline."
-      >
-        {(raw) => (
-          <AquaTable
-            label="Groups"
-            rowKey={(row: GroupView) => row.id}
-            rows={(raw as { items: GroupView[] }).items}
-            onActivate={(row) => setSelected(row.id)}
-            columns={[
-              { id: 'name', header: 'Name', primary: true, cell: (row) => row.name },
-              { id: 'status', header: 'Status', cell: (row) => <StatusDot kind={row.status === 'active' ? 'ok' : 'neutral'} label={row.status} /> },
-              { id: 'playing', header: 'Now playing', cell: (row) => row.currentTrackTitle ?? '—' },
-              { id: 'queue', header: 'Queue', align: 'right', cell: (row) => row.queueLength },
-              { id: 'listeners', header: 'Listeners', align: 'right', cell: (row) => row.listenerCount },
-              { id: 'sync', header: 'Sync', cell: (row) => row.playback?.syncGrade ?? '—' },
-              { id: 'open', header: '', headerLabel: 'Open', cell: (row) => <Button size="small" onClick={() => setSelected(row.id)}>Open</Button> },
-            ]}
-          />
-        )}
-      </AsyncPanel>
-
-      {selected ? <GroupDetail groupId={selected} onClose={() => setSelected(null)} onChanged={groups.reload} /> : null}
+      <Group title="Groups">
+        <div className="well">
+          <table className="tbl" aria-label="Groups">
+            <colgroup>
+              <col />
+              <col style={{ width: '30%' }} />
+              <col style={{ width: '14%' }} />
+              <col style={{ width: 74 }} />
+            </colgroup>
+            <thead>
+              <tr>
+                <th scope="col">Group</th>
+                <th scope="col">State</th>
+                <th scope="col" className="num">
+                  Members
+                </th>
+                <th scope="col">
+                  <span className="sr">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {state ? <EmptyCells columns={4} {...state} /> : null}
+              {state
+                ? null
+                : items.map((g) => {
+                    const playing = g.playback?.status === 'playing';
+                    return (
+                      <tr key={g.id}>
+                        <td title={g.currentTrackTitle ?? undefined}>{g.name}</td>
+                        <td>
+                          {g.status === 'archived' ? (
+                            'Archived'
+                          ) : playing ? (
+                            <>
+                              <Eqz />
+                              Playing
+                            </>
+                          ) : (
+                            (PLAYBACK_WORDS[g.playback?.status ?? 'idle'] ?? 'Paused')
+                          )}
+                        </td>
+                        <td className="num">{g.members.filter((m) => !m.revokedAt).length}</td>
+                        <td className="acts">
+                          <Push aria-label={`${selected === g.id ? 'Close' : 'Open'} ${g.name}`} aria-expanded={selected === g.id} onClick={() => setSelected(selected === g.id ? null : g.id)}>
+                            {selected === g.id ? 'Close' : 'Open'}
+                          </Push>
+                        </td>
+                      </tr>
+                    );
+                  })}
+            </tbody>
+          </table>
+        </div>
+        <NewGroup
+          onCreated={(id) => {
+            groups.reload();
+            setSelected(id);
+          }}
+        />
+      </Group>
+      {open ? (
+        <GroupDetail
+          key={open.id}
+          summary={open}
+          onArchived={() => {
+            setSelected(null);
+            groups.reload();
+          }}
+        />
+      ) : null}
     </>
   );
 }
 
 function NewGroup({ onCreated }: { onCreated: (groupId: string) => void }) {
   const [name, setName] = useState('');
-  const toast = useToast();
+  const { say } = useHubUi();
   const create = useAction(async (groupName: string) => api('groupsCreate', { body: { name: groupName } }));
 
-  const submit = (): void => {
+  const submit = (event: FormEvent): void => {
+    event.preventDefault();
     const trimmed = name.trim();
-    if (!trimmed) return;
+    if (!trimmed) {
+      say('Name the group first.');
+      return;
+    }
     void create.run(trimmed).then((made) => {
       if (!made) return;
       setName('');
-      toast.show(`Created “${trimmed}”. Make an invite link below to bring people in.`);
+      say(`Created “${trimmed}”. Make an invite link below to bring people in.`);
       onCreated((made as GroupView).id);
     });
   };
 
   return (
-    <Panel title="New group">
-      <form
-        className="admin-actions"
-        onSubmit={(event) => {
-          event.preventDefault();
-          submit();
-        }}
-      >
-        <TextField label="New group’s name" hideLabel placeholder="New group’s name" maxLength={80} value={name} onChange={(event) => setName(event.currentTarget.value)} />
-        <Button type="submit" variant="default" busy={create.busy} disabled={!name.trim()}>
+    <>
+      <form className="barrow" onSubmit={submit}>
+        <Field className="field--group" placeholder="New group’s name" aria-label="New group’s name" maxLength={80} value={name} onChange={(event) => setName(event.currentTarget.value)} />
+        <Push type="submit" busy={create.busy}>
           New Group
-        </Button>
+        </Push>
       </form>
-      {create.error ? (
-        <p className="admin-hint admin-hint--warning" role="alert">
-          The group was not created: {create.error.message}
-        </p>
-      ) : null}
-    </Panel>
+      <ActionError error={create.error} />
+    </>
   );
 }
 
@@ -138,6 +193,7 @@ function inviteStateLabel(invite: InviteView, now: number): string {
 function GroupInvites({ groupId, groupName }: { groupId: string; groupName: string }) {
   const invites = useResource('groupsInvitesList', { params: { groupId } }, { pollMs: 10_000 });
   const hub = useResource('hubIdentity', {});
+  const now = useNow();
   const [ttl, setTtl] = useState<string>('86400');
   const [role, setRole] = useState<InviteRole>('member');
   const [made, setMade] = useState<{ code: string; expiresAt: string; role: InviteRole; ttlLabel: string } | null>(null);
@@ -157,208 +213,329 @@ function GroupInvites({ groupId, groupName }: { groupId: string; groupName: stri
       // private window: the field still works for this visit
     }
   };
-  const toast = useToast();
+  const { say, confirm } = useHubUi();
   const make = useAction(async () => api('groupsInvite', { params: { groupId }, body: { ttlSeconds: Number(ttl), role } }));
   const withdraw = useAction(async (inviteId: string) => api('groupsInviteWithdraw', { params: { groupId, inviteId } }));
 
   const hubBase = (hub.data as { publicEndpoint: string | null } | null)?.publicEndpoint ?? window.location.origin;
   const items = (invites.data as { items: InviteView[] } | null)?.items ?? [];
+  const state = listState(invites, (d) => (d as { items: InviteView[] }).items.length === 0, 'No invites yet.');
   const link = made && playerAddress.trim() ? inviteLink(playerAddress.trim(), made.code, hubBase, groupName, 'admin', made.role, made.expiresAt) : null;
 
   return (
-    <PanelSection title={`Invites to ${groupName}`}>
-      <p className="admin-hint">
-        Each invite lets one person join, then stops working. Send the link: it opens the invite page in Now Playing, where they join or decline. Someone who isn’t paired yet is asked to pair first.
-      </p>
-      <div className="admin-actions">
-        <PopUpMenu label="Works for:" size="small" options={INVITE_TTLS} value={ttl} onChange={(event) => setTtl(event.currentTarget.value)} />
-        <PopUpMenu label="Joins as:" size="small" options={INVITE_ROLES} value={role} onChange={(event) => setRole(event.currentTarget.value as InviteRole)} />
-        <Button
-          variant="default"
-          size="small"
-          busy={make.busy}
-          onClick={() =>
-            void make.run().then((result) => {
-              if (!result) return;
-              const r = result as { inviteCode: string; expiresAt: string };
-              setMade({ code: r.inviteCode, expiresAt: r.expiresAt, role, ttlLabel: INVITE_TTLS.find((t) => t.value === ttl)?.label ?? '' });
-              invites.reload();
-            })
-          }
-        >
-          Make Invite Link
-        </Button>
+    <fieldset className="group--last">
+      <legend>
+        <h3 className="legend-h">Invites to {groupName}</h3>
+      </legend>
+      <p className="hint">Each invite lets one person join, then stops working. Send the link: it opens the invite page in the player, where they join or decline. Someone who isn’t paired yet is asked to pair first.</p>
+      <div className="pref">
+        <label className="k" htmlFor="invTtl">
+          Works for:
+        </label>
+        <div className="v">
+          <Pop id="invTtl" value={ttl} onChange={(event) => setTtl(event.currentTarget.value)}>
+            {INVITE_TTLS.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </Pop>
+        </div>
+        <label className="k" htmlFor="invRole">
+          Joins as:
+        </label>
+        <div className="v">
+          <Pop id="invRole" value={role} onChange={(event) => setRole(event.currentTarget.value as InviteRole)}>
+            {INVITE_ROLES.map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label}
+              </option>
+            ))}
+          </Pop>
+        </div>
+        <span className="k" />
+        <div className="v">
+          <Push
+            primary
+            busy={make.busy}
+            onClick={() =>
+              void make.run().then((result) => {
+                if (!result) return;
+                const r = result as { inviteCode: string; expiresAt: string };
+                setMade({ code: r.inviteCode, expiresAt: r.expiresAt, role, ttlLabel: INVITE_TTLS.find((t) => t.value === ttl)?.label ?? '' });
+                invites.reload();
+              })
+            }
+          >
+            Make Invite Link
+          </Push>
+        </div>
       </div>
-      {make.error ? (
-        <p className="admin-hint admin-hint--warning" role="alert">
-          No invite was made: {make.error.message}
-        </p>
-      ) : null}
+      <ActionError error={make.error} />
       {made ? (
-        <div className="admin-invite-new">
-          <p className="admin-hint">
-            New invite · works once · {made.ttlLabel}. The code is shown here only: the hub keeps its hash, so it cannot be looked up again.
-          </p>
-          <p className="admin-invite-code">{made.code}</p>
-          <TextField
-            label="Players open Now Playing at:"
-            inline
-            placeholder="https://music.example/now-playing.html"
-            value={playerAddress}
-            onChange={(event) => rememberPlayerAddress(event.currentTarget.value)}
-            hint={link ? undefined : 'Enter the address to get a link. Without one, send the code: it can be typed into the player’s Profile tab.'}
-          />
-          <div className="admin-actions">
-            <TextField label="Invite link" hideLabel readOnly value={link ?? ''} onFocus={(event) => event.currentTarget.select()} />
-            <Button
-              size="small"
-              variant="default"
+        <div className="tile detail">
+          <span className="sm">New invite · works once · {made.ttlLabel}. The code is shown here only; the hub can’t look it up again.</span>
+          <span className="invcode">{made.code}</span>
+          <div className="pref detail__form">
+            <label className="k" htmlFor="invPlayer">
+              Players open Airwave at:
+            </label>
+            <div className="v">
+              <Field id="invPlayer" mono placeholder="https://music.example.com/" value={playerAddress} onChange={(event) => rememberPlayerAddress(event.currentTarget.value)} />
+              {link ? null : <span className="sub">Enter the address to get a link. Without one, send the code: it can be typed into the player’s Profile tab.</span>}
+            </div>
+          </div>
+          <div className="barrow">
+            <Field mono readOnly aria-label="Invite link" value={link ?? ''} onFocus={(event) => event.currentTarget.select()} />
+            <Push
+              primary
               disabled={!link}
+              reason="Enter where players open Airwave first."
               onClick={() =>
                 void navigator.clipboard.writeText(link ?? '').then(
-                  () => toast.show(`Copied the invite link for ${groupName}.`),
-                  () => toast.show('The browser would not copy it. Select the link and copy it by hand.'),
+                  () => say(`Copied the invite link for ${groupName}.`),
+                  () => say('The browser would not copy it. Select the link and copy it by hand.'),
                 )
               }
             >
               Copy Link
-            </Button>
+            </Push>
           </div>
         </div>
       ) : null}
-      <AquaTable
-        label={`Invites to ${groupName}`}
-        rowKey={(row: InviteView) => row.inviteId}
-        rows={items}
-        columns={[
-          { id: 'to', header: 'For', primary: true, cell: (row) => row.toName ?? (row.toProfileId ? 'a removed profile' : 'anyone with the link') },
-          { id: 'role', header: 'Role', cell: (row) => row.role.charAt(0).toUpperCase() + row.role.slice(1) },
-          { id: 'state', header: 'State', cell: (row) => `${inviteStateLabel(row, Date.now())} · made by ${row.createdBy}` },
-          {
-            id: 'actions',
-            header: '',
-            headerLabel: 'Actions',
-            cell: (row) =>
-              row.state === 'open' ? (
-                <ConfirmButton
-                  label="Withdraw"
-                  confirmLabel="Withdraw this invite? Its link stops working immediately."
-                  busy={withdraw.busy}
-                  onConfirm={() => void withdraw.run(row.inviteId).then(() => invites.reload())}
-                />
-              ) : null,
-          },
-        ]}
-      />
-    </PanelSection>
+      <div className="well well--after">
+        <table className="tbl" aria-label={`Invites to ${groupName}`}>
+          <colgroup>
+            <col style={{ width: '28%' }} />
+            <col style={{ width: '14%' }} />
+            <col />
+            <col style={{ width: 98 }} />
+          </colgroup>
+          <thead>
+            <tr>
+              <th scope="col">For</th>
+              <th scope="col">Role</th>
+              <th scope="col">State</th>
+              <th scope="col">
+                <span className="sr">Actions</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {state ? <EmptyCells columns={4} {...state} /> : null}
+            {state
+              ? null
+              : items.map((row) => (
+                  <tr key={row.inviteId}>
+                    <td>{row.toName ?? (row.toProfileId ? 'A removed profile' : 'Anyone with the link')}</td>
+                    <td>{GROUP_ROLES[row.role] ?? capitalise(row.role)}</td>
+                    <td>
+                      {inviteStateLabel(row, now)} · made by {row.createdBy}
+                    </td>
+                    <td className="acts">
+                      {row.state === 'open' ? (
+                        <Push
+                          busy={withdraw.busy}
+                          onClick={() =>
+                            void confirm({ title: 'Withdraw this invite?', text: 'Its link stops working straight away.', verb: 'Withdraw' }).then((go) => {
+                              if (go) void withdraw.run(row.inviteId).then(() => invites.reload());
+                            })
+                          }
+                        >
+                          Withdraw
+                        </Push>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+          </tbody>
+        </table>
+      </div>
+      <ActionError error={withdraw.error} />
+    </fieldset>
   );
 }
 
-function GroupDetail({ groupId, onClose, onChanged }: { groupId: string; onClose: () => void; onChanged: () => void }) {
+interface QueueData {
+  queue: { revision: number; currentIndex: number; items: Array<{ id: string; track: { title: string; artistName: string; durationMs: number | null }; addedBy: { displayName: string } | null }> };
+}
+
+function GroupDetail({ summary, onArchived }: { summary: GroupView; onArchived: () => void }) {
+  const groupId = summary.id;
   const group = useResource('groupsGet', { params: { groupId } }, { pollMs: 5_000 });
   const sync = useResource('groupsSync', { params: { groupId } }, { pollMs: 3_000 });
   const queue = useResource('groupsQueueGet', { params: { groupId } }, { pollMs: 3_000 });
+  const playing = useResource('groupNowPlayingAdmin', { params: { groupId } }, { pollMs: 2_000 });
   const history = useResource('groupsHistoryList', { params: { groupId }, query: { limit: 25 } }, { pollMs: 15_000 });
   const archive = useAction(async () => api('groupsArchive', { params: { groupId } }));
-  const toast = useToast();
+  const command = useAction(async (type: 'play' | 'pause' | 'resume' | 'skip', baseRevision: number) =>
+    api('groupsQueueCommand', { params: { groupId }, body: { idempotencyKey: `admin-${type}-${baseRevision}-${Date.now()}`, baseRevision, command: { type } } }),
+  );
+  const { say, confirm } = useHubUi();
+  const now = useNow();
+  const [refused, setRefused] = useState<string | null>(null);
 
-  const data = group.data as GroupView | null;
-  const syncInfo = sync.data as { serverTime: string; members: Array<{ memberId: string; driftMs: number | null; dspLatencyMs: number | null; online: boolean }> } | null;
+  const data = (group.data as GroupView | null) ?? summary;
+  const syncInfo = sync.data as { members: Array<{ memberId: string; driftMs: number | null; online: boolean }> } | null;
+  const q = queue.data as QueueData | null;
+  const np = playing.data as { title: string | null; artistName: string | null; durationMs: number | null; positionMs: number } | null;
+  const status = data.playback?.status ?? 'idle';
+  const isPlaying = status === 'playing';
+  const grade = SYNC_GRADES[data.playback?.syncGrade ?? ''] ?? null;
+  const members = data.members.filter((m) => !m.revokedAt);
+  const upcoming = q ? q.queue.items.slice(Math.max(0, q.queue.currentIndex + 1)) : [];
+  const queueState = listState(queue, () => upcoming.length === 0, 'Empty.');
+  const historyItems = (history.data as { items: GroupHistoryEntry[] } | null)?.items ?? [];
+  const historyState = listState(history, (d) => (d as { items: GroupHistoryEntry[] }).items.length === 0, 'Nothing played yet.');
+  const hasQueue = (q?.queue.items.length ?? 0) > 0;
+
+  const send = (type: 'play' | 'pause' | 'resume' | 'skip'): void => {
+    if (!q) return;
+    setRefused(null);
+    void command.run(type, q.queue.revision).then((result) => {
+      const r = result as { accepted: boolean; rejection: { reason: string } | null } | null;
+      if (r && !r.accepted) setRefused(r.rejection?.reason ?? 'The group did not take that. Try again.');
+      queue.reload();
+      group.reload();
+      playing.reload();
+    });
+  };
+
+  const track = np?.title ? [np.title, np.artistName].filter(Boolean).join(' — ') : (data.currentTrackTitle ?? 'Nothing playing');
+  const length = np?.durationMs ?? 0;
+  const position = Math.min(np?.positionMs ?? 0, length || Infinity);
 
   return (
-    <Panel title={data?.name ?? 'Group'}>
-      <PanelSection title="State">
-        <KeyValueList
-          items={[
-            { key: 'Status', value: data?.status ?? '—' },
-            { key: 'Playback', value: data?.playback?.status ?? 'idle' },
-            { key: 'Sync grade', value: data?.playback?.syncGrade ?? '—' },
-            ...(data?.playback?.syncReason ? [{ key: 'Why', value: data.playback.syncReason }] : []),
-            { key: 'Queue length', value: data?.queueLength ?? 0 },
-            { key: 'Listeners', value: data?.listenerCount ?? 0 },
-          ]}
-        />
-        <div className="admin-actions">
-          <a className="aqua-button aqua-button--small" href={apiUrl('groupsHistoryExportCsv', { groupId })} download>
-            Export history (CSV)
-          </a>
-          <a className="aqua-button aqua-button--small" href={apiUrl('groupsHistoryExportJson', { groupId })} download>
-            Export history (JSON)
-          </a>
-          <ConfirmButton
-            label="Archive"
-            confirmLabel={`Archive ${data?.name ?? 'this group'}? Its history is kept; nobody can queue to it again.`}
-            busy={archive.busy}
-            onConfirm={() =>
-              void archive.run().then(() => {
-                toast.show('Group archived');
-                onChanged();
-                onClose();
-              })
-            }
-          />
-          <Button size="small" onClick={onClose}>
-            Close
-          </Button>
+    <>
+      <fieldset>
+        <legend>
+          <h3 className="legend-h">{data.name}</h3>
+        </legend>
+        <div className="split">
+          <div>
+            <SubHead first>State</SubHead>
+            <div className="tile">
+              <span className="sm">
+                {PLAYBACK_WORDS[status] ?? 'Paused'}
+                {grade ? ` · kept in step: ${grade.word}` : ''}
+              </span>
+              <span className="big big--track">{track}</span>
+              {length ? (
+                <>
+                  <div className="bar bar--track" role="img" aria-label={`${formatClock(position)} of ${formatClock(length)}`}>
+                    <i style={{ width: `${(position / length) * 100}%` }} />
+                  </div>
+                  <span className="sm mono">
+                    {formatClock(position)} / {formatClock(length)}
+                  </span>
+                </>
+              ) : null}
+            </div>
+            {data.playback?.syncReason ? <Note>{data.playback.syncReason}</Note> : null}
+            {data.status === 'active' ? (
+              <div className="barrow">
+                <Push busy={command.busy} disabled={!q || (!isPlaying && !hasQueue)} reason="The queue is empty. A member adds music from a player." onClick={() => send(isPlaying ? 'pause' : status === 'paused' ? 'resume' : 'play')}>
+                  {isPlaying ? 'Pause' : 'Play'}
+                </Push>
+                <Push busy={command.busy} disabled={!q || upcoming.length === 0} reason="Nothing is waiting in the queue." onClick={() => send('skip')}>
+                  Skip
+                </Push>
+              </div>
+            ) : (
+              <Note>This group is archived. Its history is kept; nobody can queue to it.</Note>
+            )}
+            {refused ? <Note bad>{refused}</Note> : <ActionError error={command.error} />}
+
+            <SubHead>Members and drift</SubHead>
+            <div className="well">
+              <ul className="rows" aria-label="Members and drift">
+                {members.length === 0 ? <EmptyRow text="Nobody has joined." /> : null}
+                {members.map((m) => {
+                  const drift = syncInfo?.members.find((s) => s.memberId === m.memberId)?.driftMs ?? null;
+                  const far = drift !== null && Math.abs(drift) > 100;
+                  return (
+                    <li key={m.memberId} title={`${GROUP_ROLES[m.role] ?? m.role} · ${m.online ? 'online' : 'offline'}`}>
+                      <span className="name">
+                        <b>{m.displayName}</b>
+                      </span>
+                      {drift === null ? null : (
+                        <span className={`drift ${far ? 'warn' : 'ok'}`}>
+                          {drift >= 0 ? '+' : '−'}
+                          {Math.abs(Math.round(drift))} ms
+                        </span>
+                      )}
+                      <span className="meta">{m.online ? (GROUP_ROLES[m.role] ?? m.role).toLowerCase() : 'offline'}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </div>
+          <div>
+            <SubHead first>Queue</SubHead>
+            <div className="well">
+              <ul className="rows" aria-label="Queue">
+                {queueState ? <EmptyRow {...queueState} /> : null}
+                {queueState
+                  ? null
+                  : upcoming.map((item, i) => (
+                      <li key={item.id} title={item.addedBy ? `Added by ${item.addedBy.displayName}` : undefined}>
+                        <span className="meta">{i + 1}</span>
+                        <span className="name">
+                          <b>
+                            {item.track.title} — {item.track.artistName}
+                          </b>
+                        </span>
+                      </li>
+                    ))}
+              </ul>
+            </div>
+            <SubHead>Recent history</SubHead>
+            <div className="well">
+              <ul className="rows plain" aria-label="Recent history">
+                {historyState ? <EmptyRow {...historyState} /> : null}
+                {historyState
+                  ? null
+                  : historyItems.slice(0, 8).map((h) => (
+                      <li key={h.id} title={`Asked for by ${h.requesterDisplayName} · ${OUTCOMES[h.outcome] ?? h.outcome}`}>
+                        <span className="name">
+                          {h.track.title} — {h.track.artistName} · {agoText(h.startedAt, now)}
+                        </span>
+                      </li>
+                    ))}
+              </ul>
+            </div>
+          </div>
         </div>
-      </PanelSection>
-
-      <PanelSection title="Members and drift">
-        <AquaTable
-          label="Members"
-          rowKey={(row: { memberId: string }) => row.memberId}
-          rows={(data?.members ?? []).map((m) => ({ ...m, drift: syncInfo?.members.find((s) => s.memberId === m.memberId) ?? null }))}
-          columns={[
-            { id: 'name', header: 'Member', primary: true, cell: (row) => row.displayName },
-            { id: 'role', header: 'Role', cell: (row) => row.role },
-            { id: 'online', header: 'Status', cell: (row) => <StatusDot kind={row.online ? 'ok' : 'neutral'} label={row.online ? 'online' : 'offline'} /> },
-            { id: 'latency', header: 'Latency', align: 'right', cell: (row) => (row.latencyMs === null ? '—' : `${Math.round(row.latencyMs)} ms`) },
-            { id: 'drift', header: 'Drift', align: 'right', cell: (row) => (row.drift?.driftMs === null || row.drift?.driftMs === undefined ? '—' : `${row.drift.driftMs > 0 ? '+' : ''}${Math.round(row.drift.driftMs)} ms`) },
-            { id: 'dsp', header: 'DSP latency', align: 'right', cell: (row) => (row.drift?.dspLatencyMs === null || row.drift?.dspLatencyMs === undefined ? '—' : `${Math.round(row.drift.dspLatencyMs)} ms`) },
-            { id: 'share', header: 'Shares profile', cell: (row) => (row.shareAggregate ? 'yes' : 'no') },
-          ]}
-        />
-      </PanelSection>
-
-      {data?.status === 'active' ? <GroupInvites groupId={groupId} groupName={data.name} /> : null}
-
-      <AsyncPanel resource={queue} title="Queue" emptyWhen={(d) => (d as { queue: { items: unknown[] } }).queue.items.length === 0} emptyTitle="The queue is empty">
-        {(raw) => {
-          const q = raw as { queue: { items: Array<{ id: string; track: { title: string; artistName: string; durationMs: number | null; provider: string } ; addedBy: { displayName: string } | null }>; currentIndex: number } };
-          return (
-            <AquaTable
-              label="Queue"
-              rowKey={(row) => row.id}
-              rows={q.queue.items}
-              currentKey={q.queue.items[q.queue.currentIndex]?.id ?? null}
-              columns={[
-                { id: 'title', header: 'Title', primary: true, cell: (row) => row.track.title },
-                { id: 'artist', header: 'Artist', cell: (row) => row.track.artistName },
-                { id: 'source', header: 'Source', cell: (row) => row.track.provider },
-                { id: 'by', header: 'Requested by', cell: (row) => row.addedBy?.displayName ?? 'hub' },
-                { id: 'time', header: 'Time', align: 'right', cell: (row) => <Duration ms={row.track.durationMs} /> },
-              ]}
-            />
-          );
-        }}
-      </AsyncPanel>
-
-      <AsyncPanel resource={history} title="Recent history" emptyWhen={(d) => (d as { items: unknown[] }).items.length === 0} emptyTitle="Nothing has played yet">
-        {(raw) => (
-          <AquaTable
-            label="History"
-            rowKey={(row: GroupHistoryEntry) => row.id}
-            rows={(raw as { items: GroupHistoryEntry[] }).items}
-            columns={[
-              { id: 'title', header: 'Title', primary: true, cell: (row) => row.track.title },
-              { id: 'artist', header: 'Artist', cell: (row) => row.track.artistName },
-              { id: 'by', header: 'Requested by', cell: (row) => row.requesterDisplayName },
-              { id: 'outcome', header: 'Outcome', cell: (row) => (row.skipReason ? `${row.outcome} (${row.skipReason})` : row.outcome) },
-              { id: 'when', header: 'Started', cell: (row) => <Ago iso={row.startedAt} /> },
-            ]}
-          />
-        )}
-      </AsyncPanel>
-    </Panel>
+        <p className="note">Discord members follow at best effort: the bot gets the same queue, but a voice channel can’t be timed to the millisecond.</p>
+        <div className="barrow">
+          <a className="push push--link" href={apiUrl('groupsHistoryExportCsv', { groupId })} download>
+            Export History (CSV)
+          </a>
+          <a className="push push--link" href={apiUrl('groupsHistoryExportJson', { groupId })} download>
+            Export History (JSON)
+          </a>
+          {data.status === 'active' ? (
+            <Push
+              busy={archive.busy}
+              onClick={() =>
+                void confirm({ title: `Archive ${data.name}?`, text: 'Its history is kept, but nobody can queue to it again.', verb: 'Archive' }).then((go) => {
+                  if (go)
+                    void archive.run().then((ok) => {
+                      if (!ok) return;
+                      say(`Archived ${data.name}.`);
+                      onArchived();
+                    });
+                })
+              }
+            >
+              Archive…
+            </Push>
+          ) : null}
+        </div>
+        <ActionError error={archive.error} />
+      </fieldset>
+      {data.status === 'active' ? <GroupInvites groupId={groupId} groupName={data.name} /> : null}
+    </>
   );
 }

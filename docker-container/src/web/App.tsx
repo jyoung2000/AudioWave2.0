@@ -284,10 +284,12 @@ function Window({ tools, locked, status, sheet, sheetOpen, children }: { tools?:
             </span>
           ) : null}
         </div>
-        <div className="pane-host" inert={sheetOpen}>
-          {children}
+        <div className="pane-host">
+          <div className="pane-body" inert={sheetOpen}>
+            {children}
+          </div>
+          {sheet}
         </div>
-        {sheet}
         <div className="status" inert={sheetOpen}>
           {status}
         </div>

@@ -1,415 +1,453 @@
 /*
- * Admin GUI layout.
+ * Airwave Hub: what the two generated stylesheets do not cover.
  *
- * The Aqua design tokens, window chrome and controls all come from @now-playing/aqua-ui; this file
- * only positions the admin-specific pieces. Nothing here redefines a token or overrides a control's
- * appearance — the design spec is the single source for those.
+ * The window, its controls and every list come from `@now-playing/aqua-ui/airwave-window.css` and
+ * `airwave-hub.css`, which are the design file's own CSS. This file holds three kinds of rule and
+ * nothing else:
+ *
+ *   1. Layout the design wrote as inline `style=""` attributes, given class names here because the
+ *      product renders JSX, not the mockup's strings.
+ *   2. States the mockup never needed: sign-in, the confirmation sheet, a failed or loading list,
+ *      links drawn as buttons, real semantic headings inside the chrome.
+ *   3. Text colours darkened to pass WCAG AA (4.5:1), declared once as tokens below. The design's
+ *      hues are kept; only their lightness moves.
+ *
+ * Every value is one of the design's tokens or a darker reading of one.
  */
-:root {
-  color-scheme: light;
+
+:root,
+:root:not([data-theme='light']),
+:root[data-theme='dark'] {
+  /* --ink-3 (#96999c) is 2.9:1 on white: fine for a placeholder, not for a sentence. */
+  --ink-quiet: #6b6f73;
+  /* --success (#4e9d47) and --danger (#d64a44) as text: 3.4:1 and 3.9:1 on white. */
+  --success-ink: #2f7a28;
+  --danger-ink: #b3322c;
+  --link: #1764b2;
 }
 
-html,
-body,
-#root {
-  height: 100%;
+/* ---------------------------------------------------------------- semantic headings in the kit */
+h1.titlebar {
   margin: 0;
+  font-size: inherit;
+  line-height: inherit;
 }
-
-body {
-  background: var(--aqua-window-bg, #e8e8e8);
-}
-
-.admin-centred {
-  display: grid;
-  place-items: center;
-  min-height: 100vh;
-  padding: 24px;
-}
-
-.admin-login {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-width: min(28rem, 92vw);
-  padding: 28px 32px;
-  background: var(--aqua-panel-bg, #fff);
-  border: 1px solid var(--aqua-border, #b6b6b6);
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgb(0 0 0 / 18%);
-}
-
-.admin-login h1 {
+.legend-h,
+.gate__body h2 {
+  display: inline;
   margin: 0;
-  font-size: 17px;
-  font-weight: 600;
+  font: inherit;
+  font-weight: 700;
+}
+.gate__body h2 {
+  display: block;
 }
 
-.admin-login__hint,
-.admin-hint {
-  margin: 0;
-  color: var(--aqua-text-secondary, #5a6472);
-  font-size: 11px;
-  line-height: 1.5;
+/* ---------------------------------------------------------------- window parts */
+.win {
+  position: relative;
 }
-
-.admin-hint--warning {
-  color: var(--aqua-warning-text, #8a5a00);
-}
-
-.admin-toolbar__title {
-  font-weight: 600;
-}
-
-.admin-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  margin: 8px 0;
-}
-
-.admin-form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-width: 40rem;
-}
-
-.admin-scopes {
-  display: grid;
-  gap: 4px;
-  margin: 0;
-  padding: 8px 12px;
-  border: 1px solid var(--aqua-border, #b6b6b6);
-  border-radius: 6px;
-}
-
-.admin-scopes legend {
-  padding: 0 4px;
-  font-size: 11px;
-  color: var(--aqua-text-secondary, #5a6472);
-}
-
-.admin-alerts {
-  margin: 8px 0;
-  padding: 0;
-  list-style: none;
-  display: grid;
-  gap: 6px;
-}
-
-.admin-alerts li {
-  padding: 6px 10px;
-  border-radius: 5px;
-  border-left: 3px solid var(--aqua-info, #3b74c8);
-  background: color-mix(in srgb, var(--aqua-info, #3b74c8) 8%, transparent);
-  font-size: 12px;
-}
-
-.admin-alerts li[data-level='warning'] {
-  border-left-color: var(--aqua-warning, #d08700);
-  background: color-mix(in srgb, var(--aqua-warning, #d08700) 10%, transparent);
-}
-
-.admin-alerts li[data-level='error'] {
-  border-left-color: var(--aqua-error, #c1392b);
-  background: color-mix(in srgb, var(--aqua-error, #c1392b) 10%, transparent);
-}
-
-.admin-list {
-  margin: 6px 0;
-  padding-left: 18px;
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.admin-subhead {
-  margin: 12px 0 4px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--aqua-text-secondary, #5a6472);
-}
-
-.admin-capabilities {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
-  gap: 4px 16px;
-  margin: 4px 0;
-  padding: 0;
-  list-style: none;
-  font-size: 12px;
-}
-
-.admin-capabilities li {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 2px 0;
-  border-bottom: 1px dotted var(--aqua-border-subtle, #d8dce2);
-}
-
-.admin-capabilities li[data-state='available'] span:last-child {
-  color: var(--aqua-ok, #2b7a3d);
-}
-
-.admin-capabilities li[data-state='unsupported'] span:last-child,
-.admin-capabilities li[data-state='blocked'] span:last-child {
-  color: var(--aqua-text-secondary, #5a6472);
-}
-
-.admin-capabilities li[data-state='requires_auth'] span:last-child,
-.admin-capabilities li[data-state='restricted'] span:last-child {
-  color: var(--aqua-warning-text, #8a5a00);
-}
-
-.admin-pairing {
-  display: flex;
-  gap: 20px;
-  align-items: flex-start;
-  flex-wrap: wrap;
-}
-
-.admin-pairing__qr svg {
-  width: 168px;
-  height: 168px;
-  background: #fff;
-  border: 1px solid var(--aqua-border, #b6b6b6);
-  border-radius: 6px;
-  padding: 6px;
-}
-
-.admin-pairing__code {
-  margin: 0 0 6px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 22px;
-  letter-spacing: 0.12em;
-}
-
-.admin-inline-error {
-  margin: 4px 0 0;
-  color: var(--aqua-error, #c1392b);
-  font-size: 11px;
-}
-
-.admin-inline-error__id {
-  color: var(--aqua-text-secondary, #5a6472);
-}
-
-.admin-fingerprint {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
-  color: var(--aqua-text-secondary, #5a6472);
-}
-
-.admin-report {
-  margin-top: 10px;
-}
-
-.aqua-input--number {
-  width: 5.5rem;
-  text-align: right;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  * {
-    animation-duration: 0.001ms !important;
-    transition-duration: 0.001ms !important;
-  }
-}
-
-/* --------------------------------------------------------------------------
-   The hub window, from design/frontends/airwave-hub.html: title bar, toolbar and
-   the six icon tabs share one chrome sheet; the pane scrolls beneath it; the
-   status strip stays at the foot. Colours are aqua-ui tokens; the mockup's
-   private palette folded into tokens.json (the header and warning values) or
-   was already there under an aqua-ui name.
-   -------------------------------------------------------------------------- */
-.admin-window {
-  display: flex;
-  flex-direction: column;
-}
-
-.admin-chrome {
-  flex: none;
-  background: linear-gradient(to bottom, var(--aqua-chrome-top), var(--aqua-chrome-upper) 42%, var(--aqua-chrome-lower) 88%, var(--aqua-chrome-bottom));
-  border-bottom: 1px solid var(--aqua-chrome-separator);
-  box-shadow: inset 0 1px 0 var(--aqua-chrome-highlight);
-}
-
-/* The toolbar row sits on the chrome; its own gradient would double the sheet. */
-.admin-chrome .aqua-toolbar {
-  background: none;
-  border-bottom: 0;
-  box-shadow: none;
-}
-
-.admin-pane {
+.pane-host {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
-  padding: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
-/* One tab stacks several sections; a rule between them says where one ends. */
-.admin-section + .admin-section {
-  border-top: 1px solid var(--aqua-row-divider);
-}
-
-.admin-counts {
-  margin-right: 12px;
-  color: var(--aqua-text-secondary);
-  font-size: var(--aqua-font-label);
-  white-space: nowrap;
-}
-
-.admin-window .aqua-bottom-bar__right {
   display: flex;
-  gap: 0;
-  align-items: center;
-  justify-content: flex-end;
-  min-width: 0;
-  white-space: nowrap;
+  flex-direction: column;
 }
-
-.admin-window .aqua-bottom-bar__right .admin-fingerprint {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Overview tiles: heading, one large figure, a line under it. */
-.admin-tiles {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin: 0 0 16px;
-}
-
-.admin-tile {
-  min-width: 0;
-  padding: 9px 11px 10px;
-  background: var(--aqua-content);
-  border: 1px solid var(--aqua-ctl-field-border);
-  border-radius: 4px;
-  box-shadow: inset 0 1px 2px rgb(0 0 0 / 12%);
-}
-
-.admin-tile__heading {
+.pane-body {
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
-  gap: 6px;
-  align-items: center;
-  margin: 0 0 4px;
-  color: var(--aqua-text-secondary);
-  font-size: var(--aqua-font-small);
-  font-weight: var(--aqua-weight-emphasized);
+  flex-direction: column;
+}
+.tool.locked {
+  /* Still focusable by script and announced as disabled; never clickable. */
+  cursor: default;
+}
+.gear-badge {
+  top: -1px;
 }
 
-.admin-tile__big {
-  display: block;
-  overflow: hidden;
-  font-size: 21px;
-  font-weight: 300;
-  line-height: 1.15;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.admin-tile__small {
-  display: block;
-  overflow: hidden;
-  color: var(--aqua-text-secondary);
-  font-size: var(--aqua-font-small);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-/* The first-run gate, amber: it names what is disabled and who enforces it. */
-.admin-login--gate {
-  max-width: 40rem;
-}
-
-.admin-gate {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  padding: 10px 12px;
-  background: var(--aqua-warning-bg);
-  border: 1px solid var(--aqua-warning-edge);
-  border-radius: 4px;
-}
-
-.admin-gate__icon {
+/* the status lamp in the strip, beyond the design's one green */
+.dot {
   flex: none;
-  width: 26px;
-  height: 26px;
-  color: var(--aqua-warning);
+}
+.dot--warn {
+  background: var(--warning);
+  box-shadow:
+    inset 0 -1px 1px rgba(0, 0, 0, 0.3),
+    0 0 3px rgba(217, 154, 30, 0.8);
+}
+.dot--bad {
+  background: var(--danger);
+  box-shadow:
+    inset 0 -1px 1px rgba(0, 0, 0, 0.3),
+    0 0 3px rgba(214, 74, 68, 0.8);
+}
+.dot--off {
+  background: var(--ink-3);
+  box-shadow: inset 0 -1px 1px rgba(0, 0, 0, 0.3);
+}
+.status #hubLine {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.status #countLine {
+  flex: none;
+  white-space: nowrap;
 }
 
-.admin-gate__body {
+/* ---------------------------------------------------------------- groups and spacing (the design's inline styles) */
+.group--last {
+  margin-bottom: 2px;
+}
+.group--flush {
+  margin: 0;
+}
+.group--after-split {
+  margin-top: 16px;
+}
+section:not(:last-of-type) > .group--last,
+section:not(:last-of-type) > fieldset:last-child {
+  /* A section that is not the pane's last keeps the ordinary gap under it. */
+  margin-bottom: 16px;
+}
+.subhead {
+  margin: 12px 0 4px;
+}
+.subhead--first {
+  margin-top: 0;
+}
+.well--after,
+.pref--after,
+.kv--after {
+  margin-top: 10px;
+}
+.kv--after {
+  margin-top: 12px;
+}
+.well--scroll {
+  max-height: 226px;
+  overflow-y: auto;
+}
+.well--scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.note--inline {
+  margin: 0;
+}
+.note--row {
+  flex-basis: 100%;
+  margin: 0;
+}
+.grow {
   flex: 1;
   min-width: 0;
 }
-
-.admin-gate__body h1 {
-  margin: 0 0 4px;
+.rows li {
+  /* A sentence in a row wraps instead of being cut off. */
+  flex-wrap: nowrap;
+}
+.rows .push {
+  flex: none;
+  min-width: 0;
+  padding: 0 10px;
+}
+.rows li:has(> .push) {
+  padding-block: 4px;
+}
+.sdot--inline {
+  display: inline-block;
+  margin: 0 6px 0 0;
+  vertical-align: -1px;
+}
+.tile h3 .sdot--inline {
+  margin: 0;
+  vertical-align: 0;
 }
 
-@media (max-width: 640px) {
-  .admin-tiles {
-    grid-template-columns: 1fr 1fr;
-  }
+/* ---------------------------------------------------------------- quiet states */
+.empty {
+  color: var(--ink-quiet);
 }
-
-/* The admin GUI is a window skin, and aqua-ui's stylesheet steps its controls
-   and type up on a coarse pointer. These are the GUI's own small classes,
-   which that sheet does not know about: the hint under a panel, the legend on
-   a scope group, a subheading, an inline error, and a key fingerprint — all
-   things an administrator reads on a phone while standing next to a machine. */
-@media (pointer: coarse) {
-  .admin-login__hint,
-  .admin-hint,
-  .admin-scopes legend,
-  .admin-subhead,
-  .admin-inline-error {
-    font-size: 13px;
-  }
-
-  .admin-fingerprint {
-    font-size: 12px;
-  }
+.empty-cell {
+  padding: 0 !important;
 }
-
-/* A new invite's code, shown once. Spaced and heavy so it survives being read aloud or retyped. */
-.admin-invite-new {
-  margin: 8px 0 12px;
+.empty-cell .empty,
+.rows .empty {
+  display: inline-block;
 }
-
-.admin-invite-code {
-  margin: 4px 0 8px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 17px;
+.empty-cell .push,
+.rows .empty + .push {
+  margin: 0 8px;
+}
+.rows .ok,
+.tbl .ok,
+.drift.ok {
+  color: var(--success-ink);
+}
+.rows .bad,
+.tbl .bad,
+.note--bad,
+.log .e {
+  color: var(--danger-ink);
+}
+.tbl .ok,
+.tbl .bad {
   font-weight: 700;
-  letter-spacing: 0.12em;
-  user-select: all;
+}
+.cap--no {
+  color: #6b6b6b;
+}
+.log .quiet {
+  font-family: var(--font);
+  font-size: 12px;
+  color: var(--ink-quiet);
+}
+.log:focus-visible,
+.well--scroll:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
 }
 
-/* Backup location: used · the next backup · free. Widths are measured numbers, never decoration. */
-.admin-space {
+/* ---------------------------------------------------------------- tables */
+.tbl tbody th {
+  /* a row's own heading is a cell, not a column header */
+  background: none;
+  border: 0;
+  font-weight: 400;
+  color: var(--ink);
+  text-shadow: none;
+  padding: 4px 8px;
+  white-space: normal;
+}
+.tbl td {
+  overflow-wrap: anywhere;
+}
+.tbl .acts .push {
+  vertical-align: middle;
+}
+.tbl td.num .field--cell {
+  width: 64px;
+}
+.field--cell {
+  width: 100%;
+  flex: none;
+}
+
+/* ---------------------------------------------------------------- fields */
+.field--name {
+  flex: 0 1 160px;
+}
+.field--group {
+  flex: 0 1 220px;
+}
+.field--search {
+  flex: 0 1 240px;
+}
+.field--left {
+  text-align: left;
+}
+.field.mono {
+  font-family: var(--mono);
+}
+.field:disabled,
+.pop:disabled {
+  opacity: 0.6;
+}
+.field[readonly] {
+  background: var(--content-muted);
+}
+.barrow--above {
+  margin: 0 0 7px;
+}
+a {
+  color: var(--link);
+}
+
+/* a link that is a command wears the push button */
+a.push {
+  display: inline-block;
+  box-sizing: border-box;
+  text-decoration: none;
+  color: var(--aq-ink);
+}
+a.push:active {
+  border-image-source: var(--aq-btn-22-down);
+}
+
+/* ---------------------------------------------------------------- devices */
+@media (min-width: 561px) {
+  .pref--narrow {
+    grid-template-columns: 96px minmax(0, 1fr);
+  }
+}
+.scopes {
+  margin: 10px 0 0;
+  padding: 0 2px;
+}
+.scopes legend {
+  margin: 0 0 4px -2px;
+  font-weight: 400;
+}
+.scopes .chk {
+  margin: 3px 0;
+}
+.lcd__code {
+  /* a real code is ten characters; it must never push the plate wider than its column */
+  font-size: clamp(20px, 4.2vw, 30px);
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.pairing-extra {
   display: flex;
-  height: 12px;
+  gap: 10px;
+  align-items: center;
+  margin-top: 8px;
+}
+.pairing-extra .note {
+  margin: 0;
+}
+.pairing-qr {
+  flex: none;
+  width: 92px;
+  height: 92px;
+  padding: 4px;
+  background: var(--content);
+  border: 1px solid var(--well-edge);
+  border-radius: 2px;
+}
+.pairing-qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---------------------------------------------------------------- detail tiles (provider, invite) */
+.detail {
+  margin-top: 10px;
+}
+.detail h3 {
+  font-size: 12px;
+  color: var(--ink);
+}
+.detail__text {
+  margin: 4px 0 8px;
+}
+.detail__caps {
+  margin: 0 0 8px;
+}
+.detail__list {
+  margin: 0 0 8px;
+  padding-left: 18px;
+}
+.detail__list li {
+  margin: 2px 0;
+}
+.detail__meta {
+  margin: 0;
+}
+.detail__form {
+  margin-top: 10px;
+}
+.invcode {
+  display: block;
+  margin: 6px 0 2px;
+}
+
+/* ---------------------------------------------------------------- groups */
+.big--track {
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  overflow-wrap: anywhere;
+}
+.bar--track {
   margin: 8px 0 4px;
-  overflow: hidden;
-  border: 1px solid var(--aqua-ctl-field-border);
-  border-radius: 6px;
 }
 
-.admin-space__used {
-  background: var(--aqua-graphite-mid);
+/* ---------------------------------------------------------------- sign-in */
+.signin {
+  max-width: 400px;
+  margin: 28px auto 0;
+}
+.signin fieldset {
+  margin-bottom: 12px;
+}
+@media (min-width: 561px) {
+  .signin .pref {
+    grid-template-columns: 96px minmax(0, 1fr);
+  }
+  .signin > .push {
+    margin-left: 108px;
+  }
 }
 
-.admin-space__next {
-  background: var(--aqua-selection-top);
+/* ---------------------------------------------------------------- the confirmation sheet */
+.sheet-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 0 16px;
+  background: rgba(0, 0, 0, 0.14);
+}
+.sheet {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  width: min(440px, 100%);
+  padding: 14px 16px 14px;
+  background: var(--win-body);
+  border: 1px solid var(--win-outline);
+  border-top: 0;
+  border-radius: 0 0 5px 5px;
+  box-shadow:
+    0 12px 28px -8px rgba(0, 0, 0, 0.55),
+    0 2px 6px rgba(0, 0, 0, 0.25);
+  animation: sheet-drop 0.16s ease-out;
+}
+.sheet__body {
+  flex: 1;
+  min-width: 0;
+}
+.sheet__body p {
+  margin: 3px 0 12px;
+  color: var(--ink-2);
+}
+.sheet__acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+@keyframes sheet-drop {
+  from {
+    transform: translateY(-14px);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------- narrow windows */
+@media (max-width: 640px) {
+  .tbl .acts .push + .push {
+    margin-left: 2px;
+  }
+  .pairing-extra {
+    align-items: flex-start;
+  }
+  .field--name,
+  .field--group,
+  .field--search {
+    flex: 1 1 140px;
+  }
 }

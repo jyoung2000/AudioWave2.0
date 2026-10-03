@@ -1,16 +1,17 @@
 /**
  * Backup, restore, export and import.
  *
- * Restore asks twice and says what it will do first, because it is the one action here that can
- * lose data. The export is described as what it is — a portable copy without secrets — rather than
- * being presented as an equivalent to a backup, because it is not one.
+ * The design's pane, with only what the hub really has: where backups go and how much room is
+ * there (measured, never guessed), the archives, and Back Up Now. The design also draws a path
+ * field, an Include list, a schedule and a per-archive Download; the hub has no settings or routes
+ * for those, so they are not drawn. Restore and Import ask first and say what they will do, because
+ * they are the two actions here that replace data.
  */
 import { useCallback, useState } from 'react';
-import { AquaTable, Button, Panel, PanelSection, useToast } from '@now-playing/aqua-ui';
-import { api } from '../lib/api.js';
 import type { BackupSpace } from '@now-playing/contracts';
+import { api } from '../lib/api.js';
 import { useAction, useResource } from '../lib/hooks.js';
-import { Ago, AsyncPanel, Bytes, InlineError } from './common.js';
+import { ActionError, Ago, count, EmptyCells, formatBytes, Group, listState, Note, Push, useHubUi } from '../ui.js';
 
 interface BackupEntry {
   id: string;
@@ -19,23 +20,36 @@ interface BackupEntry {
   relativePath: string;
 }
 
+interface ImportReport {
+  dryRun: boolean;
+  applied: Record<string, number>;
+  errors: string[];
+}
+
+function saveFile(data: unknown, name: string): void {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export function BackupView() {
   const backups = useResource('backupList', {}, { pollMs: 30_000 });
-  const toast = useToast();
+  const space = useResource('backupSpace', {}, { pollMs: 60_000 });
+  const { say, confirm } = useHubUi();
   const create = useAction(async () => api('backupCreate'));
   const restore = useAction(async (backupId: string) => api('backupRestore', { params: { backupId }, body: { confirm: true } }));
   const importAll = useAction(async (payload: { schemaVersion: number; data: Record<string, unknown> }, dryRun: boolean) => api('importAll', { query: { dryRun }, body: payload }));
-  const [importReport, setImportReport] = useState<{ dryRun: boolean; applied: Record<string, number>; errors: string[] } | null>(null);
+  const [report, setReport] = useState<ImportReport | null>(null);
+  const [fileProblem, setFileProblem] = useState<string | null>(null);
+  const [restarting, setRestarting] = useState<string | null>(null);
 
   const exportNow = useAction(async () => {
     const data = await api('exportAll');
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `now-playing-export-${new Date().toISOString().slice(0, 10)}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
+    saveFile(data, `airwave-hub-export-${new Date().toISOString().slice(0, 10)}.json`);
     return data;
   });
 
@@ -47,181 +61,192 @@ export function BackupView() {
       input.onchange = async () => {
         const file = input.files?.[0];
         if (!file) return;
+        setFileProblem(null);
+        let parsed: { schemaVersion: number; data: Record<string, unknown> };
         try {
-          const parsed = JSON.parse(await file.text()) as { schemaVersion: number; data: Record<string, unknown> };
-          const report = await importAll.run(parsed, dryRun);
-          if (report) {
-            setImportReport(report as typeof importReport);
-            toast.show(dryRun ? 'Checked the file; nothing was written.' : 'Import finished.', { kind: 'success' });
-          }
-        } catch (err) {
-          toast.show(`That file is not a Now Playing export: ${err instanceof Error ? err.message : String(err)}`, { kind: 'error' });
+          parsed = JSON.parse(await file.text()) as typeof parsed;
+          if (typeof parsed?.schemaVersion !== 'number' || typeof parsed.data !== 'object') throw new Error('not an export');
+        } catch {
+          setFileProblem('That file isn’t an Airwave Hub export. Choose a file made with Export.');
+          return;
+        }
+        if (!dryRun && !(await confirm({ title: `Import ${file.name}?`, text: 'Its groups, history, playlists and presets are added to this hub. Devices are not imported and pair again.', verb: 'Import' }))) return;
+        const result = (await importAll.run(parsed, dryRun)) as ImportReport | null;
+        if (result) {
+          setReport(result);
+          say(dryRun ? 'Checked the file. Nothing was written.' : 'Import finished.');
         }
       };
       input.click();
     },
-    [importAll, toast],
+    [importAll, say, confirm],
   );
 
-  return (
-    <>
-      <BackupSpacePanel />
-      <AsyncPanel
-        resource={backups}
-        title="Backups"
-        actions={
-          <>
-            <Button
-              variant="default"
-              busy={create.busy}
-              onClick={() =>
-                void create.run().then((r) => {
-                  if (r) {
-                    backups.reload();
-                    toast.show('Backup written to the data volume', { kind: 'success' });
-                  }
-                })
-              }
-            >
-              Back up now
-            </Button>
-            <InlineError error={restore.error ?? create.error} />
-          </>
-        }
-        emptyWhen={(d) => (d as { items: BackupEntry[] }).items.length === 0}
-        emptyTitle="No backups yet"
-        emptyText="A backup is a consistent copy of the database taken while the hub keeps running. It lands in the data volume, so whatever backs that up backs this up too."
-      >
-        {(raw) => (
-          <AquaTable
-            label="Backups"
-            rowKey={(row: BackupEntry) => row.id}
-            rows={(raw as { items: BackupEntry[] }).items}
-            columns={[
-              { id: 'id', header: 'Backup', primary: true, cell: (row) => row.id },
-              { id: 'when', header: 'Taken', cell: (row) => <Ago iso={row.createdAt} /> },
-              { id: 'size', header: 'Size', align: 'right', cell: (row) => <Bytes value={row.sizeBytes} /> },
-              { id: 'path', header: 'Path', cell: (row) => <code>{row.relativePath}</code> },
-              {
-                id: 'actions',
-                header: '',
-                headerLabel: 'Actions',
-                cell: (row) => (
-                  <Button
-                    size="small"
-                    variant="destructive"
-                    busy={restore.busy}
-                    onClick={() => {
-                      // A destructive, irreversible action deserves a blocking prompt.
-                      if (!window.confirm(`Restore ${row.id}?\n\nA safety backup of the current database is taken first, then this file replaces it. The hub restarts itself immediately afterwards and is unreachable for a few seconds.`)) return;
-                      void restore.run(row.id).then((r) => {
-                        if (r) {
-                          const result = r as { safetyBackupId: string };
-                          // No reload: the hub exits as soon as this response is written, so any
-                          // further request would fail until the supervisor has brought it back.
-                          toast.show(`Restored. The current database was saved as ${result.safetyBackupId}. The hub is restarting — reload this page in a few seconds.`, { kind: 'warning', durationMs: 30_000 });
-                        } else {
-                          toast.show('The restore did not complete; the details are shown above the list.', { kind: 'error' });
-                        }
-                      });
-                    }}
-                  >
-                    Restore
-                  </Button>
-                ),
-              },
-            ]}
-          />
-        )}
-      </AsyncPanel>
+  const items = (backups.data as { items: BackupEntry[] } | null)?.items ?? [];
+  const state = listState(backups, (d) => (d as { items: BackupEntry[] }).items.length === 0, 'No backups yet.');
+  const sp = space.data as BackupSpace | null;
+  const known = sp !== null && sp.freeBytes !== null && sp.totalBytes !== null && sp.totalBytes > 0;
+  const next = sp?.lastArchiveBytes ?? 0;
+  const used = known ? sp.totalBytes! - sp.freeBytes! : 0;
+  const short = known && next > sp.freeBytes!;
+  const usedPercent = known ? (used / sp.totalBytes!) * 100 : 0;
+  const nextPercent = known ? Math.max(0.6, Math.min(100 - usedPercent, (next / sp.totalBytes!) * 100)) : 0;
 
-      <Panel title="Export and import">
-        <PanelSection>
-          <p className="admin-hint">
-            An export is a portable JSON copy of groups, history, playlists, presets and device metadata. It deliberately contains <strong>no secrets at all</strong>: no password hashes, no provider
-            credentials, no device credentials, no tokens. That makes it safe to move between machines, and means devices must pair again after importing.
-          </p>
-          <div className="admin-actions">
-            <Button busy={exportNow.busy} onClick={() => void exportNow.run()}>
-              Export
-            </Button>
-            <Button busy={importAll.busy} onClick={() => pickFile(true)} ellipsis>
-              Check an export
-            </Button>
-            <Button variant="destructive" busy={importAll.busy} onClick={() => pickFile(false)} ellipsis>
-              Import
-            </Button>
-          </div>
-          <InlineError error={importAll.error} />
-          {importReport ? (
-            <div className="admin-report">
-              <h4 className="admin-subhead">{importReport.dryRun ? 'Would import' : 'Imported'}</h4>
-              <ul className="admin-list">
-                {Object.entries(importReport.applied).map(([key, count]) => (
-                  <li key={key}>
-                    {count} {key}
-                  </li>
-                ))}
-              </ul>
-              {importReport.errors.length ? (
-                <ul className="admin-alerts">
-                  {importReport.errors.map((e, i) => (
-                    <li key={i} data-level="warning">
-                      {e}
-                    </li>
-                  ))}
-                </ul>
+  return (
+    <Group title="Backup">
+      <div className="pref">
+        <span className="k">Backups go to:</span>
+        <div className="v">
+          <span className="path">{sp?.path ?? '…'}</span>
+          <span className="sub">Inside the container’s data volume, so whatever backs up the volume backs these up too.</span>
+        </div>
+        <span className="k top">Space:</span>
+        <div className="v stack">
+          {known ? (
+            <>
+              <span>
+                <b>{formatBytes(sp.freeBytes)} free</b> of {formatBytes(sp.totalBytes)} · {sp.lastArchiveBytes === null ? 'the size of a backup is known once one exists' : `each backup is about ${formatBytes(sp.lastArchiveBytes)}`}
+              </span>
+              <div className={`bar spacebar${short ? ' is-short' : ''}`} role="img" aria-label={`${formatBytes(used)} used, ${formatBytes(sp.freeBytes)} free${sp.lastArchiveBytes === null ? '' : `, the next backup about ${formatBytes(next)}`}`}>
+                <i className="used" style={{ width: `${usedPercent}%` }} />
+                {sp.lastArchiveBytes === null ? null : <i className="this" style={{ left: `${usedPercent}%`, width: `${nextPercent}%` }} />}
+              </div>
+              {short ? (
+                <span className="note note--bad note--row" role="alert">
+                  The next backup is not expected to fit. Free some space on the data volume first.
+                </span>
               ) : null}
-            </div>
-          ) : null}
-        </PanelSection>
-      </Panel>
-    </>
-  );
-}
-
-/**
- * Room at the backup location. The bar is drawn only from measured numbers: what is used, what the
- * next backup is expected to take (the size of the newest one — a backup is the whole database, so
- * the last is the best estimate of the next), and what would be left. With nothing to go on, it
- * says so instead of drawing a guess.
- */
-function BackupSpacePanel() {
-  const space = useResource('backupSpace', {}, { pollMs: 60_000 });
-  const data = space.data as BackupSpace | null;
-  if (!data) return null;
-  const { freeBytes, totalBytes, lastArchiveBytes } = data;
-  const known = freeBytes !== null && totalBytes !== null && totalBytes > 0;
-  const next = lastArchiveBytes ?? 0;
-  const fits = known && next <= freeBytes;
-  const usedPercent = known ? ((totalBytes - freeBytes) / totalBytes) * 100 : 0;
-  const nextPercent = known ? Math.min(100 - usedPercent, (next / totalBytes) * 100) : 0;
-  return (
-    <Panel title="Backup location">
-      <PanelSection>
-        <p className="admin-hint">
-          <code>{data.path}</code>
-          {data.keep ? ` · the newest ${data.keep} scheduled and safety backups are kept; ones you make here are yours to delete` : ''}
-        </p>
-        {known ? (
+            </>
+          ) : (
+            <span className="sub">{sp ? 'The free space here could not be measured. The folder may not exist yet.' : space.error ? 'The free space could not be read.' : 'Measuring…'}</span>
+          )}
+        </div>
+        {sp?.keep ? (
           <>
-            <div className="admin-space" role="img" aria-label={`${Math.round(usedPercent)}% used, next backup about ${Math.round(nextPercent * 10) / 10}%, the rest free`}>
-              <span className="admin-space__used" style={{ width: `${usedPercent}%` }} />
-              <span className="admin-space__next" style={{ width: `${nextPercent}%` }} />
+            <span className="k">Keep:</span>
+            <div className="v">
+              <span>The last {sp.keep} automatic backups</span>
+              <span className="sub">Ones you make here are yours to keep or delete.</span>
             </div>
-            <p className="admin-hint">
-              <Bytes value={totalBytes - freeBytes} /> used · next backup {lastArchiveBytes === null ? 'not known until one exists' : <>about <Bytes value={lastArchiveBytes} /></>} · <Bytes value={Math.max(0, freeBytes - next)} /> free after it
-            </p>
-            {fits ? null : (
-              <p className="admin-hint admin-hint--warning" role="alert">
-                The next backup is not expected to fit: only <Bytes value={freeBytes} /> is free here.
-              </p>
-            )}
           </>
-        ) : (
-          <p className="admin-hint admin-hint--warning">This location’s free space could not be measured — the folder may not exist yet, or the drive did not answer.</p>
-        )}
-      </PanelSection>
-    </Panel>
+        ) : null}
+      </div>
+
+      <div className="well well--after">
+        <table className="tbl" aria-label="Backups">
+          <colgroup>
+            <col />
+            <col style={{ width: '18%' }} className="hide-sm" />
+            <col style={{ width: '16%' }} />
+            <col style={{ width: 98 }} />
+          </colgroup>
+          <thead>
+            <tr>
+              <th scope="col">Archive</th>
+              <th scope="col" className="hide-sm">
+                Taken
+              </th>
+              <th scope="col" className="num">
+                Size
+              </th>
+              <th scope="col">
+                <span className="sr">Actions</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {state ? <EmptyCells columns={4} {...state} /> : null}
+            {state
+              ? null
+              : items.map((row) => (
+                  <tr key={row.id}>
+                    <td className="mono" title={row.relativePath}>
+                      {row.relativePath}
+                    </td>
+                    <td className="hide-sm">
+                      <Ago iso={row.createdAt} />
+                    </td>
+                    <td className="num">{formatBytes(row.sizeBytes)}</td>
+                    <td className="acts">
+                      <Push
+                        busy={restore.busy}
+                        aria-label={`Restore ${row.id}`}
+                        onClick={() =>
+                          void confirm({
+                            title: 'Restore this backup?',
+                            text: 'Everything on the hub goes back to how it was then. The current state is backed up first, then the hub restarts and is away for a few seconds.',
+                            verb: 'Restore',
+                          }).then((go) => {
+                            if (!go) return;
+                            void restore.run(row.id).then((r) => {
+                              // No reload: the hub exits as soon as it has answered.
+                              if (r) setRestarting((r as { safetyBackupId: string }).safetyBackupId);
+                            });
+                          })
+                        }
+                      >
+                        Restore…
+                      </Push>
+                    </td>
+                  </tr>
+                ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="barrow">
+        <Push
+          busy={create.busy}
+          busyLabel="Backing Up…"
+          disabled={short}
+          reason="There isn’t room for another backup."
+          onClick={() =>
+            void create.run().then((r) => {
+              if (!r) return;
+              backups.reload();
+              space.reload();
+              say('Backup written.');
+            })
+          }
+        >
+          Back Up Now
+        </Push>
+        <Push busy={exportNow.busy} onClick={() => void exportNow.run().then((r) => r && say('Exported. The file is in your downloads.'))}>
+          Export…
+        </Push>
+        <Push busy={importAll.busy} onClick={() => pickFile(true)}>
+          Check an Export…
+        </Push>
+        <Push busy={importAll.busy} onClick={() => pickFile(false)}>
+          Import…
+        </Push>
+      </div>
+      {restarting ? (
+        <Note>
+          Restored. What was here before is saved as <span className="mono">{restarting}</span>. The hub is restarting; reload this page in a few seconds.
+        </Note>
+      ) : null}
+      {fileProblem ? <Note bad>{fileProblem}</Note> : <ActionError error={restore.error ?? create.error ?? importAll.error ?? exportNow.error} />}
+      {report ? (
+        <div className="well well--after" role="status">
+          <ul className="rows" aria-label={report.dryRun ? 'What the file would import' : 'What was imported'}>
+            <li>
+              <span className="grow">
+                <b>{report.dryRun ? 'This file would import' : 'Imported'}</b>:{' '}
+                {Object.entries(report.applied)
+                  .map(([key, n]) => count(n, key.replace(/s$/, ''), key))
+                  .join(', ') || 'nothing'}
+                .
+              </span>
+            </li>
+            {report.errors.map((e, i) => (
+              <li key={i}>
+                <span className="grow">{e}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      <Note>A backup is the hub’s whole database, taken while it keeps running. An export is a portable copy with no passwords, tokens or provider credentials, so it is safe to move between machines.</Note>
+    </Group>
   );
 }

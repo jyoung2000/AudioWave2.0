@@ -308,6 +308,8 @@ function ConfirmSheet({ request, onAnswer }: { request: ConfirmRequest; onAnswer
   }, []);
   return (
     <div className="sheet-layer">
+      {/* The dialog owns Escape and the Tab cycle for the two buttons inside it. */}
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
       <div
         className="sheet"
         role="alertdialog"

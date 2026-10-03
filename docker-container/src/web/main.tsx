@@ -1,19 +1,23 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ToastProvider } from '@now-playing/aqua-ui';
-// The admin GUI is a framed window, so it loads the window chrome. It renders no toolbar media
-// cluster and no 2010 page, so it loads neither of those stylesheets.
-import '@now-playing/aqua-ui/window.css';
-import { App } from './App.js';
+// The hub is the window design/frontends/airwave-hub.html draws. Its two stylesheets are generated
+// from that file: the kit it shares with the companion first, then the hub's own rules. What the
+// design leaves to its script (and the few states it does not draw) is in styles.css.
+import '@now-playing/aqua-ui/airwave-window.css';
+import '@now-playing/aqua-ui/airwave-hub.css';
 import './styles.css';
+import { installAquaArt } from './lib/aqua-art.js';
+import { App } from './App.js';
 
 const container = document.getElementById('root');
 if (!container) throw new Error('The admin GUI needs a #root element');
 
+// Buttons, pop-ups and checkboxes are drawings handed to CSS as custom properties; without them
+// every control is an empty box, so they are installed before the first render.
+installAquaArt();
+
 createRoot(container).render(
   <StrictMode>
-    <ToastProvider>
-      <App />
-    </ToastProvider>
+    <App />
   </StrictMode>,
 );

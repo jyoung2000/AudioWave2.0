@@ -31,7 +31,7 @@ export function RecommendationsView() {
 
   const stored = config.data as Record<string, unknown> | null;
   const current = draft ?? stored;
-  const weights = ((current?.['actionWeights'] ?? {}) as Record<string, number>) ?? {};
+  const weights = (current?.['actionWeights'] ?? {}) as Record<string, number>;
   const set = (key: string, value: number): void => setDraft({ ...(current ?? {}), [key]: value });
   const number = (key: string, fallback: number): string => String(current?.[key] ?? fallback);
 
