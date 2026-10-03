@@ -23,13 +23,14 @@
  */
 import { createReadStream, statSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { networkInterfaces } from 'node:os';
 import { BACKUP_PARTS, createEstimator, type BackupPart } from './measure.js';
-import { HELPER_DEFAULT_HOSTS, HELPER_PROTOCOL, HELPER_ROUTES, HelperFetchRequest, HelperToolId, type HelperHealth, type HelperInstallResult, type HelperToolId as ToolId, type HelperTvChannel, type HelperTvChannels, type HelperTvGuide, type HelperTvGuideEntry, type OutputFormat } from '@now-playing/contracts';
-import { Jobs } from './jobs.js';
+import { HELPER_DEFAULT_HOSTS, HELPER_PROTOCOL, HELPER_ROUTES, HelperFetchRequest, HelperToolId, type HelperHealth, type HelperInstallResult, type HelperJob, type HelperToolId as ToolId, type HelperTvChannel, type HelperTvChannels, type HelperTvGuide, type HelperTvGuideEntry, type OutputFormat } from '@now-playing/contracts';
+import { Jobs, type FinishedFile } from './jobs.js';
 import { readStationTitle } from '@now-playing/domain/radio-node';
 import type { StationNowPlaying } from '@now-playing/contracts';
 import { serveApp, type AppSource } from './app.js';
-import { checkFetchUrl, hostAllowed, originAllowed, tokenMatches, type OriginPolicy } from './security.js';
+import { LAN_READ_ROUTES, checkFetchUrl, hostAllowed, isLoopbackAddress, lanHostAllowed, lanPageAllowed, originAllowed, tokenMatches, type OriginPolicy } from './security.js';
 import { cachedResolver, publicTool, type ResolvedTool } from './tools.js';
 import { ToolProvisioner } from './provision.js';
 
@@ -67,6 +68,28 @@ export interface HelperOptions {
    * tab; the standalone helper keeps none, and its two TV routes answer with empty lists.
    */
   tv?: { channels: () => Promise<HelperTvChannel[]> | HelperTvChannel[]; guide: () => Promise<HelperTvGuideEntry[]> | HelperTvGuideEntry[] };
+  /**
+   * Also listen on this PC's network addresses, for the token-free read routes only
+   * (`LAN_READ_ROUTES`). Off unless the companion's setting is on; the standalone helper never sets it.
+   */
+  lan?: boolean;
+  /**
+   * How downloads run, read as each job is made or started: the format used when a request names
+   * none, how many run at once (1–4) and a speed limit in KB/s. Absent: original, one, no limit.
+   */
+  downloads?: () => { format?: OutputFormat; concurrency?: number; rateLimitKBps?: number | null };
+  /** A download finished. The paths are for the process that started the helper, never a response. */
+  onJobFinished?: (job: HelperJob, files: FinishedFile[]) => void;
+  /** Whether setup may update yt-dlp by itself once a day. Absent means yes. */
+  autoUpdate?: () => boolean;
+}
+
+/** This PC's own network addresses (IPv4, not loopback): what a device on the LAN puts in `Host`. */
+function ownAddresses(): string[] {
+  return Object.values(networkInterfaces())
+    .flat()
+    .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry && !entry.internal && entry.family === 'IPv4'))
+    .map((entry) => entry.address);
 }
 
 export interface Helper {
@@ -82,7 +105,15 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
   const startedAt = new Date().toISOString();
   const resolver = cachedResolver({ configured: options.configured, toolsDir: options.toolsDir });
   const resolve_ = (): Promise<Record<ToolId, ResolvedTool>> => resolver.get();
-  const jobs = new Jobs({ workDir: options.workDir, timeoutMs: options.timeoutMs, tools: resolve_, log: options.log, ...(options.finishedTtlMs ? { finishedTtlMs: options.finishedTtlMs } : {}) });
+  const jobs = new Jobs({
+    workDir: options.workDir,
+    timeoutMs: options.timeoutMs,
+    tools: resolve_,
+    log: options.log,
+    ...(options.finishedTtlMs ? { finishedTtlMs: options.finishedTtlMs } : {}),
+    concurrency: () => options.downloads?.().concurrency ?? 1,
+    ...(options.onJobFinished ? { onFinished: options.onJobFinished } : {}),
+  });
   // Settled once the socket is bound: with port 0 the real port is only known then.
   let port = options.port;
   let origin = `http://127.0.0.1:${port}`;
@@ -94,6 +125,7 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
     configured: options.configured,
     ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
     busy: () => jobs.busy(),
+    ...(options.autoUpdate ? { autoUpdate: options.autoUpdate } : {}),
     log: options.log,
     onInstalled: (id) => {
       resolver.invalidate();
@@ -112,16 +144,41 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
   });
 
   async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
+    // Another device on this network. Only possible at all when `lan` is on (the socket is bound to
+    // loopback otherwise), and then only the read routes, from a page on this network or no page.
+    const fromLan = !isLoopbackAddress(request.socket.remoteAddress);
+    if (fromLan) return handleLan(request, response);
     // Before anything else, including the origin check: a rebound hostile name arrives with no Origin.
     if (!hostAllowed(header(request, 'host'), port)) return fail(response, 421, 'host', 'This helper only answers to 127.0.0.1 or localhost.');
     const origin_ = header(request, 'origin');
-    const url = new URL(request.url ?? '/', origin);
-    const path = url.pathname;
-
     if (!originAllowed(policy, origin_)) {
       // Deliberately the same answer whether the origin is unknown or the path does not exist.
       return fail(response, 403, 'origin', 'This origin may not talk to the helper.');
     }
+    return route(request, response, origin_);
+  }
+
+  /**
+   * A request from another device. Refused unless LAN mode is on, the `Host` names one of this PC's
+   * own addresses, the page (if any) was served from this network, and the route is one of the four
+   * token-free reads. A token does not widen that: downloads, installs, backups and jobs are never
+   * reachable from another device, whatever it sends.
+   */
+  async function handleLan(request: IncomingMessage, response: ServerResponse): Promise<void> {
+    if (!options.lan) return fail(response, 403, 'lan', 'This helper only answers this PC.');
+    if (!lanHostAllowed(header(request, 'host'), port, ownAddresses())) return fail(response, 421, 'host', 'This helper only answers to this PC’s own addresses.');
+    const origin_ = header(request, 'origin');
+    if (origin_ !== undefined && !lanPageAllowed(origin_)) return fail(response, 403, 'origin', 'This origin may not talk to the helper.');
+    const path = new URL(request.url ?? '/', origin).pathname;
+    const method = request.method ?? 'GET';
+    if (!LAN_READ_ROUTES.includes(path) || (method !== 'GET' && method !== 'OPTIONS')) return fail(response, 403, 'lan', 'Only this PC may use that. Other devices on the network can only read what is playing and the Live TV guide.');
+    return route(request, response, origin_);
+  }
+
+  async function route(request: IncomingMessage, response: ServerResponse, origin_: string | undefined): Promise<void> {
+    const url = new URL(request.url ?? '/', origin);
+    const path = url.pathname;
+
     applyCors(response, origin_);
 
     if (request.method === 'OPTIONS') {
@@ -231,7 +288,13 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
       const found = await resolve_();
       if (!found[tool].present) return fail(response, 409, 'tool-missing', tools.status()[tool]?.reason ?? found[tool].installHint ?? `${tool} is not installed.`);
 
-      const job = jobs.create({ url: checked.url.toString(), tool, format: parsed.data.format as OutputFormat });
+      // A request that names a format gets it. One that does not gets the format chosen on this PC —
+      // unless that needs FFmpeg and there is none, when the original beats a download that fails.
+      const settings = options.downloads?.() ?? {};
+      const named = typeof body === 'object' && body !== null && 'format' in body;
+      const preferred = settings.format ?? 'original';
+      const format: OutputFormat = named ? (parsed.data.format as OutputFormat) : preferred !== 'original' && !found.ffmpeg.present ? 'original' : preferred;
+      const job = jobs.create({ url: checked.url.toString(), tool, format, rateLimitKBps: settings.rateLimitKBps ?? null });
       options.log(`job ${job.id}: ${tool} ${checked.url.hostname} (${parsed.data.authorization.basis})`);
       return send(response, 202, job);
     }
@@ -328,9 +391,9 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
 
   await new Promise<void>((resolvePromise, rejectPromise) => {
     server.once('error', rejectPromise);
-    // Loopback only. Not a setting: a program that runs subprocesses should not be reachable from
-    // anywhere its operator is not already sitting.
-    server.listen(options.port, '127.0.0.1', () => {
+    // Loopback only, unless the companion's LAN setting is on. Even then, `handleLan` lets another
+    // device reach the four read routes and nothing that runs a subprocess.
+    server.listen(options.port, options.lan ? '0.0.0.0' : '127.0.0.1', () => {
       server.off('error', rejectPromise);
       resolvePromise();
     });
