@@ -18,12 +18,21 @@ export const IPC_CHANNELS = [
   'app:open-external',
   'app:reveal',
   'app:open-data-folder',
+  'app:update-status',
+  'app:check-update',
+  'app:open-release',
+  'app:storage',
+  'app:clear-cache',
+  'app:open-logs',
+  'app:export-logs',
+  'downloads:pick-dir',
 
   'library:folders',
   'library:add-folder',
   'library:remove-folder',
   'library:scan',
   'library:tracks',
+  'library:track-ids',
   'library:playlists',
   'library:presets',
 
@@ -48,6 +57,7 @@ export const IPC_CHANNELS = [
   'backup:restore',
   'backup:remove',
   'backup:export-playlists',
+  'backup:algorithms',
 
   'awsp:status',
   'awsp:set-enabled',
@@ -55,10 +65,13 @@ export const IPC_CHANNELS = [
   'awsp:new-code',
   'awsp:revoke',
   'awsp:set-tier',
+  'awsp:set-networks',
 
   'helper:status',
   'helper:check-tools',
   'helper:install-tools',
+  'helper:check-tool',
+  'helper:update-tool',
   'helper:token',
 
   'tv:links',

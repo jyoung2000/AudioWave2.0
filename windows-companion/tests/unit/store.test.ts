@@ -209,3 +209,33 @@ describe('rebuilding the search index', () => {
     }
   });
 });
+
+describe('a library of 50,000 songs, a stretch at a time', () => {
+  it('gives every song exactly one place, reads any stretch quickly, and lists the ids alone', () => {
+    const total = 50_000;
+    store.transaction(() => {
+      for (let i = 0; i < total; i += 1) {
+        // Few artists and albums, so most songs tie on them and the id has to settle their order.
+        store1(track({ title: `Song ${i}`, artistName: `Artist ${i % 40}`, albumName: `Album ${i % 7}` }), `${i}.flac`);
+      }
+    });
+    const ids = store.trackIds({ limit: 100_000, offset: 0 });
+    expect(ids.total).toBe(total);
+    expect(new Set(ids.ids).size).toBe(total);
+
+    // A stretch near the end, as the window asks for it when scrolled there.
+    const started = performance.now();
+    const page = store.searchTracks({ limit: 200, offset: 49_800 });
+    const took = performance.now() - started;
+    expect(page.total).toBe(total);
+    expect(page.items.map((t) => t.id)).toEqual(ids.ids.slice(49_800, 50_000));
+    expect(took, `a stretch of 200 at the end took ${Math.round(took)} ms`).toBeLessThan(400);
+
+    // Stretches of the ids line up with stretches of songs, so a range can be chosen without loading it.
+    expect(store.trackIds({ limit: 300, offset: 12_345 }).ids).toEqual(ids.ids.slice(12_345, 12_645));
+    // And a search pages the same way.
+    const found = store.trackIds({ query: 'Artist', limit: 100_000, offset: 0 });
+    expect(found.total).toBe(total);
+    expect(store.searchTracks({ query: 'Artist', limit: 50, offset: 100 }).items.map((t) => t.id)).toEqual(found.ids.slice(100, 150));
+  }, 120_000);
+});

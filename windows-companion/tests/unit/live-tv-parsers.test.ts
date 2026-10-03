@@ -7,7 +7,24 @@
  */
 import { describe, expect, it } from 'vitest';
 import { channelFromStream, parseM3u } from '../../src/main/live-tv/m3u.js';
-import { XmltvScanner, decodeXmlText, parseXmltvTime, type XmltvChannel, type XmltvProgramme } from '../../src/main/live-tv/xmltv.js';
+import { XmltvScanner, decodeXmlText, normalizeChannelName, parseXmltvTime, type XmltvChannel, type XmltvProgramme } from '../../src/main/live-tv/xmltv.js';
+
+describe('a channel name, as a playlist and a guide can agree on it', () => {
+  it('drops case, accents, spacing, punctuation, a country prefix and a quality label', () => {
+    for (const name of ['BBC One', 'bbc one', 'UK: BBC One HD', 'US | BBC ONE', 'BBC-One FHD', 'BBC One (HD)', ' BBC  One 4K ']) {
+      expect(normalizeChannelName(name), name).toBe('bbcone');
+    }
+    expect(normalizeChannelName('Télé Québec')).toBe(normalizeChannelName('Tele Quebec'));
+    expect(normalizeChannelName('Arts & Culture')).toBe(normalizeChannelName('Arts and Culture'));
+  });
+
+  it('keeps what makes two channels different', () => {
+    expect(normalizeChannelName('BBC One +1')).not.toBe(normalizeChannelName('BBC One'));
+    expect(normalizeChannelName('Channel 4')).not.toBe(normalizeChannelName('Channel 5'));
+    expect(normalizeChannelName('HD')).toBe('hd');
+    expect(normalizeChannelName('---')).toBe('');
+  });
+});
 
 const PLAYLIST = [
   '#EXTM3U url-tvg="https://guide.example.com/guide.xml"',

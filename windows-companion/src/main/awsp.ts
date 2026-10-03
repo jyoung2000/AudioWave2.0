@@ -11,7 +11,13 @@
  *   after a crash (with a back-off) and after the network changes, so the endpoint rebinds rather
  *   than holding sockets on an interface that has gone.
  * - **What Settings shows.** The ticket and its QR code, the one-time pairing code, the paired
- *   devices with their tier caps, and each live connection with its type (direct / relay).
+ *   devices with their tier caps and when each was last seen, and each live connection with its
+ *   type (direct / relay) and latency.
+ * - **Which connections it may use.** "On Wi-Fi and Ethernet" and "On metered connections" (Remote
+ *   ▸ How devices may connect). What this PC is on is asked of Windows (`network.ts`) at start, every
+ *   two minutes and whenever the interfaces change; on a connection that is switched off, the
+ *   sidecar is stopped — no new streams are served — and the status says why. It starts again by
+ *   itself when the connection changes or the switch is turned back on.
  *
  * The contract with the sidecar is JSON lines: one config line, then commands, on stdin; events on
  * stdout; logs on stderr.
@@ -23,19 +29,26 @@ import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import QRCode from 'qrcode';
-import type { AwspDevice, AwspStatus, AwspTier } from '../shared/ipc.js';
+import type { AwspDevice, AwspNetwork, AwspStatus, AwspTier, NetworkKind } from '../shared/ipc.js';
 import type { SecretBox } from './helper.js';
+import { streamingDecision } from './network.js';
 import type { CompanionStore } from './store.js';
 
 const KEY_SETTING = 'awspSecret';
 const DEVICES_SETTING = 'awspDevices';
 const OPTIONS_SETTING = 'awspOptions';
 const RESTART_BACKOFF_MS = [1_000, 2_000, 5_000, 10_000, 30_000];
+/** How often the connection's cost is asked again when nothing else prompts it. */
+const NETWORK_RECHECK_MS = 2 * 60_000;
 
 interface Options {
   enabled: boolean;
   /** Fixed UDP port for direct connections; null lets the OS choose. */
   port: number | null;
+  /** Stream while this PC is on Wi-Fi or Ethernet. */
+  unmetered: boolean;
+  /** Stream while this PC is on a metered connection: mobile data, a hotspot. */
+  metered: boolean;
 }
 
 export interface AwspSupervisorOptions {
@@ -52,6 +65,11 @@ export interface AwspSupervisorOptions {
   relayMode?: 'default' | 'disabled';
   /** The FFmpeg the helper resolved (possibly one it set up itself), passed as AWSP_FFMPEG. */
   ffmpegPath?: () => string | null;
+  /** Asks what this PC's connection costs (`network.ts`). Absent: never asked, treated as Wi-Fi or Ethernet. */
+  probeNetwork?: () => Promise<NetworkKind>;
+  /** Tests start a stand-in for the sidecar. */
+  spawnImpl?: typeof spawn;
+  now?: () => number;
 }
 
 /** Where the sidecar lives: beside the app when packaged, in the crate's target folder in a checkout. */
@@ -73,10 +91,14 @@ export class AwspSupervisor {
   private netTimer: ReturnType<typeof setInterval> | null = null;
   private netSignature = '';
   private status: AwspStatus;
+  private connection: NetworkKind = 'unknown';
+  private probing: Promise<void> | null = null;
+  private lastProbeAt = 0;
 
   constructor(private readonly options: AwspSupervisorOptions) {
+    const saved = this.readOptions();
     this.status = {
-      enabled: this.readOptions().enabled,
+      enabled: saved.enabled,
       running: false,
       reason: options.binary ? null : 'The streaming server was not built with this copy of the companion.',
       endpointId: null,
@@ -86,8 +108,18 @@ export class AwspSupervisor {
       pairingCode: null,
       devices: this.devices(),
       connections: [],
-      port: this.readOptions().port,
+      port: saved.port,
+      network: this.networkView(saved),
     };
+  }
+
+  private nowIso(): string {
+    return new Date(this.options.now?.() ?? Date.now()).toISOString();
+  }
+
+  private networkView(saved: Options = this.readOptions()): AwspNetwork {
+    const decision = streamingDecision(saved, this.connection);
+    return { unmetered: saved.unmetered, metered: saved.metered, connection: this.connection, blocked: decision.allowed ? null : decision.reason };
   }
 
   /* ------------------------------------------------------------- secrets */
@@ -119,7 +151,16 @@ export class AwspSupervisor {
   }
 
   devices(): AwspDevice[] {
-    return this.readSecret<AwspDevice[]>(DEVICES_SETTING, []);
+    // Devices paired before "last seen" existed have no time yet; they get one when they next connect.
+    return this.readSecret<AwspDevice[]>(DEVICES_SETTING, []).map((device) => ({ ...device, lastSeenAt: device.lastSeenAt ?? null }));
+  }
+
+  /** Records that a device is here (or has just gone), for "last seen". */
+  private seen(id: string): void {
+    const devices = this.devices();
+    if (!devices.some((d) => d.id === id)) return;
+    const at = this.nowIso();
+    this.saveDevices(devices.map((d) => (d.id === id ? { ...d, lastSeenAt: at } : d)));
   }
 
   private saveDevices(devices: AwspDevice[]): void {
@@ -129,7 +170,9 @@ export class AwspSupervisor {
 
   private readOptions(): Options {
     const saved = this.options.store.get<Partial<Options> | null>(OPTIONS_SETTING, null) ?? {};
-    return { enabled: saved.enabled === true, port: typeof saved.port === 'number' ? saved.port : null };
+    // Both connections are allowed until the person says otherwise: that is how streaming behaved
+    // before the two switches existed, and how the design draws them.
+    return { enabled: saved.enabled === true, port: typeof saved.port === 'number' ? saved.port : null, unmetered: saved.unmetered !== false, metered: saved.metered !== false };
   }
 
   private saveOptions(next: Options): void {
@@ -162,10 +205,56 @@ export class AwspSupervisor {
     return this.status;
   }
 
-  /** Called at start-up: streams if it was on last time. */
+  /** "On Wi-Fi and Ethernet" and "On metered connections". Applied at once to the connection this PC is on. */
+  async setNetworks(patch: { unmetered?: boolean; metered?: boolean }): Promise<AwspStatus> {
+    const current = this.readOptions();
+    this.saveOptions({ ...current, ...(patch.unmetered !== undefined ? { unmetered: patch.unmetered } : {}), ...(patch.metered !== undefined ? { metered: patch.metered } : {}) });
+    await this.applyNetwork();
+    return this.status;
+  }
+
+  /** Asks Windows what the connection costs, then starts or pauses the sidecar to match. */
+  async checkNetwork(): Promise<void> {
+    if (!this.options.probeNetwork) return this.applyNetwork();
+    this.probing ??= this.options
+      .probeNetwork()
+      .catch((): NetworkKind => 'unknown')
+      .then(async (kind) => {
+        this.lastProbeAt = this.options.now?.() ?? Date.now();
+        if (kind !== this.connection) this.options.log(`awsp: this PC is on ${kind === 'metered' ? 'a metered connection' : kind === 'unmetered' ? 'Wi-Fi or Ethernet' : kind === 'offline' ? 'no connection' : 'a connection Windows could not rate'}`);
+        this.connection = kind;
+        await this.applyNetwork();
+      })
+      .finally(() => {
+        this.probing = null;
+      });
+    return this.probing;
+  }
+
+  /** Pauses the sidecar on a connection that is switched off, and starts it again when it is allowed. */
+  private async applyNetwork(): Promise<void> {
+    const network = this.networkView();
+    this.publish({ network });
+    if (network.blocked) {
+      if (this.child || this.restartTimer) {
+        this.options.log(`awsp: ${network.blocked}`);
+        await this.stop(false);
+      }
+      if (this.readOptions().enabled) this.publish({ running: false, reason: network.blocked });
+      return;
+    }
+    if (this.readOptions().enabled && !this.child && !this.restartTimer) {
+      if (this.status.reason?.startsWith('Paused:')) this.publish({ reason: null });
+      this.start();
+    }
+  }
+
+  /** Called at start-up: streams if it was on last time, and the connection allows it. */
   boot(): void {
-    if (this.readOptions().enabled) this.start();
-    // A changed set of interfaces (Wi-Fi to Ethernet, a VPN, waking up) means rebinding.
+    if (this.readOptions().enabled && !this.status.network.blocked) this.start();
+    void this.checkNetwork();
+    // A changed set of interfaces (Wi-Fi to Ethernet, a VPN, waking up) means rebinding, and
+    // perhaps a connection with a different cost.
     this.netSignature = this.networkSignature();
     this.netTimer = setInterval(() => {
       const next = this.networkSignature();
@@ -173,6 +262,10 @@ export class AwspSupervisor {
         this.netSignature = next;
         this.options.log('awsp: the network changed; rebinding');
         if (this.child) void this.restart();
+        void this.checkNetwork();
+      } else if ((this.options.now?.() ?? Date.now()) - this.lastProbeAt >= NETWORK_RECHECK_MS) {
+        // A hotspot can be marked metered without any interface changing.
+        void this.checkNetwork();
       }
     }, 15_000);
     this.netTimer.unref?.();
@@ -201,6 +294,11 @@ export class AwspSupervisor {
 
   private start(): void {
     if (this.child || !this.options.binary) return;
+    const blocked = this.networkView().blocked;
+    if (blocked) {
+      this.publish({ running: false, reason: blocked });
+      return;
+    }
     const secret = this.secretKeyHex();
     if (!secret) {
       this.publish({ running: false, reason: 'Windows could not protect the streaming key, so streaming is off.' });
@@ -210,7 +308,7 @@ export class AwspSupervisor {
     // The sidecar transcodes with `AWSP_FFMPEG`, else whatever `ffmpeg` is on PATH. A copy the helper
     // set up itself is not on PATH, so it is named here.
     const ffmpeg = this.options.ffmpegPath?.() ?? null;
-    const child = spawn(this.options.binary, [], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, env: { ...process.env, ...(ffmpeg ? { AWSP_FFMPEG: ffmpeg } : {}) } });
+    const child = (this.options.spawnImpl ?? spawn)(this.options.binary, [], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, env: { ...process.env, ...(ffmpeg ? { AWSP_FFMPEG: ffmpeg } : {}) } });
     this.child = child;
     const config = {
       secret_key_hex: secret,
@@ -262,7 +360,7 @@ export class AwspSupervisor {
       case 'paired': {
         const id = String(event['id']);
         const others = this.devices().filter((d) => d.id !== id);
-        const device: AwspDevice = { id, name: String(event['name'] ?? 'A device'), clientKind: event['client_kind'] === 'android' ? 'android' : 'pwa', tierCap: 'lossless', pairedAt: new Date().toISOString() };
+        const device: AwspDevice = { id, name: String(event['name'] ?? 'A device'), clientKind: event['client_kind'] === 'android' ? 'android' : 'pwa', tierCap: 'lossless', pairedAt: this.nowIso(), lastSeenAt: this.nowIso() };
         this.saveDevices([...others, device]);
         this.publish({ pairingCode: null });
         break;
@@ -273,12 +371,19 @@ export class AwspSupervisor {
         const rttMs = typeof event['rtt_ms'] === 'number' ? event['rtt_ms'] : null;
         this.options.log(`awsp connection ${peer} type=${type} rtt=${rttMs ?? '?'}`);
         const name = this.devices().find((d) => d.id === peer)?.name ?? null;
+        const known = this.status.connections.some((c) => c.peer === peer);
         this.publish({ connections: [...this.status.connections.filter((c) => c.peer !== peer), { peer, name, type, rttMs }] });
+        // A new connection is a sighting; a path change on one already open is not worth a write.
+        if (!known) this.seen(peer);
         break;
       }
-      case 'disconnected':
-        this.publish({ connections: this.status.connections.filter((c) => c.peer !== String(event['peer'])) });
+      case 'disconnected': {
+        const peer = String(event['peer']);
+        this.publish({ connections: this.status.connections.filter((c) => c.peer !== peer) });
+        // "Last seen" is when it went, not when it came.
+        this.seen(peer);
         break;
+      }
       case 'error':
         this.options.log(`awsp-server error: ${String(event['message'])}`);
         this.publish({ reason: String(event['message']) });

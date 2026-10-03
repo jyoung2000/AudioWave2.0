@@ -54,6 +54,26 @@ export function decodeXmlText(value: string): string {
 }
 
 /**
+ * A channel's name as two lists can agree on it, for matching a playlist channel that has no
+ * `tvg-id` to the guide's channel of the same name: case, accents, punctuation and spacing are
+ * dropped, and so are the labels IPTV lists add to the same channel — a country prefix (`UK:`,
+ * `US |`) and a picture-quality suffix (HD, FHD, UHD, 4K, SD). What makes two channels different
+ * stays: `BBC One` and `BBC One +1` do not match. Returns '' for a name with nothing left.
+ */
+export function normalizeChannelName(name: string): string {
+  return name
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/^\s*[a-z]{2,3}\s*[:|]\s*/, '')
+    .replace(/[([]\s*(?:hd|fhd|uhd|sd|4k|hevc|h\.?265)\s*[)\]]/g, ' ')
+    .replace(/(?:\s+(?:hd|fhd|uhd|sd|4k|hevc|h\.?265))+\s*$/, '')
+    .replace(/\+/g, ' plus ')
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '');
+}
+
+/**
  * XMLTV time: `YYYYMMDDhhmmss ±hhmm`, with the seconds, the minutes and the offset each optional.
  * No offset means UTC, as the format says. Returns null for anything that is not a date.
  */

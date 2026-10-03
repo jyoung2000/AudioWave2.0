@@ -537,6 +537,54 @@ export class HubClient {
 
   /* ----------------------------------------------------------------- plumbing */
 
+  /* ------------------------------------------- recommendation settings, for backups */
+
+  /**
+   * The paired hub's recommendation settings for this companion's user — the taste profile the hub
+   * keeps (`GET /api/v1/recommendations/profile`) — for a backup. Null, with the reason in a
+   * sentence, when no hub is paired, it cannot be reached, or it does not let this companion read
+   * them. Nothing is sent but the credential.
+   */
+  async readRecommendations(): Promise<{ profile: Record<string, unknown> | null; hubName: string | null; reason: string | null }> {
+    const credential = this.credential;
+    if (!credential) return { profile: null, hubName: null, reason: 'No hub is paired, so there are no recommendation settings to back up.' };
+    const hubName = credential.hubName;
+    let response: Response;
+    try {
+      response = await fetchWithTimeout(`${credential.endpoint}/api/v1/recommendations/profile`, { method: 'GET', headers: { accept: 'application/json', ...this.authHeaders() } });
+    } catch {
+      return { profile: null, hubName, reason: `${hubName} can’t be reached right now, so its recommendation settings can’t be backed up.` };
+    }
+    if (response.status === 401 || response.status === 403) return { profile: null, hubName, reason: `${hubName} doesn’t let this companion read its recommendation settings. Change its permissions in the hub, under Devices.` };
+    if (!response.ok) return { profile: null, hubName, reason: `${hubName} couldn’t give its recommendation settings (${await problemMessage(response)}).` };
+    const parsed = z
+      .looseObject({ dimensions: z.record(z.string(), z.array(z.object({ key: z.string(), weight: z.number() }))), discoveryPreference: z.number(), popularityPreference: z.number(), coldStart: z.boolean() })
+      .safeParse(await response.json().catch(() => null));
+    if (!parsed.success) return { profile: null, hubName, reason: `${hubName} answered with recommendation settings this companion doesn’t understand.` };
+    return { profile: parsed.data, hubName, reason: null };
+  }
+
+  /**
+   * Restore: offer backed-up taste back to the paired hub as starting points — the artists and
+   * genres it weighed highest — through the hub's cold-start seeds (`POST /recommendations/seeds`).
+   * The hub merges them with what it has; nothing it already learned is replaced.
+   */
+  async offerRecommendationSeeds(seeds: { artists: string[]; genres: string[] }): Promise<{ ok: boolean; reason: string | null }> {
+    const credential = this.credential;
+    if (!credential) return { ok: false, reason: 'Pair a hub first: the recommendation settings in this backup go back to a hub.' };
+    try {
+      const response = await fetchWithTimeout(`${credential.endpoint}/api/v1/recommendations/seeds`, {
+        method: 'POST',
+        headers: { accept: 'application/json', 'content-type': 'application/json', ...this.authHeaders() },
+        body: JSON.stringify({ artists: seeds.artists.slice(0, 50), genres: seeds.genres.slice(0, 50), likedTrackIds: [] }),
+      });
+      if (response.status === 401 || response.status === 403) return { ok: false, reason: `${credential.hubName} doesn’t let this companion change its recommendation settings.` };
+      return response.ok ? { ok: true, reason: null } : { ok: false, reason: `${credential.hubName} didn’t take them (${await problemMessage(response)}).` };
+    } catch {
+      return { ok: false, reason: `${credential.hubName} can’t be reached right now. Restore again once it is.` };
+    }
+  }
+
   private appVersion(): string {
     return this.options.appVersion ?? process.env['NP_VERSION'] ?? '0.0.0';
   }

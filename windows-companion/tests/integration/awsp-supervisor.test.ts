@@ -6,14 +6,17 @@
  *
  * Skipped, with the reason, when the release binary has not been built on this machine.
  */
+import type { spawn } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { PassThrough, Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { AwspSupervisor } from '../../src/main/awsp.js';
 import { CompanionStore, openCompanionDb } from '../../src/main/store.js';
-import type { AwspStatus } from '../../src/shared/ipc.js';
+import type { AwspStatus, NetworkKind } from '../../src/shared/ipc.js';
 
 const BINARY = fileURLToPath(new URL(`../../awsp-server/target/release/awsp-server${process.platform === 'win32' ? '.exe' : ''}`, import.meta.url));
 const built = existsSync(BINARY);
@@ -91,4 +94,136 @@ describe.skipIf(!built)(`the streaming server, supervised${built ? '' : ' (skipp
     expect(events.some((e) => e.running)).toBe(true);
     store.close();
   }, 60_000);
+});
+
+/**
+ * A stand-in for the sidecar, speaking its JSON lines: ready once it has its config, gone on
+ * `shutdown`. Lets the supervisor's own decisions — which connections it streams on, and when a
+ * device was last seen — be tested on any machine.
+ */
+class FakeSidecar extends EventEmitter {
+  stdout = new PassThrough();
+  stderr = new PassThrough();
+  stdin = new Writable({
+    write: (chunk: Buffer, _encoding, done) => {
+      for (const line of chunk.toString().split('\n').filter(Boolean)) {
+        const message = JSON.parse(line) as { cmd?: string };
+        if (!message.cmd) this.say({ event: 'ready', endpoint_id: 'e'.repeat(64), ticket: 'endpointabc', relay_url: null });
+        if (message.cmd === 'shutdown') setTimeout(() => this.exit(), 1);
+      }
+      done();
+    },
+  });
+  say(event: Record<string, unknown>): void {
+    this.stdout.write(`${JSON.stringify(event)}\n`);
+  }
+  exit(): void {
+    this.emit('exit', 0);
+  }
+  kill(): boolean {
+    this.exit();
+    return true;
+  }
+}
+
+describe('which connections it streams on, and when a device was last seen', () => {
+  let store: CompanionStore;
+  let sidecars: FakeSidecar[];
+  let connection: NetworkKind;
+  let clock: number;
+  const spawnImpl = (() => {
+    const child = new FakeSidecar();
+    sidecars.push(child);
+    return child;
+  }) as unknown as typeof spawn;
+
+  const make = () =>
+    new AwspSupervisor({
+      store,
+      secretBox,
+      binary: 'awsp-server.exe',
+      libraryDb: ':memory:',
+      cacheDir: join(dir, 'cache'),
+      serverName: 'Test companion',
+      onStatus: () => undefined,
+      log: () => undefined,
+      spawnImpl,
+      probeNetwork: async () => connection,
+      now: () => clock,
+    });
+
+  afterEach(() => store?.close());
+
+  it('pauses on a metered connection when that is switched off, says why, and starts again when allowed', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'np-awsp-net-'));
+    store = new CompanionStore(openCompanionDb(join(dir, 'companion.sqlite')));
+    sidecars = [];
+    connection = 'unmetered';
+    clock = Date.parse('2026-10-03T12:00:00Z');
+    supervisor = make();
+    expect(supervisor.getStatus().network).toEqual({ unmetered: true, metered: true, connection: 'unknown', blocked: null });
+    await supervisor.setEnabled(true);
+    await supervisor.checkNetwork();
+    await until(() => supervisor!.getStatus(), (s) => s.running);
+
+    await supervisor.setNetworks({ metered: false });
+    expect(supervisor.getStatus().running).toBe(true);
+
+    // The PC moves to a phone's hotspot.
+    connection = 'metered';
+    await supervisor.checkNetwork();
+    const paused = supervisor.getStatus();
+    expect(paused.running).toBe(false);
+    expect(paused.network).toMatchObject({ connection: 'metered', metered: false });
+    expect(paused.reason).toMatch(/^Paused: this PC is on a metered connection/);
+    expect(paused.enabled).toBe(true);
+    expect(sidecars).toHaveLength(1);
+
+    // Allowed again: it starts by itself.
+    await supervisor.setNetworks({ metered: true });
+    await until(() => supervisor!.getStatus(), (s) => s.running);
+    expect(sidecars).toHaveLength(2);
+    expect(supervisor.getStatus().reason).toBeNull();
+
+    // Wi-Fi and Ethernet switched off while on Ethernet: paused for that reason instead.
+    connection = 'unmetered';
+    await supervisor.setNetworks({ unmetered: false });
+    await supervisor.checkNetwork();
+    expect(supervisor.getStatus()).toMatchObject({ running: false, reason: expect.stringMatching(/Wi-Fi or Ethernet/) });
+    // And it stays off across a restart of the companion, on that connection.
+    await supervisor.stop();
+    supervisor = make();
+    supervisor.boot();
+    await supervisor.checkNetwork();
+    expect(supervisor.getStatus().running).toBe(false);
+    expect(sidecars).toHaveLength(2);
+  });
+
+  it('records when each paired device was last seen, kept with the device', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'np-awsp-seen-'));
+    store = new CompanionStore(openCompanionDb(join(dir, 'companion.sqlite')));
+    sidecars = [];
+    connection = 'unmetered';
+    clock = Date.parse('2026-10-03T12:00:00Z');
+    supervisor = make();
+    await supervisor.setEnabled(true);
+    await until(() => supervisor!.getStatus(), (s) => s.running);
+    const sidecar = sidecars[0]!;
+    sidecar.say({ event: 'paired', id: 'phone', name: 'Sam’s Phone', client_kind: 'android' });
+    await until(() => supervisor!.getStatus(), (s) => s.devices.length === 1);
+    expect(supervisor.getStatus().devices[0]!.lastSeenAt).toBe('2026-10-03T12:00:00.000Z');
+
+    clock += 5 * 60_000;
+    sidecar.say({ event: 'connection', peer: 'phone', type: 'direct', rtt_ms: 34 });
+    await until(() => supervisor!.getStatus(), (s) => s.connections.length === 1);
+    expect(supervisor.getStatus().devices[0]!.lastSeenAt).toBe('2026-10-03T12:05:00.000Z');
+    expect(supervisor.getStatus().connections[0]).toEqual({ peer: 'phone', name: 'Sam’s Phone', type: 'direct', rttMs: 34 });
+
+    clock += 30 * 60_000;
+    sidecar.say({ event: 'disconnected', peer: 'phone' });
+    await until(() => supervisor!.getStatus(), (s) => s.connections.length === 0);
+    expect(supervisor.getStatus().devices[0]!.lastSeenAt).toBe('2026-10-03T12:35:00.000Z');
+    // Kept encrypted with the device, so it is there after a restart.
+    expect(make().devices()[0]!.lastSeenAt).toBe('2026-10-03T12:35:00.000Z');
+  });
 });

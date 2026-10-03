@@ -11,7 +11,7 @@
  * (docs/PRIVACY.md).
  */
 import { z } from 'zod';
-import { EqPreset, Playlist, Track } from '@now-playing/contracts';
+import { EqPreset, OutputFormat, Playlist, Track } from '@now-playing/contracts';
 import { IPC_CHANNELS, IPC_EVENT_NAMES, type IpcChannel, type IpcEvent } from './channels.js';
 
 /* ------------------------------------------------------------------ library */
@@ -94,6 +94,10 @@ export const BackupSummary = z.object({
 });
 export type BackupSummary = z.infer<typeof BackupSummary>;
 
+/** What a backup can hold. `algorithms` is the paired hub's recommendation settings, read when it allows. */
+export const BackupPartName = z.enum(['music', 'tv', 'movies', 'playlists', 'presets', 'algorithms', 'settings']);
+export type BackupPartName = z.infer<typeof BackupPartName>;
+
 export const BackupSettings = z.object({
   /** Where archives go. Null until chosen: nothing is backed up to a guessed place. */
   dir: z.string().nullable().default(null),
@@ -104,9 +108,10 @@ export const BackupSettings = z.object({
       movies: z.boolean().default(false),
       playlists: z.boolean().default(true),
       presets: z.boolean().default(true),
+      algorithms: z.boolean().default(true),
       settings: z.boolean().default(true),
     })
-    .default({ music: true, tv: false, movies: false, playlists: true, presets: true, settings: true }),
+    .default({ music: true, tv: false, movies: false, playlists: true, presets: true, algorithms: true, settings: true }),
   schedule: z.enum(['manual', 'daily', 'weekly']).default('manual'),
   /** How many archives to keep; 0 keeps every one. */
   keep: z.union([z.literal(0), z.literal(3), z.literal(5), z.literal(10)]).default(5),
@@ -124,6 +129,7 @@ export const BackupSettingsPatch = z.strictObject({
       movies: z.boolean().optional(),
       playlists: z.boolean().optional(),
       presets: z.boolean().optional(),
+      algorithms: z.boolean().optional(),
       settings: z.boolean().optional(),
     })
     .optional(),
@@ -157,7 +163,7 @@ export const BackupArchive = z.object({
   path: z.string(),
   createdAt: z.iso.datetime({ offset: true }),
   sizeBytes: z.number().int().nonnegative(),
-  parts: z.array(z.enum(['music', 'tv', 'movies', 'playlists', 'presets', 'settings'])),
+  parts: z.array(BackupPartName),
   contents: BackupSummary.shape.contents,
   /** False for an archive whose manifest is missing or unreadable: listed, but not restorable. */
   restorable: z.boolean(),
@@ -174,6 +180,17 @@ export const BackupProgress = z.object({
 });
 export type BackupProgress = z.infer<typeof BackupProgress>;
 
+/**
+ * Whether the paired hub's recommendation settings can go into a backup now, and if not, why — in
+ * the sentence the Backup pane shows under the checkbox.
+ */
+export const BackupAlgorithms = z.object({
+  available: z.boolean(),
+  hubName: z.string().nullable(),
+  reason: z.string().nullable(),
+});
+export type BackupAlgorithms = z.infer<typeof BackupAlgorithms>;
+
 /* ---------------------------------------------------------------------- awsp */
 
 export const AwspTier = z.enum(['lossless', 'high', 'saver']);
@@ -186,8 +203,27 @@ export const AwspDevice = z.object({
   clientKind: z.enum(['pwa', 'android']),
   tierCap: AwspTier,
   pairedAt: z.iso.datetime({ offset: true }),
+  /** When it last connected or was last connected; null until it first connects. */
+  lastSeenAt: z.iso.datetime({ offset: true }).nullable().default(null),
 });
 export type AwspDevice = z.infer<typeof AwspDevice>;
+
+/**
+ * What kind of connection this PC is on, as Windows rates its cost: `metered` for mobile data, a
+ * hotspot or a connection marked metered; `offline` with none; `unknown` when it could not be told.
+ */
+export const NetworkKind = z.enum(['unmetered', 'metered', 'offline', 'unknown']);
+export type NetworkKind = z.infer<typeof NetworkKind>;
+
+/** Which connections streaming may use, what this PC is on now, and why streaming is paused if it is. */
+export const AwspNetwork = z.object({
+  unmetered: z.boolean(),
+  metered: z.boolean(),
+  connection: NetworkKind,
+  /** Why streaming is paused on this connection, in a sentence; null when it is not. */
+  blocked: z.string().nullable(),
+});
+export type AwspNetwork = z.infer<typeof AwspNetwork>;
 
 export const AwspStatus = z.object({
   enabled: z.boolean(),
@@ -203,6 +239,7 @@ export const AwspStatus = z.object({
   devices: z.array(AwspDevice),
   connections: z.array(z.object({ peer: z.string(), name: z.string().nullable(), type: z.enum(['direct', 'relay', 'bridge']), rttMs: z.number().nullable() })),
   port: z.number().int().nullable(),
+  network: AwspNetwork.default({ unmetered: true, metered: true, connection: 'unknown', blocked: null }),
 });
 export type AwspStatus = z.infer<typeof AwspStatus>;
 
@@ -231,6 +268,19 @@ export const HelperTool = z.object({
   origin: z.enum(['path', 'installed', 'configured', 'missing']).optional(),
   /** Automatic setup's state; absent until setup has looked at the tool. */
   setup: HelperToolSetup.nullable().optional(),
+  /** What the last Check found: the newest release and whether this copy is behind it. Absent until checked. */
+  latest: z
+    .object({
+      version: z.string().nullable(),
+      /** True behind, false current, null when it could not be told (then `reason` says why). */
+      updateAvailable: z.boolean().nullable(),
+      reason: z.string().nullable(),
+      checkedAt: z.iso.datetime({ offset: true }),
+    })
+    .nullable()
+    .optional(),
+  /** A Check is asking GitHub right now. */
+  checking: z.boolean().optional(),
 });
 export type HelperTool = z.infer<typeof HelperTool>;
 
@@ -243,6 +293,10 @@ export const HelperStatus = z.object({
   reason: z.string().nullable(),
   tools: z.array(HelperTool),
   checkedAt: z.iso.datetime({ offset: true }).nullable(),
+  /** Downloads are running or waiting: a tool in use cannot be replaced until they finish. */
+  busy: z.boolean().default(false),
+  /** Also answering other devices on this network (Settings ▸ Network). */
+  lan: z.boolean().default(false),
 });
 export type HelperStatus = z.infer<typeof HelperStatus>;
 
@@ -287,8 +341,14 @@ export const AppInfo = z.object({
   /** Whether this build was signed in CI. Unsigned builds say so rather than implying otherwise. */
   signed: z.boolean(),
   updateFeedUrl: z.string().nullable(),
+  /** Where the companion writes its logs. */
+  logsDir: z.string().default(''),
 });
 export type AppInfo = z.infer<typeof AppInfo>;
+
+/** What happens when a download finishes, besides it being saved. */
+export const DownloadDone = z.enum(['nothing', 'notify', 'reveal']);
+export type DownloadDone = z.infer<typeof DownloadDone>;
 
 export const Preferences = z.object({
   launchAtLogin: z.boolean().default(false),
@@ -298,6 +358,23 @@ export const Preferences = z.object({
   theme: z.enum(['system', 'light']).default('system'),
   /** The port the embedded helper listens on; the player scans 17342–17345. */
   helperPort: z.number().int().min(1024).max(65535).default(17342),
+  /** Let setup update yt-dlp by itself once a day. Off: only Update in Settings does. */
+  autoUpdateTools: z.boolean().default(true),
+  /** Ask GitHub once a day whether there is a newer companion. */
+  checkForUpdates: z.boolean().default(true),
+  /** Where finished downloads are saved. Null: the Downloads folder inside Music. Set only through the folder picker. */
+  downloadDir: z.string().nullable().default(null),
+  /** The format a download is saved in when the player does not name one. */
+  downloadFormat: OutputFormat.default('original'),
+  /** How many downloads run at once. */
+  downloadConcurrency: z.number().int().min(1).max(4).default(2),
+  /** A speed limit for each download, in KB/s; null for none. */
+  downloadRateKBps: z.number().int().min(1).max(1_000_000).nullable().default(null),
+  downloadDone: DownloadDone.default('nothing'),
+  /** Let other devices on this network use the helper's token-free read routes without pairing. */
+  helperLan: z.boolean().default(false),
+  /** Write debug lines to the log as well. */
+  verboseLogs: z.boolean().default(false),
 });
 export type Preferences = z.infer<typeof Preferences>;
 
@@ -315,8 +392,39 @@ export const PreferencesPatch = z.strictObject({
   autoSync: z.boolean().optional(),
   theme: z.enum(['system', 'light']).optional(),
   helperPort: z.number().int().min(1024).max(65535).optional(),
+  autoUpdateTools: z.boolean().optional(),
+  checkForUpdates: z.boolean().optional(),
+  // No downloadDir: a folder is only ever chosen in the system's own picker (downloads:pick-dir).
+  downloadFormat: OutputFormat.optional(),
+  downloadConcurrency: z.number().int().min(1).max(4).optional(),
+  downloadRateKBps: z.number().int().min(1).max(1_000_000).nullable().optional(),
+  downloadDone: DownloadDone.optional(),
+  helperLan: z.boolean().optional(),
+  verboseLogs: z.boolean().optional(),
 });
 export type PreferencesPatch = z.infer<typeof PreferencesPatch>;
+
+/** Whether a newer companion is out, from the project's GitHub releases. */
+export const AppUpdate = z.object({
+  current: z.string(),
+  /** The newest release's version; null until asked, or when it could not be read. */
+  latest: z.string().nullable(),
+  available: z.boolean(),
+  checkedAt: z.iso.datetime({ offset: true }).nullable(),
+  /** Why the last check did not get an answer, in a sentence. */
+  reason: z.string().nullable(),
+  enabled: z.boolean(),
+});
+export type AppUpdate = z.infer<typeof AppUpdate>;
+
+/** What the companion keeps that it can fetch again, and where its logs are. */
+export const StorageReport = z.object({
+  cache: z.object({ app: z.number().int().nonnegative(), liveTv: z.number().int().nonnegative(), downloads: z.number().int().nonnegative(), total: z.number().int().nonnegative() }),
+  logsDir: z.string(),
+});
+export type StorageReport = z.infer<typeof StorageReport>;
+
+const ToolId = z.enum(['yt-dlp', 'spotdl', 'ffmpeg']);
 
 /**
  * Every channel, with the shape of its request and its result.
@@ -334,12 +442,28 @@ export const IPC = {
   'app:reveal': { request: z.object({ trackId: z.uuid() }), response: z.object({ ok: z.boolean(), reason: z.string().nullable() }) },
   /** Opens the folder the companion keeps its own data in. Takes no path: the renderer cannot name one. */
   'app:open-data-folder': { request: z.void(), response: z.object({ ok: z.boolean(), reason: z.string().nullable() }) },
+  'app:update-status': { request: z.void(), response: AppUpdate },
+  /** Asks GitHub now, whatever the daily schedule says. */
+  'app:check-update': { request: z.void(), response: AppUpdate },
+  /** Opens the project's release page. Takes no URL: the main process opens only that one GitHub page. */
+  'app:open-release': { request: z.void(), response: z.object({ opened: z.boolean(), reason: z.string().nullable() }) },
+  'app:storage': { request: z.void(), response: StorageReport },
+  /** Empties the caches the storage report counts. Nothing that cannot be fetched again is touched. */
+  'app:clear-cache': { request: z.void(), response: z.object({ storage: StorageReport, reason: z.string().nullable() }) },
+  /** Opens the companion's own logs folder. Takes no path. */
+  'app:open-logs': { request: z.void(), response: z.object({ ok: z.boolean(), reason: z.string().nullable() }) },
+  /** Asks where to save, then writes a .zip of the logs with tokens, secrets and folder paths taken out. */
+  'app:export-logs': { request: z.void(), response: z.object({ path: z.string().nullable(), reason: z.string().nullable() }) },
+  /** The system's folder picker for where downloads are saved. The only way that preference changes. */
+  'downloads:pick-dir': { request: z.void(), response: z.object({ preferences: Preferences, reason: z.string().nullable() }) },
 
   'library:folders': { request: z.void(), response: z.object({ items: z.array(LibraryFolder) }) },
   'library:add-folder': { request: z.object({ kind: FolderKind.default('music') }).default({ kind: 'music' }), response: z.object({ folder: LibraryFolder.nullable(), reason: z.string().nullable() }) },
   'library:remove-folder': { request: z.object({ folderId: z.uuid() }), response: z.object({ ok: z.boolean() }) },
   'library:scan': { request: z.object({ folderId: z.uuid().optional() }), response: z.object({ started: z.boolean(), reason: z.string().nullable() }) },
   'library:tracks': { request: z.object({ query: z.string().max(200).optional(), limit: z.number().int().min(1).max(1000).default(200), offset: z.number().int().nonnegative().default(0) }), response: z.object({ items: z.array(Track), total: z.number().int() }) },
+  /** The ids alone, in the list's order: what choosing a range or everything needs without loading every song. */
+  'library:track-ids': { request: z.object({ query: z.string().max(200).optional(), limit: z.number().int().min(1).max(100_000).default(100_000), offset: z.number().int().nonnegative().default(0) }), response: z.object({ ids: z.array(z.string()), total: z.number().int() }) },
   'library:playlists': { request: z.void(), response: z.object({ items: z.array(Playlist) }) },
   'library:presets': { request: z.void(), response: z.object({ items: z.array(EqPreset) }) },
 
@@ -367,6 +491,8 @@ export const IPC = {
   'backup:restore': { request: z.object({ id: z.string().optional() }).default({}), response: z.object({ restored: z.boolean(), reason: z.string().nullable(), summary: BackupSummary.nullable() }) },
   'backup:remove': { request: z.object({ id: z.string() }), response: z.object({ ok: z.boolean(), reason: z.string().nullable() }) },
   'backup:export-playlists': { request: z.void(), response: z.object({ path: z.string().nullable(), count: z.number().int(), reason: z.string().nullable() }) },
+  /** Whether the paired hub's recommendation settings can be backed up now, and why not when they cannot. */
+  'backup:algorithms': { request: z.void(), response: BackupAlgorithms },
 
   'awsp:status': { request: z.void(), response: AwspStatus },
   'awsp:set-enabled': { request: z.object({ enabled: z.boolean() }), response: AwspStatus },
@@ -374,11 +500,17 @@ export const IPC = {
   'awsp:new-code': { request: z.void(), response: AwspStatus },
   'awsp:revoke': { request: z.object({ id: z.string().min(1).max(200) }), response: AwspStatus },
   'awsp:set-tier': { request: z.object({ id: z.string().min(1).max(200), tier: AwspTier }), response: AwspStatus },
+  /** Which connections streaming may use: Wi-Fi and Ethernet, metered ones (mobile data, hotspots), or both. */
+  'awsp:set-networks': { request: z.strictObject({ unmetered: z.boolean().optional(), metered: z.boolean().optional() }), response: AwspStatus },
 
   'helper:status': { request: z.void(), response: HelperStatus },
   'helper:check-tools': { request: z.void(), response: HelperStatus },
   /** "Try Again": set up every tool that is missing now, without waiting out the retry backoff. Returns at once. */
   'helper:install-tools': { request: z.void(), response: HelperStatus },
+  /** Check: this tool's version, and its project's latest release. Downloads nothing. */
+  'helper:check-tool': { request: z.object({ id: ToolId }), response: HelperStatus },
+  /** Update or Install: the verified installer, for this tool. Returns at once; progress shows in the status. */
+  'helper:update-tool': { request: z.object({ id: ToolId }), response: z.object({ status: HelperStatus, reason: z.string().nullable() }) },
   /** The helper's token, for pasting into a player this app does not serve. Shown, never logged. */
   'helper:token': { request: z.void(), response: z.object({ token: z.string().nullable() }) },
 
