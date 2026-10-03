@@ -6,7 +6,7 @@ Airwave is local-first. This page states what is stored where, what is shared, a
 
 | Data | Default location | Leaves the device? |
 |---|---|---|
-| Library index (titles, artists, albums, durations, content hashes), artwork thumbnails | Player: IndexedDB `now-playing-*`; Companion: SQLite in `%APPDATA%\Now Playing Companion`; Hub: `/data/hub.sqlite` | Only through explicit sync/sharing scopes you grant a paired device |
+| Library index (titles, artists, albums, durations, content hashes), artwork thumbnails | Player: IndexedDB `now-playing-*`; Companion: SQLite in `%APPDATA%\now-playing-companion`; Hub: `/data/hub.sqlite` | Only through explicit sync/sharing scopes you grant a paired device |
 | Directory handles / file paths | Player: IndexedDB (serialized handles); Companion: local SQLite | Never. Other devices only see opaque locator ids |
 | Solo queue, Solo history | Player local storage | Never copied into a Group session or to friends |
 | Listening events (append-only) | Player local; Companion local; Hub only when the `history:events` scope is granted for hub-side personalisation | Only with explicit scope |
