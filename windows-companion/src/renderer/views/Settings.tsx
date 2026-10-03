@@ -35,10 +35,21 @@ export function shortVersion(version: string | null): string | null {
 }
 
 /**
- * One downloader's light and words (UX-SETUP-001). Setup's state wins when there is one; without it
- * (the helper is not running) the row falls back to found or missing.
+ * A missing tool that setup has not reached yet. Setup takes the tools one at a time, so for the
+ * first seconds after start a tool can be absent with nothing said about it — it is in the queue,
+ * not missing, and calling it missing (with advice to install it by hand, and a badge) would be
+ * wrong for exactly as long as it took the one before it to download.
  */
-export function toolLook(tool: HelperTool): { kind: DotKind; label: string } {
+function queued(tool: HelperTool, helperRunning: boolean): boolean {
+  return helperRunning && !tool.setup && !tool.present;
+}
+
+/**
+ * One downloader's light and words (UX-SETUP-001). Setup's state wins when there is one; a tool
+ * setup has not reached yet is on its way; and with no helper running at all the row falls back to
+ * found or missing.
+ */
+export function toolLook(tool: HelperTool, helperRunning = false): { kind: DotKind; label: string } {
   switch (tool.setup?.state) {
     case 'installing':
       return { kind: 'busy', label: tool.setup.progress !== undefined ? `Setting up… ${Math.round(tool.setup.progress * 100)}%` : 'Setting up…' };
@@ -49,14 +60,15 @@ export function toolLook(tool: HelperTool): { kind: DotKind; label: string } {
     case 'ready':
       return { kind: 'ok', label: 'Ready' };
     default:
+      if (queued(tool, helperRunning)) return { kind: 'busy', label: 'Setting up…' };
       return tool.present ? { kind: 'ok', label: 'Ready' } : { kind: 'bad', label: 'Missing' };
   }
 }
 
 /** Failed or unsupported-and-absent: the downloaders that need the person, which is what the tab badge counts. */
-export function needsAttention(tool: HelperTool): boolean {
+export function needsAttention(tool: HelperTool, helperRunning = false): boolean {
   if (tool.setup) return tool.setup.state === 'failed' || (tool.setup.state === 'unsupported' && !tool.present);
-  return !tool.present;
+  return !tool.present && !queued(tool, helperRunning);
 }
 
 export function SettingsView({ helper, prefs, say }: { helper: Resource<HelperStatus>; prefs: Resource<Preferences>; say: (text: string) => void }) {
@@ -113,10 +125,10 @@ export function SettingsView({ helper, prefs, say }: { helper: Resource<HelperSt
         <Rows label="Downloaders" live>
           {helper.data ? (
             helper.data.tools.map((tool) => {
-              const look = toolLook(tool);
+              const look = toolLook(tool, helper.data?.running ?? false);
               const name = TOOL_NAMES[tool.id];
               const failed = tool.setup?.state === 'failed';
-              const installing = tool.setup?.state === 'installing';
+              const installing = tool.setup?.state === 'installing' || look.kind === 'busy';
               return (
                 <li key={tool.id} className="dl">
                   <span className={`sdot sdot--${look.kind}`} aria-hidden="true" />
@@ -130,7 +142,7 @@ export function SettingsView({ helper, prefs, say }: { helper: Resource<HelperSt
                       ) : null}
                     </span>
                     <span className="dl__state">{look.label}</span>
-                    {installing ? <Progress label={`Setting up ${name}`} value={tool.setup?.progress !== undefined ? tool.setup.progress * 100 : null} /> : null}
+                    {tool.setup?.state === 'installing' ? <Progress label={`Setting up ${name}`} value={tool.setup.progress !== undefined ? tool.setup.progress * 100 : null} /> : null}
                     <span className="dl__role">{TOOL_ROLES[tool.id]}</span>
                     {tool.present && tool.origin === 'installed' ? <span className="dl__role">Set up automatically</span> : null}
                     {tool.present && tool.path ? <span className="dl__path">{tool.path}</span> : null}

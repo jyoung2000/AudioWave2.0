@@ -36,7 +36,8 @@ function fresh(): Record<string, Responder> {
     'library:tracks': () => ({ items: [], total: 0 }),
     'hub:status': () => ({ endpoint: null, hubId: null, hubName: null, hubFingerprint: null, connected: false, reason: 'No hub is paired.', scopes: [], lastSyncAt: null }),
     'hub:sharing': () => ({ enabled: false }),
-    'helper:status': () => ({ running: true, port: 17342, origin: 'http://127.0.0.1:17342', reason: null, tools: TOOLS_MISSING, checkedAt: null }),
+    // No helper, so nothing is setting the downloaders up: they are found or they are missing.
+    'helper:status': () => ({ running: false, port: null, origin: null, reason: 'Port 17342 is already in use on this PC. Choose another in Settings ▸ Network.', tools: TOOLS_MISSING, checkedAt: null }),
     'tv:links': () => ({ m3u: [], epg: [] }),
     'awsp:status': () => awsp(),
     'transfers:list': () => ({ items: [] }),
@@ -337,7 +338,7 @@ describe("the Library names each tempo's provenance", () => {
   const withSongs = (ffmpegPresent: boolean, extra: Record<string, Responder> = {}) =>
     installBridge({
       ...fresh(),
-      'helper:status': () => ({ running: true, port: 17342, origin: 'http://127.0.0.1:17342', reason: null, tools: [{ id: 'ffmpeg', present: ffmpegPresent, version: ffmpegPresent ? '7.1' : null, path: ffmpegPresent ? 'C:\\t\\ffmpeg.exe' : null, advice: null }], checkedAt: NOW }),
+      'helper:status': () => ({ running: false, port: null, origin: null, reason: 'The helper could not start.', tools: [{ id: 'ffmpeg', present: ffmpegPresent, version: ffmpegPresent ? '7.1' : null, path: ffmpegPresent ? 'C:\\t\\ffmpeg.exe' : null, advice: null }], checkedAt: NOW }),
       'library:tracks': () => ({ items: [song('00000000-0000-7000-8000-000000000001', 'Tagged Song', 128, 'tag'), song('00000000-0000-7000-8000-000000000002', 'Measured Song', 120, 'analysis'), song('00000000-0000-7000-8000-000000000003', 'Silent Song', null, null)], total: 3 }),
       ...extra,
     });
@@ -431,6 +432,35 @@ describe('downloaders set themselves up (UX-SETUP-001)', () => {
     expect(invoked.some((call) => call.channel === 'helper:install-tools')).toBe(true);
   });
 
+  it('a tool setup has not reached yet is on its way, not missing: no badge, no install advice', async () => {
+    // Setup takes the tools one at a time; for a few seconds after start the later ones have no state.
+    const starting = {
+      running: true,
+      port: 17342,
+      origin: 'http://127.0.0.1:17342',
+      reason: null,
+      checkedAt: NOW,
+      tools: [
+        { id: 'yt-dlp', present: false, version: null, path: null, advice: null, origin: 'missing', setup: { state: 'installing', progress: 0.07 } },
+        { id: 'spotdl', present: false, version: null, path: null, advice: 'Install spotDL.', origin: 'missing' },
+        { id: 'ffmpeg', present: false, version: null, path: null, advice: 'Install FFmpeg.', origin: 'missing' },
+      ],
+    };
+    installBridge({ ...fresh(), ...tracks, 'helper:status': () => starting });
+    openApp();
+    const settings = await tool(/Settings/);
+    await screen.findByText('Silent Song');
+    expect(settings.textContent).toBe('Settings');
+    expect(await screen.findByText('Setting up FFmpeg — tempos appear once it finishes.')).toBeTruthy();
+    await userEvent.click(settings);
+    const list = await screen.findByRole('list', { name: 'Downloaders' });
+    expect(within(list).getByText('Setting up… 7%')).toBeTruthy();
+    expect(within(list).getAllByText('Setting up…')).toHaveLength(2);
+    expect(within(list).queryByText('Missing')).toBeNull();
+    expect(within(list).queryByText('Install spotDL.')).toBeNull();
+    expect(within(list).queryByText('Install FFmpeg.')).toBeNull();
+  });
+
   it('Settings keeps the install advice for a tool this PC cannot set up', async () => {
     installBridge({ ...fresh(), 'helper:status': () => status({ setup: { state: 'unsupported', reason: 'Install it with your package manager.' } }) });
     openApp();
@@ -513,8 +543,13 @@ describe('pairing', () => {
     // What the hub allows is said in words, and a permission this build does not know is left out.
     expect(screen.getByText('Share this PC’s library and keep playlists in step.')).toBeTruthy();
     expect(scopeWords([])).toBe('Nothing yet.');
+    // Until it is on there is nothing to sync, and Sync Now says so instead of sending anything.
+    const sync = screen.getByRole('button', { name: 'Sync Now' }) as HTMLButtonElement;
+    expect(sync.disabled).toBe(true);
+    expect(sync.title).toBe('Turn on sharing below first: until then there is nothing to sync.');
     await userEvent.click(checkbox);
     await waitFor(() => expect(checkbox.checked).toBe(true));
+    expect(sync.disabled).toBe(false);
   });
 
   it('shows sharing as it was left, not “off” every time the window opens', async () => {

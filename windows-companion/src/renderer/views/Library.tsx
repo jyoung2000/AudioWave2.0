@@ -24,7 +24,8 @@ const PAGE = 300;
 export function tempoHint(status: HelperStatus | null): string | null {
   const ffmpeg = status?.tools.find((t) => t.id === 'ffmpeg');
   if (!status || ffmpeg?.present) return null;
-  if (ffmpeg?.setup?.state === 'installing') return 'Setting up FFmpeg — tempos appear once it finishes.';
+  // Being set up, or in the queue behind the tool before it: either way it is on its way.
+  if (ffmpeg?.setup?.state === 'installing' || (status.running && ffmpeg && !ffmpeg.setup)) return 'Setting up FFmpeg — tempos appear once it finishes.';
   if (ffmpeg?.setup?.state === 'failed') return 'Tempo needs FFmpeg, which could not be set up automatically. Try again in Settings.';
   return 'Tempo needs FFmpeg — install it and scan again.';
 }
@@ -144,7 +145,8 @@ export function LibraryView({ helper, hubConnected, hasMusicFolder }: { helper: 
 
   const sendReason = !hubConnected ? 'Pair an Airwave Hub under Remote to send songs to it.' : !chosen.length ? 'Choose the songs to send first.' : null;
   const tabStop = (active && items.some((row) => row.id === active) ? active : null) ?? items[0]?.id ?? null;
-  const counts = tracks.data ? `${plural(total, 'song')}${query ? ' found' : ''}${total > items.length ? ` · showing the first ${items.length.toLocaleString()}` : ''}${chosen.length ? ` · ${chosen.length.toLocaleString()} chosen` : ''}` : '';
+  // An empty library is said once, in the list; "0 songs" under it would only repeat it.
+  const counts = tracks.data && (total || query) ? `${plural(total, 'song')}${query ? ' found' : ''}${total > items.length ? ` · showing the first ${items.length.toLocaleString()}` : ''}${chosen.length ? ` · ${chosen.length.toLocaleString()} chosen` : ''}` : '';
 
   return (
     <fieldset>

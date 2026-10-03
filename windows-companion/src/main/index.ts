@@ -96,6 +96,14 @@ function savePreferences(next: Preferences): Preferences {
   return next;
 }
 
+/**
+ * Whether this PC's library may be synced to the hub. Off until it is turned on in Remote ▸ What is
+ * shared, and remembered: pairing alone shares nothing.
+ */
+function sharingEnabled(): boolean {
+  return store?.isOpen === true && store.get<boolean>('shareLibrary', false) === true;
+}
+
 /** The helper's estimate route measures the companion's folders: restarted when they change. */
 function syncHelperFolders(): void {
   if (helper && store?.isOpen) void helper.restart(preferences().helperPort);
@@ -454,9 +462,17 @@ function registerHandlers(): void {
   handle('hub:status', () => hub!.getStatus());
   handle('hub:pair-start', (request) => hub!.startPairing((request as { endpoint: string }).endpoint, (request as { code: string }).code));
   handle('hub:pair-await', (request) => hub!.awaitPairing((request as { sessionId: string }).sessionId));
-  handle('hub:forget', () => hub!.forget());
+  handle('hub:forget', async () => {
+    const status = await hub!.forget();
+    // Sharing was a choice about that hub. The next one starts unshared, like the first did.
+    store!.set('shareLibrary', false, new Date().toISOString());
+    return status;
+  });
 
   handle('hub:sync-now', async () => {
+    // The window says sharing is opted into and that turning it off stops syncing; this is where
+    // that is true. With no hub paired, sync itself says so.
+    if (hub!.getStatus().endpoint && !sharingEnabled()) return { started: false, reason: 'Sharing is off, so nothing was synced. Turn on “Let the hub see what music is on this PC” first.' };
     const result = await hub!.sync();
     if (result.reason) return { started: false, reason: result.reason };
     notice('info', `Synced: sent ${result.pushed}, received ${result.pulled}${result.conflicts ? `, ${result.conflicts} conflicts resolved` : ''}.`);
@@ -469,7 +485,7 @@ function registerHandlers(): void {
     store!.set('shareLibrary', enabled, new Date().toISOString());
     return { enabled, reason: null };
   });
-  handle('hub:sharing', () => ({ enabled: store!.get<boolean>('shareLibrary', false) === true }));
+  handle('hub:sharing', () => ({ enabled: sharingEnabled() }));
 
   handle('transfers:list', () => ({ items: [...transfers.values()] }));
 
@@ -647,7 +663,7 @@ if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow())))
       // The player reads its channels and its now/next from here (GET /helper/v1/tv/…).
       tv: { channels: () => liveTv!.channels(), guide: () => liveTv!.guide() },
     });
-    applySessionSecurity(session.defaultSession, DEV_SERVER_URL);
+    applySessionSecurity(session.defaultSession, DEV_SERVER_URL, isAppUrl);
     registerHandlers();
     mainWindow = createWindow();
     createTray();
@@ -668,7 +684,7 @@ if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow())))
     });
     awsp.boot();
     powerMonitor.on('resume', () => awsp?.onResume());
-    if (preferences().autoSync) void hub.sync();
+    if (preferences().autoSync && sharingEnabled()) void hub.sync();
     // Folders added in an earlier session are watched again from start-up, not from the first
     // time something touches the preferences.
     syncWatchers();

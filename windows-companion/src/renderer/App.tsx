@@ -44,7 +44,7 @@ const TABS: ReadonlyArray<{ id: TabId; label: string; icon: () => ReactNode; sec
     label: 'Library',
     icon: LibraryToolIcon,
     sections: ['folders', 'library'],
-    lead: 'The folders on this PC that Airwave plays from. The companion watches them and passes what it finds to your Airwave Hub, so every device sees the same library.',
+    lead: 'The folders on this PC that Airwave plays from. The companion watches them and, once sharing is on, passes what it finds to your Airwave Hub so every device sees the same library.',
   },
   {
     id: 'live-tv',
@@ -161,7 +161,7 @@ function Companion() {
   const items = folders.data?.items ?? [];
   // A downloader that needs the person is worth a badge on Settings, as the design's gear wore one.
   // One still being set up does not: it is on its way (UX-SETUP-001).
-  const attention = helper.data?.tools.filter(needsAttention).length ?? 0;
+  const attention = helper.data?.tools.filter((t) => needsAttention(t, helper.data?.running ?? false)).length ?? 0;
 
   const show = useCallback((id: TabId) => {
     setTab(id);

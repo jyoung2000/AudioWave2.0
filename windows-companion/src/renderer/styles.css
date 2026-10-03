@@ -271,7 +271,8 @@ body {
 
 /* The songs on this PC: the hub design's list table (.tbl, airwave-hub.css), in the companion's well. */
 .tracks {
-  max-height: 258px;
+  /* Ten rows in the design's window; more as the window grows. */
+  max-height: max(258px, calc(100vh - 520px));
   overflow-y: auto;
   overscroll-behavior: contain;
 }

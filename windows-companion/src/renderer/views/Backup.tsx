@@ -265,7 +265,12 @@ export function BackupView({ say }: { say: (text: string) => void }) {
               <span className="name" title={row.path}>
                 <b>{dateTime(row.createdAt)}</b>
                 {'  '}
-                {row.restorable ? row.parts.map((part) => PART_WORDS[part]).join(', ') : 'Can’t be read — its contents list is missing'}
+                {/* In the order the checkboxes above list them, whatever order the archive wrote them in. */}
+                {row.restorable
+                  ? INCLUDE.filter((item) => row.parts.includes(item.key))
+                      .map((item) => PART_WORDS[item.key])
+                      .join(', ')
+                  : 'Can’t be read — its contents list is missing'}
               </span>
               <span className="meta">{row.restorable ? formatDecimal(row.sizeBytes) : ''}</span>
               <Push className="push--row" disabled={!row.restorable || restore.busy || running} reason={!row.restorable ? 'This backup can’t be read, so it can’t be restored.' : null} onClick={() => void restoreArchive(row)}>

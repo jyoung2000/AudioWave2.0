@@ -11,7 +11,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import type { HubConnection, PairingChallenge } from '../../shared/ipc.js';
 import { invoke } from '../bridge.js';
-import { ago } from '../format.js';
+import { ago, sentence } from '../format.js';
 import { useAction } from '../hooks.js';
 import { Check, Push, Status, useConfirm } from '../ui.js';
 
@@ -102,13 +102,13 @@ export function HubView({ status, onChanged }: { status: HubConnection | null; o
             <span className="k top">This PC may:</span>
             <div className="v">{scopeWords(status.scopes)}</div>
             <span className="k">Last synced:</span>
-            <div className="v">{status.lastSyncAt ? ago(status.lastSyncAt) : 'Not yet'}</div>
+            <div className="v">{status.lastSyncAt ? sentence(ago(status.lastSyncAt)) : 'Not yet'}</div>
             <span className="k" />
             <div className="v">
               <Push
                 busy={sync.busy}
-                disabled={!status.connected}
-                reason={status.connected ? null : 'The hub isn’t reachable right now.'}
+                disabled={!status.connected || !shareLibrary}
+                reason={!status.connected ? 'The hub isn’t reachable right now.' : !shareLibrary ? 'Turn on sharing below first: until then there is nothing to sync.' : null}
                 onClick={() =>
                   void sync.run().then((result) => {
                     if (!result) return;

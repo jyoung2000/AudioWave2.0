@@ -61,3 +61,8 @@ export function countdown(iso: string, now: number = Date.now()): string | null 
   if (!Number.isFinite(left) || left <= 0) return null;
   return `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
 }
+
+/** The same words, starting a sentence. */
+export function sentence(text: string): string {
+  return text ? `${text.charAt(0).toUpperCase()}${text.slice(1)}` : text;
+}
