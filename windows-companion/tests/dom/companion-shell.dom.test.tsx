@@ -27,11 +27,33 @@ const TOOLS_MISSING = [
   { id: 'ffmpeg', present: true, version: 'ffmpeg version 7.1-full_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers', path: 'C:\\ffmpeg\\ffmpeg.exe', advice: null },
 ];
 
+/** A fresh install's preferences, as the main process answers them. */
+const PREFS = {
+  launchAtLogin: false,
+  minimizeToTray: true,
+  watchFolders: true,
+  autoSync: false,
+  theme: 'system',
+  helperPort: 17342,
+  autoUpdateTools: true,
+  checkForUpdates: true,
+  downloadDir: null,
+  downloadFormat: 'original',
+  downloadConcurrency: 2,
+  downloadRateKBps: null,
+  downloadDone: 'nothing',
+  helperLan: false,
+  verboseLogs: false,
+};
+
 /** What a companion with nothing set up answers. A test replaces only what it is about. */
 function fresh(): Record<string, Responder> {
   return {
     'app:info': () => ({ version: '0.1.0', electron: '44.1.1', node: '22.0.0', chrome: '132', platform: 'win32/x64', dataDir: 'C:\\Users\\Sam\\AppData\\Roaming\\Airwave Companion', contractsVersion: '1.0.0', protocolVersion: 1, signed: false, updateFeedUrl: null }),
-    'app:preferences:get': () => ({ launchAtLogin: false, minimizeToTray: true, watchFolders: true, autoSync: false, theme: 'system', helperPort: 17342 }),
+    'app:preferences:get': () => PREFS,
+    'app:update-status': () => ({ current: '0.1.0', latest: null, available: false, checkedAt: null, reason: null, enabled: true }),
+    'app:storage': () => ({ cache: { app: 0, liveTv: 0, downloads: 0, total: 0 }, logsDir: 'C:\\Users\\Sam\\AppData\\Roaming\\Airwave Companion\\logs' }),
+    'backup:algorithms': () => ({ available: false, hubName: null, reason: 'No hub is paired, so there are no recommendation settings to back up.' }),
     'library:folders': () => ({ items: [] }),
     'library:tracks': () => ({ items: [], total: 0 }),
     'hub:status': () => ({ endpoint: null, hubId: null, hubName: null, hubFingerprint: null, connected: false, reason: 'No hub is paired.', scopes: [], lastSyncAt: null }),
@@ -48,7 +70,7 @@ function fresh(): Record<string, Responder> {
 }
 
 function awsp(overrides: Record<string, unknown> = {}) {
-  return { enabled: false, running: false, reason: null, endpointId: null, ticket: null, ticketQrSvg: null, relayUrl: null, pairingCode: null, devices: [], connections: [], port: null, ...overrides };
+  return { enabled: false, running: false, reason: null, endpointId: null, ticket: null, ticketQrSvg: null, relayUrl: null, pairingCode: null, devices: [], connections: [], port: null, network: { unmetered: true, metered: true, connection: 'unmetered' as const, blocked: null }, ...overrides };
 }
 
 /** Install a fake bridge on `window.companion`, the way the preload script would. */
@@ -599,7 +621,7 @@ describe('streaming to devices', () => {
       ticket: 'ticket-text',
       ticketQrSvg: '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
       pairingCode: { code: '417302', expiresAt: new Date(Date.now() + 9 * 60_000 + 30_000).toISOString() },
-      devices: [{ id: 'dev-1', name: 'Sam’s Phone', clientKind: 'android', tierCap: 'high', pairedAt: NOW }],
+      devices: [{ id: 'dev-1', name: 'Sam’s Phone', clientKind: 'android', tierCap: 'high', pairedAt: NOW, lastSeenAt: NOW }],
       connections: [{ peer: 'dev-1', name: 'Sam’s Phone', type: 'direct', rttMs: 23 }],
     });
     const { invoked } = installBridge({ 'awsp:revoke': () => awsp({ enabled: true, running: true }) });

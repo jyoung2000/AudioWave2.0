@@ -86,19 +86,16 @@ function dataDir(): string {
  * there too, so a module that reports with `console.error` is in the file Export Logs collects.
  */
 const log = new Log(join(dataDir(), 'logs'));
-for (const [method, level] of [
-  ['log', 'info'],
-  ['info', 'info'],
-  ['warn', 'warn'],
-  ['error', 'error'],
-  ['debug', 'debug'],
-] as const) {
-  const original = console[method].bind(console);
-  console[method] = (...args: unknown[]) => {
+function tee(original: (...args: unknown[]) => void, level: 'info' | 'warn' | 'error'): (...args: unknown[]) => void {
+  return (...args) => {
     log[level](formatLine(...args));
     original(...args);
   };
 }
+// The three the codebase's lint allows; `console.log` and `console.debug` are not used.
+console.info = tee(console.info.bind(console), 'info');
+console.warn = tee(console.warn.bind(console), 'warn');
+console.error = tee(console.error.bind(console), 'error');
 
 /** Where finished downloads are saved: the folder chosen in Settings, or Downloads inside Music. */
 function downloadDir(): string {

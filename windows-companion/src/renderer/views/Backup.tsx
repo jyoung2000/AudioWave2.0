@@ -26,10 +26,11 @@ const INCLUDE: ReadonlyArray<{ key: Part; label: string }> = [
   { key: 'movies', label: 'Movies' },
   { key: 'playlists', label: 'Playlists' },
   { key: 'presets', label: 'EQ presets' },
+  { key: 'algorithms', label: 'Recommendation algorithms' },
   { key: 'settings', label: 'These settings' },
 ];
 
-const PART_WORDS: Record<Part, string> = { music: 'Music', tv: 'TV', movies: 'Movies', playlists: 'Playlists', presets: 'EQ presets', settings: 'Settings' };
+const PART_WORDS: Record<Part, string> = { music: 'Music', tv: 'TV', movies: 'Movies', playlists: 'Playlists', presets: 'EQ presets', algorithms: 'Algorithms', settings: 'Settings' };
 
 const SCHEDULE_WORDS: Record<BackupSettings['schedule'], string> = { manual: 'when you click', daily: 'every day', weekly: 'every week' };
 
@@ -51,12 +52,14 @@ export function BackupView({ say }: { say: (text: string) => void }) {
   const settings = useChannel('backup:settings:get', undefined);
   const estimate = useChannel('backup:estimate', undefined, { pollMs: 60_000 });
   const archives = useChannel('backup:list', undefined, { pollMs: 30_000 });
+  const algorithms = useChannel('backup:algorithms', undefined, { pollMs: 5 * 60_000 });
   const [progress, setProgress] = useState<BackupProgress | null>(null);
 
   const refresh = () => {
     settings.reload();
     estimate.reload();
     archives.reload();
+    algorithms.reload();
   };
 
   useEvent('event:backup-progress', (p) => {
@@ -95,7 +98,8 @@ export function BackupView({ say }: { say: (text: string) => void }) {
     });
 
   const restoreArchive = async (row: BackupArchive) => {
-    const yes = await confirm({ title: `Restore the backup from ${dateTime(row.createdAt)}?`, detail: 'Playlists, EQ presets and settings come back. Newer versions already on this PC are kept, and copied music stays in the backup folder.', action: 'Restore' });
+    const algos = row.parts.includes('algorithms') ? ' Its recommendation algorithms are offered back to the paired hub as artists and genres to start from.' : '';
+    const yes = await confirm({ title: `Restore the backup from ${dateTime(row.createdAt)}?`, detail: `Playlists, EQ presets and settings come back, Live TV links among them. Newer versions already on this PC are kept, and copied music stays in the backup folder.${algos}`, action: 'Restore' });
     if (!yes) return;
     const result = await restore.run(row.id);
     if (result?.restored) say('Restored. Playlists, EQ presets and settings are back.');
@@ -204,9 +208,16 @@ export function BackupView({ say }: { say: (text: string) => void }) {
                     — {formatDecimal(measured.bytes)} in {plural(measured.files, 'file')}
                   </span>
                 ) : null}
+                {item.key === 'algorithms' ? <span className="sub"> — {algorithms.data?.available ? `from ${algorithms.data.hubName ?? 'your hub'}, as it keeps them` : 'from the paired hub'}</span> : null}
+                {item.key === 'settings' ? <span className="sub"> — Live TV links among them</span> : null}
               </Check>
             );
           })}
+          {s?.include.algorithms && algorithms.data && !algorithms.data.available ? (
+            <span className="sub" role="note">
+              {algorithms.data.reason ?? 'The hub’s recommendation settings can’t be read right now.'} The rest is backed up without them.
+            </span>
+          ) : null}
         </div>
 
         <label className="k" htmlFor="backup-when">

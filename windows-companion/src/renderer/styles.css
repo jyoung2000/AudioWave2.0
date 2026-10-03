@@ -356,6 +356,32 @@ body {
   color: inherit;
 }
 
+/* The library's windowed list: every row the same height, so its place is computed rather than
+   measured, and the stripes follow each row's position in the library, not in what is drawn. */
+.tbl--window tbody tr {
+  height: 22px;
+}
+
+.tbl--window td {
+  line-height: 14px;
+}
+
+.tbl--window tbody tr:nth-child(even) {
+  background: none;
+}
+
+.tbl--window tbody tr.is-even:not([aria-selected='true']) {
+  background: var(--row-stripe);
+}
+
+.tbl--window tbody tr.tbl__spacer {
+  height: auto;
+}
+
+.tbl--window tbody tr.tbl__spacer td {
+  padding: 0;
+}
+
 .tbl tbody tr:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: -2px;
@@ -418,8 +444,24 @@ dialog.sheet {
   animation: sheet-in 0.16s ease-out;
 }
 
+/* The modal backdrop is clear: it keeps the rest of the window inert, and the title bar and the
+   toolbar the sheet hangs from stay undimmed. The dim is .sheet-dim, over the pane alone. */
 dialog.sheet::backdrop {
+  background: transparent;
+}
+
+.sheet-dim {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 10;
   background: rgba(40, 44, 50, 0.18);
+  pointer-events: none;
+}
+
+/* A checkbox that takes a line of its own among buttons (Settings ▸ Logs). */
+.chk--row {
+  flex-basis: 100%;
 }
 
 @keyframes sheet-in {

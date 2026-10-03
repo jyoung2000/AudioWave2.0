@@ -137,7 +137,7 @@ function Companion() {
   const [restoring, setRestoring] = useState(false);
 
   const restoreDefaults = async () => {
-    const yes = await confirm({ title: 'Restore the default settings?', detail: 'Start-up, the notification area, folder watching, syncing and the helper’s port go back to how a new install has them. Downloaders, folders, links, backups and pairings are unchanged.', action: 'Restore Defaults' });
+    const yes = await confirm({ title: 'Restore the default settings?', detail: 'Start-up, the notification area, folder watching, syncing, update checks, how downloads run and where they are saved, the helper’s port and network setting, and detailed logs go back to how a new install has them. Downloaders, folders, links, backups and pairings are unchanged.', action: 'Restore Defaults' });
     if (!yes) return;
     setRestoring(true);
     try {
@@ -159,8 +159,9 @@ function Companion() {
   const tv = useLive(tvLinks, pushedTv);
   const awsp = useLive(awspStatus, pushedAwsp);
   const items = folders.data?.items ?? [];
-  // A downloader that needs the person is worth a badge on Settings, as the design's gear wore one.
-  // One still being set up does not: it is on its way (UX-SETUP-001).
+  // A downloader that needs the person — missing, failed, or found behind by a Check — is worth a
+  // badge on Settings, as the design's gear wore one. One still being set up does not: it is on its
+  // way (UX-SETUP-001).
   const attention = helper.data?.tools.filter((t) => needsAttention(t, helper.data?.running ?? false)).length ?? 0;
 
   const show = useCallback((id: TabId) => {
@@ -203,7 +204,7 @@ function Companion() {
       case 'backup':
         return <BackupView say={setSettingsNote} />;
       case 'about':
-        return <AboutView />;
+        return <AboutView prefs={prefs} say={setSettingsNote} />;
     }
   };
 

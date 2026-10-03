@@ -185,17 +185,41 @@ export function useConfirm(): Confirm {
   return useMemo<Confirm>(() => provided ?? (async (request) => window.confirm([request.title, request.detail].filter(Boolean).join('\n\n'))), [provided]);
 }
 
+/** Where the pane is: below the chrome (title and toolbar) and above the status strip. */
+function paneBounds(): { top: number; bottom: number } {
+  if (typeof document === 'undefined') return { top: 86, bottom: 0 };
+  const chrome = document.querySelector('.win > .chrome')?.getBoundingClientRect();
+  const status = document.querySelector('.win > .status')?.getBoundingClientRect();
+  const top = chrome && chrome.bottom > 0 ? chrome.bottom : 86;
+  const bottom = status && status.height > 0 ? Math.max(0, window.innerHeight - status.top) : 0;
+  return { top, bottom };
+}
+
 /**
  * The question, as a sheet: it comes down from under the toolbar over the window it belongs to, as
  * Snow Leopard asked, rather than as a second window. It is a modal `<dialog>`, so focus is held
  * inside it, Escape cancels, and focus returns to where it was when it closes.
+ *
+ * Only the pane under the toolbar dims. The title bar and the toolbar stay as they are — the sheet
+ * hangs from them — so the dialog's own backdrop is clear (it still makes the rest of the window
+ * inert, which is the modal part) and a layer over the pane alone does the dimming.
  */
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [request, setRequest] = useState<ConfirmRequest | null>(null);
+  const [bounds, setBounds] = useState<{ top: number; bottom: number }>({ top: 86, bottom: 0 });
   const resolver = useRef<((answer: boolean) => void) | null>(null);
   const dialog = useRef<HTMLDialogElement | null>(null);
   const titleId = useId();
   const detailId = useId();
+
+  // Measured when the sheet opens and as the window is resized, so the dim fits the pane exactly.
+  useEffect(() => {
+    if (!request) return undefined;
+    const measure = () => setBounds(paneBounds());
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [request]);
 
   const confirm = useCallback<Confirm>((next) => {
     // A second question while one is open answers the first with "no".
@@ -226,10 +250,12 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   return (
     <ConfirmContext.Provider value={confirm}>
       {children}
+      {request ? <div className="sheet-dim" aria-hidden="true" style={{ top: bounds.top, bottom: bounds.bottom }} /> : null}
       {request ? (
         <dialog
           ref={dialog}
           className="sheet"
+          style={{ top: bounds.top }}
           aria-labelledby={titleId}
           aria-describedby={request.detail ? detailId : undefined}
           onCancel={(event) => {
