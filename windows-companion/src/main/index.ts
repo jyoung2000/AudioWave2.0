@@ -99,11 +99,16 @@ function savePreferences(next: Preferences): Preferences {
 }
 
 /**
- * Whether this PC's library may be synced to the hub. Off until it is turned on in Remote ▸ What is
- * shared, and remembered: pairing alone shares nothing.
+ * Whether this PC's library is synced to the hub. Pairing with a hub that grants `library:share` is
+ * the decision to share — that is what pairing a companion is for, and it is how the app behaved
+ * before the checkbox was wired — so sharing is on from then until it is turned off in Remote ▸
+ * What is shared. Turning it off is remembered for that hub; a hub that never granted the
+ * permission is never shared with.
  */
 function sharingEnabled(): boolean {
-  return store?.isOpen === true && store.get<boolean>('shareLibrary', false) === true;
+  if (store?.isOpen !== true) return false;
+  if (store.get<boolean | null>('shareLibrary', null) === false) return false;
+  return hub?.hasScope('library:share') === true;
 }
 
 /** The helper's estimate route measures the companion's folders: restarted when they change. */
@@ -466,8 +471,8 @@ function registerHandlers(): void {
   handle('hub:pair-await', (request) => hub!.awaitPairing((request as { sessionId: string }).sessionId));
   handle('hub:forget', async () => {
     const status = await hub!.forget();
-    // Sharing was a choice about that hub. The next one starts unshared, like the first did.
-    store!.set('shareLibrary', false, new Date().toISOString());
+    // Turning sharing off was a choice about that hub. The next one starts as the first did.
+    store!.set('shareLibrary', null, new Date().toISOString());
     return status;
   });
 

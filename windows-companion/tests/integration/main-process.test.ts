@@ -373,7 +373,7 @@ describe('sharing with a hub', () => {
     expect(await call('hub:sharing', undefined)).toEqual({ enabled: false });
     // With no hub at all, Sync says that — not that sharing is off.
     expect(await call('hub:sync-now', undefined)).toEqual({ started: false, reason: 'No hub is paired.' });
-    // Forgetting a hub leaves sharing off for the next one.
+    // Forgetting a hub clears the choice; with no hub granting the permission, nothing is shared.
     await call('hub:forget', undefined);
     expect(await call('hub:sharing', undefined)).toEqual({ enabled: false });
   });
