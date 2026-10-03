@@ -8,7 +8,7 @@
  * or off because the hub says so. And secrets are write-only: the form shows a hint of what is
  * stored and never the value, and a blank secret field keeps the stored one rather than clearing it.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ProviderAppConfigView, ProviderDescriptor, ProviderHealth } from '@now-playing/contracts';
 import { api } from '../lib/api.js';
 import { useAction, useResource } from '../lib/hooks.js';
@@ -73,7 +73,8 @@ export function ProvidersView() {
               ? null
               : (data?.items ?? []).map((p) => {
                   const status = PROVIDER_STATUS[healthOf(p.provider)?.status ?? (p.enabled ? 'ok' : 'disabled')] ?? PROVIDER_STATUS.down;
-                  const needsSetup = p.authType !== 'none' && p.authType !== 'local';
+                  // Set Up only where there is a key or an app to enter; everything else is ready as it is.
+                  const needsSetup = p.authType === 'api-key' || p.authType === 'oauth-pkce' || p.authType === 'oauth-client-credentials' || !p.configured;
                   return (
                     <tr key={p.provider}>
                       <td title={status.word}>
@@ -215,9 +216,14 @@ function ProviderDetail({ descriptor, health, onClose, onSaved }: { descriptor: 
 
   const status = PROVIDER_STATUS[health?.status ?? (descriptor.enabled ? 'ok' : 'disabled')] ?? PROVIDER_STATUS.down;
   const id = `prov-${provider}`;
+  // Opened from a row that may be far up the table: bring it into view.
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    box.current?.scrollIntoView?.({ block: 'nearest' });
+  }, []);
 
   return (
-    <div className="tile detail" role="region" aria-label={`${descriptor.displayName} details`}>
+    <div className="tile detail" ref={box} role="region" aria-label={`${descriptor.displayName} details`}>
       <h3>
         {descriptor.displayName} <span className="sub">· {PROVIDER_ROLES[descriptor.role] ?? descriptor.role} · {status.word}</span>
       </h3>

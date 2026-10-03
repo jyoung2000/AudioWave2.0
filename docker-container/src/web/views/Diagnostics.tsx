@@ -61,7 +61,9 @@ export function DiagnosticsView() {
           <Push busy={download.busy} onClick={() => void download.run().then((r) => r && say('Saved the support bundle to your downloads.'))}>
             Support Bundle…
           </Push>
-          <span className="sub">The bundle describes this hub’s versions, settings and provider health for a bug report.{redactions.length ? ` It never contains: ${redactions.join('; ')}.` : ''}</span>
+          <span className="sub" title={redactions.length ? `Left out: ${redactions.join('; ')}.` : undefined}>
+            The bundle describes this hub’s versions, settings and provider health for a bug report. Passwords, tokens, keys, full addresses and listening history are left out.
+          </span>
         </div>
       </div>
       <ActionError error={download.error} />

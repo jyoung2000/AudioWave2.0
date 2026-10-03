@@ -54,12 +54,35 @@ test.describe('signed in', () => {
     const focused = await page.evaluate(() => document.activeElement?.textContent ?? '');
     expect(focused, 'arrow-right should move focus to the next tab').toContain('Groups');
     await expect(page.getByRole('tab', { name: 'Groups' })).toHaveAttribute('aria-selected', 'true');
-    await expect(page.getByRole('heading', { name: 'New group' })).toBeVisible();
+    await expect(page.getByLabel('New group’s name')).toBeVisible();
 
     await page.keyboard.press('End');
     await expect(page.getByRole('tab', { name: 'System' })).toHaveAttribute('aria-selected', 'true');
     // Only the selected tab is in the tab order; the rest are reached with arrows.
     expect(await tabs.getByRole('tab', { name: 'Overview' }).getAttribute('tabindex')).toBe('-1');
+  });
+});
+
+test.describe('asking first', () => {
+  test('@a11y the confirmation sheet has no detectable violations, holds the keyboard, and Escape cancels', async ({ page }) => {
+    await page.goto('/#groups');
+    await page.getByLabel('New group’s name').fill('Sheet a11y');
+    await page.getByRole('button', { name: 'New Group' }).click();
+    const archive = page.getByRole('button', { name: 'Archive…' });
+    await archive.click();
+    const sheet = page.getByRole('alertdialog', { name: 'Archive Sheet a11y?' });
+    await expect(sheet).toBeVisible();
+    await analyse(page);
+    // Cancel has the focus, Tab stays inside the sheet, and Escape puts the focus back.
+    await expect(sheet.getByRole('button', { name: 'Cancel' })).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(sheet.getByRole('button', { name: 'Archive' })).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(sheet.getByRole('button', { name: 'Cancel' })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(sheet).toHaveCount(0);
+    await expect(archive).toBeFocused();
+    await expect(page.getByRole('heading', { name: 'Invites to Sheet a11y' })).toBeVisible();
   });
 });
 
@@ -70,7 +93,7 @@ test.describe('signed out', () => {
     try {
       const page = await context.newPage();
       await page.goto('/');
-      await expect(page.getByRole('heading', { name: 'Now Playing Hub' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Airwave Hub' })).toBeVisible();
       await analyse(page);
     } finally {
       await context.close();

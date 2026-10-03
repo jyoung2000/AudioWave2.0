@@ -11,7 +11,7 @@
  * It lives in the hub because `packages/aqua-ui` still ships the older window skin's components.
  * The companion draws the same kit; when the two are reconciled this file is what moves there.
  */
-import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type Ref, type SelectHTMLAttributes } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type Ref, type SelectHTMLAttributes } from 'react';
 import type { ApiError } from './lib/api.js';
 import type { Resource } from './lib/hooks.js';
 
@@ -164,7 +164,7 @@ export function Group({ title, tag, hint, children, last, className }: { title: 
   return (
     <fieldset className={[last && 'group--last', className].filter(Boolean).join(' ') || undefined}>
       <legend>
-        {title}
+        <h2 className="legend-h">{title}</h2>
         {tag}
       </legend>
       {hint ? <p className="hint">{hint}</p> : null}
@@ -219,9 +219,24 @@ export function EmptyRow({ text, retry }: { text: string; retry?: (() => void) |
 }
 
 export function EmptyCells({ columns, text, retry }: { columns: number; text: string; retry?: (() => void) | undefined }) {
+  // A narrow window hides some columns (`.hide-sm`). A cell spanning a hidden column makes the
+  // table invent one, so the span is the number of headers actually showing.
+  const cell = useRef<HTMLTableCellElement>(null);
+  const [span, setSpan] = useState(columns);
+  useLayoutEffect(() => {
+    const measure = (): void => {
+      const heads = cell.current?.closest('table')?.querySelectorAll('thead th');
+      if (!heads?.length) return;
+      const showing = Array.from(heads).filter((th) => getComputedStyle(th).display !== 'none').length;
+      setSpan(showing || columns);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [columns]);
   return (
     <tr>
-      <td colSpan={columns} className="empty-cell">
+      <td ref={cell} colSpan={span} className="empty-cell">
         <span className="empty">{text}</span>
         {retry ? <Push onClick={retry}>Try Again</Push> : null}
       </td>

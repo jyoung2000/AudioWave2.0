@@ -88,15 +88,16 @@ test('the whole pass: hub set up, player paired, group joined, invite declined, 
 
   await test.step('01 — the hub is set up, and its bootstrap password stops working', async () => {
     await hub.goto('/');
-    await expect(hub.getByRole('heading', { name: 'Now Playing Hub' })).toBeVisible();
-    await hub.getByLabel('Password', { exact: true }).fill('admin');
-    await hub.getByRole('button', { name: 'Sign in' }).click();
-    await expect(hub.getByRole('heading', { name: 'Choose a password' })).toBeVisible();
-    await hub.getByLabel('Current password').fill('admin');
+    await expect(hub.getByRole('heading', { name: 'Airwave Hub' })).toBeVisible();
+    await hub.getByLabel('Password:').fill('admin');
+    await hub.getByRole('button', { name: 'Sign In' }).click();
+    // The gate is a banner in the same window; every tab but Overview is locked until it is answered.
+    await expect(hub.getByRole('heading', { name: 'Choose a real password' })).toBeVisible();
+    await expect(hub.getByRole('tab', { name: 'Devices' })).toHaveAttribute('aria-disabled', 'true');
     await hub.getByLabel('New password', { exact: true }).fill(PASSWORD);
-    await hub.getByLabel('Repeat new password', { exact: true }).fill(PASSWORD);
-    await hub.getByRole('button', { name: 'Set password' }).click();
-    await expect(hub.getByRole('tab', { name: 'Devices' })).toBeVisible();
+    await hub.getByLabel('New password again').fill(PASSWORD);
+    await hub.getByRole('button', { name: 'Set Password' }).click();
+    await expect(hub.getByRole('tab', { name: 'Devices' })).not.toHaveAttribute('aria-disabled', 'true');
 
     // The gate is the server's, not the interface's.
     expect((await request.post(`${HUB_URL}/api/v1/auth/login`, { data: { username: 'admin', password: 'admin' } })).status()).toBe(401);
@@ -109,9 +110,10 @@ test('the whole pass: hub set up, player paired, group joined, invite declined, 
     // Not in the default set: without it the hub refuses every invite this player will later make.
     // The Aqua checkbox's input is a 1 px, opacity-0 element behind a drawn box, so it is ticked the
     // way a person ticks it — by its label — and the state is then asserted rather than assumed.
-    await hub.getByText('Manage groups', { exact: true }).click();
-    await expect(hub.getByLabel('Manage groups')).toBeChecked();
-    await hub.getByRole('button', { name: /Create pairing code/i }).click();
+    await hub.locator('label.chk', { hasText: 'Run groups' }).click();
+    await expect(hub.getByLabel(/^Run groups/)).toBeChecked();
+    await hub.getByRole('button', { name: 'Start Pairing…' }).click();
+    await expect(hub.getByLabel('Pairing code')).toHaveText(/^[0-9A-Z]{5}-[0-9A-Z]{5}$/);
     const code = (await hub.getByLabel('Pairing code').innerText()).trim();
     expect(code, 'ten Crockford base32 characters, grouped for reading aloud').toMatch(/^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}$/);
 
@@ -151,7 +153,7 @@ test('the whole pass: hub set up, player paired, group joined, invite declined, 
     await hub.getByRole('button', { name: 'Make Invite Link' }).click();
     // A link only once the hub knows where players open the app — and here that is a real address
     // serving the real player, which is why this suite runs two servers.
-    await hub.getByLabel('Players open Now Playing at:').fill(`${PLAYER_URL}/`);
+    await hub.getByLabel('Players open Airwave at:').fill(`${PLAYER_URL}/`);
     const link = await hub.getByLabel('Invite link').inputValue();
     expect(link, 'an invite link pointing at the running player').toContain(`${PLAYER_URL}/#invite/`);
 

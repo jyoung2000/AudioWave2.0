@@ -90,13 +90,6 @@ h1.titlebar {
 }
 .status #hubLine {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.status #countLine {
-  flex: none;
-  white-space: nowrap;
 }
 
 /* ---------------------------------------------------------------- groups and spacing (the design's inline styles) */
@@ -428,7 +421,6 @@ a.push:active {
 @keyframes sheet-drop {
   from {
     transform: translateY(-14px);
-    opacity: 0;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -437,8 +429,25 @@ a.push:active {
   }
 }
 
+/* A label beside a control with a line of help under it sits level with the control, not the help. */
+.pref > .k {
+  align-self: start;
+  padding-top: 3px;
+}
+@media (max-width: 560px) {
+  .pref > .k {
+    padding-top: 0;
+  }
+}
+
 /* ---------------------------------------------------------------- narrow windows */
 @media (max-width: 640px) {
+  .rows li:has(> .push) {
+    flex-wrap: wrap;
+  }
+  .rows li:has(> .push) .name {
+    flex-basis: 100%;
+  }
   .tbl .acts .push + .push {
     margin-left: 2px;
   }

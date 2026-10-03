@@ -152,7 +152,8 @@ export function DiscordView() {
               ) : null}
               {(live?.warnings ?? []).map((w, i) => (
                 <span className="sub" key={i}>
-                  {w}
+                  {/* The hub writes commands between backticks; here they are set in the mono face. */}
+                  {w.split('`').map((part, j) => (j % 2 ? <span className="mono" key={j}>{part}</span> : part))}
                 </span>
               ))}
             </div>

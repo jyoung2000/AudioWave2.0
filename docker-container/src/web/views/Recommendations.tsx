@@ -14,14 +14,31 @@ import { ActionError, errorSentence, Field, Group, Note, Push, SubHead, useHubUi
 const ACTION_LABELS: Record<string, string> = {
   immediateSkip: 'Skipped within a few seconds',
   earlySkip: 'Skipped early',
-  partialPlay: 'Played part of the track',
+  partial: 'Played in part',
+  partialPlay: 'Played in part',
+  majority: 'Played more than half',
   halfPlay: 'Played more than half',
   completed: 'Played to the end',
   replay: 'Played again soon after',
+  like: 'Liked',
   liked: 'Liked',
+  unlike: 'Un-liked',
   playlistAdd: 'Added to a playlist',
+  playlistRemove: 'Removed from a playlist',
+  favorite: 'Favourited',
   favorited: 'Favourited',
+  dislike: 'Disliked',
+  save: 'Saved',
+  download: 'Downloaded',
+  recommendationAccepted: 'Picked from recommendations',
+  recommendationDismissed: 'Dismissed from recommendations',
 };
+
+/** An action this page has no words for yet still reads as words: "queueJump" → "Queue jump". */
+function actionLabel(key: string): string {
+  const spaced = key.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
+  return ACTION_LABELS[key] ?? spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
 
 export function RecommendationsView() {
   const config = useResource('recommendationsConfigGet');
@@ -89,7 +106,7 @@ export function RecommendationsView() {
                   <tbody>
                     {Object.entries(weights).map(([key, value]) => (
                       <tr key={key}>
-                        <td>{ACTION_LABELS[key] ?? key}</td>
+                        <td>{actionLabel(key)}</td>
                         <td className="num">
                           <Field
                             numeric
@@ -97,7 +114,7 @@ export function RecommendationsView() {
                             type="number"
                             step={0.5}
                             value={String(value)}
-                            aria-label={`Weight for ${ACTION_LABELS[key] ?? key}`}
+                            aria-label={`Weight for ${actionLabel(key)}`}
                             onChange={(e) => setDraft({ ...current, actionWeights: { ...weights, [key]: Number(e.currentTarget.value) } })}
                           />
                         </td>

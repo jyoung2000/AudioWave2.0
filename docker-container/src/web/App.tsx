@@ -207,7 +207,7 @@ export function App() {
       </Window>
     );
   }
-  if (!info.authenticated) return <SignIn onSignedIn={session.reload} setupComplete={info.setupComplete} />;
+  if (!info.authenticated) return <LoginScreen onSignedIn={session.reload} setupComplete={info.setupComplete} />;
   return <AdminShell session={info} onSessionChanged={session.reload} />;
 }
 
@@ -228,7 +228,10 @@ function Window({ tools, locked, status, sheet, sheetOpen, children }: { tools?:
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
     if (!open.length) return;
-    const at = open.findIndex((t) => t.id === state.selected);
+    // From the tab that has the focus, which is the selected one unless a script moved it.
+    const focused = event.target instanceof HTMLElement ? event.target.id.replace(/^tab-/, '') : '';
+    const from = open.findIndex((t) => t.id === focused);
+    const at = from >= 0 ? from : open.findIndex((t) => t.id === state.selected);
     const next = { ArrowRight: open[(at + 1) % open.length], ArrowLeft: open[(at - 1 + open.length) % open.length], Home: open[0], End: open[open.length - 1] }[event.key];
     if (!next) return;
     event.preventDefault();
@@ -314,14 +317,17 @@ function StatusLine({ kind, text, right, message }: { kind: 'ok' | 'warn' | 'bad
 
 /* ------------------------------------------------------------------ sign-in */
 
-function SignIn({ onSignedIn, setupComplete }: { onSignedIn: () => void; setupComplete: boolean }) {
+function LoginScreen({ onSignedIn, setupComplete }: { onSignedIn: () => void; setupComplete: boolean }) {
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('');
   const login = useAction(async (u: string, p: string) => api('authLogin', { body: { username: u, password: p } }));
 
+  const [missing, setMissing] = useState(false);
   const submit = useCallback(
     async (event: FormEvent) => {
       event.preventDefault();
+      setMissing(!username || !password);
+      if (!username || !password) return;
       const result = (await login.run(username, password)) as SessionInfo | null;
       if (result) {
         setCsrfToken(result.csrfToken ?? null);
@@ -337,7 +343,9 @@ function SignIn({ onSignedIn, setupComplete }: { onSignedIn: () => void; setupCo
       <div className="pane">
         <form className="signin" onSubmit={submit} noValidate>
           <fieldset className="group--last">
-            <legend>Sign in</legend>
+            <legend>
+              <h2 className="legend-h">Sign in</h2>
+            </legend>
             <p className="hint">
               {setupComplete ? (
                 'Sign in with the admin password to manage this hub.'
@@ -360,12 +368,12 @@ function SignIn({ onSignedIn, setupComplete }: { onSignedIn: () => void; setupCo
               <div className="v">
                 {/* The form is the whole pane and exists to be typed into, so the caret starts in it. */}
                 {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
-                <Field id="signin-pass" type="password" value={password} autoComplete="current-password" autoFocus invalid={Boolean(login.error)} onChange={(e) => setPassword(e.currentTarget.value)} />
+                <Field id="signin-pass" type="password" value={password} autoComplete="current-password" autoFocus invalid={Boolean(login.error) || missing} onChange={(e) => setPassword(e.currentTarget.value)} />
               </div>
             </div>
-            <ActionError error={login.error} />
+            {missing ? <Note bad>Type the username and password first.</Note> : <ActionError error={login.error} />}
           </fieldset>
-          <Push type="submit" primary busy={login.busy} disabled={!username || !password} reason="Type the username and password first.">
+          <Push type="submit" primary busy={login.busy}>
             Sign In
           </Push>
         </form>
@@ -380,7 +388,7 @@ function SignIn({ onSignedIn, setupComplete }: { onSignedIn: () => void; setupCo
  * The design's amber gate. It asks for the new password twice; the current one is what was just
  * typed at sign-in, and is asked for here only when the page was reloaded in between.
  */
-function PasswordGate({ onDone }: { onDone: () => void }) {
+function ChangePasswordScreen({ onDone }: { onDone: () => void }) {
   const remembered = passwordJustTyped;
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
@@ -497,13 +505,37 @@ function AdminShell({ session, onSessionChanged }: { session: SessionInfo; onSes
 
   const pane = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
+    const host = pane.current;
     const node = target ? document.getElementById(target) : null;
-    if (node && pane.current) pane.current.scrollTop = Math.max(0, node.offsetTop - pane.current.offsetTop - 12);
+    if (!host || !node) return;
+    // The sections above it grow as their data arrives, so the target is kept at the top until the
+    // pane has settled or the person scrolls for themselves.
+    const align = (): void => {
+      host.scrollTop = Math.max(0, node.offsetTop - host.offsetTop - 12);
+    };
+    align();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(align);
+    for (const child of Array.from(host.children)) observer.observe(child);
+    const stop = (): void => {
+      observer.disconnect();
+      clearTimeout(timer);
+      for (const type of ['wheel', 'pointerdown', 'keydown'] as const) host.removeEventListener(type, stop);
+    };
+    const timer = setTimeout(stop, 3000);
+    for (const type of ['wheel', 'pointerdown', 'keydown'] as const) host.addEventListener(type, stop, { passive: true });
+    return stop;
   }, [target, tab]);
 
   const hub = useResource('hubIdentity');
   const overview = useResource('metricsOverview', {}, { pollMs: 10_000 });
   const network = useResource('networkGet', {}, { pollMs: 30_000 });
+
+  // The moment the password is set, what the overview says about setup is out of date.
+  const reloadOverview = overview.reload;
+  useEffect(() => {
+    if (!gated) reloadOverview();
+  }, [gated, reloadOverview]);
 
   const logout = useAction(async () => api('authLogout'));
   const signOut = useCallback(async () => {
@@ -540,7 +572,7 @@ function AdminShell({ session, onSessionChanged }: { session: SessionInfo; onSes
       {({ message, sheet, sheetOpen }) => (
         <Window tools={tools} sheet={sheet} sheetOpen={sheetOpen} status={<StatusLine kind={worst} text={statusText} right={counts} message={message} />}>
           <div className="pane" ref={pane} key={current.id} id={`pane-${current.id}`} role="tabpanel" aria-labelledby={`tab-${current.id}`}>
-            {gated ? <PasswordGate onDone={onSessionChanged} /> : null}
+            {gated ? <ChangePasswordScreen onDone={onSessionChanged} /> : null}
             {current.lead ? <p className="lead">{current.lead}</p> : null}
             {current.sections.map((section) => (
               <section key={section} id={section} aria-label={SECTION_TITLES[section]}>

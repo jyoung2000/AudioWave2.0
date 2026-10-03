@@ -22,7 +22,9 @@ test('the remote access page states what the hub will not do, rather than promis
 test('a pairing code is high-entropy, unambiguous, and shown with a fingerprint to compare', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('tab', { name: 'Devices' }).click();
-  await page.getByRole('button', { name: /Create pairing code/i }).click();
+  // Before a code exists the plate says so, rather than showing a sample.
+  await expect(page.getByLabel('Pairing code')).toHaveText('— — —');
+  await page.getByRole('button', { name: 'Start Pairing…' }).click();
 
   const code = page.getByLabel('Pairing code');
   await expect(code).toBeVisible();
@@ -31,22 +33,36 @@ test('a pairing code is high-entropy, unambiguous, and shown with a fingerprint 
   await expect(code).toHaveText(/^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}$/);
   await expect(page.getByText(/Hub fingerprint/i)).toBeVisible();
   await expect(page.getByText(/if it does not match what the device shows, do not confirm/i)).toBeVisible();
+
+  // The verification code is twelve characters (AB12-CD34-EF56): Confirm stays off until all twelve
+  // are typed, and the field has room for the dashes a person copies with them.
+  const confirm = page.getByRole('button', { name: 'Confirm', exact: true });
+  await expect(confirm).toBeDisabled();
+  await page.getByLabel('Verification code').fill('AB12-CD34-EF5');
+  await expect(confirm).toBeDisabled();
+  await page.getByLabel('Verification code').fill('AB12-CD34-EF56');
+  await expect(page.getByLabel('Verification code')).toHaveValue('AB12-CD34-EF56');
+  await expect(confirm).toBeEnabled();
 });
 
 test('a permission can be ticked before the code is made, and the session shows it was granted', async ({ page }) => {
   // The scope boxes crashed the whole panel on the first tick ("Cannot read properties of null
   // (reading 'checked')": the box was read inside the state updater, after React had released the
   // event), so no operator could ever pair a device with anything but the default set. Found by the
-  // cross-app journey, which needs "Manage groups" for a player that invites to its own group.
+  // cross-app journey, which needs "Run groups" for a player that invites to its own group.
   await page.goto('/');
   await page.getByRole('tab', { name: 'Devices' }).click();
-  await page.getByText('Manage groups', { exact: true }).click();
-  await expect(page.getByLabel('Manage groups')).toBeChecked();
+  // Every permission is said in plain words, with its id as the small suffix beside it.
+  const run = page.locator('label.chk', { hasText: 'Run groups' });
+  await expect(run).toHaveText('Run groups group:admin');
+  await expect(page.getByRole('group', { name: 'What this device may do' }).getByRole('checkbox')).toHaveCount(16);
+  await run.click();
+  await expect(page.getByLabel(/^Run groups/)).toBeChecked();
   await expect(page.getByText('This panel could not be displayed')).toHaveCount(0);
-  await page.getByRole('button', { name: /Create pairing code/i }).click();
-  await expect(page.getByLabel('Pairing code')).toBeVisible();
-  // The default set is eight permissions; with one more ticked the pending session carries nine.
-  await expect(page.getByRole('row').filter({ hasText: /pending/i }).first()).toContainText('9');
+  await page.getByRole('button', { name: 'Start Pairing…' }).click();
+  await expect(page.getByLabel('Pairing code')).toHaveText(/^[0-9A-Z]{5}-[0-9A-Z]{5}$/);
+  // The default set is eight permissions; with one more ticked the pending pairing carries nine.
+  await expect(page.getByRole('list', { name: 'Pending pairings' }).getByRole('listitem').filter({ hasText: '9 permissions' })).toHaveCount(1);
 });
 
 test('the interface loads nothing from outside the hub', async ({ page }) => {
@@ -68,7 +84,7 @@ test('a signed-out visitor is no longer offered the first-run credentials', asyn
   const page = await browser.newPage({ storageState: { cookies: [], origins: [] } });
   try {
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: 'Now Playing Hub' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Airwave Hub' })).toBeVisible();
     await expect(page.getByText(/First run/)).toHaveCount(0);
   } finally {
     await page.close();
@@ -86,18 +102,22 @@ test('a group is made here, invited to with a link the player understands, and t
   await page.getByLabel('Joins as:').selectOption('guest');
   await page.getByRole('button', { name: 'Make Invite Link' }).click();
 
-  // Without knowing where players open Now Playing there is a code but, honestly, no link yet.
+  // Without knowing where players open the player there is a code but, honestly, no link yet.
   const link = page.getByLabel('Invite link');
   await expect(link).toHaveValue('');
   await expect(page.getByRole('button', { name: 'Copy Link' })).toBeDisabled();
-  await page.getByLabel('Players open Now Playing at:').fill('https://music.example/now-playing.html');
+  await page.getByLabel('Players open Airwave at:').fill('https://music.example/now-playing.html');
   // A fragment: the code and the hub address never reach the server the page came from.
   await expect(link).toHaveValue(/^https:\/\/music\.example\/now-playing\.html#invite\/[0-9A-Z]+\?hub=http%3A%2F%2F(127\.0\.0\.1|localhost)%3A\d+&g=Kitchen\+e2e&from=admin&r=guest&x=\d{4}-/);
 
   const invites = page.getByRole('table', { name: 'Invites to Kitchen e2e' });
   await expect(invites.getByText(/Open · .* left · made by admin/)).toBeVisible();
-  page.once('dialog', (dialog) => void dialog.accept());
+  // Withdrawing asks first, in a sheet; Cancel leaves the invite open.
   await invites.getByRole('button', { name: 'Withdraw' }).click();
+  await page.getByRole('alertdialog', { name: 'Withdraw this invite?' }).getByRole('button', { name: 'Cancel' }).click();
+  await expect(invites.getByText(/Open · .* left · made by admin/)).toBeVisible();
+  await invites.getByRole('button', { name: 'Withdraw' }).click();
+  await page.getByRole('alertdialog', { name: 'Withdraw this invite?' }).getByRole('button', { name: 'Withdraw' }).click();
   await expect(invites.getByText(/Withdrawn · made by admin/)).toBeVisible();
   await expect(invites.getByRole('button', { name: 'Withdraw' })).toHaveCount(0);
 });
@@ -106,26 +126,63 @@ test('profiles are listed for moderation, and say who can see them', async ({ pa
   await page.goto('/');
   await page.getByRole('tab', { name: 'Devices' }).click();
   await expect(page.getByRole('heading', { name: 'Profiles' })).toBeVisible();
-  await expect(page.getByText(/Nobody has a profile yet|Every device paired with this hub can see these names/)).toBeVisible();
+  await expect(page.getByText(/Nobody has a profile yet|Every device paired with this hub can see these names/).first()).toBeVisible();
 });
 
 test('the window is the six-tab hub, its status line reads the real bind address and port, and old section ids still land on a tab', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/#overview');
   const tabs = page.getByRole('tablist', { name: 'Sections' });
-  await expect(tabs.locator('.aqua-tool-tab__label')).toHaveText(['Overview', 'Devices', 'Music', 'Groups', 'Sharing', 'System']);
+  await expect(tabs.getByRole('tab')).toHaveText([/^Overview/, 'Devices', 'Music', 'Groups', 'Sharing', 'System']);
+  await expect(page).toHaveTitle('Airwave Hub');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Airwave Hub');
 
   // The status strip says where the hub listens, from the network route, not a constant in the markup.
-  const status = page.locator('.aqua-bottom-bar__status');
+  const status = page.locator('.status [role="status"]');
   await expect(status).toHaveText(/(127\.0\.0\.1|0\.0\.0\.0|localhost|::):\d+ · reachable from (this machine only|your network|the internet)/);
 
   // The Overview tiles are the metrics route's figures.
-  await expect(page.locator('.admin-tile__heading')).toHaveText(['Hub', 'Connections', 'Groups', 'Providers', 'Storage', 'Jobs']);
+  await expect(page.locator('.tile h3')).toHaveText(['Hub', 'Devices', 'Groups', 'Library', 'Providers', 'Storage']);
 
   // Every section the source list once listed opens by its id in the address, on the tab it lives in.
   await page.goto('/#diagnostics');
   await expect(page.getByRole('tab', { name: 'System' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByRole('heading', { name: 'Logs' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Diagnostics' })).toBeInViewport();
   await page.goto('/#recommendations');
   await expect(page.getByRole('tab', { name: 'Music' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByRole('heading', { name: 'How recommendations work here' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Recommendations' })).toBeInViewport();
+});
+
+test('the external media tool is shown as the hub reports it, with nothing to set up', async ({ page, request }) => {
+  // The interface makes no assumption about whether the tool is on: the row says what the API says.
+  const listed = (await (await request.get('/api/v1/providers')).json()) as { items: Array<{ provider: string; displayName: string; role: string; enabled: boolean }>; health: Array<{ provider: string; status: string }> };
+  const tool = listed.items.find((p) => p.role === 'tool');
+  expect(tool, 'the hub lists its external tool').toBeTruthy();
+  const status = listed.health.find((h) => h.provider === tool!.provider)?.status ?? (tool!.enabled ? 'ok' : 'disabled');
+  const word = { ok: 'Working', degraded: 'Limited', unconfigured: 'Needs setting up', disabled: 'Off', down: 'Down' }[status]!;
+
+  await page.goto('/#providers');
+  const row = page.getByRole('table', { name: 'Providers' }).getByRole('row').filter({ hasText: tool!.displayName });
+  await expect(row).toContainText(`${word}:`);
+  await expect(row.getByRole('button', { name: /^Set up/i })).toHaveCount(0);
+  await row.getByRole('button', { name: `Details of ${tool!.displayName}` }).click();
+  await expect(page.getByRole('region', { name: `${tool!.displayName} details` })).toBeVisible();
+});
+
+test('no pane scrolls sideways, at the window width the design is drawn for or at a phone width', async ({ page }) => {
+  for (const viewport of [
+    { width: 1280, height: 860 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/');
+    for (const name of ['Overview', 'Devices', 'Music', 'Groups', 'Sharing', 'System']) {
+      await page.getByRole('tab', { name }).click();
+      await expect(page.getByRole('tabpanel')).toBeVisible();
+      const overflow = await page.evaluate(() => {
+        const pane = document.querySelector('.pane')!;
+        return Math.max(document.documentElement.scrollWidth - document.documentElement.clientWidth, pane.scrollWidth - pane.clientWidth);
+      });
+      expect(overflow, `${name} at ${viewport.width}px`).toBeLessThanOrEqual(0);
+    }
+  }
 });

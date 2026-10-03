@@ -416,8 +416,7 @@ function GroupDetail({ summary, onArchived }: { summary: GroupView; onArchived: 
             <SubHead first>State</SubHead>
             <div className="tile">
               <span className="sm">
-                {PLAYBACK_WORDS[status] ?? 'Paused'}
-                {grade ? ` · kept in step: ${grade.word}` : ''}
+                {status === 'idle' ? 'Waiting for music' : `${PLAYBACK_WORDS[status] ?? 'Paused'}${grade ? ` · kept in step: ${grade.word}` : ''}`}
               </span>
               <span className="big big--track">{track}</span>
               {length ? (

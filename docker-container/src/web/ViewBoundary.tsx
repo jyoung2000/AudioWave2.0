@@ -41,7 +41,9 @@ export class ViewBoundary extends Component<Props, State> {
     if (!this.state.error) return this.props.children;
     return (
       <fieldset>
-        <legend>This panel could not be displayed</legend>
+        <legend>
+          <h2 className="legend-h">This panel could not be displayed</h2>
+        </legend>
         <div className="well" role="alert">
           <ul className="rows">
             <li>
