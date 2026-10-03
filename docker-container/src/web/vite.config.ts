@@ -23,6 +23,7 @@ export default defineConfig({
       // prefix, so otherwise "…/aqua-ui/window.css" is rewritten to "…/src/index.ts/window.css".
       '@now-playing/aqua-ui/airwave-window.css': fileURLToPath(new URL('../../../packages/aqua-ui/src/styles/airwave-window.css', import.meta.url)),
       '@now-playing/aqua-ui/airwave-hub.css': fileURLToPath(new URL('../../../packages/aqua-ui/src/styles/airwave-hub.css', import.meta.url)),
+      '@now-playing/aqua-ui/airwave-art': fileURLToPath(new URL('../../../packages/aqua-ui/src/airwave/aqua-art.ts', import.meta.url)),
       '@now-playing/aqua-ui/window.css': fileURLToPath(new URL('../../../packages/aqua-ui/src/styles/aqua-window.css', import.meta.url)),
       '@now-playing/aqua-ui/media.css': fileURLToPath(new URL('../../../packages/aqua-ui/src/styles/aqua-media.css', import.meta.url)),
       '@now-playing/aqua-ui/now-playing.css': fileURLToPath(new URL('../../../packages/aqua-ui/src/styles/now-playing.css', import.meta.url)),

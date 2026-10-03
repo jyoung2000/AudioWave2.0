@@ -8,8 +8,11 @@
  * wrong, and so the few rules the design leaves to its script (a busy button stays its size, a
  * disabled one says why) live in one place.
  *
- * They are written here rather than in `@now-playing/aqua-ui` because that package carries the
- * design's stylesheet but not yet its components; they should move there when it does.
+ * The drawings they wear are shared with the hub (`@now-playing/aqua-ui/airwave-art`), and so is
+ * the stylesheet. The components stay here: the hub's kit writes the same classes but not the same
+ * markup or props (its sheet is a `role="alertdialog"` layer, its checkbox reports a boolean, its
+ * pop-up takes `<option>` children), so one shared component would change what one of the two
+ * renders. design/decisions.md DEC-026 records that, and the styleguide draws both.
  */
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react';
 

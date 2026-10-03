@@ -6,7 +6,7 @@ import { createRoot } from 'react-dom/client';
 import '@now-playing/aqua-ui/airwave-window.css';
 import '@now-playing/aqua-ui/airwave-hub.css';
 import './styles.css';
-import { installAquaArt } from './lib/aqua-art.js';
+import { installAquaArt } from '@now-playing/aqua-ui/airwave-art';
 import { App } from './App.js';
 
 const container = document.getElementById('root');

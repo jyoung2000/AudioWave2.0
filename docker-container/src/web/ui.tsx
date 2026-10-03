@@ -8,8 +8,11 @@
  * same markup and gives loading, empty and failed states one quiet shape (a line inside the list
  * box, never an illustration).
  *
- * It lives in the hub because `packages/aqua-ui` still ships the older window skin's components.
- * The companion draws the same kit; when the two are reconciled this file is what moves there.
+ * The drawings these controls wear are shared (`@now-playing/aqua-ui/airwave-art`), and so are the
+ * stylesheets. The components stay here: the companion's kit writes the same classes but not the
+ * same markup or props (its sheet is a `<dialog>`, its checkbox passes input props through, its
+ * pop-up takes an options list), so one shared component would change what one of the two renders.
+ * design/decisions.md DEC-026 records that, and the styleguide draws both.
  */
 import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type Ref, type SelectHTMLAttributes } from 'react';
 import type { ApiError } from './lib/api.js';
