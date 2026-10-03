@@ -25,6 +25,7 @@ import { appUrlGuard, applySessionSecurity, applyWindowSecurity, enforceSingleIn
 import { CompanionStore, openCompanionDb } from './store.js';
 import { LiveTv } from './live-tv/index.js';
 import { APP_ID, PRODUCT_NAME } from '../shared/identity.js';
+import { sharingIsOn } from '../shared/sharing.js';
 
 const DEV_SERVER_URL = process.env['NP_DEV_SERVER_URL'] ?? null;
 const INDEX_FILE = join(__dirname, '..', 'renderer', 'index.html');
@@ -107,8 +108,7 @@ function savePreferences(next: Preferences): Preferences {
  */
 function sharingEnabled(): boolean {
   if (store?.isOpen !== true) return false;
-  if (store.get<boolean | null>('shareLibrary', null) === false) return false;
-  return hub?.hasScope('library:share') === true;
+  return sharingIsOn(store.get<boolean | null>('shareLibrary', null), hub?.hasScope('library:share') === true);
 }
 
 /** The helper's estimate route measures the companion's folders: restarted when they change. */
