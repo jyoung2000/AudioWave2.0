@@ -1,17 +1,22 @@
 /**
  * Product naming is centralised here so the suite can be renamed in one place.
  * Nothing else in the repository may hard-code the product name.
+ *
+ * The suite is Airwave, as its three designs (design/frontends/) name it; "Now Playing" is the
+ * player's front page, not the product. The machine identifiers below (slug, URL scheme, storage
+ * namespace, User-Agent) keep their original spelling on purpose: they are keys to data people
+ * already have — renaming them would orphan a library, a pairing and a taskbar pin.
  */
 export const BRANDING = {
   /** Human-readable suite name. */
-  suiteName: 'Now Playing',
+  suiteName: 'Airwave',
   /** Short machine identifier used in file names, storage keys and headers. */
   slug: 'now-playing',
   /** Product names by folder. */
   products: {
-    player: 'Now Playing Player',
-    hub: 'Now Playing Hub',
-    companion: 'Now Playing Companion for Windows',
+    player: 'Airwave',
+    hub: 'Airwave Hub',
+    companion: 'Airwave Companion',
   },
   /** Deep-link scheme used by pairing QR codes and OS-level links. */
   urlScheme: 'nowplaying',

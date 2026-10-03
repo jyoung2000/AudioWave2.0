@@ -98,7 +98,7 @@ function check(name, fn) {
 function windowsPackageContents() {
   const root = join('windows-companion', 'release', 'win-unpacked');
   const missing = [];
-  for (const rel of ['Now Playing Companion.exe', join('resources', 'app.asar')]) if (!existsSync(join(root, rel))) missing.push(rel);
+  for (const rel of ['Airwave Companion.exe', join('resources', 'app.asar')]) if (!existsSync(join(root, rel))) missing.push(rel);
   const sidecarBuilt = existsSync(join('windows-companion', 'awsp-server', 'target', 'release', 'awsp-server.exe'));
   if (sidecarBuilt && !existsSync(join(root, 'resources', 'awsp-server.exe'))) missing.push(join('resources', 'awsp-server.exe'));
   return missing.length ? `${root} is missing: ${missing.join(', ')}` : null;

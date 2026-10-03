@@ -24,13 +24,12 @@ describe('VOICE-003: the product name is set once', () => {
     const strings = read('android/app/src/main/res/values/strings.xml');
     expect(strings).toContain(BRANDING.suiteName);
     // A stray capitalisation is the drift this rule exists to catch.
-    expect(strings).not.toMatch(/Now playing(?![a-z])/);
-    expect(strings).not.toMatch(/NowPlaying(?!\/)/);
+    expect(strings).not.toMatch(/AirWave|Air Wave/);
   });
 
   it('is spelled the same in the Electron builder configuration, which cannot import it', () => {
     const config = read('windows-companion/electron-builder.config.cjs');
-    expect(config).toContain('Now Playing Companion');
+    expect(config).toContain(BRANDING.products.companion);
     // The companion's product name in `package.json` agrees with the constant.
     const pkg = JSON.parse(read('windows-companion/package.json')) as { description: string };
     expect(pkg.description).toContain(BRANDING.suiteName);

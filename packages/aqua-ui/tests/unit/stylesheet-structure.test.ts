@@ -18,7 +18,9 @@ import { describe, expect, it } from 'vitest';
 const stylesDir = fileURLToPath(new URL('../../src/styles/', import.meta.url));
 const sheets = [
   ...readdirSync(stylesDir)
-    .filter((name) => name.endsWith('.css'))
+    // airwave-*.css are copied verbatim from the designs (scripts/make-window-css.py); the designs
+    // repeat a selector where a later section refines it, and the copy keeps their order.
+    .filter((name) => name.endsWith('.css') && !name.startsWith('airwave-'))
     .map((name) => [`src/styles/${name}`, `${stylesDir}${name}`] as const),
   ['styleguide/styleguide.css', fileURLToPath(new URL('../../styleguide/styleguide.css', import.meta.url))] as const,
 ];

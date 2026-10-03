@@ -20,4 +20,4 @@
 export const APP_ID = 'com.nowplaying.companion';
 
 /** What the owner sees in Start-menu, Add/Remove Programs and the taskbar. */
-export const PRODUCT_NAME = 'Now Playing Companion';
+export const PRODUCT_NAME = 'Airwave Companion';

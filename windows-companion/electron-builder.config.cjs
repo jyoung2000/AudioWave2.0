@@ -17,8 +17,8 @@ const pkg = JSON.parse(readFileSync(require('node:path').join(__dirname, 'packag
 /** @type {import('electron-builder').Configuration} */
 module.exports = {
   appId: 'com.nowplaying.companion',
-  productName: 'Now Playing Companion',
-  copyright: `Copyright © ${new Date().getFullYear()} Now Playing contributors`,
+  productName: 'Airwave Companion',
+  copyright: `Copyright © ${new Date().getFullYear()} Airwave contributors`,
   directories: {
     output: 'release',
     buildResources: 'resources',
@@ -52,7 +52,7 @@ module.exports = {
     allowToChangeInstallationDirectory: true,
     createDesktopShortcut: true,
     createStartMenuShortcut: true,
-    shortcutName: 'Now Playing Companion',
+    shortcutName: 'Airwave Companion',
     // Uninstalling removes the program. It does not delete a person's library database or their
     // music; an uninstaller that took someone's playlists with it would be a data-loss bug.
     deleteAppDataOnUninstall: false,

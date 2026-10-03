@@ -1,9 +1,9 @@
 {
   "name": "@now-playing/windows-companion",
   "version": "0.1.0",
-  "description": "Now Playing Companion for Windows \u2014 secure Electron desktop app for filesystem library management, watched folders, import, backup, sync and remote access.",
+  "description": "Airwave Companion for Windows \u2014 secure Electron desktop app for filesystem library management, watched folders, import, backup, sync and remote access.",
   "author": {
-    "name": "Now Playing contributors"
+    "name": "Airwave contributors"
   },
   "license": "MIT",
   "type": "module",

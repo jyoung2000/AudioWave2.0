@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-  <string name="app_name">Now Playing</string>
+  <string name="app_name">Airwave</string>
   <string name="channel_fetches">Fetching music</string>
   <string name="channel_fetches_description">Shown while a download you asked for is running.</string>
   <string name="fetching_title">Fetching music</string>
@@ -10,5 +10,5 @@
   <string name="awsp_title">Stream from a PC</string>
   <string name="awsp_battery_channel">Streaming reliability</string>
   <string name="awsp_battery_title">Keep streaming with the screen off</string>
-  <string name="awsp_battery_text">Android\'s battery optimisation (Doze) can cut the connection to your PC. Allow Now Playing to ignore it so music keeps playing.</string>
+  <string name="awsp_battery_text">Android\'s battery optimisation (Doze) can cut the connection to your PC. Allow Airwave to ignore it so music keeps playing.</string>
 </resources>

@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Now Playing">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Airwave">
   <!--
     The maskable variant. Android crops this to whatever shape the launcher uses — a circle, a
     squircle, a rounded square — so the artwork bleeds to every edge and the note is kept inside the

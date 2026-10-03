@@ -32,6 +32,7 @@
     "test:contracts": "vitest run --project contracts",
     "test:a11y": "pnpm --filter @now-playing/music-player test:a11y && pnpm --filter @now-playing/hub test:a11y",
     "test:e2e": "pnpm --filter @now-playing/music-player test:e2e && pnpm --filter @now-playing/hub test:e2e && pnpm --filter @now-playing/aqua-ui test:e2e",
+    "build:window-css": "python packages/aqua-ui/scripts/make-window-css.py",
     "test:journey": "playwright test --config tests/journey/playwright.config.ts",
     "test:journey:container": "node scripts/journey-container.mjs",
     "test:security": "vitest run --project security",
