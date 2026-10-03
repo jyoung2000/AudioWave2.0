@@ -268,3 +268,87 @@ describe('the schedule', () => {
     expect(backups.settings().lastRunError).toMatch(/could not be measured/);
   });
 });
+
+describe('the hub’s recommendation settings, and the Live TV links', () => {
+  const PROFILE = {
+    ownerId: '01920000-0000-7000-8000-0000000000aa',
+    computedAt: '2026-09-20T10:00:00.000Z',
+    eventCount: 40,
+    dimensions: {
+      artists: [
+        { key: 'Miles Davis', weight: 0.9 },
+        { key: 'Nobody', weight: -0.4 },
+        { key: 'John Coltrane', weight: 0.6 },
+      ],
+      genres: [{ key: 'jazz', weight: 0.8 }],
+    },
+    contexts: [],
+    discoveryPreference: 0.3,
+    popularityPreference: 0.5,
+    coldStart: false,
+  };
+
+  function withHub(read: () => Promise<{ profile: Record<string, unknown> | null; hubName: string | null; reason: string | null }>, offered: Array<{ artists: string[]; genres: string[] }>): BackupManager {
+    return new BackupManager({
+      store,
+      readSettings: () => settings,
+      writeSettings: (next) => {
+        settings = next;
+      },
+      onProgress: (p) => progress.push(p),
+      onNotice: (_kind, message) => notices.push(message),
+      now: () => clock.now,
+      readAlgorithms: read,
+      restoreAlgorithms: async (seeds) => {
+        offered.push(seeds);
+        return { ok: true, reason: null };
+      },
+    });
+  }
+
+  it('backs them up when the paired hub gives them, and restore offers them back as starting points', async () => {
+    const offered: Array<{ artists: string[]; genres: string[] }> = [];
+    const backups = withHub(async () => ({ profile: PROFILE, hubName: 'Den Hub', reason: null }), offered);
+    backups.setDir(join(root, 'backups'));
+    backups.update({ include: { music: false } });
+    expect(await backups.algorithms()).toEqual({ available: true, hubName: 'Den Hub', reason: null });
+    await backups.create();
+    const [archive] = await backups.list();
+    expect(archive!.parts).toEqual(['playlists', 'presets', 'algorithms', 'settings']);
+    const data = JSON.parse(readFileSync(join(archive!.path, 'data.json'), 'utf8')) as { algorithms: { hubName: string; profile: unknown } };
+    expect(data.algorithms).toMatchObject({ hubName: 'Den Hub', profile: PROFILE });
+
+    await backups.restoreArchive(archive!.id);
+    await new Promise((r) => setTimeout(r, 10));
+    // Strongest first, and a negative weight is not something to start from.
+    expect(offered).toEqual([{ artists: ['Miles Davis', 'John Coltrane'], genres: ['jazz'] }]);
+    expect(notices.some((n) => /recommendation settings went back to the hub/.test(n))).toBe(true);
+  });
+
+  it('backs up the rest, and says why, when the hub cannot give them', async () => {
+    const backups = withHub(async () => ({ profile: null, hubName: null, reason: 'No hub is paired, so there are no recommendation settings to back up.' }), []);
+    backups.setDir(join(root, 'backups'));
+    backups.update({ include: { music: false } });
+    expect(await backups.algorithms()).toEqual({ available: false, hubName: null, reason: 'No hub is paired, so there are no recommendation settings to back up.' });
+    expect((await backups.create()).reason).toBeNull();
+    const [archive] = await backups.list();
+    expect(archive!.parts).toEqual(['playlists', 'presets', 'settings']);
+  });
+
+  it('carries the Live TV links in “these settings”, and restore hands them back', async () => {
+    const links = [
+      { kind: 'm3u', url: 'https://iptv.example.com/basic.m3u8' },
+      { kind: 'epg', url: 'https://iptv.example.com/guide.xml' },
+    ];
+    settings = { preferences: { minimizeToTray: true }, liveTv: links };
+    const backups = manager();
+    backups.setDir(join(root, 'backups'));
+    backups.update({ include: { music: false } });
+    await backups.create();
+    const [archive] = await backups.list();
+    expect((JSON.parse(readFileSync(join(archive!.path, 'data.json'), 'utf8')) as { settings: { liveTv: unknown } }).settings.liveTv).toEqual(links);
+    settings = { preferences: { minimizeToTray: true }, liveTv: [] };
+    await backups.restoreArchive(archive!.id);
+    expect(settings['liveTv']).toEqual(links);
+  });
+});

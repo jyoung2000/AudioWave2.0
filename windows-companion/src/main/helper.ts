@@ -17,10 +17,11 @@
  * read the database.
  */
 import { randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { defaultHosts, resolveAll, startHelper, type Helper, type HelperOptions } from '@now-playing/local-helper';
+import { defaultHosts, resolveAll, resolveTool, startHelper, ToolProvisioner, type FinishedFile, type Helper, type HelperOptions } from '@now-playing/local-helper';
 import type { BackupPart } from '@now-playing/local-helper/measure';
+import type { HelperJob, OutputFormat } from '@now-playing/contracts';
 import type { HelperStatus, HelperTool } from '../shared/ipc.js';
 import type { CompanionStore } from './store.js';
 
@@ -60,7 +61,22 @@ export interface EmbeddedHelperOptions {
   fetchImpl?: typeof fetch;
   /** Live TV for the player: the channels and now/next the Live TV tab keeps. */
   tv?: NonNullable<HelperOptions['tv']>;
+  /**
+   * Read at start (LAN) and whenever a job is made or could start (downloads), and on every setup
+   * pass (automatic updates). Absent: loopback only, original format, one at a time, no limit.
+   */
+  settings?: () => HelperSettings;
+  /** A download finished; the companion saves it where the person chose. Paths stay in this process. */
+  onJobFinished?: (job: HelperJob, files: FinishedFile[]) => void;
 }
+
+export interface HelperSettings {
+  lan: boolean;
+  autoUpdate: boolean;
+  downloads: { format: OutputFormat; concurrency: number; rateLimitKBps: number | null };
+}
+
+type Latest = NonNullable<HelperTool['latest']>;
 
 export class EmbeddedHelper {
   private helper: Helper | null = null;
@@ -69,6 +85,12 @@ export class EmbeddedHelper {
   private checkedAt: string | null = null;
   private starting: Promise<void> | null = null;
   private recheck: NodeJS.Timeout | null = null;
+  /** What each tool's last Check found. Kept across restarts of the helper; cleared by an update. */
+  private readonly latest = new Map<ToolId, Latest>();
+  private readonly checking = new Set<ToolId>();
+  /** Update or Install was chosen and has not finished. */
+  private readonly pending = new Set<ToolId>();
+  private lan = false;
 
   constructor(private readonly options: EmbeddedHelperOptions) {}
 
@@ -113,7 +135,17 @@ export class EmbeddedHelper {
     try {
       mkdirSync(toolsDir, { recursive: true });
       const backup = this.options.backup();
+      const settings = this.options.settings;
+      const lan = settings?.().lan ?? false;
       this.helper = await startHelper({
+        lan,
+        ...(settings
+          ? {
+              downloads: () => settings().downloads,
+              autoUpdate: () => settings().autoUpdate,
+            }
+          : {}),
+        ...(this.options.onJobFinished ? { onJobFinished: this.options.onJobFinished } : {}),
         port,
         version: this.options.version,
         token,
@@ -133,11 +165,14 @@ export class EmbeddedHelper {
         ...(this.options.fetchImpl ? { fetchImpl: this.options.fetchImpl } : {}),
         ...(this.options.tv ? { tv: this.options.tv } : {}),
         onToolInstalled: (id) => {
+          // A copy setup just replaced is the latest it found; an older Check's answer no longer holds.
+          if (!this.pending.has(id)) this.latest.delete(id);
           void this.checkTools().then(() => this.options.onToolInstalled?.(id));
         },
       });
       this.reason = null;
-      this.options.log(`helper listening at ${this.helper.origin}`);
+      this.lan = lan;
+      this.options.log(`helper listening at ${this.helper.origin}${lan ? ', and to this network for the read-only routes' : ''}`);
       await this.checkTools();
       this.provision(true);
       this.recheck = setInterval(() => this.provision(false), RECHECK_MS);
@@ -177,7 +212,82 @@ export class EmbeddedHelper {
     this.recheck = null;
     const helper = this.helper;
     this.helper = null;
+    this.lan = false;
     if (helper) await helper.close().catch(() => undefined);
+  }
+
+  /** Whether downloads are running or waiting. */
+  busy(): boolean {
+    return this.helper?.jobs.busy() ?? false;
+  }
+
+  /** Where downloads are staged until the player (or the save folder) takes them. */
+  stagingDir(): string {
+    return join(this.options.dataDir, 'helper', 'jobs');
+  }
+
+  /**
+   * Clear Cache: what finished downloads left in staging, and folders no job owns. Downloads still
+   * running keep theirs. With no helper running, nothing can be using it, so it all goes.
+   */
+  async clearStaging(): Promise<void> {
+    if (this.helper) {
+      await this.helper.jobs.clearFinished();
+      return;
+    }
+    rmSync(this.stagingDir(), { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
+  }
+
+  /**
+   * Check: ask the tool for its version again and its project for the latest release. A tool with
+   * nothing to check against on this PC (no published build) says so instead.
+   */
+  async checkTool(id: ToolId): Promise<HelperStatus> {
+    this.checking.add(id);
+    try {
+      const resolved = await resolveTool(id, { configured: {}, toolsDir: this.toolsDir() });
+      this.tools = this.tools.map((tool) => (tool.id === id ? { ...tool, present: resolved.present, version: resolved.version ?? null, path: resolved.path, advice: resolved.present ? null : ADVICE[id], origin: resolved.origin } : tool));
+      const provisioner = this.helper?.tools ?? new ToolProvisioner({ toolsDir: this.toolsDir(), configured: {}, ...(this.options.fetchImpl ? { fetchImpl: this.options.fetchImpl } : {}) });
+      const found = await provisioner.check(id, { present: resolved.present, version: resolved.version ?? null, origin: resolved.origin });
+      this.latest.set(id, { version: found.latest, updateAvailable: found.updateAvailable, reason: found.reason, checkedAt: found.checkedAt });
+      this.checkedAt = new Date().toISOString();
+    } finally {
+      this.checking.delete(id);
+    }
+    return this.status();
+  }
+
+  /** Check All: every tool, one after another (three questions to GitHub, well inside its keyless limit). */
+  async checkAll(): Promise<HelperStatus> {
+    await this.checkTools();
+    for (const id of TOOL_IDS) await this.checkTool(id);
+    return this.status();
+  }
+
+  /**
+   * Update or Install one tool with the verified installer. Returns at once with the tool shown as
+   * being set up; its progress is in the status from then on. Refused, with the reason, while
+   * downloads are using the tool or when the helper is not running.
+   */
+  async updateTool(id: ToolId): Promise<{ status: HelperStatus; reason: string | null }> {
+    if (this.starting) await this.starting;
+    const helper = this.helper;
+    if (!helper) return { status: this.status(), reason: this.reason ?? 'The helper isn’t running, so nothing can be installed. Check the port in Settings ▸ Network.' };
+    const present = this.tools.find((t) => t.id === id)?.present ?? false;
+    if (present && helper.jobs.busy()) return { status: this.status(), reason: 'Downloads are running. Wait for them to finish, then update again.' };
+    if (this.pending.has(id)) return { status: this.status(), reason: null };
+    this.pending.add(id);
+    void helper.tools
+      .install(id)
+      .then(async (outcome) => {
+        this.options.log(outcome.installed ? `${id} ${present ? 'updated' : 'installed'}: ${outcome.version ?? ''}` : `${id} could not be ${present ? 'updated' : 'installed'}: ${outcome.reason ?? 'unknown'}`);
+        await this.checkTools();
+        // The helper's own install callback has told the companion (tempo pass, streaming) already.
+        if (outcome.installed) this.latest.set(id, { version: this.latest.get(id)?.version ?? null, updateAvailable: false, reason: null, checkedAt: new Date().toISOString() });
+      })
+      .catch((err: unknown) => this.options.log(`${id} install stopped: ${err instanceof Error ? err.message : String(err)}`))
+      .finally(() => this.pending.delete(id));
+    return { status: this.status(), reason: null };
   }
 
   async checkTools(): Promise<HelperStatus> {
@@ -208,12 +318,14 @@ export class EmbeddedHelper {
     const port = this.helper ? Number(new URL(this.helper.origin).port) : null;
     // Setup's live state rides on each tool, so progress shows between checks.
     const setup = this.helper?.tools.status() ?? {};
-    const tools = this.tools.map((tool) => {
-      const state = setup[tool.id];
-      if (!state) return tool;
+    const tools = this.tools.map((tool): HelperTool => {
+      const extra = { ...(this.latest.has(tool.id) ? { latest: this.latest.get(tool.id)! } : {}), ...(this.checking.has(tool.id) ? { checking: true } : {}) };
+      // Chosen but still queued behind setup: shown as under way from the moment it is pressed.
+      const state = setup[tool.id]?.state === 'installing' || !this.pending.has(tool.id) ? setup[tool.id] : { state: 'installing' as const };
+      if (!state) return { ...tool, ...extra };
       // A tool setup cannot fetch here keeps the manual advice; anything else it handles itself.
-      return { ...tool, setup: state, advice: state.state === 'unsupported' ? (tool.advice ?? ADVICE[tool.id]) : null };
+      return { ...tool, ...extra, setup: state, advice: state.state === 'unsupported' ? (tool.advice ?? ADVICE[tool.id]) : null };
     });
-    return { running: this.helper !== null, port, origin: this.helper?.origin ?? null, reason: this.reason, tools, checkedAt: this.checkedAt };
+    return { running: this.helper !== null, port, origin: this.helper?.origin ?? null, reason: this.reason, tools, checkedAt: this.checkedAt, busy: this.busy(), lan: this.lan };
   }
 }

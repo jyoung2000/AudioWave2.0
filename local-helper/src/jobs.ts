@@ -8,11 +8,13 @@
  * even indirectly, so the tool is told to ignore every configuration file and is handed a command
  * line built entirely from this module.
  *
- * One job runs at a time. These are network-bound and disk-bound, two at once is not twice as fast,
- * and a queue of one keeps the progress people are watching truthful.
+ * One job runs at a time unless the caller says otherwise. These are network-bound and disk-bound,
+ * two at once is not twice as fast, and a queue of one keeps the progress people are watching
+ * truthful — but the companion lets the person choose up to four (Settings ▸ Downloads), and a
+ * speed limit, which reaches the tool as a number this file writes and nothing else.
  */
 import { execFile, spawn, type ChildProcess } from 'node:child_process';
-import { mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join, extname } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -44,6 +46,24 @@ export interface JobRequest {
   url: string;
   tool: HelperToolId;
   format: OutputFormat;
+  /** A speed limit in kilobytes a second, or none. Fixed when the job is made. */
+  rateLimitKBps?: number | null;
+}
+
+/** The most jobs that may run at once, whatever a caller asks for. */
+export const MAX_CONCURRENT_JOBS = 4;
+
+/** A speed limit as a whole number of KB/s in range, or null for none. Anything else is no limit. */
+export function rateLimitOf(value: number | null | undefined): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  const whole = Math.round(value);
+  return whole >= 1 && whole <= 1_000_000 ? whole : null;
+}
+
+/** What a finished job left, with where it is: only ever handed to code in this process. */
+export interface FinishedFile {
+  name: string;
+  path: string;
 }
 
 interface Running {
@@ -63,6 +83,7 @@ interface Record_ {
   paths: Map<string, string>;
   running: Running | null;
   cancelled: boolean;
+  rateLimitKBps: number | null;
 }
 
 export interface JobsOptions {
@@ -77,12 +98,16 @@ export interface JobsOptions {
   /** Kept for the tests, which need to watch a job without waiting on a real download. */
   spawnImpl?: typeof spawn;
   onChange?: (job: HelperJob) => void;
+  /** How many may run at once, read each time one could start. 1 when absent; never more than four. */
+  concurrency?: () => number;
+  /** A job finished with files. The paths are for this process only; they never reach a response. */
+  onFinished?: (job: HelperJob, files: FinishedFile[]) => void;
 }
 
 export class Jobs {
   private readonly records = new Map<string, Record_>();
   private queue: string[] = [];
-  private active: string | null = null;
+  private readonly active = new Set<string>();
 
   constructor(private readonly options: JobsOptions) {
     mkdirSync(join(options.workDir, 'jobs'), { recursive: true });
@@ -109,7 +134,7 @@ export class Jobs {
       startedAt: new Date().toISOString(),
       finishedAt: null,
     };
-    this.records.set(id, { job, root, directory, home, paths: new Map(), running: null, cancelled: false });
+    this.records.set(id, { job, root, directory, home, paths: new Map(), running: null, cancelled: false, rateLimitKBps: rateLimitOf(request.rateLimitKBps) });
     this.queue.push(id);
     void this.pump();
     return job;
@@ -132,7 +157,25 @@ export class Jobs {
 
   /** Whether anything is running or waiting — while so, a tool binary may be held open. */
   busy(): boolean {
-    return this.active !== null || this.queue.length > 0;
+    return this.active.size > 0 || this.queue.length > 0;
+  }
+
+  /**
+   * Clears what finished jobs left behind, and any job folder no job owns any more (a run that ended
+   * without tidying up). Jobs still queued or running keep theirs. Returns how many folders went.
+   */
+  async clearFinished(): Promise<number> {
+    const finished = [...this.records.values()].filter((r) => r.job.finishedAt).map((r) => r.job.id);
+    await Promise.allSettled(finished.map((id) => this.forget(id)));
+    const jobsDir = join(this.options.workDir, 'jobs');
+    let removed = finished.length;
+    if (!existsSync(jobsDir)) return removed;
+    for (const entry of readdirSync(jobsDir, { withFileTypes: true })) {
+      if (!entry.isDirectory() || this.records.has(entry.name)) continue;
+      this.remove(join(jobsDir, entry.name));
+      removed += 1;
+    }
+    return removed;
   }
 
   /**
@@ -186,19 +229,30 @@ export class Jobs {
     }
   }
 
+  /** How many may run now: the caller's choice, kept between one and four. */
+  private limit(): number {
+    const asked = this.options.concurrency?.() ?? 1;
+    return Number.isFinite(asked) ? Math.max(1, Math.min(MAX_CONCURRENT_JOBS, Math.round(asked))) : 1;
+  }
+
   private async pump(): Promise<void> {
-    if (this.active) return;
-    const id = this.queue.shift();
-    if (!id) return;
-    const record = this.records.get(id);
-    if (!record) return void this.pump();
-    this.active = id;
+    while (this.active.size < this.limit()) {
+      const id = this.queue.shift();
+      if (!id) return;
+      const record = this.records.get(id);
+      if (!record) continue;
+      this.active.add(id);
+      void this.runOne(record);
+    }
+  }
+
+  private async runOne(record: Record_): Promise<void> {
     try {
       await this.run(record);
     } catch (error) {
       if (!record.cancelled) this.finish(record, { state: 'failed', error: redactPaths(error instanceof Error ? error.message : String(error), record).slice(0, 600) });
     } finally {
-      this.active = null;
+      this.active.delete(record.job.id);
       void this.pump();
     }
   }
@@ -211,7 +265,8 @@ export class Jobs {
     if (record.job.tool === 'spotdl' && !ffmpeg.present) throw new Error('spotDL needs FFmpeg, and there is none on this machine.');
     if (record.job.format !== 'original' && !ffmpeg.present) throw new Error(`Converting to ${record.job.format} needs FFmpeg, and there is none on this machine.`);
 
-    const args = record.job.tool === 'yt-dlp' ? ytDlpArgs(record.job, record.directory, ffmpeg) : spotdlArgs(record.job, record.directory, ffmpeg);
+    const limits = { rateLimitKBps: record.rateLimitKBps };
+    const args = record.job.tool === 'yt-dlp' ? ytDlpArgs(record.job, record.directory, ffmpeg, limits) : spotdlArgs(record.job, record.directory, ffmpeg, limits);
     // Forgotten while the tools were being looked up: there is nothing left to run it for.
     if (record.cancelled) return;
     this.patch(record, { state: 'running', stage: 'fetching' });
@@ -258,6 +313,17 @@ export class Jobs {
     const files = this.collect(record);
     if (!files.length) throw new Error(`${record.job.tool} finished without producing an audio file.`);
     this.finish(record, { state: 'done', files });
+    if (this.options.onFinished) {
+      const done = files.flatMap((file) => {
+        const path = record.paths.get(file.id);
+        return path ? [{ name: file.name, path }] : [];
+      });
+      try {
+        this.options.onFinished(record.job, done);
+      } catch (error) {
+        this.options.log?.(`after a download: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
   }
 
   /**
@@ -319,7 +385,12 @@ export class Jobs {
  * `--ignore-config` comes first because everything after it is only true if no configuration file
  * got a say.
  */
-export function ytDlpArgs(job: Pick<HelperJob, 'url' | 'format'>, directory: string, ffmpeg: { present: boolean; path?: string | null }): string[] {
+export interface JobLimits {
+  /** Kilobytes a second; anything that is not a whole number in range is no limit. */
+  rateLimitKBps?: number | null;
+}
+
+export function ytDlpArgs(job: Pick<HelperJob, 'url' | 'format'>, directory: string, ffmpeg: { present: boolean; path?: string | null }, limits: JobLimits = {}): string[] {
   const args = [
     '--ignore-config',
     '--no-colors',
@@ -342,6 +413,9 @@ export function ytDlpArgs(job: Pick<HelperJob, 'url' | 'format'>, directory: str
     // No FFmpeg means no extracting and no merging, so ask for a single stream that is already audio.
     args.push('--format', 'bestaudio/best');
   }
+  const rate = rateLimitOf(limits.rateLimitKBps);
+  // Built from a whole number here, never from text: `500K` is all the tool ever sees.
+  if (rate !== null) args.push('--limit-rate', `${rate}K`);
   args.push('--', urlArgument(job.url));
   return args;
 }
@@ -357,9 +431,13 @@ function urlArgument(url: string): string {
  * match from YouTube Music, which is why it needs FFmpeg and why "original" means nothing to it.
  * Asking for the original therefore gets MP3, which is what it would have produced anyway.
  */
-export function spotdlArgs(job: Pick<HelperJob, 'url' | 'format'>, directory: string, ffmpeg: { present: boolean; path?: string | null }): string[] {
+export function spotdlArgs(job: Pick<HelperJob, 'url' | 'format'>, directory: string, ffmpeg: { present: boolean; path?: string | null }, limits: JobLimits = {}): string[] {
   const args = ['download', '--output', join(directory, '{artists} - {title}.{output-ext}'), '--format', job.format === 'original' ? 'mp3' : job.format];
   if (ffmpeg.path) args.push('--ffmpeg', ffmpeg.path);
+  // spotDL fetches through yt-dlp and hands it whatever `--yt-dlp-args` holds. Only the limit, as a
+  // number this function formats, ever goes in there.
+  const rate = rateLimitOf(limits.rateLimitKBps);
+  if (rate !== null) args.push('--yt-dlp-args', `--limit-rate ${rate}K`);
   // Last and behind `--`, as for yt-dlp.
   args.push('--', urlArgument(job.url));
   return args;

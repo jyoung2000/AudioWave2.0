@@ -62,6 +62,24 @@ describe('the renderer can only do what is on the list', () => {
     expect(schema.parse({ autoSync: true })).toEqual({ autoSync: true });
     expect(schema.parse({})).toEqual({});
     expect(schema.safeParse({ downloadDirectory: 'C:\\Windows' }).success).toBe(false);
+    // The folder downloads are saved to is a preference, but only the system's own picker sets it.
+    expect(schema.safeParse({ downloadDir: 'C:\\Windows\\System32' }).success).toBe(false);
+    expect(IPC['downloads:pick-dir'].request.safeParse({ dir: 'C:\\Windows' }).success).toBe(false);
+  });
+
+  it('opens the release page, the logs and the data folder without the page naming a place', () => {
+    for (const channel of ['app:open-release', 'app:open-logs', 'app:open-data-folder', 'app:export-logs', 'app:clear-cache'] as const) {
+      expect(IPC[channel].request.safeParse(undefined).success, channel).toBe(true);
+      expect(IPC[channel].request.safeParse({ url: 'file:///C:/Windows/System32/cmd.exe' }).success, channel).toBe(false);
+      expect(IPC[channel].request.safeParse({ path: 'C:\\Windows' }).success, channel).toBe(false);
+    }
+  });
+
+  it('takes only a known tool for Check and Update, and only the two connection switches for streaming', () => {
+    expect(IPC['helper:update-tool'].request.safeParse({ id: 'yt-dlp' }).success).toBe(true);
+    expect(IPC['helper:update-tool'].request.safeParse({ id: 'calc.exe' }).success).toBe(false);
+    expect(IPC['awsp:set-networks'].request.safeParse({ metered: false }).success).toBe(true);
+    expect(IPC['awsp:set-networks'].request.safeParse({ metered: false, binary: 'C:\\x.exe' }).success).toBe(false);
   });
 
   it('names no channel that could read an arbitrary file or run a command', () => {

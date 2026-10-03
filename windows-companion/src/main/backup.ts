@@ -19,7 +19,7 @@ import { basename, join } from 'node:path';
 import { z } from 'zod';
 import { EqPreset, Playlist } from '@now-playing/contracts';
 import { BACKUP_PARTS, createEstimator, measureFolder, type BackupPart } from '@now-playing/local-helper/measure';
-import { BackupSettings, BackupSummary, type BackupArchive, type BackupEstimate, type BackupProgress, type BackupSettingsPatch, type FolderKind } from '../shared/ipc.js';
+import { BackupPartName, BackupSettings, BackupSummary, type BackupAlgorithms, type BackupArchive, type BackupEstimate, type BackupProgress, type BackupSettingsPatch, type FolderKind } from '../shared/ipc.js';
 import type { CompanionStore } from './store.js';
 
 const SETTINGS_KEY = 'backup';
@@ -27,6 +27,17 @@ const ARCHIVE_PREFIX = 'now-playing-companion-';
 /** A day and a week, for the schedule; a run that is late by a few minutes is still on time. */
 const DAY_MS = 24 * 60 * 60_000;
 const SCHEDULE_MS = { manual: Infinity, daily: DAY_MS, weekly: 7 * DAY_MS } as const;
+
+/**
+ * The paired hub's recommendation settings, as read for a backup: its taste profile for this
+ * companion's user, and which hub it came from. Restored by offering its strongest artists and
+ * genres back to a hub as starting points.
+ */
+export const BackupAlgorithmsFile = z.object({
+  hubName: z.string().max(200).nullable(),
+  savedAt: z.iso.datetime({ offset: true }),
+  profile: z.record(z.string(), z.unknown()),
+});
 
 /** What `data.json` holds. Version 1 is the export format the companion has always written. */
 export const BackupFile = z.object({
@@ -36,16 +47,34 @@ export const BackupFile = z.object({
   presets: z.array(EqPreset).max(10_000).default([]),
   counts: BackupSummary.shape.contents.optional(),
   settings: z.record(z.string(), z.unknown()).optional(),
+  algorithms: BackupAlgorithmsFile.optional(),
 });
 export type BackupFile = z.infer<typeof BackupFile>;
 
 const Manifest = z.object({
   schemaVersion: z.literal(2),
   createdAt: z.iso.datetime({ offset: true }),
-  parts: z.array(z.enum(['music', 'tv', 'movies', 'playlists', 'presets', 'settings'])),
+  parts: z.array(BackupPartName),
   sizeBytes: z.number().int().nonnegative(),
   contents: BackupSummary.shape.contents,
 });
+
+/** How long an answer about the hub's recommendation settings is reused before asking again. */
+const ALGORITHMS_TTL_MS = 5 * 60_000;
+
+/** The artists and genres a taste profile weighs highest, as seeds a hub takes back. */
+export function seedsFromProfile(profile: Record<string, unknown>): { artists: string[]; genres: string[] } {
+  const ranked = (name: string): string[] => {
+    const dimensions = (profile['dimensions'] ?? {}) as Record<string, unknown>;
+    const rows = Array.isArray(dimensions[name]) ? (dimensions[name] as Array<{ key?: unknown; weight?: unknown }>) : [];
+    return rows
+      .filter((row) => typeof row.key === 'string' && row.key.trim() && typeof row.weight === 'number' && row.weight > 0)
+      .sort((a, b) => (b.weight as number) - (a.weight as number))
+      .map((row) => (row.key as string).slice(0, 200))
+      .slice(0, 50);
+  };
+  return { artists: ranked('artists'), genres: ranked('genres').map((g) => g.slice(0, 60)) };
+}
 
 export interface BackupManagerOptions {
   store: CompanionStore;
@@ -57,6 +86,10 @@ export interface BackupManagerOptions {
   now?: () => number;
   /** How long one estimate may take. Default 20 s, as the helper's route. */
   budgetMs?: number;
+  /** The paired hub's recommendation settings, or why they cannot be read. Absent: never included. */
+  readAlgorithms?: () => Promise<{ profile: Record<string, unknown> | null; hubName: string | null; reason: string | null }>;
+  /** Offers backed-up recommendation settings back to the paired hub. */
+  restoreAlgorithms?: (seeds: { artists: string[]; genres: string[] }) => Promise<{ ok: boolean; reason: string | null }>;
 }
 
 type Estimator = ReturnType<typeof createEstimator>;
@@ -67,6 +100,7 @@ export class BackupManager {
   private estimatorKey = '';
   private running: Promise<{ backup: BackupSummary | null; reason: string | null }> | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
+  private algorithmsAnswer: { at: number; value: BackupAlgorithms } | null = null;
 
   constructor(private readonly options: BackupManagerOptions) {
     this.now = options.now ?? Date.now;
@@ -125,7 +159,25 @@ export class BackupManager {
     return this.estimator;
   }
 
-  private dataPayload(include: BackupSettings['include']): { text: string; parts: BackupArchive['parts'] } {
+  /**
+   * Whether the hub's recommendation settings can go into a backup now, and why not when they
+   * cannot: the sentence under the Backup pane's checkbox. Asked of the hub at most every five
+   * minutes; `fresh` asks now.
+   */
+  async algorithms(fresh = false): Promise<BackupAlgorithms> {
+    const now = this.now();
+    if (!fresh && this.algorithmsAnswer && now - this.algorithmsAnswer.at < ALGORITHMS_TTL_MS) return this.algorithmsAnswer.value;
+    let value: BackupAlgorithms;
+    if (!this.options.readAlgorithms) value = { available: false, hubName: null, reason: 'This companion can’t read a hub’s recommendation settings.' };
+    else {
+      const read = await this.options.readAlgorithms().catch(() => ({ profile: null, hubName: null, reason: 'The hub couldn’t be asked for its recommendation settings.' }));
+      value = { available: read.profile !== null, hubName: read.hubName, reason: read.profile ? null : read.reason };
+    }
+    this.algorithmsAnswer = { at: now, value };
+    return value;
+  }
+
+  private dataPayload(include: BackupSettings['include'], algorithms: BackupFile['algorithms'] | null = null): { text: string; parts: BackupArchive['parts'] } {
     const store = this.options.store;
     const parts: BackupArchive['parts'] = [];
     const payload: BackupFile & { folders: Array<{ displayName: string; kind: string; trackCount: number }> } = {
@@ -139,6 +191,10 @@ export class BackupManager {
     };
     if (include.playlists) parts.push('playlists');
     if (include.presets) parts.push('presets');
+    if (include.algorithms && algorithms) {
+      payload.algorithms = algorithms;
+      parts.push('algorithms');
+    }
     if (include.settings) {
       payload.settings = this.options.readSettings();
       parts.push('settings');
@@ -244,7 +300,15 @@ export class BackupManager {
     const stamp = new Date(this.now()).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
     const id = `${ARCHIVE_PREFIX}${stamp}`;
     const path = join(settings.dir, id);
-    const { text, parts } = this.dataPayload(settings.include);
+    // The hub's recommendation settings, read now. A hub that cannot give them does not stop the
+    // backup: the rest is written, the archive lists what it holds, and the pane says why.
+    let algorithms: BackupFile['algorithms'] | null = null;
+    if (settings.include.algorithms && this.options.readAlgorithms) {
+      const read = await this.options.readAlgorithms().catch(() => ({ profile: null, hubName: null, reason: null }));
+      if (read.profile) algorithms = { hubName: read.hubName, savedAt: new Date(this.now()).toISOString(), profile: read.profile };
+      this.algorithmsAnswer = { at: this.now(), value: { available: read.profile !== null, hubName: read.hubName, reason: read.profile ? null : read.reason } };
+    }
+    const { text, parts } = this.dataPayload(settings.include, algorithms);
     let written = 0;
     const total = estimate.expectedBytes;
     try {
@@ -331,7 +395,18 @@ export class BackupManager {
       }
     });
     if (payload.settings) this.options.writeSettings(payload.settings);
+    if (payload.algorithms) void this.offerAlgorithms(payload.algorithms);
     return { restored: true, reason: null, summary: { path, createdAt: payload.exportedAt ?? now, sizeBytes: Buffer.byteLength(text), contents: payload.counts ?? store.counts() } };
+  }
+
+  /** Offers a backup's recommendation settings back to the paired hub, and says how that went. */
+  private async offerAlgorithms(algorithms: NonNullable<BackupFile['algorithms']>): Promise<void> {
+    const seeds = seedsFromProfile(algorithms.profile);
+    if (!seeds.artists.length && !seeds.genres.length) return;
+    if (!this.options.restoreAlgorithms) return;
+    const result = await this.options.restoreAlgorithms(seeds).catch(() => ({ ok: false, reason: 'The hub couldn’t be reached.' }));
+    if (result.ok) this.options.onNotice('info', `Your recommendation settings went back to the hub: ${seeds.artists.length} artists and ${seeds.genres.length} genres to start from.`);
+    else this.options.onNotice('warning', `The recommendation settings in this backup weren’t restored: ${result.reason ?? 'the hub didn’t take them.'}`);
   }
 
   /* --------------------------------------------------------------- schedule */

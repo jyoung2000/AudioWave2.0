@@ -56,6 +56,11 @@ export interface EnsureOptions {
   force?: boolean;
   /** Whether jobs are running; a yt-dlp update waits for them rather than replacing a busy file. */
   busy?: () => boolean;
+  /**
+   * Whether the daily yt-dlp update may run by itself. Read on every pass; absent means yes. Off
+   * leaves first-time setup alone — a missing tool is still set up — and updates become manual.
+   */
+  autoUpdate?: () => boolean;
   onStatus?: (id: HelperToolId, setup: ToolSetup) => void;
   onInstalled?: (id: HelperToolId, outcome: InstallOutcome) => void;
   log?: (line: string) => void;
@@ -120,7 +125,7 @@ export async function ensureTools(options: EnsureOptions): Promise<EnsureResult>
 
     if (tool.present && !options.force) {
       // Only a copy this helper set up is ever replaced; the person's own copies are theirs.
-      if (id === 'yt-dlp' && tool.origin === 'installed' && source && due(record.lastUpdateCheckAt, UPDATE_CHECK_MS, now) && !options.busy?.()) {
+      if (id === 'yt-dlp' && tool.origin === 'installed' && source && (options.autoUpdate?.() ?? true) && due(record.lastUpdateCheckAt, UPDATE_CHECK_MS, now) && !options.busy?.()) {
         try {
           const latest = await release(source.repo);
           const behind = !!latest.tag && !!tool.version && latest.tag.trim() !== tool.version.trim();
@@ -181,6 +186,47 @@ export async function ensureTools(options: EnsureOptions): Promise<EnsureResult>
 
   writeState(options.toolsDir, state, log);
   return { setup, outcomes };
+}
+
+/** What a check found: the newest release, and whether the copy here is behind it. */
+export interface ToolCheck {
+  /** The newest release's version as its project names it; null when it has no meaningful one (FFmpeg's rolling build). */
+  latest: string | null;
+  /** True behind, false current, null when it cannot be told (a copy this helper did not set up, or no answer). */
+  updateAvailable: boolean | null;
+  /** Why the answer is null, in a sentence; null otherwise. */
+  reason: string | null;
+  checkedAt: string;
+}
+
+/** A tag or a version, compared as a person would: `v4.2.11` and `4.2.11` are the same release. */
+function sameVersion(a: string, b: string): boolean {
+  const norm = (value: string) => value.trim().replace(/^v(?=\d)/i, '').toLowerCase();
+  return norm(a) === norm(b);
+}
+
+/**
+ * Whether the copy here is behind the latest release. Pure, so the rules are tested on their own:
+ *
+ * - yt-dlp and spotDL report the version their release is tagged with, so the two are compared.
+ * - FFmpeg's builds are one rolling release (`latest`) whose zip is replaced every day, so the zip's
+ *   published SHA-256 is compared with the one the installed copy was checked against — known only
+ *   for a copy this helper set up.
+ */
+export function compareRelease(id: HelperToolId, tool: { present: boolean; version: string | null; origin: ResolvedTool['origin'] }, release: Release, verified: { asset: string; sha256: string } | null | undefined, assetName: string | null): Omit<ToolCheck, 'checkedAt'> {
+  if (id === 'ffmpeg') {
+    const asset = assetName ? release.assets.find((a) => a.name === assetName) : undefined;
+    if (!tool.present) return { latest: null, updateAvailable: true, reason: null };
+    if (!verified || tool.origin !== 'installed') return { latest: null, updateAvailable: null, reason: 'This copy of FFmpeg wasn’t set up by Airwave, so it can’t be compared with the latest build.' };
+    if (!asset?.digest) return { latest: null, updateAvailable: null, reason: 'The latest FFmpeg build doesn’t say what it contains yet. Check again later.' };
+    return { latest: null, updateAvailable: asset.digest !== verified.sha256.toLowerCase(), reason: null };
+  }
+  const latest = release.tag.trim().replace(/^v(?=\d)/i, '');
+  if (!tool.present) return { latest, updateAvailable: true, reason: null };
+  if (!tool.version) return { latest, updateAvailable: null, reason: 'This copy didn’t say which version it is.' };
+  // spotDL answers `--version` with the bare number; yt-dlp with its date tag. Either way, the number is the part that counts.
+  const number = /\d+(?:\.\d+)+/.exec(tool.version)?.[0] ?? tool.version;
+  return { latest, updateAvailable: !sameVersion(number, latest), reason: null };
 }
 
 function due(iso: string | undefined, afterMs: number, now: () => number): boolean {
@@ -271,6 +317,26 @@ export class ToolProvisioner {
   async close(): Promise<void> {
     this.stopped.abort();
     await this.queue;
+  }
+
+  /**
+   * Check: ask the tool's project for its latest release and compare it with the copy here. Reads
+   * GitHub's public API without a key; nothing is downloaded or changed.
+   */
+  async check(id: HelperToolId, tool: { present: boolean; version: string | null; origin: ResolvedTool['origin'] }): Promise<ToolCheck> {
+    const now = this.options.now ?? Date.now;
+    const checkedAt = new Date(now()).toISOString();
+    const source = toolSource(id, this.options.platform ?? process.platform, this.options.arch ?? process.arch);
+    if (!source) return { latest: null, updateAvailable: null, reason: installHint(id, false), checkedAt };
+    const release = this.options.release ?? ((repo: string) => latestRelease(repo, { ...(this.options.fetchImpl ? { fetchImpl: this.options.fetchImpl } : {}), signal: AbortSignal.any([this.stopped.signal, AbortSignal.timeout(20_000)]) }));
+    try {
+      const latest = await release(source.repo);
+      const record = readState(this.options.toolsDir).tools[id];
+      return { ...compareRelease(id, tool, latest, record?.verified, source.asset(latest.assets.map((a) => a.name))), checkedAt };
+    } catch (error) {
+      this.options.log?.(`could not check ${id}: ${error instanceof Error ? error.message : String(error)}`);
+      return { latest: null, updateAvailable: null, reason: 'GitHub didn’t answer, so the latest version isn’t known. Check again in a moment.', checkedAt };
+    }
   }
 
   /** A manual install of one tool, queued behind whatever is running. */

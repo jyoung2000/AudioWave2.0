@@ -60,7 +60,15 @@ const TRACKS_INDEXES = `
 CREATE INDEX IF NOT EXISTS idx_tracks_folder ON tracks(folder_id);
 CREATE INDEX IF NOT EXISTS idx_tracks_hash ON tracks(content_hash);
 CREATE INDEX IF NOT EXISTS idx_tracks_updated ON tracks(updated_at);
+CREATE INDEX IF NOT EXISTS idx_tracks_order ON tracks(json_extract(track, '$.artistName'), json_extract(track, '$.albumName'), json_extract(track, '$.trackNumber'), id) WHERE deleted_at IS NULL;
 `;
+
+/**
+ * The library's order: artist, album, track number, and the id last so every row has one place —
+ * which is what lets the window ask for any stretch of 50,000 songs by position and get the same
+ * songs each time. `idx_tracks_order` is this order, so a stretch is read, not sorted.
+ */
+const LIBRARY_ORDER = "ORDER BY json_extract(track, '$.artistName'), json_extract(track, '$.albumName'), json_extract(track, '$.trackNumber'), id";
 
 /**
  * Schema migrations, tracked with `PRAGMA user_version`.
@@ -169,6 +177,19 @@ interface FolderRow {
   size_bytes: number;
   last_scan_at: string | null;
   last_scan_error: string | null;
+}
+
+/**
+ * A search as FTS5 reads it, or null for no search. FTS5 needs its own escaping: a bare quote or
+ * hyphen in a search term is a syntax error, not a match, so each word becomes a quoted prefix term.
+ */
+function searchTerms(query: string | undefined): string | null {
+  if (!query?.trim()) return null;
+  return query
+    .trim()
+    .split(/\s+/)
+    .map((term) => `"${term.replace(/"/g, '""')}"*`)
+    .join(' ');
 }
 
 export interface StoredTrack {
@@ -326,21 +347,29 @@ export class CompanionStore {
   }
 
   searchTracks(options: { query?: string | undefined; limit: number; offset: number }): { items: Track[]; total: number } {
-    if (options.query?.trim()) {
-      // FTS5 needs its own escaping: a bare quote or hyphen in a search term is a syntax error, not
-      // a match, so the query is turned into quoted prefix terms.
-      const terms = options.query
-        .trim()
-        .split(/\s+/)
-        .map((term) => `"${term.replace(/"/g, '""')}"*`)
-        .join(' ');
-      const rows = this.db.prepare<[string, number, number], TrackRow>('SELECT t.* FROM tracks_fts f JOIN tracks t ON t.rowid = f.rowid WHERE tracks_fts MATCH ? AND t.deleted_at IS NULL ORDER BY rank LIMIT ? OFFSET ?').all(terms, options.limit, options.offset);
-      const total = this.db.prepare<[string], { n: number }>('SELECT COUNT(*) AS n FROM tracks_fts f JOIN tracks t ON t.rowid = f.rowid WHERE tracks_fts MATCH ? AND t.deleted_at IS NULL').get(terms)?.n ?? rows.length;
-      return { items: rows.map((row) => toStoredTrack(row).track), total };
+    const terms = searchTerms(options.query);
+    if (terms) {
+      // Ties in rank are broken by rowid, so paging through a search never repeats or skips a song.
+      const rows = this.db.prepare<[string, number, number], TrackRow>('SELECT t.* FROM tracks_fts f JOIN tracks t ON t.rowid = f.rowid WHERE tracks_fts MATCH ? AND t.deleted_at IS NULL ORDER BY rank, t.rowid LIMIT ? OFFSET ?').all(terms, options.limit, options.offset);
+      return { items: rows.map((row) => toStoredTrack(row).track), total: this.countMatches(terms) };
     }
-    const rows = this.db.prepare<[number, number], TrackRow>('SELECT * FROM tracks WHERE deleted_at IS NULL ORDER BY json_extract(track, \'$.artistName\'), json_extract(track, \'$.albumName\'), json_extract(track, \'$.trackNumber\') LIMIT ? OFFSET ?').all(options.limit, options.offset);
-    const total = this.db.prepare<[], { n: number }>('SELECT COUNT(*) AS n FROM tracks WHERE deleted_at IS NULL').get()?.n ?? 0;
-    return { items: rows.map((row) => toStoredTrack(row).track), total };
+    const rows = this.db.prepare<[number, number], TrackRow>(`SELECT * FROM tracks WHERE deleted_at IS NULL ${LIBRARY_ORDER} LIMIT ? OFFSET ?`).all(options.limit, options.offset);
+    return { items: rows.map((row) => toStoredTrack(row).track), total: this.countTracks() };
+  }
+
+  /** The ids alone, in the same order as `searchTracks`: for choosing a range, or everything, without loading every song. */
+  trackIds(options: { query?: string | undefined; limit: number; offset: number }): { ids: string[]; total: number } {
+    const terms = searchTerms(options.query);
+    if (terms) {
+      const rows = this.db.prepare<[string, number, number], { id: string }>('SELECT t.id FROM tracks_fts f JOIN tracks t ON t.rowid = f.rowid WHERE tracks_fts MATCH ? AND t.deleted_at IS NULL ORDER BY rank, t.rowid LIMIT ? OFFSET ?').all(terms, options.limit, options.offset);
+      return { ids: rows.map((row) => row.id), total: this.countMatches(terms) };
+    }
+    const rows = this.db.prepare<[number, number], { id: string }>(`SELECT id FROM tracks WHERE deleted_at IS NULL ${LIBRARY_ORDER} LIMIT ? OFFSET ?`).all(options.limit, options.offset);
+    return { ids: rows.map((row) => row.id), total: this.countTracks() };
+  }
+
+  private countMatches(terms: string): number {
+    return this.db.prepare<[string], { n: number }>('SELECT COUNT(*) AS n FROM tracks_fts f JOIN tracks t ON t.rowid = f.rowid WHERE tracks_fts MATCH ? AND t.deleted_at IS NULL').get(terms)?.n ?? 0;
   }
 
   countTracks(folderId?: string): number {

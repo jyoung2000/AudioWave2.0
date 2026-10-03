@@ -293,6 +293,58 @@ describe('what the player is given', () => {
     expect(await tv.guide()).toEqual([]);
   });
 
+  it('gives a channel with no tvg-id the guide of the channel with the same name', async () => {
+    routes.set('/unnamed.m3u', {
+      body: ['#EXTM3U', '#EXTINF:-1 group-title="UK",UK: TWO HD', 'https://tv.example.com/two-hd.m3u8', '#EXTINF:-1,One +1', 'https://tv.example.com/one-plus.m3u8', '#EXTINF:-1,Nobody Lists This', 'https://tv.example.com/x.m3u8'].join('\n'),
+    });
+    const tv = liveTv();
+    await tv.add('m3u', `${base}/unnamed.m3u`);
+    // No guide yet: nothing to match against, so nothing is invented.
+    expect((await tv.channels()).map((c) => c.tvgId)).toEqual([null, null, null]);
+    await tv.add('epg', `${base}/guide.xml`);
+    const channels = await tv.channels();
+    // "UK: TWO HD" is the guide's "Two"; "One +1" is a different channel from "One", and stays unmatched.
+    expect(channels.map((c) => [c.name, c.tvgId])).toEqual([
+      ['UK: TWO HD', 'two.example'],
+      ['One +1', null],
+      ['Nobody Lists This', null],
+    ]);
+    expect(await tv.guide()).toEqual([{ tvgId: 'two.example', now: null, next: { title: 'Later On Two', start: '2026-10-03T09:00:00.000Z', stop: '2026-10-03T10:00:00.000Z', description: null } }]);
+  });
+});
+
+describe('clearing the cache, and links from a backup', () => {
+  it('forgets what was read and reads every link again, keeping the links', async () => {
+    const tv = liveTv();
+    await tv.add('m3u', `${base}/channels.m3u8`);
+    const before = requests.filter((r) => r === '/channels.m3u8').length;
+    await tv.clearCache();
+    expect(tv.list().m3u).toHaveLength(1);
+    // Read again in the background; give it a moment.
+    for (let i = 0; i < 50 && requests.filter((r) => r === '/channels.m3u8').length === before; i += 1) await new Promise((r) => setTimeout(r, 20));
+    expect(requests.filter((r) => r === '/channels.m3u8').length).toBe(before + 1);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(await tv.channels()).toHaveLength(3);
+  });
+
+  it('brings links back from a backup once each, refusing what is not a link, and reads them', async () => {
+    const tv = liveTv();
+    await tv.add('m3u', `${base}/channels.m3u8`);
+    const added = tv.restoreLinks([
+      { kind: 'm3u', url: `${base}/channels.m3u8` },
+      { kind: 'epg', url: `${base}/guide.xml` },
+      { kind: 'epg', url: 'not a link' },
+      { kind: 'other', url: `${base}/x` },
+    ]);
+    expect(added).toBe(1);
+    expect(tv.exportLinks()).toEqual([
+      { kind: 'm3u', url: `${base}/channels.m3u8` },
+      { kind: 'epg', url: `${base}/guide.xml` },
+    ]);
+    for (let i = 0; i < 50 && tv.list().epg[0]?.summary !== '7-day guide'; i += 1) await new Promise((r) => setTimeout(r, 20));
+    expect(tv.list().epg[0]).toMatchObject({ state: 'ok', summary: '7-day guide' });
+  });
+
   it('serves both through the helper’s routes, in the contract’s shape', async () => {
     const tv = liveTv();
     await tv.add('m3u', `${base}/channels.m3u8`);

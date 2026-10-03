@@ -4,7 +4,9 @@
  * A program that runs subprocesses and listens on a port is the most dangerous thing in this
  * repository, so the rules are short enough to hold in your head:
  *
- *   1. It binds to loopback. Nothing outside this machine can reach it at all.
+ *   1. It binds to loopback. Nothing outside this machine can reach it at all — unless the
+ *      companion's "use the helper without pairing on this network" is on, and then another device
+ *      reaches only the four token-free read routes in `LAN_READ_ROUTES`, and nothing else.
  *   2. A page may only talk to it if its origin is allowed. Every request is checked, not just the
  *      preflight — a `fetch` that skips preflight must not slip a side effect through.
  *   3. Anything that starts work needs the run token. It is new every start, so a page that saw one
@@ -96,6 +98,55 @@ export function hostAllowed(host: string | undefined, port: number): boolean {
   if (!host) return false;
   const value = host.trim().toLowerCase();
   return value === `127.0.0.1:${port}` || value === `localhost:${port}` || value === `[::1]:${port}`;
+}
+
+/**
+ * The routes another device on this network may reach when the companion lets it (Settings ▸
+ * Network, off by default): the ones that need no token and only read — whether a helper is here,
+ * a radio station's title, and the Live TV channels and guide. Everything else stays this PC's.
+ */
+export const LAN_READ_ROUTES: readonly string[] = ['/helper/v1/health', '/helper/v1/radio/now-playing', '/helper/v1/tv/channels', '/helper/v1/tv/guide'];
+
+/** Whether a socket's peer is this machine. Node spells IPv4 loopback inside IPv6 as `::ffff:127.x`. */
+export function isLoopbackAddress(address: string | undefined): boolean {
+  if (!address) return false;
+  const value = address.toLowerCase();
+  return value === '::1' || value.startsWith('127.') || value.startsWith('::ffff:127.');
+}
+
+/** An IPv4 address on a home or office network: 10/8, 172.16/12, 192.168/16, or link-local 169.254/16. */
+export function isPrivateIpv4(host: string): boolean {
+  const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (!match) return false;
+  const [a, b] = [Number(match[1]), Number(match[2])];
+  if ([a, b, Number(match[3]), Number(match[4])].some((n) => n > 255)) return false;
+  return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254);
+}
+
+/**
+ * Whether a page another device on this network served may read the LAN routes: an http(s) origin
+ * whose host is a private IPv4 address, spelled exactly as a browser sends it. A name is not
+ * accepted — any website can make a name resolve to a private address — and neither is a public
+ * address.
+ */
+export function lanPageAllowed(origin: string | undefined): boolean {
+  if (!origin) return false;
+  try {
+    const url = new URL(origin);
+    return (url.protocol === 'http:' || url.protocol === 'https:') && url.origin === origin && isPrivateIpv4(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The `Host` a device on this network sends: one of this PC's own network addresses and this port.
+ * The DNS-rebinding check, for the LAN: a hostile name pointed at this PC still arrives as that name.
+ */
+export function lanHostAllowed(host: string | undefined, port: number, ownAddresses: readonly string[]): boolean {
+  if (!host) return false;
+  const value = host.trim().toLowerCase();
+  return ownAddresses.some((address) => value === `${address}:${port}`);
 }
 
 export interface UrlCheck {

@@ -10,7 +10,7 @@
 import { useEffect, useState } from 'react';
 import type { AwspDevice, AwspStatus, AwspTier } from '../../shared/ipc.js';
 import { invoke } from '../bridge.js';
-import { countdown } from '../format.js';
+import { ago, countdown } from '../format.js';
 import { useAction } from '../hooks.js';
 import { DeviceIcon } from '../icons.js';
 import { EmptyRow, LoadingRow, Option, Pop, Push, Remove, Rows, Status, useConfirm } from '../ui.js';
@@ -32,13 +32,24 @@ function useSeconds(active: boolean): number {
   return now;
 }
 
-function connection(status: AwspStatus, device: AwspDevice): string {
+/**
+ * A paired device's line: how it is connected and how quickly when it is, and when it was last seen
+ * when it is not — “Android · direct · 23 ms”, “browser · last seen 5 minutes ago”.
+ */
+export function connection(status: AwspStatus, device: AwspDevice, now: number = Date.now()): string {
   const live = status.connections.find((c) => c.peer === device.id);
   const kind = device.clientKind === 'android' ? 'Android' : 'browser';
-  if (!live) return `${kind} · not connected`;
+  if (!live) return `${kind} · ${device.lastSeenAt ? `last seen ${ago(device.lastSeenAt, now)}` : 'not seen yet'}`;
   const how = live.type === 'direct' ? 'direct' : live.type === 'relay' ? 'through a relay' : 'through a bridge';
   return `${kind} · ${how}${live.rttMs !== null ? ` · ${live.rttMs} ms` : ''}`;
 }
+
+const CONNECTION_WORDS: Record<AwspStatus['network']['connection'], string> = {
+  unmetered: 'This PC is on Wi-Fi or Ethernet.',
+  metered: 'This PC is on a metered connection.',
+  offline: 'This PC has no connection right now.',
+  unknown: 'Windows hasn’t said what this connection costs; it is treated as Wi-Fi or Ethernet.',
+};
 
 export function StreamingView({ status, onChanged }: { status: AwspStatus | null; onChanged: (status: AwspStatus) => void }) {
   const confirm = useConfirm();
@@ -50,6 +61,9 @@ export function StreamingView({ status, onChanged }: { status: AwspStatus | null
   const revoke = useAction(async (id: string) => invoke('awsp:revoke', { id }));
   const tier = useAction(async (id: string, value: AwspTier) => invoke('awsp:set-tier', { id, tier: value }));
   const pin = useAction(async (value: number | null) => invoke('awsp:set-port', { port: value }));
+  const networks = useAction(async (patch: { unmetered?: boolean; metered?: boolean }) => invoke('awsp:set-networks', patch));
+  // The device list's "last seen" moves on by itself, a minute at a time.
+  const minute = useSeconds(Boolean(status?.devices.length));
 
   const apply = (next: AwspStatus | null) => {
     if (next) onChanged(next);
@@ -134,11 +148,19 @@ export function StreamingView({ status, onChanged }: { status: AwspStatus | null
             <Option title="Let paired devices stream from this PC" checked={status?.enabled ?? false} disabled={!status || enable.busy} onChange={(event) => void enable.run(event.currentTarget.checked).then(apply)}>
               On your home network they connect directly. Away from home they connect directly where the network allows, or through an encrypted relay where it doesn’t.
             </Option>
+            <Option title="On Wi-Fi and Ethernet" checked={status?.network.unmetered ?? true} disabled={!status?.enabled || networks.busy} onChange={(event) => void networks.run({ unmetered: event.currentTarget.checked }).then(apply)}>
+              Stream while this PC is on Wi-Fi or a cable.
+            </Option>
+            <Option title="On metered connections (mobile data, hotspots)" checked={status?.network.metered ?? true} disabled={!status?.enabled || networks.busy} onChange={(event) => void networks.run({ metered: event.currentTarget.checked }).then(apply)}>
+              Stream while this PC itself is on mobile data, a phone’s hotspot or a network Windows marks as metered. Streaming uses that allowance.
+            </Option>
           </div>
           <p className="note" role="status">
             {status ? <Status kind={running ? 'ok' : status.enabled ? (status.reason ? 'warn' : 'busy') : 'off'}>{running ? 'Streaming is on' : status.enabled ? (status.reason ?? 'Starting…') : 'Streaming is off'}</Status> : ' '}
           </p>
+          {status?.enabled ? <p className="note">{CONNECTION_WORDS[status.network.connection]}</p> : null}
           {enable.error ? <p className="note note--bad">{enable.error}</p> : null}
+          {networks.error ? <p className="note note--bad">{networks.error}</p> : null}
           <p className="note">Every connection is encrypted. A pairing code works once, and only devices paired here can connect.</p>
         </fieldset>
       </div>
@@ -155,7 +177,7 @@ export function StreamingView({ status, onChanged }: { status: AwspStatus | null
                 <span className="name">
                   <b>{device.name || 'Unnamed device'}</b>
                 </span>
-                <span className="meta">{connection(status, device)}</span>
+                <span className="meta">{connection(status, device, minute)}</span>
                 <Pop className="pop--row" aria-label={`Best quality ${device.name || 'this device'} may ask for`} value={device.tierCap} disabled={tier.busy} onChange={(event) => void tier.run(device.id, event.currentTarget.value as AwspTier).then(apply)} options={TIERS} />
                 <Remove label={`Revoke ${device.name || 'this device'}`} disabled={revoke.busy} onClick={() => void ask(device)} />
               </li>

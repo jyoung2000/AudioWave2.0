@@ -24,7 +24,7 @@ import type { TvLink, TvLinkKind, TvLinks } from '../../shared/ipc.js';
 import type { CompanionStore } from '../store.js';
 import { LinkError, checkLink, readLink, type LinkFailure, type ReadLink, type ReadLinkOptions } from './fetch.js';
 import { channelFromStream, parseM3u, type M3uChannel } from './m3u.js';
-import { XmltvScanner } from './xmltv.js';
+import { normalizeChannelName, XmltvScanner } from './xmltv.js';
 
 const SETTINGS_KEY = 'liveTv';
 const HOUR_MS = 60 * 60 * 1000;
@@ -66,6 +66,12 @@ interface PlaylistCache {
 interface GuideCache {
   /** Keyed by the guide's channel id, lower-cased: playlists and guides disagree about case. */
   programmes: Record<string, ProgrammeRow[]>;
+  /**
+   * The guide's channels by name (`normalizeChannelName`) → their id, lower-cased: how a playlist
+   * channel with no `tvg-id` finds its programmes. Absent in a guide read before names were kept;
+   * it is filled at the next refresh.
+   */
+  names?: Record<string, string>;
 }
 
 /** What the person is told, by what went wrong. One sentence, and what to do about it. */
@@ -226,16 +232,28 @@ export class LiveTv {
     }
   }
 
-  /** Every channel from every playlist, in the order the playlists were added, each stream once. */
+  /**
+   * Every channel from every playlist, in the order the playlists were added, each stream once. A
+   * channel the playlist gives no `tvg-id` takes the id of the guide channel with the same name
+   * (`normalizeChannelName`), so it gets a guide too; the first guide that knows the name wins, as
+   * it does for programmes.
+   */
   async channels(): Promise<HelperTvChannel[]> {
     const merged: Array<Omit<HelperTvChannel, 'number'> & { chno: number | null }> = [];
     const seen = new Set<string>();
+    let byName: Map<string, string> | null = null;
+    const guideIdFor = async (name: string): Promise<string | null> => {
+      byName ??= await this.guideNames();
+      const key = normalizeChannelName(name);
+      return key ? (byName.get(key) ?? null) : null;
+    };
     for (const link of this.links.filter((l) => l.kind === 'm3u')) {
       const cache = await this.playlist(link.id);
       for (const channel of cache?.channels ?? []) {
         if (seen.has(channel.url) || merged.length >= MAX_MERGED_CHANNELS) continue;
         seen.add(channel.url);
-        merged.push({ id: createHash('sha1').update(channel.url).digest('hex').slice(0, 16), name: channel.name, group: channel.group, logo: channel.logo, url: channel.url, tvgId: channel.tvgId, chno: channel.chno });
+        const tvgId = channel.tvgId ?? (await guideIdFor(channel.name));
+        merged.push({ id: createHash('sha1').update(channel.url).digest('hex').slice(0, 16), name: channel.name, group: channel.group, logo: channel.logo, url: channel.url, tvgId, chno: channel.chno });
       }
     }
     // A playlist's own numbers are kept where they do not collide; the rest take the next free one.
@@ -284,7 +302,63 @@ export class LiveTv {
     return out;
   }
 
+  /** How much the parsed playlists and guides take on disk: part of the cache Settings shows. */
+  cacheDir(): string {
+    return this.options.cacheDir;
+  }
+
+  /**
+   * Clear Cache: forget every parsed playlist and guide and read every link again now. The links
+   * stay; until each answers, the player sees fewer channels, which is what clearing a cache means.
+   */
+  async clearCache(): Promise<void> {
+    this.playlists.clear();
+    this.guides.clear();
+    await rm(this.options.cacheDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
+    for (const link of this.links) link.checkedAt = null;
+    this.persist();
+    void this.refreshStale();
+  }
+
+  /** The links as they are kept, for a backup's settings: what was added, not what was read. */
+  exportLinks(): Array<{ kind: TvLinkKind; url: string }> {
+    return this.links.map((l) => ({ kind: l.kind, url: l.url }));
+  }
+
+  /**
+   * Links from a backup. One already here is left as it is; a new one is kept and read in the
+   * background like any other link due a look. Returns how many were added.
+   */
+  restoreLinks(links: ReadonlyArray<{ kind: unknown; url: unknown }>): number {
+    let added = 0;
+    for (const item of links) {
+      if ((item.kind !== 'm3u' && item.kind !== 'epg') || typeof item.url !== 'string') continue;
+      const kind: TvLinkKind = item.kind;
+      if (checkLink(item.url, this.options.allowPrivateNetworkForTests)) continue;
+      const url = new URL(item.url.trim()).toString();
+      if (this.links.some((l) => l.kind === kind && l.url === url)) continue;
+      if (this.links.filter((l) => l.kind === kind).length >= MAX_LINKS[kind]) continue;
+      this.links = [...this.links, { id: randomUUID(), kind, url, addedAt: new Date(this.now()).toISOString(), checkedAt: null, ok: true, summary: 'restored, checking…', error: null }];
+      added += 1;
+    }
+    if (added) {
+      this.persist();
+      void this.refreshStale();
+    }
+    return added;
+  }
+
   /* ----------------------------------------------------------------- internals */
+
+  /** Every stored guide's channel names, the first guide's answer for a name winning. */
+  private async guideNames(): Promise<Map<string, string>> {
+    const names = new Map<string, string>();
+    for (const link of this.links.filter((l) => l.kind === 'epg')) {
+      const cache = await this.guideCache(link.id);
+      for (const [name, id] of Object.entries(cache?.names ?? {})) if (!names.has(name)) names.set(name, id);
+    }
+    return names;
+  }
 
   private view(id: string): TvLink | null {
     const all = this.list();
@@ -380,10 +454,21 @@ export class LiveTv {
     const from = this.now();
     const until = from + GUIDE_WINDOW_MS;
     const programmes: Record<string, ProgrammeRow[]> = {};
+    const names: Record<string, string> = {};
+    let named = 0;
     let kept = 0;
     let first = Number.POSITIVE_INFINITY;
     let last = Number.NEGATIVE_INFINITY;
     const scanner = new XmltvScanner({
+      channel: (c) => {
+        if (!c.name || named >= MAX_GUIDE_CHANNELS) return;
+        const key = normalizeChannelName(c.name);
+        // The first channel to claim a name keeps it: a guide that lists one name twice is ambiguous.
+        if (key && !(key in names)) {
+          names[key] = c.id.toLowerCase();
+          named += 1;
+        }
+      },
       programme: (p) => {
         if (p.startMs < first) first = p.startMs;
         if (p.stopMs > last) last = p.stopMs;
@@ -404,7 +489,7 @@ export class LiveTv {
     scanner.end();
     if (!scanner.sawRoot || (scanner.channels === 0 && scanner.programmes === 0)) return null;
     for (const rows of Object.values(programmes)) rows.sort((a, b) => a[0] - b[0]);
-    const cache: GuideCache = { programmes };
+    const cache: GuideCache = { programmes, names };
     await this.writeCache(link.id, cache);
     this.guides.set(link.id, cache);
     if (!scanner.programmes) return `${plural(scanner.channels, 'channel', 'channels')}, no programmes yet`;

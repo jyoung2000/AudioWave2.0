@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { HelperToolId } from '@now-playing/contracts';
 import type { InstallOutcome } from '../../src/install.js';
-import { ensureTools, RETRY_AFTER_MS, STATE_FILE, ToolProvisioner, UPDATE_CHECK_MS, type EnsureOptions } from '../../src/provision.js';
+import { compareRelease, ensureTools, RETRY_AFTER_MS, STATE_FILE, ToolProvisioner, UPDATE_CHECK_MS, type EnsureOptions } from '../../src/provision.js';
 import type { ResolvedTool } from '../../src/tools.js';
 
 type World = Partial<Record<HelperToolId, { origin: ResolvedTool['origin']; version: string }>>;
@@ -141,6 +141,57 @@ describe('setting the tools up', () => {
     world = { 'yt-dlp': { origin: 'installed', version: '2026.09.20' }, ffmpeg: { origin: 'path', version: '7' }, spotdl: { origin: 'path', version: '4' } };
     await ensureTools(options());
     expect(installs).toEqual([]);
+  });
+
+  it('with “Update downloaders automatically” off, leaves an old yt-dlp alone but still sets up a missing tool', async () => {
+    world = { 'yt-dlp': { origin: 'installed', version: '2026.08.01' }, spotdl: { origin: 'path', version: '4' } };
+    await ensureTools(options({ autoUpdate: () => false }));
+    // FFmpeg was missing, so first-time setup still ran for it; yt-dlp was not replaced.
+    expect(installs).toEqual(['ffmpeg']);
+    expect(world['yt-dlp']!.version).toBe('2026.08.01');
+
+    // Turned back on, the next pass catches it up.
+    await ensureTools(options({ autoUpdate: () => true }));
+    expect(installs).toEqual(['ffmpeg', 'yt-dlp']);
+  });
+});
+
+describe('checking a tool against its latest release', () => {
+  const release = (tag: string, assets: Array<{ name: string; digest: string | null }> = []) => ({ tag, assets: assets.map((a) => ({ ...a, url: `https://github.com/x/${a.name}`, size: 1 })) });
+
+  it('compares yt-dlp’s and spotDL’s versions with the release tag, ignoring a leading v', () => {
+    expect(compareRelease('yt-dlp', { present: true, version: '2026.08.01', origin: 'installed' }, release('2026.09.14'), null, null)).toEqual({ latest: '2026.09.14', updateAvailable: true, reason: null });
+    expect(compareRelease('yt-dlp', { present: true, version: '2026.09.14', origin: 'path' }, release('2026.09.14'), null, null).updateAvailable).toBe(false);
+    expect(compareRelease('spotdl', { present: true, version: '4.2.11', origin: 'installed' }, release('v4.2.11'), null, null)).toEqual({ latest: '4.2.11', updateAvailable: false, reason: null });
+    expect(compareRelease('spotdl', { present: false, version: null, origin: 'missing' }, release('v4.2.11'), null, null).updateAvailable).toBe(true);
+  });
+
+  it('compares FFmpeg’s rolling build by the SHA-256 the installed copy was checked against', () => {
+    const sha = 'b'.repeat(64);
+    const asset = 'ffmpeg-master-latest-win64-gpl.zip';
+    const same = release('latest', [{ name: asset, digest: sha }]);
+    const newer = release('latest', [{ name: asset, digest: 'c'.repeat(64) }]);
+    expect(compareRelease('ffmpeg', { present: true, version: 'N-1', origin: 'installed' }, same, { asset, sha256: sha }, asset)).toEqual({ latest: null, updateAvailable: false, reason: null });
+    expect(compareRelease('ffmpeg', { present: true, version: 'N-1', origin: 'installed' }, newer, { asset, sha256: sha }, asset).updateAvailable).toBe(true);
+    // A copy someone installed themselves cannot be compared, and says so rather than guessing.
+    const own = compareRelease('ffmpeg', { present: true, version: '7.1', origin: 'path' }, newer, null, asset);
+    expect(own.updateAvailable).toBeNull();
+    expect(own.reason).toMatch(/wasn’t set up by Airwave/);
+  });
+
+  it('asks GitHub through the provisioner and says so plainly when it does not answer', async () => {
+    const provisioner = new ToolProvisioner(options({ release: async () => ({ tag: '2026.09.20', assets: [] }) }));
+    await expect(provisioner.check('yt-dlp', { present: true, version: '2026.08.01', origin: 'installed' })).resolves.toMatchObject({ latest: '2026.09.20', updateAvailable: true });
+    const offline = new ToolProvisioner(
+      options({
+        release: async () => {
+          throw new Error('offline');
+        },
+      }),
+    );
+    const result = await offline.check('yt-dlp', { present: true, version: '2026.08.01', origin: 'installed' });
+    expect(result.updateAvailable).toBeNull();
+    expect(result.reason).toMatch(/GitHub didn’t answer/);
   });
 });
 

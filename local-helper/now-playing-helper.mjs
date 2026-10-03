@@ -21387,6 +21387,33 @@ function hostAllowed(host, port) {
   const value = host.trim().toLowerCase();
   return value === `127.0.0.1:${port}` || value === `localhost:${port}` || value === `[::1]:${port}`;
 }
+var LAN_READ_ROUTES = ["/helper/v1/health", "/helper/v1/radio/now-playing", "/helper/v1/tv/channels", "/helper/v1/tv/guide"];
+function isLoopbackAddress(address) {
+  if (!address) return false;
+  const value = address.toLowerCase();
+  return value === "::1" || value.startsWith("127.") || value.startsWith("::ffff:127.");
+}
+function isPrivateIpv42(host) {
+  const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (!match) return false;
+  const [a, b] = [Number(match[1]), Number(match[2])];
+  if ([a, b, Number(match[3]), Number(match[4])].some((n) => n > 255)) return false;
+  return a === 10 || a === 172 && b >= 16 && b <= 31 || a === 192 && b === 168 || a === 169 && b === 254;
+}
+function lanPageAllowed(origin) {
+  if (!origin) return false;
+  try {
+    const url2 = new URL(origin);
+    return (url2.protocol === "http:" || url2.protocol === "https:") && url2.origin === origin && isPrivateIpv42(url2.hostname);
+  } catch {
+    return false;
+  }
+}
+function lanHostAllowed(host, port, ownAddresses2) {
+  if (!host) return false;
+  const value = host.trim().toLowerCase();
+  return ownAddresses2.some((address) => value === `${address}:${port}`);
+}
 function checkFetchUrl(input2, allowedHosts) {
   if (!allowedHosts.length) return { ok: false, reason: "The host allowlist is empty, so nothing may be fetched." };
   const result = validateOutboundUrl(input2, { allowedHosts, allowedSchemes: ["https:"], maxLength: 2048 });
@@ -21397,6 +21424,7 @@ function checkFetchUrl(input2, allowedHosts) {
 // src/server.ts
 import { createReadStream as createReadStream2, statSync as statSync5 } from "node:fs";
 import { createServer } from "node:http";
+import { networkInterfaces } from "node:os";
 
 // src/measure.ts
 import { lstat, readdir, statfs } from "node:fs/promises";
@@ -21494,7 +21522,7 @@ function createEstimator(options) {
 
 // src/jobs.ts
 import { execFile as execFile2, spawn } from "node:child_process";
-import { mkdirSync as mkdirSync2, readdirSync as readdirSync2, rmSync as rmSync2, statSync as statSync4 } from "node:fs";
+import { existsSync as existsSync3, mkdirSync as mkdirSync2, readdirSync as readdirSync2, rmSync as rmSync2, statSync as statSync4 } from "node:fs";
 import { homedir as homedir2, tmpdir as tmpdir2 } from "node:os";
 import { join as join7, extname as extname2 } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -22007,6 +22035,12 @@ var CONTENT_TYPES = {
   ".alac": "audio/mp4",
   ".mka": "audio/x-matroska"
 };
+var MAX_CONCURRENT_JOBS = 4;
+function rateLimitOf(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  const whole = Math.round(value);
+  return whole >= 1 && whole <= 1e6 ? whole : null;
+}
 var Jobs = class {
   constructor(options) {
     this.options = options;
@@ -22015,7 +22049,7 @@ var Jobs = class {
   options;
   records = /* @__PURE__ */ new Map();
   queue = [];
-  active = null;
+  active = /* @__PURE__ */ new Set();
   create(request) {
     const id = randomUUID();
     const root = join7(this.options.workDir, "jobs", id);
@@ -22037,7 +22071,7 @@ var Jobs = class {
       startedAt: (/* @__PURE__ */ new Date()).toISOString(),
       finishedAt: null
     };
-    this.records.set(id, { job, root, directory, home, paths: /* @__PURE__ */ new Map(), running: null, cancelled: false });
+    this.records.set(id, { job, root, directory, home, paths: /* @__PURE__ */ new Map(), running: null, cancelled: false, rateLimitKBps: rateLimitOf(request.rateLimitKBps) });
     this.queue.push(id);
     void this.pump();
     return job;
@@ -22056,7 +22090,24 @@ var Jobs = class {
   }
   /** Whether anything is running or waiting — while so, a tool binary may be held open. */
   busy() {
-    return this.active !== null || this.queue.length > 0;
+    return this.active.size > 0 || this.queue.length > 0;
+  }
+  /**
+   * Clears what finished jobs left behind, and any job folder no job owns any more (a run that ended
+   * without tidying up). Jobs still queued or running keep theirs. Returns how many folders went.
+   */
+  async clearFinished() {
+    const finished = [...this.records.values()].filter((r) => r.job.finishedAt).map((r) => r.job.id);
+    await Promise.allSettled(finished.map((id) => this.forget(id)));
+    const jobsDir = join7(this.options.workDir, "jobs");
+    let removed = finished.length;
+    if (!existsSync3(jobsDir)) return removed;
+    for (const entry of readdirSync2(jobsDir, { withFileTypes: true })) {
+      if (!entry.isDirectory() || this.records.has(entry.name)) continue;
+      this.remove(join7(jobsDir, entry.name));
+      removed += 1;
+    }
+    return removed;
   }
   /**
    * Stops it if it is running, and takes its working directory with it either way.
@@ -22103,19 +22154,28 @@ var Jobs = class {
       this.options.log?.(`could not remove a job directory: ${error61.code ?? "error"}`);
     }
   }
+  /** How many may run now: the caller's choice, kept between one and four. */
+  limit() {
+    const asked = this.options.concurrency?.() ?? 1;
+    return Number.isFinite(asked) ? Math.max(1, Math.min(MAX_CONCURRENT_JOBS, Math.round(asked))) : 1;
+  }
   async pump() {
-    if (this.active) return;
-    const id = this.queue.shift();
-    if (!id) return;
-    const record2 = this.records.get(id);
-    if (!record2) return void this.pump();
-    this.active = id;
+    while (this.active.size < this.limit()) {
+      const id = this.queue.shift();
+      if (!id) return;
+      const record2 = this.records.get(id);
+      if (!record2) continue;
+      this.active.add(id);
+      void this.runOne(record2);
+    }
+  }
+  async runOne(record2) {
     try {
       await this.run(record2);
     } catch (error61) {
       if (!record2.cancelled) this.finish(record2, { state: "failed", error: redactPaths(error61 instanceof Error ? error61.message : String(error61), record2).slice(0, 600) });
     } finally {
-      this.active = null;
+      this.active.delete(record2.job.id);
       void this.pump();
     }
   }
@@ -22126,7 +22186,8 @@ var Jobs = class {
     const ffmpeg = tools.ffmpeg;
     if (record2.job.tool === "spotdl" && !ffmpeg.present) throw new Error("spotDL needs FFmpeg, and there is none on this machine.");
     if (record2.job.format !== "original" && !ffmpeg.present) throw new Error(`Converting to ${record2.job.format} needs FFmpeg, and there is none on this machine.`);
-    const args = record2.job.tool === "yt-dlp" ? ytDlpArgs(record2.job, record2.directory, ffmpeg) : spotdlArgs(record2.job, record2.directory, ffmpeg);
+    const limits = { rateLimitKBps: record2.rateLimitKBps };
+    const args = record2.job.tool === "yt-dlp" ? ytDlpArgs(record2.job, record2.directory, ffmpeg, limits) : spotdlArgs(record2.job, record2.directory, ffmpeg, limits);
     if (record2.cancelled) return;
     this.patch(record2, { state: "running", stage: "fetching" });
     const env = record2.job.tool === "spotdl" ? childEnv(process.env, { HOME: record2.home, USERPROFILE: record2.home }) : childEnv();
@@ -22169,6 +22230,17 @@ var Jobs = class {
     const files = this.collect(record2);
     if (!files.length) throw new Error(`${record2.job.tool} finished without producing an audio file.`);
     this.finish(record2, { state: "done", files });
+    if (this.options.onFinished) {
+      const done = files.flatMap((file2) => {
+        const path = record2.paths.get(file2.id);
+        return path ? [{ name: file2.name, path }] : [];
+      });
+      try {
+        this.options.onFinished(record2.job, done);
+      } catch (error61) {
+        this.options.log?.(`after a download: ${error61 instanceof Error ? error61.message : String(error61)}`);
+      }
+    }
   }
   /**
    * yt-dlp with `--newline` puts one progress line per update, which is the whole reason that flag
@@ -22218,7 +22290,7 @@ var Jobs = class {
     this.patch(record2, { stage: "done", finishedAt: (/* @__PURE__ */ new Date()).toISOString(), ...patch });
   }
 };
-function ytDlpArgs(job, directory, ffmpeg) {
+function ytDlpArgs(job, directory, ffmpeg, limits = {}) {
   const args = [
     "--ignore-config",
     "--no-colors",
@@ -22240,6 +22312,8 @@ function ytDlpArgs(job, directory, ffmpeg) {
   } else {
     args.push("--format", "bestaudio/best");
   }
+  const rate = rateLimitOf(limits.rateLimitKBps);
+  if (rate !== null) args.push("--limit-rate", `${rate}K`);
   args.push("--", urlArgument(job.url));
   return args;
 }
@@ -22247,9 +22321,11 @@ function urlArgument(url2) {
   if (!/^https?:\/\//i.test(url2)) throw new Error("Only http(s) addresses can be handed to a tool.");
   return url2;
 }
-function spotdlArgs(job, directory, ffmpeg) {
+function spotdlArgs(job, directory, ffmpeg, limits = {}) {
   const args = ["download", "--output", join7(directory, "{artists} - {title}.{output-ext}"), "--format", job.format === "original" ? "mp3" : job.format];
   if (ffmpeg.path) args.push("--ffmpeg", ffmpeg.path);
+  const rate = rateLimitOf(limits.rateLimitKBps);
+  if (rate !== null) args.push("--yt-dlp-args", `--limit-rate ${rate}K`);
   args.push("--", urlArgument(job.url));
   return args;
 }
@@ -22528,7 +22604,7 @@ async function ensureTools(options) {
     const tool = await resolve3(id);
     const source = toolSource(id, platform, arch);
     if (tool.present && !options.force) {
-      if (id === "yt-dlp" && tool.origin === "installed" && source && due(record2.lastUpdateCheckAt, UPDATE_CHECK_MS, now) && !options.busy?.()) {
+      if (id === "yt-dlp" && tool.origin === "installed" && source && (options.autoUpdate?.() ?? true) && due(record2.lastUpdateCheckAt, UPDATE_CHECK_MS, now) && !options.busy?.()) {
         try {
           const latest = await release(source.repo);
           const behind = !!latest.tag && !!tool.version && latest.tag.trim() !== tool.version.trim();
@@ -22581,6 +22657,24 @@ async function ensureTools(options) {
   }
   writeState(options.toolsDir, state, log);
   return { setup, outcomes };
+}
+function sameVersion(a, b) {
+  const norm = (value) => value.trim().replace(/^v(?=\d)/i, "").toLowerCase();
+  return norm(a) === norm(b);
+}
+function compareRelease(id, tool, release, verified, assetName) {
+  if (id === "ffmpeg") {
+    const asset = assetName ? release.assets.find((a) => a.name === assetName) : void 0;
+    if (!tool.present) return { latest: null, updateAvailable: true, reason: null };
+    if (!verified || tool.origin !== "installed") return { latest: null, updateAvailable: null, reason: "This copy of FFmpeg wasn\u2019t set up by Airwave, so it can\u2019t be compared with the latest build." };
+    if (!asset?.digest) return { latest: null, updateAvailable: null, reason: "The latest FFmpeg build doesn\u2019t say what it contains yet. Check again later." };
+    return { latest: null, updateAvailable: asset.digest !== verified.sha256.toLowerCase(), reason: null };
+  }
+  const latest = release.tag.trim().replace(/^v(?=\d)/i, "");
+  if (!tool.present) return { latest, updateAvailable: true, reason: null };
+  if (!tool.version) return { latest, updateAvailable: null, reason: "This copy didn\u2019t say which version it is." };
+  const number4 = /\d+(?:\.\d+)+/.exec(tool.version)?.[0] ?? tool.version;
+  return { latest, updateAvailable: !sameVersion(number4, latest), reason: null };
 }
 function due(iso, afterMs, now) {
   if (!iso) return true;
@@ -22653,6 +22747,25 @@ var ToolProvisioner = class {
     this.stopped.abort();
     await this.queue;
   }
+  /**
+   * Check: ask the tool's project for its latest release and compare it with the copy here. Reads
+   * GitHub's public API without a key; nothing is downloaded or changed.
+   */
+  async check(id, tool) {
+    const now = this.options.now ?? Date.now;
+    const checkedAt = new Date(now()).toISOString();
+    const source = toolSource(id, this.options.platform ?? process.platform, this.options.arch ?? process.arch);
+    if (!source) return { latest: null, updateAvailable: null, reason: installHint(id, false), checkedAt };
+    const release = this.options.release ?? ((repo) => latestRelease(repo, { ...this.options.fetchImpl ? { fetchImpl: this.options.fetchImpl } : {}, signal: AbortSignal.any([this.stopped.signal, AbortSignal.timeout(2e4)]) }));
+    try {
+      const latest = await release(source.repo);
+      const record2 = readState(this.options.toolsDir).tools[id];
+      return { ...compareRelease(id, tool, latest, record2?.verified, source.asset(latest.assets.map((a) => a.name))), checkedAt };
+    } catch (error61) {
+      this.options.log?.(`could not check ${id}: ${error61 instanceof Error ? error61.message : String(error61)}`);
+      return { latest: null, updateAvailable: null, reason: "GitHub didn\u2019t answer, so the latest version isn\u2019t known. Check again in a moment.", checkedAt };
+    }
+  }
   /** A manual install of one tool, queued behind whatever is running. */
   async install(id) {
     const result = await this.run({ only: [id], force: true, ignoreBackoff: true });
@@ -22688,11 +22801,22 @@ var ToolProvisioner = class {
 // src/server.ts
 var MAX_BODY_BYTES = 64 * 1024;
 var MAX_JOBS = 50;
+function ownAddresses() {
+  return Object.values(networkInterfaces()).flat().filter((entry) => Boolean(entry && !entry.internal && entry.family === "IPv4")).map((entry) => entry.address);
+}
 async function startHelper(options) {
   const startedAt = (/* @__PURE__ */ new Date()).toISOString();
   const resolver = cachedResolver({ configured: options.configured, toolsDir: options.toolsDir });
   const resolve_ = () => resolver.get();
-  const jobs = new Jobs({ workDir: options.workDir, timeoutMs: options.timeoutMs, tools: resolve_, log: options.log, ...options.finishedTtlMs ? { finishedTtlMs: options.finishedTtlMs } : {} });
+  const jobs = new Jobs({
+    workDir: options.workDir,
+    timeoutMs: options.timeoutMs,
+    tools: resolve_,
+    log: options.log,
+    ...options.finishedTtlMs ? { finishedTtlMs: options.finishedTtlMs } : {},
+    concurrency: () => options.downloads?.().concurrency ?? 1,
+    ...options.onJobFinished ? { onFinished: options.onJobFinished } : {}
+  });
   let port = options.port;
   let origin = `http://127.0.0.1:${port}`;
   let policy = { allowed: options.allowedOrigins, self: options.app ? origin : null, loopbackPages: options.loopbackPages === true };
@@ -22703,6 +22827,7 @@ async function startHelper(options) {
     configured: options.configured,
     ...options.fetchImpl ? { fetchImpl: options.fetchImpl } : {},
     busy: () => jobs.busy(),
+    ...options.autoUpdate ? { autoUpdate: options.autoUpdate } : {},
     log: options.log,
     onInstalled: (id) => {
       resolver.invalidate();
@@ -22719,13 +22844,28 @@ async function startHelper(options) {
     });
   });
   async function handle(request, response) {
+    const fromLan = !isLoopbackAddress(request.socket.remoteAddress);
+    if (fromLan) return handleLan(request, response);
     if (!hostAllowed(header(request, "host"), port)) return fail(response, 421, "host", "This helper only answers to 127.0.0.1 or localhost.");
     const origin_ = header(request, "origin");
-    const url2 = new URL(request.url ?? "/", origin);
-    const path = url2.pathname;
     if (!originAllowed(policy, origin_)) {
       return fail(response, 403, "origin", "This origin may not talk to the helper.");
     }
+    return route(request, response, origin_);
+  }
+  async function handleLan(request, response) {
+    if (!options.lan) return fail(response, 403, "lan", "This helper only answers this PC.");
+    if (!lanHostAllowed(header(request, "host"), port, ownAddresses())) return fail(response, 421, "host", "This helper only answers to this PC\u2019s own addresses.");
+    const origin_ = header(request, "origin");
+    if (origin_ !== void 0 && !lanPageAllowed(origin_)) return fail(response, 403, "origin", "This origin may not talk to the helper.");
+    const path = new URL(request.url ?? "/", origin).pathname;
+    const method = request.method ?? "GET";
+    if (!LAN_READ_ROUTES.includes(path) || method !== "GET" && method !== "OPTIONS") return fail(response, 403, "lan", "Only this PC may use that. Other devices on the network can only read what is playing and the Live TV guide.");
+    return route(request, response, origin_);
+  }
+  async function route(request, response, origin_) {
+    const url2 = new URL(request.url ?? "/", origin);
+    const path = url2.pathname;
     applyCors(response, origin_);
     if (request.method === "OPTIONS") {
       if (header(request, "access-control-request-private-network") === "true") response.setHeader("access-control-allow-private-network", "true");
@@ -22811,7 +22951,11 @@ async function startHelper(options) {
       if (tools.installing() === tool) return fail(response, 409, "busy", `${tool} is being set up. Try again in a moment.`);
       const found = await resolve_();
       if (!found[tool].present) return fail(response, 409, "tool-missing", tools.status()[tool]?.reason ?? found[tool].installHint ?? `${tool} is not installed.`);
-      const job = jobs.create({ url: checked.url.toString(), tool, format: parsed.data.format });
+      const settings = options.downloads?.() ?? {};
+      const named = typeof body === "object" && body !== null && "format" in body;
+      const preferred = settings.format ?? "original";
+      const format = named ? parsed.data.format : preferred !== "original" && !found.ffmpeg.present ? "original" : preferred;
+      const job = jobs.create({ url: checked.url.toString(), tool, format, rateLimitKBps: settings.rateLimitKBps ?? null });
       options.log(`job ${job.id}: ${tool} ${checked.url.hostname} (${parsed.data.authorization.basis})`);
       return send(response, 202, job);
     }
@@ -22898,7 +23042,7 @@ async function startHelper(options) {
   }
   await new Promise((resolvePromise, rejectPromise) => {
     server.once("error", rejectPromise);
-    server.listen(options.port, "127.0.0.1", () => {
+    server.listen(options.port, options.lan ? "0.0.0.0" : "127.0.0.1", () => {
       server.off("error", rejectPromise);
       resolvePromise();
     });

@@ -7,13 +7,19 @@
  * on the way out — so a compromised renderer can call only what is listed there, with only the
  * shapes declared there.
  */
-import { app, BrowserWindow, dialog, ipcMain, Menu, powerMonitor, safeStorage, session, shell, Tray, nativeImage } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, powerMonitor, safeStorage, session, shell, Tray, nativeImage } from 'electron';
 import { existsSync, mkdirSync } from 'node:fs';
 import { writeFile, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { CONTRACTS_VERSION, EqPreset, Playlist, WS_PROTOCOL_VERSION } from '@now-playing/contracts';
+import { basename, join } from 'node:path';
+import { format as formatLine } from 'node:util';
+import { CONTRACTS_VERSION, EqPreset, Playlist, WS_PROTOCOL_VERSION, type HelperJob } from '@now-playing/contracts';
 import { uuidv7 } from '@now-playing/domain';
-import { IPC, Preferences, type AppInfo, type BackupSettingsPatch, type FolderKind, type IpcChannel, type LibraryFolder, type PreferencesPatch, type ScanProgress, type TransferProgress, type TvLinkKind } from '../shared/ipc.js';
+import type { FinishedFile } from '@now-playing/local-helper';
+import { IPC, Preferences, type AppInfo, type BackupSettingsPatch, type FolderKind, type IpcChannel, type LibraryFolder, type PreferencesPatch, type ScanProgress, type StorageReport, type TransferProgress, type TvLinkKind } from '../shared/ipc.js';
+import { exportLogs, Log } from './log.js';
+import { probeConnection } from './network.js';
+import { folderBytes, saveDownload } from './storage.js';
+import { RELEASES_PAGE, UpdateChecker } from './updates.js';
 import { absolutePathOf, scanFolder } from './library.js';
 import { runTempoPass } from './tempo-analysis.js';
 import { FolderWatcher } from './watcher.js';
@@ -44,6 +50,7 @@ let backups: BackupManager | null = null;
 let helper: EmbeddedHelper | null = null;
 let awsp: AwspSupervisor | null = null;
 let liveTv: LiveTv | null = null;
+let updates: UpdateChecker | null = null;
 let scanning: AbortController | null = null;
 let tempoPass: AbortController | null = null;
 let watcher: FolderWatcher | null = null;
@@ -74,6 +81,60 @@ function dataDir(): string {
   return portableRoot ? join(portableRoot, 'NowPlayingCompanion-data') : app.getPath('userData');
 }
 
+/**
+ * The log (`<data>\logs\companion.log`). Everything the main process says on the console goes
+ * there too, so a module that reports with `console.error` is in the file Export Logs collects.
+ */
+const log = new Log(join(dataDir(), 'logs'));
+function tee(original: (...args: unknown[]) => void, level: 'info' | 'warn' | 'error'): (...args: unknown[]) => void {
+  return (...args) => {
+    log[level](formatLine(...args));
+    original(...args);
+  };
+}
+// The three the codebase's lint allows; `console.log` and `console.debug` are not used.
+console.info = tee(console.info.bind(console), 'info');
+console.warn = tee(console.warn.bind(console), 'warn');
+console.error = tee(console.error.bind(console), 'error');
+
+/** Where finished downloads are saved: the folder chosen in Settings, or Downloads inside Music. */
+function downloadDir(): string {
+  return preferences().downloadDir ?? join(app.getPath('music'), 'Downloads');
+}
+
+/**
+ * A download finished in the helper: it is saved where the person chose, then — as they chose —
+ * nothing more, a notification (clicking it shows the file), or the file shown in Explorer.
+ */
+async function onDownloadFinished(job: HelperJob, files: FinishedFile[]): Promise<void> {
+  if (!files.length || isQuitting) return;
+  const dir = downloadDir();
+  let saved: string[];
+  try {
+    saved = await saveDownload(files, dir);
+  } catch (err) {
+    console.error(`A download from ${new URL(job.url).hostname} could not be saved:`, err instanceof Error ? err.message : String(err));
+    notice('warning', `A download finished but couldn’t be saved to ${dir}. Choose another folder in Settings ▸ Downloads.`);
+    return;
+  }
+  log.info(`download from ${new URL(job.url).hostname} saved: ${saved.length} file${saved.length === 1 ? '' : 's'}`);
+  const first = saved[0];
+  if (!first) return;
+  const done = preferences().downloadDone;
+  if (done === 'reveal') shell.showItemInFolder(first);
+  else if (done === 'notify' && Notification.isSupported()) {
+    const toast = new Notification({ title: 'Download finished', body: saved.length === 1 ? basename(first) : `${saved.length} files saved to ${basename(dir) || dir}`, ...iconOption() });
+    toast.on('click', () => shell.showItemInFolder(first));
+    toast.show();
+  }
+}
+
+/** The caches Settings shows: the window's web cache, the parsed Live TV lists, and downloads waiting in the helper. */
+async function storageReport(): Promise<StorageReport> {
+  const [web, tv, staged] = await Promise.all([session.defaultSession.getCacheSize().catch(() => 0), folderBytes(join(dataDir(), 'live-tv')), helper ? folderBytes(helper.stagingDir()) : Promise.resolve(0)]);
+  return { cache: { app: web, liveTv: tv, downloads: staged, total: web + tv + staged }, logsDir: log.dir };
+}
+
 function send<T>(channel: string, payload: T): void {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
 }
@@ -95,7 +156,11 @@ function savePreferences(next: Preferences): Preferences {
   store!.set(PREFERENCES_KEY, next, new Date().toISOString());
   preferencesCache = next;
   syncWatchers();
-  if (before.helperPort !== next.helperPort) void helper?.restart(next.helperPort);
+  // The port and the LAN setting are where the helper listens: both need it bound again.
+  if (before.helperPort !== next.helperPort || before.helperLan !== next.helperLan) void helper?.restart(next.helperPort);
+  log.setVerbose(next.verboseLogs);
+  if (!before.checkForUpdates && next.checkForUpdates) updates?.start();
+  else if (before.checkForUpdates && !next.checkForUpdates) updates?.stop();
   return next;
 }
 
@@ -372,7 +437,11 @@ async function runUpload(id: string, trackId: string): Promise<void> {
  */
 function handle<C extends IpcChannel>(channel: C, handler: (request: unknown) => Promise<unknown> | unknown): void {
   ipcMain.handle(channel, async (event, raw: unknown) => {
-    if (!isTrustedSender(event, isAppUrl)) throw new Error(`${channel}: refused a request from a page that is not this app`);
+    if (!isTrustedSender(event, isAppUrl)) {
+      log.warn(`${channel}: refused a request from a page that is not this app`);
+      throw new Error(`${channel}: refused a request from a page that is not this app`);
+    }
+    log.debug(`ipc ${channel}`);
     const parsedRequest = IPC[channel].request.safeParse(raw ?? undefined);
     if (!parsedRequest.success) throw new Error(`${channel}: ${parsedRequest.error.issues.map((i) => `${i.path.join('.')} ${i.message}`).join('; ')}`);
     const result = await handler(parsedRequest.data);
@@ -396,18 +465,18 @@ function registerHandlers(): void {
     // an unsigned build says so rather than repeating back whatever a variable claims.
     signed: typeof __NP_SIGNED__ === 'boolean' ? __NP_SIGNED__ : false,
     updateFeedUrl: process.env['NP_UPDATE_FEED'] ?? null,
+    logsDir: log.dir,
   }));
 
   handle('app:preferences:get', () => preferences());
   handle('app:preferences:set', (request) => {
     const patch = request as PreferencesPatch;
+    // Every key the patch may hold is a key of Preferences, and the patch's schema is strict; the
+    // download folder is not among them (downloads:pick-dir is its only way in).
     const next: Preferences = { ...preferences() };
-    if (patch.launchAtLogin !== undefined) next.launchAtLogin = patch.launchAtLogin;
-    if (patch.minimizeToTray !== undefined) next.minimizeToTray = patch.minimizeToTray;
-    if (patch.watchFolders !== undefined) next.watchFolders = patch.watchFolders;
-    if (patch.autoSync !== undefined) next.autoSync = patch.autoSync;
-    if (patch.theme !== undefined) next.theme = patch.theme;
-    if (patch.helperPort !== undefined) next.helperPort = patch.helperPort;
+    for (const [key, value] of Object.entries(patch) as Array<[keyof PreferencesPatch, unknown]>) {
+      if (value !== undefined) (next as Record<string, unknown>)[key] = value;
+    }
     savePreferences(next);
     app.setLoginItemSettings({ openAtLogin: next.launchAtLogin });
     return next;
@@ -424,6 +493,53 @@ function registerHandlers(): void {
   handle('app:open-data-folder', async () => {
     const failure = await shell.openPath(dataDir());
     return failure ? { ok: false, reason: 'Windows could not open that folder. Its location is shown above.' } : { ok: true, reason: null };
+  });
+
+  handle('app:update-status', () => updates!.status());
+  handle('app:check-update', () => updates!.check());
+  // The release page, and nothing the network answered: an https GitHub page fixed in updates.ts.
+  handle('app:open-release', async () => {
+    await shell.openExternal(RELEASES_PAGE);
+    return { opened: true, reason: null };
+  });
+
+  handle('app:storage', () => storageReport());
+  handle('app:clear-cache', async () => {
+    const failures: string[] = [];
+    await session.defaultSession.clearCache().catch(() => failures.push('the window’s cache'));
+    await liveTv!.clearCache().catch(() => failures.push('the Live TV lists'));
+    await helper!.clearStaging().catch(() => failures.push('finished downloads'));
+    log.info(`cache cleared${failures.length ? `, except ${failures.join(' and ')}` : ''}`);
+    return { storage: await storageReport(), reason: failures.length ? `Some of it couldn’t be cleared (${failures.join(', ')}). Close anything using those files and try again.` : null };
+  });
+
+  // The app's own logs folder, named here: there is no path in the request.
+  handle('app:open-logs', async () => {
+    mkdirSync(log.dir, { recursive: true });
+    const failure = await shell.openPath(log.dir);
+    return failure ? { ok: false, reason: 'Windows couldn’t open the logs folder.' } : { ok: true, reason: null };
+  });
+
+  handle('app:export-logs', async () => {
+    const stamp = new Date().toISOString().slice(0, 10);
+    const result = await dialog.showSaveDialog(mainWindow!, { title: 'Export logs', defaultPath: join(app.getPath('documents'), `airwave-companion-logs-${stamp}.zip`), filters: [{ name: 'Zip archive', extensions: ['zip'] }] });
+    if (result.canceled || !result.filePath) return { path: null, reason: null };
+    const prefs = preferences();
+    const about = [`Airwave Companion ${app.getVersion()}`, `Electron ${process.versions['electron'] ?? '?'} on ${process.platform}/${process.arch}`, `Exported ${new Date().toISOString()}`, `Helper: ${helper?.status().running ? `running on port ${prefs.helperPort}` : 'not running'}${prefs.helperLan ? ', answering this network' : ''}`, `Detailed logs: ${prefs.verboseLogs ? 'on' : 'off'}`].join('\n');
+    try {
+      const token = helper?.token();
+      const count = exportLogs(log, result.filePath, token ? [token] : [], [{ name: 'about.txt', data: Buffer.from(`${about}\n`, 'utf8') }]);
+      log.info(`exported ${count} log file${count === 1 ? '' : 's'}`);
+      return { path: result.filePath, reason: count ? null : 'There were no logs yet, so the file holds only which version this is.' };
+    } catch (err) {
+      return { path: null, reason: `The logs couldn’t be saved there: ${err instanceof Error ? err.message : String(err)}` };
+    }
+  });
+
+  handle('downloads:pick-dir', async () => {
+    const result = await dialog.showOpenDialog(mainWindow!, { title: 'Where should downloads be saved?', defaultPath: downloadDir(), properties: ['openDirectory', 'createDirectory'], buttonLabel: 'Use this folder' });
+    if (result.canceled || !result.filePaths[0]) return { preferences: preferences(), reason: null };
+    return { preferences: savePreferences({ ...preferences(), downloadDir: result.filePaths[0] }), reason: null };
   });
 
   handle('app:reveal', (request) => {
@@ -462,6 +578,7 @@ function registerHandlers(): void {
   handle('library:scan', (request) => startScan((request as { folderId?: string }).folderId));
 
   handle('library:tracks', (request) => store!.searchTracks(request as { query?: string; limit: number; offset: number }));
+  handle('library:track-ids', (request) => store!.trackIds(request as { query?: string; limit: number; offset: number }));
   // A stored record that no longer fits the contract is left out rather than breaking the list.
   handle('library:playlists', () => ({ items: store!.listPlaylists().filter((p) => Playlist.safeParse(p).success) }));
   handle('library:presets', () => ({ items: store!.listPresets().filter((p) => EqPreset.safeParse(p).success) }));
@@ -540,6 +657,7 @@ function registerHandlers(): void {
   });
 
   handle('backup:estimate', () => backups!.estimate());
+  handle('backup:algorithms', () => backups!.algorithms());
   handle('backup:list', async () => ({ items: await backups!.list() }));
   handle('backup:create', () => backups!.create());
   handle('backup:remove', (request) => backups!.remove((request as { id: string }).id));
@@ -567,10 +685,14 @@ function registerHandlers(): void {
   handle('awsp:new-code', () => awsp!.newPairingCode());
   handle('awsp:revoke', (request) => awsp!.revoke((request as { id: string }).id));
   handle('awsp:set-tier', (request) => awsp!.setTierCap((request as { id: string }).id, (request as { tier: 'lossless' | 'high' | 'saver' }).tier));
+  handle('awsp:set-networks', (request) => awsp!.setNetworks(request as { unmetered?: boolean; metered?: boolean }));
 
   handle('helper:status', () => helper!.settledStatus());
-  handle('helper:check-tools', () => helper!.checkTools());
+  // Check All: every tool's version again, and each project's latest release.
+  handle('helper:check-tools', () => helper!.checkAll());
   handle('helper:install-tools', () => helper!.installTools());
+  handle('helper:check-tool', (request) => helper!.checkTool((request as { id: 'yt-dlp' | 'spotdl' | 'ffmpeg' }).id));
+  handle('helper:update-tool', (request) => helper!.updateTool((request as { id: 'yt-dlp' | 'spotdl' | 'ffmpeg' }).id));
   handle('helper:token', () => ({ token: helper!.token() }));
 
   handle('tv:links', () => liveTv!.list());
@@ -642,15 +764,27 @@ if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow())))
       appVersion: app.getVersion(),
       onNotice: (message) => notice('warning', message),
     });
+    log.setVerbose(preferences().verboseLogs);
+    log.info(`Airwave Companion ${app.getVersion()} starting (Electron ${process.versions['electron'] ?? '?'}, ${process.platform}/${process.arch})`);
     backups = new BackupManager({
       store,
-      readSettings: () => ({ preferences: preferences() }),
+      // "These settings" are the preferences and the Live TV links (the links as they were added; what
+      // they hold is read again after a restore).
+      readSettings: () => ({ preferences: preferences(), liveTv: liveTv?.exportLinks() ?? [] }),
       writeSettings: (settings) => {
         const parsed = Preferences.safeParse((settings as { preferences?: unknown }).preferences ?? {});
-        if (parsed.success) savePreferences({ ...parsed.data, launchAtLogin: preferences().launchAtLogin });
+        // Starting with Windows and the download folder belong to this PC, not to the backup.
+        if (parsed.success) savePreferences({ ...parsed.data, launchAtLogin: preferences().launchAtLogin, downloadDir: preferences().downloadDir });
+        const links = (settings as { liveTv?: unknown }).liveTv;
+        if (Array.isArray(links)) {
+          const added = liveTv?.restoreLinks(links as Array<{ kind: unknown; url: unknown }>) ?? 0;
+          if (added) notice('info', `${added} Live TV link${added === 1 ? '' : 's'} came back from the backup and ${added === 1 ? 'is' : 'are'} being checked.`);
+        }
       },
       onProgress: (progress) => send('event:backup-progress', progress),
       onNotice: notice,
+      readAlgorithms: () => hub!.readRecommendations(),
+      restoreAlgorithms: (seeds) => hub!.offerRecommendationSeeds(seeds),
     });
     liveTv = new LiveTv({
       store,
@@ -664,9 +798,14 @@ if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow())))
       secretBox: safeStorage,
       version: app.getVersion(),
       dataDir: dataDir(),
-      log: (line) => console.info(`[helper] ${line}`),
+      log: (line) => log.info(`[helper] ${line}`),
       backup: () => ({ folders: backups!.folders(), backupDir: backups!.settings().dir }),
       onToolInstalled,
+      settings: () => {
+        const prefs = preferences();
+        return { lan: prefs.helperLan, autoUpdate: prefs.autoUpdateTools, downloads: { format: prefs.downloadFormat, concurrency: prefs.downloadConcurrency, rateLimitKBps: prefs.downloadRateKBps } };
+      },
+      onJobFinished: (job, files) => void onDownloadFinished(job, files),
       // The player reads its channels and its now/next from here (GET /helper/v1/tv/…).
       tv: { channels: () => liveTv!.channels(), guide: () => liveTv!.guide() },
     });
@@ -686,10 +825,19 @@ if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow())))
       cacheDir: join(dataDir(), 'awsp-cache'),
       serverName: `${process.env['COMPUTERNAME'] ?? 'Windows'} companion`,
       onStatus: (status) => send('event:awsp-status', status),
-      log: (line) => console.info(line),
+      // The sidecar's own chatter is detail; what the supervisor decides is worth keeping.
+      log: (line) => (line.startsWith('awsp-server:') ? log.debug(line) : log.info(line)),
       ffmpegPath: () => helper?.ffmpegPath() ?? null,
+      probeNetwork: () => probeConnection(),
     });
     awsp.boot();
+    updates = new UpdateChecker({
+      store,
+      version: app.getVersion(),
+      enabled: () => preferences().checkForUpdates,
+      log: (line) => log.info(line),
+    });
+    if (preferences().checkForUpdates) updates.start();
     powerMonitor.on('resume', () => awsp?.onResume());
     if (preferences().autoSync && sharingEnabled()) void hub.sync();
     // Folders added in an earlier session are watched again from start-up, not from the first
@@ -713,6 +861,8 @@ if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow())))
 
   // The database closes last: windows are closed (and their close handlers have run) by now.
   app.on('will-quit', () => {
+    log.info('quitting');
+    updates?.stop();
     backups?.stop();
     liveTv?.stop();
     void helper?.stop();
