@@ -54,7 +54,16 @@ export function isTrustedSender(event: { senderFrame?: { url: string } | null },
   return typeof url === 'string' && isAllowed(url);
 }
 
-export function applySessionSecurity(session: Session, devServerUrl: string | null): void {
+/**
+ * The one permission the app's own page has: putting text on the clipboard, which is what Copy
+ * Ticket and the helper token's Copy do. Reading the clipboard is not it, and no other page gets
+ * even this.
+ */
+export function permissionAllowed(permission: string, pageUrl: string | null | undefined, isAllowed: AppUrlGuard): boolean {
+  return permission === 'clipboard-sanitized-write' && typeof pageUrl === 'string' && isAllowed(pageUrl);
+}
+
+export function applySessionSecurity(session: Session, devServerUrl: string | null, isAllowed: AppUrlGuard): void {
   const csp = contentSecurityPolicy(devServerUrl);
   session.webRequest.onHeadersReceived((details, callback) => {
     callback({
@@ -66,10 +75,11 @@ export function applySessionSecurity(session: Session, devServerUrl: string | nu
     });
   });
 
-  // The companion needs none of these. Denying rather than prompting means a compromised page
-  // cannot even ask.
-  session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
-  session.setPermissionCheckHandler(() => false);
+  // The companion needs no camera, microphone, location or notification. Denying rather than
+  // prompting means a compromised page cannot even ask. Its own page may write text to the
+  // clipboard, and that is all (see permissionAllowed).
+  session.setPermissionRequestHandler((contents, permission, callback) => callback(permissionAllowed(permission, contents?.getURL(), isAllowed)));
+  session.setPermissionCheckHandler((contents, permission) => permissionAllowed(permission, contents?.getURL(), isAllowed));
 
   // No device access at all: no serial, no HID, no USB, no Bluetooth.
   session.setDevicePermissionHandler(() => false);

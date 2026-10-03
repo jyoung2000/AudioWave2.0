@@ -1,381 +1,465 @@
 /*
- * Companion layout.
+ * Airwave Companion — where the design's window meets a real one.
  *
- * Every token, control and window part comes from @now-playing/aqua-ui; this file only positions
- * the companion-specific pieces. Nothing here redefines an Aqua token or restyles a control — the
- * design spec owns those, and a second definition here would be a second source of truth.
+ * Everything that makes this window look the way it does is the design's own stylesheet,
+ * `@now-playing/aqua-ui/airwave-window.css`, copied verbatim from
+ * `design/frontends/airwave-companion.html`. This file adds only what a mockup in a browser tab
+ * did not need and a program does:
+ *
+ *   1. the window fills the frame Windows gives it, instead of floating on a desktop backdrop;
+ *   2. the chrome is the title bar — a drag region, with the tools left clickable;
+ *   3. the states the design's sample data never reached (disabled, loading, selected);
+ *   4. the few things the real app holds that the mockup did not draw: a list of songs, a QR
+ *      code, a question before something is removed.
+ *
+ * It introduces no colour of its own beyond two the design uses inline, takes every value it can
+ * from the design's custom properties, and redefines none of them.
  */
-:root {
-  color-scheme: light;
-}
 
+/* ---------------------------------------------------------------- 1. the window */
 html,
 body,
 #root {
   height: 100%;
-  margin: 0;
 }
 
 body {
-  background: var(--aqua-window-bg, #e8e8e8);
-  /* The window chrome is the app's own; a scrollbar on the body would sit outside it. */
+  /* The mockup's desktop and its margins: a real window has neither. */
+  padding: 0;
+  min-height: 0;
+  background: var(--win-body);
   overflow: hidden;
 }
 
-.companion-title {
-  font-weight: 600;
-}
-
-.companion-version {
-  color: var(--aqua-text-secondary, #5a6472);
-  font-variant-numeric: tabular-nums;
-}
-
-.companion-hint {
-  margin: 0;
-  color: var(--aqua-text-secondary, #5a6472);
-  font-size: 11px;
-  line-height: 1.5;
-}
-
-.companion-hint--warning {
-  color: var(--aqua-warning-text, #8a5a00);
-}
-
-.companion-hint--error {
-  color: var(--aqua-danger-text, #9b1c1c);
-}
-
-.companion-actions,
-.companion-row-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
-.companion-actions {
-  margin: 8px 0;
-}
-
-.companion-form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-width: 40rem;
-}
-
-.companion-list {
-  margin: 6px 0 0;
-  padding-left: 18px;
-  color: var(--aqua-text-secondary, #5a6472);
-  font-size: 11px;
-  line-height: 1.6;
-}
-
-.companion-list li + li {
-  margin-top: 2px;
-}
-
-/*
- * A filesystem path is shown to *this* machine's owner and never sent anywhere. It is monospaced
- * and allowed to break mid-word because a deep Windows path is otherwise unreadable, and it is
- * selectable so it can be copied into Explorer.
- */
-.companion-path {
-  font-family: Consolas, "SF Mono", ui-monospace, monospace;
-  font-size: 11px;
-  color: var(--aqua-text-secondary, #5a6472);
-  overflow-wrap: anywhere;
-  user-select: text;
-}
-
-/*
- * The pairing fingerprint. Large, spaced and monospaced because its whole purpose is that a person
- * compares it character by character against the hub's screen; anything that makes two different
- * fingerprints look alike defeats the check.
- */
-.companion-fingerprint {
-  font-family: Consolas, "SF Mono", ui-monospace, monospace;
-  font-size: 18px;
-  letter-spacing: 0.14em;
-  padding: 10px 14px;
-  border: 1px solid var(--aqua-border, #b6b6b6);
-  border-radius: 6px;
-  background: var(--aqua-panel-bg, #fff);
-  user-select: text;
-}
-
-.companion-notices {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.companion-notices:not(:empty) {
-  margin-bottom: 10px;
-}
-
-.companion-blocked {
-  max-width: 34rem;
-  margin: 12vh auto 0;
-  text-align: center;
-}
-
-.companion-blocked h1 {
-  margin: 0 0 8px;
-  font-size: 17px;
-  font-weight: 600;
-}
-
-.companion-blocked p {
-  margin: 0;
-  color: var(--aqua-text-secondary, #5a6472);
-  line-height: 1.6;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
-  }
-}
-
-/* As in the hub's GUI: aqua-ui steps the shared controls up on a coarse
-   pointer, and these are the companion's own small classes. The window runs
-   on a desktop, so this is reached on a touchscreen laptop or a tablet. */
-@media (pointer: coarse) {
-  .companion-hint,
-  .companion-list {
-    font-size: 13px;
-  }
-
-  .companion-path {
-    font-size: 12px;
-  }
-}
-
-/* --------------------------------------------------------------------------
-   The companion window, from design/frontends/airwave-companion.html: title
-   bar, toolbar and the four tool tabs share one chrome sheet; the pane scrolls
-   beneath; the status line stays at the foot. Colours are aqua-ui tokens.
-   -------------------------------------------------------------------------- */
-.companion-window {
-  display: flex;
-  flex-direction: column;
-}
-
-.companion-chrome {
-  flex: none;
-  background: linear-gradient(to bottom, var(--aqua-chrome-top), var(--aqua-chrome-upper) 42%, var(--aqua-chrome-lower) 88%, var(--aqua-chrome-bottom));
-  border-bottom: 1px solid var(--aqua-chrome-separator);
-  box-shadow: inset 0 1px 0 var(--aqua-chrome-highlight);
-}
-
-.companion-chrome .aqua-toolbar {
-  background: none;
-  border-bottom: 0;
+.win {
+  height: 100%;
+  /* Windows draws this window's edge, corners and shadow. */
+  border: 0;
+  border-radius: 0;
   box-shadow: none;
 }
 
-.companion-pane {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+/* ------------------------------------------------------------- 2. the title bar */
+.chrome {
+  -webkit-app-region: drag;
+  user-select: none;
 }
 
-.companion-section + .companion-section {
-  border-top: 1px solid var(--aqua-row-divider);
+/* Windows' minimise, maximise and close sit over the right of the title strip. */
+.titlebar {
+  padding: 0 142px;
+  white-space: nowrap;
 }
 
-/* Snow Leopard preference panes: right-aligned labels in one column, controls in the next. */
-.companion-pref {
-  display: grid;
-  grid-template-columns: 158px minmax(0, 1fr);
-  gap: 9px 12px;
-  align-items: center;
+.tool {
+  -webkit-app-region: no-drag;
 }
 
-.companion-pref__k {
-  color: var(--aqua-text);
-  text-align: right;
-}
-
-.companion-pref__v {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 8px;
-  align-items: center;
-  min-width: 0;
-}
-
-.companion-pref__v--stack {
-  display: grid;
-  gap: 6px;
-}
-
-.companion-pref__sub {
-  flex-basis: 100%;
-}
-
-.companion-options {
-  display: grid;
-  gap: 6px;
-}
-
-.companion-inline {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 6px 8px;
-  align-items: center;
-}
-
-.companion-token {
-  font-size: 11px;
-  user-select: all;
-}
-
-/* Backup location: used · this backup · free after it. Widths are measured numbers. */
-.companion-space {
-  position: relative;
-  display: flex;
-  width: min(360px, 100%);
-  height: 10px;
-  overflow: hidden;
-  background: #d6d9dd;
-  border-radius: 5px;
-  box-shadow: inset 0 1px 2px rgb(0 0 0 / 25%);
-}
-
-.companion-space > i {
+/* ------------------------------------------------------------------- 3. states */
+.sect {
   display: block;
-  height: 100%;
 }
 
-.companion-space__used {
-  background: linear-gradient(var(--aqua-graphite-top), var(--aqua-graphite-mid));
+.pane > .sect:last-child > fieldset:last-of-type {
+  margin-bottom: 2px;
 }
 
-.companion-space__this {
-  background: linear-gradient(var(--aqua-selection-top), var(--aqua-selection-bottom));
+.dim {
+  color: var(--ink-3);
 }
 
-.companion-space--short .companion-space__this {
-  background: linear-gradient(#e98a7e, var(--aqua-danger));
+/* The design's checkbox input is laid over its drawn box; the row must be what it is laid over. */
+.optrow {
+  position: relative;
 }
 
-/* Downloader rows: a dot, the tool and its version, its role, where it was found or what to do. */
-.companion-tools {
-  display: grid;
-  gap: 2px;
-  margin: 6px 0;
-  padding: 0;
-  list-style: none;
+.chk.is-off,
+.optrow.is-off .lbl b {
+  color: var(--aq-ink-off);
 }
 
-.companion-tool {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  padding: 8px 8px 9px;
-  border: 1px solid var(--aqua-ctl-field-border);
-  border-radius: 4px;
-  background: var(--aqua-content);
+.chk input:disabled + .box,
+.optrow input:disabled + .box {
+  border-image-source: var(--aq-cb-14-off);
 }
 
-.companion-tool__main {
-  display: grid;
-  flex: 1 1 250px;
-  gap: 1px;
-  min-width: 0;
+.chk input:checked:disabled + .box,
+.optrow input:checked:disabled + .box {
+  border-image-source: var(--aq-cb-14-on-off);
 }
 
-.companion-tool__version {
-  color: var(--aqua-text-secondary);
-  font-family: ui-monospace, Consolas, monospace;
+.pop:disabled {
+  border-image-source: var(--aq-pop-22-off);
+  color: var(--aq-ink-off);
+}
+
+.rm:disabled {
+  opacity: 0.45;
+}
+
+.rm:disabled:hover {
+  color: #5c5c5c;
+}
+
+.rm--again {
   font-size: 11px;
   font-weight: 400;
 }
 
-.companion-tool__path {
-  color: var(--aqua-text-disabled);
-  font-size: 10.5px;
+.rm--again:hover {
+  color: var(--sel-bot);
+}
+
+.field:disabled {
+  background: var(--content-muted);
+  color: var(--ink-3);
+}
+
+.field[readonly] {
+  color: var(--ink-2);
+}
+
+/* A field for words rather than an address reads in the window's own face. */
+.field--search,
+.field--code {
+  font-family: var(--font);
+  font-size: 12px;
+}
+
+.field--search {
+  flex: 1 1 150px;
+}
+
+.field--code {
+  flex: 0 1 140px;
+}
+
+/* A button or a pop-up inside a list row. */
+.push--row {
+  flex: none;
+  min-width: 0;
+  padding: 0 10px;
+}
+
+.pop--row {
+  flex: none;
+  max-width: 170px;
+}
+
+.rows .meta {
+  white-space: nowrap;
+}
+
+/* A status light with its words. */
+.state {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.state .sdot {
+  margin-top: 0;
+}
+
+.short {
+  color: #b3261e;
+}
+
+.token {
+  user-select: all;
+}
+
+.well--gap {
+  margin-top: 10px;
+}
+
+.plainlist {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--ink-2);
+}
+
+.plainlist li {
+  margin: 3px 0;
+}
+
+.blocked__title {
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+
+/* The status strip's light when no hub is paired, and when a paired one is out of reach. */
+.dot--off {
+  background: var(--ink-3);
+  box-shadow: inset 0 -1px 1px rgba(0, 0, 0, 0.3);
+}
+
+.dot--warn {
+  background: var(--warning);
+  box-shadow:
+    inset 0 -1px 1px rgba(0, 0, 0, 0.3),
+    0 0 3px rgba(217, 154, 30, 0.8);
+}
+
+.dot {
+  flex: none;
+}
+
+.status__hub {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status__counts {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* Progress: the design's space bar, used for how far along something is. */
+.progress {
+  width: 100%;
+  max-width: 220px;
+  height: 8px;
+  margin: 3px 0 2px;
+  flex: none;
+}
+
+.rows li > .progress {
+  width: 110px;
+  margin: 0;
+}
+
+.progress.is-waiting .this {
+  opacity: 0.45;
+  animation: pulse 1s ease-in-out infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress.is-waiting .this {
+    animation: none;
+  }
+}
+
+/* --------------------------------------------- 4. what the mockup did not draw */
+
+/* Notices from the main process: one line each, at the top of the pane. */
+.notices {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.notices li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 5px 6px 5px 9px;
+  border: 1px solid var(--row-divider);
+  border-radius: 4px;
+  background: var(--content-muted);
+}
+
+.notices__text {
+  flex: 1;
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 
-/* The Live TV tab's amber notice: what is missing, said plainly. */
-.companion-gate {
-  display: grid;
-  gap: 6px;
-  padding: 10px 12px;
-  background: var(--aqua-warning-bg);
-  border: 1px solid var(--aqua-warning-edge);
-  border-radius: 4px;
+/* The songs on this PC: the hub design's list table (.tbl, airwave-hub.css), in the companion's well. */
+.tracks {
+  /* Ten rows in the design's window; more as the window grows. */
+  max-height: max(258px, calc(100vh - 520px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
-@media (max-width: 560px) {
-  .companion-pref {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 3px 0;
-  }
-
-  .companion-pref__k {
-    margin-top: 8px;
-    font-weight: 700;
-    text-align: left;
-  }
+.tracks::-webkit-scrollbar {
+  width: 15px;
 }
 
-/* Stream to your devices: the QR beside the code, as the mockup's Remote tab set them. */
-.companion-pair {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  align-items: flex-start;
+.tracks::-webkit-scrollbar-track {
+  background: linear-gradient(to right, var(--track-lo), var(--track-hi) 45%, var(--track-hi) 70%, var(--track-lo));
+  box-shadow: inset 1px 0 0 var(--track-edge);
 }
 
-.companion-pair__qr svg {
-  display: block;
-  width: 168px;
-  height: 168px;
-  padding: 6px;
-  background: #fff;
-  border: 1px solid var(--aqua-ctl-field-border);
-  border-radius: 4px;
+.tracks::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 8px;
+  min-height: 40px;
+  background:
+    repeating-linear-gradient(to bottom, var(--gel-stripe) 0 2px, transparent 2px 4px) padding-box,
+    var(--gel-thumb) padding-box;
 }
 
-.companion-pair__text {
-  flex: 1 1 260px;
-  min-width: 0;
-}
-
-.companion-lcd {
-  display: grid;
-  gap: 3px;
-  justify-items: center;
-  padding: 12px 14px 13px;
-  color: var(--aqua-lcd-text);
-  text-align: center;
-  background: linear-gradient(var(--aqua-lcd-top), var(--aqua-lcd-bottom));
-  border: 1px solid #7f8a8e;
-  border-radius: 4px;
-  box-shadow: inset 0 1px 3px rgb(0 0 0 / 25%);
-}
-
-.companion-lcd__code {
-  font: 700 30px/1.1 ui-monospace, Consolas, monospace;
-  letter-spacing: 0.14em;
-}
-
-.companion-lcd__sub {
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
   font-size: 11px;
+  table-layout: fixed;
 }
 
-.companion-steps {
-  margin: 8px 0 0;
-  padding-left: 18px;
+.tbl th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  text-align: left;
+  font-weight: 700;
+  color: #3a3d41;
+  padding: 3px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: linear-gradient(#f8f8f8, #dadada);
+  box-shadow: inset 0 -1px 0 #adadad;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.tbl td {
+  padding: 4px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tbl .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.tbl__time {
+  width: 52px;
+}
+
+.tbl__tempo {
+  width: 60px;
+}
+
+.tbl tbody tr {
+  cursor: default;
+  user-select: none;
+}
+
+.tbl tbody tr:nth-child(even) {
+  background: var(--row-stripe);
+}
+
+.tbl tbody tr[aria-selected='true'] {
+  background: linear-gradient(var(--sel-top), var(--sel-mid) 55%, var(--sel-bot));
+  color: var(--sel-ink);
+}
+
+.tbl tbody tr[aria-selected='true'] .dim {
+  color: inherit;
+}
+
+.tbl tbody tr:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+/* A code to compare, in words rather than digits: the LCD, a size down. */
+.lcd__code--words {
+  font-size: 20px;
+  letter-spacing: 0.08em;
+  overflow-wrap: anywhere;
+}
+
+/* The ticket's QR code beside the three steps. */
+.pairhow {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-top: 8px;
+}
+
+.pairhow .steps {
+  margin-top: 0;
+}
+
+.pairhow__qr {
+  flex: none;
+  width: 96px;
+  height: 96px;
+  padding: 4px;
+  background: var(--content);
+  border: 1px solid var(--well-edge);
+  border-radius: 2px;
+}
+
+.pairhow__qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* A question, as a sheet: it comes down from under the toolbar over the window it belongs to. */
+dialog.sheet {
+  position: fixed;
+  top: 86px;
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  width: min(430px, calc(100vw - 40px));
+  max-width: none;
+  padding: 0;
+  border: 1px solid var(--win-outline);
+  border-top: 0;
+  border-radius: 0 0 6px 6px;
+  background: var(--win-body);
+  color: var(--ink);
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.42),
+    inset 0 7px 8px -7px rgba(0, 0, 0, 0.4);
+  transform-origin: top;
+  animation: sheet-in 0.16s ease-out;
+}
+
+dialog.sheet::backdrop {
+  background: rgba(40, 44, 50, 0.18);
+}
+
+@keyframes sheet-in {
+  from {
+    transform: scaleY(0.7);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  dialog.sheet {
+    animation: none;
+  }
+}
+
+.sheet__body {
+  padding: 16px 18px 14px;
+}
+
+.sheet__body h2 {
+  font-size: 13px;
+  margin: 0 0 6px;
+}
+
+.sheet__body .hint {
+  margin: 0;
+}
+
+.sheet__acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+/* A sheet has one default button, and it is blue for as long as the sheet is open. */
+.sheet .push--default {
+  border-image-source: var(--aq-def-22);
+}
+
+.sheet .push--default:active {
+  border-image-source: var(--aq-def-22-down);
 }

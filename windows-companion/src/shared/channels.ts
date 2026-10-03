@@ -14,8 +14,10 @@ export const IPC_CHANNELS = [
   'app:info',
   'app:preferences:get',
   'app:preferences:set',
+  'app:preferences:reset',
   'app:open-external',
   'app:reveal',
+  'app:open-data-folder',
 
   'library:folders',
   'library:add-folder',
@@ -31,6 +33,7 @@ export const IPC_CHANNELS = [
   'hub:forget',
   'hub:sync-now',
   'hub:share-library',
+  'hub:sharing',
 
   'transfers:list',
   'transfers:send',
@@ -58,11 +61,15 @@ export const IPC_CHANNELS = [
   'helper:install-tools',
   'helper:token',
 
+  'tv:links',
+  'tv:add',
+  'tv:remove',
+  'tv:refresh',
 ] as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[number];
 
 /** Events the main process pushes to the renderer. Same rule: an event not listed does not exist. */
-export const IPC_EVENT_NAMES = ['event:scan-progress', 'event:hub-status', 'event:transfer-progress', 'event:backup-progress', 'event:awsp-status', 'event:notice'] as const;
+export const IPC_EVENT_NAMES = ['event:scan-progress', 'event:hub-status', 'event:transfer-progress', 'event:backup-progress', 'event:awsp-status', 'event:tv-links', 'event:notice'] as const;
 
 export type IpcEvent = (typeof IPC_EVENT_NAMES)[number];

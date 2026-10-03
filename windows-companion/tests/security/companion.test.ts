@@ -24,7 +24,7 @@ vi.mock('electron', () => ({
 }));
 
 const { isPlainHttpOverInternet, sanitize } = await import('../../src/main/hub.js');
-const { appUrlGuard, contentSecurityPolicy, isAllowedAppUrl, isTrustedSender, openExternally } = await import('../../src/main/security.js');
+const { appUrlGuard, contentSecurityPolicy, isAllowedAppUrl, isTrustedSender, openExternally, permissionAllowed } = await import('../../src/main/security.js');
 const { IPC_CHANNELS, IPC_EVENT_NAMES } = await import('../../src/shared/channels.js');
 const { IPC, IPC_EVENTS } = await import('../../src/shared/ipc.js');
 
@@ -96,7 +96,7 @@ describe('the content security policy', () => {
 });
 
 describe('the window only ever shows the app', () => {
-  const indexFile = process.platform === 'win32' ? 'C:\\Program Files\\Now Playing Companion\\resources\\app.asar\\dist\\renderer\\index.html' : '/opt/companion/resources/app.asar/dist/renderer/index.html';
+  const indexFile = process.platform === 'win32' ? 'C:\\Program Files\\Airwave Companion\\resources\\app.asar\\dist\\renderer\\index.html' : '/opt/companion/resources/app.asar/dist/renderer/index.html';
   const indexUrl = pathToFileURL(indexFile).href;
 
   it('allows the bundled index.html, with or without a fragment', () => {
@@ -124,6 +124,20 @@ describe('the window only ever shows the app', () => {
     expect(isTrustedSender({ senderFrame: { url: 'file:///C:/evil.html' } }, guard)).toBe(false);
     expect(isTrustedSender({ senderFrame: null }, guard)).toBe(false);
     expect(isTrustedSender({}, guard)).toBe(false);
+  });
+
+  it('lets its own page put text on the clipboard, and grants nothing else to anything', () => {
+    const guard = appUrlGuard(null, indexFile);
+    // Copy Ticket and the helper token's Copy need this; without it they fail silently.
+    expect(permissionAllowed('clipboard-sanitized-write', indexUrl, guard)).toBe(true);
+    for (const permission of ['clipboard-read', 'media', 'geolocation', 'notifications', 'openExternal', 'fullscreen', 'hid', 'serial', 'usb', 'fileSystem']) {
+      expect(permissionAllowed(permission, indexUrl, guard), permission).toBe(false);
+    }
+    // Not another page, and not a request with no page behind it.
+    expect(permissionAllowed('clipboard-sanitized-write', 'https://example.com/', guard)).toBe(false);
+    expect(permissionAllowed('clipboard-sanitized-write', 'file:///C:/evil.html', guard)).toBe(false);
+    expect(permissionAllowed('clipboard-sanitized-write', undefined, guard)).toBe(false);
+    expect(permissionAllowed('clipboard-sanitized-write', null, guard)).toBe(false);
   });
 });
 

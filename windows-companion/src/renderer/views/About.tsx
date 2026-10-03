@@ -1,58 +1,83 @@
 /**
- * Versions, and an honest statement about signing and updates.
+ * Where the companion keeps its own data, what it never sends, and what build this is — with an
+ * honest statement about signing and updates.
  *
  * An unsigned Windows build makes SmartScreen warn on first run. Saying so here, with what the
- * warning will look like, is better than a person deciding the app is malware.
+ * warning looks like, is better than a person deciding the app is malware.
  */
-import { Button, KeyValueList, Panel, PanelSection, StatusDot } from '@now-playing/aqua-ui';
+import { useState } from 'react';
 import { invoke } from '../bridge.js';
-import { useChannel } from '../hooks.js';
+import { useAction, useChannel } from '../hooks.js';
+import { Push, Status } from '../ui.js';
 
 export function AboutView() {
   const info = useChannel('app:info', undefined);
   const data = info.data;
+  const open = useAction(async () => invoke('app:open-data-folder', undefined));
+  const [said, setSaid] = useState<string | null>(null);
 
   return (
-    <Panel title="About">
-      <PanelSection>
-        <KeyValueList
-          items={[
-            { key: 'Version', value: data?.version ?? '—' },
-            { key: 'Electron', value: data ? `${data.electron} (Chromium ${data.chrome}, Node ${data.node})` : '—' },
-            { key: 'Platform', value: data?.platform ?? '—' },
-            { key: 'Contracts', value: data ? `${data.contractsVersion}, protocol ${data.protocolVersion}` : '—' },
-            { key: 'Code signing', value: <StatusDot kind={data?.signed ? 'ok' : 'warning'} label={data?.signed ? 'Signed' : 'Not signed'} /> },
-          ]}
-        />
-        {data && !data.signed ? (
-          <p className="companion-hint companion-hint--warning">
-            This build is not code-signed, so Windows SmartScreen will show a blue “Windows protected your PC” warning the first time you run it. Choose “More info” and then “Run anyway”. Signing requires a
-            certificate that costs money and is tied to an identity; a build from source will not have one.
-          </p>
-        ) : null}
-      </PanelSection>
+    <>
+      <fieldset>
+        <legend>Storage and privacy</legend>
+        <div className="pref">
+          <span className="k top">Settings are kept in:</span>
+          <div className="v">
+            <span className="path">{data?.dataDir ?? ' '}</span>
+            <span className="sub">The index of your music, your playlists and EQ presets, the hub pairing and the helper token. No audio.</span>
+            <Push
+              busy={open.busy}
+              disabled={!data}
+              onClick={() =>
+                void open.run().then((result) => {
+                  setSaid(result && !result.ok ? result.reason : null);
+                })
+              }
+            >
+              Show in Explorer
+            </Push>
+            {said ? (
+              <span className="sub note--bad" role="alert">
+                {said}
+              </span>
+            ) : null}
+          </div>
+        </div>
+        <p className="note">No telemetry, no analytics, no crash reports. Folder paths never leave this PC; the hub only gets what’s in them.</p>
+      </fieldset>
 
-      <PanelSection title="Updates">
-        <p className="companion-hint">
-          {data?.updateFeedUrl
-            ? 'This build checks the release feed below for a newer version. It never installs anything on its own.'
-            : 'This build does not check for updates. There is no update server configured, so nothing is contacted and nothing is downloaded. Get new versions from wherever you got this one.'}
-        </p>
-        {data?.updateFeedUrl ? (
-          <Button size="small" onClick={() => void invoke('app:open-external', { url: data.updateFeedUrl! })}>
-            Open the release page
-          </Button>
-        ) : null}
-      </PanelSection>
-
-      <PanelSection title="What this app does and does not do">
-        <ul className="companion-list">
-          <li>Reads music files where they already are. It never moves, copies or modifies them.</li>
-          <li>Sends nothing anywhere unless you pair a hub, and then only metadata until you send a file yourself.</li>
-          <li>No analytics, no telemetry, no crash reporting.</li>
-          <li>Folder paths never leave this computer.</li>
-        </ul>
-      </PanelSection>
-    </Panel>
+      <fieldset>
+        <legend>About</legend>
+        <div className="pref">
+          <span className="k">Version:</span>
+          <div className="v">{data ? `Airwave Companion ${data.version}` : ' '}</div>
+          <span className="k top">Built with:</span>
+          <div className="v">
+            {data ? `Electron ${data.electron} · Chromium ${data.chrome} · Node ${data.node}` : ' '}
+            {data ? (
+              <span className="sub">
+                {data.platform} · contracts {data.contractsVersion}, protocol {data.protocolVersion}
+              </span>
+            ) : null}
+          </div>
+          <span className="k top">Code signing:</span>
+          <div className="v">
+            {data ? <Status kind={data.signed ? 'ok' : 'warn'}>{data.signed ? 'Signed' : 'Not signed'}</Status> : ' '}
+            {data && !data.signed ? <span className="sub">Windows SmartScreen shows “Windows protected your PC” the first time an unsigned build runs. Choose More info, then Run anyway.</span> : null}
+          </div>
+          <span className="k top">Updates:</span>
+          <div className="v">
+            {data?.updateFeedUrl ? (
+              <>
+                <Push onClick={() => void invoke('app:open-external', { url: data.updateFeedUrl! })}>Open Release Page</Push>
+                <span className="sub">This build checks the release page for a newer version. It never installs anything by itself.</span>
+              </>
+            ) : (
+              <span>{data ? 'This build doesn’t check for updates, so nothing is contacted. Get new versions from where you got this one.' : ' '}</span>
+            )}
+          </div>
+        </div>
+      </fieldset>
+    </>
   );
 }

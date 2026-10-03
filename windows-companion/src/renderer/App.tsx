@@ -1,38 +1,72 @@
 /**
- * The companion's interface.
+ * The companion's window.
  *
- * The window is the one `design/frontends/airwave-companion.html` drew: a title bar and four icon
- * tabs on one chrome sheet — Library, Live TV, Remote, Settings — the pane scrolling beneath, a
- * status line at the foot. What differs from the hub's window is what this app *can* do: reach the
- * filesystem. The sections are organised around exactly that. Every figure on screen comes through
- * the preload bridge from the main process; the renderer has no way to read a folder itself.
+ * It is the window `design/frontends/airwave-companion.html` drew, on this PC's own data: a title
+ * and four tools on one sheet of chrome — Library, Live TV, Remote, Settings — the pane scrolling
+ * beneath, a status line at the foot. The markup and class names are the design's, styled by the
+ * design's stylesheet; what this file adds is where the mockup had sample data: every figure on
+ * screen comes through the preload bridge from the main process, which is the only part of the app
+ * that can read a folder or reach the network.
+ *
+ * The chrome is also the window's title bar: the operating system's own is hidden, the page draws
+ * the title, and Windows draws its minimise, maximise and close over the top-right corner
+ * (`src/main/index.ts`, createWindow). The chrome is the drag region; the tools are not.
  */
-import { useMemo, useState } from 'react';
-import { AquaWindow, BottomBar, Button, Content, StatusDot, Toolbar, ToolTabs, type ToolTabItem } from '@now-playing/aqua-ui';
+import { useCallback, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { bridgeAvailable, invoke } from './bridge.js';
-import { useChannel, useEvent } from './hooks.js';
-import { LibraryView } from './views/Library.js';
+import { ago, plural } from './format.js';
+import { useChannel, useEvent, type Resource } from './hooks.js';
+import { LibraryToolIcon, LiveTvToolIcon, RemoteToolIcon, SettingsToolIcon } from './icons.js';
+import { ConfirmProvider, Push, useConfirm } from './ui.js';
+import { AboutView } from './views/About.js';
+import { BackupView } from './views/Backup.js';
 import { FoldersView } from './views/Folders.js';
-import { LiveTvView } from './views/LiveTv.js';
 import { HubView } from './views/Hub.js';
-import { TransfersView } from './views/Transfers.js';
+import { LibraryView } from './views/Library.js';
+import { LiveTvView } from './views/LiveTv.js';
+import { NoticeBar, useNotices } from './views/NoticeBar.js';
 import { needsAttention, SettingsView } from './views/Settings.js';
 import { StreamingView } from './views/Streaming.js';
-import { BackupView } from './views/Backup.js';
-import { AboutView } from './views/About.js';
-import { NoticeBar, useNotices } from './views/NoticeBar.js';
-import type { HelperStatus, HubConnection } from '../shared/ipc.js';
+import { TransfersView } from './views/Transfers.js';
+import { PRODUCT_NAME } from '../shared/identity.js';
+import type { AwspStatus, HelperStatus, HubConnection, TvLinks } from '../shared/ipc.js';
 
 /** The sections. Each is a screen in design/coverage.json; the tab it lives in is below. */
 export type ViewId = 'folders' | 'library' | 'live-tv' | 'streaming' | 'hub' | 'transfers' | 'settings' | 'backup' | 'about';
 
 export type TabId = 'library' | 'live-tv' | 'remote' | 'settings';
 
-const TABS: ReadonlyArray<ToolTabItem<TabId> & { sections: ViewId[] }> = [
-  { id: 'library', label: 'Library', icon: 'folder', sections: ['folders', 'library'] },
-  { id: 'live-tv', label: 'Live TV', icon: 'device', sections: ['live-tv'] },
-  { id: 'remote', label: 'Remote', icon: 'link', sections: ['streaming', 'hub', 'transfers'] },
-  { id: 'settings', label: 'Settings', icon: 'gear', sections: ['settings', 'backup', 'about'] },
+const PRODUCT = PRODUCT_NAME;
+
+const TABS: ReadonlyArray<{ id: TabId; label: string; icon: () => ReactNode; sections: ViewId[]; lead: string }> = [
+  {
+    id: 'library',
+    label: 'Library',
+    icon: LibraryToolIcon,
+    sections: ['folders', 'library'],
+    lead: 'The folders on this PC that Airwave plays from. The companion watches them and, once sharing is on, passes what it finds to your Airwave Hub so every device sees the same library.',
+  },
+  {
+    id: 'live-tv',
+    label: 'Live TV',
+    icon: LiveTvToolIcon,
+    sections: ['live-tv'],
+    lead: 'Channel playlists and programme guides for the Live TV tab. Paste a link and it is checked, kept here, and passed to the Airwave player on this PC.',
+  },
+  {
+    id: 'remote',
+    label: 'Remote',
+    icon: RemoteToolIcon,
+    sections: ['streaming', 'hub', 'transfers'],
+    lead: 'Reach this PC from the Airwave player wherever you are. Every connection is encrypted, and only devices you pair here can connect.',
+  },
+  {
+    id: 'settings',
+    label: 'Settings',
+    icon: SettingsToolIcon,
+    sections: ['settings', 'backup', 'about'],
+    lead: 'The tools this PC downloads with, and how the companion behaves on this PC. Changes take effect as you make them.',
+  },
 ];
 
 const SECTION_TITLES: Record<ViewId, string> = {
@@ -52,103 +86,206 @@ export function helperPollMs(status: HelperStatus | null): number {
   return status?.tools.some((t) => t.setup?.state === 'installing') ? 1_500 : 30_000;
 }
 
+/** A channel's answer, replaced by whatever the main process pushes after it. */
+function useLive<T>(resource: Resource<T>, pushed: T | null): T | null {
+  return pushed ?? resource.data;
+}
+
 export function App() {
+  if (!bridgeAvailable()) return <Outside />;
+  return (
+    <ConfirmProvider>
+      <Companion />
+    </ConfirmProvider>
+  );
+}
+
+/** Opened in a browser, the page has no way to reach the app. It says so and offers nothing. */
+function Outside() {
+  return (
+    <div className="win">
+      <div className="chrome">
+        <div className="titlebar">{PRODUCT}</div>
+      </div>
+      <section className="pane">
+        <h1 className="blocked__title">This window is not running inside the companion</h1>
+        <p className="lead">The page is loaded, but it has no connection to the app that can read your files. That happens when it is opened in a web browser. Open Airwave Companion from the Start menu instead.</p>
+      </section>
+    </div>
+  );
+}
+
+function Companion() {
   const [tab, setTab] = useState<TabId>('library');
-  const info = useChannel('app:info', undefined);
+  /** A pane is built the first time its tool is chosen and then kept, so coming back to it is instant. */
+  const [opened, setOpened] = useState<ReadonlySet<TabId>>(() => new Set<TabId>(['library']));
+  const tools = useRef(new Map<TabId, HTMLButtonElement>());
+
   const folders = useChannel('library:folders', undefined, { pollMs: 5_000 });
   const hubStatus = useChannel('hub:status', undefined, { pollMs: 10_000 });
   const helper = useChannel('helper:status', undefined, { pollMs: helperPollMs });
-  const [liveHub, setLiveHub] = useState<HubConnection | null>(null);
+  const tvLinks = useChannel('tv:links', undefined, { pollMs: 60_000 });
+  const awspStatus = useChannel('awsp:status', undefined, { pollMs: 30_000 });
+  const [pushedHub, setPushedHub] = useState<HubConnection | null>(null);
+  const [pushedTv, setPushedTv] = useState<TvLinks | null>(null);
+  const [pushedAwsp, setPushedAwsp] = useState<AwspStatus | null>(null);
+  const prefs = useChannel('app:preferences:get', undefined);
   const notices = useNotices();
+  const confirm = useConfirm();
+  /** The Settings tab's one line of feedback, at its foot, as the design's `say()` wrote it. */
+  const [settingsNote, setSettingsNote] = useState<string | null>(null);
+  const [restoring, setRestoring] = useState(false);
 
-  useEvent('event:hub-status', setLiveHub);
+  const restoreDefaults = async () => {
+    const yes = await confirm({ title: 'Restore the default settings?', detail: 'Start-up, the notification area, folder watching, syncing and the helper’s port go back to how a new install has them. Downloaders, folders, links, backups and pairings are unchanged.', action: 'Restore Defaults' });
+    if (!yes) return;
+    setRestoring(true);
+    try {
+      await invoke('app:preferences:reset', undefined);
+      prefs.reload();
+      setSettingsNote('Defaults restored. Downloaders and folders are unchanged.');
+    } catch (err) {
+      setSettingsNote(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRestoring(false);
+    }
+  };
 
-  const hub = liveHub ?? hubStatus.data ?? null;
+  useEvent('event:hub-status', setPushedHub);
+  useEvent('event:tv-links', setPushedTv);
+  useEvent('event:awsp-status', setPushedAwsp);
+
+  const hub = useLive(hubStatus, pushedHub);
+  const tv = useLive(tvLinks, pushedTv);
+  const awsp = useLive(awspStatus, pushedAwsp);
   const items = folders.data?.items ?? [];
-  const trackCount = items.reduce((sum, folder) => sum + folder.trackCount, 0);
-  const unavailable = items.filter((folder) => !folder.available).length;
-  // A downloader that needs the person is worth a badge on Settings, as the mockup's gear wore one.
+  // A downloader that needs the person is worth a badge on Settings, as the design's gear wore one.
   // One still being set up does not: it is on its way (UX-SETUP-001).
-  const missingTools = helper.data?.tools.filter(needsAttention).length ?? 0;
+  const attention = helper.data?.tools.filter((t) => needsAttention(t, helper.data?.running ?? false)).length ?? 0;
 
-  const tabItems = useMemo(
-    () => TABS.map((t) => (t.id === 'settings' && missingTools ? { id: t.id, label: t.label, icon: t.icon, badge: missingTools, badgeLabel: `${missingTools} downloader${missingTools === 1 ? '' : 's'} not set up` } : { id: t.id, label: t.label, icon: t.icon })),
-    [missingTools],
-  );
+  const show = useCallback((id: TabId) => {
+    setTab(id);
+    setOpened((current) => (current.has(id) ? current : new Set(current).add(id)));
+  }, []);
 
-  if (!bridgeAvailable()) {
-    return (
-      <AquaWindow active title="Now Playing Companion" flush>
-        <Content>
-          <div className="companion-blocked">
-            <h1>This window is not running inside the companion</h1>
-            <p>
-              The interface is loaded, but it has no connection to the app that can read your files. This happens when the page is opened in a normal browser. Start the companion from its own shortcut.
-            </p>
-          </div>
-        </Content>
-      </AquaWindow>
-    );
-  }
+  /** Arrow keys move along the tools and choose as they go, as the design's toolbar does. */
+  const onToolKey = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+    const target = event.key === 'Home' ? 0 : event.key === 'End' ? TABS.length - 1 : step ? (index + step + TABS.length) % TABS.length : null;
+    if (target === null) return;
+    event.preventDefault();
+    const next = TABS[target]!;
+    show(next.id);
+    tools.current.get(next.id)?.focus();
+  };
+
+  const refreshHub = () => {
+    setPushedHub(null);
+    hubStatus.reload();
+  };
 
   const section = (id: ViewId) => {
     switch (id) {
       case 'folders':
-        return <FoldersView onFoldersChanged={folders.reload} />;
+        return <FoldersView folders={folders} />;
       case 'library':
-        return <LibraryView helper={helper} />;
+        return <LibraryView helper={helper} hubConnected={hub?.connected ?? false} hasMusicFolder={items.some((f) => f.kind === 'music')} />;
       case 'live-tv':
-        return <LiveTvView />;
+        return <LiveTvView links={tv} onChanged={setPushedTv} />;
       case 'streaming':
-        return <StreamingView />;
+        return <StreamingView status={awsp} onChanged={setPushedAwsp} />;
       case 'hub':
-        return <HubView status={hub} onChanged={hubStatus.reload} />;
+        return <HubView status={hub} onChanged={refreshHub} />;
       case 'transfers':
         return <TransfersView hubConnected={hub?.connected ?? false} />;
       case 'settings':
-        return <SettingsView helper={helper} />;
+        return <SettingsView helper={helper} prefs={prefs} say={setSettingsNote} />;
       case 'backup':
-        return <BackupView />;
+        return <BackupView say={setSettingsNote} />;
       case 'about':
         return <AboutView />;
     }
   };
 
-  const current = TABS.find((t) => t.id === tab) ?? TABS[0]!;
-  const statusLine = hub?.connected ? `Connected to ${hub.hubName ?? 'a hub'}${hub.lastSyncAt ? ` · synced ${new Date(hub.lastSyncAt).toLocaleTimeString()}` : ''}` : 'No hub paired';
-  const helperLine = helper.data ? (helper.data.running ? `helper on 127.0.0.1:${helper.data.port}` : 'helper not running') : null;
+  const paired = Boolean(hub?.endpoint);
+  const hubName = hub?.hubName ?? 'your Airwave Hub';
+  const hubLine = !hub ? '' : hub.connected ? `Connected to ${hubName}${hub.lastSyncAt ? ` · synced ${ago(hub.lastSyncAt)}` : ''}` : paired ? `Can’t reach ${hubName}` : 'No hub paired';
+  const countLine = [plural(items.length, 'folder'), plural(tv?.m3u.length ?? 0, 'playlist'), plural(tv?.epg.length ?? 0, 'guide'), plural(awsp?.devices.length ?? 0, 'device')].join(' · ');
 
   return (
-    <AquaWindow active title="Now Playing Companion" flush className="companion-window">
-      <div className="companion-chrome">
-        <Toolbar
-          display={<div className="companion-title">Now Playing Companion</div>}
-          secondary={
-            <>
-              <Button size="small" icon="refresh" onClick={() => void invoke('library:scan', {})}>
-                Scan
-              </Button>
-              <Button size="small" icon="reconnect" disabled={!hub?.connected} onClick={() => void invoke('hub:sync-now', undefined)}>
-                Sync
-              </Button>
-            </>
-          }
-        />
-        <ToolTabs tabs={tabItems} value={tab} onChange={setTab} label="Sections" idPrefix="companion" />
+    <div className="win">
+      <div className="chrome">
+        <div className="titlebar" role="heading" aria-level={1}>
+          {PRODUCT}
+        </div>
+        <div className="toolbar" role="tablist" aria-label="Sections">
+          {TABS.map((t, index) => {
+            const selected = t.id === tab;
+            const Icon = t.icon;
+            const badge = t.id === 'settings' ? attention : 0;
+            return (
+              <button
+                key={t.id}
+                ref={(node) => {
+                  if (node) tools.current.set(t.id, node);
+                  else tools.current.delete(t.id);
+                }}
+                type="button"
+                className="tool"
+                role="tab"
+                id={`companion-tab-${t.id}`}
+                aria-selected={selected}
+                aria-controls={`companion-pane-${t.id}`}
+                tabIndex={selected ? 0 : -1}
+                onClick={() => show(t.id)}
+                onKeyDown={(event) => onToolKey(event, index)}
+              >
+                <Icon />
+                {t.label}
+                {badge ? (
+                  <>
+                    <span className="gear-badge" aria-hidden="true">
+                      {badge}
+                    </span>
+                    <span className="sr">, {badge === 1 ? '1 downloader needs attention' : `${badge} downloaders need attention`}</span>
+                  </>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
       </div>
-      <Content className="companion-pane" id={`companion-pane-${current.id}`} role="tabpanel" aria-labelledby={`companion-tab-${current.id}`}>
-        <NoticeBar notices={notices.items} onDismiss={notices.dismiss} />
-        {current.sections.map((id) => (
-          <section key={id} className="companion-section" id={id} aria-label={SECTION_TITLES[id]}>
-            {section(id)}
+
+      {TABS.map((t) =>
+        opened.has(t.id) ? (
+          <section key={t.id} className="pane" id={`companion-pane-${t.id}`} role="tabpanel" aria-labelledby={`companion-tab-${t.id}`} hidden={t.id !== tab}>
+            {t.id === tab ? <NoticeBar notices={notices.items} onDismiss={notices.dismiss} /> : null}
+            <p className="lead">{t.lead}</p>
+            {t.sections.map((id) => (
+              <section key={id} className="sect" id={id} aria-label={SECTION_TITLES[id]}>
+                {section(id)}
+              </section>
+            ))}
+            {t.id === 'settings' ? (
+              <div className="panefoot">
+                <p className="note" role="status">
+                  {settingsNote ?? 'Settings are kept on this PC.'}
+                </p>
+                <Push busy={restoring} onClick={() => void restoreDefaults()}>
+                  Restore Defaults
+                </Push>
+              </div>
+            ) : null}
           </section>
-        ))}
-      </Content>
-      <BottomBar
-        left={<StatusDot kind={hub?.connected ? 'ok' : 'neutral'} label={statusLine} />}
-        status={`${trackCount.toLocaleString()} tracks in ${items.length} folder${items.length === 1 ? '' : 's'}${unavailable ? ` · ${unavailable} folder${unavailable === 1 ? '' : 's'} unavailable` : ''}${helperLine ? ` · ${helperLine}` : ''}`}
-        right={<span className="companion-version">{info.data ? `v${info.data.version}` : ''}</span>}
-      />
-    </AquaWindow>
+        ) : null,
+      )}
+
+      <div className="status">
+        <span className={hub?.connected ? 'dot' : paired ? 'dot dot--warn' : 'dot dot--off'} aria-hidden="true" />
+        <span className="status__hub">{hubLine}</span>
+        <span className="spacer" />
+        <span className="status__counts">{countLine}</span>
+      </div>
+    </div>
   );
 }

@@ -1,8 +1,11 @@
-# Now Playing Companion for Windows
+# Airwave Companion for Windows
 
 A desktop app that reads the music already on your computer, keeps a searchable index of it, and —
-if you want — connects to a [Now Playing hub](../docker-container/README.md) so the rest of your
+if you want — connects to an [Airwave Hub](../docker-container/README.md) so the rest of your
 devices can see what you have.
+
+Its window is the one drawn in [`design/frontends/airwave-companion.html`](../design/frontends/airwave-companion.html):
+four tools — Library, Live TV, Remote, Settings — on one sheet of chrome that is also the title bar.
 
 It is optional. The [player](../music-player/README.md) works on its own, and so does the hub. This
 app exists for the one thing a web page cannot do: read a folder full of files off a Windows disk
@@ -21,6 +24,11 @@ and keep watching it.
   end; a truncated upload is discarded rather than stored as a corrupt file.
 - **Backs up what it knows.** Playlists, equalizer presets and folder names, as a JSON file you can
   read. Not your music — the files stay where they are.
+- **Keeps your Live TV links.** Paste a channel playlist (M3U) or a programme guide (XMLTV) and the
+  app reads it — public addresses only, with a size cap and a deadline — keeps it if it holds
+  channels or programmes, and hands the channel list and each channel's now/next to the player on
+  this PC through the local helper (`GET /helper/v1/tv/channels`, `GET /helper/v1/tv/guide`). Links
+  are looked at again at most every six hours.
 
 ## What it does not do
 
@@ -59,7 +67,7 @@ Packaging runs on Windows. On Linux or macOS `build` works, `package` does not.
 |  | Installer (`Setup … .exe`) | Portable (`Portable … .exe`) |
 | --- | --- | --- |
 | Installs to | your user profile (no administrator needed) | nowhere — it runs from where it is |
-| Data lives in | `%APPDATA%\Now Playing Companion` | `NowPlayingCompanion-data` beside the .exe |
+| Data lives in | `%APPDATA%\now-playing-companion` (unchanged by the rename to Airwave) | `NowPlayingCompanion-data` beside the .exe |
 | Start-menu entry | yes | no |
 | Uninstaller | yes; it leaves your database and music alone | delete the folder |
 | Architectures | x64, arm64 | x64 |
@@ -80,7 +88,7 @@ past that dialog is relying on the answer being true.
 Verify a download against `SHA256SUMS.txt` from the same release:
 
 ```powershell
-Get-FileHash '.\Now Playing Companion Setup 0.1.0 x64.exe' -Algorithm SHA256
+Get-FileHash '.\Airwave Companion Setup 0.1.0 x64.exe' -Algorithm SHA256
 ```
 
 ## How it is put together
@@ -96,11 +104,16 @@ src/
     store.ts             SQLite: folders, tracks, playlists, presets, search index
     library.ts           scanning, hashing, tag reading, path containment
     hub.ts               pairing, sync, chunked transfers, and the sanitiser
+    live-tv/             reading, checking and caching M3U playlists and XMLTV guides
   renderer/            ordinary web code with no privileges of its own
+    App.tsx              the window: chrome, four tools, panes, status line
+    ui.tsx, icons.tsx    the design's controls and icons, as components
+    aqua-art.ts          the design's drawn buttons, pop-ups and checkboxes
+    styles.css           only what a real window needs beyond the design's stylesheet
 ```
 
 The security boundary is the channel list. The renderer has no Node access, no remote module and no
-filesystem; everything it can do is one of the 26 channels in `shared/channels.ts`, validated on the
+filesystem; everything it can do is one of the channels in `shared/channels.ts`, validated on the
 way in *and* on the way out. Adding a capability means adding a channel — there is no ambient way to
 reach the operating system, and `tests/security/companion.test.ts` asserts the preload's allowlist
 and the schema registry cannot drift apart.
