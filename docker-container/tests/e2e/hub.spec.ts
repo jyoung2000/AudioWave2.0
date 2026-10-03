@@ -186,3 +186,76 @@ test('no pane scrolls sideways, at the window width the design is drawn for or a
     }
   }
 });
+
+test('backup settings are saved with Save, the schedule says when the next one runs, and an archive downloads', async ({ page }) => {
+  await page.goto('/#backup');
+  const folder = page.getByLabel('Save backups to:');
+  await expect(folder).toHaveValue(/\/backups$/);
+  const save = page.getByRole('button', { name: 'Save', exact: true }).last();
+  await expect(save).toBeDisabled();
+
+  // Outside the data volume: said under the form, and nothing is sent.
+  await folder.fill('/etc/airwave');
+  await save.click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Use a folder inside the data volume' })).toBeVisible();
+  await page.getByRole('button', { name: 'Revert' }).last().click();
+  await expect(folder).toHaveValue(/\/backups$/);
+
+  await page.getByLabel('How often:').selectOption('weekly');
+  await page.getByLabel('On', { exact: true }).selectOption('1');
+  await page.getByLabel('Keep:').selectOption('4');
+  await save.click();
+  await expect(page.locator('.status [role="status"]')).toContainText('Saved. Next one Monday');
+  await expect(page.getByLabel('Keep:')).toHaveValue('4');
+
+  await page.getByRole('button', { name: 'Back Up Now' }).click();
+  const table = page.getByRole('table', { name: 'Backups' });
+  const download = table.getByRole('link', { name: /^Download backup-/ }).first();
+  await expect(download).toBeVisible();
+  const [file] = await Promise.all([page.waitForEvent('download'), download.click()]);
+  expect(file.suggestedFilename()).toMatch(/^backup-\d{8}T\d{6}Z\.sqlite$/);
+});
+
+test('network settings wait for Save, check the address first, and say Saved.', async ({ page }) => {
+  await page.goto('/#network');
+  const endpoint = page.getByLabel('Public address:');
+  await endpoint.fill('http://music.example.com');
+  await expect(page.getByText('Not saved yet.')).toBeVisible();
+  await page.getByRole('button', { name: 'Save', exact: true }).first().click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Use an https address' })).toBeVisible();
+  await endpoint.fill('');
+  await page.getByLabel('IPs in logs:').selectOption('hashed');
+  await page.getByRole('button', { name: 'Save', exact: true }).first().click();
+  await expect(page.locator('.status [role="status"]')).toHaveText('Saved.');
+  await page.getByLabel('IPs in logs:').selectOption('truncated');
+  await page.getByRole('button', { name: 'Save', exact: true }).first().click();
+  await expect(page.getByText('Not saved yet.')).toHaveCount(0);
+});
+
+test('the Sharing tab offers to make a link from what the hub holds, and says when there is nothing', async ({ page }) => {
+  await page.goto('/#shares');
+  const what = page.getByLabel('What to share');
+  await expect(what).toBeVisible();
+  await expect(page.getByLabel('Expires')).toHaveValue('7');
+  await page.getByRole('button', { name: 'Create Link' }).click();
+  await expect(page.getByRole('alert').filter({ hasText: /Choose what to share first|nothing on the hub to share/ })).toBeVisible();
+});
+
+test('Live TV from the companion is shown read-only in the Music tab', async ({ page }) => {
+  await page.goto('/#downloads');
+  await expect(page.getByRole('heading', { name: 'Live TV from the companion' })).toBeVisible();
+  await expect(page.getByRole('list', { name: 'Live TV from the companion' })).toContainText(/Nothing yet|channel/);
+});
+
+test('provider details open under their row and Escape puts the caret back on its button', async ({ page }) => {
+  await page.goto('/#providers');
+  const button = page.getByRole('table', { name: 'Providers' }).getByRole('button', { name: /^(Details of|Set up) / }).first();
+  await button.click();
+  await expect(button).toHaveAttribute('aria-expanded', 'true');
+  const region = page.getByRole('region', { name: /details$/ });
+  await expect(region).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(region).toHaveCount(0);
+  await expect(button).toBeFocused();
+  await expect(button).toHaveAttribute('aria-expanded', 'false');
+});
