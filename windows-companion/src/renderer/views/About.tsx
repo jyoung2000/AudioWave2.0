@@ -139,7 +139,7 @@ export function AboutView({ prefs, say }: { prefs?: Resource<Preferences>; say?:
                 <span className="sub">This build checks the release page for a newer version. It never installs anything by itself.</span>
               </>
             ) : (
-              <span>{data ? 'This build doesn’t check for updates, so nothing is contacted. Get new versions from where you got this one.' : ' '}</span>
+              <span>{data ? (prefs?.data?.checkForUpdates === false ? 'Not checked: “Check for new versions of the companion” is off, under General. Nothing is contacted about updates.' : 'Once a day this PC asks GitHub whether a newer version is out, and says so under General. Nothing is installed by itself.') :' '}</span>
             )}
           </div>
         </div>
