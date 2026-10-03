@@ -124,8 +124,12 @@ const BUNDLES: Bundle[] = [
      * long-press on touch, menus with several submenus) and the "setting up" state of the
      * companion's downloaders (UX-SETUP-001) — measured, 12 KB, all inline shell script in both
      * the shell and the single-file build, none of it new network or first-load script.
+     *
+     * And to 2401 for Live TV from the companion (NP-TV-001, 2026-10-03): reading the companion's
+     * channels and guide and showing now and next — measured, 3 KB of inline shell script, counted
+     * in both the shell and the single-file build; the entry is unchanged.
      */
-    totalBudgetKb: 2397,
+    totalBudgetKb: 2401,
     // Three.js belongs to the constellation and the jewel case; the tag reader only to a scan.
     mustBeSplit: ['three', 'music-metadata'],
   },

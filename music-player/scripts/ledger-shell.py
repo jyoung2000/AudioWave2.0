@@ -39,7 +39,7 @@ NEW = [
     surface('fetch-sheet', 'Fetch sheet', 'transport ▸ Download, on a link row', ['no basis chosen (refused, said why)', 'helper found / not found', 'fetching', 'refused by the helper (its reason)', 'fetched and playing'], ['UX-SAFE-001', 'UX-FEED-001'], ['music-player/src/lib/tools-core.ts']),
     surface('mini-player', 'Mini player', 'the header while Settings is open', ['hidden', 'shown for music and radio'], ['NP-CHROME-001']),
     surface('radio', 'Radio', 'toolbar ▸ Radio', ['directory unreachable (offline shelf)', 'a station playing', 'station list'], ['NP-LIVE-001']),
-    surface('live-tv', 'Live TV', 'toolbar ▸ Live TV', ['no playlist loaded (empty guide)', 'channels from a loaded M3U', 'a channel playing (LIVE)'], ['NP-LIVE-002']),
+    surface('live-tv', 'Live TV', 'toolbar ▸ Live TV', ['no playlist loaded (empty guide)', 'channels from a loaded M3U', 'channels and now/next from the companion', 'a channel playing (LIVE)'], ['NP-LIVE-002', 'NP-TV-001']),
     surface('tv', 'TV', 'toolbar ▸ TV', ['no catalogue (nothing invented)'], ['NP-PRIN-001']),
     surface('movies', 'Movies', 'toolbar ▸ Movies', ['no catalogue (nothing invented)'], ['NP-PRIN-001']),
     surface('settings-statistics', 'Settings ▸ Statistics', 'profile button ▸ Statistics, or #settings/stats', ['nothing recorded yet', "this player's history", 'imported file', '3D views unavailable (tables still carry the numbers)'], ['NP-DATA-001']),

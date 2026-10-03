@@ -1,6 +1,6 @@
 # @now-playing/aqua-ui
 
-Shared React component library and semantic design tokens for the Now Playing suite. It implements
+Shared React component library and semantic design tokens for the Airwave suite. It implements
 the **Snow Leopard / iTunes 9** Aqua profile (`AQUA_PROFILE=snow-leopard-itunes-9`) described in
 `docs/design/APPLE_AQUA_2009_2010_UI_DESIGN_SPEC.md`, and the visual grammar preserved in
 `docs/reference/now-playing-header.html`.
