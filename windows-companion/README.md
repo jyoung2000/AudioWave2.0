@@ -67,7 +67,7 @@ Packaging runs on Windows. On Linux or macOS `build` works, `package` does not.
 |  | Installer (`Setup … .exe`) | Portable (`Portable … .exe`) |
 | --- | --- | --- |
 | Installs to | your user profile (no administrator needed) | nowhere — it runs from where it is |
-| Data lives in | `%APPDATA%\Airwave Companion` (an installation made as Now Playing Companion keeps `%APPDATA%\Now Playing Companion`) | `NowPlayingCompanion-data` beside the .exe |
+| Data lives in | `%APPDATA%\now-playing-companion` (unchanged by the rename to Airwave) | `NowPlayingCompanion-data` beside the .exe |
 | Start-menu entry | yes | no |
 | Uninstaller | yes; it leaves your database and music alone | delete the folder |
 | Architectures | x64, arm64 | x64 |
@@ -105,7 +105,6 @@ src/
     library.ts           scanning, hashing, tag reading, path containment
     hub.ts               pairing, sync, chunked transfers, and the sanitiser
     live-tv/             reading, checking and caching M3U playlists and XMLTV guides
-    data-dir.ts          where the data lives, and the folder names that never change
   renderer/            ordinary web code with no privileges of its own
     App.tsx              the window: chrome, four tools, panes, status line
     ui.tsx, icons.tsx    the design's controls and icons, as components

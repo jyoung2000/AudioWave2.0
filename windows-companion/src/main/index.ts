@@ -24,7 +24,6 @@ import { AwspSupervisor, findAwspBinary } from './awsp.js';
 import { appUrlGuard, applySessionSecurity, applyWindowSecurity, enforceSingleInstance, guardWebContents, isTrustedSender, openExternally } from './security.js';
 import { CompanionStore, openCompanionDb } from './store.js';
 import { LiveTv } from './live-tv/index.js';
-import { resolveDataDir } from './data-dir.js';
 import { APP_ID, PRODUCT_NAME } from '../shared/identity.js';
 
 const DEV_SERVER_URL = process.env['NP_DEV_SERVER_URL'] ?? null;
@@ -67,8 +66,11 @@ let preferencesCache: Preferences | null = null;
  * Installed builds use the normal per-user application-data folder.
  */
 function dataDir(): string {
-  // The rule, including which folder names never change, is in `data-dir.ts`.
-  return resolveDataDir({ portableRoot: process.env['PORTABLE_EXECUTABLE_DIR'], userData: app.getPath('userData'), appData: app.getPath('appData'), exists: existsSync });
+  // Both names are machine identifiers and did not change when the product was renamed: the
+  // portable folder is spelled out here, and an installed copy's folder comes from the package
+  // name (`now-playing-companion`), not from the product name.
+  const portableRoot = process.env['PORTABLE_EXECUTABLE_DIR'];
+  return portableRoot ? join(portableRoot, 'NowPlayingCompanion-data') : app.getPath('userData');
 }
 
 function send<T>(channel: string, payload: T): void {
