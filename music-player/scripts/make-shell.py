@@ -1307,11 +1307,13 @@ replace("        return { id: c.id || 'm3u-' + i, num: c.num || String(i + 1), n
         "      if (mediaView === 'live-tv' && !media.hidden) mediaRender();\n"
         "    }\n"
         "\n"
-        "    /* The companion's Live TV, when a companion is in reach. The list is replaced only when the\n"
-        "       channels themselves changed, so a guide refresh never throws you out of where you were. */\n"
+        "    /* Live TV, from the companion when one is in reach on this machine, otherwise from the paired\n"
+        "       hub, which keeps the copy a companion shares with it (GET /api/v1/live-tv). The list is\n"
+        "       replaced only when the channels themselves changed, so a guide refresh never throws you\n"
+        "       out of where you were. */\n"
         "    var companionTvSig = '';\n"
-        "    function companionTv() {\n"
-        "      if (!window.COMPANION) return Promise.resolve(0);\n"
+        "    function tvFromCompanion() {\n"
+        "      if (!window.COMPANION) return Promise.resolve(null);\n"
         "      var base = String(window.COMPANION).replace(/\\/$/, '');\n"
         "      var get = function (path) {\n"
         "        return fetch(base + path, { cache: 'no-store' }).then(function (r) {\n"
@@ -1321,13 +1323,34 @@ replace("        return { id: c.id || 'm3u-' + i, num: c.num || String(i + 1), n
         "      };\n"
         "      return get('/helper/v1/tv/channels').then(function (c) {\n"
         "        var list = c && Array.isArray(c.channels) ? c.channels : [];\n"
-        "        if (!list.length) return 0;\n"
+        "        if (!list.length) return null;\n"
         "        return get('/helper/v1/tv/guide').catch(function () { return { guide: [] }; }).then(function (g) {\n"
+        "          return { channels: list, guide: g && Array.isArray(g.guide) ? g.guide : [] };\n"
+        "        });\n"
+        "      }).catch(function () { return null; });\n"
+        "    }\n"
+        "    function tvFromHub() {\n"
+        "      var acct = window.kv && window.kv.get ? window.kv.get('player:hub') : Promise.resolve(null);\n"
+        "      return acct.then(function (a) {\n"
+        "        if (!a || !a.base || !a.credentialId || !a.secret) return null;\n"
+        "        return fetch(a.base + '/api/v1/live-tv', { headers: { Authorization: 'Bearer ' + a.credentialId + '.' + a.secret }, cache: 'no-store' })\n"
+        "          .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })\n"
+        "          .then(function (d) {\n"
+        "            var list = d && Array.isArray(d.channels) ? d.channels : [];\n"
+        "            return list.length ? { channels: list, guide: Array.isArray(d.guide) ? d.guide : [] } : null;\n"
+        "          });\n"
+        "      }).catch(function () { return null; });\n"
+        "    }\n"
+        "    function companionTv() {\n"
+        "      return tvFromCompanion().then(function (got) { return got || tvFromHub(); }).then(function (got) {\n"
+        "        if (!got) return 0;\n"
+        "        var list = got.channels;\n"
+        "        return Promise.resolve(got).then(function (g) {\n"
         "          var by = {};\n"
-        "          (g && Array.isArray(g.guide) ? g.guide : []).forEach(function (e) { by[e.tvgId] = e; });\n"
+        "          g.guide.forEach(function (e) { by[String(e.tvgId).toLowerCase()] = e; });\n"
         "          var mapped = list.map(function (ch) {\n"
         "            return { id: ch.id, num: String(ch.number), name: ch.name, genre: ch.group || '', url: ch.url,\n"
-        "                     guide: (ch.tvgId && by[ch.tvgId]) || null };\n"
+        "                     guide: (ch.tvgId && by[String(ch.tvgId).toLowerCase()]) || null };\n"
         "          });\n"
         "          var sig = mapped.map(function (ch) { return ch.id + '\\u0001' + ch.url; }).join('\\u0002');\n"
         "          if (sig !== companionTvSig) {\n"
@@ -1342,6 +1365,8 @@ replace("        return { id: c.id || 'm3u-' + i, num: c.num || String(i + 1), n
         "      }).catch(function () { return 0; });\n"
         "    }\n"
         "    window.companionTv = companionTv;\n"
+        "    /* A player that has only a hub still asks once at start; pairing later asks again. */\n"
+        "    setTimeout(companionTv, 1500);\n"
         "    setInterval(companionTv, 5 * 60 * 1000);\n")
 replace("      conn.app = { base: base, health: j };\n"
         "      window.COMPANION = base;\n",
@@ -1353,6 +1378,10 @@ replace("      if (cfg.companion) window.COMPANION = cfg.companion;\n",
         "      if (window.companionTv) window.companionTv();\n")
 replace("              'The companion app can fetch it instead.';\n",
         "              'Add it in the companion app\\u2019s Live TV tab instead: the companion reads it and the channels appear here.';\n")
+
+# Pairing with a hub is a moment Live TV may have become available: ask straight away (NP-TV-001).
+replace("              hubSave(); paintHubPair(); paintProfileTab(); loadMe();",
+        "              hubSave().then(function () { if (window.companionTv) window.companionTv(); }); paintHubPair(); paintProfileTab(); loadMe();")
 
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):

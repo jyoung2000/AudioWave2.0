@@ -70,7 +70,7 @@ export class AccountsService {
     return this.registry.ids().map((provider) => {
       const adapter = this.registry.get(provider);
       if (!isOAuthCapable(adapter)) return { provider, configured: false, reason: 'This provider does not support connecting a personal account' };
-      if (!this.registry.isEnabled(provider)) return { provider, configured: false, reason: 'Disabled by the administrator' };
+      if (!this.registry.isEnabled(provider)) return { provider, configured: false, reason: 'Turned off on this hub, so there is nothing to connect.' };
       const missing = this.registry.missing(provider);
       if (missing.length) return { provider, configured: false, reason: `The administrator has not set ${missing.join(', ')} for this provider yet` };
       return { provider, configured: true, reason: null };

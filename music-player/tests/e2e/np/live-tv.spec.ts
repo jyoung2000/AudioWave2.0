@@ -72,3 +72,24 @@ test('a companion with no playlists leaves the guide as it was, and one that is 
   await expect(page.locator('#mediaMenu')).toBeVisible();
   await expect(page.locator('#mediaMenu .rlist tbody tr')).toHaveCount(0);
 });
+
+test('with no companion on this machine, a paired hub’s copy of the companion’s Live TV fills the guide', async ({ page }) => {
+  const HUB = 'http://192.168.1.20:4546';
+  const ACCT = { base: HUB, credentialId: '00000000-0000-4000-8000-0000000000aa', secret: 'x'.repeat(40), scopes: ['library:read'], hubName: 'TOWER', deviceId: 'd1' };
+  let auth = '';
+  await page.route(`${HUB}/api/v1/live-tv`, (r) => {
+    auth = r.request().headers()['authorization'] ?? '';
+    return r.fulfill(json({ ...CHANNELS, ...guide('Hub Report'), updatedAt: new Date().toISOString(), sourceDevice: { deviceId: 'c1', name: 'Living room PC' } }));
+  });
+  await boot(page);
+  const n = await page.evaluate(async (a) => {
+    const w = window as unknown as { kv: { set(k: string, v: unknown): Promise<void> }; COMPANION?: string; companionTv: () => Promise<number> };
+    await w.kv.set('player:hub', a);
+    w.COMPANION = '';
+    return w.companionTv();
+  }, ACCT);
+  expect(n, 'the hub’s two channels arrived').toBe(2);
+  expect(auth, 'asked as this paired device').toBe(`Bearer ${ACCT.credentialId}.${ACCT.secret}`);
+  await page.click('.tb__btn[data-view="live-tv"]');
+  await expect(page.locator('#mediaMenu .rlist tbody tr').first()).toContainText('Hub Report');
+});

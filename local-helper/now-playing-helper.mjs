@@ -20218,6 +20218,175 @@ var SyncStatus = external_exports.object({
   conflicts: external_exports.number().int().nonnegative()
 });
 
+// ../packages/contracts/src/api/local-helper.ts
+var HELPER_PROTOCOL = 1;
+var HELPER_DEFAULT_PORT = 17342;
+var HELPER_PORT_SCAN = 4;
+var HELPER_TOKEN_META = "np-helper-token";
+var HelperToolId = external_exports.enum(["yt-dlp", "spotdl", "ffmpeg"]);
+var HelperToolSetup = external_exports.object({
+  state: external_exports.enum(["ready", "installing", "failed", "unsupported"]),
+  progress: external_exports.number().min(0).max(1).optional(),
+  reason: external_exports.string().max(400).optional()
+});
+var HelperTool = external_exports.object({
+  id: HelperToolId,
+  present: external_exports.boolean(),
+  version: external_exports.string().max(120).nullable().default(null),
+  /** How it was found. `missing` is a first-class answer, not an error. */
+  origin: external_exports.enum(["path", "installed", "configured", "missing"]),
+  /** What to do about it when it is missing, written for the person reading it. */
+  installHint: external_exports.string().max(400).nullable().default(null),
+  /** True when the helper can fetch this tool's current release here and verify its published SHA-256. */
+  installable: external_exports.boolean().default(false),
+  /** Automatic setup's progress for this tool (since protocol 1, optional). */
+  setup: HelperToolSetup.optional()
+});
+var HelperHealth = external_exports.object({
+  helper: external_exports.literal("now-playing-local-helper"),
+  protocol: external_exports.number().int().positive(),
+  version: external_exports.string().max(40),
+  /** True when this helper also serves the player, so the two share an origin. */
+  servesApp: external_exports.boolean(),
+  tools: external_exports.array(HelperTool),
+  /** The hosts a fetch may name. Anything else is refused before a process is started. */
+  allowedHosts: external_exports.array(external_exports.string().max(253)),
+  /** What it can actually produce here — which depends on whether FFmpeg is present. */
+  formats: external_exports.array(OutputFormat),
+  startedAt: IsoDateTime
+});
+var HelperFetchRequest = external_exports.object({
+  url: external_exports.string().url().max(2048),
+  /** `auto` picks spotDL for a Spotify link and yt-dlp for everything else. */
+  tool: external_exports.enum(["auto", "yt-dlp", "spotdl"]).default("auto"),
+  format: OutputFormat.default("original"),
+  /**
+   * The same acknowledgement the hub requires. It is not a checkbox to get past: it is the record
+   * of *why* this person is entitled to this file, and the helper refuses without it.
+   */
+  authorization: external_exports.object({ basis: DownloadAuthorizationBasis, acknowledged: external_exports.literal(true) })
+});
+var HelperJobFile = external_exports.object({
+  id: external_exports.string().max(80),
+  name: external_exports.string().max(300),
+  sizeBytes: external_exports.number().int().nonnegative(),
+  contentType: external_exports.string().max(120)
+});
+var HelperJobState = external_exports.enum(["queued", "running", "done", "failed", "cancelled"]);
+var HelperJob = external_exports.object({
+  id: external_exports.string().max(80),
+  state: HelperJobState,
+  url: external_exports.string().max(2048),
+  tool: HelperToolId,
+  format: OutputFormat,
+  stage: external_exports.enum(["preflight", "fetching", "converting", "finalizing", "done"]),
+  percent: external_exports.number().min(0).max(100).nullable().default(null),
+  /** The tool's own last line of progress, trimmed. Shown as-is; it is the honest status. */
+  message: external_exports.string().max(400).nullable().default(null),
+  files: external_exports.array(HelperJobFile).default([]),
+  error: external_exports.string().max(600).nullable().default(null),
+  startedAt: IsoDateTime,
+  finishedAt: IsoDateTime.nullable().default(null)
+});
+var HelperInstallResult = external_exports.object({
+  tool: HelperToolId,
+  installed: external_exports.boolean(),
+  version: external_exports.string().max(120).nullable().default(null),
+  /** Why it did not install, when it did not. */
+  reason: external_exports.string().max(400).nullable().default(null)
+});
+var HelperError = external_exports.object({
+  error: external_exports.string().max(80),
+  message: external_exports.string().max(600)
+});
+var HelperBackupPart = external_exports.enum(["music", "tv", "movies"]);
+var HelperBackupEstimate = external_exports.object({
+  parts: external_exports.partialRecord(HelperBackupPart, external_exports.object({ bytes: external_exports.number().int().nonnegative(), files: external_exports.number().int().nonnegative(), measuredAt: IsoDateTime })),
+  destination: external_exports.object({ path: external_exports.string(), freeBytes: external_exports.number().int().nonnegative().nullable(), totalBytes: external_exports.number().int().nonnegative().nullable() }).nullable()
+});
+var HelperTvChannel = external_exports.object({
+  id: external_exports.string().min(1).max(80),
+  name: external_exports.string().min(1).max(200),
+  number: external_exports.number().int().positive(),
+  group: external_exports.string().max(200).nullable(),
+  logo: external_exports.string().max(2048).nullable(),
+  url: external_exports.string().min(1).max(2048),
+  tvgId: external_exports.string().max(200).nullable()
+});
+var HelperTvChannels = external_exports.object({ channels: external_exports.array(HelperTvChannel) });
+var HelperTvProgramme = external_exports.object({
+  title: external_exports.string().max(300),
+  start: IsoDateTime,
+  stop: IsoDateTime,
+  description: external_exports.string().max(600).nullable()
+});
+var HelperTvGuideEntry = external_exports.object({
+  /** The channel's `tvgId`, spelled as `HelperTvChannel.tvgId` spells it. */
+  tvgId: external_exports.string().min(1).max(200),
+  now: HelperTvProgramme.nullable(),
+  next: HelperTvProgramme.nullable()
+});
+var HelperTvGuide = external_exports.object({ generatedAt: IsoDateTime, guide: external_exports.array(HelperTvGuideEntry) });
+var HELPER_ROUTES = {
+  health: "/helper/v1/health",
+  fetch: "/helper/v1/fetch",
+  backupEstimate: "/helper/v1/backup/estimate",
+  /** The merged Live TV channel list (HelperTvChannels). No token, same rule as the radio route: a vetted page only. */
+  tvChannels: "/helper/v1/tv/channels",
+  /** Now and next per channel (HelperTvGuide). No token, same rule as the radio route. */
+  tvGuide: "/helper/v1/tv/guide",
+  /** `?url=` — what a radio station says it is playing (StationNowPlaying). No token: it only ever reads a public stream. */
+  radioNowPlaying: "/helper/v1/radio/now-playing",
+  install: (tool) => `/helper/v1/tools/${tool}/install`,
+  job: (id) => `/helper/v1/jobs/${encodeURIComponent(id)}`,
+  file: (jobId, fileId) => `/helper/v1/jobs/${encodeURIComponent(jobId)}/files/${encodeURIComponent(fileId)}`
+};
+var HELPER_DEFAULT_HOSTS = [
+  "youtube.com",
+  "www.youtube.com",
+  "m.youtube.com",
+  "music.youtube.com",
+  "youtu.be",
+  "soundcloud.com",
+  "api.soundcloud.com",
+  "on.soundcloud.com",
+  "open.spotify.com",
+  "bandcamp.com",
+  "archive.org"
+];
+
+// ../packages/contracts/src/api/live-tv.ts
+var HUB_LIVE_TV_MAX_CHANNELS = 5e4;
+var HUB_LIVE_TV_MAX_GUIDE = 5e4;
+var HUB_LIVE_TV_MAX_BYTES = 32 * 1024 * 1024;
+function isPlainWebUrl(value) {
+  try {
+    const url2 = new URL(value);
+    return (url2.protocol === "http:" || url2.protocol === "https:") && !url2.username && !url2.password;
+  } catch {
+    return false;
+  }
+}
+var WebUrl = external_exports.string().min(1).max(2048).refine(isPlainWebUrl, { message: "Use an http or https address with no user name or password in it" });
+var HubLiveTvChannel = HelperTvChannel.extend({ url: WebUrl, logo: WebUrl.nullable() });
+var HubLiveTvUpload = external_exports.object({
+  channels: external_exports.array(HubLiveTvChannel).max(HUB_LIVE_TV_MAX_CHANNELS),
+  guide: external_exports.array(HelperTvGuideEntry).max(HUB_LIVE_TV_MAX_GUIDE)
+});
+var HubLiveTvSource = external_exports.object({ deviceId: Uuid, name: external_exports.string().max(200) });
+var HubLiveTv = external_exports.object({
+  channels: external_exports.array(HubLiveTvChannel),
+  guide: external_exports.array(HelperTvGuideEntry),
+  updatedAt: IsoDateTime.nullable(),
+  sourceDevice: HubLiveTvSource.nullable()
+});
+var HubLiveTvSummary = external_exports.object({
+  channelCount: external_exports.number().int().nonnegative(),
+  guideCount: external_exports.number().int().nonnegative(),
+  updatedAt: IsoDateTime.nullable(),
+  sourceDevice: HubLiveTvSource.nullable()
+});
+
 // ../packages/contracts/src/api/routes.ts
 function defineRoute(route) {
   return route;
@@ -20444,6 +20613,35 @@ var BackupSpace = external_exports.object({
   lastArchiveBytes: external_exports.number().int().nonnegative().nullable(),
   keep: external_exports.number().int().positive().nullable()
 });
+var BackupParts = external_exports.object({ credentials: external_exports.boolean(), activity: external_exports.boolean(), caches: external_exports.boolean() });
+var BackupFrequency = external_exports.enum(["off", "daily", "weekly"]);
+var BackupSchedule = external_exports.object({
+  frequency: BackupFrequency,
+  time: external_exports.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use a time such as 03:00"),
+  weekday: external_exports.number().int().min(0).max(6)
+});
+var BackupSettings = external_exports.object({
+  /** A folder inside the data volume, relative to it ("backups", "archive/hub"). */
+  location: external_exports.string().min(1).max(300),
+  include: BackupParts,
+  schedule: BackupSchedule,
+  /** How many scheduled backups to keep; 0 keeps every one. Backups made by hand are never pruned. */
+  keep: external_exports.number().int().min(0).max(100)
+});
+var BackupSettingsView = BackupSettings.extend({
+  /** Where backups are written, as the container sees it. */
+  path: external_exports.string(),
+  /** The data volume the location is relative to. */
+  dataDir: external_exports.string(),
+  /** True when NP_BACKUP_DIR sets the folder, which the admin window cannot change. */
+  locationFixed: external_exports.boolean(),
+  nextRunAt: IsoDateTime.nullable(),
+  lastRunAt: IsoDateTime.nullable()
+});
+var ShareSources = external_exports.object({
+  playlists: external_exports.array(external_exports.object({ id: Uuid, name: external_exports.string(), trackCount: external_exports.number().int().nonnegative() })),
+  albums: external_exports.array(external_exports.object({ id: external_exports.string().min(1).max(200), title: external_exports.string(), artistName: external_exports.string().nullable(), trackCount: external_exports.number().int().nonnegative() }))
+});
 var groupParams = external_exports.object({ groupId: Uuid });
 var routes = {
   /* health */
@@ -20562,6 +20760,7 @@ var routes = {
   libraryRootAdd: defineRoute({ method: "POST", path: "/library/roots", operationId: "addLibraryRoot", summary: "Register a directory inside the mounted data volume", tags: ["library"], auth: "admin", rateLimit: "write", body: external_exports.object({ relativePath: external_exports.string().min(1).max(500), displayName: external_exports.string().min(1).max(200) }), response: LibraryRoot, responseStatus: 201 }),
   libraryRootRemove: defineRoute({ method: "DELETE", path: "/library/roots/:rootId", operationId: "removeLibraryRoot", summary: "Remove a root without deleting files", tags: ["library"], auth: "admin", params: external_exports.object({ rootId: Uuid }), response: Ok }),
   libraryScan: defineRoute({ method: "POST", path: "/library/scan", operationId: "scanLibrary", summary: "Rescan hub roots", tags: ["library"], auth: "admin", rateLimit: "write", response: external_exports.object({ jobId: Uuid, roots: external_exports.number().int() }) }),
+  libraryScanRoot: defineRoute({ method: "POST", path: "/library/roots/:rootId/scan", operationId: "scanLibraryRoot", summary: "Rescan one hub root", tags: ["library"], auth: "admin", rateLimit: "write", params: external_exports.object({ rootId: Uuid }), response: external_exports.object({ jobId: Uuid, roots: external_exports.number().int() }) }),
   libraryStream: defineRoute({ method: "GET", path: "/library/stream/:trackId", operationId: "streamTrack", summary: "Range-capable audio stream of an authorized hub track (bearer credential, admin session, or a `sig` from POST /library/stream-urls)", tags: ["library"], auth: "admin-or-device", scopes: ["library:read"], params: external_exports.object({ trackId: Uuid }), response: external_exports.unknown(), responseContentType: "audio/*" }),
   libraryStreamUrls: defineRoute({ method: "POST", path: "/library/stream-urls", operationId: "libraryStreamUrls", summary: "Short-lived signed stream URLs for media elements, which cannot send a bearer credential", tags: ["library"], auth: "device", scopes: ["library:read"], body: external_exports.object({ trackIds: external_exports.array(Uuid).min(1).max(50) }), response: external_exports.object({ items: external_exports.array(external_exports.object({ trackId: Uuid, url: external_exports.string() })), expiresAt: IsoDateTime }) }),
   libraryArtwork: defineRoute({ method: "GET", path: "/library/artwork/:artworkId", operationId: "getArtwork", summary: "Artwork bytes", tags: ["library"], auth: "admin-or-device", params: external_exports.object({ artworkId: external_exports.string().max(200) }), response: external_exports.unknown(), responseContentType: "image/*" }),
@@ -20592,6 +20791,11 @@ var routes = {
   discordTemplatesPreview: defineRoute({ method: "POST", path: "/discord/templates/preview", operationId: "previewDiscordTemplate", summary: "Render a template with sample variables", tags: ["discord"], auth: "admin", body: external_exports.object({ key: external_exports.enum(DISCORD_TEMPLATE_KEYS), template: DiscordTemplate, sample: external_exports.record(external_exports.string(), external_exports.string()).optional() }), response: external_exports.object({ content: external_exports.string(), embedTitle: external_exports.string().nullable(), embedDescription: external_exports.string().nullable(), warnings: external_exports.array(external_exports.string()), errors: external_exports.array(external_exports.string()), variablesUsed: external_exports.array(external_exports.string()) }) }),
   discordTemplatesReset: defineRoute({ method: "POST", path: "/discord/templates/reset", operationId: "resetDiscordTemplates", summary: "Reset to defaults", tags: ["discord"], auth: "admin", response: DiscordTemplates }),
   discordCommandTest: defineRoute({ method: "POST", path: "/discord/commands/test", operationId: "testDiscordCommand", summary: "Run a command through the shared command service without Discord (fixture testing)", tags: ["discord"], auth: "admin", body: external_exports.object({ command: external_exports.string().min(1).max(40), args: external_exports.string().max(500).default(""), guildId: external_exports.string(), channelId: external_exports.string(), userId: external_exports.string(), roleIds: external_exports.array(external_exports.string()).default([]), transport: external_exports.enum(["slash", "prefix"]).default("slash") }), response: external_exports.object({ ok: external_exports.boolean(), templateKey: external_exports.string(), content: external_exports.string(), embedTitle: external_exports.string().nullable(), embedDescription: external_exports.string().nullable(), ephemeral: external_exports.boolean() }) }),
+  /* Live TV kept for players that cannot reach the companion's own helper */
+  liveTvGet: defineRoute({ method: "GET", path: "/live-tv", operationId: "getLiveTv", summary: "Channels and now/next a paired companion keeps on the hub", tags: ["live-tv"], auth: "admin-or-device", scopes: ["library:read"], response: HubLiveTv }),
+  liveTvPut: defineRoute({ method: "PUT", path: "/live-tv", operationId: "putLiveTv", summary: "A paired companion replaces the hub copy of its Live TV (http(s) addresses only, at most 50,000 channels)", tags: ["live-tv"], auth: "device", scopes: ["library:share"], rateLimit: "write", body: HubLiveTvUpload, response: HubLiveTvSummary }),
+  liveTvDelete: defineRoute({ method: "DELETE", path: "/live-tv", operationId: "deleteLiveTv", summary: "Remove the hub copy of Live TV (the admin, or the companion that sent it)", tags: ["live-tv"], auth: "admin-or-device", scopes: ["library:share"], response: Ok }),
+  liveTvSummary: defineRoute({ method: "GET", path: "/live-tv/summary", operationId: "getLiveTvSummary", summary: "Where the hub copy of Live TV came from, how many channels and when", tags: ["live-tv"], auth: "admin", response: HubLiveTvSummary }),
   /* network, logs, diagnostics, backup, updates, releases */
   networkGet: defineRoute({ method: "GET", path: "/network", operationId: "getNetwork", summary: "Bind mode and remote access configuration", tags: ["network"], auth: "admin", setupRequired: false, response: NetworkConfig }),
   networkPut: defineRoute({ method: "PUT", path: "/network", operationId: "putNetwork", summary: "Change bind mode / public endpoint / trusted proxies / IP logging (setup must be complete)", tags: ["network"], auth: "admin", rateLimit: "write", body: NetworkConfig.omit({ restartRequired: true, warnings: true, port: true, bindAddress: true }).partial(), response: NetworkConfig }),
@@ -20601,6 +20805,9 @@ var routes = {
   backupSpace: defineRoute({ method: "GET", path: "/backup/space", operationId: "backupSpace", summary: "Room at the backup location and the size of the newest archive", tags: ["backup"], auth: "admin-or-device", scopes: ["backup:read"], response: BackupSpace }),
   backupList: defineRoute({ method: "GET", path: "/backup", operationId: "listBackups", summary: "Backups on the data volume", tags: ["backup"], auth: "admin", response: external_exports.object({ items: external_exports.array(external_exports.object({ id: external_exports.string(), createdAt: IsoDateTime, sizeBytes: external_exports.number().int(), relativePath: external_exports.string() })) }) }),
   backupRestore: defineRoute({ method: "POST", path: "/backup/:backupId/restore", operationId: "restoreBackup", summary: "Restore (a safety backup is taken first; restart required)", tags: ["backup"], auth: "admin", rateLimit: "write", params: external_exports.object({ backupId: external_exports.string() }), body: external_exports.object({ confirm: external_exports.literal(true) }), response: external_exports.object({ ok: external_exports.literal(true), safetyBackupId: external_exports.string(), restartRequired: external_exports.literal(true) }) }),
+  backupDownload: defineRoute({ method: "GET", path: "/backup/:backupId/download", operationId: "downloadBackup", summary: "Download one backup archive the hub lists", tags: ["backup"], auth: "admin", params: external_exports.object({ backupId: external_exports.string().min(1).max(80) }), response: external_exports.unknown(), responseContentType: "application/vnd.sqlite3" }),
+  backupSettingsGet: defineRoute({ method: "GET", path: "/backup/settings", operationId: "getBackupSettings", summary: "Where backups go, what they hold, when they run and how many are kept", tags: ["backup"], auth: "admin", response: BackupSettingsView }),
+  backupSettingsPut: defineRoute({ method: "PUT", path: "/backup/settings", operationId: "putBackupSettings", summary: "Change the backup location (inside the data volume), parts, schedule and how many to keep", tags: ["backup"], auth: "admin", rateLimit: "write", body: BackupSettings.partial(), response: BackupSettingsView }),
   exportAll: defineRoute({ method: "GET", path: "/export", operationId: "exportAll", summary: "JSON export of groups, history, playlists, presets, devices (no secrets)", tags: ["backup"], auth: "admin", response: external_exports.object({ schemaVersion: external_exports.number().int(), exportedAt: IsoDateTime, data: external_exports.record(external_exports.string(), external_exports.unknown()) }) }),
   importAll: defineRoute({ method: "POST", path: "/import", operationId: "importAll", summary: "Validate and import a JSON export (dry run supported)", tags: ["backup"], auth: "admin", rateLimit: "write", query: external_exports.object({ dryRun: external_exports.coerce.boolean().default(false) }), body: external_exports.object({ schemaVersion: external_exports.number().int(), data: external_exports.record(external_exports.string(), external_exports.unknown()) }), response: external_exports.object({ dryRun: external_exports.boolean(), applied: external_exports.record(external_exports.string(), external_exports.number().int()), errors: external_exports.array(external_exports.string()) }) }),
   updatesGet: defineRoute({ method: "GET", path: "/updates", operationId: "getUpdates", summary: "Version compatibility matrix", tags: ["updates"], auth: "admin", setupRequired: false, response: external_exports.object({ currentVersion: external_exports.string(), contractsVersion: external_exports.string(), protocolVersion: external_exports.number().int(), minSupportedProtocolVersion: external_exports.number().int(), migrationVersion: external_exports.number().int(), compatibility: external_exports.array(external_exports.object({ product: external_exports.string(), minVersion: external_exports.string(), protocolVersion: external_exports.number().int() })), companionRelease: ReleaseMetadata.nullable() }) }),
@@ -20618,6 +20825,7 @@ var routes = {
     /** For library/playlist shares the creator uploads the item list (the hub cannot see browser-local libraries otherwise). */
     items: external_exports.array(external_exports.object({ trackId: Uuid, title: external_exports.string().max(300), artistName: external_exports.string().max(300), albumName: external_exports.string().max(300).nullable().default(null), durationMs: external_exports.number().int().nullable().default(null), contentHash: external_exports.string().regex(/^[a-f0-9]{64}$/).nullable().default(null), openAtSourceUrl: external_exports.string().url().nullable().default(null) })).max(5e3).optional()
   }), response: external_exports.object({ share: ShareLinkView, token: external_exports.string().describe("Returned exactly once") }), responseStatus: 201 }),
+  sharesSources: defineRoute({ method: "GET", path: "/shares/sources", operationId: "listShareSources", summary: "Hub playlists and albums the admin window can make a link to", tags: ["shares"], auth: "admin", response: ShareSources }),
   sharesList: defineRoute({ method: "GET", path: "/shares", operationId: "listShares", summary: "Links created by the caller (admin sees all)", tags: ["shares"], auth: "admin-or-device", response: external_exports.object({ items: external_exports.array(ShareLinkView) }) }),
   sharesRevoke: defineRoute({ method: "DELETE", path: "/shares/:shareId", operationId: "revokeShare", summary: "Revoke a link", tags: ["shares"], auth: "admin-or-device", params: external_exports.object({ shareId: Uuid }), response: Ok }),
   shareResolve: defineRoute({ method: "GET", path: "/shares/resolve/:token", operationId: "resolveShare", summary: "Public: metadata for a shared link (rate limited; counts an access)", tags: ["shares"], auth: "none", setupRequired: false, rateLimit: "search", params: external_exports.object({ token: external_exports.string().min(16).max(64) }), response: SharePayload }),
@@ -20636,143 +20844,6 @@ var routes = {
   groupNowPlayingAdmin: defineRoute({ method: "GET", path: "/groups/:groupId/now-playing", operationId: "groupNowPlaying", summary: "Now playing summary for admin views and Discord embeds", tags: ["groups"], auth: "admin-or-device", params: groupParams, response: external_exports.object({ mode: ListeningMode, groupId: Uuid, title: external_exports.string().nullable(), artistName: external_exports.string().nullable(), albumName: external_exports.string().nullable(), artworkUrl: external_exports.string().nullable(), source: ProviderId.nullable(), canonicalUrl: external_exports.string().nullable(), durationMs: external_exports.number().int().nullable(), positionMs: external_exports.number().int(), requester: external_exports.string().nullable(), syncGrade: external_exports.string(), warning: external_exports.string().nullable(), serverTime: IsoDateTime }) })
 };
 var REALTIME_PATH = `${API_PREFIX}/realtime`;
-
-// ../packages/contracts/src/api/local-helper.ts
-var HELPER_PROTOCOL = 1;
-var HELPER_DEFAULT_PORT = 17342;
-var HELPER_PORT_SCAN = 4;
-var HELPER_TOKEN_META = "np-helper-token";
-var HelperToolId = external_exports.enum(["yt-dlp", "spotdl", "ffmpeg"]);
-var HelperToolSetup = external_exports.object({
-  state: external_exports.enum(["ready", "installing", "failed", "unsupported"]),
-  progress: external_exports.number().min(0).max(1).optional(),
-  reason: external_exports.string().max(400).optional()
-});
-var HelperTool = external_exports.object({
-  id: HelperToolId,
-  present: external_exports.boolean(),
-  version: external_exports.string().max(120).nullable().default(null),
-  /** How it was found. `missing` is a first-class answer, not an error. */
-  origin: external_exports.enum(["path", "installed", "configured", "missing"]),
-  /** What to do about it when it is missing, written for the person reading it. */
-  installHint: external_exports.string().max(400).nullable().default(null),
-  /** True when the helper can fetch this tool's current release here and verify its published SHA-256. */
-  installable: external_exports.boolean().default(false),
-  /** Automatic setup's progress for this tool (since protocol 1, optional). */
-  setup: HelperToolSetup.optional()
-});
-var HelperHealth = external_exports.object({
-  helper: external_exports.literal("now-playing-local-helper"),
-  protocol: external_exports.number().int().positive(),
-  version: external_exports.string().max(40),
-  /** True when this helper also serves the player, so the two share an origin. */
-  servesApp: external_exports.boolean(),
-  tools: external_exports.array(HelperTool),
-  /** The hosts a fetch may name. Anything else is refused before a process is started. */
-  allowedHosts: external_exports.array(external_exports.string().max(253)),
-  /** What it can actually produce here — which depends on whether FFmpeg is present. */
-  formats: external_exports.array(OutputFormat),
-  startedAt: IsoDateTime
-});
-var HelperFetchRequest = external_exports.object({
-  url: external_exports.string().url().max(2048),
-  /** `auto` picks spotDL for a Spotify link and yt-dlp for everything else. */
-  tool: external_exports.enum(["auto", "yt-dlp", "spotdl"]).default("auto"),
-  format: OutputFormat.default("original"),
-  /**
-   * The same acknowledgement the hub requires. It is not a checkbox to get past: it is the record
-   * of *why* this person is entitled to this file, and the helper refuses without it.
-   */
-  authorization: external_exports.object({ basis: DownloadAuthorizationBasis, acknowledged: external_exports.literal(true) })
-});
-var HelperJobFile = external_exports.object({
-  id: external_exports.string().max(80),
-  name: external_exports.string().max(300),
-  sizeBytes: external_exports.number().int().nonnegative(),
-  contentType: external_exports.string().max(120)
-});
-var HelperJobState = external_exports.enum(["queued", "running", "done", "failed", "cancelled"]);
-var HelperJob = external_exports.object({
-  id: external_exports.string().max(80),
-  state: HelperJobState,
-  url: external_exports.string().max(2048),
-  tool: HelperToolId,
-  format: OutputFormat,
-  stage: external_exports.enum(["preflight", "fetching", "converting", "finalizing", "done"]),
-  percent: external_exports.number().min(0).max(100).nullable().default(null),
-  /** The tool's own last line of progress, trimmed. Shown as-is; it is the honest status. */
-  message: external_exports.string().max(400).nullable().default(null),
-  files: external_exports.array(HelperJobFile).default([]),
-  error: external_exports.string().max(600).nullable().default(null),
-  startedAt: IsoDateTime,
-  finishedAt: IsoDateTime.nullable().default(null)
-});
-var HelperInstallResult = external_exports.object({
-  tool: HelperToolId,
-  installed: external_exports.boolean(),
-  version: external_exports.string().max(120).nullable().default(null),
-  /** Why it did not install, when it did not. */
-  reason: external_exports.string().max(400).nullable().default(null)
-});
-var HelperError = external_exports.object({
-  error: external_exports.string().max(80),
-  message: external_exports.string().max(600)
-});
-var HelperBackupPart = external_exports.enum(["music", "tv", "movies"]);
-var HelperBackupEstimate = external_exports.object({
-  parts: external_exports.partialRecord(HelperBackupPart, external_exports.object({ bytes: external_exports.number().int().nonnegative(), files: external_exports.number().int().nonnegative(), measuredAt: IsoDateTime })),
-  destination: external_exports.object({ path: external_exports.string(), freeBytes: external_exports.number().int().nonnegative().nullable(), totalBytes: external_exports.number().int().nonnegative().nullable() }).nullable()
-});
-var HelperTvChannel = external_exports.object({
-  id: external_exports.string().min(1).max(80),
-  name: external_exports.string().min(1).max(200),
-  number: external_exports.number().int().positive(),
-  group: external_exports.string().max(200).nullable(),
-  logo: external_exports.string().max(2048).nullable(),
-  url: external_exports.string().min(1).max(2048),
-  tvgId: external_exports.string().max(200).nullable()
-});
-var HelperTvChannels = external_exports.object({ channels: external_exports.array(HelperTvChannel) });
-var HelperTvProgramme = external_exports.object({
-  title: external_exports.string().max(300),
-  start: IsoDateTime,
-  stop: IsoDateTime,
-  description: external_exports.string().max(600).nullable()
-});
-var HelperTvGuideEntry = external_exports.object({
-  /** The channel's `tvgId`, spelled as `HelperTvChannel.tvgId` spells it. */
-  tvgId: external_exports.string().min(1).max(200),
-  now: HelperTvProgramme.nullable(),
-  next: HelperTvProgramme.nullable()
-});
-var HelperTvGuide = external_exports.object({ generatedAt: IsoDateTime, guide: external_exports.array(HelperTvGuideEntry) });
-var HELPER_ROUTES = {
-  health: "/helper/v1/health",
-  fetch: "/helper/v1/fetch",
-  backupEstimate: "/helper/v1/backup/estimate",
-  /** The merged Live TV channel list (HelperTvChannels). No token, same rule as the radio route: a vetted page only. */
-  tvChannels: "/helper/v1/tv/channels",
-  /** Now and next per channel (HelperTvGuide). No token, same rule as the radio route. */
-  tvGuide: "/helper/v1/tv/guide",
-  /** `?url=` — what a radio station says it is playing (StationNowPlaying). No token: it only ever reads a public stream. */
-  radioNowPlaying: "/helper/v1/radio/now-playing",
-  install: (tool) => `/helper/v1/tools/${tool}/install`,
-  job: (id) => `/helper/v1/jobs/${encodeURIComponent(id)}`,
-  file: (jobId, fileId) => `/helper/v1/jobs/${encodeURIComponent(jobId)}/files/${encodeURIComponent(fileId)}`
-};
-var HELPER_DEFAULT_HOSTS = [
-  "youtube.com",
-  "www.youtube.com",
-  "m.youtube.com",
-  "music.youtube.com",
-  "youtu.be",
-  "soundcloud.com",
-  "api.soundcloud.com",
-  "on.soundcloud.com",
-  "open.spotify.com",
-  "bandcamp.com",
-  "archive.org"
-];
 
 // src/app.ts
 import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";

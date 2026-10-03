@@ -128,8 +128,11 @@ const BUNDLES: Bundle[] = [
      * And to 2401 for Live TV from the companion (NP-TV-001, 2026-10-03): reading the companion's
      * channels and guide and showing now and next — measured, 3 KB of inline shell script, counted
      * in both the shell and the single-file build; the entry is unchanged.
+     *
+     * And to 2403 for Live TV from the paired hub (the hub keeps the companion's copy, so a player
+     * away from the companion's PC still gets channels) — measured, 2 KB of inline shell script.
      */
-    totalBudgetKb: 2401,
+    totalBudgetKb: 2403,
     // Three.js belongs to the constellation and the jewel case; the tag reader only to a scan.
     mustBeSplit: ['three', 'music-metadata'],
   },

@@ -11614,11 +11614,13 @@ window.AW.startStats = function () {
       if (mediaView === 'live-tv' && !media.hidden) mediaRender();
     }
 
-    /* The companion's Live TV, when a companion is in reach. The list is replaced only when the
-       channels themselves changed, so a guide refresh never throws you out of where you were. */
+    /* Live TV, from the companion when one is in reach on this machine, otherwise from the paired
+       hub, which keeps the copy a companion shares with it (GET /api/v1/live-tv). The list is
+       replaced only when the channels themselves changed, so a guide refresh never throws you
+       out of where you were. */
     var companionTvSig = '';
-    function companionTv() {
-      if (!window.COMPANION) return Promise.resolve(0);
+    function tvFromCompanion() {
+      if (!window.COMPANION) return Promise.resolve(null);
       var base = String(window.COMPANION).replace(/\/$/, '');
       var get = function (path) {
         return fetch(base + path, { cache: 'no-store' }).then(function (r) {
@@ -11628,13 +11630,34 @@ window.AW.startStats = function () {
       };
       return get('/helper/v1/tv/channels').then(function (c) {
         var list = c && Array.isArray(c.channels) ? c.channels : [];
-        if (!list.length) return 0;
+        if (!list.length) return null;
         return get('/helper/v1/tv/guide').catch(function () { return { guide: [] }; }).then(function (g) {
+          return { channels: list, guide: g && Array.isArray(g.guide) ? g.guide : [] };
+        });
+      }).catch(function () { return null; });
+    }
+    function tvFromHub() {
+      var acct = window.kv && window.kv.get ? window.kv.get('player:hub') : Promise.resolve(null);
+      return acct.then(function (a) {
+        if (!a || !a.base || !a.credentialId || !a.secret) return null;
+        return fetch(a.base + '/api/v1/live-tv', { headers: { Authorization: 'Bearer ' + a.credentialId + '.' + a.secret }, cache: 'no-store' })
+          .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+          .then(function (d) {
+            var list = d && Array.isArray(d.channels) ? d.channels : [];
+            return list.length ? { channels: list, guide: Array.isArray(d.guide) ? d.guide : [] } : null;
+          });
+      }).catch(function () { return null; });
+    }
+    function companionTv() {
+      return tvFromCompanion().then(function (got) { return got || tvFromHub(); }).then(function (got) {
+        if (!got) return 0;
+        var list = got.channels;
+        return Promise.resolve(got).then(function (g) {
           var by = {};
-          (g && Array.isArray(g.guide) ? g.guide : []).forEach(function (e) { by[e.tvgId] = e; });
+          g.guide.forEach(function (e) { by[String(e.tvgId).toLowerCase()] = e; });
           var mapped = list.map(function (ch) {
             return { id: ch.id, num: String(ch.number), name: ch.name, genre: ch.group || '', url: ch.url,
-                     guide: (ch.tvgId && by[ch.tvgId]) || null };
+                     guide: (ch.tvgId && by[String(ch.tvgId).toLowerCase()]) || null };
           });
           var sig = mapped.map(function (ch) { return ch.id + '\u0001' + ch.url; }).join('\u0002');
           if (sig !== companionTvSig) {
@@ -11649,6 +11672,8 @@ window.AW.startStats = function () {
       }).catch(function () { return 0; });
     }
     window.companionTv = companionTv;
+    /* A player that has only a hub still asks once at start; pairing later asks again. */
+    setTimeout(companionTv, 1500);
     setInterval(companionTv, 5 * 60 * 1000);
 
     /* ---- saved shows and films ---- */
@@ -15679,7 +15704,7 @@ window.AW.startStats = function () {
               if (!d.ok || !d.json || !d.json.secret) { msg.textContent = 'The container confirmed, but didn’t hand over a credential. Start again.'; return; }
               hubAcct = { base: base, credentialId: d.json.credentialId, secret: d.json.secret, scopes: d.json.scopes || [], hubName: d.json.hubName || c.hubName, deviceId: d.json.deviceId,
                 hubId: d.json.hubId || (conn.hub && conn.hub.id && conn.hub.id.hubId) || null, hubFingerprint: c.hubFingerprint || (conn.hub && conn.hub.id && conn.hub.id.fingerprint) || null };
-              hubSave(); paintHubPair(); paintProfileTab(); loadMe();
+              hubSave().then(function () { if (window.companionTv) window.companionTv(); }); paintHubPair(); paintProfileTab(); loadMe();
               say('Paired with ' + hubAcct.hubName);
             });
           });

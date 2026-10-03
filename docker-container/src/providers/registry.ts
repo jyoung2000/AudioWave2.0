@@ -9,6 +9,18 @@ import type { Logger } from 'pino';
 import { EMPTY_RUNTIME_CONFIG, type ProviderAdapter, type ProviderRuntimeConfig } from './adapter.js';
 import type { RateLimitManager } from './rate-limit-manager.js';
 
+/** What a missing configuration field is called in the admin window. */
+const FIELD_WORDS: Record<string, string> = {
+  clientId: 'a client ID',
+  clientSecret: 'a client secret',
+  apiKey: 'an API key',
+  applicationId: 'an application ID',
+  redirectUri: 'a redirect address',
+  contactEmail: 'a contact email',
+  command: 'a command',
+  allowedHosts: 'the allowed hosts',
+};
+
 /** Provider adapters, their application-level configuration (secrets sealed at rest) and live health. */
 export class ProviderRegistry {
   private readonly adapters = new Map<string, ProviderAdapter>();
@@ -113,13 +125,13 @@ export class ProviderRegistry {
     const adapter = this.get(id);
     const caps = adapter.capabilities();
     if (!this.isEnabled(id)) {
-      const out = { ...caps, reason: 'Disabled by the administrator' } as ProviderCapabilities;
+      const out = { ...caps, reason: 'Turned off on this hub. An administrator can turn it on under Music ▸ Providers.' } as ProviderCapabilities;
       for (const key of ['metadata', 'search', 'preview', 'playback', 'importLikes', 'importPlaylists', 'creatorDownload', 'userOwnedDownload', 'eq'] as const) out[key] = 'unsupported';
       return out;
     }
     const missing = this.missing(id);
     if (missing.length) {
-      const out = { ...caps, reason: `Not configured: ${missing.join(', ')} missing (Admin → Providers)` } as ProviderCapabilities;
+      const out = { ...caps, reason: `Needs setting up: add ${missing.map((field) => FIELD_WORDS[field] ?? field).join(' and ')} under Music ▸ Providers.` } as ProviderCapabilities;
       for (const key of ['metadata', 'search', 'preview', 'playback', 'importLikes', 'importPlaylists'] as const) if (out[key] === 'available') out[key] = 'requires_auth';
       return out;
     }
