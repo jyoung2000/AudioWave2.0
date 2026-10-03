@@ -1,7 +1,7 @@
 {
   "name": "@now-playing/hub",
   "version": "0.1.0",
-  "description": "Now Playing Hub \u2014 self-hosted server with password-protected admin GUI on port 4546: providers, group listening, realtime sync, pairing, downloads, metrics, recommendations and a Discord bot.",
+  "description": "Airwave Hub \u2014 self-hosted server with password-protected admin GUI on port 4546: providers, group listening, realtime sync, pairing, downloads, metrics, recommendations and a Discord bot.",
   "license": "MIT",
   "type": "module",
   "private": true,

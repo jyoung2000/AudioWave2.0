@@ -1,4 +1,4 @@
-# Now Playing — the player
+# Airwave — the player
 
 An offline-first music player for the music already on your device. It is a web app you can install;
 everything it needs is in the bundle, and nothing is fetched from anywhere else.

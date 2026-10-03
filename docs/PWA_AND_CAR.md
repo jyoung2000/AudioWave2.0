@@ -128,7 +128,7 @@ after that is the same.
 
 ```jsonc
 {
-  "name": "Now Playing",
+  "name": "Airwave",
   "display": "standalone", // its own window, no browser chrome
   "display_override": ["standalone", "minimal-ui"],
   "launch_handler": { "client_mode": "focus-existing" }, // a second tap focuses the one that is playing

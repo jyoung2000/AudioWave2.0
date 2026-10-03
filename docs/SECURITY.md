@@ -1,6 +1,6 @@
 # Security
 
-This document is the threat model and the list of concrete mitigations for the Now Playing suite. Every mitigation names where it lives and how it is tested. Report vulnerabilities privately to the repository owner; do not open public issues for exploitable bugs.
+This document is the threat model and the list of concrete mitigations for the Airwave suite. Every mitigation names where it lives and how it is tested. Report vulnerabilities privately to the repository owner; do not open public issues for exploitable bugs.
 
 ## Trust boundaries
 

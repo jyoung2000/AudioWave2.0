@@ -1,4 +1,4 @@
-# Now Playing
+# Airwave
 
 Three music applications that work on their own and work better together.
 

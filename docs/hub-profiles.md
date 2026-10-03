@@ -5,7 +5,7 @@ Paste this into Claude Code at the root of the AudioWave2.0 repo.
 ---
 
 Add **user profiles** to the hub in `docker-container`, so a paired player can keep a username, a
-picture and shared playlists on the hub, and find other people's. The Now Playing player already
+picture and shared playlists on the hub, and find other people's. The Airwave player already
 calls these routes (Settings ▸ Profile, and people results in search); until they exist it tells the
 user the container "doesn't keep profiles yet". Follow AGENTS.md: contracts first, then server,
 migration, tests, admin GUI, docs; run `pnpm styleguide:check`, `pnpm styleguide:build` and

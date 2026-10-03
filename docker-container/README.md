@@ -1,4 +1,4 @@
-# Now Playing Hub
+# Airwave Hub
 
 A self-hosted music hub in one container: your library, group listening in sync, device pairing,
 shared links, provider connections and a Discord bot. It runs on a laptop, a NAS or a small VPS, and

@@ -1,4 +1,4 @@
-# Now Playing — agent context
+# Airwave — agent context
 
 A pnpm monorepo (Node 22, TypeScript 6, React 19):
 

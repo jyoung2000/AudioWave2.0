@@ -1,6 +1,6 @@
 # Privacy
 
-Now Playing is local-first. This page states what is stored where, what is shared, and how to inspect, export, delete or revoke it. The same rules are implemented as settings in the player (Settings → Privacy) and the hub (Security, Network, Recommendations).
+Airwave is local-first. This page states what is stored where, what is shared, and how to inspect, export, delete or revoke it. The same rules are implemented as settings in the player (Settings → Privacy) and the hub (Security, Network, Recommendations).
 
 ## Data locations
 
