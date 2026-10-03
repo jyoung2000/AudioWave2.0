@@ -143,15 +143,26 @@ describe('bot status honesty', () => {
     const status = response.json() as { configured: boolean; gateway: string; warnings: string[] };
     expect(status.configured).toBe(false);
     expect(status.gateway).toBe('stopped');
-    expect(status.warnings.join(' ')).toContain('No bot token');
+    expect(status.warnings.join(' ')).toContain('The bot has no token yet');
     expect(status.warnings.join(' ')).toContain('Message Content');
+  });
+
+  it('words every warning as a plain sentence: “server”, never “guild”, and no command lines', async () => {
+    const response = await hub.app.inject({ method: 'GET', url: '/api/v1/discord/status', headers: { cookie: admin.cookie } });
+    const { warnings } = response.json() as { warnings: string[] };
+    expect(warnings.length).toBeGreaterThan(0);
+    for (const warning of warnings) {
+      expect(warning).not.toMatch(/guild|`|\.\/nowplaying|docker compose/i);
+      expect(warning).toMatch(/^[A-Z].*[.!]$/);
+    }
+    expect(warnings.join(' ')).toContain('Server allowlist');
   });
 
   it('offers no invite URL until an application id exists, and explains why', async () => {
     const response = await hub.app.inject({ method: 'GET', url: '/api/v1/discord/invite-url', headers: { cookie: admin.cookie } });
     const invite = response.json() as { url: string | null; reason: string | null; scopes: string[] };
     expect(invite.url).toBeNull();
-    expect(invite.reason).toContain('application id');
+    expect(invite.reason).toContain('Save a bot token first');
     expect(invite.scopes).toEqual(['bot', 'applications.commands']);
   });
 

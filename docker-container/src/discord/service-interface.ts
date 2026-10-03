@@ -114,7 +114,7 @@ export class DiscordService {
     const { id: _i, updatedAt: _u, tokenSource: _ts, tokenLast4: _tl, ...allowed } = patch;
     const next = DiscordConfigurationSchema.parse({ ...current, ...allowed, updatedAt: this.nowIso() });
     if (next.enabled && this.tokenSource() === 'none') {
-      throw new DomainError('setup-required', 'Add a bot token before enabling the Discord bot');
+      throw new DomainError('setup-required', 'Paste a bot token before turning the bot on.');
     }
     this.settings.set(CONFIG_KEY, next, this.nowIso());
     this.audit.record({ actor: { kind: 'admin', id: actor.id, displayName: actor.displayName }, action: 'discord.config', outcome: 'success', target: { kind: 'discord', id: next.id }, ip: meta.ip, correlationId: meta.correlationId, details: { enabled: String(next.enabled) } });
@@ -203,7 +203,7 @@ export class DiscordService {
     const config = this.configuration();
     const scopes = ['bot', 'applications.commands'];
     if (!config.applicationId) {
-      return { url: null, permissions: PERMISSION_BITS.toString(), scopes, reason: 'Set the application id (or install a bot token, which fills it in) before generating an invite link.' };
+      return { url: null, permissions: PERMISSION_BITS.toString(), scopes, reason: 'Save a bot token first. The invite link is made from it.' };
     }
     const url = `https://discord.com/oauth2/authorize?client_id=${encodeURIComponent(config.applicationId)}&scope=${encodeURIComponent(scopes.join(' '))}&permissions=${PERMISSION_BITS.toString()}`;
     return { url, permissions: `${PERMISSION_BITS.toString()} (${REQUIRED_PERMISSIONS.join(', ')})`, scopes, reason: null };
@@ -307,9 +307,9 @@ export class DiscordService {
   async runCommand(input: CommandTestInput): Promise<{ ok: boolean; templateKey: string; content: string; embedTitle: string | null; embedDescription: string | null; ephemeral: boolean }> {
     const config = this.configuration();
     if (config.guildAllowlist.length && !config.guildAllowlist.includes(input.guildId)) {
-      throw new DomainError('forbidden', 'That guild is not on the allowlist for this hub');
+      throw new DomainError('forbidden', 'That server isn’t on this hub’s server allowlist.');
     }
-    if (!config.defaultGroupId) throw new DomainError('setup-required', 'Choose which group Discord commands control (Admin → Discord → Default group)');
+    if (!config.defaultGroupId) throw new DomainError('setup-required', 'Choose a group in Sharing ▸ Discord bot ▸ Group it controls first.');
     const command = normalizeCommand(input.command);
     if (!command) throw new DomainError('validation', `${input.command} is not a command this bot understands`);
 
@@ -333,7 +333,7 @@ export class DiscordService {
     const config = this.configuration();
     const token = this.token();
     if ((action === 'start' || action === 'reconnect' || action === 'register-commands' || action === 'test') && !token) {
-      throw new DomainError('setup-required', 'Add a bot token first (Admin → Discord → Token)');
+      throw new DomainError('setup-required', 'Paste a bot token in Sharing ▸ Discord bot first.');
     }
     if (action === 'test') {
       // "Test" checks the token without touching the running connection, so it needs no worker.
@@ -356,7 +356,7 @@ export class DiscordService {
       }
     } else {
       // The gateway lives in the worker container; the shared database is the only channel to it.
-      if (action === 'start' && !config.enabled) throw new DomainError('setup-required', 'Turn the bot on (Enabled) and save before starting it.');
+      if (action === 'start' && !config.enabled) throw new DomainError('setup-required', 'The bot is switched off. Choose Save and Start to turn it on.');
       await this.requestFromWorker(action);
     }
     this.audit.record({ actor: { kind: 'admin', id: actor.id, displayName: actor.displayName }, action: `discord.${action}`, outcome: 'success', target: { kind: 'discord', id: 'bot' }, ip: meta.ip, correlationId: meta.correlationId });
@@ -367,11 +367,11 @@ export class DiscordService {
     const config = this.configuration();
     const configured = this.tokenSource() !== 'none';
     const warnings: string[] = [];
-    if (!configured) warnings.push('No bot token is installed, so the bot cannot connect.');
-    if (configured && !config.enabled) warnings.push('The bot is configured but disabled.');
-    if (!config.defaultGroupId) warnings.push('No default group is chosen, so commands have nothing to control.');
-    if (config.prefixEnabled) warnings.push('Prefix commands need the Message Content intent, which Discord only grants after you enable it in the Developer Portal. Slash commands work without it.');
-    if (!config.guildAllowlist.length) warnings.push('No guild allowlist is set: the bot will answer in every server it is invited to.');
+    if (!configured) warnings.push('The bot has no token yet. Paste one in Bot token, then choose Save and Start.');
+    if (configured && !config.enabled) warnings.push('The bot has a token but is switched off. Choose Save and Start to turn it on.');
+    if (!config.defaultGroupId) warnings.push('No group is chosen in Group it controls, so commands have nothing to play to.');
+    if (config.prefixEnabled) warnings.push('Prefix commands only work once Discord lets the bot read messages: turn on Message Content Intent for the bot in Discord’s Developer Portal. Slash commands work without it.');
+    if (!config.guildAllowlist.length) warnings.push('The bot answers in every server it is invited to. To limit it, list server IDs in Server allowlist.');
 
     const live = this.gateway?.status() ?? this.workerHeartbeat();
     if (live) {
@@ -393,7 +393,7 @@ export class DiscordService {
       currentVoiceChannelId: null,
       currentTrackTitle: null,
       lastError: this.lastError,
-      warnings: [...warnings, 'The Discord worker is not running. Start it with `docker compose --profile discord up -d` (or `./nowplaying install --discord`).'],
+      warnings: [...warnings, 'The hub’s Discord service isn’t running, so the bot can’t start. Install the hub again with the Discord option (see the Discord bot guide), then choose Save and Start.'],
     };
   }
 
@@ -422,7 +422,7 @@ export class DiscordService {
 
   private async requestFromWorker(action: WorkerAction): Promise<void> {
     if (!this.workerHeartbeat()) {
-      throw new DomainError('unavailable', 'The Discord worker is not running. Start it with `docker compose --profile discord up -d`, then try again.');
+      throw new DomainError('unavailable', 'The hub’s Discord service isn’t running, so the bot can’t start. Install the hub again with the Discord option (see the Discord bot guide), then choose Save and Start.');
     }
     const id = uuidv7(this.clock.now());
     this.settings.set(CONTROL_KEY, { id, action, requestedAt: this.nowIso() } satisfies ControlRequest, this.nowIso());
@@ -431,10 +431,10 @@ export class DiscordService {
       await sleep(CONTROL_POLL_MS);
       const result = this.settings.get<{ id: string; ok: boolean; error: string | null }>(CONTROL_RESULT_KEY);
       if (result?.id !== id) continue;
-      if (!result.ok) throw new DomainError('unavailable', result.error ?? 'The Discord worker could not do that.');
+      if (!result.ok) throw new DomainError('unavailable', result.error ?? 'The hub’s Discord service couldn’t do that. Try again in a moment.');
       return;
     }
-    throw new DomainError('unavailable', 'The Discord worker has not answered yet. It may still be working on it; the status will update in a moment.');
+    throw new DomainError('unavailable', 'The hub’s Discord service hasn’t answered yet. It may still be working on it; the status will update in a moment.');
   }
 
   /** Command names accepted on both transports, for slash-command registration. */

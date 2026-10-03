@@ -167,7 +167,7 @@ export class DiscordGatewayClient implements DiscordGateway {
     const config = this.config;
     const warnings: string[] = [];
     if (config?.prefixEnabled && this.messageContentIntent === 'disabled') {
-      warnings.push('Prefix commands are enabled but Discord has not granted the Message Content intent, so only slash commands work. Enable it in the Developer Portal under Bot → Privileged Gateway Intents.');
+      warnings.push('Prefix commands are on, but Discord hasn’t let the bot read messages, so only slash commands work. Turn on Message Content Intent under Bot in Discord’s Developer Portal.');
     }
     const voice = this.voice?.status() ?? { voice: 'idle' as const, currentGuildId: null, currentVoiceChannelId: null, currentTrackTitle: null, lastError: null };
     return {
