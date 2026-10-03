@@ -119,7 +119,7 @@ test.describe('saved algorithms', () => {
   test('built-ins, copies, rename, duplicate, delete, export, import, and a reload', async ({ page }) => {
     await boot(page, '#settings/rec');
     const opts = await page.$$eval('#algoPick optgroup', (g) => g.map((x) => [(x as HTMLOptGroupElement).label, [...x.querySelectorAll('option')].map((o) => o.textContent)]));
-    expect(opts, 'three built in, none of yours yet').toEqual([['Built in', ['Now Playing default', 'Late night', 'Crate digger']], ['Yours', ['None yet']]]);
+    expect(opts, 'three built in, none of yours yet').toEqual([['Built in', ['Airwave default', 'Late night', 'Crate digger']], ['Yours', ['None yet']]]);
     expect(await page.$eval('#algoDel', (n) => (n as HTMLButtonElement).disabled) && await page.$eval('#algoName', (n) => (n as HTMLInputElement).disabled), 'a built-in cannot be renamed or deleted').toBe(true);
 
     await page.selectOption('#algoPick', 'crate-digger'); await page.waitForTimeout(400);

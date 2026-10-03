@@ -74,7 +74,7 @@ export async function main(argv: readonly string[] = process.argv.slice(2), out:
 
   const tools = await resolveAll({ configured: options.tools, toolsDir: options.toolsDir });
   out('');
-  out(`  Now Playing helper ${VERSION}`);
+  out(`  Airwave helper ${VERSION}`);
   out(`  ${app ? 'Player and tools' : 'Tools'} at  ${helper.origin}`);
   out('');
   for (const tool of [tools['yt-dlp'], tools.spotdl, tools.ffmpeg]) {

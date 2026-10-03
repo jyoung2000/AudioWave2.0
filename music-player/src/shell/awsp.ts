@@ -149,7 +149,7 @@ function deviceName(): string {
   const ua = navigator.userAgent;
   const browser = /Edg\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Browser';
   const os = /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iOS' : /Windows/.test(ua) ? 'Windows' : /Mac OS/.test(ua) ? 'macOS' : /Linux/.test(ua) ? 'Linux' : 'a device';
-  return `Now Playing in ${browser} on ${os}`;
+  return `Airwave in ${browser} on ${os}`;
 }
 
 /* ------------------------------------------------------------------ install */

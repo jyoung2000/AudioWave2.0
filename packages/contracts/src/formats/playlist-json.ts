@@ -14,7 +14,7 @@ export const PlaylistJsonItem = z.object({
   note: z.string().max(300).nullable().default(null),
 });
 
-/** Versioned Now Playing JSON playlist format. Preserves provider ids, EQ bindings and stable ids. */
+/** Versioned Airwave JSON playlist format. Preserves provider ids, EQ bindings and stable ids. */
 export const PlaylistJson = z.object({
   format: z.literal(PLAYLIST_JSON_FORMAT),
   schemaVersion: z.literal(SCHEMA_VERSIONS.playlistJson),

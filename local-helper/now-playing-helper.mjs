@@ -20844,7 +20844,7 @@ function withinRoot(root, urlPath) {
 // src/options.ts
 import { homedir, tmpdir } from "node:os";
 import { join as join2, posix, win32 } from "node:path";
-var HELP = `now-playing-helper \u2014 run yt-dlp and spotDL for the Now Playing player
+var HELP = `now-playing-helper \u2014 run yt-dlp and spotDL for the Airwave player
 
   A browser page cannot start a program. This can. It serves the player on a
   loopback address and runs the tools on its behalf, so the two share an origin
@@ -22960,7 +22960,7 @@ async function main(argv = process.argv.slice(2), out = (line) => process.stdout
   }
   const tools = await resolveAll({ configured: options.tools, toolsDir: options.toolsDir });
   out("");
-  out(`  Now Playing helper ${VERSION}`);
+  out(`  Airwave helper ${VERSION}`);
   out(`  ${app ? "Player and tools" : "Tools"} at  ${helper.origin}`);
   out("");
   for (const tool of [tools["yt-dlp"], tools.spotdl, tools.ffmpeg]) {

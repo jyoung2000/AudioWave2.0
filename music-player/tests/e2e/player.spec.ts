@@ -105,7 +105,7 @@ test('the app is installable: manifest, icons and a service worker', async ({ pa
   const manifestHref = await page.locator('link[rel=manifest]').first().getAttribute('href');
   expect(manifestHref).toBeTruthy();
   const manifest = await (await page.request.get(manifestHref!)).json();
-  expect(manifest.name).toBe('Now Playing');
+  expect(manifest.name).toBe('Airwave');
   expect(manifest.display).toBe('standalone');
   expect(manifest.icons.some((icon: { purpose?: string }) => icon.purpose === 'maskable')).toBe(true);
   for (const icon of manifest.icons) expect((await page.request.get(icon.src)).status(), `${icon.src} should exist`).toBe(200);

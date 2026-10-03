@@ -73,7 +73,7 @@ export function PlayerProvider({ children, store: injected }: { children: ReactN
       }
       if (cancelled) return;
       // Registered after the store is up so the "new version" notice has somewhere to go.
-      void registerServiceWorker((update) => store.notice('info', 'A new version of Now Playing is ready.', { label: 'Reload', run: update.reload }));
+      void registerServiceWorker((update) => store.notice('info', 'A new version of Airwave is ready.', { label: 'Reload', run: update.reload }));
       const client = new HubClient(db);
       setHub(client);
       client.subscribe(setHubStatus);

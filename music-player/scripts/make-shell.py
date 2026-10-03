@@ -51,13 +51,13 @@ def replace_between(start: str, end: str, new: str) -> None:
 # ---- 1. head: no CDN import map; the player's own metas and icons; the title ---------------------
 replace_between('<script type="importmap">', '</script>', '')
 replace('<title>Now Playing — status bar header</title>',
-        '<title>Now Playing</title>\n'
+        '<title>Airwave</title>\n'
         '<meta name="color-scheme" content="light">\n'
         '<meta name="theme-color" content="#dfe4ea">\n'
         '<meta name="description" content="An offline-first music player for the music already on your device.">\n'
         '<meta name="mobile-web-app-capable" content="yes">\n'
         '<meta name="apple-mobile-web-app-capable" content="yes">\n'
-        '<meta name="apple-mobile-web-app-title" content="Now Playing">\n'
+        '<meta name="apple-mobile-web-app-title" content="Airwave">\n'
         '<link rel="icon" href="icon.svg" type="image/svg+xml">\n'
         '<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">')
 replace('<meta name="viewport" content="width=device-width, initial-scale=1">',
@@ -454,14 +454,10 @@ replace("</style>\n",
         "</style>\n")
 
 # ---- 13. the product's name ------------------------------------------------------------------------------
-# The frontend was drawn as "Airwave"; the product is Now Playing (packages/contracts/src/branding.ts),
-# as the hub and the companion windows already say. The lowercase `airwave-algorithm` file type stays:
-# it is a format name files already carry.
+# The product is Airwave (packages/contracts/src/branding.ts), as the frontend was drawn; "Now Playing"
+# is the name of its home page, not of the app. Only the user agent differs from the drawing: it is a
+# machine identifier that hubs and logs already know, so it keeps the value it has always had.
 replace("AirwaveNowPlaying/1.0", "NowPlaying/1.0")
-n = text.count('Airwave')
-text = text.replace('Airwave', 'Now Playing')
-edits += 1
-assert 'Airwave' not in text and n > 0
 
 # ---- 14. streaming from a PC (AWSP, docs/AWSP.md §6) -----------------------------------------------------
 # Sources ▸ Connections gains a third card: paste the PC's ticket, type its six-digit code, Pair. The

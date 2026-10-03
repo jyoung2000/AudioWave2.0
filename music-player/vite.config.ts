@@ -44,8 +44,8 @@ export default defineConfig({
       registerType: 'prompt',
       injectRegister: null,
       manifest: {
-        name: 'Now Playing',
-        short_name: 'Now Playing',
+        name: 'Airwave',
+        short_name: 'Airwave',
         description: 'An offline-first music player for the music already on your device.',
         id: base,
         start_url: base,

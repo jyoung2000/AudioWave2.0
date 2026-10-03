@@ -181,7 +181,7 @@ function sharePage(payload: SharePayload, token: string, nonce: string, grant: s
 <div class="panel"><table><thead><tr><th class="num">#</th><th>Title</th><th>Artist</th><th>Album</th><th>Time</th><th>Play</th></tr></thead><tbody>${rows}</tbody></table></div>
 <audio id="player" controls preload="none"></audio>
 ${honesty}${expiry}
-<footer>Served by a self-hosted Now Playing hub. Nothing on this page is loaded from anywhere else.</footer>
+<footer>Served by a self-hosted Airwave hub. Nothing on this page is loaded from anywhere else.</footer>
 </div><script nonce="${nonce}">
 (function(){
   var player=document.getElementById('player');

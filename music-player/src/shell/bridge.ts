@@ -471,7 +471,7 @@ async function boot(): Promise<void> {
   void registerServiceWorker((update) => {
     note('a new version is ready');
     const say = (window as unknown as { say?: (text: string) => void }).say;
-    say?.('A new version of Now Playing is ready — reload to use it.');
+    say?.('A new version of Airwave is ready — reload to use it.');
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') update.reload(); }, { once: true });
   });
   note(`bridge ready: ${window.LIBRARY.length} tracks, hub ${hub.getStatus().connected ? 'paired' : 'not paired'}`);

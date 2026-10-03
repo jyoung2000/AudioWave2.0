@@ -72,7 +72,7 @@ async function main(): Promise<void> {
 
 main().catch((err: unknown) => {
   // Nothing is constructed yet, so there is no logger: write plainly and exit non-zero.
-  process.stderr.write(`Now Playing hub failed to start: ${err instanceof Error ? err.message : String(err)}\n`);
+  process.stderr.write(`Airwave hub failed to start: ${err instanceof Error ? err.message : String(err)}\n`);
   if (err instanceof Error && err.stack) process.stderr.write(`${err.stack}\n`);
   process.exit(1);
 });

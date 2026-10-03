@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <!-- The import map comes first: a map parsed after any module has started
      loading is ignored, and Statistics may import three.js early (NPD-023). -->
-<title>Now Playing</title>
+<title>Airwave</title>
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#dfe4ea">
 <meta name="description" content="An offline-first music player for the music already on your device.">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Now Playing">
+<meta name="apple-mobile-web-app-title" content="Airwave">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <style>
@@ -5086,7 +5086,7 @@ var AquaArt = (function () {
 AquaArt.install({ btn: [22, 30], pop: [22, 30], cb: [14, 18] });
 </script>
 <script>
-/* ================= Now Playing Statistics — data and numbers =================
+/* ================= Airwave Statistics — data and numbers =================
 
    Every event is the header's own shape — { k, id, name, at, dur, meta } —
    with the fields a statistics page needs added to it: how long the track
@@ -5401,7 +5401,7 @@ var AW = window.AW = window.AW || {};
 })();
 
 
-/* ================= Now Playing Statistics — the three.js views =================
+/* ================= Airwave Statistics — the three.js views =================
 
    Three scenes share one frame: a renderer that draws only when something
    changed (a drag, a hover, new data, a resize) and not at all while the
@@ -5998,7 +5998,7 @@ window.AW.defineViews = function () {
 })();
 };
 
-/* ================= Now Playing Statistics — the page =================
+/* ================= Airwave Statistics — the page =================
 
    One state object, one update(): every section is recomputed from the
    events that match the current source, period, measure and focus. Nothing
@@ -7226,7 +7226,7 @@ window.AW.startStats = function () {
          are. One bar, two idioms, because they were the same idea. -->
     <div class="prefs__nav">
       <button class="prefs__back" type="button" id="prefsBack">
-        <span class="prefs__chev" aria-hidden="true"></span><span id="prefsBackLbl">Now Playing</span>
+        <span class="prefs__chev" aria-hidden="true"></span><span id="prefsBackLbl">Airwave</span>
       </button>
       <h2 class="prefs__title" id="prefsTitle" tabindex="-1">Settings</h2>
       <span class="prefs__navright" id="prefsNavRight"></span>
@@ -7236,7 +7236,7 @@ window.AW.startStats = function () {
          which is how a phone with one column has always done this. -->
     <div class="prefs__index" id="prefsIndex">
       <ul class="ios-group" id="prefsIndexList"></ul>
-      <p class="ios-foot">Now Playing — preferences are kept on this device.</p>
+      <p class="ios-foot">Airwave — preferences are kept on this device.</p>
     </div>
 
     <div class="prefs__tabs" role="tablist" aria-label="Settings sections">
@@ -7505,7 +7505,7 @@ window.AW.startStats = function () {
 
           <section class="conn__card" aria-labelledby="connHubH">
             <h3 class="conn__h" id="connHubH"><span class="conn__dot" id="connHubDot" data-state="off" aria-hidden="true"></span>Docker container</h3>
-            <p class="conn__what">The Now Playing hub on your server. Keeps the shared library, the channel playlists and guide, and group listening. Its port is 4546 unless you changed it.</p>
+            <p class="conn__what">The Airwave hub on your server. Keeps the shared library, the channel playlists and guide, and group listening. Its port is 4546 unless you changed it.</p>
             <div class="prefs__row">
               <label for="cfgHub">Address</label>
               <input class="prefs__field" type="text" id="cfgHub" placeholder="http://192.168.1.20:4546" spellcheck="false">
@@ -7881,7 +7881,7 @@ window.AW.startStats = function () {
         <fieldset class="prefs__group" id="volGroup" style="margin-top: 16px">
           <legend class="prefs__legend">Default volume</legend>
           <div class="prefs__row">
-            <label for="volMode">When Now Playing opens</label>
+            <label for="volMode">When Airwave opens</label>
             <select class="prefs__select" id="volMode">
               <option value="last">Use the volume I left it at</option>
               <option value="fixed">Start at the default volume</option>
@@ -12824,9 +12824,9 @@ window.AW.startStats = function () {
       document.getElementById('prefsTitle').textContent =
         onIndex ? 'Settings' : (wide() ? 'Settings' : PANE_TITLE[paneShown]);
       document.getElementById('prefsBackLbl').textContent =
-        onIndex || wide() ? 'Now Playing' : 'Settings';
+        onIndex || wide() ? 'Airwave' : 'Settings';
       document.getElementById('prefsBack').setAttribute('aria-label',
-        onIndex || wide() ? 'Back to Now Playing' : 'Back to Settings');
+        onIndex || wide() ? 'Back to Airwave' : 'Back to Settings');
     }
 
     function buildIndex() {
@@ -13958,7 +13958,7 @@ window.AW.startStats = function () {
       dig.explorationRate = 0.3;
       dig.decay.halfLifeDays = 90;
       return [
-        { id: 'default', name: 'Now Playing default', mode: 'for-you', cfg: algoClone(ALGO_DEFAULTS), builtin: true },
+        { id: 'default', name: 'Airwave default', mode: 'for-you', cfg: algoClone(ALGO_DEFAULTS), builtin: true },
         { id: 'late-night', name: 'Late night', mode: 'playlist', cfg: late, builtin: true },
         { id: 'crate-digger', name: 'Crate digger', mode: 'deep', cfg: dig, builtin: true },
       ];
@@ -14790,7 +14790,7 @@ window.AW.startStats = function () {
       if (data && data.format === 'airwave-algorithm' && Array.isArray(data.algorithms)) items = data.algorithms;
       else if (data && data.format === 'airwave-algorithm' && data.config) items = [data];
       else if (data && typeof data === 'object' && (data.ranking || data.actionWeights || data.diversity)) items = [{ name: stem, config: data }];
-      if (!items.length) { algoMsg(fileName + ' is neither an Now Playing algorithm nor an engine config.', 'err'); return; }
+      if (!items.length) { algoMsg(fileName + ' is neither an Airwave algorithm nor an engine config.', 'err'); return; }
       var first = null, used = 0, ignored = 0, bad = 0;
       items.slice(0, 50).forEach(function (it) {
         if (!it || typeof it !== 'object' || !it.config) { bad++; return; }
@@ -15330,7 +15330,7 @@ window.AW.startStats = function () {
       connGet('Container', base + '/healthz').then(function (h) {
         if (!h.json || typeof h.json.version !== 'string' || !/^(ok|db-closed)$/.test(h.json.status)) {
           btn.disabled = false; conn.hub = null; connLight('connHubDot', 'bad'); connFacts('connHubFacts', []);
-          msg.textContent = h.status ? 'Something answered, but it is not the Now Playing container.'
+          msg.textContent = h.status ? 'Something answered, but it is not the Airwave container.'
             : location.protocol === 'https:' && /^http:/i.test(base) && h.why === 'blocked'
               ? 'This page is on https, so the browser won’t call a plain-http address. Use the container’s https address.'
               : 'No answer from ' + base + '. Check the container is running and the port is right.';
@@ -16636,7 +16636,7 @@ window.AW.startStats = function () {
     }
     document.getElementById('volMode').addEventListener('change', function () {
       cfg.volume.mode = this.value; cfgSave();
-      setStatus(this.value === 'fixed' ? 'Now Playing will open at ' + cfg.volume.level + '%.' : 'Now Playing will open where you left the volume.');
+      setStatus(this.value === 'fixed' ? 'Airwave will open at ' + cfg.volume.level + '%.' : 'Airwave will open where you left the volume.');
     });
     document.getElementById('volDefault').addEventListener('input', function () {
       cfg.volume.level = +this.value;

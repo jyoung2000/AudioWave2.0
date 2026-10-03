@@ -180,7 +180,7 @@ function coldStartCandidates(catalogue: Catalogue, profile: TasteProfile, config
       trackId: entry.track.id,
       track: entry.track,
       sources: [{ kind: 'exploration', via: null, score: Math.min(1, entry.weight / 3) }],
-      reasons: ['Starting point while Now Playing learns what you like'],
+      reasons: ['Starting point while Airwave learns what you like'],
     });
     if (out.length >= limit) break;
   }

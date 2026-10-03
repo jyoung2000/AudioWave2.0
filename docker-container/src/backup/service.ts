@@ -284,7 +284,7 @@ export class BackupService {
       // Credential secrets and their hashes are never exported: a restored export must re-pair.
     }));
     const data: Record<string, unknown> = {
-      hub: { name: this.repos.settings.get<{ name?: string }>('hub.identity')?.name ?? 'Now Playing hub' },
+      hub: { name: this.repos.settings.get<{ name?: string }>('hub.identity')?.name ?? 'Airwave hub' },
       groups,
       devices,
       playlists: this.repos.sync.all('playlists'),

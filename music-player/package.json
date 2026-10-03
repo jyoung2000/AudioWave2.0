@@ -1,7 +1,7 @@
 {
   "name": "@now-playing/music-player",
   "version": "0.1.0",
-  "description": "Now Playing Player \u2014 offline-first standalone PWA for local music playback with optional hub and companion connections.",
+  "description": "Airwave \u2014 offline-first standalone PWA for local music playback with optional hub and companion connections.",
   "license": "MIT",
   "type": "module",
   "private": true,

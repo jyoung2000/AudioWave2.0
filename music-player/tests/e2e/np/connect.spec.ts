@@ -67,7 +67,7 @@ test.describe('desktop', () => {
     await page.click('#hubTest'); await page.waitForTimeout(200);
     await expect(page.locator('#hubMsg'), 'the container needs an address to test').toContainText(/address first/);
     await page.fill('#cfgHub', '192.168.1.99:4546'); await page.click('#hubTest');
-    await expect(page.locator('#hubMsg'), 'a web page that is not the hub is called out').toContainText(/not the Now Playing container/);
+    await expect(page.locator('#hubMsg'), 'a web page that is not the hub is called out').toContainText(/not the Airwave container/);
     await page.fill('#cfgHub', '192.168.1.20:4546'); await page.click('#hubTest');
     await expect(page.locator('#hubMsg'), 'a bare host:port is read as http and connects').toContainText('Connected to TOWER');
     const hf = (await page.textContent('#connHubFacts')) ?? '';
