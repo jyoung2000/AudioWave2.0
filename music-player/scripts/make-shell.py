@@ -1280,6 +1280,80 @@ replace("        function () {\n"
 replace("       browser; the companion beats both when it's running */",
         "       browser; a paired container, when there is one, beats both */")
 
+# ---- Live TV: the companion's channels and guide (NP-TV-001) --------------------------------------------------
+# The companion keeps the M3U playlists and XMLTV guides pasted into its Live TV tab and serves them on
+# /helper/v1/tv/channels and /helper/v1/tv/guide. A player that can see a companion takes its channel
+# list from there — no playlist to load by hand, and no CORS wall, because the companion did the reading.
+# A channel with a guide entry says what is on and what follows; one without still says "Live".
+replace("      if (!ch.run) return ch.url ? 'Live' : '\\u2014';\n",
+        "      if (ch.guide) {\n"
+        "        var later = at > Date.now();\n"
+        "        var prog = later ? ch.guide.next : ch.guide.now;\n"
+        "        return prog && prog.title ? prog.title : (later ? '\\u2014' : 'Live');\n"
+        "      }\n"
+        "      if (!ch.run) return ch.url ? 'Live' : '\\u2014';\n")
+replace("        return { id: c.id || 'm3u-' + i, num: c.num || String(i + 1), name: c.name,\n"
+        "                 genre: c.genre || '', url: c.url };\n"
+        "      });\n"
+        "      mediaStack = [];\n"
+        "      mediaSel = 0;\n"
+        "      if (mediaView === 'live-tv' && !media.hidden) mediaRender();\n"
+        "    }\n",
+        "        return { id: c.id || 'm3u-' + i, num: c.num || String(i + 1), name: c.name,\n"
+        "                 genre: c.genre || '', url: c.url, guide: c.guide || null };\n"
+        "      });\n"
+        "      mediaStack = [];\n"
+        "      mediaSel = 0;\n"
+        "      if (mediaView === 'live-tv' && !media.hidden) mediaRender();\n"
+        "    }\n"
+        "\n"
+        "    /* The companion's Live TV, when a companion is in reach. The list is replaced only when the\n"
+        "       channels themselves changed, so a guide refresh never throws you out of where you were. */\n"
+        "    var companionTvSig = '';\n"
+        "    function companionTv() {\n"
+        "      if (!window.COMPANION) return Promise.resolve(0);\n"
+        "      var base = String(window.COMPANION).replace(/\\/$/, '');\n"
+        "      var get = function (path) {\n"
+        "        return fetch(base + path, { cache: 'no-store' }).then(function (r) {\n"
+        "          if (!r.ok) throw new Error(String(r.status));\n"
+        "          return r.json();\n"
+        "        });\n"
+        "      };\n"
+        "      return get('/helper/v1/tv/channels').then(function (c) {\n"
+        "        var list = c && Array.isArray(c.channels) ? c.channels : [];\n"
+        "        if (!list.length) return 0;\n"
+        "        return get('/helper/v1/tv/guide').catch(function () { return { guide: [] }; }).then(function (g) {\n"
+        "          var by = {};\n"
+        "          (g && Array.isArray(g.guide) ? g.guide : []).forEach(function (e) { by[e.tvgId] = e; });\n"
+        "          var mapped = list.map(function (ch) {\n"
+        "            return { id: ch.id, num: String(ch.number), name: ch.name, genre: ch.group || '', url: ch.url,\n"
+        "                     guide: (ch.tvgId && by[ch.tvgId]) || null };\n"
+        "          });\n"
+        "          var sig = mapped.map(function (ch) { return ch.id + '\\u0001' + ch.url; }).join('\\u0002');\n"
+        "          if (sig !== companionTvSig) {\n"
+        "            companionTvSig = sig;\n"
+        "            useChannels(mapped);\n"
+        "          } else {\n"
+        "            CHANNELS.forEach(function (ch, i) { ch.guide = mapped[i].guide; });\n"
+        "            if (mediaView === 'live-tv' && !media.hidden) mediaRender();\n"
+        "          }\n"
+        "          return mapped.length;\n"
+        "        });\n"
+        "      }).catch(function () { return 0; });\n"
+        "    }\n"
+        "    window.companionTv = companionTv;\n"
+        "    setInterval(companionTv, 5 * 60 * 1000);\n")
+replace("      conn.app = { base: base, health: j };\n"
+        "      window.COMPANION = base;\n",
+        "      conn.app = { base: base, health: j };\n"
+        "      window.COMPANION = base;\n"
+        "      if (window.companionTv) window.companionTv();\n")
+replace("      if (cfg.companion) window.COMPANION = cfg.companion;\n",
+        "      if (cfg.companion) window.COMPANION = cfg.companion;\n"
+        "      if (window.companionTv) window.companionTv();\n")
+replace("              'The companion app can fetch it instead.';\n",
+        "              'Add it in the companion app\\u2019s Live TV tab instead: the companion reads it and the channels appear here.';\n")
+
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):
     assert bad not in text, f'left behind: {bad}'

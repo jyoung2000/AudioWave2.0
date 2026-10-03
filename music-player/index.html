@@ -11570,6 +11570,11 @@ window.AW.startStats = function () {
          schedule to go with it — that comes from an XMLTV guide the companion
          app parses. Until then the guide says what it honestly knows, which is
          that the channel is on. */
+      if (ch.guide) {
+        var later = at > Date.now();
+        var prog = later ? ch.guide.next : ch.guide.now;
+        return prog && prog.title ? prog.title : (later ? '\u2014' : 'Live');
+      }
       if (!ch.run) return ch.url ? 'Live' : '\u2014';
       var run = ch.run.split('|');
       var i = Math.floor(at / SLOT) + ch.num.charCodeAt(0) + ch.num.length;
@@ -11602,12 +11607,49 @@ window.AW.startStats = function () {
     function useChannels(list) {
       CHANNELS = list.map(function (c, i) {
         return { id: c.id || 'm3u-' + i, num: c.num || String(i + 1), name: c.name,
-                 genre: c.genre || '', url: c.url };
+                 genre: c.genre || '', url: c.url, guide: c.guide || null };
       });
       mediaStack = [];
       mediaSel = 0;
       if (mediaView === 'live-tv' && !media.hidden) mediaRender();
     }
+
+    /* The companion's Live TV, when a companion is in reach. The list is replaced only when the
+       channels themselves changed, so a guide refresh never throws you out of where you were. */
+    var companionTvSig = '';
+    function companionTv() {
+      if (!window.COMPANION) return Promise.resolve(0);
+      var base = String(window.COMPANION).replace(/\/$/, '');
+      var get = function (path) {
+        return fetch(base + path, { cache: 'no-store' }).then(function (r) {
+          if (!r.ok) throw new Error(String(r.status));
+          return r.json();
+        });
+      };
+      return get('/helper/v1/tv/channels').then(function (c) {
+        var list = c && Array.isArray(c.channels) ? c.channels : [];
+        if (!list.length) return 0;
+        return get('/helper/v1/tv/guide').catch(function () { return { guide: [] }; }).then(function (g) {
+          var by = {};
+          (g && Array.isArray(g.guide) ? g.guide : []).forEach(function (e) { by[e.tvgId] = e; });
+          var mapped = list.map(function (ch) {
+            return { id: ch.id, num: String(ch.number), name: ch.name, genre: ch.group || '', url: ch.url,
+                     guide: (ch.tvgId && by[ch.tvgId]) || null };
+          });
+          var sig = mapped.map(function (ch) { return ch.id + '\u0001' + ch.url; }).join('\u0002');
+          if (sig !== companionTvSig) {
+            companionTvSig = sig;
+            useChannels(mapped);
+          } else {
+            CHANNELS.forEach(function (ch, i) { ch.guide = mapped[i].guide; });
+            if (mediaView === 'live-tv' && !media.hidden) mediaRender();
+          }
+          return mapped.length;
+        });
+      }).catch(function () { return 0; });
+    }
+    window.companionTv = companionTv;
+    setInterval(companionTv, 5 * 60 * 1000);
 
     /* ---- saved shows and films ---- */
     function savedVideo(id) { return !!(state.videos && state.videos[id]); }
@@ -15110,7 +15152,7 @@ window.AW.startStats = function () {
           msg.textContent = err && err.message === 'empty'
             ? 'That file has no channels in it.'
             : 'Could not load it — the server is down, or it does not allow this page to read it. ' +
-              'The companion app can fetch it instead.';
+              'Add it in the companion app\u2019s Live TV tab instead: the companion reads it and the channels appear here.';
         })
         .then(function () { btn.disabled = false; });
     });
@@ -15254,6 +15296,7 @@ window.AW.startStats = function () {
     function showApp(base, j) {
       conn.app = { base: base, health: j };
       window.COMPANION = base;
+      if (window.companionTv) window.companionTv();
       var tools = (Array.isArray(j.tools) ? j.tools : []);
       var frag = document.createDocumentFragment(), missing = 0;
       tools.forEach(function (t, i) {
@@ -16703,6 +16746,7 @@ window.AW.startStats = function () {
       cfgLoad(saved);
       applyPlayer();
       if (cfg.companion) window.COMPANION = cfg.companion;
+      if (window.companionTv) window.companionTv();
       document.dispatchEvent(new CustomEvent('prefs:ready', { detail: { cfg: cfg } }));
       /* A page opened straight at #settings/eq has to arrive on the equalizer,
          not on the player with a hash nobody read. The address is the state,

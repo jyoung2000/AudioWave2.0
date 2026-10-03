@@ -1627,6 +1627,31 @@
       ]
     },
     {
+      "id": "NP-TV-001",
+      "group": "np-radio",
+      "title": "Live TV channels come from the companion, and the guide says only what a guide said",
+      "contract": "A player that can reach a companion takes its Live TV channels from the playlists kept in the companion's Live TV tab; nothing has to be loaded by hand in the player, and a playlist the page could not read itself is the companion's to read. A channel with a guide entry shows what is on and what follows; one without says Live and no programme is invented. A guide refresh changes the words and never resets the list or the listener's place in it. A companion with no playlists, or one that has gone, leaves the guide as it was.",
+      "example": "",
+      "authority": "adopted",
+      "owners": [
+        "music-player/scripts/make-shell.py",
+        "local-helper/src/server.ts",
+        "windows-companion/src/main/live-tv/index.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/live-tv.spec.ts",
+          "name": "the companion’s channels fill the guide, with what is on and what follows"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/live-tv.spec.ts",
+          "name": "a companion with no playlists leaves the guide as it was, and one that is gone breaks nothing"
+        }
+      ]
+    },
+    {
       "id": "NP-PREF-012",
       "group": "np-prefs",
       "title": "Groups and invites live on the Profile tab",

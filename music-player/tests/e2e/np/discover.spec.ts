@@ -143,7 +143,7 @@ test.describe('saved algorithms', () => {
     expect(await page.$eval('#algoPick', (n) => [...n.querySelectorAll('optgroup[label="Yours"] option')].map((o) => o.textContent).join()), 'and then removes only that one').toBe('Slow burn');
 
     const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#algoExportFile')]);
-    expect(dl.suggestedFilename(), 'export saves a file named for the algorithm').toBe('now-playing-default.airwave-algorithm.json');
+    expect(dl.suggestedFilename(), 'export saves a file named for the algorithm').toBe('airwave-default.airwave-algorithm.json');
     await page.evaluate(() => (window as unknown as { algoImportText(t: string, n: string): void }).algoImportText(JSON.stringify({ ranking: { tasteMatch: 0.5, discoveryBonus: 0.5, bogus: 1 }, explorationRate: 0.2, madeUp: true }), 'from-engine.json'));
     await page.waitForTimeout(400);
     expect(await pickName(page), 'a bare engine config imports as an algorithm named for its file').toBe('from-engine');
