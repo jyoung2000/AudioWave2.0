@@ -49,8 +49,8 @@ RUN --mount=type=cache,id=npm,target=/root/.npm \
     npm install --omit=dev --no-audit --no-fund && \
     node -e "require('better-sqlite3'); require('@discordjs/voice'); console.log(require('@discordjs/voice').generateDependencyReport())"
 
-# yt-dlp for the optional external-tool provider, which is off by default and stays off until an
-# administrator enables it and accepts the rights notice (docs/DOWNLOADS_AND_LEGAL.md). Fetched with
+# yt-dlp for the external-tool provider, which is ready without setup and limited to allowlisted
+# hosts and requests that name a rights basis (docs/DOWNLOADS_AND_LEGAL.md). Fetched with
 # Node rather than curl so the runtime image needs no download tooling, verified against the
 # checksums published in the same release, and skipped without failing the build when there is no
 # network. The script explains why it is not pinned.

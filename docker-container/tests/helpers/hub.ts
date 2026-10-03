@@ -143,6 +143,7 @@ export async function createTestHub(options: TestHubOptions = {}): Promise<TestH
     installKeyFile: join(dataDir, 'install.key'),
     ipLogging: 'truncated',
     ffmpegPath: null,
+    autoTools: false,
     publicDomainDir: null,
     demoMode: false,
     nodeEnv: 'test',

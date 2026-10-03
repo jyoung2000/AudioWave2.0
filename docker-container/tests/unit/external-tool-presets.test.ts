@@ -56,9 +56,25 @@ describe('the yt-dlp preset', () => {
 describe('choosing a preset', () => {
   it('fills in both the command and the hosts, so nothing else is required', () => {
     const instance = adapter({ preset: 'yt-dlp' });
-    expect(instance.requiredConfig()).toEqual(['preset']);
+    expect(instance.requiredConfig()).toEqual([]);
     expect(instance.commandTemplate()[0]).toBe('/usr/local/bin/yt-dlp');
     expect(instance.allowedHosts()).toContain('music.youtube.com');
+  });
+
+  it('needs no setup at all: with nothing configured, yt-dlp is the tool', () => {
+    const instance = adapter({});
+    expect(instance.preset()?.displayName).toBe('yt-dlp');
+    expect(instance.requiredConfig()).toEqual([]);
+    expect(instance.commandTemplate().at(-1)).toBe('{url}');
+    expect(instance.allowedHosts()).toContain('soundcloud.com');
+  });
+
+  it('runs the copy the hub found or set up for itself, unless an operator named another', () => {
+    const instance = new ExternalToolAdapter((id) => (id === 'yt-dlp' ? '/data/tools/yt-dlp' : null));
+    instance.configure({ enabled: true, clientId: null, clientSecret: null, apiKey: null, applicationId: null, redirectUri: null, contactEmail: null, extra: {} });
+    expect(instance.commandTemplate()[0]).toBe('/data/tools/yt-dlp');
+    instance.configure({ enabled: true, clientId: null, clientSecret: null, apiKey: null, applicationId: null, redirectUri: null, contactEmail: null, extra: { binary: '/opt/yt-dlp' } });
+    expect(instance.commandTemplate()[0]).toBe('/opt/yt-dlp');
   });
 
   it('lets an operator add hosts but never quietly lose the preset’s own', () => {
@@ -93,10 +109,19 @@ describe('what it reports', () => {
     expect(result.message).toMatch(/not found/i);
   });
 
-  it('says what is wrong when nothing is configured at all', async () => {
-    const result = await adapter({}).test();
+  it('says the tool is still on its way when it is not on this machine yet', async () => {
+    const instance = new ExternalToolAdapter(() => '/nope/yt-dlp');
+    instance.configure({ enabled: true, clientId: null, clientSecret: null, apiKey: null, applicationId: null, redirectUri: null, contactEmail: null, extra: {} });
+    const result = await instance.test();
     expect(result.ok).toBe(false);
-    expect(result.message).toMatch(/no preset/i);
+    expect(result.message).toMatch(/not found/i);
+    expect(result.message).toMatch(/sets it up/i);
+  });
+
+  it('says what is wrong when a template was started and not finished', async () => {
+    const result = await adapter({ preset: 'something-else' }).test();
+    expect(result.ok).toBe(false);
+    expect(result.message).toMatch(/no command/i);
   });
 
   it('reports the version a real binary gives, because an old yt-dlp fails confusingly', async () => {

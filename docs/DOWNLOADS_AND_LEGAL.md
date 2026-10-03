@@ -187,10 +187,14 @@ for the user" — and this is the posture now:
   spotDL does not touch it. It reads Spotify for the track list and fetches a match from YouTube
   Music, so what you get is another recording of the same song. The app says so on the sheet, in
   those words, because assuming otherwise is the single most common misunderstanding about it.
-- **The hub can do the same thing**, through the external-tool provider that has been there all
-  along, and that is unchanged by the 2026-09-27 decision: off by default, enabled by an
-  administrator who accepts a rights notice, allowlisted hosts, no cookies. The image ships yt-dlp so
-  enabling it is a toggle rather than an install — but it stays a toggle an administrator chooses.
+- **The hub does the same thing**, through the external-tool provider that has been there all
+  along. Until 2026-10-03 it was off until an administrator switched it on; **the owner reversed
+  that too** ("ensure the companion and hub app downloaders work without setup"). It is now ready
+  from the first start: with nothing configured it is yt-dlp, from the copy the image ships or — on
+  a hub run straight from Node — one the hub fetches for itself with the same verified installer as
+  the companion (`docker-container/src/media/tools.ts`; `NP_AUTO_TOOLS=0` turns the fetching off).
+  The limits were never the switch and they have not moved: allowlisted hosts, no cookies, and a
+  rights basis on every single request. An administrator can still turn it off under Providers.
 - **The Android app carries it**, and that is a change of posture worth naming rather than sliding
   past. Until it existed, someone had to go and install yt-dlp themselves, and that was itself a
   decision; in the app it arrives bundled. What stands in for that decision is the per-fetch rights
@@ -200,14 +204,15 @@ for the user" — and this is the posture now:
 
 ## The optional external tool
 
-The hub can be configured to call an external media tool for content you own or are authorized to
-download. It is **off by default** and has to be enabled deliberately by an administrator, who is
-shown a rights notice when doing so.
+The hub calls an external media tool — yt-dlp unless an administrator configures another — for
+content you own or are authorized to download. Since the owner's decision of 2026-10-03 it is **ready
+without setup**; an administrator can turn it off, and every request still has to name its rights
+basis.
 
-When enabled it is constrained: an allowlist of hosts, no cookies passed to it, serialized execution
+It is constrained whether or not anyone configured it: an allowlist of hosts, no cookies passed to it, serialized execution
 with timeouts, and no DRM handling. It exists because "I own this and want a copy" is a legitimate
 thing to want, and refusing to acknowledge that would push people to worse tools. It is not a way
-around any of the rules above, and enabling it does not change what the provider adapters permit.
+around any of the rules above, and its being on does not change what the provider adapters permit.
 
 ## Converting a file you own
 

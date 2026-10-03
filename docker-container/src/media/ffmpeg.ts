@@ -20,8 +20,9 @@ const UNAVAILABLE: FfmpegInfo = { available: false, path: null, version: null, e
 /** Encoders the hub asks about; anything else in the build is irrelevant here. */
 const AUDIO_ENCODERS = ['libmp3lame', 'aac', 'libopus', 'libvorbis', 'flac', 'alac', 'pcm_s16le'] as const;
 
-export async function detectFfmpeg(configuredPath: string | null): Promise<FfmpegInfo> {
-  const candidates = configuredPath ? [configuredPath] : ['ffmpeg', '/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg'];
+/** `also` is where the hub puts a copy it set up for itself; a configured path still wins outright. */
+export async function detectFfmpeg(configuredPath: string | null, also: readonly string[] = []): Promise<FfmpegInfo> {
+  const candidates = configuredPath ? [configuredPath] : ['ffmpeg', '/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg', ...also];
   for (const path of candidates) {
     try {
       // `shell: false` is the default for execFile; no argument here is ever user-supplied.

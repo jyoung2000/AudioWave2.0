@@ -52,6 +52,8 @@ export default defineConfig({
       NP_BIND_MODE: 'localhost',
       NP_LOG_LEVEL: 'warn',
       NP_DEMO_MODE: 'false',
+      // A test run must not fetch a 200 MB FFmpeg build; the installer has its own tests.
+      NP_AUTO_TOOLS: '0',
     },
   },
 });

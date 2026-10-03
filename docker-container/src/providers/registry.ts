@@ -31,8 +31,13 @@ export class ProviderRegistry {
     adapter.configure(config);
   }
 
-  private defaultEnabled(id: string): boolean {
-    return id !== 'external-tool';
+  /**
+   * Every provider starts enabled. The external tool used to be the exception; the owner's decision
+   * of 2026-10-03 is that downloaders work without setup, and its real limits — allowlisted hosts,
+   * a rights basis on every request, no credentials — do not depend on the switch.
+   */
+  private defaultEnabled(_id: string): boolean {
+    return true;
   }
 
   private toRuntime(row: ProviderAppConfigRow): ProviderRuntimeConfig {

@@ -39,7 +39,7 @@ export const TOOL_PRESETS: Record<string, ToolPreset> = {
     binary: '/usr/local/bin/yt-dlp',
     args: ['--ignore-config', '--no-colors', '--newline', '--no-mtime', '--no-cache-dir', '--no-playlist', '--format', 'bestaudio/best', '--output', '{output}', '--', '{url}'],
     allowedHosts: ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be', 'soundcloud.com', 'on.soundcloud.com', 'bandcamp.com', 'archive.org'],
-    note: 'Shipped in this image. Keeping it current matters: yt-dlp works by tracking sites that change, so an old copy fails confusingly rather than safely.',
+    note: 'Shipped in the image, and set up by the hub itself anywhere else. Keeping it current matters: yt-dlp works by tracking sites that change, so an old copy fails confusingly rather than safely.',
   },
 };
 
@@ -54,15 +54,15 @@ async function toolVersion(binary: string): Promise<string | null> {
 }
 
 /**
- * Optional bridge to an administrator-installed command-line media tool. Off by default. It never passes cookies or
- * credentials to the tool, restricts it to allowlisted hosts, and only runs it for downloads the requesting user has
- * explicitly attributed to a rights basis (own content / licensed / public domain).
+ * Bridge to a command-line media tool. Ready without setup (owner decision 2026-10-03): with nothing configured it is
+ * yt-dlp, run from the copy the image ships or the one the hub set up for itself (`media/tools.ts`). What made it safe
+ * was never the switch: it never passes cookies or credentials to the tool, restricts it to allowlisted hosts, and only
+ * runs it for downloads the requesting user has explicitly attributed to a rights basis (own content / licensed /
+ * public domain). An administrator can still turn it off, or change it (Admin → Providers → External tool):
  *
- * Two ways to configure it (Admin → Providers → External tool):
- *
- *   **A preset.** `extra.preset` names one of the tools below and fills in both the command and the hosts. This is
- *   what most people want, and it means the command line is written here — reviewed, in the repository — rather than
- *   typed into a web form where a stray `--exec` would be nobody's fault but everybody's problem.
+ *   **A preset.** `extra.preset` names one of the tools below and fills in both the command and the hosts; leaving it
+ *   empty means yt-dlp. The command line is written here — reviewed, in the repository — rather than typed into a web
+ *   form where a stray `--exec` would be nobody's fault but everybody's problem.
  *
  *   **A template.** `extra.command`, such as `/usr/local/bin/mytool --no-playlist -o {output} {url}`, plus
  *   `extra.allowedHosts`. For a tool this file has never heard of.
@@ -74,23 +74,33 @@ async function toolVersion(binary: string): Promise<string | null> {
 export class ExternalToolAdapter extends BaseAdapter {
   readonly id = 'external-tool';
 
+  /** `locate` answers with the copy of a preset's tool on this machine, when the hub knows of one. */
+  constructor(private readonly locate: (tool: 'yt-dlp') => string | null = () => null) {
+    super();
+  }
+
   descriptor(): Omit<ProviderDescriptor, 'enabled' | 'configured' | 'capabilities'> {
-    return { provider: this.id, displayName: 'External media tool', role: 'tool', authType: 'local', authScopes: [], groupCompatible: false, discordCompatible: false, reviewedAt: REVIEWED_AT, limitations: ['Disabled by default; the administrator must install a tool and allowlist hosts', 'Only for content you own or are licensed to download; the request records the rights basis', 'No cookies, credentials or DRM circumvention; the tool runs without a shell and with a timeout'] };
+    return { provider: this.id, displayName: 'External media tool', role: 'tool', authType: 'local', authScopes: [], groupCompatible: false, discordCompatible: false, reviewedAt: REVIEWED_AT, limitations: ['Ready without setup: yt-dlp, limited to the hosts on its list; an administrator can turn it off', 'Only for content you own or are licensed to download; the request records the rights basis', 'No cookies, credentials or DRM circumvention; the tool runs without a shell and with a timeout'] };
   }
 
   capabilities(): ProviderCapabilities {
-    return caps({ metadata: 'restricted', creatorDownload: 'restricted', userOwnedDownload: 'restricted', groupSync: 'unsupported', reason: 'Only for allowlisted hosts and content you have rights to; enabled by the administrator' });
+    return caps({ metadata: 'restricted', creatorDownload: 'restricted', userOwnedDownload: 'restricted', groupSync: 'unsupported', reason: 'Only for allowlisted hosts and content you have rights to' });
   }
 
   override requiredConfig(): readonly string[] {
     // A preset supplies both, so demanding them as well would report a working setup as incomplete.
-    return this.preset() ? ['preset'] : ['command', 'allowedHosts'];
+    return this.preset() ? [] : ['command', 'allowedHosts'];
   }
 
-  /** The chosen preset, when it names one this build knows. */
+  /**
+   * The preset in force. One that was named, when this build knows it; yt-dlp when nothing was
+   * configured at all. A hand-written command, or a name this build has never heard of, means no
+   * preset — the operator started something of their own and is asked to finish it.
+   */
   preset(): ToolPreset | null {
     const name = (this.config.extra['preset'] ?? '').trim();
-    return name ? (TOOL_PRESETS[name] ?? null) : null;
+    if (name) return TOOL_PRESETS[name] ?? null;
+    return (this.config.extra['command'] ?? '').trim() ? null : TOOL_PRESETS['yt-dlp']!;
   }
 
   override allowedHosts(): readonly string[] {
@@ -108,7 +118,8 @@ export class ExternalToolAdapter extends BaseAdapter {
     if (configured.length) return configured;
     const preset = this.preset();
     if (!preset) return [];
-    const binary = (this.config.extra['binary'] ?? preset.binary).trim();
+    const named = (this.config.extra['binary'] ?? '').trim();
+    const binary = named || (preset === TOOL_PRESETS['yt-dlp'] ? this.locate('yt-dlp') : null) || preset.binary;
     return [binary, ...preset.args];
   }
 
@@ -126,8 +137,11 @@ export class ExternalToolAdapter extends BaseAdapter {
    */
   override async test(): Promise<ProviderTestResult> {
     const [binary] = this.commandTemplate();
-    if (!binary) return { ok: false, latencyMs: null, message: 'No preset chosen and no command configured' };
-    if (!existsSync(binary)) return { ok: false, latencyMs: null, message: `Binary not found: ${binary}` };
+    if (!binary) return { ok: false, latencyMs: null, message: 'No command configured, and the preset named is not one this hub knows' };
+    if (!existsSync(binary)) {
+      const own = this.preset() !== null && !(this.config.extra['binary'] ?? '').trim();
+      return { ok: false, latencyMs: null, message: own ? `${this.preset()!.displayName} was not found on this hub yet. The hub sets it up by itself when it can reach github.com; restart the hub to try again.` : `Binary not found: ${binary}` };
+    }
     if (!this.allowedHosts().length) return { ok: false, latencyMs: null, message: 'No allowed hosts configured' };
     const started = Date.now();
     const version = await toolVersion(binary);

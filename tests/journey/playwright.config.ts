@@ -75,6 +75,8 @@ export default defineConfig({
         NP_BIND_MODE: 'localhost',
         NP_LOG_LEVEL: 'info',
         NP_DEMO_MODE: 'false',
+        // A test run must not fetch a 200 MB FFmpeg build; the installer has its own tests.
+        NP_AUTO_TOOLS: '0',
         // The repo's rights-clean tone fixtures: a keyless library with real audio, so step 08's
         // paired search and audible preview run against the real thing.
         NP_PUBLIC_DOMAIN_DIR: join(repo, 'packages', 'test-fixtures', 'generated', 'audio'),

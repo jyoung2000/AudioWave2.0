@@ -21,16 +21,12 @@
  * **Why FFmpeg is not fetched on macOS or Linux.** The package manager's copy is the better one
  * there, and every such machine has a package manager. The helper says which command to run.
  */
-import { existsSync, statSync } from 'node:fs';
-import { execFile } from 'node:child_process';
-import { basename, delimiter, join } from 'node:path';
-import { promisify } from 'node:util';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import type { HelperTool, HelperToolId } from '@now-playing/contracts';
-import { binaryName, toolSource } from './sources.js';
+import { binaryName, findOnPath, toolSource, versionOf } from '@now-playing/domain/tool-install';
 
-export { digestFor, ytDlpAsset } from './sources.js';
-
-const run = promisify(execFile);
+export { digestFor, ytDlpAsset } from '@now-playing/domain/tool-install';
 
 export interface ToolPaths {
   'yt-dlp'?: string | undefined;
@@ -126,52 +122,8 @@ export function cachedResolver(options: ResolveOptions, ttlMs = 30_000, now: () 
   };
 }
 
-/**
- * How to start a tool at `path`. A configured path that is a JavaScript file is run with this Node,
- * because Windows cannot execute a script by its name without a shell, and a shell is not an option.
- */
-export function toolCommand(path: string): { command: string; prefix: string[] } {
-  return /\.(?:mjs|cjs|js)$/i.test(path) ? { command: process.execPath, prefix: [path] } : { command: path, prefix: [] };
-}
+export { toolCommand, versionFlag, versionOf, findOnPath } from '@now-playing/domain/tool-install';
 
-/** FFmpeg and ffprobe take `-version`; everything else here takes `--version`. */
-export function versionFlag(path: string, id?: HelperToolId): string {
-  if (id === 'ffmpeg') return '-version';
-  return /^(?:ffmpeg|ffprobe)(?:\.exe)?$/i.test(basename(path)) ? '-version' : '--version';
-}
-
-/** The first line of the version flag's output, which is all any of these put there that is worth keeping. */
-export async function versionOf(path: string, id?: HelperToolId, timeoutMs = 8000): Promise<string | null> {
-  try {
-    const { command, prefix } = toolCommand(path);
-    const { stdout } = await run(command, [...prefix, versionFlag(path, id)], { timeout: timeoutMs, windowsHide: true, maxBuffer: 1024 * 256 });
-    const first = stdout.split(/\r?\n/)[0]?.trim() ?? '';
-    return first.slice(0, 120) || null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * PATH, walked by hand rather than shelled out to `which`, because a shell is the thing this
- * program is trying not to need.
- */
-export function findOnPath(binary: string, env: NodeJS.ProcessEnv = process.env): string | null {
-  const path = env['PATH'] ?? env['Path'] ?? '';
-  const extensions = process.platform === 'win32' ? (env['PATHEXT'] ?? '.EXE;.CMD;.BAT').split(';').filter(Boolean) : [''];
-  for (const directory of path.split(delimiter).filter(Boolean)) {
-    for (const extension of extensions) {
-      // On Windows the name already carries .exe; only try the others when it does not.
-      const candidate = join(directory, binary.toLowerCase().endsWith(extension.toLowerCase()) ? binary : `${binary}${extension}`);
-      try {
-        if (statSync(candidate).isFile()) return candidate;
-      } catch {
-        // Unreadable directory on PATH — normal, and not this program's problem.
-      }
-    }
-  }
-  return null;
-}
 
 export function publicTool(tool: ResolvedTool): HelperTool {
   // The path stays here. It is the one thing in this record that says something about the machine,

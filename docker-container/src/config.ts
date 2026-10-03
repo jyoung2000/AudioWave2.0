@@ -20,6 +20,8 @@ export interface HubConfig {
   installKeyFile: string;
   ipLogging: IpLoggingMode;
   ffmpegPath: string | null;
+  /** Fetch yt-dlp (and, on Windows, FFmpeg) when this machine has none. `NP_AUTO_TOOLS=0` turns it off. */
+  autoTools: boolean;
   publicDomainDir: string | null;
   demoMode: boolean;
   nodeEnv: string;
@@ -108,6 +110,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): HubConfig {
     installKeyFile: text(env, 'NP_INSTALL_KEY_FILE') ?? join(dataDir, 'keys', 'install.key'),
     ipLogging: oneOf(text(env, 'NP_IP_LOGGING'), IP_MODES, 'truncated', 'NP_IP_LOGGING'),
     ffmpegPath: text(env, 'NP_FFMPEG_PATH'),
+    autoTools: !['0', 'false', 'off'].includes((text(env, 'NP_AUTO_TOOLS') ?? '').toLowerCase()),
     publicDomainDir: text(env, 'NP_PUBLIC_DOMAIN_DIR') ?? defaultPublicDomainDir(),
     demoMode: demo === 'true' || demo === '1',
     nodeEnv: text(env, 'NODE_ENV') ?? 'development',

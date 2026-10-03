@@ -8,7 +8,7 @@ var __export = (target, all) => {
 // src/cli.ts
 import { mkdirSync as mkdirSync4, mkdtempSync as mkdtempSync2, rmSync as rmSync3 } from "node:fs";
 import { spawn as spawn2 } from "node:child_process";
-import { dirname as dirname2, join as join8, resolve as resolve2 } from "node:path";
+import { dirname as dirname2, join as join9, resolve as resolve2 } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // ../node_modules/zod/v4/classic/external.js
@@ -21467,18 +21467,22 @@ function createEstimator(options) {
 
 // src/jobs.ts
 import { execFile as execFile2, spawn } from "node:child_process";
-import { mkdirSync, readdirSync, rmSync, statSync as statSync3 } from "node:fs";
+import { mkdirSync as mkdirSync2, readdirSync as readdirSync2, rmSync as rmSync2, statSync as statSync4 } from "node:fs";
 import { homedir as homedir2, tmpdir as tmpdir2 } from "node:os";
-import { join as join5, extname as extname2 } from "node:path";
+import { join as join7, extname as extname2 } from "node:path";
 import { randomUUID } from "node:crypto";
 
 // src/tools.ts
-import { existsSync as existsSync2, statSync as statSync2 } from "node:fs";
-import { execFile } from "node:child_process";
-import { basename, delimiter, join as join4 } from "node:path";
-import { promisify } from "node:util";
+import { existsSync as existsSync2 } from "node:fs";
+import { join as join6 } from "node:path";
 
-// src/sources.ts
+// ../packages/domain/src/tool-install/install.ts
+import { createHash } from "node:crypto";
+import { chmodSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, statSync as statSync3, writeFileSync } from "node:fs";
+import { open as open2 } from "node:fs/promises";
+import { join as join5 } from "node:path";
+
+// ../packages/domain/src/tool-install/sources.ts
 function ytDlpAsset(platform = process.platform, arch = process.arch) {
   if (platform === "win32") return arch === "ia32" ? "yt-dlp_x86.exe" : arch === "arm64" ? "yt-dlp_arm64.exe" : "yt-dlp.exe";
   if (platform === "darwin") return "yt-dlp_macos";
@@ -21521,8 +21525,384 @@ function digestFor(sums, asset) {
   return null;
 }
 
-// src/tools.ts
+// ../packages/domain/src/tool-install/probe.ts
+import { execFile } from "node:child_process";
+import { statSync as statSync2 } from "node:fs";
+import { basename, delimiter, join as join4 } from "node:path";
+import { promisify } from "node:util";
 var run = promisify(execFile);
+function toolCommand(path) {
+  return /\.(?:mjs|cjs|js)$/i.test(path) ? { command: process.execPath, prefix: [path] } : { command: path, prefix: [] };
+}
+function versionFlag(path, id) {
+  if (id === "ffmpeg") return "-version";
+  return /^(?:ffmpeg|ffprobe)(?:\.exe)?$/i.test(basename(path)) ? "-version" : "--version";
+}
+async function versionOf(path, id, timeoutMs = 8e3) {
+  try {
+    const { command, prefix } = toolCommand(path);
+    const { stdout } = await run(command, [...prefix, versionFlag(path, id)], { timeout: timeoutMs, windowsHide: true, maxBuffer: 1024 * 256 });
+    const first = stdout.split(/\r?\n/)[0]?.trim() ?? "";
+    return first.slice(0, 120) || null;
+  } catch {
+    return null;
+  }
+}
+function findOnPath(binary, env = process.env) {
+  const path = env["PATH"] ?? env["Path"] ?? "";
+  const extensions = process.platform === "win32" ? (env["PATHEXT"] ?? ".EXE;.CMD;.BAT").split(";").filter(Boolean) : [""];
+  for (const directory of path.split(delimiter).filter(Boolean)) {
+    for (const extension of extensions) {
+      const candidate = join4(directory, binary.toLowerCase().endsWith(extension.toLowerCase()) ? binary : `${binary}${extension}`);
+      try {
+        if (statSync2(candidate).isFile()) return candidate;
+      } catch {
+      }
+    }
+  }
+  return null;
+}
+
+// ../packages/domain/src/tool-install/zip.ts
+import { closeSync, fstatSync, openSync, readSync } from "node:fs";
+import { inflateRawSync } from "node:zlib";
+var ZipError = class extends Error {
+  name = "ZipError";
+};
+var EOCD = 101010256;
+var ZIP64_LOCATOR = 117853008;
+var ZIP64_EOCD = 101075792;
+var CENTRAL = 33639248;
+var LOCAL = 67324752;
+var MAX_ENTRY_BYTES = 1024 * 1024 * 1024;
+function withZipFile(path, use) {
+  const fd = openSync(path, "r");
+  try {
+    const size = fstatSync(fd).size;
+    const source = {
+      size,
+      read: (offset, length) => {
+        if (offset < 0 || offset + length > size) throw new ZipError("The archive is truncated.");
+        const buffer = Buffer.alloc(length);
+        let done = 0;
+        while (done < length) {
+          const n = readSync(fd, buffer, done, length - done, offset + done);
+          if (n === 0) throw new ZipError("The archive is truncated.");
+          done += n;
+        }
+        return buffer;
+      }
+    };
+    return use(openZip(source));
+  } finally {
+    closeSync(fd);
+  }
+}
+function openZip(source) {
+  const end = findEnd(source);
+  let count = end.readUInt16LE(10);
+  let directorySize = end.readUInt32LE(12);
+  let directoryOffset = end.readUInt32LE(16);
+  if (count === 65535 || directorySize === 4294967295 || directoryOffset === 4294967295) {
+    const eocdAt = locateEnd(source);
+    if (eocdAt < 20) throw new ZipError("The archive says it is ZIP64 but has no ZIP64 locator.");
+    const locator = source.read(eocdAt - 20, 20);
+    if (locator.readUInt32LE(0) !== ZIP64_LOCATOR) throw new ZipError("The archive says it is ZIP64 but has no ZIP64 locator.");
+    const recordAt = toNumber(locator.readBigUInt64LE(8));
+    const record2 = source.read(recordAt, 56);
+    if (record2.readUInt32LE(0) !== ZIP64_EOCD) throw new ZipError("The ZIP64 end record is missing.");
+    count = toNumber(record2.readBigUInt64LE(32));
+    directorySize = toNumber(record2.readBigUInt64LE(40));
+    directoryOffset = toNumber(record2.readBigUInt64LE(48));
+  }
+  const directory = source.read(directoryOffset, directorySize);
+  const entries = [];
+  let at = 0;
+  for (let i = 0; i < count; i += 1) {
+    if (at + 46 > directory.length || directory.readUInt32LE(at) !== CENTRAL) throw new ZipError("The central directory is damaged.");
+    const flags = directory.readUInt16LE(at + 8);
+    const method = directory.readUInt16LE(at + 10);
+    const crc = directory.readUInt32LE(at + 16);
+    let compressedSize = directory.readUInt32LE(at + 20);
+    let uncompressedSize = directory.readUInt32LE(at + 24);
+    const nameLength = directory.readUInt16LE(at + 28);
+    const extraLength = directory.readUInt16LE(at + 30);
+    const commentLength = directory.readUInt16LE(at + 32);
+    let localHeaderOffset = directory.readUInt32LE(at + 42);
+    const name = directory.subarray(at + 46, at + 46 + nameLength).toString("utf8");
+    const extra = directory.subarray(at + 46 + nameLength, at + 46 + nameLength + extraLength);
+    for (let e = 0; e + 4 <= extra.length; ) {
+      const id = extra.readUInt16LE(e);
+      const size = extra.readUInt16LE(e + 2);
+      if (id === 1) {
+        let p = e + 4;
+        const next = () => {
+          if (p + 8 > e + 4 + size) throw new ZipError("A ZIP64 field is short.");
+          const value = toNumber(extra.readBigUInt64LE(p));
+          p += 8;
+          return value;
+        };
+        if (uncompressedSize === 4294967295) uncompressedSize = next();
+        if (compressedSize === 4294967295) compressedSize = next();
+        if (localHeaderOffset === 4294967295) localHeaderOffset = next();
+      }
+      e += 4 + size;
+    }
+    if (!safeEntryName(name)) throw new ZipError(`The archive holds an unsafe entry name (${JSON.stringify(name.slice(0, 80))}), so none of it was used.`);
+    entries.push({ name, method, flags, crc32: crc, compressedSize, uncompressedSize, localHeaderOffset });
+    at += 46 + nameLength + extraLength + commentLength;
+  }
+  return { entries, read: (entry) => readEntry(source, entry) };
+}
+function readEntry(source, entry) {
+  if (entry.flags & 1) throw new ZipError(`${entry.name} is encrypted.`);
+  if (entry.uncompressedSize > MAX_ENTRY_BYTES) throw new ZipError(`${entry.name} is larger than anything this reader will unpack.`);
+  const header2 = source.read(entry.localHeaderOffset, 30);
+  if (header2.readUInt32LE(0) !== LOCAL) throw new ZipError(`The local header for ${entry.name} is missing.`);
+  const dataAt = entry.localHeaderOffset + 30 + header2.readUInt16LE(26) + header2.readUInt16LE(28);
+  const raw = source.read(dataAt, entry.compressedSize);
+  let data;
+  if (entry.method === 0) data = Buffer.from(raw);
+  else if (entry.method === 8) {
+    try {
+      data = inflateRawSync(raw, { maxOutputLength: Math.max(1, entry.uncompressedSize) });
+    } catch (error61) {
+      throw new ZipError(`${entry.name} could not be inflated: ${error61 instanceof Error ? error61.message : String(error61)}`);
+    }
+  } else throw new ZipError(`${entry.name} uses compression method ${entry.method}, which this reader does not handle.`);
+  if (data.length !== entry.uncompressedSize) throw new ZipError(`${entry.name} unpacked to the wrong size.`);
+  if (crc32(data) !== entry.crc32 >>> 0) throw new ZipError(`${entry.name} failed its CRC-32 check.`);
+  return data;
+}
+function safeEntryName(name) {
+  if (!name || name.includes("\0")) return false;
+  if (name.startsWith("/") || name.startsWith("\\")) return false;
+  if (/^[a-zA-Z]:/.test(name)) return false;
+  return !name.split(/[\\/]/).some((segment) => segment === "..");
+}
+function findEnd(source) {
+  return source.read(locateEnd(source), 22);
+}
+function locateEnd(source) {
+  if (source.size < 22) throw new ZipError("This is not a zip archive.");
+  const span = Math.min(source.size, 22 + 65535);
+  const tail = source.read(source.size - span, span);
+  for (let i = tail.length - 22; i >= 0; i -= 1) {
+    if (tail.readUInt32LE(i) === EOCD) return source.size - span + i;
+  }
+  throw new ZipError("This is not a zip archive.");
+}
+function toNumber(value) {
+  if (value > BigInt(Number.MAX_SAFE_INTEGER)) throw new ZipError("A size in the archive is out of range.");
+  return Number(value);
+}
+var table = null;
+function crc32(data) {
+  if (!table) {
+    table = new Uint32Array(256);
+    for (let n = 0; n < 256; n += 1) {
+      let c = n;
+      for (let k = 0; k < 8; k += 1) c = c & 1 ? 3988292384 ^ c >>> 1 : c >>> 1;
+      table[n] = c >>> 0;
+    }
+  }
+  let crc = 4294967295;
+  for (let i = 0; i < data.length; i += 1) crc = table[(crc ^ data[i]) & 255] ^ crc >>> 8;
+  return (crc ^ 4294967295) >>> 0;
+}
+
+// ../packages/domain/src/tool-install/install.ts
+var USER_AGENT = "NowPlaying-helper";
+var API = "https://api.github.com";
+var ReleaseBody = external_exports.object({
+  tag_name: external_exports.string().min(1).max(200),
+  assets: external_exports.array(
+    external_exports.object({
+      name: external_exports.string().max(300),
+      browser_download_url: external_exports.string().max(2048),
+      size: external_exports.number().int().nonnegative(),
+      digest: external_exports.string().max(200).nullable().optional()
+    })
+  ).max(1e3)
+});
+var Refusal = class extends Error {
+};
+async function latestRelease(repo, options = {}) {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const response = await fetchImpl(`${API}/repos/${repo}/releases/latest`, {
+    headers: { accept: "application/vnd.github+json", "user-agent": USER_AGENT },
+    redirect: "follow",
+    ...options.signal ? { signal: options.signal } : {}
+  });
+  if (!response.ok) throw new Refusal(`GitHub did not answer for ${repo}'s latest release (${response.status}${response.statusText ? ` ${response.statusText}` : ""}).`);
+  const parsed = ReleaseBody.safeParse(await response.json());
+  if (!parsed.success) throw new Refusal(`GitHub's answer for ${repo} was not a release this helper understands.`);
+  return {
+    tag: parsed.data.tag_name,
+    assets: parsed.data.assets.map((asset) => {
+      const match = /^sha256:([a-f0-9]{64})$/i.exec(asset.digest ?? "");
+      return { name: asset.name, url: asset.browser_download_url, size: asset.size, digest: match ? match[1].toLowerCase() : null };
+    })
+  };
+}
+function unsupportedReason(id, platform, arch) {
+  if (id === "ffmpeg") return `FFmpeg is not set up automatically on ${platform === "darwin" ? "macOS" : platform}. Install it with your package manager: brew install ffmpeg, apt install ffmpeg or dnf install ffmpeg.`;
+  return `There is no published ${id} build for ${platform}/${arch}. Install it with pipx install ${id}.`;
+}
+async function installTool(id, options) {
+  const platform = options.platform ?? process.platform;
+  const arch = options.arch ?? process.arch;
+  const source = toolSource(id, platform, arch);
+  if (!source) return { installed: false, version: null, reason: unsupportedReason(id, platform, arch), tag: null };
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const limitMs = options.timeoutMs ?? (id === "ffmpeg" ? 20 * 6e4 : 10 * 6e4);
+  const timeout = AbortSignal.timeout(limitMs);
+  const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
+  const probe = options.probe ?? ((tool, path) => versionOf(path, tool, 6e4));
+  let tag = null;
+  let staging = null;
+  try {
+    if (signal.aborted) throw signal.reason;
+    const release = await latestRelease(source.repo, { fetchImpl, signal });
+    tag = release.tag;
+    const assetName = source.asset(release.assets.map((a) => a.name));
+    const asset = assetName ? release.assets.find((a) => a.name === assetName) : void 0;
+    if (!asset) throw new Refusal(`${source.repo} ${release.tag} publishes no ${id} build for ${platform}/${arch}.`);
+    assertGitHub(asset.url);
+    let expected = asset.digest;
+    if (!expected && source.sums) {
+      const sumsAsset = release.assets.find((a) => a.name === source.sums);
+      if (sumsAsset) {
+        assertGitHub(sumsAsset.url);
+        const sumsResponse = await fetchImpl(sumsAsset.url, { redirect: "follow", signal, headers: { "user-agent": USER_AGENT } });
+        if (!sumsResponse.ok) throw new Refusal(`The checksum file could not be read (${sumsResponse.status}). Nothing was installed.`);
+        expected = digestFor(await sumsResponse.text(), asset.name);
+      }
+    }
+    if (!expected) throw new Refusal(`${source.repo} ${release.tag} publishes no SHA-256 for ${asset.name}, so it was not installed.`);
+    mkdirSync(options.toolsDir, { recursive: true });
+    sweepStaging(options.toolsDir);
+    staging = mkdtempSync(join5(options.toolsDir, ".staging-"));
+    const download = join5(staging, "download.part");
+    const actual = await downloadTo(fetchImpl, asset, download, signal, options.onProgress);
+    if (actual !== expected) throw new Refusal(`The downloaded ${asset.name} did not match its published SHA-256, so it was discarded.`);
+    const staged = [];
+    if (source.kind === "binary") {
+      const name = binaryName(id, platform);
+      renameSync(download, join5(staging, name));
+      staged.push({ from: join5(staging, name), name });
+    } else {
+      const wanted = ["ffmpeg", "ffprobe"].map((tool) => binaryName(tool, platform));
+      withZipFile(download, (zip) => {
+        for (const name of wanted) {
+          const entry = zip.entries.find((e) => isBinEntry(e.name, name));
+          if (!entry) throw new Refusal(`The FFmpeg archive has no bin/${name}, so nothing was installed.`);
+          const part = join5(staging, `${name}.part`);
+          writeFileSync(part, zip.read(entry));
+          renameSync(part, join5(staging, name));
+          staged.push({ from: join5(staging, name), name });
+        }
+      });
+      rmSync(download, { force: true });
+    }
+    if (platform !== "win32") for (const file2 of staged) chmodSync(file2.from, 493);
+    const main2 = staged.find((f) => f.name === binaryName(id, platform));
+    const version2 = await probe(id, main2.from);
+    if (!version2) throw new Refusal(`The downloaded ${id} was verified but would not report a version, so it is not being used.`);
+    for (const file2 of [...staged.filter((f) => f !== main2), main2]) {
+      try {
+        await renameWithRetry(file2.from, join5(options.toolsDir, file2.name));
+      } catch (error61) {
+        throw new Refusal(describeWriteError(id, error61));
+      }
+    }
+    return { installed: true, version: version2, reason: null, tag, verified: { asset: asset.name, sha256: expected } };
+  } catch (error61) {
+    return { installed: false, version: null, reason: explain(error61, id, options.signal, timeout, limitMs), tag };
+  } finally {
+    if (staging) rmSync(staging, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
+  }
+}
+async function downloadTo(fetchImpl, asset, path, signal, onProgress) {
+  const response = await fetchImpl(asset.url, { redirect: "follow", signal, headers: { "user-agent": USER_AGENT } });
+  if (!response.ok || !response.body) throw new Refusal(`The download failed: ${response.status}${response.statusText ? ` ${response.statusText}` : ""}.`);
+  const header2 = Number(response.headers.get("content-length"));
+  const total = Number.isFinite(header2) && header2 > 0 ? header2 : asset.size > 0 ? asset.size : null;
+  const hash2 = createHash("sha256");
+  const file2 = await open2(path, "w");
+  let received = 0;
+  const reader = response.body.getReader();
+  try {
+    for (; ; ) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      received += value.byteLength;
+      if (asset.size > 0 && received > asset.size) throw new Refusal(`The download ran past the ${asset.size} bytes the release lists, so it was discarded.`);
+      hash2.update(value);
+      await file2.write(value);
+      onProgress?.(received, total);
+    }
+  } finally {
+    await reader.cancel().catch(() => void 0);
+    await file2.close();
+  }
+  return hash2.digest("hex");
+}
+function sweepStaging(toolsDir, olderThanMs = 36e5) {
+  let names;
+  try {
+    names = readdirSync(toolsDir);
+  } catch {
+    return;
+  }
+  for (const name of names) {
+    if (!name.startsWith(".staging-")) continue;
+    const path = join5(toolsDir, name);
+    try {
+      if (Date.now() - statSync3(path).mtimeMs > olderThanMs) rmSync(path, { recursive: true, force: true });
+    } catch {
+    }
+  }
+}
+function assertGitHub(url2) {
+  let parsed;
+  try {
+    parsed = new URL(url2);
+  } catch {
+    throw new Refusal("The release named a download address that is not a URL, so nothing was fetched.");
+  }
+  if (parsed.protocol !== "https:" || parsed.hostname !== "github.com") throw new Refusal(`The release pointed somewhere other than GitHub (${parsed.hostname}), so nothing was fetched.`);
+}
+async function renameWithRetry(from, to, attempts = 4) {
+  for (let i = 1; ; i += 1) {
+    try {
+      renameSync(from, to);
+      return;
+    } catch (error61) {
+      const code = error61.code ?? "";
+      if (i >= attempts || !["EBUSY", "EPERM", "EACCES"].includes(code)) throw error61;
+      await new Promise((resolve3) => setTimeout(resolve3, 250 * i));
+    }
+  }
+}
+function describeWriteError(id, error61) {
+  const code = error61?.code ?? "";
+  if (["EBUSY", "EPERM", "EACCES"].includes(code)) return `The existing ${id} is in use and could not be replaced. Wait for running downloads to finish and try again.`;
+  return `The verified ${id} could not be saved: ${error61 instanceof Error ? error61.message : String(error61)}`;
+}
+function explain(error61, id, outer, timeout, limitMs) {
+  if (error61 instanceof Refusal) return error61.message;
+  if (error61 instanceof ZipError) return `The FFmpeg archive could not be unpacked: ${error61.message}`;
+  if (timeout.aborted) return `Setting up ${id} took longer than ${Math.round(limitMs / 6e4)} minutes and was stopped. It will be tried again.`;
+  if (outer?.aborted) return `Setting up ${id} was cancelled.`;
+  return `The download could not be completed: ${error61 instanceof Error ? error61.message : String(error61)}`;
+}
+function isBinEntry(entryName, file2) {
+  const parts = entryName.split(/[\\/]/);
+  return parts.length >= 2 && parts.length <= 3 && parts[parts.length - 2].toLowerCase() === "bin" && parts[parts.length - 1].toLowerCase() === file2.toLowerCase();
+}
+
+// src/tools.ts
 function installHint(id, installable) {
   if (installable) return `Not set up yet. The helper downloads ${id} from its project\u2019s GitHub release and checks it against the published SHA-256 before using it.`;
   if (id === "ffmpeg") return "Not installed. Without it nothing can be converted and yt-dlp takes whatever single audio stream a site offers. Install it with your package manager: brew install ffmpeg, apt install ffmpeg or dnf install ffmpeg.";
@@ -21533,7 +21913,7 @@ async function resolveTool(id, options) {
   const candidates = [];
   const configured = options.configured[id];
   if (configured) candidates.push({ path: configured, origin: "configured" });
-  const installed = join4(options.toolsDir, binaryName(id));
+  const installed = join6(options.toolsDir, binaryName(id));
   if (existsSync2(installed)) candidates.push({ path: installed, origin: "installed" });
   const onPath = findOnPath(binaryName(id));
   if (onPath) candidates.push({ path: onPath, origin: "path" });
@@ -21579,37 +21959,6 @@ function cachedResolver(options, ttlMs = 3e4, now = Date.now) {
     }
   };
 }
-function toolCommand(path) {
-  return /\.(?:mjs|cjs|js)$/i.test(path) ? { command: process.execPath, prefix: [path] } : { command: path, prefix: [] };
-}
-function versionFlag(path, id) {
-  if (id === "ffmpeg") return "-version";
-  return /^(?:ffmpeg|ffprobe)(?:\.exe)?$/i.test(basename(path)) ? "-version" : "--version";
-}
-async function versionOf(path, id, timeoutMs = 8e3) {
-  try {
-    const { command, prefix } = toolCommand(path);
-    const { stdout } = await run(command, [...prefix, versionFlag(path, id)], { timeout: timeoutMs, windowsHide: true, maxBuffer: 1024 * 256 });
-    const first = stdout.split(/\r?\n/)[0]?.trim() ?? "";
-    return first.slice(0, 120) || null;
-  } catch {
-    return null;
-  }
-}
-function findOnPath(binary, env = process.env) {
-  const path = env["PATH"] ?? env["Path"] ?? "";
-  const extensions = process.platform === "win32" ? (env["PATHEXT"] ?? ".EXE;.CMD;.BAT").split(";").filter(Boolean) : [""];
-  for (const directory of path.split(delimiter).filter(Boolean)) {
-    for (const extension of extensions) {
-      const candidate = join4(directory, binary.toLowerCase().endsWith(extension.toLowerCase()) ? binary : `${binary}${extension}`);
-      try {
-        if (statSync2(candidate).isFile()) return candidate;
-      } catch {
-      }
-    }
-  }
-  return null;
-}
 function publicTool(tool) {
   const { path: _path, ...rest } = tool;
   return rest;
@@ -21634,7 +21983,7 @@ var CONTENT_TYPES = {
 var Jobs = class {
   constructor(options) {
     this.options = options;
-    mkdirSync(join5(options.workDir, "jobs"), { recursive: true });
+    mkdirSync2(join7(options.workDir, "jobs"), { recursive: true });
   }
   options;
   records = /* @__PURE__ */ new Map();
@@ -21642,11 +21991,11 @@ var Jobs = class {
   active = null;
   create(request) {
     const id = randomUUID();
-    const root = join5(this.options.workDir, "jobs", id);
-    const directory = join5(root, "out");
-    const home = join5(root, "home");
-    mkdirSync(directory, { recursive: true });
-    mkdirSync(home, { recursive: true });
+    const root = join7(this.options.workDir, "jobs", id);
+    const directory = join7(root, "out");
+    const home = join7(root, "home");
+    mkdirSync2(directory, { recursive: true });
+    mkdirSync2(home, { recursive: true });
     const job = {
       id,
       state: "queued",
@@ -21722,7 +22071,7 @@ var Jobs = class {
   }
   remove(path) {
     try {
-      rmSync(path, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+      rmSync2(path, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     } catch (error61) {
       this.options.log?.(`could not remove a job directory: ${error61.code ?? "error"}`);
     }
@@ -21821,14 +22170,14 @@ var Jobs = class {
     for (const name of walk(record2.directory)) {
       const extension = extname2(name).toLowerCase();
       if (!AUDIO_EXTENSIONS.has(extension)) continue;
-      const absolute = join5(record2.directory, name);
+      const absolute = join7(record2.directory, name);
       const id = randomUUID();
       record2.paths.set(id, absolute);
       files.push({
         id,
         // The name is rebuilt rather than trusted: it came from a page title on someone else's site.
         name: sanitizeFilename(name.split(/[/\\]/).pop() ?? `track${extension}`, { fallback: `track${extension}` }),
-        sizeBytes: statSync3(absolute).size,
+        sizeBytes: statSync4(absolute).size,
         contentType: CONTENT_TYPES[extension] ?? "application/octet-stream"
       });
     }
@@ -21872,7 +22221,7 @@ function urlArgument(url2) {
   return url2;
 }
 function spotdlArgs(job, directory, ffmpeg) {
-  const args = ["download", "--output", join5(directory, "{artists} - {title}.{output-ext}"), "--format", job.format === "original" ? "mp3" : job.format];
+  const args = ["download", "--output", join7(directory, "{artists} - {title}.{output-ext}"), "--format", job.format === "original" ? "mp3" : job.format];
   if (ffmpeg.path) args.push("--ffmpeg", ffmpeg.path);
   args.push("--", urlArgument(job.url));
   return args;
@@ -21916,9 +22265,9 @@ function escapeRegExp(value) {
 function walk(directory, prefix = "", depth = 0) {
   if (depth > 4) return [];
   const out = [];
-  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+  for (const entry of readdirSync2(directory, { withFileTypes: true })) {
     const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
-    if (entry.isDirectory()) out.push(...walk(join5(directory, entry.name), relative, depth + 1));
+    if (entry.isDirectory()) out.push(...walk(join7(directory, entry.name), relative, depth + 1));
     else if (entry.isFile()) out.push(relative);
   }
   return out;
@@ -22104,354 +22453,7 @@ function headerText(value) {
 
 // src/provision.ts
 import { mkdirSync as mkdirSync3, readFileSync as readFileSync2, renameSync as renameSync2, writeFileSync as writeFileSync2 } from "node:fs";
-import { join as join7 } from "node:path";
-
-// src/install.ts
-import { createHash } from "node:crypto";
-import { chmodSync, mkdirSync as mkdirSync2, mkdtempSync, readdirSync as readdirSync2, renameSync, rmSync as rmSync2, statSync as statSync4, writeFileSync } from "node:fs";
-import { open as open2 } from "node:fs/promises";
-import { join as join6 } from "node:path";
-
-// src/zip.ts
-import { closeSync, fstatSync, openSync, readSync } from "node:fs";
-import { inflateRawSync } from "node:zlib";
-var ZipError = class extends Error {
-  name = "ZipError";
-};
-var EOCD = 101010256;
-var ZIP64_LOCATOR = 117853008;
-var ZIP64_EOCD = 101075792;
-var CENTRAL = 33639248;
-var LOCAL = 67324752;
-var MAX_ENTRY_BYTES = 1024 * 1024 * 1024;
-function withZipFile(path, use) {
-  const fd = openSync(path, "r");
-  try {
-    const size = fstatSync(fd).size;
-    const source = {
-      size,
-      read: (offset, length) => {
-        if (offset < 0 || offset + length > size) throw new ZipError("The archive is truncated.");
-        const buffer = Buffer.alloc(length);
-        let done = 0;
-        while (done < length) {
-          const n = readSync(fd, buffer, done, length - done, offset + done);
-          if (n === 0) throw new ZipError("The archive is truncated.");
-          done += n;
-        }
-        return buffer;
-      }
-    };
-    return use(openZip(source));
-  } finally {
-    closeSync(fd);
-  }
-}
-function openZip(source) {
-  const end = findEnd(source);
-  let count = end.readUInt16LE(10);
-  let directorySize = end.readUInt32LE(12);
-  let directoryOffset = end.readUInt32LE(16);
-  if (count === 65535 || directorySize === 4294967295 || directoryOffset === 4294967295) {
-    const eocdAt = locateEnd(source);
-    if (eocdAt < 20) throw new ZipError("The archive says it is ZIP64 but has no ZIP64 locator.");
-    const locator = source.read(eocdAt - 20, 20);
-    if (locator.readUInt32LE(0) !== ZIP64_LOCATOR) throw new ZipError("The archive says it is ZIP64 but has no ZIP64 locator.");
-    const recordAt = toNumber(locator.readBigUInt64LE(8));
-    const record2 = source.read(recordAt, 56);
-    if (record2.readUInt32LE(0) !== ZIP64_EOCD) throw new ZipError("The ZIP64 end record is missing.");
-    count = toNumber(record2.readBigUInt64LE(32));
-    directorySize = toNumber(record2.readBigUInt64LE(40));
-    directoryOffset = toNumber(record2.readBigUInt64LE(48));
-  }
-  const directory = source.read(directoryOffset, directorySize);
-  const entries = [];
-  let at = 0;
-  for (let i = 0; i < count; i += 1) {
-    if (at + 46 > directory.length || directory.readUInt32LE(at) !== CENTRAL) throw new ZipError("The central directory is damaged.");
-    const flags = directory.readUInt16LE(at + 8);
-    const method = directory.readUInt16LE(at + 10);
-    const crc = directory.readUInt32LE(at + 16);
-    let compressedSize = directory.readUInt32LE(at + 20);
-    let uncompressedSize = directory.readUInt32LE(at + 24);
-    const nameLength = directory.readUInt16LE(at + 28);
-    const extraLength = directory.readUInt16LE(at + 30);
-    const commentLength = directory.readUInt16LE(at + 32);
-    let localHeaderOffset = directory.readUInt32LE(at + 42);
-    const name = directory.subarray(at + 46, at + 46 + nameLength).toString("utf8");
-    const extra = directory.subarray(at + 46 + nameLength, at + 46 + nameLength + extraLength);
-    for (let e = 0; e + 4 <= extra.length; ) {
-      const id = extra.readUInt16LE(e);
-      const size = extra.readUInt16LE(e + 2);
-      if (id === 1) {
-        let p = e + 4;
-        const next = () => {
-          if (p + 8 > e + 4 + size) throw new ZipError("A ZIP64 field is short.");
-          const value = toNumber(extra.readBigUInt64LE(p));
-          p += 8;
-          return value;
-        };
-        if (uncompressedSize === 4294967295) uncompressedSize = next();
-        if (compressedSize === 4294967295) compressedSize = next();
-        if (localHeaderOffset === 4294967295) localHeaderOffset = next();
-      }
-      e += 4 + size;
-    }
-    if (!safeEntryName(name)) throw new ZipError(`The archive holds an unsafe entry name (${JSON.stringify(name.slice(0, 80))}), so none of it was used.`);
-    entries.push({ name, method, flags, crc32: crc, compressedSize, uncompressedSize, localHeaderOffset });
-    at += 46 + nameLength + extraLength + commentLength;
-  }
-  return { entries, read: (entry) => readEntry(source, entry) };
-}
-function readEntry(source, entry) {
-  if (entry.flags & 1) throw new ZipError(`${entry.name} is encrypted.`);
-  if (entry.uncompressedSize > MAX_ENTRY_BYTES) throw new ZipError(`${entry.name} is larger than anything this reader will unpack.`);
-  const header2 = source.read(entry.localHeaderOffset, 30);
-  if (header2.readUInt32LE(0) !== LOCAL) throw new ZipError(`The local header for ${entry.name} is missing.`);
-  const dataAt = entry.localHeaderOffset + 30 + header2.readUInt16LE(26) + header2.readUInt16LE(28);
-  const raw = source.read(dataAt, entry.compressedSize);
-  let data;
-  if (entry.method === 0) data = Buffer.from(raw);
-  else if (entry.method === 8) {
-    try {
-      data = inflateRawSync(raw, { maxOutputLength: Math.max(1, entry.uncompressedSize) });
-    } catch (error61) {
-      throw new ZipError(`${entry.name} could not be inflated: ${error61 instanceof Error ? error61.message : String(error61)}`);
-    }
-  } else throw new ZipError(`${entry.name} uses compression method ${entry.method}, which this reader does not handle.`);
-  if (data.length !== entry.uncompressedSize) throw new ZipError(`${entry.name} unpacked to the wrong size.`);
-  if (crc32(data) !== entry.crc32 >>> 0) throw new ZipError(`${entry.name} failed its CRC-32 check.`);
-  return data;
-}
-function safeEntryName(name) {
-  if (!name || name.includes("\0")) return false;
-  if (name.startsWith("/") || name.startsWith("\\")) return false;
-  if (/^[a-zA-Z]:/.test(name)) return false;
-  return !name.split(/[\\/]/).some((segment) => segment === "..");
-}
-function findEnd(source) {
-  return source.read(locateEnd(source), 22);
-}
-function locateEnd(source) {
-  if (source.size < 22) throw new ZipError("This is not a zip archive.");
-  const span = Math.min(source.size, 22 + 65535);
-  const tail = source.read(source.size - span, span);
-  for (let i = tail.length - 22; i >= 0; i -= 1) {
-    if (tail.readUInt32LE(i) === EOCD) return source.size - span + i;
-  }
-  throw new ZipError("This is not a zip archive.");
-}
-function toNumber(value) {
-  if (value > BigInt(Number.MAX_SAFE_INTEGER)) throw new ZipError("A size in the archive is out of range.");
-  return Number(value);
-}
-var table = null;
-function crc32(data) {
-  if (!table) {
-    table = new Uint32Array(256);
-    for (let n = 0; n < 256; n += 1) {
-      let c = n;
-      for (let k = 0; k < 8; k += 1) c = c & 1 ? 3988292384 ^ c >>> 1 : c >>> 1;
-      table[n] = c >>> 0;
-    }
-  }
-  let crc = 4294967295;
-  for (let i = 0; i < data.length; i += 1) crc = table[(crc ^ data[i]) & 255] ^ crc >>> 8;
-  return (crc ^ 4294967295) >>> 0;
-}
-
-// src/install.ts
-var USER_AGENT = "NowPlaying-helper";
-var API = "https://api.github.com";
-var ReleaseBody = external_exports.object({
-  tag_name: external_exports.string().min(1).max(200),
-  assets: external_exports.array(
-    external_exports.object({
-      name: external_exports.string().max(300),
-      browser_download_url: external_exports.string().max(2048),
-      size: external_exports.number().int().nonnegative(),
-      digest: external_exports.string().max(200).nullable().optional()
-    })
-  ).max(1e3)
-});
-var Refusal = class extends Error {
-};
-async function latestRelease(repo, options = {}) {
-  const fetchImpl = options.fetchImpl ?? fetch;
-  const response = await fetchImpl(`${API}/repos/${repo}/releases/latest`, {
-    headers: { accept: "application/vnd.github+json", "user-agent": USER_AGENT },
-    redirect: "follow",
-    ...options.signal ? { signal: options.signal } : {}
-  });
-  if (!response.ok) throw new Refusal(`GitHub did not answer for ${repo}'s latest release (${response.status}${response.statusText ? ` ${response.statusText}` : ""}).`);
-  const parsed = ReleaseBody.safeParse(await response.json());
-  if (!parsed.success) throw new Refusal(`GitHub's answer for ${repo} was not a release this helper understands.`);
-  return {
-    tag: parsed.data.tag_name,
-    assets: parsed.data.assets.map((asset) => {
-      const match = /^sha256:([a-f0-9]{64})$/i.exec(asset.digest ?? "");
-      return { name: asset.name, url: asset.browser_download_url, size: asset.size, digest: match ? match[1].toLowerCase() : null };
-    })
-  };
-}
-function unsupportedReason(id, platform, arch) {
-  if (id === "ffmpeg") return `FFmpeg is not set up automatically on ${platform === "darwin" ? "macOS" : platform}. Install it with your package manager: brew install ffmpeg, apt install ffmpeg or dnf install ffmpeg.`;
-  return `There is no published ${id} build for ${platform}/${arch}. Install it with pipx install ${id}.`;
-}
-async function installTool(id, options) {
-  const platform = options.platform ?? process.platform;
-  const arch = options.arch ?? process.arch;
-  const source = toolSource(id, platform, arch);
-  if (!source) return { installed: false, version: null, reason: unsupportedReason(id, platform, arch), tag: null };
-  const fetchImpl = options.fetchImpl ?? fetch;
-  const limitMs = options.timeoutMs ?? (id === "ffmpeg" ? 20 * 6e4 : 10 * 6e4);
-  const timeout = AbortSignal.timeout(limitMs);
-  const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
-  const probe = options.probe ?? ((tool, path) => versionOf(path, tool, 6e4));
-  let tag = null;
-  let staging = null;
-  try {
-    if (signal.aborted) throw signal.reason;
-    const release = await latestRelease(source.repo, { fetchImpl, signal });
-    tag = release.tag;
-    const assetName = source.asset(release.assets.map((a) => a.name));
-    const asset = assetName ? release.assets.find((a) => a.name === assetName) : void 0;
-    if (!asset) throw new Refusal(`${source.repo} ${release.tag} publishes no ${id} build for ${platform}/${arch}.`);
-    assertGitHub(asset.url);
-    let expected = asset.digest;
-    if (!expected && source.sums) {
-      const sumsAsset = release.assets.find((a) => a.name === source.sums);
-      if (sumsAsset) {
-        assertGitHub(sumsAsset.url);
-        const sumsResponse = await fetchImpl(sumsAsset.url, { redirect: "follow", signal, headers: { "user-agent": USER_AGENT } });
-        if (!sumsResponse.ok) throw new Refusal(`The checksum file could not be read (${sumsResponse.status}). Nothing was installed.`);
-        expected = digestFor(await sumsResponse.text(), asset.name);
-      }
-    }
-    if (!expected) throw new Refusal(`${source.repo} ${release.tag} publishes no SHA-256 for ${asset.name}, so it was not installed.`);
-    mkdirSync2(options.toolsDir, { recursive: true });
-    sweepStaging(options.toolsDir);
-    staging = mkdtempSync(join6(options.toolsDir, ".staging-"));
-    const download = join6(staging, "download.part");
-    const actual = await downloadTo(fetchImpl, asset, download, signal, options.onProgress);
-    if (actual !== expected) throw new Refusal(`The downloaded ${asset.name} did not match its published SHA-256, so it was discarded.`);
-    const staged = [];
-    if (source.kind === "binary") {
-      const name = binaryName(id, platform);
-      renameSync(download, join6(staging, name));
-      staged.push({ from: join6(staging, name), name });
-    } else {
-      const wanted = ["ffmpeg", "ffprobe"].map((tool) => binaryName(tool, platform));
-      withZipFile(download, (zip) => {
-        for (const name of wanted) {
-          const entry = zip.entries.find((e) => isBinEntry(e.name, name));
-          if (!entry) throw new Refusal(`The FFmpeg archive has no bin/${name}, so nothing was installed.`);
-          const part = join6(staging, `${name}.part`);
-          writeFileSync(part, zip.read(entry));
-          renameSync(part, join6(staging, name));
-          staged.push({ from: join6(staging, name), name });
-        }
-      });
-      rmSync2(download, { force: true });
-    }
-    if (platform !== "win32") for (const file2 of staged) chmodSync(file2.from, 493);
-    const main2 = staged.find((f) => f.name === binaryName(id, platform));
-    const version2 = await probe(id, main2.from);
-    if (!version2) throw new Refusal(`The downloaded ${id} was verified but would not report a version, so it is not being used.`);
-    for (const file2 of [...staged.filter((f) => f !== main2), main2]) {
-      try {
-        await renameWithRetry(file2.from, join6(options.toolsDir, file2.name));
-      } catch (error61) {
-        throw new Refusal(describeWriteError(id, error61));
-      }
-    }
-    return { installed: true, version: version2, reason: null, tag, verified: { asset: asset.name, sha256: expected } };
-  } catch (error61) {
-    return { installed: false, version: null, reason: explain(error61, id, options.signal, timeout, limitMs), tag };
-  } finally {
-    if (staging) rmSync2(staging, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
-  }
-}
-async function downloadTo(fetchImpl, asset, path, signal, onProgress) {
-  const response = await fetchImpl(asset.url, { redirect: "follow", signal, headers: { "user-agent": USER_AGENT } });
-  if (!response.ok || !response.body) throw new Refusal(`The download failed: ${response.status}${response.statusText ? ` ${response.statusText}` : ""}.`);
-  const header2 = Number(response.headers.get("content-length"));
-  const total = Number.isFinite(header2) && header2 > 0 ? header2 : asset.size > 0 ? asset.size : null;
-  const hash2 = createHash("sha256");
-  const file2 = await open2(path, "w");
-  let received = 0;
-  const reader = response.body.getReader();
-  try {
-    for (; ; ) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      received += value.byteLength;
-      if (asset.size > 0 && received > asset.size) throw new Refusal(`The download ran past the ${asset.size} bytes the release lists, so it was discarded.`);
-      hash2.update(value);
-      await file2.write(value);
-      onProgress?.(received, total);
-    }
-  } finally {
-    await reader.cancel().catch(() => void 0);
-    await file2.close();
-  }
-  return hash2.digest("hex");
-}
-function sweepStaging(toolsDir, olderThanMs = 36e5) {
-  let names;
-  try {
-    names = readdirSync2(toolsDir);
-  } catch {
-    return;
-  }
-  for (const name of names) {
-    if (!name.startsWith(".staging-")) continue;
-    const path = join6(toolsDir, name);
-    try {
-      if (Date.now() - statSync4(path).mtimeMs > olderThanMs) rmSync2(path, { recursive: true, force: true });
-    } catch {
-    }
-  }
-}
-function assertGitHub(url2) {
-  let parsed;
-  try {
-    parsed = new URL(url2);
-  } catch {
-    throw new Refusal("The release named a download address that is not a URL, so nothing was fetched.");
-  }
-  if (parsed.protocol !== "https:" || parsed.hostname !== "github.com") throw new Refusal(`The release pointed somewhere other than GitHub (${parsed.hostname}), so nothing was fetched.`);
-}
-async function renameWithRetry(from, to, attempts = 4) {
-  for (let i = 1; ; i += 1) {
-    try {
-      renameSync(from, to);
-      return;
-    } catch (error61) {
-      const code = error61.code ?? "";
-      if (i >= attempts || !["EBUSY", "EPERM", "EACCES"].includes(code)) throw error61;
-      await new Promise((resolve3) => setTimeout(resolve3, 250 * i));
-    }
-  }
-}
-function describeWriteError(id, error61) {
-  const code = error61?.code ?? "";
-  if (["EBUSY", "EPERM", "EACCES"].includes(code)) return `The existing ${id} is in use and could not be replaced. Wait for running downloads to finish and try again.`;
-  return `The verified ${id} could not be saved: ${error61 instanceof Error ? error61.message : String(error61)}`;
-}
-function explain(error61, id, outer, timeout, limitMs) {
-  if (error61 instanceof Refusal) return error61.message;
-  if (error61 instanceof ZipError) return `The FFmpeg archive could not be unpacked: ${error61.message}`;
-  if (timeout.aborted) return `Setting up ${id} took longer than ${Math.round(limitMs / 6e4)} minutes and was stopped. It will be tried again.`;
-  if (outer?.aborted) return `Setting up ${id} was cancelled.`;
-  return `The download could not be completed: ${error61 instanceof Error ? error61.message : String(error61)}`;
-}
-function isBinEntry(entryName, file2) {
-  const parts = entryName.split(/[\\/]/);
-  return parts.length >= 2 && parts.length <= 3 && parts[parts.length - 2].toLowerCase() === "bin" && parts[parts.length - 1].toLowerCase() === file2.toLowerCase();
-}
-
-// src/provision.ts
+import { join as join8 } from "node:path";
 var SETUP_ORDER = ["yt-dlp", "ffmpeg", "spotdl"];
 var RETRY_AFTER_MS = 6 * 60 * 60 * 1e3;
 var UPDATE_CHECK_MS = 24 * 60 * 60 * 1e3;
@@ -22560,7 +22562,7 @@ function due(iso, afterMs, now) {
 }
 function readState(toolsDir) {
   try {
-    const parsed = JSON.parse(readFileSync2(join7(toolsDir, STATE_FILE), "utf8"));
+    const parsed = JSON.parse(readFileSync2(join8(toolsDir, STATE_FILE), "utf8"));
     if (parsed && typeof parsed === "object" && parsed.tools && typeof parsed.tools === "object") return { version: 1, tools: parsed.tools };
   } catch {
   }
@@ -22569,7 +22571,7 @@ function readState(toolsDir) {
 function writeState(toolsDir, state, log) {
   try {
     mkdirSync3(toolsDir, { recursive: true });
-    const path = join7(toolsDir, STATE_FILE);
+    const path = join8(toolsDir, STATE_FILE);
     const part = `${path}.${process.pid}.part`;
     writeFileSync2(part, `${JSON.stringify(state, null, 2)}
 `);
@@ -22937,7 +22939,7 @@ async function main(argv = process.argv.slice(2), out = (line) => process.stdout
   let runDir;
   try {
     mkdirSync4(options.workDir, { recursive: true });
-    runDir = mkdtempSync2(join8(options.workDir, "now-playing-run-"));
+    runDir = mkdtempSync2(join9(options.workDir, "now-playing-run-"));
   } catch (error61) {
     out(`Cannot use ${options.workDir} for temporary files: ${error61 instanceof Error ? error61.message : String(error61)}`);
     out("Point somewhere writable with --work-dir <path>.");

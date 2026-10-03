@@ -8,7 +8,8 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./radio-node": "./src/radio-node.ts"
+    "./radio-node": "./src/radio-node.ts",
+    "./tool-install": "./src/tool-install/index.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit",

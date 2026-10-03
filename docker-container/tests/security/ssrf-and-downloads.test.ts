@@ -141,13 +141,16 @@ describe('download authorization', () => {
 });
 
 describe('external tool provider', () => {
-  it('is disabled by default and reports what the administrator must do', async () => {
+  it('is ready by default, and still says what it will never do', async () => {
     const response = await hub.app.inject({ method: 'GET', url: '/api/v1/providers', headers: { authorization: device.authorization } });
     const descriptors = (response.json() as { items: Array<{ provider: string; enabled: boolean; configured: boolean; limitations: string[] }> }).items;
     const tool = descriptors.find((d) => d.provider === 'external-tool');
     expect(tool).toBeDefined();
-    expect(tool?.enabled).toBe(false);
-    expect(tool?.limitations.join(' ')).toMatch(/administrator must install/i);
+    // Owner decision 2026-10-03: downloaders work without setup. What does not change is the
+    // boundary: allowlisted hosts, a rights basis on every request, no cookies or credentials.
+    expect(tool?.enabled).toBe(true);
+    expect(tool?.configured).toBe(true);
+    expect(tool?.limitations.join(' ')).toMatch(/rights basis/i);
     expect(tool?.limitations.join(' ')).toMatch(/no cookies/i);
   });
 });
