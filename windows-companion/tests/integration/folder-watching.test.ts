@@ -17,7 +17,10 @@ import { FolderWatcher, WATCH_DEBOUNCE_MS } from '../../src/main/watcher.js';
 const UNREACHABLE = ['X:', 'gone'].join(String.fromCharCode(92));
 
 /** Short, so the tests are not paced by the production debounce. */
-const DEBOUNCE_MS = 120;
+// Longer than chokidar's write-finish poll (200 ms, see watcher.ts): a burst of files is reported
+// over two or three polls on a busy machine, and a debounce shorter than one poll would split it
+// into two scans here though it never does at the app's own two seconds.
+const DEBOUNCE_MS = 500;
 
 let root: string;
 let watcher: FolderWatcher | null = null;
