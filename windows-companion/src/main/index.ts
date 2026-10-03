@@ -490,6 +490,7 @@ function registerHandlers(): void {
     const enabled = (request as { enabled: boolean }).enabled;
     if (enabled && !hub!.hasScope('library:share')) return { enabled: false, reason: 'The hub has not given this companion permission to share its library. Change its permissions in the hub, under Devices.' };
     store!.set('shareLibrary', enabled, new Date().toISOString());
+    hub!.scheduleLiveTvPush(0);
     return { enabled, reason: null };
   });
   handle('hub:sharing', () => ({ enabled: sharingEnabled() }));
@@ -657,8 +658,13 @@ if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow())))
       cacheDir: join(dataDir(), 'live-tv'),
       version: app.getVersion(),
       log: (line) => console.info(line),
-      onChange: (links) => send('event:tv-links', links),
+      // A change to Live TV also refreshes the hub's copy (only while this PC shares with it).
+      onChange: (links) => {
+        send('event:tv-links', links);
+        hub?.scheduleLiveTvPush();
+      },
     });
+    hub.setLiveTvSource({ channels: () => liveTv!.channels(), guide: () => liveTv!.guide(), sharing: sharingEnabled });
     helper = new EmbeddedHelper({
       store,
       secretBox: safeStorage,

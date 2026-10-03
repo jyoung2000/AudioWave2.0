@@ -13,13 +13,41 @@
 import { open, type FileHandle } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import { z } from 'zod';
-import { EqBinding, EqPreset, Playlist, PlaylistItem, SyncChange, SyncDeltaResponse, SyncManifest, WS_PROTOCOL_VERSION, type SyncCollection } from '@now-playing/contracts';
+import {
+  EqBinding,
+  EqPreset,
+  HUB_LIVE_TV_MAX_CHANNELS,
+  isPlainWebUrl,
+  Playlist,
+  PlaylistItem,
+  SyncChange,
+  SyncDeltaResponse,
+  SyncManifest,
+  WS_PROTOCOL_VERSION,
+  type HelperTvChannel,
+  type HelperTvGuideEntry,
+  type SyncCollection,
+} from '@now-playing/contracts';
 import { collectionsNeedingSync, summarize, uuidv7, type SyncRecord } from '@now-playing/domain';
 import type { HubConnection, PairingChallenge } from '../shared/ipc.js';
 import type { CompanionStore, SyncedTable } from './store.js';
 import { absolutePathOf, fullHash } from './library.js';
 
 const CREDENTIAL_KEY = 'hub.credential';
+/** Set while the hub holds a copy of this companion's Live TV, so turning sharing off can remove it. */
+const LIVE_TV_SENT_KEY = 'hub.liveTvSent';
+/** Live TV changes come in bursts (one per playlist refreshed); one push follows the burst. */
+const LIVE_TV_PUSH_DELAY_MS = 3_000;
+
+/**
+ * Where the companion's Live TV comes from, and whether this PC shares with the hub. Given to the
+ * client once at start-up (`setLiveTvSource`), so a sync can send the channels along with it.
+ */
+export interface LiveTvSource {
+  channels(): Promise<HelperTvChannel[]>;
+  guide(): Promise<HelperTvGuideEntry[]>;
+  sharing(): boolean;
+}
 const SYNC_COLLECTIONS: SyncCollection[] = ['tracks', 'playlists', 'playlistItems', 'eqPresets', 'eqBindings'];
 const CHUNK_BYTES = 4 * 1024 * 1024;
 /** Local changes sent per delta request; the hub accepts at most 2000. */
@@ -91,6 +119,8 @@ export class HubClient {
   private status: HubConnection = { endpoint: null, hubId: null, hubName: null, hubFingerprint: null, connected: false, reason: 'No hub is paired.', scopes: [], lastSyncAt: null };
   /** When the hub last proved to be the one paired with; zero means "not since the last failure". */
   private verifiedAt = 0;
+  private liveTv: LiveTvSource | null = null;
+  private liveTvTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private readonly store: CompanionStore,
@@ -269,6 +299,7 @@ export class HubClient {
     this.pending = null;
     this.verifiedAt = 0;
     this.saveCredential(null);
+    this.store.set(LIVE_TV_SENT_KEY, false, new Date().toISOString());
     this.resetSyncState();
     this.setStatus({ endpoint: null, hubId: null, hubName: null, hubFingerprint: null, connected: false, scopes: [], reason: 'No hub is paired.' });
     return this.status;
@@ -303,6 +334,7 @@ export class HubClient {
       const needed = SYNC_COLLECTIONS.filter((collection) => differing.has(collection));
       if (!needed.length) {
         this.setStatus({ lastSyncAt: new Date().toISOString() });
+        this.scheduleLiveTvPush(0);
         return { pushed: 0, pulled: 0, conflicts: 0, reason: null };
       }
 
@@ -334,11 +366,70 @@ export class HubClient {
         if (!page.more && !response.more) break;
       }
       this.setStatus({ lastSyncAt: new Date().toISOString(), reason: null });
+      this.scheduleLiveTvPush(0);
       return { pushed, pulled, conflicts, reason: null };
     } catch (err) {
       const reason = err instanceof z.ZodError ? 'The hub sent a sync answer this app does not understand. Nothing from it was applied.' : describeNetworkError(err, credential.endpoint);
       this.setStatus({ reason });
       return { pushed: 0, pulled: 0, conflicts: 0, reason };
+    }
+  }
+
+  /* --------------------------------------------------------------- live tv */
+
+  /** Where the channels come from and whether sharing is on. Called once, at start-up. */
+  setLiveTvSource(source: LiveTvSource): void {
+    this.liveTv = source;
+  }
+
+  /** Send the Live TV soon: after a sync, or once a burst of Live TV changes has settled. */
+  scheduleLiveTvPush(delayMs = LIVE_TV_PUSH_DELAY_MS): void {
+    if (!this.liveTv) return;
+    if (this.liveTvTimer) clearTimeout(this.liveTvTimer);
+    this.liveTvTimer = setTimeout(() => {
+      this.liveTvTimer = null;
+      void this.pushLiveTv().then((result) => {
+        if (result.reason) this.options.onNotice?.(result.reason);
+      });
+    }, delayMs);
+    this.liveTvTimer.unref?.();
+  }
+
+  /**
+   * Give the hub a copy of this companion's channels and guide (`PUT /api/v1/live-tv`), so players
+   * that are not on this PC get Live TV too. Only while this PC shares with the hub; once sharing is
+   * turned off, a copy sent earlier is removed. Channels whose address is not a plain web link, or
+   * that carries a user name and password, stay on this PC: every paired player would see it.
+   * Returns a reason only when something worth telling the person went wrong.
+   */
+  async pushLiveTv(): Promise<{ sent: boolean; reason: string | null }> {
+    const source = this.liveTv;
+    if (!source || !this.credential || !this.hasScope('library:share')) return { sent: false, reason: null };
+    const sentBefore = this.store.get<boolean>(LIVE_TV_SENT_KEY, false);
+    const sharing = source.sharing();
+    try {
+      const channels = sharing
+        ? (await source.channels())
+            .filter((c) => isPlainWebUrl(c.url))
+            .map((c) => ({ ...c, logo: c.logo && isPlainWebUrl(c.logo) ? c.logo : null }))
+            .slice(0, HUB_LIVE_TV_MAX_CHANNELS)
+        : [];
+      if (!channels.length) {
+        if (!sentBefore) return { sent: false, reason: null };
+        if (await this.ensureVerified()) return { sent: false, reason: null };
+        await this.request<unknown>('DELETE', '/api/v1/live-tv');
+        this.store.set(LIVE_TV_SENT_KEY, false, new Date().toISOString());
+        return { sent: true, reason: null };
+      }
+      const unverified = await this.ensureVerified();
+      if (unverified) return { sent: false, reason: null };
+      const ids = new Set(channels.map((c) => c.tvgId?.toLowerCase()).filter(Boolean));
+      const guide = (await source.guide()).filter((g) => ids.has(g.tvgId.toLowerCase())).slice(0, HUB_LIVE_TV_MAX_CHANNELS);
+      await this.request<unknown>('PUT', '/api/v1/live-tv', { body: { channels, guide } });
+      this.store.set(LIVE_TV_SENT_KEY, true, new Date().toISOString());
+      return { sent: true, reason: null };
+    } catch (err) {
+      return { sent: false, reason: `Live TV could not be sent to the hub: ${err instanceof Error ? err.message : String(err)}` };
     }
   }
 
