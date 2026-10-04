@@ -349,5 +349,28 @@ test('the whole pass: hub set up, player paired, group joined, invite declined, 
     await player.goto('about:blank');
   });
 
+  // Only the image ships a downloader, so only the container run can ask whether it runs. Hermes
+  // (2026-10-04) found the image's yt-dlp listed as working while every job it was given exited 255:
+  // it unpacks itself into $TMPDIR and the container's /tmp is a small noexec tmpfs. The hub now asks
+  // the tool itself, in the environment downloads use; this asks the hub.
+  if (process.env['JOURNEY_HUB_URL']) {
+    await test.step('09 — the image’s downloader really starts, and the hub says so', async () => {
+      const list = await request.get(`${HUB_URL}/api/v1/providers`, { headers: { 'x-csrf-token': csrf } });
+      expect(list.status()).toBe(200);
+      const items = ((await list.json()) as { items: Array<{ provider: string; enabled: boolean; configured: boolean }> }).items;
+      expect(items.find((p) => p.provider === 'external-tool'), 'the downloader is ready without setup').toMatchObject({ enabled: true, configured: true });
+      // The operator's Test button: runs the tool now, in the downloads' environment.
+      const tested = await request.post(`${HUB_URL}/api/v1/providers/external-tool/test`, { headers: { 'x-csrf-token': csrf } });
+      expect(tested.status()).toBe(200);
+      const result = (await tested.json()) as { ok: boolean; message: string };
+      expect(result, `yt-dlp answered --version inside the container (${result.message})`).toMatchObject({ ok: true });
+      // And what Overview and Providers show: the same answer, not the file's existence.
+      const overview = await request.get(`${HUB_URL}/api/v1/metrics/overview`, { headers: { 'x-csrf-token': csrf } });
+      expect(overview.status()).toBe(200);
+      const tool = ((await overview.json()) as { providers: Array<{ provider: string; status: string; lastError?: string }> }).providers.find((p) => p.provider === 'external-tool');
+      expect(tool, `the hub reports the downloader as working (${tool?.lastError ?? 'no error'})`).toMatchObject({ status: 'ok' });
+    });
+  }
+
   await device.dispose();
 });

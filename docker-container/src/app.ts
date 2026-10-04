@@ -70,6 +70,7 @@ import { SyncService } from './sync/service.js';
 import { TransferService } from './sync/transfers.js';
 import { detectFfmpeg } from './media/ffmpeg.js';
 import { HubTools } from './media/tools.js';
+import { toolEnvironment, toolScratchDir } from './media/tool-env.js';
 
 const HUB_IDENTITY_KEY = 'hub.identity';
 
@@ -170,7 +171,7 @@ export async function buildApp(deps: HubDeps): Promise<HubApp> {
   providers.register(new SoundCloudAdapter(http, clock));
   providers.register(new SpotifyAdapter(http, clock));
   providers.register(new BandcampAdapter((url) => musicbrainz.lookupUrl(url)));
-  providers.register(new ExternalToolAdapter((tool) => tools.locate(tool)));
+  providers.register(new ExternalToolAdapter((tool) => tools.locate(tool), () => toolEnvironment(toolScratchDir(config.dataDir))));
   providers.register(new DeezerAdapter(http));
   providers.register(new AcousticBrainzAdapter(http));
   providers.register(new LastFmAdapter(http));

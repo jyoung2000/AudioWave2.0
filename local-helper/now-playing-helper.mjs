@@ -21664,10 +21664,10 @@ function versionFlag(path, id) {
   if (id === "ffmpeg") return "-version";
   return /^(?:ffmpeg|ffprobe)(?:\.exe)?$/i.test(basename(path)) ? "-version" : "--version";
 }
-async function versionOf(path, id, timeoutMs = 8e3) {
+async function versionOf(path, id, timeoutMs = 8e3, env) {
   try {
     const { command, prefix } = toolCommand(path);
-    const { stdout } = await run(command, [...prefix, versionFlag(path, id)], { timeout: timeoutMs, windowsHide: true, maxBuffer: 1024 * 256 });
+    const { stdout } = await run(command, [...prefix, versionFlag(path, id)], { timeout: timeoutMs, windowsHide: true, maxBuffer: 1024 * 256, ...env ? { env } : {} });
     const first = stdout.split(/\r?\n/)[0]?.trim() ?? "";
     return first.slice(0, 120) || null;
   } catch {

@@ -91,7 +91,9 @@ describe('looking the tools up', () => {
     expect(await resolver.get()).toBe(a);
     clock = 2000;
     expect(await resolver.get()).not.toBe(a);
-  });
+    // Each lookup really asks whatever tools are on this machine's PATH for their version, twice
+    // here; on a busy machine (an image building alongside) that took longer than vitest's 5 s.
+  }, 30_000);
 });
 
 describe('the environment a tool is given', () => {

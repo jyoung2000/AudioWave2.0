@@ -17,6 +17,7 @@
  * cancel or pause stops the transfer (or the FFmpeg/external-tool child) and the runner never
  * writes over a state somebody else set while it was working.
  */
+import { toolEnvironment, toolScratchDir } from '../media/tool-env.js';
 import { createHash } from 'node:crypto';
 import { createReadStream, createWriteStream, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs';
 import { spawn } from 'node:child_process';
@@ -77,17 +78,6 @@ class JobSuperseded extends Error {
     super('The job was changed while it was running');
     this.name = 'JobSuperseded';
   }
-}
-
-/**
- * What the external tool is allowed to inherit: where programs are, and — on Windows — the three
- * variables without which a process cannot open a socket or a temporary file. Nothing else: no
- * tokens, no proxy credentials, no home directory to read a configuration file from.
- */
-function toolEnvironment(): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { PATH: process.env['PATH'] ?? process.env['Path'] ?? '/usr/bin:/bin' };
-  if (process.platform === 'win32') for (const key of ['SystemRoot', 'TEMP', 'TMP']) if (process.env[key]) env[key] = process.env[key];
-  return env;
 }
 
 export class DownloadService {
@@ -500,7 +490,7 @@ export class DownloadService {
     const args = rest.map((a) => a.replace('{output}', part).replace('{url}', authorized.url));
     if (!args.some((a) => a.includes(part))) args.push(part);
     this.log.info({ module: 'downloads', job: job.id, binary }, 'running external media tool');
-    await runChild(binary, args, { stdio: ['ignore', 'pipe', 'pipe'], env: toolEnvironment() }, adapter.timeoutMs(), signal, {
+    await runChild(binary, args, { stdio: ['ignore', 'pipe', 'pipe'], env: toolEnvironment(toolScratchDir(this.config.dataDir)) }, adapter.timeoutMs(), signal, {
       spawnError: (message) => new DomainError('unavailable', `The external tool could not be started: ${message}`),
       exitError: (code, stderr) => new DomainError('unavailable', `The external tool exited with code ${code}: ${stderr.slice(-300)}`),
     });

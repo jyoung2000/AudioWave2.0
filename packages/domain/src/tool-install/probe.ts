@@ -25,11 +25,15 @@ export function versionFlag(path: string, id?: HelperToolId): string {
   return /^(?:ffmpeg|ffprobe)(?:\.exe)?$/i.test(basename(path)) ? '-version' : '--version';
 }
 
-/** The first line of the version flag's output, which is all any of these put there that is worth keeping. */
-export async function versionOf(path: string, id?: HelperToolId, timeoutMs = 8000): Promise<string | null> {
+/**
+ * The first line of the version flag's output, which is all any of these put there that is worth keeping.
+ * `env`, when given, is the whole environment the tool runs in — the one it will really be run with,
+ * so a tool that can start in one environment and not the other is asked in the right one.
+ */
+export async function versionOf(path: string, id?: HelperToolId, timeoutMs = 8000, env?: NodeJS.ProcessEnv): Promise<string | null> {
   try {
     const { command, prefix } = toolCommand(path);
-    const { stdout } = await run(command, [...prefix, versionFlag(path, id)], { timeout: timeoutMs, windowsHide: true, maxBuffer: 1024 * 256 });
+    const { stdout } = await run(command, [...prefix, versionFlag(path, id)], { timeout: timeoutMs, windowsHide: true, maxBuffer: 1024 * 256, ...(env ? { env } : {}) });
     const first = stdout.split(/\r?\n/)[0]?.trim() ?? '';
     return first.slice(0, 120) || null;
   } catch {

@@ -1,12 +1,9 @@
-import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { promisify } from 'node:util';
-import type { ProviderCapabilities, ProviderDescriptor, SearchResult } from '@now-playing/contracts';
+import type { ProviderCapabilities, ProviderDescriptor, ProviderHealth, SearchResult } from '@now-playing/contracts';
 import { hostMatches, validateOutboundUrl } from '@now-playing/domain';
+import { versionOf } from '@now-playing/domain/tool-install';
 import type { AuthorizedDownload, DownloadContext, ProviderTestResult } from '../adapter.js';
-import { BaseAdapter, caps, REVIEWED_AT, result } from './base.js';
-
-const run = promisify(execFile);
+import { BaseAdapter, caps, healthy, REVIEWED_AT, result } from './base.js';
 
 export interface ToolPreset {
   displayName: string;
@@ -43,15 +40,8 @@ export const TOOL_PRESETS: Record<string, ToolPreset> = {
   },
 };
 
-/** The first line of `--version`, or null for anything that will not answer. */
-async function toolVersion(binary: string): Promise<string | null> {
-  try {
-    const { stdout } = await run(binary, ['--version'], { timeout: 8000, maxBuffer: 1024 * 256 });
-    return stdout.split(/\r?\n/)[0]?.trim().slice(0, 120) || null;
-  } catch {
-    return null;
-  }
-}
+/** How long an answer from the tool stands before it is asked again. */
+const PROBE_TTL_MS = 10 * 60_000;
 
 /**
  * Bridge to a command-line media tool. Ready without setup (owner decision 2026-10-03): with nothing configured it is
@@ -74,9 +64,41 @@ async function toolVersion(binary: string): Promise<string | null> {
 export class ExternalToolAdapter extends BaseAdapter {
   readonly id = 'external-tool';
 
-  /** `locate` answers with the copy of a preset's tool on this machine, when the hub knows of one. */
-  constructor(private readonly locate: (tool: 'yt-dlp') => string | null = () => null) {
+  private probe: { binary: string; at: number; version: Promise<string | null> } | null = null;
+
+  /**
+   * `locate` answers with the copy of a preset's tool on this machine, when the hub knows of one.
+   * `environment` is the one the download service runs the tool in (`media/tool-env.ts`), so the
+   * hub asks the tool whether it works in the same place it will later ask it to work.
+   */
+  constructor(
+    private readonly locate: (tool: 'yt-dlp') => string | null = () => null,
+    private readonly environment: () => NodeJS.ProcessEnv | undefined = () => undefined,
+  ) {
     super();
+  }
+
+  /**
+   * The tool's own answer to `--version`, run for real. A file that exists and will not start is not
+   * a working tool — Hermes found the container's yt-dlp reported "ok" while every job it was given
+   * exited 255 — so neither `test()` nor `health()` takes the file's existence as the answer.
+   */
+  private version(binary: string): Promise<string | null> {
+    const now = Date.now();
+    if (this.probe && this.probe.binary === binary && now - this.probe.at < PROBE_TTL_MS) return this.probe.version;
+    const version = versionOf(binary, undefined, 20_000, this.environment());
+    this.probe = { binary, at: now, version };
+    return version;
+  }
+
+  override async health(): Promise<ProviderHealth> {
+    const checkedAt = new Date().toISOString();
+    const [binary] = this.commandTemplate();
+    if (!binary || !existsSync(binary)) return { provider: this.id, status: 'unconfigured', circuit: 'closed', checkedAt, lastError: binary ? `${binary} is not on this hub yet` : 'No command configured' };
+    const started = Date.now();
+    const version = await this.version(binary);
+    if (!version) return { provider: this.id, status: 'down', circuit: 'closed', checkedAt, lastError: `${binary} is on this hub but would not start, so downloads through it cannot run` };
+    return healthy(this.id, checkedAt, Date.now() - started);
   }
 
   descriptor(): Omit<ProviderDescriptor, 'enabled' | 'configured' | 'capabilities'> {
@@ -144,7 +166,8 @@ export class ExternalToolAdapter extends BaseAdapter {
     }
     if (!this.allowedHosts().length) return { ok: false, latencyMs: null, message: 'No allowed hosts configured' };
     const started = Date.now();
-    const version = await toolVersion(binary);
+    this.probe = null;
+    const version = await this.version(binary);
     const latencyMs = Date.now() - started;
     if (!version) return { ok: false, latencyMs, message: `${binary} did not answer --version, so it is not being used` };
     return { ok: true, latencyMs, message: `${version} — ${this.allowedHosts().length} host(s) allowlisted` };
