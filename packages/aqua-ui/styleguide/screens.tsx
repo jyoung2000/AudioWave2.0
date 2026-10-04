@@ -112,7 +112,7 @@ export const PRODUCTS: readonly ProductSpec[] = [
     id: 'player',
     label: BRANDING.products.player,
     skin: 'Page skin (component library)',
-    note: 'The player. These screens are the library’s page skin — the React interface kept in music-player/src. The served player is the shell generated from design/frontends/airwave-now-playing.html, which has the same look and is recorded surface by surface under Every screen.',
+    note: 'The player. These screens are the library’s page skin — the React interface kept in music-player/src. The served player is the shell generated from design/frontends/airwave-now-playing.html, which has the same look, is photographed under The served shell and is recorded surface by surface under Every screen.',
     isolated: false,
     devices: ['small-phone', 'phone', 'tablet', 'laptop', 'desktop'],
     shown: ['phone', 'laptop'],

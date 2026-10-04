@@ -455,11 +455,23 @@ library's page skin: the host page's stylesheets cloned in, the player's own sty
 and the library's components — the React interface, not the served shell, which is one document
 with its own scripts and cannot be portalled into a frame. The frames say which they are.
 
-**Where that stops.** The screens are arranged as each product's views arrange them, in the views'
-own words, but they are not the product's own view files executed verbatim — those are wired to a
-database, a playback engine and, for the companion, Electron's IPC. The data is fixture data. So the
-*visual and responsive* behaviour is exact and the *content* is representative, which is the trade
-that keeps the page from breaking whenever a store changes.
+**Where that stops — and where it no longer does.** Most of the hub's sections (Groups, Library,
+Live TV from the companion, Profiles, Shared links, Recommendations, Discord, Network, Backup,
+Diagnostics) and the companion's Settings, Backup and About are the products' own view components,
+executed as they are. Each view reaches its product through one module — the hub's API client, the
+companion's bridge — and the styleguide build alone swaps those two for fakes that answer from
+recordings of a real hub and a real companion (`packages/aqua-ui/styleguide/fixtures/`, with the
+scripts that record them) and refuse every change with a sentence (DEC-030). The other screens —
+sign-in, first run, Overview, Providers, Downloads, the confirmation sheets, and the companion's
+Library, Live TV and Remote — need states a recording cannot reach (a refused link, a failed
+download, an open sheet), so they are arranged as the views arrange them, in the views' own words,
+with fixture data (DEC-009). Each screen's note says which it is.
+
+**The served player is photographed, not framed.** The shell is one document with its own scripts,
+so the guide shows it as screenshots of the production build in *The served shell*, taken by
+`pnpm styleguide:shell` (`scripts/styleguide-shell-shots.mjs`) at 1280 × 860 and 390 × 844 with
+nothing reaching the network. `shots.json` beside them records the hash of the shell they show, and
+`pnpm styleguide:check` fails when `music-player/index.html` changes without new screenshots.
 
 **Touch is emulated, and the emulation is derived.** An iframe inherits the host's pointer, so on a
 desktop `@media (pointer: coarse)` never matches however narrow the frame is — and this system keeps
