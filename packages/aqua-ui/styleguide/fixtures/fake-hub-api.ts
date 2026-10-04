@@ -58,14 +58,18 @@ const DAY = 86_400_000;
 /**
  * The recording, brought up to now: what had happened moves by exactly however long ago it was
  * recorded, so "4 min ago" stays "4 min ago"; what was still to come moves by whole days, so a
- * backup due at 03:00 is still due at 03:00.
+ * backup due at 03:00 is still due at 03:00 and a link that had a week left still has one.
  */
 function revive(value: unknown, recordedAt: number): unknown {
   if (typeof value === 'string') {
     if (!ISO.test(value)) return value;
     const at = Date.parse(value);
-    const elapsed = Date.now() - recordedAt;
-    return new Date(at + (at > recordedAt ? Math.ceil(elapsed / DAY) * DAY : elapsed)).toISOString();
+    const now = Date.now();
+    const elapsed = now - recordedAt;
+    if (at <= recordedAt) return new Date(at + elapsed).toISOString();
+    // Whole days, as many as have passed, and never so few that it is already over.
+    const days = Math.max(Math.round(elapsed / DAY), Math.ceil((now - at) / DAY), 0);
+    return new Date(at + days * DAY).toISOString();
   }
   if (Array.isArray(value)) return value.map((item) => revive(item, recordedAt));
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, revive(item, recordedAt)]));
