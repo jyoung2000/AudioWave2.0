@@ -1,0 +1,62 @@
+loaded redactLog out of the shipped bundle (1118 chars of the built main process)
+COMPANION_PID=56780
+helper token read through the companion's own bridge: yes (never printed, never written)
+
+log files present: companion.log
+
+### redacting 10887 chars: the real log, plus six planted lines carrying a token, a
+### Bearer value, a folder path, a password and a credential
+### redacted output: 10566 chars
+
+### what must NOT survive
+  redacted  the exact helper token
+  redacted  any Bearer value with 8+ chars after it
+  redacted  this scratch folder path
+  redacted  the owner's home folder name
+  redacted  a password assignment
+  redacted  a credential assignment
+
+### what those planted lines actually read after redaction
+  2026-10-04T10:07:10.857Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T10:10:32.148Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T10:12:41.530Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T10:13:45.450Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T10:17:05.370Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T10:18:27.082Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T10:21:13.013Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T10:22:07.938Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T10:22:39.813Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T10:23:00.037Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T10:23:40.910Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T10:23:47.381Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T10:24:05.410Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T10:24:09.151Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T10:24:50.631Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T10:43:57.927Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T10:44:12.496Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T10:45:10.197Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T10:45:13.352Z INFO  [helper] helper listening at http://127.0.0.1:17342, and to this network for the read-only routes
+  2026-10-04T10:45:40.206Z INFO  [helper] helper listening at http://127.0.0.1:17342, and to this network for the read-only routes
+  2026-10-04T10:45:43.718Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T10:47:10.957Z INFO  [helper] helper listening at http://127.0.0.1:17342, and to this network for the read-only routes
+  2026-10-04T10:47:48.448Z INFO  [helper] helper listening at http://127.0.0.1:17342, and to this network for the read-only routes
+  2026-10-04T10:47:57.052Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T11:49:16.860Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T11:49:33.545Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T11:54:48.333Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T12:00:17.913Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T12:06:59.930Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T12:15:59.057Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T12:17:57.023Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T12:19:14.643Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T12:21:47.885Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T12:23:44.499Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T12:24:47.345Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T12:26:09.927Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T12:31:14.264Z INFO  [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T00:00:00Z INFO [helper] token=[secret]
+  2026-10-04T00:00:02Z INFO [paths] wrote …\yt-dlp.exe
+  2026-10-04T00:00:04Z INFO [helper] helper listening at http://127.0.0.1:17342
+  2026-10-04T00:00:05Z INFO [secret] password=[secret] credential:[secret]
+
+VERDICT: nothing sensitive survives redaction

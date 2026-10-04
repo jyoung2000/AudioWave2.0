@@ -1,0 +1,22 @@
+ffmpeg removed from PATH: C:\Users\owner\AppData\Local\hermes\tools\ffmpeg-9.0.1-win32-x64\bin, C:\Users\owner\AppData\Local\Microsoft\WinGet\Links
+COMPANION_PID=51448
+title=Airwave Companion url=file:///C:/Users/owner/AudioWave2.0-prove/windows-companion/release/win-unpacked/resources/app.asar/dist/renderer/index.html
+div id=root checked= :: Airwave CompanionLibraryLive TVRemoteSettingsThe folders on this PC that Airwave | Airwave CompanionLibraryLive TVRemoteSettingsThe folders on this PC that Airwave plays from. The companion watches them and, once sharing is on, passes what it 
+div[heading] id= checked= :: Airwave Companion | Airwave Companion
+div[tablist] id= checked= :: Sections | LibraryLive TVRemoteSettings
+button[tab] id=companion-tab-library checked= :: Library | Library
+button[tab] id=companion-tab-live-tv checked= :: Live TV | Live TV
+button[tab] id=companion-tab-remote checked= :: Remote | Remote
+button[tab] id=companion-tab-settings checked= :: Settings | Settings
+section[tabpanel] id=companion-pane-library checked= :: The folders on this PC that Airwave plays from. The companion watches them and, | The folders on this PC that Airwave plays from. The companion watches them and, once sharing is on, passes what it finds to your Airwave Hub so every device see
+section id=folders checked= :: Folders | Saved MusicNo folders yet — add the one this PC keeps these in.Add Folder…Saved TVNo folders yet — add the one this PC keeps these in.Add Folder…Saved MoviesNo 
+button id= checked= :: Add Folder… | Add Folder…
+button id= checked= :: Add Folder… | Add Folder…
+button id= checked= :: Add Folder… | Add Folder…
+section id=library checked= :: Music | Music on This PCWhat the companion found in your music folders. Choose a song and press Enter to see its file.TitleArtistAlbumTimeTempoNo music yet — add a musi
+table[grid] id= checked= :: Music | TitleArtistAlbumTimeTempo
+input id= checked=false :: Search music | 
+button id= checked= :: Scan Now | Scan Now
+button id= checked= :: Show in Explorer | Show in Explorer
+button id= checked= :: Send to Hub | Send to Hub
+p[status] id= checked= ::  | 

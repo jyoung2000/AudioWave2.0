@@ -1,0 +1,655 @@
+[
+  {
+    "tag": "div",
+    "role": "",
+    "id": "root",
+    "name": "Airwave CompanionLibraryLive TVRemoteSettingsThe folders on this PC that Airwave",
+    "text": "Airwave CompanionLibraryLive TVRemoteSettingsThe folders on this PC that Airwave plays from. The companion watches them and, once sharing is on, passes what it "
+  },
+  {
+    "tag": "div",
+    "role": "heading",
+    "id": "",
+    "name": "Airwave Companion",
+    "text": "Airwave Companion"
+  },
+  {
+    "tag": "div",
+    "role": "tablist",
+    "id": "",
+    "name": "Sections",
+    "text": "LibraryLive TVRemoteSettings"
+  },
+  {
+    "tag": "button",
+    "role": "tab",
+    "id": "companion-tab-library",
+    "name": "Library",
+    "value": "",
+    "text": "Library"
+  },
+  {
+    "tag": "button",
+    "role": "tab",
+    "id": "companion-tab-live-tv",
+    "name": "Live TV",
+    "value": "",
+    "text": "Live TV"
+  },
+  {
+    "tag": "button",
+    "role": "tab",
+    "id": "companion-tab-remote",
+    "name": "Remote",
+    "value": "",
+    "text": "Remote"
+  },
+  {
+    "tag": "button",
+    "role": "tab",
+    "id": "companion-tab-settings",
+    "name": "Settings",
+    "value": "",
+    "text": "Settings"
+  },
+  {
+    "tag": "section",
+    "role": "tabpanel",
+    "id": "companion-pane-settings",
+    "name": "The tools this PC downloads with, and how the companion behaves on this PC. Chan",
+    "text": "The tools this PC downloads with, and how the companion behaves on this PC. Changes take effect as you make them.DownloadersThe copies on this PC, set up automa"
+  },
+  {
+    "tag": "section",
+    "role": "",
+    "id": "settings",
+    "name": "Settings",
+    "text": "DownloadersThe copies on this PC, set up automatically and checked against what their projects publish. The hub keeps its own; spotDL runs only here.yt-dlp2026."
+  },
+  {
+    "tag": "button",
+    "role": "",
+    "id": "",
+    "name": "Check yt-dlp",
+    "value": "",
+    "text": "Check"
+  },
+  {
+    "tag": "button",
+    "role": "",
+    "id": "",
+    "name": "Update yt-dlp",
+    "value": "",
+    "text": "Update"
+  },
+  {
+    "tag": "button",
+    "role": "",
+    "id": "",
+    "name": "Check spotDL",
+    "value": "",
+    "text": "Check"
+  },
+  {
+    "tag": "button",
+    "role": "",
+    "id": "",
+    "name": "Update spotDL",
+    "value": "",
+    "text": "Update"
+  },
+  {
+    "tag": "button",
+    "role": "",
+    "id": "",
+    "name": "Check FFmpeg",
+    "value": "",
+    "text": "Check"
+  },
+  {
+    "tag": "button",
+    "role": "",
+    "id": "",
+    "name": "Update FFmpeg",
+    "value": "",
+    "text": "Update"
+  },
+  {
+    "tag": "button",
+    "role": "",
+    "id": "",
+    "name": "Check All",
+    "value": "",
+    "text": "Check All"
+  },
+  {
+    "tag": "label",
+    "role": "",
+    "id": "",
+    "name": "Update downloaders automaticallySites change often. An out-of-date yt-dlp is the",
+    "text": "Update downloaders automaticallySites change often. An out-of-date yt-dlp is the usual reason a download fails."
+  },
+  {
+    "tag": "input",
+    "role": "",
+    "id": "",
+    "name": "on",
+    "checked": true,
+    "value": "on",
+    "text": ""
+  },
+  {
+    "tag": "label",
+    "role": "",
+    "id": "",
+    "name": "Start when Windows starts",
+    "text": "Start when Windows starts"
+  },
+  {
+    "tag": "input",
+    "role": "",
+    "id": "",
+    "name": "on",
+    "checked": false,
+    "value": "on",
+    "text": ""
+  },
+  {
+    "tag": "label",
+    "role": "",
+    "id": "",
+    "name": "Keep running in the notification area when the window closes",
+    "text": "Keep running in the notification area when the window closes"
+  },
+  {
+    "tag": "input",
+    "role": "",
+    "id": "",
+    "name": "on",
+    "checked": true,
+    "value": "on",
+    "text": ""
+  },
+  {
+    "tag": "label",
+    "role": "",
+    "id": "",
+    "name": "Watch folders and scan them when something changes",
+    "text": "Watch folders and scan them when something changes"
+  },
+  {
+    "tag": "input",
+    "role": "",
+    "id": "",
+    "name": "on",
+    "checked": true,
+    "value": "on",
+    "text": ""
+  },
+  {
+    "tag": "label",
+    "role": "",
+    "id": "",
+    "name": "Sync with the hub when the companion starts",
+    "text": "Sync with the hub when the companion starts"
+  },
+  {
+    "tag": "input",
+    "role": "",
+    "id": "",
+    "name": "on",
+    "checked": false,
+    "value": "on",
+    "text": ""
+  },
+  {
+    "tag": "label",
+    "role": "",
+    "id": "",
+    "name": "Check for new versions of the companion",
+    "text": "Check for new versions of the companion"
+  },
+  {
+    "tag": "input",
+    "role": "",
+    "id": "",
+    "name": "on",
+    "checked": true,
+    "value": "on",
+    "text": ""
+  },
+  {
+    "tag": "label",
+    "role": "",
+    "id": "",
+    "name": "Show a notification when a download finishes",
+    "text": "Show a notification when a download finishes"
+  },
+  {
+    "tag": "input",
+    "role": "",
+    "id": "",
+    "name": "on",
+    "checked": true,
+    "value": "on",
+    "text": ""
+  },
+  {
+    "tag": "span",
+    "role": "status",
+    "id": "",
+    "name": "No version has been published yet.",
+    "text": "No version has been published yet."
+  },
+  {
+    "tag": "button",
+    "role": "",
+    "id": "",
+    "name": "Check Now",
+    "value": "",
+    "text": "Check Now"
+  },
+  {
+    "tag": "span",
+    "role": "",
+    "id": "downloads-dir-k",
+    "name": "Save to:",
+    "text": "Save to:"
+  },
+  {
+    "tag": "button",
+    "role": "",
+    "id": "",
+    "name": "Choose…",
+    "value": "",
+    "text": "Choose…"
+  },
+  {
+    "tag": "label",
+    "role": "",
+    "id": "",
+    "name": "Format:",
+    "text": "Format:"
+  },
+  {
+    "tag": "select",
+    "role": "",
+    "id": "downloads-format",
+    "name": "Format:",
+    "value": "mp3",
+    "text": "Keep originalMP3AAC (M4A)OpusFLAC · lossless"
+  },
+  {
+    "tag": "label",
+    "role": "",
+    "id": "",
+    "name": "At the same time:",
+    "text": "At the same time:"
+  },
+  {
+    "tag": "input",
+    "role": "",
+    "id": "downloads-jobs",
+    "name": "At the same time:",
+    "checked": false,
+    "value": "2",
+    "text": ""
+  },
+  {
+    "tag": "span",
+    "role": "",
+    "id": "downloads-jobs-help",
+    "name": "downloads (1–4)",
+    "text": "downloads (1–4)"
+  },
+  {
+    "tag": "label",
+    "role": "",
+    "id": "",
+    "name": "Speed limit:",
+    "text": "Speed limit:"
+  },
+  {
+    "tag": "input",
+    "role": "",
+    "id": "downloads-speed",
+    "name": "Speed limit:",
+    "checked": false,
+    "value": "",
+    "text": ""
+  },
+  {
+    "tag": "span",
+    "role": "",
+    "id": "downloads-speed-help",
+    "name": "For each download. Leave it empty for no limit.",
+    "text": "For each download. Leave it empty for no limit."
+  },
+  {
+    "tag": "label",
+    "role": "",
+    "id": "",
+    "name": "When one finishes:",
+    "text": "When one finishes:"
+  },
+  {
+    "tag": "select",
+    "role": "",
+    "id": "downloads-done",
+    "name": "When one finishes:",
+    "value": "notify",
+    "text": "Just save itShow a notificationShow it in File Explorer"
+  },
+  {
+    "tag": "label",
+    "role": "",
+    "id": "",
+    "name": "Local helper port:",
+    "text": "Local helper port:"
+  },
+  {
+    "tag": "input",
+    "role": "",
+    "id": "helper-port",
+    "name": "Local helper port:",
+    "checked": false,
+    "value": "17342",
+    "text": ""
+  },
+  {
+    "tag": "span",
+    "role": "",
+    "id": "helper-port-help",
+    "name": "The player on this PC talks to the companion here. It is running.",
+    "text": "The player on this PC talks to the companion here. It is running."
+  },
+  {
+    "tag": "label",
+    "role": "",
+    "id": "",
+    "name": "Let devices on this network use the helper without pairingOff is safer. When on,",
+    "text": "Let devices on this network use the helper without pairingOff is safer. When on, any device on this network can see that the companion is running and which down"
+  },
+  {
+    "tag": "input",
+    "role": "",
+    "id": "",
+    "name": "on",
+    "checked": false,
+    "value": "on",
+    "text": ""
+  },
+  {
+    "tag": "button",
+    "role": "",
+    "id": "",
+    "name": "Show",
+    "value": "",
+    "text": "Show"
+  },
+  {
+    "tag": "section",
+    "role": "",
+    "id": "backup",
+    "name": "Backup",
+    "text": "BackupBack up to:Not chosen yetChoose…A folder on this PC or a drive you plug in. The hub keeps its own backups.Space:Choose a folder to see how much room it ha"
+  },
+  {
+    "tag": "span",
+    "role": "",
+    "id": "backup-dir-k",
+    "name": "Back up to:",
+    "text": "Back up to:"
+  },
+  {
+    "tag": "button",
+    "role": "",
+    "id": "",
+    "name": "Choose…",
+    "value": "",
+    "text": "Choose…"
+  },
+  {
+    "tag": "label",
+    "role": "",
+    "id": "",
+    "name": "Music",
+    "text": "Music"
+  },
+  {
+    "tag": "input",
+    "role": "",
+    "id": "",
+    "name": "on",
+    "checked": true,
+    "value": "on",
+    "text": ""
+  },
+  {
+    "tag": "label",
+    "role": "",
+    "id": "",
+    "name": "TV",
+    "text": "TV"
+  },
+  {
+    "tag": "input",
+    "role": "",
+    "id": "",
+    "name": "on",
+    "checked": false,
+    "value": "on",
+    "text": ""
+  },
+  {
+    "tag": "label",
+    "role": "",
+    "id": "",
+    "name": "Movies",
+    "text": "Movies"
+  },
+  {
+    "tag": "input",
+    "role": "",
+    "id": "",
+    "name": "on",
+    "checked": false,
+    "value": "on",
+    "text": ""
+  },
+  {
+    "tag": "label",
+    "role": "",
+    "id": "",
+    "name": "Playlists",
+    "text": "Playlists"
+  },
+  {
+    "tag": "input",
+    "role": "",
+    "id": "",
+    "name": "on",
+    "checked": true,
+    "value": "on",
+    "text": ""
+  },
+  {
+    "tag": "label",
+    "role": "",
+    "id": "",
+    "name": "EQ presets",
+    "text": "EQ presets"
+  },
+  {
+    "tag": "input",
+    "role": "",
+    "id": "",
+    "name": "on",
+    "checked": true,
+    "value": "on",
+    "text": ""
+  },
+  {
+    "tag": "label",
+    "role": "",
+    "id": "",
+    "name": "Recommendation algorithms — from Airwave Hub, as it keeps them",
+    "text": "Recommendation algorithms — from Airwave Hub, as it keeps them"
+  },
+  {
+    "tag": "input",
+    "role": "",
+    "id": "",
+    "name": "on",
+    "checked": true,
+    "value": "on",
+    "text": ""
+  },
+  {
+    "tag": "label",
+    "role": "",
+    "id": "",
+    "name": "These settings — Live TV links among them",
+    "text": "These settings — Live TV links among them"
+  },
+  {
+    "tag": "input",
+    "role": "",
+    "id": "",
+    "name": "on",
+    "checked": true,
+    "value": "on",
+    "text": ""
+  },
+  {
+    "tag": "label",
+    "role": "",
+    "id": "",
+    "name": "How often:",
+    "text": "How often:"
+  },
+  {
+    "tag": "select",
+    "role": "",
+    "id": "backup-when",
+    "name": "How often:",
+    "value": "manual",
+    "text": "Only when I click Back Up NowEvery day, while the companion is openEvery week, while the companion is open"
+  },
+  {
+    "tag": "label",
+    "role": "",
+    "id": "",
+    "name": "Keep:",
+    "text": "Keep:"
+  },
+  {
+    "tag": "select",
+    "role": "",
+    "id": "backup-keep",
+    "name": "Keep:",
+    "value": "5",
+    "text": "The last 3 backupsThe last 5 backupsThe last 10 backupsEvery backup"
+  },
+  {
+    "tag": "button",
+    "role": "",
+    "id": "",
+    "name": "Back Up Now",
+    "value": "",
+    "text": "Back Up Now"
+  },
+  {
+    "tag": "span",
+    "role": "status",
+    "id": "",
+    "name": "Choose where backups go first.",
+    "text": "Choose where backups go first."
+  },
+  {
+    "tag": "button",
+    "role": "",
+    "id": "",
+    "name": "Restore from a File…",
+    "value": "",
+    "text": "Restore from a File…"
+  },
+  {
+    "tag": "button",
+    "role": "",
+    "id": "",
+    "name": "Export Playlists…",
+    "value": "",
+    "text": "Export Playlists…"
+  },
+  {
+    "tag": "section",
+    "role": "",
+    "id": "about",
+    "name": "About",
+    "text": "Storage and privacySettings are kept in:C:\\np-prove\\NowPlayingCompanion-dataThe index of your music, your playlists and EQ presets, the hub pairing and the help"
+  },
+  {
+    "tag": "button",
+    "role": "",
+    "id": "",
+    "name": "Show in Explorer",
+    "value": "",
+    "text": "Show in Explorer"
+  },
+  {
+    "tag": "button",
+    "role": "",
+    "id": "",
+    "name": "Clear Cache",
+    "value": "",
+    "text": "Clear Cache"
+  },
+  {
+    "tag": "button",
+    "role": "",
+    "id": "",
+    "name": "Open Logs Folder",
+    "value": "",
+    "text": "Open Logs Folder"
+  },
+  {
+    "tag": "button",
+    "role": "",
+    "id": "",
+    "name": "Export Logs…",
+    "value": "",
+    "text": "Export Logs…"
+  },
+  {
+    "tag": "label",
+    "role": "",
+    "id": "",
+    "name": "Keep detailed logsAdds what each part of the companion does, step by step. Usefu",
+    "text": "Keep detailed logsAdds what each part of the companion does, step by step. Useful when something goes wrong."
+  },
+  {
+    "tag": "input",
+    "role": "",
+    "id": "",
+    "name": "on",
+    "checked": false,
+    "value": "on",
+    "text": ""
+  },
+  {
+    "tag": "p",
+    "role": "status",
+    "id": "",
+    "name": "Settings are kept on this PC.",
+    "text": "Settings are kept on this PC."
+  },
+  {
+    "tag": "button",
+    "role": "",
+    "id": "",
+    "name": "Restore Defaults",
+    "value": "",
+    "text": "Restore Defaults"
+  }
+]

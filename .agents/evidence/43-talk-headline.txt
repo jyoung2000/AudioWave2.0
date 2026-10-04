@@ -1,0 +1,22 @@
+### §2.7 talk-station headline - CLEARED
+
+Method: each station selected by its OWN data-sid row text, then a single click on that row.
+(music-player/index.html:11439 binds 'click' -> radioChoose; a dblclick additionally fires
+ the pointerdown/up pair the same view treats as a click-drag and cancels, which is why the
+ earlier attempt tuned nothing.)
+
+screenshot: /c/np-prove/evidence/43-android-headline-wbez-fm-91-5-group.png
+screenshot: /c/np-prove/evidence/43-android-headline-wbez-fm-91-5-solo.png
+screenshot: /c/np-prove/evidence/43-android-headline-wgn-radio-720-solo.png
+
+Results - the big title at the top of the player:
+  WBEZ FM 91.5   solo : "Live broadcast  WBEZ FM 91.5  Chicago"        play button: Pause
+  WGN Radio 720  solo : "Live broadcast  WGN Radio 720  Chicago, IL"   play button: Pause
+  WBEZ FM 91.5   group: "Live broadcast  WBEZ FM 91.5  Chicago"        play button: Pause
+
+sids confirmed present in the page:
+  WBEZ FM 91.5  data-sid=915f7adc-163e-4d61-9f38-568c34c641e1
+  WGN Radio 720 data-sid=29998653-f92f-4ab5-abf3-44c03e3b5a0a
+
+VERDICT: pass 4's "No group session" and "Classical" were its own harness clicking the
+wrong thing (dblclick) and reading the wrong slice of the page. The feature is correct.

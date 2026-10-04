@@ -1,0 +1,147 @@
+[
+  {
+    "tag": "div",
+    "role": "",
+    "id": "root",
+    "name": "Airwave CompanionLibraryLive TVRemoteSettingsThe folders on this PC that Airwave",
+    "text": "Airwave CompanionLibraryLive TVRemoteSettingsThe folders on this PC that Airwave plays from. The companion watches them and, once sharing is on, passes what it "
+  },
+  {
+    "tag": "div",
+    "role": "heading",
+    "id": "",
+    "name": "Airwave Companion",
+    "text": "Airwave Companion"
+  },
+  {
+    "tag": "div",
+    "role": "tablist",
+    "id": "",
+    "name": "Sections",
+    "text": "LibraryLive TVRemoteSettings"
+  },
+  {
+    "tag": "button",
+    "role": "tab",
+    "id": "companion-tab-library",
+    "name": "Library",
+    "value": "",
+    "text": "Library"
+  },
+  {
+    "tag": "button",
+    "role": "tab",
+    "id": "companion-tab-live-tv",
+    "name": "Live TV",
+    "value": "",
+    "text": "Live TV"
+  },
+  {
+    "tag": "button",
+    "role": "tab",
+    "id": "companion-tab-remote",
+    "name": "Remote",
+    "value": "",
+    "text": "Remote"
+  },
+  {
+    "tag": "button",
+    "role": "tab",
+    "id": "companion-tab-settings",
+    "name": "Settings",
+    "value": "",
+    "text": "Settings"
+  },
+  {
+    "tag": "section",
+    "role": "tabpanel",
+    "id": "companion-pane-library",
+    "name": "The folders on this PC that Airwave plays from. The companion watches them and,",
+    "text": "The folders on this PC that Airwave plays from. The companion watches them and, once sharing is on, passes what it finds to your Airwave Hub so every device see"
+  },
+  {
+    "tag": "section",
+    "role": "",
+    "id": "folders",
+    "name": "Folders",
+    "text": "Saved MusicNo folders yet — add the one this PC keeps these in.Add Folder…Saved TVNo folders yet — add the one this PC keeps these in.Add Folder…Saved MoviesNo "
+  },
+  {
+    "tag": "button",
+    "role": "",
+    "id": "",
+    "name": "Add Folder…",
+    "value": "",
+    "text": "Add Folder…"
+  },
+  {
+    "tag": "button",
+    "role": "",
+    "id": "",
+    "name": "Add Folder…",
+    "value": "",
+    "text": "Add Folder…"
+  },
+  {
+    "tag": "button",
+    "role": "",
+    "id": "",
+    "name": "Add Folder…",
+    "value": "",
+    "text": "Add Folder…"
+  },
+  {
+    "tag": "section",
+    "role": "",
+    "id": "library",
+    "name": "Music",
+    "text": "Music on This PCWhat the companion found in your music folders. Choose a song and press Enter to see its file.TitleArtistAlbumTimeTempoNo music yet — add a musi"
+  },
+  {
+    "tag": "table",
+    "role": "grid",
+    "id": "",
+    "name": "Music",
+    "text": "TitleArtistAlbumTimeTempo"
+  },
+  {
+    "tag": "input",
+    "role": "",
+    "id": "",
+    "name": "Search music",
+    "checked": false,
+    "value": "",
+    "text": ""
+  },
+  {
+    "tag": "button",
+    "role": "",
+    "id": "",
+    "name": "Scan Now",
+    "value": "",
+    "text": "Scan Now"
+  },
+  {
+    "tag": "button",
+    "role": "",
+    "id": "",
+    "name": "Show in Explorer",
+    "value": "",
+    "text": "Show in Explorer"
+  },
+  {
+    "tag": "button",
+    "role": "",
+    "id": "",
+    "name": "Send to Hub",
+    "value": "",
+    "text": "Send to Hub"
+  },
+  {
+    "tag": "p",
+    "role": "status",
+    "id": "",
+    "name": "",
+    "text": ""
+  }
+]

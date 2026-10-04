@@ -1,0 +1,44 @@
+### §2.6 Android - PROVEN (real hardware: Android 14 emulator, Pixel_7_API_34, x86_64)
+
+Build, exactly as android/README.md says:
+  NP_BASE_PATH=/assets/app/ pnpm build:player          -> log: logs/android-player-build.log (exit 0)
+  cp -R music-player/dist android/app/src/main/assets/app
+  ./gradlew assembleDebug
+
+APKs produced (split per ABI, as the README explains):
+  68.3 MB  android/app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
+  61.3 MB  android/app/build/outputs/apk/debug/app-armeabi-v7a-debug.apk
+  71.8 MB  android/app/build/outputs/apk/debug/app-x86_64-debug.apk
+
+Installed: adb install -r app-x86_64-debug.apk -> Success   (emulator ro.product.cpu.abi=x86_64)
+Launched:  am start -n com.nowplaying.player/.MainActivity
+
+The WebView serves the app over a secure origin, exactly as the README claims:
+  page target title: "Airwave"
+  page URL: https://appassets.androidplatform.net/assets/app/index.html
+  service worker target: https://appassets.androidplatform.net/assets/app/sw.js  (registered)
+
+Screenshots:
+  evidence/40-android-launch.png
+  evidence/41-android-tab-Radio.png
+  evidence/42-android-radio-wgn.png
+  evidence/44-android-livetv.png
+
+What was exercised, through the shipped WebView:
+  - the player renders fully: header, transport, Music/Radio/Live TV/TV/Movies tabs, queue
+  - Radio: 27 real Chicago stations listed (WLS, WFMT, Moody Radio WMBI, WGCI, WBEZ, WGN ...).
+    TUNED AND PLAYING AUDIO: play button read "Pause"; WLS showed on-air "Bad"/Michael Jackson,
+    then "Material Girl"/Madonna. Station metadata is live, not static.
+  - Radio row data-sid attributes confirmed present and used to select rows (see 43-*)
+  - Live TV: tab opens, guide shows its empty state ("Empty") - correct, the phone is not
+    paired with a hub, so it has no guide. No error.
+  - logcat: NO crash, NO AndroidRuntime fatal, NO SecurityException, NO net::ERR_*,
+    NO WebView console error, across install, launch, tab switches and station tuning.
+
+Honest limits on this item:
+  - This is an EMULATOR, not a physical phone. Audio decode, background playback with the"
+echo "    screen off, and hardware DRM behaviour cannot be judged here."
+echo  - Only the x86_64 APK was installed. The arm64-v8a APK - the one almost every real phone
+echo "    wants - was built but not installed, because no arm64 device was available."
+echo  - yt-dlp INSIDE the app was not exercised: there is no paired hub to authorize a fetch
+echo "    against, and the brief requires a rights basis per fetch.

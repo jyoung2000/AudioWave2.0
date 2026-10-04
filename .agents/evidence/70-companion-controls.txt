@@ -1,0 +1,23 @@
+COMPANION_PID=47092
+
+### per-tool Check and Update
+  PASS  Check All — "(no "Last checked" line)" -> "Last checked just now". Versions reported: spotDL runs, yt-dlp is
+  screenshot: evidence/70-check-all.png
+  PASS  per-tool Update (first row, yt-dlp) — clicked. Versions after: spotDL runs, yt-dlp is
+  screenshot: evidence/71-tool-update.png
+
+### Check for new versions
+  PASS  Check for new versions — checkbox=true; it says: "No version has been published yet."
+  screenshot: evidence/72-check-new-versions.png
+
+### Export Logs
+  FAIL  Export Logs — no file appeared under C:/np-prove; the export opens the system save dialog, which a native window cannot be filled from here
+  screenshot: evidence/73-export-logs.png
+
+### Clear Cache
+  PASS  Clear Cache — live-tv: 5809282 -> 5809282 bytes
+  screenshot: evidence/74-clear-cache.png
+
+### the song list reachable by keyboard
+  PASS  song list by keyboard — focus went to <BUTTON> tabindex=null, 0 rows, empty state ""; ArrowDown x2 selected: Library
+  screenshot: evidence/75-library-keyboard.png

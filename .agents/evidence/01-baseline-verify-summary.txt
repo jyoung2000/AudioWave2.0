@@ -1,0 +1,36 @@
+
+== windows-package-contents
+
+
+Verification summary
+------------------------------------------------------------------------
+PASS     generate                 2s     
+PASS     generated-up-to-date     4s     
+PASS     licenses-up-to-date      0s     
+PASS     icons-up-to-date         5s     
+PASS     format                   2s     
+PASS     lint                     38s    
+PASS     typecheck                22s    
+PASS     test:unit                10s    
+PASS     test:dom                 16s    
+PASS     test:contracts           5s     
+PASS     test:integration         46s    
+PASS     test:security            9s     
+PASS     build                    28s    
+PASS     test:perf                1s     
+PASS     build:local              8s     
+PASS     local-file-up-to-date    1s     
+PASS     helper-up-to-date        3s     
+PASS     test:local               19s    
+PASS     build:styleguide         1s     
+PASS     styleguide-up-to-date    0s     
+PASS     styleguide:check         0s     
+PASS     styleguide:pdf           13s    
+PASS     test:a11y                87s    
+PASS     test:e2e                 1447s  
+PASS     test:journey             34s    
+PASS     test:awsp                190s   
+PASS     docker-build             109s   
+PASS     windows-package          34s    
+PASS     windows-package-contents 0s     
+------------------------------------------------------------------------

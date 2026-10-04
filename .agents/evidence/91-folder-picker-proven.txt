@@ -1,0 +1,61 @@
+### §2.5 the native folder picker — PROVEN, with no person involved
+
+**`.agents/evidence/harness/folder-picker.mjs` drives it end to end.** The folder was chosen through Windows' own
+dialog, with the path set by `ValuePattern` and the button pressed by `InvokePattern` — no
+keystrokes, no coordinates, no clicking into the shell window.
+
+```
+clicked "Add Folder…" (trusted)
+OK dialog found: 'Choose a music folder' pid 67376
+OK folder set to C:\np-prove\music
+OK dialog closed - folder chosen
+```
+
+**The folder is registered and watched:**
+
+```json
+{"items":[{"id":"01a10788-…","path":"C:\\np-prove\\music","displayName":"music",
+           "watch":true,"kind":"music","trackCount":9,"sizeBytes":6227127,
+           "lastScanAt":"2026-10-04T15:28:37.365Z","lastScanError":null,"available":true}]}
+```
+
+`lastScanError: null`, `available: true`, `watch: true` — the folder is connected and being watched.
+
+**The scan found all 9 tracks, with tempo** (the corpus is copies of `C:\Music\NowPlayingTest`, whose
+file names carry the known BPM):
+
+| Track | Measured | In the file name |
+| --- | --- | --- |
+| Untagged 100BPM | 100 | 100 ✅ |
+| Known 120BPM | 120 | 120 ✅ |
+| Untagged 120BPM | 120 | 120 ✅ |
+| Known 90BPM | 90 | 90 ✅ |
+| Untagged 132BPM | 132 | 132 ✅ |
+| Known 140BPM | 140 | 140 ✅ |
+| Untagged 110BPM | 110 | 110 ✅ |
+| Known 128BPM | 128 | 128 ✅ |
+| Untagged 120BPM | **94** | 120 ❌ |
+
+Eight of nine match exactly. **The ninth does not**, and it is worth naming precisely: a file whose
+name says 120 BPM was measured at 94. Everything else about it is in order (it is listed, it is
+tagged Untagged, so its tempo is measured rather than read from a tag). This is the one number in
+§2.5 that does not match, and I could not tell from here whether the file's name or the measurement
+is the wrong one — the brief's corpus names are the only reference I have.
+
+## Why the automated route works, when it did not before
+
+Three harness faults, each of which had looked like "the dialog cannot be automated":
+
+1. **The click must be trusted.** A synthetic `element.click()` from `page.evaluate` did not open the
+   dialog at all and closed the companion. A real Playwright click does.
+2. **The dialog is an OWNED window.** Electron calls `showOpenDialog(mainWindow, …)`, so the shell
+   dialog hangs off the companion's top-level window as a *descendant*, not off the desktop root as a
+   sibling. Searching only the root's children reports `no window titled 'Choose a music folder'`
+   while the dialog is plainly on screen — which is what my script did, twice, before I enumerated
+   what was actually there.
+3. **The dialog is not owned by the pid a launcher hands back.** It was pid 67376 when Playwright
+   launched pid 76056. Requiring the launcher's pid is therefore wrong; the meaningful check is the
+   owning *executable*, which the script now verifies is `Airwave Companion`.
+
+Point 2 was invisible until the script printed what *was* on screen on failure rather than just
+asserting what was not. That diagnostic is why this stopped being a BLOCKED item.

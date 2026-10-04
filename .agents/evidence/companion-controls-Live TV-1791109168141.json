@@ -1,0 +1,103 @@
+[
+  {
+    "tag": "div",
+    "role": "",
+    "id": "root",
+    "name": "Airwave CompanionLibraryLive TVRemoteSettingsThe folders on this PC that Airwave",
+    "text": "Airwave CompanionLibraryLive TVRemoteSettingsThe folders on this PC that Airwave plays from. The companion watches them and, once sharing is on, passes what it "
+  },
+  {
+    "tag": "div",
+    "role": "heading",
+    "id": "",
+    "name": "Airwave Companion",
+    "text": "Airwave Companion"
+  },
+  {
+    "tag": "div",
+    "role": "tablist",
+    "id": "",
+    "name": "Sections",
+    "text": "LibraryLive TVRemoteSettings"
+  },
+  {
+    "tag": "button",
+    "role": "tab",
+    "id": "companion-tab-library",
+    "name": "Library",
+    "value": "",
+    "text": "Library"
+  },
+  {
+    "tag": "button",
+    "role": "tab",
+    "id": "companion-tab-live-tv",
+    "name": "Live TV",
+    "value": "",
+    "text": "Live TV"
+  },
+  {
+    "tag": "button",
+    "role": "tab",
+    "id": "companion-tab-remote",
+    "name": "Remote",
+    "value": "",
+    "text": "Remote"
+  },
+  {
+    "tag": "button",
+    "role": "tab",
+    "id": "companion-tab-settings",
+    "name": "Settings",
+    "value": "",
+    "text": "Settings"
+  },
+  {
+    "tag": "section",
+    "role": "tabpanel",
+    "id": "companion-pane-live-tv",
+    "name": "Channel playlists and programme guides for the Live TV tab. Paste a link and it",
+    "text": "Channel playlists and programme guides for the Live TV tab. Paste a link and it is checked, kept here, and passed to the Airwave player on this PC.Channel playl"
+  },
+  {
+    "tag": "section",
+    "role": "",
+    "id": "live-tv",
+    "name": "Live TV",
+    "text": "Channel playlists (M3U)One or more .m3u / .m3u8 links. Every channel they list appears in the guide.No playlists yet.AddProgramme guides (EPG)XMLTV links. The g"
+  },
+  {
+    "tag": "input",
+    "role": "",
+    "id": "",
+    "name": "M3U link",
+    "checked": false,
+    "value": "",
+    "text": ""
+  },
+  {
+    "tag": "button",
+    "role": "",
+    "id": "",
+    "name": "Add",
+    "value": "",
+    "text": "Add"
+  },
+  {
+    "tag": "input",
+    "role": "",
+    "id": "",
+    "name": "EPG link",
+    "checked": false,
+    "value": "",
+    "text": ""
+  },
+  {
+    "tag": "button",
+    "role": "",
+    "id": "",
+    "name": "Add",
+    "value": "",
+    "text": "Add"
+  }
+]

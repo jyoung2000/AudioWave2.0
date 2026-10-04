@@ -1,0 +1,63 @@
+### §2.10 metered connections — HALF PROVEN, and the remaining step is now precise
+
+#### What Windows actually reports on this machine
+
+Using **the companion's own probe** (`COST_SCRIPT`, `windows-companion/src/main/network.ts:21` —
+`NetworkInformation.GetInternetConnectionProfile().GetConnectionCost()`), and then every profile:
+
+| Profile | NetworkCostType |
+| --- | --- |
+| **HomeWiFi (Wi-Fi)** — the one set to metered | **`Fixed`** ← metered |
+| **Ethernet** — what `GetInternetConnectionProfile()` returns | `Unrestricted` |
+| the other saved Wi-Fi networks on this PC (names removed) | `Unrestricted` |
+
+The metered setting **did take effect** — on the Wi-Fi network. But `GetInternetConnectionProfile()`
+returns the **Ethernet** profile, because Ethernet is the adapter actually carrying the traffic
+(default route `Ethernet → 192.168.0.1`, route metric 0, interface metric 20). Windows reports the
+cost of the connection in use, not of the one you marked.
+
+So the companion correctly says it is *not* on a metered connection: from the OS's point of view it
+is not. This is Windows and the product both behaving correctly.
+
+#### The product's half — PROVEN, on the real lines
+
+`.agents/evidence/harness/metered-decision.mjs` extracts `classifyCost()` and `streamingDecision()` out of the
+**shipped bundle** (`windows-companion/dist/main/index.cjs`) and runs them against the exact strings
+Windows produced today:
+
+    "Unrestricted|False|False|False"  ->  classifyCost -> unmetered
+    "Fixed|False|False|False"         ->  classifyCost -> metered
+
+And the decision §2.10 asks about, produced by the shipped code:
+
+    metered + "On metered connections" OFF -> allowed=false
+      "Paused: this PC is on a metered connection (mobile data or a hotspot), and
+       streaming on metered connections is off."
+    metered + "On metered connections" ON  -> allowed=true, reason=null
+
+The full matrix was run across `Fixed`, `Variable`, `Unrestricted`, a WWAN profile and `none`, with
+both switches in each state: streaming is refused **only** for a metered connection with the metered
+switch off, and is allowed in every other combination. `Unrestricted` + Wi-Fi switch off stays
+allowed, as `streamingDecision`'s comment says it should.
+
+Evidence: `92-metered-decision.txt`, `metered-check.ps1` (re-runnable probe).
+
+#### The remaining step, and it is the owner's
+
+For `GetInternetConnectionProfile()` to return the metered profile, the metered adapter has to be the
+one carrying the traffic. One of these, all of them system settings I do not touch:
+
+1. **Unplug the Ethernet cable** (or disable the Ethernet adapter in `ncpa.cpl`) — Wi-Fi then becomes
+   the internet profile, and its `Fixed` cost is what the companion will read. Simplest and reversible.
+2. Raise the Wi-Fi adapter's interface metric above Ethernet's, so Windows prefers Wi-Fi.
+3. Tether to a phone hotspot and disconnect Ethernet — Windows marks a WWAN profile metered by
+   itself, which `classifyCost` also treats as metered.
+
+Option 1 is a single unplug. Once it is done I will re-run `metered-check.ps1`, and if it reads
+`metered` the end-to-end is closeable in one pass: turn **Remote ▸ "Let paired devices stream from
+this PC"** on, watch the companion's log say it is on a metered connection, then with **"On metered
+connections"** off confirm the refusal sentence appears, and with it on confirm streaming is allowed.
+
+**Still not provable here either way:** streaming an actual FLAC to a paired player, and `last seen`
+on a paired device after it disconnects. Both need a paired player or device, which this run has not
+reached — that is a separate limit from the metered setting.

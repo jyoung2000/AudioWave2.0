@@ -1,0 +1,23 @@
+COMPANION_PID=56464
+companion hub:sharing on arrival -> {"enabled":false}
+turning sharing ON
+sharing is on; waiting for the debounced push to land
+
+### sharing ON
+  GET /api/v1/live-tv -> 200
+  channels=301  guide=0  updatedAt=2026-10-04T12:54:01.814Z  sourceDevice=[object Object]
+  rows rendered under "Live TV from the companion" on the Music tab: 1
+  screenshot: evidence/36-hub-livetv-from-companion.png
+
+>>> turning sharing OFF
+  sharing is now off
+
+### sharing OFF
+  GET /api/v1/live-tv -> 200
+  channels=0  guide=0  updatedAt=null  sourceDevice=null
+  rows rendered under "Live TV from the companion" on the Music tab: 1
+  screenshot: evidence/37-hub-livetv-withdrawn.png
+
+### VERDICT
+  the companion's Live TV reached the hub while sharing was on: YES (301 channels, 0 guide entries)
+  turning sharing off withdrew the hub's copy: YES (0 channels left)

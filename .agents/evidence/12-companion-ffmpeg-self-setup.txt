@@ -1,0 +1,62 @@
+### §2.4 companion FFmpeg self-setup
+launched with PATH lacking every ffmpeg dir; nothing uninstalled
+companion's own tools dir + setup-state.json:
+
+{
+  "version": 1,
+  "tools": {
+    "yt-dlp": {
+      "lastAttemptAt": "2026-10-04T10:07:14.259Z",
+      "lastError": null,
+      "tag": "2026.08.19",
+      "verified": {
+        "asset": "yt-dlp.exe",
+        "sha256": "66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a"
+      },
+      "lastUpdateCheckAt": "2026-10-04T10:07:14.259Z"
+    },
+    "ffmpeg": {
+      "lastAttemptAt": "2026-10-04T10:07:26.365Z",
+      "lastError": null,
+      "tag": "latest",
+      "verified": {
+        "asset": "ffmpeg-master-latest-win64-gpl.zip",
+        "sha256": "1281f33d17cf456c843b02f2354aaa080e6d172c23afbc18e21e3ce5eb3f94c4"
+      }
+    },
+    "spotdl": {
+      "lastAttemptAt": "2026-10-04T10:07:31.028Z",
+      "lastError": null,
+      "tag": "v4.5.2",
+      "verified": {
+        "asset": "spotdl-4.5.2-win32.exe",
+        "sha256": "4490ae3b38c4321173e17975a9990a130cf9a9aea8132ee2978afecefbeeb477"
+      }
+    }
+  }
+}
+
+### tools on disk (fetched by the companion itself)
+total 391948
+drwxr-xr-x 1 owner 197609         0 Oct  4 05:13 .
+drwxr-xr-x 1 owner 197609         0 Oct  4 05:07 ..
+-rwxr-xr-x 1 owner 197609 168868352 Oct  4 05:07 ffmpeg.exe
+-rwxr-xr-x 1 owner 197609 168657408 Oct  4 05:07 ffprobe.exe
+-rw-r--r-- 1 owner 197609       929 Oct  4 05:13 setup-state.json
+-rwxr-xr-x 1 owner 197609  45970977 Oct  4 05:07 spotdl.exe
+-rwxr-xr-x 1 owner 197609  17840399 Oct  4 05:07 yt-dlp.exe
+
+### the fetched ffmpeg.exe actually runs
+ffmpeg version N-127142-g12b7b9891b-20261003 Copyright (c) 2000-2026 the FFmpeg developers
+built with gcc 16.2.0 (crosstool-NG 1.29.0.7_b1a94f6)
+
+### yt-dlp.exe SHA-256 on disk vs the digest setup-state.json claims
+66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a *C:/np-prove/NowPlayingCompanion-data/helper/tools/yt-dlp.exe
+setup-state claims: 66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a  <- MATCH
+
+NOTE: ffmpeg's recorded sha256 (1281f33d...) is the RELEASE ASSET's digest (the .zip),
+not the unpacked ffmpeg.exe's (6de576f3...). Correct for a zipped asset; recorded so the
+report does not read it as a mismatch.
+
+### screenshot: Settings > Downloaders, all three Ready
+C:/np-prove/evidence/12-downloaders-ffmpeg-setup.png

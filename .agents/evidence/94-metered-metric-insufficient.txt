@@ -1,0 +1,60 @@
+### §2.10 why raising Wi-Fi's interface metric could not work on this machine
+
+The owner ran, in an Administrator PowerShell:
+
+    Set-NetIPInterface -InterfaceIndex 18 -InterfaceMetric 5 -AutomaticMetric Disabled
+
+**Verified applied:** Wi-Fi `InterfaceMetric 5`, `AutomaticMetric Disabled`; Ethernet still 20 /
+Enabled; and Wi-Fi is now listed *first* among the default routes:
+
+    Wi-Fi      192.168.0.1   RouteMetric 0   ifIndex 18
+    Ethernet   192.168.0.1   RouteMetric 0   ifIndex 3
+
+So the routing preference did change. **The companion's probe still returns Ethernet:**
+
+    cost line : Unrestricted|False|False|False
+    profile   : Ethernet
+    VERDICT   : unmetered
+
+Re-probed after a pause, so it is not a cache. And the reason is visible in one field:
+
+    ProfileName : Ethernet
+    Cost        : Unrestricted
+    Adapter id  : 15ca8af4-56f3-47ef-a4c7-c9f50c05b989
+    WifiAdapter :            <-- empty
+
+**`WifiAdapterId` is empty**, so the profile Windows considers "the internet connection" is backed by
+the wired adapter. And the two adapters are on the **same network**:
+
+| Adapter | Address | Prefix | Gateway |
+| --- | --- | --- | --- |
+| Wi-Fi | 192.168.0.17 | /22 | 192.168.0.1 |
+| Ethernet | 192.168.0.16 | /22 | 192.168.0.1 |
+
+Same subnet, same gateway, one LAN. Windows groups the connection profiles by network identity rather
+than following the per-interface metric for this call, so while Ethernet stays connected the metered
+`HomeWiFi` profile (`cost=Fixed`, confirmed) is never the one handed back. The metric change is therefore
+**not sufficient** here — a fact about this machine's topology, not about the product.
+
+**What does work:** getting the wired adapter out of the connection, so the metered Wi-Fi profile is
+the only one. Either
+
+- **unplug the Ethernet cable** — no Administrator needed, fully reversible by plugging it back in
+  (the simplest option), or
+- disable the Ethernet adapter in `ncpa.cpl` (needs Administrator).
+
+Either leaves Wi-Fi as the sole internet connection, `GetInternetConnectionProfile()` returns `HomeWiFi`,
+and its cost is `Fixed` — which `classifyCost()` already maps to `metered`, proven in
+`92-metered-decision.txt`.
+
+### Outstanding owner action: the metric must be put back
+
+The metric change is still in force and was **not** made by me. The exact undo, recorded before the
+change was requested:
+
+    Set-NetIPInterface -InterfaceIndex 18 -AutomaticMetric Enabled
+
+which returns Wi-Fi to automatic (metric 35). It must be run in an Administrator PowerShell — my shell
+is not elevated and Windows returns `Access is denied`.
+
+The before-state is in `$NP_SCRATCH/netif-before.json`, not in the repository.

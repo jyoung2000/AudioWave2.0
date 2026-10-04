@@ -1,0 +1,17 @@
+ffmpeg removed from PATH: C:\Users\owner\AppData\Local\hermes\tools\ffmpeg-9.0.1-win32-x64\bin, C:\Users\owner\AppData\Local\Microsoft\WinGet\Links
+COMPANION_PID=60144
+title=Airwave Companion url=file:///C:/Users/owner/AudioWave2.0-prove/windows-companion/release/win-unpacked/resources/app.asar/dist/renderer/index.html
+controls written to C:\np-prove\evidence\companion-controls-Live TV-1791109168141.json
+div id=root checked= :: Airwave CompanionLibraryLive TVRemoteSettingsThe folders on this PC that Airwave | Airwave CompanionLibraryLive TVRemoteSettingsThe folders on this PC that Airwave plays from. The companion watches them and, once sharing is on, passes what it 
+div[heading] id= checked= :: Airwave Companion | Airwave Companion
+div[tablist] id= checked= :: Sections | LibraryLive TVRemoteSettings
+button[tab] id=companion-tab-library checked= :: Library | Library
+button[tab] id=companion-tab-live-tv checked= :: Live TV | Live TV
+button[tab] id=companion-tab-remote checked= :: Remote | Remote
+button[tab] id=companion-tab-settings checked= :: Settings | Settings
+section[tabpanel] id=companion-pane-live-tv checked= :: Channel playlists and programme guides for the Live TV tab. Paste a link and it | Channel playlists and programme guides for the Live TV tab. Paste a link and it is checked, kept here, and passed to the Airwave player on this PC.Channel playl
+section id=live-tv checked= :: Live TV | Channel playlists (M3U)One or more .m3u / .m3u8 links. Every channel they list appears in the guide.No playlists yet.AddProgramme guides (EPG)XMLTV links. The g
+input id= checked=false :: M3U link | 
+button id= checked= :: Add | Add
+input id= checked=false :: EPG link | 
+button id= checked= :: Add | Add

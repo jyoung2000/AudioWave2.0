@@ -1,0 +1,72 @@
+### §2.10 streaming on a metered connection — PROVEN
+
+Both halves of the brief, on the packaged companion, with Windows reporting a real metered connection.
+
+**Windows, via the companion's own `COST_SCRIPT`**
+
+    cost line : Fixed|False|False|False
+    profile   : HomeWiFi
+    VERDICT   : metered
+
+(The Ethernet adapter had to leave the connection first — see below. With both adapters on the same
+subnet, `GetInternetConnectionProfile()` returns the wired profile whatever the interface metric says,
+because Windows groups connection profiles by network rather than by metric.)
+
+**"On metered connections" ON — the stream continues**
+
+    awsp:status -> { "enabled": true, "running": true, "reason": null,
+                     "network": { "unmetered": true, "metered": true,
+                                  "connection": "metered", "blocked": null } }
+    the tab says: "Streaming is on  This PC is on a metered connection."
+    pause reason: (none)
+
+**"On metered connections" OFF — the stream stops, and says why**
+
+    awsp:status -> { "enabled": true, "running": false,
+                     "reason": "Paused: this PC is on a metered connection (mobile data or a
+                                 hotspot), and streaming on metered connections is off.",
+                     "network": { "unmetered": true, "metered": false,
+                                  "connection": "metered", "blocked": "Paused: this PC is on a
+                                  metered connection (mobile data or a hotspot), and streaming on
+                                  metered connections is off." } }
+    the tab shows that same pause reason
+
+**Restored** — the switch put back ON: `running: true`, `blocked: null` again.
+
+`running` is the supervisor's own flag for whether the AWSP sidecar is serving, read over the app's own
+`awsp:status` channel (`windows-companion/src/main/index.ts:683`). So this is the supervisor genuinely
+pausing and resuming, not a checkbox changing its own label.
+
+Evidence: `95-metered-live.txt`, screenshots `95-metered-switch-on.png`,
+`96-metered-switch-off.png`, `97-metered-restored.png`. Harness: `.agents/evidence/harness/metered-live.mjs`.
+
+### What getting here needed, and what must be undone
+
+The owner's metered setting **did work** — on the Wi-Fi profile `HomeWiFi`, which reads `cost=Fixed`. But
+this PC had **two adapters on the same LAN** (Wi-Fi `192.168.0.17/22`, Ethernet `192.168.0.16/22`, same
+gateway), and Windows reports the cost of the connection actually in use. `WifiAdapterId` came back
+empty, so the wired profile won regardless of the interface metric. Raising Wi-Fi's preference
+(`Set-NetIPInterface -InterfaceIndex 18 -InterfaceMetric 5`) changed the routing but not the profile
+Windows returned.
+
+Unplugging the Ethernet cable fixed it, and the probe then read `metered` immediately.
+
+**Two owner settings are still changed and must be put back:**
+
+    # 1. Wi-Fi interface metric (Administrator PowerShell)
+    Set-NetIPInterface -InterfaceIndex 18 -AutomaticMetric Enabled    # back to automatic, metric 35
+
+    # 2. the Wi-Fi network's metered flag
+    Settings > Network & internet > Wi-Fi > Manage known networks > HomeWiFi
+      > set as metered connection OFF
+
+    # 3. plug the Ethernet cable back in
+
+The before-state is in `$NP_SCRATCH/netif-before.json`, not in the repository. My shell is not
+elevated, so (1) could not be undone by me — Windows returns `Access is denied`.
+
+### Still not proven, and it is a separate limit
+
+Streaming an actual FLAC to a paired player, and `last seen` on a paired device after it disconnects,
+both need a paired player or device, which this run has not reached. That is nothing to do with
+metered.

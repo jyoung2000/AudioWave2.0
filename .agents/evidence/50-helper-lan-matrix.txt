@@ -1,0 +1,77 @@
+### §2.9 the helper on the network - PROVEN
+
+Companion: the PACKAGED build, sandboxed (PORTABLE_EXECUTABLE_DIR=C:\np-prove). Helper port 17342.
+Every request below went to this PC's OWN LAN ADDRESS 192.168.0.16 with a Host header spelled the way
+a browser on another device sends it -- loopback would pass the check and prove nothing about the
+network. The DNS-rebinding guard is local-helper/src/security.ts:146 (lanHostAllowed).
+
+Companion log, proving the socket really rebound:
+
+    INFO [helper] helper listening at http://127.0.0.1:17342
+    INFO [helper] helper listening at http://127.0.0.1:17342, and to this network for the read-only routes
+
+--- toggle state on arrival
+
+    state on arrival: OFF   <- §2.9's "off by default" requirement, on a store written earlier that day
+
+--- toggle hint text, verbatim from the app
+
+    "Off is safer. When on, any device on this network can see that the companion is running and
+     which downloaders it has, read the Live TV channels and guide, and ask what a radio station is
+     playing -- without pairing. Downloads, backups and the helper's token stay on this PC. Paired
+     devices connect through Remote either way."
+
+--- LAN ON, no Origin header (a phone app or curl on another device)
+
+    200  GET /helper/v1/health
+         {"helper":"now-playing-local-helper","protocol":1,"version":"0.1.0","servesApp":false,
+          "tools":[{"id":"yt-dlp","present":true,"version":"2026.08.19","origin":"installed", ...
+    403  GET /helper/v1/tv/channels
+         {"error":"origin","message":"This origin may not talk to the helper."}
+    403  GET /helper/v1/radio/now-playing?url=<public stream>
+         {"error":"origin","message":"This origin may not talk to the helper."}
+
+--- LAN ON, Origin is a page served from THIS network (the real case)
+
+    200  GET /helper/v1/tv/channels   Origin: http://192.168.0.16:4173
+         {"channels":[{"id":"17fca471f898300e","name":"5 Cops","group":"Series",
+           "logo":"https://i.imgur.com/...","url":"https://jmp2.uk/...
+          (the 301-channel UK playlist added in §2.5 is being served to the network)
+    200  GET /helper/v1/radio/now-playing?url=https://stream.radioparadise.com/mp3-32
+         {"raw":"Crowded House - Private Universe","artist":"Crowded House",
+          "title":"Private Universe","station":"Radio Paradise (32k mp3)","reason":null}
+
+--- LAN ON, refusals that must happen
+
+    403  GET /helper/v1/tv/channels   Origin: https://evil.example
+         {"error":"origin","message":"This origin may not talk to the helper."}
+    403  POST /helper/v1/fetch  Authorization: Bearer <token>  Origin: http://192.168.0.16:4173
+         {"error":"lan","message":"Only this PC may use that. Other devices on the network can
+          only read what is playing and the Live TV guide."}
+         ^ a token does NOT widen LAN access. This is exactly what §2.9 asks for.
+
+--- LAN OFF: the network routes stop answering
+
+    NO REPLY  GET /helper/v1/health       ECONNREFUSED
+    NO REPLY  GET /helper/v1/tv/channels  ECONNREFUSED
+
+NOTES, so the report is not read as more than it is
+
+1. /helper/v1/health answers with no Origin while /tv/channels and /radio/now-playing do not. That is
+   deliberate and commented in the source, not an inconsistency:
+
+     - local-helper/src/server.ts:203-207 refuses radio/now-playing with no Origin and no token
+       precisely so the helper cannot be used as a blind GET relay by any website's <img>.
+     - handleLan (server.ts:171) only vets the Origin when one is present; health carries no data a
+       stranger should not have and is the route that answers "is a helper here at all".
+
+   So on the network: health is a bare reachability probe, and the two content routes need a page
+   served from this network. That matches the wording of the toggle's own hint text.
+
+2. A Windows Firewall prompt appears the first time the helper binds 0.0.0.0. The owner answered it
+   ("Private networks" only). That is a person, not an automated step.
+
+3. NO SECOND PHYSICAL DEVICE WAS AVAILABLE on this network. Every request above was issued from this
+   same PC, but over its LAN address and with the LAN Host/Origin rules in force -- so the helper's
+   network-side decisions are proven; what is NOT proven is that a phone or another PC can reach it,
+   which depends on the firewall rule the owner allowed and on that device's own network.

@@ -1,0 +1,90 @@
+### §2.2 container: image size
+template parsing error: template: :1:40: executing "" at <.DiskUsage>: can't evaluate field DiskUsage in type *formatter.imageContext
+
+### journey summary
+ Container now-playing-journey-hub Started 
+ Container now-playing-journey-hub Healthy 
+[WebServer] npm warn install-scripts .npmrc allow-scripts setting is being ignored because --allow-scripts was passed on the command line
+  ok 1 [chromium] › tests\journey\cross-app.spec.ts:76:1 › the whole pass: hub set up, player paired, group joined, invite declined, name taken, group owned, someone found (19.4s)
+  1 passed (21.1s)
+ Container now-playing-journey-hub Removed 
+
+### yt-dlp present in image
+-rwxr-xr-x 1 root root 40446224 Oct  4 09:52 /usr/local/bin/yt-dlp
+
+### yt-dlp --version INSIDE the compose container (tmpfs 64m on /tmp)
+[PYI-1562:ERROR] Failed to extract Cryptodome/Cipher/_ARC4.abi3.so: decompression resulted in return code -1!
+[PYI-1562:ERROR] Failed to extract entry: Cryptodome/Cipher/_ARC4.abi3.so.
+EXIT=255
+
+### /tmp inside that container
+Filesystem      Size  Used Avail Use% Mounted on
+tmpfs            64M   64M     0 100% /tmp
+
+### control A: same image, /tmp tmpfs 512m
+/usr/local/bin/yt-dlp: error while loading shared libraries: libz.so.1: failed to map segment from shared object
+EXIT=127
+
+### control B: same image, NO tmpfs on /tmp (writable layer)
+2026.08.19
+EXIT=0
+
+### hub providers health: external-tool reported ok
+      "provider": "external-tool",
+      "displayName": "External media tool",
+      "role": "tool",
+      "authType": "local",
+--
+      "provider": "external-tool",
+      "status": "ok",
+      "circuit": "closed",
+      "checkedAt": "2026-10-04T10:07:01.799Z"
+
+### download job record (the real §2.3 attempt in the container)
+GET /api/v1/downloads -> 200
+{
+  "items": [
+    {
+      "id": "01a1065a-f4ac-70a3-8ed7-209cece5da16",
+      "state": "failed",
+      "ownerId": "admin",
+      "source": {
+        "provider": "external-tool",
+        "providerTrackId": null,
+        "url": "https://archive.org/download/HorseFeathers_201303/HorseFeathers.mp3",
+        "locator": null,
+        "title": "HorseFeathers",
+        "artistName": "Marx Brothers"
+      },
+      "authorization": {
+        "basis": "public-domain",
+        "evidence": "archive.org public-domain item",
+        "acknowledgedAt": "2026-10-04T09:59:46.604Z"
+      },
+      "target": {
+        "destination": "hub",
+        "directoryId": null,
+        "filenameTemplate": "{artist} - {title}",
+        "format": "original",
+        "quality": null
+      },
+      "progress": {
+        "bytesDone": 0,
+        "bytesTotal": null,
+        "speedBps": null,
+        "percent": null,
+        "stage": "downloading"
+      },
+      "attempts": 5,
+      "maxAttempts": 5,
+      "nextRetryAt": null,
+      "checksumSha256": null,
+      "resultLocator": null,
+      "resultSizeBytes": null,
+      "error": "The external tool exited with code 255: [PYI-588:ERROR] Failed to extract Cryptodome/Cipher/_ARC4.abi3.so: decompression resulted in return code -1!\n[PYI-588:ERROR] Failed to extract entry: Cryptodome/Cipher/_ARC4.abi3.so.\n",
+      "createdAt": "2026-10-04T09:59:46.604Z",
+      "updatedAt": "2026-10-04T10:00:46.533Z",
+      "completedAt": "2026-10-04T10:00:46.533Z"
+    }
+  ]
+}

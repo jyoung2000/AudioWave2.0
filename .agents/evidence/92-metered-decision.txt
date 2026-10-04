@@ -1,0 +1,25 @@
+loaded classifyCost() and streamingDecision() out of the shipped bundle (1081 chars)
+
+### classifyCost() on the two real lines this machine produced
+  "Unrestricted|False|False|False"              -> the profile Windows picked (Ethernet, the adapter carrying traffic)
+      classifyCost -> unmetered
+  "Fixed|False|False|False"                     -> the Wi-Fi profile you set to metered (HomeWiFi)
+      classifyCost -> metered
+
+### the decision matrix (both switches in each state)
+  connection   metered-switch  wi-fi-switch  allowed  reason
+  metered      true            true          yes      -
+  metered      false           true          NO       Paused: this PC is on a metered connection (mobile data or a hotspot), and streaming on metered connections is off.
+  metered      true            true          yes      -
+  metered      false           true          NO       Paused: this PC is on a metered connection (mobile data or a hotspot), and streaming on metered connections is off.
+  unmetered    true            true          yes      -
+  unmetered    false           true          yes      -
+  metered      true            true          yes      -
+  metered      false           true          NO       Paused: this PC is on a metered connection (mobile data or a hotspot), and streaming on metered connections is off.
+  offline      true            true          yes      -
+  offline      false           true          yes      -
+
+### the two sentences §2.10 asks for, produced by the shipped code
+  metered + "On metered connections" OFF -> allowed=false
+      "Paused: this PC is on a metered connection (mobile data or a hotspot), and streaming on metered connections is off."
+  metered + "On metered connections" ON  -> allowed=true, reason=null

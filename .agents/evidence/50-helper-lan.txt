@@ -1,0 +1,31 @@
+this PC's IPv4 addresses: 100.112.3.62, 255.255.255.255, 192.168.0.16, 255.255.252.0, 192.168.0.1, 172.24.128.1, 255.255.240.0
+probing over the LAN address: 192.168.0.16  (loopback would pass the check and prove nothing)
+
+COMPANION_PID=14268
+### toggle "Let devices on this network use the helper without pairing"
+state on arrival: ON   <- §2.9 requires OFF by default
+surrounding text: Let devices on this network use the helper without pairing Off is safer. When on, any device on this network can see that the companion is running and which downloaders it has, read the Live TV channels and guide, and ask what a radio station is playing — without pairing. Downloads, backups and the helper’s token stay on this PC. Paired devices connect through Remote either way.
+
+>>> turning the toggle ON. Windows may show a Firewall prompt; only a person can answer it.
+state after clicking: OFF
+waiting for the helper to rebind for this network…
+  the helper still does not answer on the LAN address after 15s
+
+===== LAN routes, toggle ON =====
+  NO REPLY  GET /helper/v1/health   (2049ms)
+  NO REPLY  GET /helper/v1/tv/channels   (2034ms)
+  NO REPLY  GET /helper/v1/radio/now-playing?url=<public stream>   (2008ms)
+  NO REPLY  POST /helper/v1/fetch  (token presented, from the network)   (2025ms)
+
+>>> turning the toggle OFF again
+state after turning off: ON
+
+===== LAN routes, toggle OFF (these must all stop answering) =====
+  HTTP 200  GET /helper/v1/health   (2329ms)
+       {"helper":"now-playing-local-helper","protocol":1,"version":"0.1.0","servesApp":false,"tools":[{"id":"yt-dlp","present":true,"version":"2026.08.19","origin":"installed","installHint":null,"installable
+  HTTP 403  GET /helper/v1/tv/channels   (4ms)
+       {"error":"origin","message":"This origin may not talk to the helper."}
+  HTTP 403  GET /helper/v1/radio/now-playing?url=<public stream>   (4ms)
+       {"error":"origin","message":"This origin may not talk to the helper."}
+  HTTP 403  POST /helper/v1/fetch  (token presented, from the network)   (5ms)
+       {"error":"lan","message":"Only this PC may use that. Other devices on the network can only read what is playing and the Live TV guide."}

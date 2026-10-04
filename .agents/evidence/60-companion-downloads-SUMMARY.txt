@@ -1,0 +1,98 @@
+### §2.11 a real download with the companion's Downloads settings - PARTIAL
+
+What is proven, on the packaged companion, sandboxed (PORTABLE_EXECUTABLE_DIR=C:\np-prove):
+
+1. The settings exist, are reachable and SAVE. Set through the real controls on
+   Settings > Downloads and read back from the live DOM afterwards:
+
+       before:  format=original  concurrency=2  rateLimit=(empty)  onDone=nothing
+       after:   format=mp3       concurrency=2  rateLimit=500      onDone=notify
+
+   The five formats offered are: Keep original, MP3, AAC (M4A), Opus, FLAC - lossless.
+   The three "When one finishes" options are: Just save it, Show a notification, Show it in File
+   Explorer. So the option §2.11 names ("notify" = "Show a notification") exists and is settable.
+   Screenshot: evidence/60-downloads-settings.png
+
+2. THE FORMAT SETTING DECIDES THE FORMAT. The request below names no format at all, and both jobs
+   came back with the PC's setting already applied:
+
+       POST /helper/v1/fetch -> HTTP 202
+         {"id":"043aa19d-...","state":"queued","tool":"yt-dlp","format":"mp3","stage":"preflight"}
+         {"id":"549665f6-...","state":"queued","tool":"yt-dlp","format":"mp3","stage":"preflight"}
+
+   That is local-helper/src/server.ts:289-294 doing exactly what its comment says: a request naming
+   no format gets the format chosen on this PC.
+
+3. Both jobs RAN, not just queued. Polled state: queued -> running -> (terminal).
+
+       job 043aa19d: state=running format=mp3
+       job 549665f6: state=running format=mp3
+
+4. The rights gate is enforced per fetch. Each request carried
+   authorization.basis = "public-domain" plus an ISO timestamp. The hub's own attempt at a download
+   without one was refused (see evidence/02-container-yt-dlp-defect.txt for the shape of a refusal).
+
+5. The helper's token gate works. With no token: HTTP 401
+   {"error":"token","message":"This request needs the helper's token. It is printed when the
+   helper starts."}. The token was then obtained through the companion's own bridge channel
+   `helper:token` (windows-companion/src/main/index.ts:697) - the same way the player gets one - and
+   never printed and never written to a file.
+
+6. The host allowlist is enforced. A Wikimedia Commons URL was refused:
+   HTTP 400 {"error":"url","message":"Host upload.wikimedia.org is not on the allowlist"}.
+   The allowlist is packages/contracts/src/api/local-helper.ts:230 - youtube.com, soundcloud.com,
+   bandcamp.com, archive.org and their hosts. Correct behaviour, and it is why a free public-domain
+   file has to come from archive.org.
+
+WHAT IS NOT PROVEN, and why
+
+No file reached C:\np-prove\downloads, so these remain unproven on real hardware:
+
+  - the rate limit is actually enforced (500 KB/s). The baseline for comparison would have been
+    clear: an unthrottled fetch of the same file measured 6,145,543 B/s, so a 500 KB/s cap is
+    plainly measurable. But no job ran to completion, so there is no measured rate to report.
+  - "Show a notification" actually appearing, and clicking it opening the file.
+  - two-at-once actually running concurrently (both jobs were queued and both started; whether they
+    overlapped is not something I could read without a completed job).
+
+THE BLOCKER, precisely
+
+archive.org is refusing THIS MACHINE, not the application:
+
+    HEAD https://archive.org/download/HorseFeathers_201303/HorseFeathers.mp3 -> HTTP 503
+    GET  https://archive.org/metadata/HorseFeathers_201303                   -> {}   (empty)
+    GET  https://archive.org/metadata/TestMP3TestFile                        -> {}   (empty)
+    GET  https://archive.org/metadata/nasa_mission_control                   -> {}   (empty)
+    HEAD https://archive.org/                                               -> HTTP 200
+
+The site root answers 200 and every /download/ and /metadata/ path answers 503 or empty, so this is
+an edge-level refusal of this IP for the download paths. The identical fetch through the companion's
+own yt-dlp gives the same answer, and the direct yt-dlp run confirms it is not the wrapper:
+
+    yt-dlp -J https://archive.org/download/HorseFeathers_201303/HorseFeathers.mp3
+    ERROR: [generic] HorseFeathers: Unable to download webpage: HTTP Error 503
+
+So the failure is upstream of the application. yt-dlp itself is healthy against the network - against
+an allowlisted host it resolves formats normally:
+
+    yt-dlp --simulate https://www.youtube.com/watch?v=aqz-KE-bpKQ
+    [youtube] aqz-KE-bpKQ: Downloading visionos player API JSON
+    [info] aqz-KE-bpKQ: Downloading 1 format(s): 401+251
+
+(That run was a --simulate: a metadata resolve only, no media fetched. It is quoted because it
+isolates the tool's health from the host's refusal, not as a download.)
+
+NEXT STEP, and who does it
+
+  - Claude Code: no code change is needed for the parts that passed. To close the remaining three,
+    re-run this harness from a network archive.org answers, or add one openly-licensed host that
+    serves static audio to HELPER_DEFAULT_HOSTS
+    (packages/contracts/src/api/local-helper.ts:230). The second is a product decision, not a fix.
+  - Owner: nothing. This is not a settings problem on the PC.
+
+EVIDENCE PATHS
+
+  evidence/60-companion-downloads.txt   the full transcript of this run
+  evidence/60-downloads-settings.png    Settings > Downloads after the change
+  evidence/61-downloads-finished.png    the companion at the end of the run
+  .agents/evidence/harness/companion-downloads.mjs       the harness, re-runnable as-is

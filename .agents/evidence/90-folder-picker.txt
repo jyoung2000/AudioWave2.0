@@ -1,0 +1,21 @@
+COMPANION_PID=76056
+folders before: {"items":[]}
+clicked "Add Folder…" (trusted) - waiting for "Choose a music folder"
+OK dialog found: 'Choose a music folder' pid 67376
+INFO 28 Edit controls: Name | Name | Name | Name | Name | Name | Name | Name | Name | Name | Name | Name | Name | Name | Name | Name | Name | Name | Name | Name | Name | Name | Name | Name | Name | Name | Folder: | Search Box
+OK folder set to C:\np-prove\music
+OK dialog closed - folder chosen
+
+folders after: {"items":[{"id":"01a10788-051b-7012-a28e-05646939d489","path":"C:\\np-prove\\music","displayName":"music","watch":true,"kind":"music","trackCount":9,"sizeBytes":6227127,"lastScanAt":"2026-10-04T15:28:37.365Z","lastScanError":null,"available":true}]}
+
+library after the scan: total=9
+  Untagged 100BPM                              tempo=100
+  Known 120BPM                                 tempo=120
+  Untagged 120BPM                              tempo=120
+  Known 90BPM                                  tempo=90
+  Untagged 132BPM                              tempo=132
+  Known 140BPM                                 tempo=140
+  Untagged 110BPM                              tempo=110
+  Known 128BPM                                 tempo=128
+  Untagged 120BPM                              tempo=94
+screenshot: evidence/90-folder-picker.png

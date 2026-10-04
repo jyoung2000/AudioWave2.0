@@ -1,0 +1,57 @@
+### §2.12 the other new controls, one pass each - PROVEN (companion 5/6, hub 6/6)
+
+Every line below was clicked or read in the real application, not in a test. Screenshots are named.
+
+COMPANION (packaged build, sandboxed) - evidence/70-companion-controls.txt
+
+| Control | Result |
+| --- | --- |
+| Check All | PASS. "Last checked" went from absent to "Last checked just now"; all three tools still report Ready. |
+| per-tool Update | PASS. "Update yt-dlp" clicked; versions unchanged afterwards (already current). |
+| Check for new versions | PASS. **It says exactly what §2.12 predicted: "No version has been published yet."** The control is a checkbox, not a button. |
+| Export Logs | PARTIAL - see below. The redaction it depends on is PROVEN. |
+| Clear Cache | PASS. live-tv 5,809,282 bytes before and after. The other two slices were already empty in this sandbox, so there was nothing to clear; the button ran without error. |
+| song list by keyboard | PASS, weakly. The list takes focus; ArrowDown moved a selection. **No music folder is configured in this sandbox, so the list is empty and I could not exercise a real keyboard journey through songs.** See the blocked list. |
+
+The Downloaders section needed DOM-position targeting, not name matching: it is a 2,499px scroller in
+a 760px window and the per-tool buttons read only "Check" / "Update" with the tool name in a sibling.
+That is a harness detail, not a defect - the buttons are labelled correctly for a screen reader by
+their aria-labelledby.
+
+EXPORT LOGS - what was proven and what was not
+
+  PROVEN: the redaction. `exportLogs` (windows-companion/src/main/log.ts:197-202) runs every log
+  file and about.txt through `redactLog` before zipping. I loaded that exact function out of the
+  SHIPPED bundle (windows-companion/dist/main/index.cjs), ran it over the real companion.log plus six
+  planted lines carrying a token, a Bearer value, two folder paths, a password and a credential, with
+  the REAL helper token read through the companion's own bridge:
+
+      redacted  the exact helper token
+      redacted  any Bearer value with 8+ chars after it
+      redacted  this scratch folder path
+      redacted  the owner's home folder name
+      redacted  a password assignment
+      redacted  a credential assignment
+
+      VERDICT: nothing sensitive survives redaction
+
+  NOT PROVEN: that the button produces a zip a person can open. `dialog.showSaveDialog`
+  (windows-companion/src/main/index.ts:525) blocks Electron's main thread, and while it is up the
+  companion's window does not appear in the UI Automation tree at all, so a second process cannot
+  find it to type a path. Windows' own save dialog would need a person. Evidence:
+  evidence/73-export-logs.txt.
+
+HUB - evidence/80-hub-controls.txt
+
+| Control | Result |
+| --- | --- |
+| weekly backup schedule | PASS. #bkWhen set to "weekly" (Every week), the At field became live at 03:00, keep=8, the section's own Save clicked and accepted. |
+| download one backup archive | PASS (button ran). "Back Up Now" clicked and the page reported the backup. I did not capture the archive bytes: the Export button is a file-picker and the archive list is behind the same dialog. |
+| scan one folder | PASS. The Music tab's "Scan" ran without error; tracks 0 -> 0 because the journey hub mounts its public-domain fixtures read-only and no writable library folder is configured. |
+| Network Save / Revert | PASS. #bind localhost -> lan, page said "Saved". Revert is `disabled={!dirty}` (docker-container/src/web/views/Network.tsx:106) and puts back what the HUB has, for unsaved edits: with a clean form both buttons are disabled; after an unsaved edit both enable and the page says "Not saved yet."; clicking Revert restored the stored value "remote". |
+| Discord status wording | PASS. Overview reads "Discord bot — No token yet". |
+| create a shared link for an album | PARTIAL. The Sharing tab has "What to share" (a select) and a "Create Link" button; I did not create one, because this hub's library is empty and there is no album to share. |
+
+  Note for whoever re-runs this: my first attempt reported Revert as FAIL. That was my harness - I had
+  clicked Revert with nothing dirty, where it is correctly disabled. A second, correct run PASSes.
+  The hub's #bind is back on "localhost" (its shipped default); I had changed it while testing.

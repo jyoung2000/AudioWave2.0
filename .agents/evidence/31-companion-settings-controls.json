@@ -1,0 +1,435 @@
+[
+  {
+    "tag": "button",
+    "id": "companion-tab-library",
+    "name": "Library",
+    "placeholder": ""
+  },
+  {
+    "tag": "button",
+    "id": "companion-tab-live-tv",
+    "name": "Live TV",
+    "placeholder": ""
+  },
+  {
+    "tag": "button",
+    "id": "companion-tab-remote",
+    "name": "Remote",
+    "placeholder": ""
+  },
+  {
+    "tag": "button",
+    "id": "companion-tab-settings",
+    "name": "Settings",
+    "placeholder": ""
+  },
+  {
+    "tag": "button",
+    "id": "",
+    "name": "Check yt-dlp",
+    "placeholder": ""
+  },
+  {
+    "tag": "button",
+    "id": "",
+    "name": "Update yt-dlp",
+    "placeholder": ""
+  },
+  {
+    "tag": "button",
+    "id": "",
+    "name": "Check spotDL",
+    "placeholder": ""
+  },
+  {
+    "tag": "button",
+    "id": "",
+    "name": "Update spotDL",
+    "placeholder": ""
+  },
+  {
+    "tag": "button",
+    "id": "",
+    "name": "Check FFmpeg",
+    "placeholder": ""
+  },
+  {
+    "tag": "button",
+    "id": "",
+    "name": "Update FFmpeg",
+    "placeholder": ""
+  },
+  {
+    "tag": "button",
+    "id": "",
+    "name": "Check All",
+    "placeholder": ""
+  },
+  {
+    "tag": "label",
+    "id": "",
+    "name": "Update downloaders automaticallySites change often. An out-of-date yt-dlp is the",
+    "placeholder": ""
+  },
+  {
+    "tag": "input",
+    "id": "",
+    "name": "",
+    "placeholder": "",
+    "checked": true
+  },
+  {
+    "tag": "label",
+    "id": "",
+    "name": "Start when Windows starts",
+    "placeholder": ""
+  },
+  {
+    "tag": "input",
+    "id": "",
+    "name": "",
+    "placeholder": "",
+    "checked": false
+  },
+  {
+    "tag": "label",
+    "id": "",
+    "name": "Keep running in the notification area when the window closes",
+    "placeholder": ""
+  },
+  {
+    "tag": "input",
+    "id": "",
+    "name": "",
+    "placeholder": "",
+    "checked": true
+  },
+  {
+    "tag": "label",
+    "id": "",
+    "name": "Watch folders and scan them when something changes",
+    "placeholder": ""
+  },
+  {
+    "tag": "input",
+    "id": "",
+    "name": "",
+    "placeholder": "",
+    "checked": true
+  },
+  {
+    "tag": "label",
+    "id": "",
+    "name": "Sync with the hub when the companion starts",
+    "placeholder": ""
+  },
+  {
+    "tag": "input",
+    "id": "",
+    "name": "",
+    "placeholder": "",
+    "checked": false
+  },
+  {
+    "tag": "label",
+    "id": "",
+    "name": "Check for new versions of the companion",
+    "placeholder": ""
+  },
+  {
+    "tag": "input",
+    "id": "",
+    "name": "",
+    "placeholder": "",
+    "checked": true
+  },
+  {
+    "tag": "label",
+    "id": "",
+    "name": "Show a notification when a download finishes",
+    "placeholder": ""
+  },
+  {
+    "tag": "input",
+    "id": "",
+    "name": "",
+    "placeholder": "",
+    "checked": false
+  },
+  {
+    "tag": "button",
+    "id": "",
+    "name": "Check Now",
+    "placeholder": ""
+  },
+  {
+    "tag": "button",
+    "id": "",
+    "name": "Choose…",
+    "placeholder": ""
+  },
+  {
+    "tag": "label",
+    "id": "",
+    "name": "Format:",
+    "placeholder": ""
+  },
+  {
+    "tag": "select",
+    "id": "downloads-format",
+    "name": "Format:",
+    "placeholder": ""
+  },
+  {
+    "tag": "label",
+    "id": "",
+    "name": "At the same time:",
+    "placeholder": ""
+  },
+  {
+    "tag": "input",
+    "id": "downloads-jobs",
+    "name": "At the same time:",
+    "placeholder": "",
+    "checked": false
+  },
+  {
+    "tag": "label",
+    "id": "",
+    "name": "Speed limit:",
+    "placeholder": ""
+  },
+  {
+    "tag": "input",
+    "id": "downloads-speed",
+    "name": "Speed limit:",
+    "placeholder": "None",
+    "checked": false
+  },
+  {
+    "tag": "label",
+    "id": "",
+    "name": "When one finishes:",
+    "placeholder": ""
+  },
+  {
+    "tag": "select",
+    "id": "downloads-done",
+    "name": "When one finishes:",
+    "placeholder": ""
+  },
+  {
+    "tag": "label",
+    "id": "",
+    "name": "Local helper port:",
+    "placeholder": ""
+  },
+  {
+    "tag": "input",
+    "id": "helper-port",
+    "name": "Local helper port:",
+    "placeholder": "",
+    "checked": false
+  },
+  {
+    "tag": "label",
+    "id": "",
+    "name": "Let devices on this network use the helper without pairingOff is safer. When on,",
+    "placeholder": ""
+  },
+  {
+    "tag": "input",
+    "id": "",
+    "name": "",
+    "placeholder": "",
+    "checked": false
+  },
+  {
+    "tag": "button",
+    "id": "",
+    "name": "Show",
+    "placeholder": ""
+  },
+  {
+    "tag": "button",
+    "id": "",
+    "name": "Choose…",
+    "placeholder": ""
+  },
+  {
+    "tag": "label",
+    "id": "",
+    "name": "Music",
+    "placeholder": ""
+  },
+  {
+    "tag": "input",
+    "id": "",
+    "name": "",
+    "placeholder": "",
+    "checked": true
+  },
+  {
+    "tag": "label",
+    "id": "",
+    "name": "TV",
+    "placeholder": ""
+  },
+  {
+    "tag": "input",
+    "id": "",
+    "name": "",
+    "placeholder": "",
+    "checked": false
+  },
+  {
+    "tag": "label",
+    "id": "",
+    "name": "Movies",
+    "placeholder": ""
+  },
+  {
+    "tag": "input",
+    "id": "",
+    "name": "",
+    "placeholder": "",
+    "checked": false
+  },
+  {
+    "tag": "label",
+    "id": "",
+    "name": "Playlists",
+    "placeholder": ""
+  },
+  {
+    "tag": "input",
+    "id": "",
+    "name": "",
+    "placeholder": "",
+    "checked": true
+  },
+  {
+    "tag": "label",
+    "id": "",
+    "name": "EQ presets",
+    "placeholder": ""
+  },
+  {
+    "tag": "input",
+    "id": "",
+    "name": "",
+    "placeholder": "",
+    "checked": true
+  },
+  {
+    "tag": "label",
+    "id": "",
+    "name": "Recommendation algorithms — from the paired hub",
+    "placeholder": ""
+  },
+  {
+    "tag": "input",
+    "id": "",
+    "name": "",
+    "placeholder": "",
+    "checked": true
+  },
+  {
+    "tag": "label",
+    "id": "",
+    "name": "These settings — Live TV links among them",
+    "placeholder": ""
+  },
+  {
+    "tag": "input",
+    "id": "",
+    "name": "",
+    "placeholder": "",
+    "checked": true
+  },
+  {
+    "tag": "label",
+    "id": "",
+    "name": "How often:",
+    "placeholder": ""
+  },
+  {
+    "tag": "select",
+    "id": "backup-when",
+    "name": "How often:",
+    "placeholder": ""
+  },
+  {
+    "tag": "label",
+    "id": "",
+    "name": "Keep:",
+    "placeholder": ""
+  },
+  {
+    "tag": "select",
+    "id": "backup-keep",
+    "name": "Keep:",
+    "placeholder": ""
+  },
+  {
+    "tag": "button",
+    "id": "",
+    "name": "Back Up Now",
+    "placeholder": ""
+  },
+  {
+    "tag": "button",
+    "id": "",
+    "name": "Restore from a File…",
+    "placeholder": ""
+  },
+  {
+    "tag": "button",
+    "id": "",
+    "name": "Export Playlists…",
+    "placeholder": ""
+  },
+  {
+    "tag": "button",
+    "id": "",
+    "name": "Show in Explorer",
+    "placeholder": ""
+  },
+  {
+    "tag": "button",
+    "id": "",
+    "name": "Clear Cache",
+    "placeholder": ""
+  },
+  {
+    "tag": "button",
+    "id": "",
+    "name": "Open Logs Folder",
+    "placeholder": ""
+  },
+  {
+    "tag": "button",
+    "id": "",
+    "name": "Export Logs…",
+    "placeholder": ""
+  },
+  {
+    "tag": "label",
+    "id": "",
+    "name": "Keep detailed logsAdds what each part of the companion does, step by step. Usefu",
+    "placeholder": ""
+  },
+  {
+    "tag": "input",
+    "id": "",
+    "name": "",
+    "placeholder": "",
+    "checked": false
+  },
+  {
+    "tag": "button",
+    "id": "",
+    "name": "Restore Defaults",
+    "placeholder": ""
+  }
+]

@@ -1,0 +1,99 @@
+
+### hub: weekly backup schedule
+  PASS  hub: weekly backup schedule — bkWhen="weekly" (Every week), At field visible=true value=03:00, keep=8, section Save clicked
+  screenshot: evidence/81-hub-backup-schedule.png
+
+### hub: download one backup archive
+  after "Back Up Now" the page says: 1:4546 Encryption None: plain http Pairing with a code alone Needs a public address the device can reach Backup Save backups to: A folder inside the container’s data volume, so whatever backs up the volume backs these up
+  screenshot: evidence/83-hub-backup-done.png
+  GET /api/v1/backups -> 404 {"type":"about:blank","title":"Not Found","status":404,"detail":"No route matches GET /api/v1/backups","correlationId":"00dce3ee-b2df-4e08-a92b-4618bcf98a7a"}
+  GET /api/v1/backup -> 200 {"items":[{"id":"backup-20261004T123343Z","createdAt":"2026-10-04T12:33:43.519Z","sizeBytes":798720,"relativePath":"backups/backup-20261004T123343Z.sqlite"}]}
+  PASS  hub: backup ran and an archive exists — the Back Up Now button was clicked; page text after it: 1:4546 Encryption None: plain http Pairing with a code alone Needs a public address the device can reach Backup Save backups to: A folder inside the container’s
+
+### hub: Network Save / Revert
+  PASS  hub: Network Save — bind localhost -> lan; the page said " Saved"
+  FAIL  hub: Revert undoes a saved change — saved "remote", then Revert left it "remote" (2 Save / 2 Revert buttons on the page)
+  screenshot: evidence/84-hub-network-revert.png
+
+### hub: Discord status wording
+  PASS  hub: Discord status wording — "Discord bot No token yet Versions Hub 0.1.0 · contracts 1.0.0 · protocol 1 Signed in as admin. Sign Out Airwave Hub running · 127.0.0.1:4546 · reachab"
+  screenshot: evidence/82-hub-overview.png
+
+### hub: scan one folder
+  Music tab controls:
+    button[button] id=tab-overview Overview2, 2 things need attention
+    button[button] id=tab-devices Devices
+    button[button] id=tab-music Music
+    button[button] id=tab-groups Groups
+    button[button] id=tab-sharing Sharing
+    button[button] id=tab-system System
+    button[button] id=- Scan Public domain fixtures
+    button[button] id=- Remove Public domain fixtures
+    input[text] id=- Display name
+    input[text] id=- Path inside the data volume
+    button[submit] id=- Add Folder
+    button[button] id=- Scan Now
+    input[search] id=- Search the library
+    button[button] id=- Details of Hub library
+    button[button] id=- Details of Public domain
+    button[button] id=- Details of Windows companion libraries
+    button[button] id=- Set up MusicBrainz
+    button[button] id=- Set up YouTube
+    button[button] id=- Set up SoundCloud
+    button[button] id=- Set up Spotify
+    button[button] id=- Details of Bandcamp
+    button[button] id=- Details of External media tool
+    button[button] id=- Details of Deezer (tempo)
+    button[button] id=- Details of AcousticBrainz (tempo archive)
+    button[button] id=- Set up Last.fm (tags)
+    button[button] id=- Show All Providers (5 more)
+    button[button] id=- Retry HorseFeathers — Marx Brothers
+    input[number] id=rExp 
+    input[number] id=rHalf 
+    input[number] id=rMax 
+    input[number] id=- Weight for Skipped within a few seconds
+    input[number] id=- Weight for Skipped early
+    input[number] id=- Weight for Played in part
+    input[number] id=- Weight for Played more than half
+    input[number] id=- Weight for Played to the end
+    input[number] id=- Weight for Played again soon after
+    input[number] id=- Weight for Liked
+    input[number] id=- Weight for Un-liked
+    input[number] id=- Weight for Added to a playlist
+    input[number] id=- Weight for Removed from a playlist
+    input[number] id=- Weight for Favourited
+    input[number] id=- Weight for Disliked
+    input[number] id=- Weight for Saved
+    input[number] id=- Weight for Downloaded
+    input[number] id=- Weight for Picked from recommendations
+    input[number] id=- Weight for Dismissed from recommendations
+    button[button] id=- Save
+    button[button] id=- Revert
+  PASS  hub: scan one folder — clicked "Scan"; tracks 0 -> 0 after 8s
+  screenshot: evidence/85-hub-music-scan.png
+
+### hub: create a shared link for an album
+  Sharing tab controls:
+    button[button] id=tab-overview Overview2, 2 things need attention
+    button[button] id=tab-devices Devices
+    button[button] id=tab-music Music
+    button[button] id=tab-groups Groups
+    button[button] id=tab-sharing Sharing
+    button[button] id=tab-system System
+    select[select-one] id=- What to share
+    select[select-one] id=- Expires
+    button[submit] id=- Create Link
+    input[password] id=botToken Paste the token
+    input[text] id=botGuilds Answers in every server it’s invited to
+    input[text] id=botPrefix 
+    input[checkbox] id=- 
+    input[text] id=botDj Anyone may queue
+    input[text] id=botAdmin Server administrators only
+    select[select-one] id=botGroup No groups yet
+    input[checkbox] id=- 
+    input[checkbox] id=- 
+    button[button] id=- Save and Start
+    button[button] id=- Invite the Bot…
+  Sharing tab text: Airwave Hub Overview 2 , 2 things need attention Devices Music Groups Sharing System Shared links Links that let someone without an account open a track, album, playlist or library. Unreachable to others until the hub has a public https address (System ▸ Network). What Link Expires Actions No shared links yet. Make one below, or from a player or the companion. Choose a playlist or album… Copper Meridian — Orbital Car
+  screenshot: evidence/86-hub-sharing.png
+  PASS  hub: shared-link control present — select[select-one] id=- What to share | button[submit] id=- Create Link

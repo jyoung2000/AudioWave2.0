@@ -1,0 +1,59 @@
+COMPANION_PID=56972
+### Settings > Downloads, as it arrived
+{
+  "format": "mp3",
+  "formatOptions": [
+    "original",
+    "mp3",
+    "aac",
+    "opus",
+    "flac"
+  ],
+  "concurrency": "2",
+  "rateLimit": "",
+  "onDone": "notify",
+  "onDoneOptions": [
+    "nothing",
+    "notify",
+    "reveal"
+  ]
+}
+
+### setting the options (through the controls, as a person does)
+  Format: -> mp3
+  When one finishes: -> notify
+  At the same time: -> 2
+  Speed limit (KB/s): -> 500
+
+### Settings > Downloads after the change
+{
+  "format": "mp3",
+  "formatOptions": [
+    "original",
+    "mp3",
+    "aac",
+    "opus",
+    "flac"
+  ],
+  "concurrency": "2",
+  "rateLimit": "500",
+  "onDone": "notify",
+  "onDoneOptions": [
+    "nothing",
+    "notify",
+    "reveal"
+  ]
+}
+screenshot: evidence/60-downloads-settings.png
+helper token obtained through the companion's bridge: yes (value never printed or written)
+helper health: HTTP 200 [{"id":"yt-dlp","present":true,"version":"2026.08.19","origin":"installed","installHint":null,"installable":true,"setup":{"state":"ready"}},{"id":"spotdl","present":true,"version":"4.5.2","origin":"installed","installHint":null,"installable":true,"setup":{"state":"ready"}},{"id":"ffmpeg","present":true,"version":"ffmpe
+
+### queueing two public-domain tracks (no format named, so the PC setting decides)
+  Anchors Aweigh: HTTP 400 {"error":"url","message":"Host upload.wikimedia.org is not on the allowlist"}
+  Blow the Man Down: HTTP 400 {"error":"url","message":"Host upload.wikimedia.org is not on the allowlist"}
+
+### watching C:\np-prove\downloads
+
+### final contents of the download folder
+  (empty)
+screenshot: evidence/61-downloads-finished.png
