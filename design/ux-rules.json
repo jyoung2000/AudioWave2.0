@@ -187,7 +187,8 @@
         "packages/aqua-ui/src/components/AquaTable.tsx",
         "packages/aqua-ui/src/components/MusicList.tsx",
         "docker-container/src/web/App.tsx",
-        "windows-companion/src/renderer/App.tsx"
+        "windows-companion/src/renderer/App.tsx",
+        "windows-companion/src/renderer/views/Library.tsx"
       ],
       "evidence": [
         {
@@ -214,6 +215,16 @@
           "type": "test",
           "path": "windows-companion/tests/dom/companion-shell.dom.test.tsx",
           "name": "moves along the tools with the arrow keys, choosing as it goes"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-controls.dom.test.tsx",
+          "name": "End reaches the last song, fetching only its stretch; Shift+Home chooses everything between by asking for the ids"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-controls.dom.test.tsx",
+          "name": "Ctrl+A chooses every song, and Send to Hub sends them in batches"
         }
       ]
     },
@@ -225,13 +236,19 @@
       "authority": "adopted",
       "owners": [
         "packages/aqua-ui/src/styles/aqua.css",
-        "packages/aqua-ui/src/styles/now-playing.css"
+        "packages/aqua-ui/src/styles/now-playing.css",
+        "windows-companion/src/renderer/styles.css"
       ],
       "evidence": [
         {
           "type": "test",
           "path": "music-player/tests/e2e/a11y.spec.ts",
           "name": "@a11y focus is visible wherever it lands"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-controls.dom.test.tsx",
+          "name": "dims only the pane under the toolbar while a sheet is open, and keeps it modal"
         }
       ]
     },
@@ -311,6 +328,56 @@
       ]
     },
     {
+      "id": "UX-FORM-001",
+      "group": "input",
+      "title": "A hub settings form sends nothing until Save, and Revert puts back what the hub has",
+      "contract": "In the hub’s Network, Backup, Recommendations and Discord forms nothing is sent while typing or choosing. Values the hub would refuse are checked first and said under the form; Save sends what changed together and says so; Revert puts back what the hub holds. The companion is different on purpose: its preferences are written as they change and the foot of the pane says so (UX-FEED-001).",
+      "authority": "adopted",
+      "owners": [
+        "docker-container/src/web/views/Network.tsx",
+        "docker-container/src/web/views/Backup.tsx",
+        "docker-container/src/web/views/Recommendations.tsx",
+        "docker-container/src/web/views/Discord.tsx"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/admin-forms.dom.test.tsx",
+          "name": "sends nothing until Save, checks the address first, and Revert puts it back"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/admin-forms.dom.test.tsx",
+          "name": "saves the schedule, the parts and Keep together, and Revert puts them back"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/admin-forms.dom.test.tsx",
+          "name": "saves the edit, and Revert puts back what the hub has"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/admin-forms.dom.test.tsx",
+          "name": "saves the edited settings, then starts the bot"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/admin-forms.dom.test.tsx",
+          "name": "refuses a number outside its range before sending it"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/e2e/hub.spec.ts",
+          "name": "network settings wait for Save, check the address first, and say Saved."
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/e2e/hub.spec.ts",
+          "name": "backup settings are saved with Save, the schedule says when the next one runs, and an archive downloads"
+        }
+      ]
+    },
+    {
       "id": "UX-STATE-001",
       "group": "feedback",
       "title": "Every data view answers empty, loading and error",
@@ -321,7 +388,8 @@
         "docker-container/src/web/ViewBoundary.tsx",
         "packages/aqua-ui/src/components/States.tsx",
         "docker-container/src/web/ui.tsx",
-        "windows-companion/src/renderer/ui.tsx"
+        "windows-companion/src/renderer/ui.tsx",
+        "docker-container/src/web/lib/overview.tsx"
       ],
       "evidence": [
         {
@@ -343,6 +411,16 @@
           "type": "test",
           "path": "windows-companion/tests/dom/companion-shell.dom.test.tsx",
           "name": "shows no sample channels: two empty lists in the design’s words"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/admin-shell.dom.test.tsx",
+          "name": "draws the badge and the Needs attention list from one reading, so they always agree"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-controls.dom.test.tsx",
+          "name": "draws a window of rows, not 50,000, and counts them all"
         }
       ]
     },
@@ -453,6 +531,21 @@
           "type": "test",
           "path": "windows-companion/tests/dom/companion-shell.dom.test.tsx",
           "name": "a tool setup has not reached yet is on its way, not missing: no badge, no install advice"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-controls.dom.test.tsx",
+          "name": "Check asks about that tool; one found behind says which version is out, wears the badge, and Update installs it"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-controls.dom.test.tsx",
+          "name": "a missing tool offers Install, and Check waits for it; a busy helper says why Update must wait"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-controls.dom.test.tsx",
+          "name": "“Update downloaders automatically” is on by default and writes its preference"
         }
       ]
     },
@@ -517,7 +610,8 @@
         "windows-companion/src/renderer/App.tsx",
         "windows-companion/src/renderer/views/Backup.tsx",
         "windows-companion/src/renderer/views/Hub.tsx",
-        "windows-companion/src/renderer/views/Streaming.tsx"
+        "windows-companion/src/renderer/views/Streaming.tsx",
+        "windows-companion/src/renderer/views/About.tsx"
       ],
       "evidence": [
         {
@@ -557,6 +651,11 @@
           "type": "test",
           "path": "windows-companion/tests/dom/companion-shell.dom.test.tsx",
           "name": "asks before restoring the defaults"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-controls.dom.test.tsx",
+          "name": "shows the cache, asks before clearing it, and clears it through the main process"
         }
       ]
     },
@@ -641,7 +740,10 @@
         "windows-companion/src/main/live-tv/m3u.ts",
         "windows-companion/src/main/live-tv/xmltv.ts",
         "local-helper/src/server.ts",
-        "windows-companion/src/renderer/views/LiveTv.tsx"
+        "windows-companion/src/renderer/views/LiveTv.tsx",
+        "windows-companion/src/main/hub.ts",
+        "docker-container/src/live-tv/service.ts",
+        "docker-container/src/web/views/LiveTv.tsx"
       ],
       "evidence": [
         {
@@ -693,6 +795,110 @@
           "type": "test",
           "path": "windows-companion/tests/dom/companion-shell.dom.test.tsx",
           "name": "says why a link was not kept, keeps what was typed, and adds nothing"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/integration/live-tv-to-hub.test.ts",
+          "name": "sends the channels and their guide while sharing is on, leaving out addresses with a sign-in"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/integration/live-tv-to-hub.test.ts",
+          "name": "sends nothing while sharing is off, and removes what was sent once it is turned off"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/integration/hub-admin-controls.test.ts",
+          "name": "is accepted only from a companion holding library:share, and read only with library:read"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/e2e/hub.spec.ts",
+          "name": "Live TV from the companion is shown read-only in the Music tab"
+        }
+      ]
+    },
+    {
+      "id": "UX-NET-001",
+      "group": "safety",
+      "title": "The helper reaches the network only when switched on, and then only to be read",
+      "contract": "The companion’s local helper listens on this PC alone by default. Switched on under Settings ▸ Network, other devices on the home network may use only its four token-free read routes; every other route still refuses them, even with the token, and a rebound name or a page from the internet is refused. What the switch exposes is said before it is turned on (DEC-032).",
+      "authority": "adopted",
+      "owners": [
+        "local-helper/src/security.ts",
+        "local-helper/src/server.ts",
+        "windows-companion/src/renderer/views/Settings.tsx"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "local-helper/tests/security/helper-lan.test.ts",
+          "name": "cannot be reached from the network at all"
+        },
+        {
+          "type": "test",
+          "path": "local-helper/tests/security/helper-lan.test.ts",
+          "name": "lists only the four token-free reads"
+        },
+        {
+          "type": "test",
+          "path": "local-helper/tests/security/helper-lan.test.ts",
+          "name": "refuses every other route from the network, even with the token"
+        },
+        {
+          "type": "test",
+          "path": "local-helper/tests/security/helper-lan.test.ts",
+          "name": "refuses a rebound name and a page from the internet"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-controls.dom.test.tsx",
+          "name": "explains what the LAN switch exposes before it is turned on"
+        }
+      ]
+    },
+    {
+      "id": "UX-PRIV-001",
+      "group": "safety",
+      "title": "Asking for a new version needs no key and opens only the release page",
+      "contract": "The companion asks the project’s public releases for the latest version, with no key, and only while the check is switched on (it is on by default and asks at once when switched on). It says in words when a newer version is out, when there is none and when GitHub does not answer. Download opens the fixed release page through the main process; no address from the answer is ever opened (DEC-033). Logs leave the PC only through Export, with secrets, tokens and folder paths taken out.",
+      "authority": "adopted",
+      "owners": [
+        "windows-companion/src/main/updates.ts",
+        "windows-companion/src/main/log.ts",
+        "windows-companion/src/renderer/views/Settings.tsx",
+        "windows-companion/src/renderer/views/About.tsx"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "windows-companion/tests/unit/settings-plumbing.test.ts",
+          "name": "asks the project’s releases without a key, says when a newer one is out, and opens only the release page"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/unit/settings-plumbing.test.ts",
+          "name": "says plainly when GitHub has nothing or does not answer, and shows nothing when switched off"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/unit/settings-plumbing.test.ts",
+          "name": "takes out secrets, tokens and folder paths before anything leaves this PC"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-controls.dom.test.tsx",
+          "name": "says a new version is out, and Download opens the release page through the main process"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-controls.dom.test.tsx",
+          "name": "asks GitHub at once when the new-version check is turned on, and says what it found"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/security/companion.test.ts",
+          "name": "opens the release page, the logs and the data folder without the page naming a place"
         }
       ]
     },
@@ -829,6 +1035,45 @@
       ]
     },
     {
+      "id": "UX-STREAM-001",
+      "group": "shared",
+      "title": "Streaming from the PC follows what the connection costs, and says why it paused",
+      "contract": "Two switches under Remote decide whether the companion streams on Wi-Fi and Ethernet and on metered connections (mobile data, a hotspot); both are on by default (DEC-031). The cost is read from what Windows says about the connection; on a connection that is switched off streaming pauses, the pane says why in a sentence, and it starts again when allowed. The switches are off while streaming itself is off.",
+      "authority": "adopted",
+      "owners": [
+        "windows-companion/src/main/network.ts",
+        "windows-companion/src/main/awsp.ts",
+        "windows-companion/src/renderer/views/Streaming.tsx"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "windows-companion/tests/integration/awsp-supervisor.test.ts",
+          "name": "pauses on a metered connection when that is switched off, says why, and starts again when allowed"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/unit/settings-plumbing.test.ts",
+          "name": "reads what Windows says a connection costs"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/unit/settings-plumbing.test.ts",
+          "name": "decides whether streaming may serve, and says why not"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-controls.dom.test.tsx",
+          "name": "has the two switches, writes each, and says why streaming is paused on this connection"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-controls.dom.test.tsx",
+          "name": "keeps the switches off while streaming itself is off"
+        }
+      ]
+    },
+    {
       "id": "VOICE-001",
       "group": "voice",
       "title": "Empty states say what to do next",
@@ -862,12 +1107,23 @@
       "authority": "adopted",
       "owners": [
         "docker-container/src/app.ts",
-        "docker-container/src/discord/service-interface.ts"
+        "docker-container/src/discord/service-interface.ts",
+        "docker-container/src/web/views/Discord.tsx"
       ],
       "evidence": [
         {
           "type": "source",
           "path": "docker-container/src/discord/service-interface.ts"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/admin-forms.dom.test.tsx",
+          "name": "loads what the hub has and shows its warnings as plain sentences"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/admin-forms.dom.test.tsx",
+          "name": "says what the hub said when it refuses"
         }
       ]
     },
@@ -1874,7 +2130,8 @@
       "owners": [
         "music-player/scripts/make-shell.py",
         "local-helper/src/server.ts",
-        "windows-companion/src/main/live-tv/index.ts"
+        "windows-companion/src/main/live-tv/index.ts",
+        "docker-container/src/live-tv/service.ts"
       ],
       "evidence": [
         {
@@ -1886,6 +2143,11 @@
           "type": "test",
           "path": "music-player/tests/e2e/np/live-tv.spec.ts",
           "name": "a companion with no playlists leaves the guide as it was, and one that is gone breaks nothing"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/live-tv.spec.ts",
+          "name": "with no companion on this machine, a paired hub’s copy of the companion’s Live TV fills the guide"
         }
       ]
     },

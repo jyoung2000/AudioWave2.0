@@ -197,13 +197,69 @@
   },
   "verification": {
     "note": "Filled in by whoever last verified the guide at runtime. Source checks are automatic (styleguide:check); `runtime` records what was seen in a running product as it is now, and `superseded` keeps earlier records of interfaces that have since been replaced, which no longer count.",
-    "runtime": [],
+    "runtime": [
+      {
+        "date": "2026-10-03",
+        "commit": "e608abc (hub sources as of 1256e4a)",
+        "scenario": "A scratch hub (pnpm build:hub, then dist/server.js on port 4564 with a fresh data folder, stopped by its PID) seeded through its API the way an administrator would: sign in with admin/admin, set a real password, two library folders with six tagged songs, two groups and an invite, an album link valid for a week, a daily backup schedule keeping 7, one backup. The admin window was signed into in Chrome and each section opened by its #id and captured (outerHTML and a 1280×900 screenshot each), and the same hub's answers to every route those sections read were recorded (packages/aqua-ui/styleguide/fixtures/hub-api.json). Seen: the sign-in in the window, the six tools, and each section with its new controls — Create Link with the playlist-or-album picker and how long it works, the backup folder, parts, schedule and Keep with Save and Revert and a Download per archive, a Scan per library folder, Network and Recommendations with Save and Revert, Discord's plain-sentence warnings with Invite the Bot withheld, and Diagnostics' log and support bundle.",
+        "platform": "web (Chrome, Windows)",
+        "viewports": ["1280×900"],
+        "theme": "light",
+        "method": "Playwright driving installed Chrome (DOM capture and screenshots); recorded API answers",
+        "surfaces": [
+          "hub-login",
+          "hub-window",
+          "hub-groups",
+          "hub-library",
+          "hub-profiles",
+          "hub-shares",
+          "hub-recommendations",
+          "hub-discord",
+          "hub-network",
+          "hub-backup",
+          "hub-diagnostics"
+        ],
+        "notes": "Live TV from the companion (hub-live-tv) was read from the same hub's API (empty: no companion had synced) and is seen in the guide's frame, not in this window. Profiles was empty: no player was paired."
+      },
+      {
+        "date": "2026-10-03",
+        "commit": "renderer and helper as of 108fc3e (unchanged through e608abc); main process without 47b690d",
+        "scenario": "The packaged companion (win-unpacked, built 2026-10-03 17:37) started with PORTABLE_EXECUTABLE_DIR in a scratch folder, so no person's data was read or written, attached over CDP on port 9335 and stopped by its PID. The backup schedule was set to weekly keeping 5 through the bridge; the Settings tab was opened and the Backup, Storage and privacy and About groups captured (outerHTML and screenshots), and the answers to every channel the Settings tab reads were recorded (packages/aqua-ui/styleguide/fixtures/companion-ipc.json). Seen: yt-dlp ready with Check and Update, spotDL setting itself up, FFmpeg found on the PATH; Update downloaders automatically on; the update check on; the helper on this PC only; Backup with no folder yet (Back Up Now disabled with the reason), recommendation algorithms unavailable with the reason (no hub paired), Live TV links among these settings; the cache by part, the logs, and the build with how updates are checked.",
+        "platform": "Windows 11 (Electron 44)",
+        "viewports": ["640×760"],
+        "theme": "light",
+        "method": "Playwright over CDP against the packaged app",
+        "surfaces": [
+          "companion-window",
+          "companion-settings",
+          "companion-backup",
+          "companion-about"
+        ],
+        "notes": "Streaming was not built into this copy (its reason was shown), so the metered-connection switches and last seen were not seen at runtime; they are covered by companion-controls.dom.test.tsx and awsp-supervisor.test.ts."
+      },
+      {
+        "date": "2026-10-04",
+        "commit": "e608abc (music-player/index.html, shell 365b1448afc6c7df)",
+        "scenario": "pnpm build:player, then pnpm styleguide:shell: the production build served by vite preview on port 4183 (stopped by its PID), every outside host refused, eight tagged songs added through the shell's own import path, Gantry played, Radio opened with the bundled stations, Live TV filled from a stubbed companion helper (three channels, two with a guide), and Settings opened — at 1280×860 and 390×844. The screenshots are the guide's The served shell (packages/aqua-ui/styleguide/shell).",
+        "platform": "web (Chrome, Windows)",
+        "viewports": ["1280×860", "390×844"],
+        "theme": "light",
+        "method": "scripts/styleguide-shell-shots.mjs (Playwright, installed Chrome)",
+        "surfaces": [
+          "player-shell-library",
+          "player-shell-now-playing",
+          "player-shell-radio",
+          "player-shell-live-tv",
+          "player-shell-settings-statistics"
+        ]
+      }
+    ],
     "blocked": {
-      "companion": "Electron-only; its renderer needs the preload bridge. Covered by its DOM and contract tests and the mockups.",
+      "companion": "Electron-only; its renderer needs the preload bridge. Its Settings tab was seen in the packaged app on 2026-10-03 (see runtime); the other tabs are covered by its DOM and contract tests and the mockups.",
       "android": "No Android SDK or JDK 17 on the machine that built this revision.",
       "discord": "Needs a bot token and a Discord server; covered by the voice and parity tests.",
       "local-helper": "Console output was not captured for this revision; covered by its integration tests.",
-      "hub": "Not opened in a running hub since the Airwave window replaced the earlier admin GUI. Covered by its DOM, e2e, a11y and journey suites, and by the mockups."
+      "hub": "Seen at runtime on 2026-10-03 (see runtime). Overview, Devices, Providers and Downloads were not captured in that run; they are covered by the hub's DOM, e2e, a11y and journey suites."
     },
     "superseded": [
       {
