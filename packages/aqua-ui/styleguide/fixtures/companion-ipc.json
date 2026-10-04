@@ -1,0 +1,168 @@
+{
+  "recordedAt": "2026-10-03T23:15:19.117Z",
+  "channels": {
+    "app:info": {
+      "version": "0.1.0",
+      "electron": "44.1.1",
+      "chrome": "152.0.7977.65",
+      "node": "24.19.0",
+      "platform": "win32/x64",
+      "contractsVersion": "1.0.0",
+      "protocolVersion": 1,
+      "dataDir": "C:\\Users\\you\\AppData\\Roaming\\now-playing-companion",
+      "signed": false,
+      "updateFeedUrl": null,
+      "logsDir": "C:\\Users\\you\\AppData\\Roaming\\now-playing-companion\\logs"
+    },
+    "app:storage": {
+      "cache": {
+        "app": 0,
+        "liveTv": 0,
+        "downloads": 0,
+        "total": 0
+      },
+      "logsDir": "C:\\Users\\you\\AppData\\Roaming\\now-playing-companion\\logs"
+    },
+    "app:preferences:get": {
+      "launchAtLogin": false,
+      "minimizeToTray": true,
+      "watchFolders": true,
+      "autoSync": false,
+      "theme": "system",
+      "helperPort": 17342,
+      "autoUpdateTools": true,
+      "checkForUpdates": true,
+      "downloadDir": null,
+      "downloadFormat": "original",
+      "downloadConcurrency": 2,
+      "downloadRateKBps": null,
+      "downloadDone": "nothing",
+      "helperLan": false,
+      "verboseLogs": false
+    },
+    "app:update-status": {
+      "current": "0.1.0",
+      "latest": null,
+      "available": false,
+      "checkedAt": "2026-10-03T23:15:13.333Z",
+      "reason": "No version has been published yet.",
+      "enabled": true
+    },
+    "helper:status": {
+      "running": true,
+      "port": 17342,
+      "origin": "http://127.0.0.1:17342",
+      "reason": null,
+      "tools": [
+        {
+          "id": "yt-dlp",
+          "present": true,
+          "version": "2026.08.19",
+          "path": "C:\\Users\\you\\AppData\\Roaming\\now-playing-companion\\helper\\tools\\yt-dlp.exe",
+          "advice": null,
+          "origin": "installed",
+          "setup": {
+            "state": "ready"
+          }
+        },
+        {
+          "id": "spotdl",
+          "present": false,
+          "version": null,
+          "path": null,
+          "advice": null,
+          "origin": "missing",
+          "setup": {
+            "state": "installing",
+            "progress": 0.98
+          }
+        },
+        {
+          "id": "ffmpeg",
+          "present": true,
+          "version": "ffmpeg version 9.0-full_build-www.gyan.dev Copyright (c) 2000-2026 the FFmpeg developers",
+          "path": "C:\\Users\\you\\AppData\\Local\\Microsoft\\WinGet\\Links\\ffmpeg.exe",
+          "advice": null,
+          "origin": "path",
+          "setup": {
+            "state": "ready"
+          }
+        }
+      ],
+      "checkedAt": "2026-10-03T23:15:16.706Z",
+      "busy": false,
+      "lan": false
+    },
+    "backup:settings:get": {
+      "dir": null,
+      "include": {
+        "music": true,
+        "tv": false,
+        "movies": false,
+        "playlists": true,
+        "presets": true,
+        "algorithms": true,
+        "settings": true
+      },
+      "schedule": "weekly",
+      "keep": 5,
+      "lastRunAt": null,
+      "lastRunError": null
+    },
+    "backup:estimate": {
+      "parts": {},
+      "dataBytes": 717,
+      "expectedBytes": 717,
+      "complete": true,
+      "destination": null,
+      "blocked": "Choose where backups go first."
+    },
+    "backup:list": {
+      "items": []
+    },
+    "backup:algorithms": {
+      "available": false,
+      "hubName": null,
+      "reason": "No hub is paired, so there are no recommendation settings to back up."
+    },
+    "awsp:status": {
+      "enabled": false,
+      "running": false,
+      "reason": "The streaming server was not built with this copy of the companion.",
+      "endpointId": null,
+      "ticket": null,
+      "ticketQrSvg": null,
+      "relayUrl": null,
+      "pairingCode": null,
+      "devices": [],
+      "connections": [],
+      "port": null,
+      "network": {
+        "unmetered": true,
+        "metered": true,
+        "connection": "unmetered",
+        "blocked": null
+      }
+    },
+    "hub:status": {
+      "endpoint": null,
+      "hubId": null,
+      "hubName": null,
+      "hubFingerprint": null,
+      "connected": false,
+      "reason": "No hub is paired.",
+      "scopes": [],
+      "lastSyncAt": null
+    },
+    "library:folders": {
+      "items": []
+    },
+    "tv:links": {
+      "m3u": [],
+      "epg": []
+    },
+    "transfers:list": {
+      "items": []
+    }
+  }
+}

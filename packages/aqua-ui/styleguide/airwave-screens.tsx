@@ -12,10 +12,12 @@
  *   - each product's own window kit (`docker-container/src/web/ui.tsx`,
  *     `windows-companion/src/renderer/ui.tsx`) and icons, imported from the products.
  *
- * What is written here by hand is the window frame (chrome, tools, pane, status line) and the
- * arrangement of each pane: those live inside `App.tsx` and the view files, which are wired to the
- * hub's API and to Electron's bridge, so they cannot run on a page (design/decisions.md DEC-009).
- * The class names, the order and the words are the views'; the data is fixture data.
+ * What is written here by hand is the window frame (chrome, tools, pane, status line), which lives
+ * inside each product's `App.tsx` with its session handling, and the arrangement of the panes below.
+ * Most sections are now the products' own views, run against recordings in `./view-specimens.tsx`
+ * (DEC-030); the screens here are the ones that need a state a recording cannot reach — a refused
+ * link, a failed download, an open sheet, a first-run gate — so their arrangement is taken from the
+ * views and their data is fixture data (design/decisions.md DEC-009).
  */
 import { useEffect, useState, type ReactNode } from 'react';
 import { BRANDING } from '@now-playing/contracts';
@@ -52,7 +54,7 @@ const HUB_TABS: ReadonlyArray<{ id: TabIconId; label: string; lead?: string }> =
   { id: 'overview', label: 'Overview' },
   { id: 'devices', label: 'Devices', lead: 'Players and companion apps that may use this hub. Each gets only the permissions you tick when you pair it.' },
   { id: 'music', label: 'Music', lead: 'What the hub plays from, where it looks things up, and what it may save. Everything here is shared by every paired device.' },
-  { id: 'groups', label: 'Groups' },
+  { id: 'groups', label: 'Groups', lead: 'Listening together: one queue, one clock, every member kept in step. Drift is how far each device is from the group’s clock.' },
   { id: 'sharing', label: 'Sharing' },
   { id: 'system', label: 'System' },
 ];
@@ -71,7 +73,7 @@ interface HubWindowProps {
 }
 
 /** The window `docker-container/src/web/App.tsx` renders: chrome, six tools, pane, status strip. */
-function HubWindow({ tab, locked, dot = 'ok', status, counts, badge, sheet, children }: HubWindowProps) {
+export function HubWindow({ tab, locked, dot = 'ok', status, counts, badge, sheet, children }: HubWindowProps) {
   const current = HUB_TABS.find((item) => item.id === tab);
   return (
     <div className="frame">
@@ -610,7 +612,7 @@ const COMPANION_TABS: ReadonlyArray<{ id: CompanionTab; label: string; icon: () 
  * operating system's own is hidden and Windows draws minimise, maximise and close over its top-right
  * corner (DEC-020), which a frame on a page cannot show.
  */
-function CompanionWindow({ tab, badge, hubLine = 'Connected to Living Room · synced 4 min ago', dot = 'ok', children }: { tab: CompanionTab; badge?: number; hubLine?: string; dot?: 'ok' | 'warn' | 'off'; children: ReactNode }) {
+export function CompanionWindow({ tab, badge, hubLine = 'Connected to Living Room · synced 4 min ago', dot = 'ok', counts = '3 folders · 2 playlists · 1 guide · 1 device', children }: { tab: CompanionTab; badge?: number; hubLine?: string; dot?: 'ok' | 'warn' | 'off'; counts?: string; children: ReactNode }) {
   const current = COMPANION_TABS.find((item) => item.id === tab)!;
   return (
     <div className="win">
@@ -646,7 +648,7 @@ function CompanionWindow({ tab, badge, hubLine = 'Connected to Living Room · sy
         <span className={dot === 'ok' ? 'dot' : `dot dot--${dot}`} aria-hidden="true" />
         <span className="status__hub">{hubLine}</span>
         <span className="spacer" />
-        <span className="status__counts">3 folders · 2 playlists · 1 guide · 1 device</span>
+        <span className="status__counts">{counts}</span>
       </div>
     </div>
   );
@@ -966,102 +968,6 @@ export function CompanionRemoteScreen() {
           <p className="note note--bad">Signal Fade didn’t send: the hub stopped answering.</p>
         </fieldset>
       </Sect>
-    </CompanionWindow>
-  );
-}
-
-const TOOLS: ReadonlyArray<{ name: string; version?: string; kind: Companion.DotKind; label: string; role: string; progress?: number; auto?: boolean; path?: string; failed?: boolean }> = [
-  { name: 'yt-dlp', version: '2026.09.14', kind: 'ok', label: 'Ready', role: 'Audio and video from the sites it supports', auto: true, path: 'C:\\Users\\You\\AppData\\Roaming\\now-playing-companion\\tools\\yt-dlp.exe' },
-  { name: 'spotDL', kind: 'warn', label: 'Couldn’t set up: the download did not finish.', role: 'Finds the audio for a playlist you link. Runs on this PC only.', failed: true },
-  { name: 'FFmpeg', kind: 'busy', label: 'Setting up… 42%', role: 'Converts, tags and joins what the others fetch', progress: 42 },
-];
-
-/** Settings ▸ Downloaders, General and Network, with the pane's foot (UX-SETUP-001). */
-export function CompanionSettingsScreen() {
-  const [prefs, setPrefs] = useState({ launch: false, tray: true, watch: true, sync: false });
-  return (
-    <CompanionWindow tab="settings" badge={1}>
-      <Sect label="Settings">
-        <fieldset>
-          <legend>Downloaders</legend>
-          <p className="hint">The copies on this PC, set up automatically and checked against what their projects publish. The hub keeps its own; spotDL runs only here.</p>
-          <Companion.Rows label="Downloaders" live>
-            {TOOLS.map((tool) => (
-              <li key={tool.name} className="dl">
-                <span className={`sdot sdot--${tool.kind}`} aria-hidden="true" />
-                <span className="dl__main">
-                  <span>
-                    <b>{tool.name}</b>
-                    {tool.version ? <span className="ver">{tool.version}</span> : null}
-                  </span>
-                  <span className="dl__state">{tool.label}</span>
-                  {tool.progress !== undefined ? <Companion.Progress label={`Setting up ${tool.name}`} value={tool.progress} /> : null}
-                  <span className="dl__role">{tool.role}</span>
-                  {tool.auto ? <span className="dl__role">Set up automatically</span> : null}
-                  {tool.path ? <span className="dl__path">{tool.path}</span> : null}
-                </span>
-                {tool.failed ? (
-                  <span className="dl__acts">
-                    <Companion.Push>Try Again</Companion.Push>
-                  </span>
-                ) : null}
-              </li>
-            ))}
-          </Companion.Rows>
-          <div className="barrow">
-            <Companion.Push>Check All</Companion.Push>
-            <span className="note" style={{ margin: 0 }}>
-              Last checked 2 min ago
-            </span>
-          </div>
-          <p className="note">Downloaders fetch only what a site offers. The companion doesn’t strip DRM, get round a provider’s terms or read browser cookies.</p>
-        </fieldset>
-        <fieldset>
-          <legend>General</legend>
-          <div className="pref">
-            <span className="k top">On this PC:</span>
-            <div className="v stack">
-              <Companion.Check checked={prefs.launch} onChange={(event) => setPrefs({ ...prefs, launch: event.currentTarget.checked })}>
-                Start when Windows starts
-              </Companion.Check>
-              <Companion.Check checked={prefs.tray} onChange={(event) => setPrefs({ ...prefs, tray: event.currentTarget.checked })}>
-                Keep running in the notification area when the window closes
-              </Companion.Check>
-              <Companion.Check checked={prefs.watch} onChange={(event) => setPrefs({ ...prefs, watch: event.currentTarget.checked })}>
-                Watch folders and scan them when something changes
-              </Companion.Check>
-              <Companion.Check checked={prefs.sync} onChange={(event) => setPrefs({ ...prefs, sync: event.currentTarget.checked })}>
-                Sync with the hub when the companion starts
-              </Companion.Check>
-            </div>
-          </div>
-        </fieldset>
-        <fieldset>
-          <legend>Network</legend>
-          <div className="pref">
-            <label className="k top" htmlFor="sg-helper-port">
-              Local helper port:
-            </label>
-            <div className="v">
-              <span className="path">127.0.0.1&thinsp;:</span>
-              <input className="field num" type="number" id="sg-helper-port" min={1024} max={65535} defaultValue={17342} />
-              <span className="sub">The player on this PC talks to the companion here. It is running.</span>
-            </div>
-            <span className="k top">Helper token:</span>
-            <div className="v">
-              <Companion.Push>Show</Companion.Push>
-              <span className="sub">For a player this PC doesn’t serve. It is shown here only, and never written to a log.</span>
-            </div>
-          </div>
-          <p className="note">The helper listens on this PC only. Other devices reach this PC through Remote.</p>
-        </fieldset>
-      </Sect>
-      <div className="panefoot">
-        <p className="note" role="status">
-          Settings are kept on this PC.
-        </p>
-        <Companion.Push>Restore Defaults</Companion.Push>
-      </div>
     </CompanionWindow>
   );
 }

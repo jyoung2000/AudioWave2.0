@@ -128,7 +128,13 @@
       "docker-container/src/web/ui.tsx",
       "docker-container/src/web/icons.tsx",
       "windows-companion/src/renderer/ui.tsx",
-      "windows-companion/src/renderer/icons.tsx"
+      "windows-companion/src/renderer/icons.tsx",
+      "docker-container/src/web/views",
+      "docker-container/src/web/lib/hooks.ts",
+      "docker-container/src/web/lib/words.ts",
+      "windows-companion/src/renderer/views",
+      "windows-companion/src/renderer/hooks.ts",
+      "windows-companion/src/renderer/format.ts"
     ]
   },
   "consumers": [
