@@ -243,7 +243,7 @@
 
 /* --------------------------------------------------------------------------
    3. Reduced motion: no pulse, no marquee, no striped travel, no sheet travel.
-   Honoured from the OS setting and from an explicit attribute (AquaProvider).
+   Honoured from the OS setting and from an explicit attribute (data-aqua-reduced-motion).
    -------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   :root {
@@ -271,7 +271,6 @@
    4. Base
    -------------------------------------------------------------------------- */
 .aqua-root,
-.aqua-window,
 .np-app {
   color: var(--aqua-text);
   font: var(--aqua-weight-regular) var(--aqua-font-system) / var(--aqua-line-body) var(--aqua-font);
@@ -279,14 +278,9 @@
   text-rendering: optimizeLegibility;
 }
 
-/* The roots are in this list as well as their descendants: `.aqua-window` has a
-   1px border, and a window given `width: 100%` would otherwise be 2px wider
-   than what contains it — the sort of overflow that only shows up at one
-   size. */
-.aqua-window,
-.aqua-window *,
-.aqua-window *::before,
-.aqua-window *::after,
+/* The roots are in this list as well as their descendants: a root with a
+   1px border given `width: 100%` would otherwise be 2px wider than what
+   contains it — the sort of overflow that only shows up at one size. */
 .np-app,
 .np-app *,
 .np-app *::before,
@@ -312,7 +306,6 @@
 }
 
 /* Only the Aqua halo replaces the platform outline; never removed without it */
-.aqua-window :focus-visible,
 .np-app :focus-visible,
 .aqua-layer :focus-visible {
   outline: 2px solid var(--aqua-focus);
@@ -330,18 +323,6 @@
 
 .aqua-icon--glyph {
   fill: currentColor;
-}
-
-.aqua-icon--source {
-  filter: var(--aqua-source-icon-filter);
-}
-
-.aqua-window[data-active="false"] .aqua-icon--source {
-  filter: var(--aqua-source-icon-filter) saturate(0.7);
-}
-
-[data-aqua-profile="itunes-10-transition"] .aqua-icon--source {
-  filter: var(--aqua-source-icon-filter);
 }
 
 .aqua-emphasis {
@@ -495,9 +476,8 @@
   }
 }
 
-/* Graphite tint: neutral alternative / inactive-window default */
-.aqua-button[data-variant="graphite"],
-.aqua-window[data-active="false"] .aqua-button[data-default="true"] {
+/* Graphite tint: the neutral alternative */
+.aqua-button[data-variant="graphite"] {
   color: #1d2124;
   background:
     linear-gradient(to bottom, rgb(255 255 255 / 80%) 0%, rgb(255 255 255 / 40%) 40%, rgb(255 255 255 / 4%) 50%, rgb(0 0 0 / 5%) 54%, rgb(0 0 0 / 18%) 100%),
@@ -643,18 +623,6 @@
   height: 6px;
 }
 
-[data-aqua-profile="itunes-10-transition"] .aqua-bottom-bar .aqua-icon-button__face {
-  background: transparent;
-  border-color: transparent;
-  box-shadow: none;
-}
-
-[data-aqua-profile="itunes-10-transition"] .aqua-bottom-bar .aqua-icon-button:hover:not(:disabled) .aqua-icon-button__face,
-[data-aqua-profile="itunes-10-transition"] .aqua-bottom-bar .aqua-icon-button:focus-visible .aqua-icon-button__face {
-  background: rgb(0 0 0 / 8%);
-  border-color: rgb(0 0 0 / 25%);
-}
-
 /* --------------------------------------------------------------------------
    10. Segmented control (spec §9.14)
    -------------------------------------------------------------------------- */
@@ -716,7 +684,7 @@
 .aqua-segmented__item[aria-checked="true"] .aqua-icon { filter: drop-shadow(0 -1px 0 rgb(0 0 0 / 45%)); }
 
 /* --------------------------------------------------------------------------
-   11. Checkbox / radio (spec §9.16)
+   11. Checkbox (spec §9.16)
    -------------------------------------------------------------------------- */
 .aqua-check {
   position: relative;
@@ -756,8 +724,6 @@
   transition: box-shadow var(--aqua-motion-press) ease-out;
 }
 
-.aqua-check--radio .aqua-check__box { border-radius: 50%; }
-
 .aqua-check__box svg { width: 10px; height: 10px; opacity: 0; }
 
 .aqua-check__input:checked + .aqua-check__box,
@@ -777,17 +743,6 @@
 
 .aqua-check__dash { display: block; width: 8px; height: 2px; background: #fff; border-radius: 1px; opacity: 0; }
 
-.aqua-check--radio .aqua-check__input:checked + .aqua-check__box::after {
-  content: "";
-  width: 5px;
-  height: 5px;
-  background: #fff;
-  border-radius: 50%;
-  box-shadow: 0 1px 1px rgb(0 0 0 / 30%);
-}
-
-.aqua-check--radio .aqua-check__box svg { display: none; }
-
 .aqua-check:hover .aqua-check__box { border-color: #8d8d8d; }
 .aqua-check:active .aqua-check__box { box-shadow: inset 0 2px 3px rgb(0 0 0 / 25%); }
 
@@ -801,11 +756,6 @@
 .aqua-check__input:disabled ~ .aqua-check__label { color: var(--aqua-text-disabled); }
 
 .aqua-check__label { min-width: 0; }
-
-.aqua-window[data-active="false"] .aqua-check__input:checked + .aqua-check__box {
-  background: linear-gradient(to bottom, var(--aqua-graphite-top), var(--aqua-graphite-mid) 55%, var(--aqua-graphite-bottom));
-  border-color: #5c6368;
-}
 
 /* --------------------------------------------------------------------------
    12. Text field, validation, pop-up menu (spec §9.16)
@@ -957,13 +907,12 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
 
 .aqua-popup:hover:not(:has(:disabled)) { background: linear-gradient(to bottom, #fff 0%, #f8f8f8 47%, #ececec 53%, #e3e3e3 100%); }
 .aqua-popup:has(:disabled) { color: var(--aqua-text-disabled); filter: grayscale(0.8) contrast(0.75) brightness(1.08); }
-.aqua-window[data-active="false"] .aqua-popup__end,
 .aqua-popup[data-tint="graphite"] .aqua-popup__end {
   background: linear-gradient(to bottom, var(--aqua-graphite-top), var(--aqua-graphite-mid) 55%, var(--aqua-graphite-bottom));
 }
 
 /* --------------------------------------------------------------------------
-   13. Sliders (generic + volume) and progress (spec §9.17)
+   13. Sliders and progress (spec §9.17)
    -------------------------------------------------------------------------- */
 .aqua-slider {
   display: inline-grid;
@@ -1043,23 +992,6 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
 
 .aqua-slider__readout { color: var(--aqua-text-secondary); font-size: var(--aqua-font-small); font-variant-numeric: tabular-nums; }
 
-.aqua-window[data-active="false"] .aqua-slider__fill { background: linear-gradient(to bottom, #c7ccd1, #a3aab1); }
-
-.aqua-volume {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  width: 130px;
-  min-width: 0;
-  color: #3b4046;
-}
-
-.aqua-volume .aqua-slider { flex: 1 1 auto; grid-template-columns: minmax(40px, 1fr); }
-.aqua-volume .aqua-slider__channel { height: 6px; }
-.aqua-volume .aqua-slider__fill { background: linear-gradient(to bottom, #9aa1a9, #b7bdc4); }
-.aqua-volume__icon { display: inline-flex; flex: none; font-size: 13px; color: #55595e; }
-.aqua-volume__icon--button { min-width: 22px; min-height: 22px; }
-
 .aqua-progress {
   display: grid;
   gap: 4px;
@@ -1095,8 +1027,7 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
 }
 
 /* paused/inactive: the fill loses Aqua priority but keeps its extent */
-.aqua-progress[data-paused="true"] .aqua-progress__fill,
-.aqua-window[data-active="false"] .aqua-progress__fill {
+.aqua-progress[data-paused="true"] .aqua-progress__fill {
   background:
     linear-gradient(to bottom, rgb(255 255 255 / 70%), transparent 44%),
     linear-gradient(#d8dcdf, #aeb4b9 48%, #858c92);
@@ -1214,7 +1145,6 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
 .aqua-table--num { text-align: right; font-variant-numeric: tabular-nums; }
 .aqua-table--center { text-align: center; }
 .aqua-table--icon { padding: 0 !important; text-align: center; }
-.aqua-table__primary { font-weight: var(--aqua-weight-emphasized); }
 
 .aqua-table tbody tr { cursor: default; }
 .aqua-table tbody tr:nth-child(even) { background: var(--aqua-stripe); }
@@ -1229,8 +1159,7 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
 
 .aqua-table tbody tr[aria-selected="true"] .aqua-secondary { color: rgb(255 255 255 / 85%); }
 
-.aqua-table-wrap:not(:focus-within) .aqua-table tbody tr[aria-selected="true"],
-.aqua-window[data-active="false"] .aqua-table tbody tr[aria-selected="true"] {
+.aqua-table-wrap:not(:focus-within) .aqua-table tbody tr[aria-selected="true"] {
   color: #20252a;
   background: linear-gradient(#d3d8dc, #b5bdc4);
   text-shadow: 0 1px rgb(255 255 255 / 54%);
@@ -1240,8 +1169,6 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
 .aqua-table tbody tr[aria-disabled="true"] { color: var(--aqua-text-disabled); }
 
 .aqua-table__spacer td { padding: 0; height: auto; }
-.aqua-table__now-playing { display: inline-flex; color: var(--aqua-selection-bottom); font-size: 11px; }
-.aqua-table tbody tr[aria-selected="true"] .aqua-table__now-playing { color: #fff; }
 .aqua-table__empty td { height: 60px; color: var(--aqua-text-secondary); text-align: center; }
 
 /* narrow: primary label / secondary metadata rows, never cards (spec §8.3) */
@@ -1257,126 +1184,11 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
      row. Found in the page list, fixed in both. */
   .aqua-table--responsive { table-layout: auto;}
   /* Column widths are inline styles from the column definitions; only !important takes them back. */
-  .aqua-table--responsive col { width: auto !important;}
- .aqua-form-row { grid-template-columns: minmax(0, 1fr);} .aqua-form-row > :first-child { text-align: left;}}
+  .aqua-table--responsive col { width: auto !important;}}
 .aqua-table__stack { display: none; color: var(--aqua-text-secondary); font-size: var(--aqua-font-small); }
 
 /* --------------------------------------------------------------------------
-   20. Artwork grid (spec §9.10)
-   -------------------------------------------------------------------------- */
-.aqua-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(var(--aqua-tile, 128px), 1fr));
-  gap: 16px 14px;
-  margin: 0;
-  padding: 16px;
-  list-style: none;
-  background: var(--aqua-content);
-}
-
-.aqua-tile {
-  position: relative;
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-  padding: 0;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  background: none;
-  border: 0;
-  border-radius: 2px;
-  cursor: default;
-}
-
-.aqua-tile__art {
-  position: relative;
-  aspect-ratio: 1;
-  overflow: hidden;
-  background: linear-gradient(to bottom, #e8e8e8, #d3d3d3);
-  border-radius: 2px;
-  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 14%), 0 1px 1px rgb(0 0 0 / 18%);
-}
-
-.aqua-tile__art img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.aqua-tile__placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #8f959b; font-size: 28px; }
-
-.aqua-tile__play {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 34px;
-  height: 34px;
-  color: #fff;
-  font-size: 14px;
-  background: rgb(20 24 30 / 62%);
-  border: 1px solid rgb(255 255 255 / 60%);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  opacity: 0;
-  transition: opacity 100ms var(--aqua-ease);
-  cursor: default;
-}
-
-.aqua-tile:hover .aqua-tile__play,
-.aqua-tile:focus-within .aqua-tile__play,
-.aqua-tile__play:focus-visible { opacity: 1; }
-@media (hover: none) { .aqua-tile__play { opacity: 1; } }
-
-.aqua-tile__title { overflow: hidden; font-size: var(--aqua-font-view); line-height: 15px; white-space: nowrap; text-overflow: ellipsis; }
-.aqua-tile__sub { overflow: hidden; color: var(--aqua-text-secondary); font-size: var(--aqua-font-small); line-height: 14px; white-space: nowrap; text-overflow: ellipsis; }
-
-.aqua-tile[aria-selected="true"] .aqua-tile__art { box-shadow: 0 0 0 3px var(--aqua-selection-mid), inset 0 0 0 1px rgb(0 0 0 / 14%); }
-.aqua-tile[aria-selected="true"] .aqua-tile__title { color: #fff; background: var(--aqua-selection-mid); border-radius: 3px; padding: 0 4px; margin: 0 -4px; }
-.aqua-window[data-active="false"] .aqua-tile[aria-selected="true"] .aqua-tile__art { box-shadow: 0 0 0 3px #b5bdc4, inset 0 0 0 1px rgb(0 0 0 / 14%); }
-.aqua-window[data-active="false"] .aqua-tile[aria-selected="true"] .aqua-tile__title { background: #b5bdc4; color: #20252a; }
-.aqua-tile:focus-visible { outline-offset: 3px; }
-
-/* --------------------------------------------------------------------------
-   21. Tabs / scope bar (spec §9.9)
-   -------------------------------------------------------------------------- */
-.aqua-scope {
-  display: flex;
-  align-items: center;
-  gap: var(--aqua-space-control);
-  min-height: 28px;
-  padding: 0 var(--aqua-space-control);
-  background: linear-gradient(#f3f3f3, #e2e2e2);
-  border-bottom: 1px solid #b4b4b4;
-  box-shadow: inset 0 1px #fff;
-}
-
-.aqua-scope__label { color: var(--aqua-text-secondary); font-size: var(--aqua-font-small); }
-
-.aqua-tabs { display: inline-flex; gap: 2px; padding: 0; margin: 0; list-style: none; }
-
-.aqua-tab {
-  min-height: var(--aqua-control-h-small);
-  padding: 0 10px;
-  color: #2b2e33;
-  font: var(--aqua-weight-regular) var(--aqua-font-small) / 17px var(--aqua-font);
-  white-space: nowrap;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--aqua-pill-radius);
-  cursor: default;
-}
-
-.aqua-tab:hover { background: rgb(0 0 0 / 6%); }
-.aqua-tab[aria-selected="true"] {
-  color: #fff;
-  background: linear-gradient(to bottom, #767c85, #939aa3 55%, #a9b0b8);
-  border-color: rgb(0 0 0 / 30%);
-  box-shadow: inset 0 1px 2px rgb(0 0 0 / 35%);
-  text-shadow: 0 -1px rgb(0 0 0 / 30%);
-}
-.aqua-tab:focus-visible { outline-offset: 1px; }
-.aqua-tab:disabled { color: var(--aqua-text-disabled); }
-.aqua-tabpanel { min-width: 0; min-height: 0; outline: none; }
-.aqua-tabpanel[hidden] { display: none; }
-
-/* --------------------------------------------------------------------------
-   22. Layers: sheet, dialog, menu, toast, tooltip (spec §9.19, §9.20)
+   22. Layers: sheet, alert, toast (spec §9.19, §9.20)
    -------------------------------------------------------------------------- */
 .aqua-layer {
   position: fixed;
@@ -1439,62 +1251,9 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
 .aqua-sheet__actions--split { justify-content: space-between; }
 .aqua-sheet__actions-group { display: flex; gap: var(--aqua-space-group); }
 
-.aqua-menu {
-  position: fixed;
-  z-index: 1001;
-  min-width: 180px;
-  max-width: 320px;
-  margin: 0;
-  padding: 4px 0;
-  list-style: none;
-  color: var(--aqua-text);
-  background: rgb(252 252 252 / 97%);
-  border: 1px solid rgb(0 0 0 / 30%);
-  border-radius: 6px;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 70%), var(--aqua-panel-shadow);
-  animation: aqua-menu-in var(--aqua-motion-selection) ease-out;
-}
-
 @keyframes aqua-menu-in { from { opacity: 0; transform: translateY(-2px); } to { opacity: 1; transform: none; } }
-
-.aqua-menu__item {
-  position: relative;
-  display: grid;
-  grid-template-columns: 16px minmax(0, 1fr) auto 12px;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  min-height: 20px;
-  margin: 0;
-  padding: 0 8px 0 6px;
-  color: inherit;
-  font: var(--aqua-weight-regular) var(--aqua-font-system) / 20px var(--aqua-font);
-  text-align: left;
-  white-space: nowrap;
-  background: transparent;
-  border: 0;
-  cursor: default;
-}
-
-.aqua-menu__item[aria-disabled="true"] { color: var(--aqua-text-disabled); }
-.aqua-menu__item:not([aria-disabled="true"]):hover,
-.aqua-menu__item:focus-visible,
-.aqua-menu__item[data-open="true"] {
-  color: #fff;
-  background: linear-gradient(var(--aqua-selection-top), var(--aqua-selection-mid) 48%, var(--aqua-selection-bottom));
-  outline: none;
-}
-.aqua-menu__item:not([aria-disabled="true"]):hover .aqua-menu__shortcut,
-.aqua-menu__item:focus-visible .aqua-menu__shortcut { color: rgb(255 255 255 / 85%); }
-.aqua-menu__check { display: inline-flex; justify-content: center; font-size: 11px; }
-.aqua-menu__label { overflow: hidden; text-overflow: ellipsis; }
-.aqua-menu__shortcut { color: var(--aqua-text-secondary); font-size: var(--aqua-font-small); }
-.aqua-menu__submenu-arrow { display: inline-flex; justify-content: center; font-size: 8px; }
-.aqua-menu__separator { height: 1px; margin: 4px 1px; background: rgb(0 0 0 / 14%); }
 /* A destructive item is named by its ink, not by a colour pasted into the markup. Separation
    from the ordinary items is the separator above it; the wording is the caller's. */
-.aqua-menu__item--destructive { color: var(--aqua-danger-ink); }
-.aqua-menu__heading { padding: 3px 8px 2px; color: var(--aqua-text-secondary); font-size: var(--aqua-font-label); font-weight: var(--aqua-weight-emphasized); text-transform: uppercase; letter-spacing: 0.03em; }
 
 .aqua-toast-region {
   position: fixed;
@@ -1533,7 +1292,7 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
 .aqua-toast .aqua-button { min-width: 0; }
 
 /* --------------------------------------------------------------------------
-   23. State panels: empty, loading, partial, offline, error, permission, incompatible, unavailable
+   23. State panels: empty and loading
    Same material and type system (spec §18).
    -------------------------------------------------------------------------- */
 .aqua-state {
@@ -1552,12 +1311,6 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
 .aqua-state--inline .aqua-state__icon { grid-column: 1; grid-row: 1 / span 3; font-size: 20px; margin-top: 2px; }
 
 .aqua-state__icon { display: inline-flex; color: #5d6772; font-size: 40px; }
-.aqua-state[data-kind="error"] .aqua-state__icon { color: var(--aqua-danger); }
-.aqua-state[data-kind="warning"] .aqua-state__icon,
-.aqua-state[data-kind="permission"] .aqua-state__icon,
-.aqua-state[data-kind="partial"] .aqua-state__icon { color: #a97a12; }
-.aqua-state[data-kind="offline"] .aqua-state__icon,
-.aqua-state[data-kind="incompatible"] .aqua-state__icon { color: #6b7681; }
 .aqua-state__title { margin: 0; font-size: var(--aqua-font-system); font-weight: var(--aqua-weight-emphasized); }
 .aqua-state__text { margin: 0; color: var(--aqua-text-secondary); font-size: var(--aqua-font-small); line-height: 1.45; }
 .aqua-state__actions { display: flex; flex-wrap: wrap; gap: var(--aqua-space-control); justify-content: center; margin-top: 4px; }
@@ -1569,7 +1322,7 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
 .aqua-state__details p { margin: 6px 0 0; padding: 6px 8px; background: var(--aqua-content-muted); border: 1px solid var(--aqua-row-divider); border-radius: 3px; }
 
 /* --------------------------------------------------------------------------
-   24. Marquee (playing row), avatar, tooltip-ish, panels/forms
+   24. Marquee (playing row), panels, status dots
    -------------------------------------------------------------------------- */
 .aqua-marquee {
   --mq-fade-l: 0px;
@@ -1583,26 +1336,6 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
 .aqua-marquee__inner { display: inline-block; white-space: nowrap; will-change: transform; }
 .aqua-marquee--static { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.aqua-avatar {
-  position: relative;
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: var(--aqua-avatar-size, 20px);
-  height: var(--aqua-avatar-size, 20px);
-  overflow: hidden;
-  color: #4a5561;
-  background: linear-gradient(to bottom, #fff, #f3f3f3);
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 26%), inset 0 1px 2px rgb(0 0 0 / 16%), 0 1px 0 rgb(255 255 255 / 70%);
-}
-.aqua-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.aqua-avatar svg { width: 70%; height: 70%; }
-.aqua-avatar--button { padding: 0; border: 0; cursor: default; }
-.aqua-avatar--button:hover { filter: brightness(1.03); }
-.aqua-avatar--button:active { transform: translateY(0.5px); }
-
 .aqua-panel {
   display: grid;
   gap: var(--aqua-space-group);
@@ -1612,10 +1345,6 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
 .aqua-panel__title { margin: 0; font-size: var(--aqua-font-system); font-weight: var(--aqua-weight-emphasized); }
 .aqua-panel__section { display: grid; gap: var(--aqua-space-control); padding: var(--aqua-space-group); background: var(--aqua-content); border: 1px solid var(--aqua-row-divider); border-radius: var(--aqua-panel-radius); }
 .aqua-panel__section-title { margin: 0; color: var(--aqua-text-secondary); font-size: var(--aqua-font-small); font-weight: var(--aqua-weight-emphasized); text-transform: uppercase; letter-spacing: 0.03em; }
-.aqua-form-row { display: grid; grid-template-columns: minmax(120px, 160px) minmax(0, 1fr); align-items: center; gap: var(--aqua-space-control) var(--aqua-space-group); }
-.aqua-form-row > :first-child { text-align: right; font-size: var(--aqua-font-system); }
-.aqua-form-row--stack, .aqua-form-row--stacked { grid-template-columns: minmax(0, 1fr); }
-.aqua-form-row--stack > :first-child, .aqua-form-row--stacked > :first-child { text-align: left; }
 .aqua-kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; margin: 0; font-size: var(--aqua-font-small); }
 .aqua-kv dt { color: var(--aqua-text-secondary); }
 .aqua-kv dd { margin: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -1624,14 +1353,6 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
 .aqua-status-dot[data-kind="warning"] { background: var(--aqua-warning); }
 .aqua-status-dot[data-kind="error"] { background: var(--aqua-danger); }
 .aqua-status-dot[data-kind="info"] { background: var(--aqua-selection-mid); }
-.aqua-list-view { display: grid; }
-.aqua-list-view__row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; min-height: 34px; padding: 4px 10px; border-bottom: 1px solid var(--aqua-row-divider); }
-.aqua-list-view__row:nth-child(even) { background: var(--aqua-stripe); }
-.aqua-list-view__primary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--aqua-font-view); }
-.aqua-list-view__secondary { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--aqua-text-secondary); font-size: var(--aqua-font-small); }
-
-/* text that must survive 200% zoom: never clip toolbar labels or buttons */
-@media (min-resolution: 1.5dppx) { .aqua-window { text-rendering: geometricPrecision; } }
 
 /* Vertical fader (spec §9.17): the same recessed channel and silver thumb, rotated. Used by the
    equalizer, where a column of faders is the shape people expect. */
@@ -1689,21 +1410,14 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
 
   /* A field is typed into as well as tapped, and its padding puts it just
      under the line the rest of the controls clear. */
-  .aqua-field__input,
-  .aqua-search__input {
+  .aqua-field__input {
     min-height: var(--aqua-hit);}
 
   /* iOS zooms the page when a field under 16px takes focus. */
   .aqua-field__input,
-  .aqua-search__input,
   .aqua-select,
   textarea.aqua-field__input {
     font-size: 16px;}
-
-  /* A collapsible group heading in the source list is a real button — it is
-     what opens and closes the group — and it was drawn as a 16px label. */
-  .aqua-source-list__heading[role='button'] {
-    min-height: var(--aqua-hit);}
 
   /* The editable number beside a slider is typed into as well as tapped. */
   .aqua-slider__value {
@@ -1715,27 +1429,18 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
     min-height: var(--aqua-hit);}
 
   /* Two segments or three tabs: each gets a finger's width, not a word's. */
-  .aqua-segmented__item,
-  .aqua-tab {
+  .aqua-segmented__item {
     min-width: var(--aqua-hit);}
 
   /*
-   * The window's traffic lights are 14px by design and cannot be anything
-   * else — they are the one shape in the system everybody recognises at a
-   * glance. The span around each is spacing rather than a target, so the
-   * overlay goes on the button itself.
-   *
+   * A badge keeps its drawn size, so the overlay goes on the badge itself.
    * A vertical fader is the same case in the other axis: 22px wide is the
    * groove, and the overlay gives the thumb somewhere to be caught.
    */
-  .aqua-traffic__light,
   .aqua-slider--vertical .aqua-slider__track,
-  .aqua-volume > .aqua-icon-button,
   .aqua-badge {
     position: relative;}
 
-  .aqua-traffic__light::after,
-  .aqua-volume > .aqua-icon-button::after,
   .aqua-badge::after {
     position: absolute;
     top: 50%;
@@ -1764,24 +1469,19 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
    written, leaving every small button 30px tall in a block that asked for 44.
    -------------------------------------------------------------------------- */
 
-  .aqua-check__box,
-  .aqua-radio__dot {
+  .aqua-check__box {
     width: 20px;
     height: 20px;}
 
-  .aqua-check,
-  .aqua-radio {
+  .aqua-check {
     gap: 10px;
     min-height: var(--aqua-hit);}
 
   .aqua-button,
   .aqua-button--small,
-  .aqua-tab,
   .aqua-segmented__item,
   .aqua-popup,
   .aqua-select,
-  .aqua-menu__item,
-  .aqua-source-list__item,
   .aqua-icon-button {
     min-height: var(--aqua-hit);}
 
@@ -1809,22 +1509,11 @@ textarea.aqua-field__input { min-height: 60px; line-height: 1.35; resize: vertic
    * moving anything. Nothing else can sit on top of these, so there is no
    * ambiguity about which one a tap reaches.
    */
-  .aqua-button--mini::after,
-  .aqua-work-area__splitter::after,
-  .aqua-traffic-light::after {
+  .aqua-button--mini::after {
     position: absolute;
     top: 50%;
     left: 50%;
     width: max(100%, var(--aqua-hit));
     height: max(100%, var(--aqua-hit));
     content: '';
-    transform: translate(-50%, -50%);}
-
-  .aqua-work-area__splitter,
-  .aqua-traffic-light {
-    position: relative;}
-
-  /* A splitter is dragged rather than tapped: it needs width, not squareness. */
-  .aqua-work-area__splitter::after {
-    width: 24px;
-    height: 100%;}}
+    transform: translate(-50%, -50%);}}

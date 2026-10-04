@@ -1,8 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-// Every stylesheet, because the styleguide shows every element from both skins.
-import '@now-playing/aqua-ui/window.css';
-import '@now-playing/aqua-ui/media.css';
+// The page skin's stylesheet; the library's own (aqua.css) comes with the components.
 import '@now-playing/aqua-ui/now-playing.css';
 import './styleguide.css';
 import { Styleguide } from './Styleguide.js';

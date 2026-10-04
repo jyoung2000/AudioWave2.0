@@ -300,7 +300,7 @@ export function Styleguide() {
                 <div className="sg__grp">
                   <b>The component library</b>
                   <p>
-                    --aqua-*, --np-*, --lib-* · aqua.css, aqua-window.css, aqua-media.css, now-playing.css · <code>packages/aqua-ui</code> React components · imported by the player's
+                    --aqua-*, --np-*, --lib-* · aqua.css, now-playing.css · <code>packages/aqua-ui</code> React components · imported by the player's
                     React source, the gallery and this guide; no served product (DEC-026)
                   </p>
                 </div>

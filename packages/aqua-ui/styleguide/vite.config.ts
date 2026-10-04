@@ -167,8 +167,6 @@ export default defineConfig({
     alias: {
       '@now-playing/contracts': workspace('contracts'),
       '@now-playing/domain': workspace('domain'),
-      '@now-playing/aqua-ui/window.css': here('../src/styles/aqua-window.css'),
-      '@now-playing/aqua-ui/media.css': here('../src/styles/aqua-media.css'),
       '@now-playing/aqua-ui/now-playing.css': here('../src/styles/now-playing.css'),
       '@now-playing/aqua-ui': here('../src/index.ts'),
     },

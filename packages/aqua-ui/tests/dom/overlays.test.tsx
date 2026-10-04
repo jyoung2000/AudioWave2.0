@@ -48,8 +48,8 @@ describe('Sheet', () => {
  * "Internal panes do not all cast independent card shadows", which `docs/AQUA_CONFORMANCE.md` cites
  * to this file and which nothing here checked.
  *
- * The rule is about depth meaning something. One surface lifts off the window — the sheet, the menu
- * — and everything inside it is grouped by a hairline and a fill, not by another drop shadow. Panes
+ * The rule is about depth meaning something. One surface lifts off the window — the sheet — and
+ * everything inside it is grouped by a hairline and a fill, not by another drop shadow. Panes
  * that each cast their own shadow read as a pile of cards rather than as one dialog with parts.
  *
  * Asserted against the stylesheet rather than `getComputedStyle`, because these tests run without
@@ -107,9 +107,9 @@ describe('§ depth', () => {
   });
 
   it('keeps the lift for the one surface that leaves the window', () => {
-    // The sheet and the menu are what rise; that is what makes the panes inside them read as parts.
+    // The sheet is what rises; that is what makes the panes inside it read as parts.
     expect(css).toMatch(/--aqua-panel-shadow:/);
-    const lifted = ['aqua-sheet', 'aqua-menu'].filter((name) => rulesFor(name).some((block) => block.includes('--aqua-panel-shadow')));
+    const lifted = ['aqua-sheet'].filter((name) => rulesFor(name).some((block) => block.includes('--aqua-panel-shadow')));
     expect(lifted.length, 'no overlay uses the panel shadow, so nothing lifts off the window').toBeGreaterThan(0);
   });
 });

@@ -11,8 +11,6 @@
     "./styles.css": "./src/styles/aqua.css",
     "./tokens.json": "./src/styles/tokens.json",
     "./now-playing.css": "./src/styles/now-playing.css",
-    "./window.css": "./src/styles/aqua-window.css",
-    "./media.css": "./src/styles/aqua-media.css",
     "./airwave-window.css": "./src/styles/airwave-window.css",
     "./airwave-hub.css": "./src/styles/airwave-hub.css",
     "./airwave-art": "./src/airwave/aqua-art.ts"

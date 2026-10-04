@@ -34,11 +34,10 @@ const css = styles('aqua.css');
 /**
  * Every sheet the library ships.
  *
- * The stylesheet was one file until the player stopped being a window; the material MUSTs are
- * about the library's whole surface, so the checks that scan *rules* rather than tokens scan all
- * four. Splitting a file must not be a way to stop being checked.
+ * The material MUSTs are about the library's whole surface, so the checks that scan *rules* rather
+ * than tokens scan both sheets. Splitting a file must not be a way to stop being checked.
  */
-const allCss = ['aqua.css', 'aqua-window.css', 'aqua-media.css', 'now-playing.css'].map((name) => [name, styles(name)] as const);
+const allCss = ['aqua.css', 'now-playing.css'].map((name) => [name, styles(name)] as const);
 
 describe('§17.6 profile coherence', () => {
   it('MUST: the selected profile is declared', () => {
