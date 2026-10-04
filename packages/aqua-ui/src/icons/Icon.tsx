@@ -6,7 +6,7 @@ export interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'children'> {
   size?: number | string;
 }
 
-export function svgProps({ title, size, className, ...rest }: IconProps, kind: 'glyph' | 'source' | 'provider'): SVGProps<SVGSVGElement> {
+export function svgProps({ title, size, className, ...rest }: IconProps, kind: 'glyph' | 'provider'): SVGProps<SVGSVGElement> {
   const dimension = size ?? undefined;
   return {
     className: ['aqua-icon', `aqua-icon--${kind}`, className].filter(Boolean).join(' '),

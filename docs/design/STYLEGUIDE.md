@@ -96,15 +96,17 @@ from, in two skins:
 | | Window skin | Page skin |
 |---|---|---|
 | Token prefix | `--aqua-*` | `--np-*`, `--lib-*` |
-| Stylesheets | `aqua.css`, `aqua-window.css`, `aqua-media.css` | `now-playing.css` |
+| Stylesheets | `aqua.css` | `now-playing.css` |
 | Type | Lucida Grande | Helvetica — the iPod's face |
-| Imported by | no product | the player's React source in `music-player/src` (kept, not served — DEC-019) |
-| Shape | a framed desktop window with a source list | a sticky bar over a hero and a list |
+| Imported by | the player's React source, for its controls, table, sheets and states | the player's React source in `music-player/src` (kept, not served — DEC-019) |
+| Shape | Snow Leopard controls: buttons, fields, a table, a sheet, state panels | a sticky bar over a hero and a list |
 
-It is kept, tested and documented below (§3–§9 describe it), and the rendered guide lists which
-of its components the player's React source still imports and which no product imports at all.
-Nothing was deleted when the products moved to the Airwave designs. The page skin and the player's
-shell are the same look, drawn twice: the shell is what is served.
+It is kept, tested and documented below (§3–§9 describe it). The library exports what the player's
+React source imports and nothing else: the framed window the hub and the companion were first built
+from — toolbar, transport, LCD, source list, bottom bar — and the other components no product
+imported were removed with `aqua-window.css` and `aqua-media.css` (DEC-026), and the rendered guide
+names any component that falls out of use. The page skin and the player's shell are the same look,
+drawn twice: the shell is what is served.
 
 ---
 
@@ -246,7 +248,7 @@ border is the same, so it still reads as this interface rather than a separate m
 Three rules hold the layer together.
 
 **Nothing interactive is under 44 px.** Where a control has room, it grows. Where it cannot — a
-14 px traffic light, a 22 px vertical fader, the icons inside a list row — it keeps the size it is
+badge, a 22 px vertical fader, the icons inside a list row — it keeps the size it is
 drawn at and takes its taps from a transparent `::after` centred on it. The visual and the target
 are different things, and only one of them is allowed to be small.
 
@@ -308,7 +310,7 @@ system keeps it:
 | Place | What it is |
 |---|---|
 | The default button | The gel face above, pulsing |
-| Source-list selection | `--aqua-selection-*` gradient with white text |
+| Table-row selection | `--aqua-selection-*` gradient with white text |
 | Music-list selection, sorted column | `--lib-sel-*`, `--lib-sort-*` |
 | The overlay scroller thumb | The full five-stop `--aqua-blue-*` gel at strength — the only place |
 | The checked box, the pop-up's end cap | `--aqua-blue-*` at control size |
@@ -372,45 +374,38 @@ the 3D stage stops its idle drift. Two variables carry most of it — `--aqua-an
 Everything is exported from `@now-playing/aqua-ui`. Reach for one of these before writing a `<div>`.
 
 These are the component library's. The hub and the companion import none of them (their kits are
-in §2); the player's React source imports the page shell and most of the controls; the window
-shell is imported by no product. The rendered page reads the exact lists from the products'
-imports each time it is built; the short version:
+in §2); the player's React source imports every one, and a component no product imports is removed
+rather than kept. The rendered page reads the exact list from the products' imports each time it is
+built; the short version:
 
 | | Player's React source | Hub | Companion |
 |---|---|---|---|
 | Page shell (`PageBar` … `LevelSlider`) | ● | – | – |
-| Window shell (`AquaWindow` … `BottomBar`, `SearchField`) | – | – | – |
 | Controls, structure, states, toasts | ● | – | – |
 | The 3D stage, the list, popover, menu, sheet, toast, equalizer (page-skin classes) | ● | – | – |
 
 **Page shell** — `PageBar`, `BarSearch`, `BarClock`, `ModeSwitch`, `ProfileButton`, `SectionStrip`,
 `Hero`, `HeroArt`, `TrackScrubber`, `KeyTransport`, `KeyButton`, `LevelSlider`.
 
-**Window shell** — `AquaWindow`, `Toolbar`, `TrafficLights`, `SourceList`, `WorkArea`, `Content`,
-`BottomBar`, `Splitter`.
+**Stage and list** — `JewelStage` over `mountJewelCase` (the reference's 3D module, ported), and
+`MusicList` with its own row menu, marquee and overlay scroller, and the `sourceOf` / `offlineOf`
+helpers that name where a track lives. Both live here rather than in the player so this page renders
+the same ones.
 
-**Media** — `Transport`, `TransportAuxButton`, `LcdDisplay`, `Scrubber`, `VolumeSlider`,
-`SearchField`, `ResultsPopover`, `NowPlayingGlyph`, `ArtworkGrid`, `Marquee`.
+**Controls** — `Button`, `ButtonLink`, `IconButton`, `Checkbox`, `TextField`, `PopUpMenu`, `Slider`,
+`SegmentedControl`, `ProgressBar`, `Spinner`.
 
-**Stage and list** — `JewelStage` over `mountJewelCase` (the reference's 3D module, ported), `MusicList`
-with `useMarquee`, `RowMenu` and `NewPlaylistSheet`, and the `sourceOf` / `offlineOf` helpers that name
-where a track lives. Both live here rather than in the player so this page renders the same ones.
+**Structure** — `Panel`, `PanelSection`, `KeyValueList`, `AquaTable`, `StatusDot`, `SourceBadge`,
+`ProviderMark`, `Glyph`.
 
-**Controls** — `Button`, `ButtonLink`, `IconButton`, `Checkbox`, `Radio`, `TextField`, `PopUpMenu`,
-`Slider`, `SegmentedControl`, `ProgressBar`, `Spinner`, `Tabs`.
+**Overlays** — `Sheet`, `ToastProvider`, `useToast`.
 
-**Structure** — `Panel`, `PanelSection`, `FormRow`, `KeyValueList`, `AquaTable`, `ListView`,
-`StatusDot`, `SourceBadge`, `Avatar`, `AvatarButton`, `Glyph`, `SourceIcon`.
-
-**Overlays** — `Sheet`, `Dialog`, `Menu`, `useContextMenu`, `ToastProvider`, `useToast`.
-
-**States** — `StatePanel`, `EmptyState`, `ErrorState`, `LoadingState`, `OfflineState`,
-`PartialState`, `PermissionRequiredState`, `UnavailableCapabilityState`, `IncompatibleVersionState`,
-`InlineValidation`.
+**States** — `EmptyState`, `LoadingState`, `InlineValidation`.
 
 That last group is the one people skip. Every screen owes an answer for empty, loading, offline,
-partial, refused and out-of-date — and `UnavailableCapabilityState` exists so "this cannot work here"
-is a designed state carrying its reason, rather than a blank pane.
+partial, refused and out-of-date. The library draws empty and loading as panels; the rest are said
+in the view's own words, where the choice is made, carrying the reason rather than leaving a blank
+pane.
 
 ### A download is a link
 
@@ -460,11 +455,23 @@ library's page skin: the host page's stylesheets cloned in, the player's own sty
 and the library's components — the React interface, not the served shell, which is one document
 with its own scripts and cannot be portalled into a frame. The frames say which they are.
 
-**Where that stops.** The screens are arranged as each product's views arrange them, in the views'
-own words, but they are not the product's own view files executed verbatim — those are wired to a
-database, a playback engine and, for the companion, Electron's IPC. The data is fixture data. So the
-*visual and responsive* behaviour is exact and the *content* is representative, which is the trade
-that keeps the page from breaking whenever a store changes.
+**Where that stops — and where it no longer does.** Most of the hub's sections (Groups, Library,
+Live TV from the companion, Profiles, Shared links, Recommendations, Discord, Network, Backup,
+Diagnostics) and the companion's Settings, Backup and About are the products' own view components,
+executed as they are. Each view reaches its product through one module — the hub's API client, the
+companion's bridge — and the styleguide build alone swaps those two for fakes that answer from
+recordings of a real hub and a real companion (`packages/aqua-ui/styleguide/fixtures/`, with the
+scripts that record them) and refuse every change with a sentence (DEC-030). The other screens —
+sign-in, first run, Overview, Providers, Downloads, the confirmation sheets, and the companion's
+Library, Live TV and Remote — need states a recording cannot reach (a refused link, a failed
+download, an open sheet), so they are arranged as the views arrange them, in the views' own words,
+with fixture data (DEC-009). Each screen's note says which it is.
+
+**The served player is photographed, not framed.** The shell is one document with its own scripts,
+so the guide shows it as screenshots of the production build in *The served shell*, taken by
+`pnpm styleguide:shell` (`scripts/styleguide-shell-shots.mjs`) at 1280 × 860 and 390 × 844 with
+nothing reaching the network. `shots.json` beside them records the hash of the shell they show, and
+`pnpm styleguide:check` fails when `music-player/index.html` changes without new screenshots.
 
 **Touch is emulated, and the emulation is derived.** An iframe inherits the host's pointer, so on a
 desktop `@media (pointer: coarse)` never matches however narrow the frame is — and this system keeps
@@ -492,9 +499,8 @@ buttons do not — so the hub's phone frames print their target sizes without be
 
 That last row is not hypothetical. At 390 px the earlier hub window's toolbar ran its last two columns off the
 side, and because a window clips, the search field was not merely cramped — it did not exist, while
-the page reported itself as fitting perfectly. The library's toolbar now gives the search a row of its own
-below 600 px, the display column truncates instead of pushing, and a secondary group that will not
-fit wraps.
+the page reported itself as fitting perfectly. That toolbar has since been removed with the rest of
+the library's earlier window skin; the check that caught it still runs on every screen.
 
 ### Editing it
 

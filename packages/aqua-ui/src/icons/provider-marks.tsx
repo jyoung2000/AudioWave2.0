@@ -26,7 +26,7 @@
 import { svgProps, type IconProps } from './Icon.js';
 import { useProviderArtwork } from '../lib/provider-artwork.js';
 
-export type ProviderGlyph = 'play' | 'cloud' | 'bars' | 'tag' | 'disc' | 'note' | 'house' | 'desktop' | 'speaker' | 'wrench' | 'metronome' | 'archive' | 'hash';
+type ProviderGlyph = 'play' | 'cloud' | 'bars' | 'tag' | 'disc' | 'note' | 'house' | 'desktop' | 'speaker' | 'wrench' | 'metronome' | 'archive' | 'hash';
 
 export interface ProviderMarkSpec {
   /** Display name, spelled the way the platform spells it. */

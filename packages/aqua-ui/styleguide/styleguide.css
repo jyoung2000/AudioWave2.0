@@ -361,6 +361,47 @@ body {
   justify-items: stretch;
 }
 
+/* The served shell: a desktop screenshot and a phone screenshot side by side, both scaled to fit. */
+.sg-shell {
+  margin: 16px 0 0;
+  padding: 16px;
+  border: 1px solid var(--sg-rim);
+  border-radius: 5px;
+  background: var(--sg-panel-sunk);
+  break-inside: avoid;
+}
+
+.sg-shell figcaption {
+  margin-bottom: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.sg-shell__pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1280fr) minmax(0, 390fr);
+  align-items: start;
+  gap: 16px;
+}
+
+.sg-shell__pair img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--sg-rim);
+  background: #fff;
+}
+
+@media (max-width: 640px) {
+  .sg-shell__pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sg-shell__phone {
+    max-width: 260px;
+  }
+}
+
 /* A specimen drawn at its real size scrolls inside its bed rather than widening the page. */
 .sg__bed,
 .sg-mockups {

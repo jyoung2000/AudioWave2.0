@@ -280,7 +280,7 @@ const KEY_GLYPHS = {
   ),
 } as const;
 
-export type TransportKeyGlyph = keyof typeof KEY_GLYPHS;
+type TransportKeyGlyph = keyof typeof KEY_GLYPHS;
 
 export interface KeyButtonProps {
   label: string;

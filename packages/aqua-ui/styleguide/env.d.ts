@@ -4,6 +4,12 @@ declare module '*?raw' {
   export default text;
 }
 
+/** Screenshots of the served player (./shell), inlined as data URIs by the build. */
+declare module '*.png' {
+  const url: string;
+  export default url;
+}
+
 /** Computed by vite.config.ts at build time from scripts/styleguide-lib.mjs. */
 declare const __STYLEGUIDE_BUILD__: {
   fingerprint: string;

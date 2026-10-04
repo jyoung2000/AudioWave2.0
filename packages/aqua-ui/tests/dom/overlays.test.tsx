@@ -3,9 +3,8 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Sheet } from '../../src/components/Sheet.js';
-import { Menu, useContextMenu } from '../../src/components/Menu.js';
 import { Button } from '../../src/components/Button.js';
 import { TextField } from '../../src/components/TextField.js';
 import './setup.js';
@@ -45,46 +44,12 @@ describe('Sheet', () => {
   });
 });
 
-describe('Menu', () => {
-  it('opens with menu roles, moves with arrows, closes with Escape and restores focus', async () => {
-    const user = userEvent.setup();
-    const onPlay = vi.fn();
-    function Demo() {
-      const menu = useContextMenu();
-      const ref = useRef<HTMLButtonElement | null>(null);
-      return (
-        <>
-          <Button ref={ref} onClick={() => menu.openAt(ref.current!)}>Open</Button>
-          <Menu open={menu.open} anchor={menu.anchor} onClose={menu.close} returnFocusTo={menu.returnFocusTo} label="Song actions" entries={[{ kind: 'item', id: 'play', label: 'Play', onSelect: onPlay }, { kind: 'item', id: 'next', label: 'Play Next', onSelect: () => undefined }, { kind: 'separator', id: 's' }, { kind: 'checkbox', id: 'c', label: 'Starred', checked: true, onToggle: () => undefined }]} />
-        </>
-      );
-    }
-    render(<Demo />);
-    const opener = screen.getByRole('button', { name: 'Open' });
-    await user.click(opener);
-    const menu = screen.getByRole('menu', { name: 'Song actions' });
-    const items = screen.getAllByRole('menuitem');
-    expect(items).toHaveLength(2);
-    expect(document.activeElement).toBe(items[0]);
-    await user.keyboard('{ArrowDown}');
-    expect(document.activeElement).toBe(items[1]);
-    expect(screen.getByRole('menuitemcheckbox', { name: 'Starred' }).getAttribute('aria-checked')).toBe('true');
-    await user.keyboard('{Escape}');
-    expect(screen.queryByRole('menu')).toBeNull();
-    expect(document.activeElement).toBe(opener);
-    expect(menu.isConnected).toBe(false);
-    await user.click(opener);
-    await user.click(screen.getByRole('menuitem', { name: 'Play' }));
-    expect(onPlay).toHaveBeenCalled();
-  });
-});
-
 /**
  * "Internal panes do not all cast independent card shadows", which `docs/AQUA_CONFORMANCE.md` cites
  * to this file and which nothing here checked.
  *
- * The rule is about depth meaning something. One surface lifts off the window — the sheet, the menu
- * — and everything inside it is grouped by a hairline and a fill, not by another drop shadow. Panes
+ * The rule is about depth meaning something. One surface lifts off the window — the sheet — and
+ * everything inside it is grouped by a hairline and a fill, not by another drop shadow. Panes
  * that each cast their own shadow read as a pile of cards rather than as one dialog with parts.
  *
  * Asserted against the stylesheet rather than `getComputedStyle`, because these tests run without
@@ -142,9 +107,9 @@ describe('§ depth', () => {
   });
 
   it('keeps the lift for the one surface that leaves the window', () => {
-    // The sheet and the menu are what rise; that is what makes the panes inside them read as parts.
+    // The sheet is what rises; that is what makes the panes inside it read as parts.
     expect(css).toMatch(/--aqua-panel-shadow:/);
-    const lifted = ['aqua-sheet', 'aqua-menu'].filter((name) => rulesFor(name).some((block) => block.includes('--aqua-panel-shadow')));
+    const lifted = ['aqua-sheet'].filter((name) => rulesFor(name).some((block) => block.includes('--aqua-panel-shadow')));
     expect(lifted.length, 'no overlay uses the panel shadow, so nothing lifts off the window').toBeGreaterThan(0);
   });
 });

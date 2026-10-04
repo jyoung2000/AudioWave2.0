@@ -17,7 +17,6 @@ const alias = {
   // Listed before the bare package alias: string aliases match by prefix, so without this the
   // stylesheet path would be rewritten into "…/src/index.ts/now-playing.css".
   '@now-playing/aqua-ui/now-playing.css': path('./packages/aqua-ui/src/styles/now-playing.css'),
-  '@now-playing/aqua-ui/window.css': path('./packages/aqua-ui/src/styles/aqua-window.css'),
   // The Airwave window's drawn controls (push button, pop-up, checkbox), shared by the hub and the companion.
   '@now-playing/aqua-ui/airwave-art': path('./packages/aqua-ui/src/airwave/aqua-art.ts'),
   '@now-playing/aqua-ui': path('./packages/aqua-ui/src/index.ts'),

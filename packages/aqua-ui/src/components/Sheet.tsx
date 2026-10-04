@@ -101,9 +101,3 @@ export function Sheet({ open, title, message, icon, children, actions, leftActio
   );
   return createPortal(node, container ?? document.body);
 }
-
-export type DialogProps = Omit<SheetProps, 'standalone'>;
-/** Standalone alert for application-wide issues. */
-export function Dialog(props: DialogProps) {
-  return <Sheet {...props} standalone />;
-}

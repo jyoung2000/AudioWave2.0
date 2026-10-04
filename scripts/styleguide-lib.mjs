@@ -42,6 +42,28 @@ export function sourceFingerprint(root) {
   return hash.digest('hex').slice(0, 16);
 }
 
+/* ------------------------------------------------------------ the shell */
+
+/** The hash `shots.json` records of the player's shell. Line endings are normalised. */
+export function shellHash(text) {
+  return createHash('sha256').update(text.replace(/\r\n/g, '\n')).digest('hex').slice(0, 16);
+}
+
+/**
+ * The served player is shown in the guide as screenshots (scripts/styleguide-shell-shots.mjs).
+ * They are stale when the shell they were taken from has changed, or when a file they list is
+ * missing. Pure, so a test can plant drift.
+ */
+export function checkShellShots({ record, source, present }) {
+  const errors = [];
+  if (!record) return ['shell: no shots.json beside the shell screenshots. Run pnpm styleguide:shell.'];
+  const now = shellHash(source);
+  if (record.sourceHash !== now) errors.push(`shell: the screenshots were taken from ${record.source} at ${record.sourceHash}, and it is now ${now}. Run pnpm build:player and pnpm styleguide:shell.`);
+  for (const file of record.files ?? []) if (!present(file)) errors.push(`shell: ${file} is listed in shots.json but missing`);
+  if (!record.files?.length) errors.push('shell: shots.json lists no screenshots');
+  return errors;
+}
+
 /* ------------------------------------------------------------------ CSS */
 
 /**
@@ -280,6 +302,15 @@ export function runChecks(root, { freshness = true } = {}) {
 
   // Runtime evidence refers to real surfaces.
   for (const record of manifest.verification.runtime) for (const id of record.surfaces) if (!surfaceIds.has(id)) errors.push(`manifest.verification: unknown surface ${id}`);
+
+  // The served shell's screenshots were taken from the shell as it is now.
+  if (manifest.guide.shell) {
+    const { shots, source } = manifest.guide.shell;
+    need(source, 'manifest.guide.shell');
+    const recordPath = `${shots}/shots.json`;
+    const record = exists(recordPath) ? readJson(root, recordPath) : null;
+    if (exists(source)) errors.push(...checkShellShots({ record, source: readText(root, source), present: (file) => exists(`${shots}/${file}`) }));
+  }
 
   // Tokens
   const sheets = Object.fromEntries(tokenMap.stylesheets.map((path) => [path, readText(root, path)]));

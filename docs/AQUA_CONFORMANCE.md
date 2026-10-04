@@ -15,18 +15,18 @@ true if each one maps to something that can fail, so this page is the map. Three
 
 | MUST | How it is checked |
 |---|---|
-| One dominant work window is visually clear | **Reviewer.** Each product renders a single `AquaWindow`; `tests/dom/overlays.test.tsx` asserts sheets and menus are children of it rather than competing windows |
+| One dominant work window is visually clear | **Reviewer.** The hub and the companion each render one Airwave window and confirm in a sheet over it, never a second window (DEC-021); the player is one page |
 | Titlebar and toolbar read as one continuous neutral surface | **Test** — `aqua-conformance.test.ts`, chrome ramp is achromatic and continuous |
-| Persistent source list, or a responsive equivalent with current-location context | **Test** — `tests/dom/source-list.test.tsx`; the e2e a11y spec walks every section in the strip through it |
+| Persistent source list, or a responsive equivalent with current-location context | **Test** — `tests/dom/page-chrome.test.tsx` holds the section strip (the player's equivalent) to one tab stop, arrows, type-ahead and its counts; the e2e a11y spec walks every section in the strip through it |
 | Content region visually dominant and mostly neutral | **Reviewer**, with `windowBody` and `content` tokens pinned by the conformance test |
-| Bottom-bar actions visibly subordinate | **Test** — `aqua-conformance.test.ts`, `bottomBarSmall` and label sizes are below body sizes |
+| Bottom-bar actions visibly subordinate | **Test** — `aqua-conformance.test.ts`, label and small sizes are below body sizes. The library's bottom bar went with its earlier window skin; the Airwave windows' status strips are drawn by their designs (**Reviewer**) |
 | *SHOULD:* large/medium/small hierarchy | **Reviewer** |
 
 ## §17.2 Material
 
 | MUST | How it is checked |
 |---|---|
-| Rims crisp and generally 1 px | **Test** — every border declaration in **all four** stylesheets (`aqua.css`, `aqua-window.css`, `aqua-media.css`, `now-playing.css`) is ≤ 1 px. It has failed once for real: the section strip's selected underline was a 2 px border, and is now an inset shadow |
+| Rims crisp and generally 1 px | **Test** — every border declaration in **both** library stylesheets (`aqua.css`, `now-playing.css`) is ≤ 1 px. It has failed once for real: the section strip's selected underline was a 2 px border, and is now an inset shadow |
 | Virtual light source above each dimensional control | **Test** — the gel ramp is monotonically darker downward; both inset shadow tokens exist |
 | Gel has specular top, mid body, darker lower depth | **Test** — five-step luminance ordering |
 | Neutral controls stay neutral; Aqua blue is selective | **Test** — chrome chroma ≤ 2, graphite ≤ 16, accent > 100 |
@@ -60,12 +60,12 @@ MUSTs apply to it unchanged, and are checked separately because the tokens are a
 
 | MUST | How it is checked |
 |---|---|
-| Familiar transport symbols, play/pause spatially stable | **Test** — `tests/dom/controls.test.tsx`; the player e2e asserts the transport row's controls are named and reachable |
-| Search is a rounded recessed field with visible focus and clear state | **Test** — `tests/dom/controls.test.tsx`; the e2e focus-visibility test walks ancestors, which is how the search field's `:focus-within` ring is caught |
-| Source and row selection have active and inactive variants | **Test** — `tests/dom/source-list.test.tsx`, `table.test.tsx` |
+| Familiar transport symbols, play/pause spatially stable | **Test** — `tests/dom/page-chrome.test.tsx` (the hero transport groups its keys under one name and keeps play on the centre line); the player e2e asserts the transport row's controls are named and reachable |
+| Search is a rounded recessed field with visible focus and clear state | **Test** — `tests/dom/page-chrome.test.tsx` (the bar search closes on Escape but keeps what was typed, and keeps the focus in the field); the e2e focus-visibility test walks ancestors, which is how the search field's `:focus-within` ring is caught |
+| Source and row selection have active and inactive variants | **Test** — `tests/dom/table.test.tsx` (selection and the current row). The inactive variant is the table's unfocused tint (`.aqua-table-wrap:not(:focus-within)`), a **Reviewer** check; the library's source list was removed with its window skin |
 | Tables communicate sort state and preserve semantics | **Test** — `tests/dom/table.test.tsx` asserts `aria-sort` and roving tabindex. The *visual* sort state had a defect the tint outran: `aria-sort="none"` is present on every sortable header, so `th[aria-sort]` painted the whole header row as sorted. Both skins now use `:not([aria-sort='none'])` |
 | Progress communicates status beyond animation | **Test** — `tests/dom/controls.test.tsx` asserts text and `aria-valuenow`, not motion alone |
-| *SHOULD:* central inset information display | Present — the LCD display in the hub GUI's toolbar. The player replaced it with the hero, which states the same information at reading size rather than in an inset panel; recorded in [DEVIATIONS.md](DEVIATIONS.md) |
+| *SHOULD:* central inset information display | Not present: the LCD went with the library's earlier window skin, which no product rendered. The player's hero states the same information at reading size rather than in an inset panel; recorded in [DEVIATIONS.md](DEVIATIONS.md) |
 
 ## §17.5 Interaction
 
@@ -76,14 +76,14 @@ MUSTs apply to it unchanged, and are checked separately because the tokens are a
 | Focus not colour-alone, visible on gradients | **Test** — the focus shadow has a spread; the e2e test checks focus is visible wherever it lands, including on an ancestor |
 | Reduced motion removes pulse and nonessential travel | **Test** — `prefers-reduced-motion` and the explicit `--aqua-anim-state` switch, plus an e2e test that sets the media feature |
 | Destructive actions clearly worded and separated | **Test** — `tests/dom/controls.test.tsx`; the hub and companion both confirm before destructive actions |
-| *SHOULD:* immediate feedback on drag, resize, reorder | Present in the queue and the source-list splitter |
+| *SHOULD:* immediate feedback on drag, resize, reorder | Present in the queue |
 
 ## §17.6 Profile coherence
 
 | MUST | How it is checked |
 |---|---|
 | The selected profile is declared | **Test** — the token file and the stylesheet agree on `snow-leopard-itunes-9` |
-| Default profile: horizontal traffic lights, coloured source icons | **Test** |
+| Default profile: horizontal traffic lights, coloured source icons | **Test** — the `trafficLight` size token and the iTunes 10 override block. The library no longer draws traffic lights or source icons; the Airwave windows draw their own title bar |
 | iTunes 10 profile applies its changes as one set | **Test** — the override block exists and is keyed on the profile attribute |
 | Classic gel accent strengthens only appropriate controls | **Test** — chroma bounds above |
 

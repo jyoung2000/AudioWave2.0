@@ -185,7 +185,7 @@
         "music-player/src/views/Search.tsx",
         "music-player/src/components/SearchPopover.tsx"
       ],
-      "components": ["BarSearch", "ResultsPopover", "EmptyState", "LoadingState"],
+      "components": ["BarSearch", "AquaTable", "EmptyState", "LoadingState"],
       "states": [
         "prompt (device only / with hub)",
         "searching hub",
@@ -370,7 +370,7 @@
       "title": "Search popover",
       "entry": "(React specimen, not served — DEC-019) typing in the status-bar search",
       "sourcePaths": ["music-player/src/components/SearchPopover.tsx"],
-      "components": ["ResultsPopover"],
+      "components": ["ProviderMark"],
       "states": ["counting", "results", "none", "dismissed (arrow brings back)"],
       "rules": ["UX-FEED-001", "UX-KEY-001"],
       "guideAnchor": "overlays",
@@ -401,7 +401,7 @@
       "title": "Row context menu",
       "entry": "(React specimen, not served — DEC-019) right-click or the row's menu key",
       "sourcePaths": ["packages/aqua-ui/src/components/music-list-behaviours.tsx"],
-      "components": ["RowMenu", "Menu"],
+      "components": ["RowMenu"],
       "states": ["open", "disabled items with reason"],
       "rules": ["UX-KEY-001", "UX-PRIN-004"],
       "guideAnchor": "overlays",
@@ -569,7 +569,8 @@
         "error (tiles read Not available; Try Again in Needs attention)",
         "alerts (count on the Overview tool)",
         "nothing needs you",
-        "signed-in line and Sign Out at the foot"
+        "signed-in line and Sign Out at the foot",
+        "the badge on the Overview tool and the Needs attention list come from one reading, so they always agree"
       ],
       "rules": ["UX-STATE-001", "UX-KEY-001", "UX-CHROME-001"],
       "guideAnchor": "screens",
@@ -649,12 +650,14 @@
         "invite made (code shown once)",
         "invite listed by who it is for, its role and state (never its code)",
         "invite withdrawn (confirm sheet)",
-        "archive (confirm sheet)"
+        "archive (confirm sheet)",
+        "a new invite opens under its own row with its code, folded away with its button or Escape"
       ],
       "rules": ["UX-SHARED-001", "UX-STATE-001"],
       "guideAnchor": "screens",
       "authority": "adopted",
-      "decision": "DEC-017"
+      "decision": "DEC-017",
+      "mockup": "hub-groups"
     },
     {
       "id": "hub-providers",
@@ -689,7 +692,9 @@
         "set-up form (secrets write-only; blank keeps what is stored)",
         "saved and tested (result beside the button)",
         "external tool on without setup (DEC-024)",
-        "requests and limits"
+        "requests and limits",
+        "details open under their own row; Escape closes them and puts the caret back on the button",
+        "Requests and limits lists the providers in use, the rest behind a disclosure"
       ],
       "rules": ["UX-PRIN-002", "UX-A11Y-001"],
       "guideAnchor": "screens",
@@ -723,11 +728,14 @@
         "folder scan failed",
         "tracks",
         "no matches",
-        "remove folder (confirm sheet)"
+        "remove folder (confirm sheet)",
+        "Scan on a folder’s row scans that folder alone",
+        "Scan Now scans every folder"
       ],
       "rules": ["UX-STATE-001", "UX-SAFE-001"],
       "guideAnchor": "screens",
-      "authority": "adopted"
+      "authority": "adopted",
+      "mockup": "hub-library"
     },
     {
       "id": "hub-downloads",
@@ -767,6 +775,39 @@
       "authority": "adopted"
     },
     {
+      "id": "hub-live-tv",
+      "kind": "screen",
+      "product": "hub",
+      "platform": "web",
+      "title": "Live TV from the companion",
+      "entry": "Music tab → Live TV from the companion (drawn after Downloads, inside the downloads section)",
+      "sourcePaths": [
+        "docker-container/src/web/views/LiveTv.tsx",
+        "docker-container/src/live-tv/service.ts"
+      ],
+      "components": [
+        "Group",
+        "EmptyRow",
+        "Sdot",
+        "Ago",
+        "Push",
+        ".rows list in a .well",
+        "confirmation sheet"
+      ],
+      "states": [
+        "loading",
+        "nothing yet: a sharing companion sends its channels when it syncs",
+        "kept: which companion sent it, how many channels, the guide, when it was updated",
+        "remove (confirm sheet); the companion sends them again when it next syncs",
+        "failed to load (Try Again)",
+        "read-only: channels are added and removed in the companion"
+      ],
+      "rules": ["UX-TV-001", "UX-STATE-001", "UX-SAFE-001"],
+      "guideAnchor": "screens",
+      "authority": "adopted",
+      "mockup": "hub-live-tv"
+    },
+    {
       "id": "hub-profiles",
       "kind": "screen",
       "product": "hub",
@@ -788,7 +829,8 @@
       "states": ["none", "listed", "renaming", "name taken", "remove picture (confirm sheet)"],
       "rules": ["UX-SAFE-001", "UX-FEED-001"],
       "guideAnchor": "screens",
-      "authority": "adopted"
+      "authority": "adopted",
+      "mockup": "hub-profiles"
     },
     {
       "id": "hub-shares",
@@ -813,12 +855,15 @@
         "active (expiry in words)",
         "revoked",
         "revoke (confirm sheet)",
-        "no form to create one: links are made in the player (DEC-017)"
+        "Create Link: a hub playlist or album from the picker and how long the link works; the hub builds the item list (DEC-028)",
+        "link made: the full link shown once, under the form, with Copy",
+        "nothing to share yet: the picker says so"
       ],
       "rules": ["UX-SAFE-001"],
       "guideAnchor": "screens",
       "authority": "adopted",
-      "decision": "DEC-017"
+      "decision": "DEC-028",
+      "mockup": "hub-shares"
     },
     {
       "id": "hub-recommendations",
@@ -838,10 +883,17 @@
         ".tbl table in a .well",
         ".pref rows"
       ],
-      "states": ["defaults", "edited"],
-      "rules": ["UX-PRIN-003"],
+      "states": [
+        "defaults",
+        "edited",
+        "nothing sent until Save; Revert puts back what the hub has",
+        "a number outside its range refused before sending",
+        "refused by the hub: its sentence under the form"
+      ],
+      "rules": ["UX-PRIN-003", "UX-FORM-001"],
       "guideAnchor": "screens",
-      "authority": "adopted"
+      "authority": "adopted",
+      "mockup": "hub-recommendations"
     },
     {
       "id": "hub-discord",
@@ -874,11 +926,16 @@
         "voice playing",
         "last error",
         "template preview",
-        "remove token (confirm sheet)"
+        "remove token (confirm sheet)",
+        "warnings and errors as plain sentences",
+        "server IDs checked before anything is sent",
+        "Save and Start sends the lot; Revert puts back what the hub has",
+        "Invite the Bot disabled with its reason until a token is saved"
       ],
-      "rules": ["UX-PRIN-002", "UX-DISCORD-003", "VOICE-002", "UX-SAFE-001"],
+      "rules": ["UX-PRIN-002", "UX-DISCORD-003", "VOICE-002", "UX-SAFE-001", "UX-FORM-001"],
       "guideAnchor": "discord",
-      "authority": "adopted"
+      "authority": "adopted",
+      "mockup": "hub-discord"
     },
     {
       "id": "hub-network",
@@ -899,10 +956,18 @@
         ".kv",
         ".pref rows"
       ],
-      "states": ["localhost", "lan", "remote (restart required)"],
-      "rules": ["UX-SAFE-002"],
+      "states": [
+        "localhost",
+        "lan",
+        "remote (restart required)",
+        "edited: nothing sent until Save; the public address checked first; Revert puts back what the hub has",
+        "saved: Saved. in the status strip",
+        "what works where: this machine, your network, the internet"
+      ],
+      "rules": ["UX-SAFE-002", "UX-FORM-001"],
       "guideAnchor": "screens",
-      "authority": "adopted"
+      "authority": "adopted",
+      "mockup": "hub-network"
     },
     {
       "id": "hub-backup",
@@ -936,12 +1001,16 @@
         "space measured",
         "space unknown",
         "next backup will not fit",
-        "no path, schedule or include controls: no route sets them (DEC-017)"
+        "settings: the folder inside the data volume, the parts included, how often (every day or week, at a time) and how many to keep — sent together with Save; Revert puts them back",
+        "a folder outside the data volume refused before sending",
+        "the next scheduled backup said in words, on the hub’s clock; a slot missed while the hub was off is taken when it starts (DEC-029)",
+        "Download on each archive (an attachment, admin only)"
       ],
-      "rules": ["UX-SAFE-001", "UX-STATE-001"],
+      "rules": ["UX-SAFE-001", "UX-STATE-001", "UX-FORM-001"],
       "guideAnchor": "screens",
       "authority": "adopted",
-      "decision": "DEC-017"
+      "decision": "DEC-029",
+      "mockup": "hub-backup"
     },
     {
       "id": "hub-diagnostics",
@@ -952,10 +1021,15 @@
       "entry": "System tab → Diagnostics",
       "sourcePaths": ["docker-container/src/web/views/Diagnostics.tsx"],
       "components": ["ActionError", "Group", "Note", "Pop", "Push", ".pref rows", ".log"],
-      "states": ["loaded"],
+      "states": [
+        "loaded",
+        "log level chosen (the list follows it)",
+        "support bundle saved as a file, with what it leaves out said beside the button"
+      ],
       "rules": ["UX-STATE-001"],
       "guideAnchor": "screens",
-      "authority": "adopted"
+      "authority": "adopted",
+      "mockup": "hub-diagnostics"
     },
     {
       "id": "share-page",
@@ -1018,7 +1092,8 @@
         "a tempo read from a tag is plain; a measured one wears ≈",
         "tempo waiting: Setting up FFmpeg",
         "tempo unavailable: FFmpeg could not be set up (Try again in Settings)",
-        "tempo unavailable: no FFmpeg (install it and scan again)"
+        "tempo unavailable: no FFmpeg (install it and scan again)",
+        "a windowed list: only the rows in view are drawn and every song is counted; End, Shift+Home and Ctrl+A reach every song, fetching only what they need"
       ],
       "rules": [
         "UX-STATE-001",
@@ -1117,11 +1192,16 @@
         "running with progress",
         "archives listed",
         "restore (confirm sheet)",
-        "delete (confirm sheet)"
+        "delete (confirm sheet)",
+        "what goes in: music, TV, movies, playlists, EQ presets, recommendation algorithms (from the paired hub, named; the reason when there is none) and these settings with the Live TV links",
+        "how often: by hand, every day or every week while the companion is open; a run that is due is taken when the companion next opens",
+        "how many to keep",
+        "a scheduled run that could not happen is reported, not dropped"
       ],
       "rules": ["UX-SAFE-001", "VOICE-002"],
       "guideAnchor": "screens",
-      "authority": "adopted"
+      "authority": "adopted",
+      "mockup": "companion-backup"
     },
     {
       "id": "companion-about",
@@ -1132,10 +1212,16 @@
       "entry": "Settings tab → About",
       "sourcePaths": ["windows-companion/src/renderer/views/About.tsx"],
       "components": ["Push", "Status", ".pref rows"],
-      "states": ["loaded"],
-      "rules": ["VOICE-003"],
+      "states": [
+        "where its data is kept, with Open",
+        "cache by part, Clear Cache (confirm sheet), then what was cleared",
+        "logs: Open, Export (secrets, tokens and folder paths taken out), detailed logs switch",
+        "build, signing, and how updates are checked"
+      ],
+      "rules": ["VOICE-003", "UX-PRIV-001"],
       "guideAnchor": "screens",
-      "authority": "adopted"
+      "authority": "adopted",
+      "mockup": "companion-about"
     },
     {
       "id": "companion-live-tv",
@@ -1155,7 +1241,8 @@
         "refused (the reason under the field; what was typed is kept; nothing added)",
         "stopped answering (keeps what it last held; Check Again)",
         "remove (the round minus)",
-        "Add disabled with reason until a link is pasted"
+        "Add disabled with reason until a link is pasted",
+        "while sharing is on, its channels and guide are kept on the hub too (links with a sign-in left out); turning sharing off removes them"
       ],
       "rules": ["UX-TV-001", "UX-STATE-001", "VOICE-001", "UX-PRIN-001"],
       "mockup": "companion-live-tv",
@@ -1192,9 +1279,22 @@
         "helper running / not running with reason",
         "port invalid",
         "token shown / hidden / copied",
-        "restore defaults (confirm)"
+        "restore defaults (confirm)",
+        "a tool: Check asks about that tool; Update when a newer version is out (badge on the tool); Install when it is missing; Update waits, with the reason, while the helper is busy",
+        "Update downloaders automatically: on by default",
+        "Downloads: the folder from the system’s picker, format, how many at once and a speed limit",
+        "new versions of the companion: checked by default, asked at once when switched on, said when one is out; Download opens the release page",
+        "notifications when a download finishes: one preference with “When one finishes”",
+        "helper on your network: off by default; what it exposes said before it is switched on (DEC-032)"
       ],
-      "rules": ["UX-PRIN-001", "UX-FEED-001", "UX-SETUP-001", "UX-SAFE-001"],
+      "rules": [
+        "UX-PRIN-001",
+        "UX-FEED-001",
+        "UX-SETUP-001",
+        "UX-SAFE-001",
+        "UX-NET-001",
+        "UX-PRIV-001"
+      ],
       "mockup": "companion-settings",
       "decision": "DEC-018"
     },
@@ -1269,7 +1369,8 @@
         "not destructive: Cancel, then the action as the default button",
         "Escape cancels",
         "a second question answers the first with no",
-        "focus returns to where it was"
+        "focus returns to where it was",
+        "the sheet dims only the pane under the toolbar, and stays modal"
       ],
       "rules": ["UX-SAFE-001", "UX-FOCUS-001"],
       "guideAnchor": "window",
@@ -1409,7 +1510,7 @@
         "filtered by the bar"
       ],
       "rules": ["NP-LIST-001", "UX-KEY-001", "UX-STATE-001"],
-      "guideAnchor": "screens",
+      "guideAnchor": "shell",
       "authority": "adopted"
     },
     {
@@ -1434,7 +1535,7 @@
         "a channel (video bar, LIVE)"
       ],
       "rules": ["NP-TRANS-001", "UX-KEY-002"],
-      "guideAnchor": "screens",
+      "guideAnchor": "shell",
       "authority": "adopted"
     },
     {
@@ -1565,7 +1666,7 @@
         "no feed and nothing to read the stream: the programme format, no invented title"
       ],
       "rules": ["NP-LIVE-001", "NP-RADIO-001", "NP-RADIO-002"],
-      "guideAnchor": "screens",
+      "guideAnchor": "shell",
       "authority": "adopted"
     },
     {
@@ -1586,10 +1687,12 @@
         "channels from a loaded M3U",
         "a channel playing (LIVE)",
         "channels and guide from the companion (now and next where a guide has them; Live where it has none)",
-        "no companion, or one with no playlists: the guide is as it was"
+        "no companion, or one with no playlists: the guide is as it was",
+        "no companion on this machine: a paired hub’s copy of the companion’s Live TV fills the guide",
+        "Until: when the programme on now ends; blank where a channel has no guide"
       ],
       "rules": ["NP-LIVE-002", "NP-TV-001"],
-      "guideAnchor": "screens",
+      "guideAnchor": "shell",
       "authority": "adopted"
     },
     {
@@ -1648,7 +1751,7 @@
         "3D views unavailable (tables still carry the numbers)"
       ],
       "rules": ["NP-DATA-001"],
-      "guideAnchor": "screens",
+      "guideAnchor": "shell",
       "authority": "adopted"
     },
     {
@@ -1863,9 +1966,12 @@
         "sidecar missing or crashed (reason, restarting)",
         "devices paired, each direct / through a relay / not connected, with its quality cap",
         "revoke (confirm sheet)",
-        "port invalid"
+        "port invalid",
+        "Wi-Fi and Ethernet / metered connections: two switches, both on by default; paused with the reason on a connection that is switched off (DEC-031)",
+        "the connection switches are off while streaming itself is off",
+        "each paired device says when it was last seen, and how it is connected while it is"
       ],
-      "rules": ["UX-SAFE-001", "UX-FEED-001", "UX-PRIN-002"],
+      "rules": ["UX-SAFE-001", "UX-FEED-001", "UX-PRIN-002", "UX-STREAM-001"],
       "mockup": "companion-transfers",
       "decision": "DEC-018"
     }

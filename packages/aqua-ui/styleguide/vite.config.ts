@@ -12,6 +12,7 @@
  * first time a token changes.
  */
 import { copyFileSync, existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -99,6 +100,32 @@ function stampFingerprint(): Plugin {
   };
 }
 
+/**
+ * The hub's and the companion's real views, with a recording where their server would be.
+ *
+ * The views talk to their product through one module each — the hub's API client
+ * (`docker-container/src/web/lib/api.ts`) and the companion's bridge to its main process
+ * (`windows-companion/src/renderer/bridge.ts`). In this build, and only here, those two modules are
+ * swapped for `fixtures/fake-hub-api.ts` and `fixtures/fake-companion-bridge.ts`, which answer from
+ * what a running hub and companion answered. Everything else the views import is the products' own.
+ */
+function specimenTransports(): Plugin {
+  const key = (path: string): string => path.replace(/\\/g, '/').replace(/\.js$/, '.ts').toLowerCase();
+  const swaps = new Map([
+    [key(here('../../../docker-container/src/web/lib/api.ts')), here('./fixtures/fake-hub-api.ts')],
+    [key(here('../../../windows-companion/src/renderer/bridge.ts')), here('./fixtures/fake-companion-bridge.ts')],
+  ]);
+  return {
+    name: 'styleguide:specimen-transports',
+    enforce: 'pre',
+    resolveId(source, importer) {
+      if (!importer || !source.startsWith('.')) return null;
+      const from = importer.split('?')[0]!.replace(/\\/g, '/');
+      return swaps.get(key(resolvePath(from.slice(0, from.lastIndexOf('/')), source))) ?? null;
+    },
+  };
+}
+
 function escapeForRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -161,14 +188,12 @@ export default defineConfig({
   root: here('.'),
   base: './',
   publicDir: false,
-  plugins: [react(), stampFingerprint(), inlineEverything(), publish()],
+  plugins: [specimenTransports(), react(), stampFingerprint(), inlineEverything(), publish()],
   define: { __STYLEGUIDE_BUILD__: JSON.stringify(BUILD) },
   resolve: {
     alias: {
       '@now-playing/contracts': workspace('contracts'),
       '@now-playing/domain': workspace('domain'),
-      '@now-playing/aqua-ui/window.css': here('../src/styles/aqua-window.css'),
-      '@now-playing/aqua-ui/media.css': here('../src/styles/aqua-media.css'),
       '@now-playing/aqua-ui/now-playing.css': here('../src/styles/now-playing.css'),
       '@now-playing/aqua-ui': here('../src/index.ts'),
     },

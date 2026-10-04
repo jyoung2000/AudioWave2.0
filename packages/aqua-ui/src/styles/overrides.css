@@ -8,7 +8,7 @@
  *
  * `:root:root` rather than `:root` is deliberate. It selects the same element, so it changes nothing
  * about what is matched, but it carries one more point of specificity — which matters because the
- * products load `aqua-window.css` and `now-playing.css` after this file, and a plain `:root` here
+ * player loads `now-playing.css` after this file, and a plain `:root` here
  * would lose to theirs on source order. An override that only works in some import orders is worse
  * than none.
  *

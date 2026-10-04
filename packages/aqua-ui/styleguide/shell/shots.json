@@ -1,0 +1,28 @@
+{
+  "source": "music-player/index.html",
+  "sourceHash": "365b1448afc6c7df",
+  "takenAt": "2026-10-04T04:58:48.928Z",
+  "how": "pnpm styleguide:shell (scripts/styleguide-shell-shots.mjs) against pnpm build:player, served by vite preview",
+  "viewports": [
+    {
+      "id": "desktop",
+      "width": 1280,
+      "height": 860
+    },
+    {
+      "id": "phone",
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "files": [
+    "player-desktop-now-playing.png",
+    "player-desktop-radio.png",
+    "player-desktop-live-tv.png",
+    "player-desktop-settings.png",
+    "player-phone-now-playing.png",
+    "player-phone-radio.png",
+    "player-phone-live-tv.png",
+    "player-phone-settings.png"
+  ]
+}
