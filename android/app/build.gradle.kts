@@ -83,14 +83,36 @@ android {
  */
 val playerAssets = layout.projectDirectory.dir("src/main/assets/app")
 
+/*
+ * Where the app serves the player from, read from MainActivity's START_URL rather than written twice:
+ * `.../assets/app/index.html` means the player must have been built with the base `/assets/app/`.
+ */
+val servedBase: String = run {
+  val source = layout.projectDirectory.file("src/main/java/com/nowplaying/player/MainActivity.kt").asFile.readText()
+  val start = Regex("""START_URL\s*=\s*"\${'$'}ASSET_ORIGIN(/[^"]*/)index\.html"""").find(source)
+    ?: error("MainActivity.START_URL no longer has the shape \"\$ASSET_ORIGIN/<base>/index.html\"; update checkPlayerAssets with it.")
+  start.groupValues[1]
+}
+
 tasks.register("checkPlayerAssets") {
   doLast {
-    val index = playerAssets.file("index.html").asFile
-    check(index.exists()) {
-      "No player in ${playerAssets.asFile.path}.\n" +
-        "Build it and copy it in first (the base path must match where the app serves it):\n" +
-        "  NP_BASE_PATH=/assets/app/ pnpm build:player\n" +
+    val advice =
+      "Build it for the path the app serves it from, and copy it in:\n" +
+        "  NP_BASE_PATH=$servedBase pnpm build:player   (in Git Bash: MSYS_NO_PATHCONV=1 NP_BASE_PATH=$servedBase pnpm build:player)\n" +
         "  rm -rf android/app/src/main/assets/app && cp -R music-player/dist android/app/src/main/assets/app"
+    val index = playerAssets.file("index.html").asFile
+    check(index.exists()) { "No player in ${playerAssets.asFile.path}.\n$advice" }
+    // A player built for another base still produces a green build and an app that opens to a blank
+    // screen (Hermes, 2026-10-04): every script it asks for is somewhere the app does not serve. The
+    // built page names its entry script; it must sit under the base the app serves from. Git Bash
+    // also rewrites `/assets/app/` into `/Program Files/Git/assets/app/` unless told not to.
+    val html = index.readText()
+    val entries = Regex("""<script[^>]*\ssrc="([^"]*/index-[^"/]*\.js)"""").findAll(html).map { it.groupValues[1] }.toList()
+    check(entries.isNotEmpty()) { "The player in ${playerAssets.asFile.path} names no entry script; it is not a player build.\n$advice" }
+    val wrong = entries.filterNot { it.startsWith("${servedBase}assets/") }
+    check(wrong.isEmpty()) {
+      "The player in ${playerAssets.asFile.path} was built for another base path: it asks for ${wrong.joinToString()} " +
+        "but the app serves it from $servedBase, so it would open to a blank screen.\n$advice"
     }
   }
 }

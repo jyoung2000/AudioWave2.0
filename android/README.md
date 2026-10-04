@@ -81,6 +81,12 @@ cd android
 ```
 
 In PowerShell, set the variable with `$env:NP_BASE_PATH = '/assets/app/'` before `pnpm build:player`.
+In Git Bash, prefix the build with `MSYS_NO_PATHCONV=1`: without it Git Bash turns `/assets/app/` into
+`/Program Files/Git/assets/app/` before the build sees it.
+
+`assembleDebug` checks the copy before it packages it (`checkPlayerAssets`): it fails, saying what
+to run, when there is no player there or when the player was built for a base other than the one
+`MainActivity.START_URL` serves from. Both used to produce a green build and a blank screen.
 
 APKs land in `app/build/outputs/apk/debug/`, one per architecture — `arm64-v8a` is the one almost
 every phone since about 2017 wants. They are split because the tool libraries carry a Python runtime
