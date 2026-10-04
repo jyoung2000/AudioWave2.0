@@ -331,12 +331,3 @@ function usePageScroller(ref: React.RefObject<HTMLDivElement | null>, enabled: b
   }, [ref, enabled]);
   return state;
 }
-
-/** Speaker glyph for the status column of the playing row. */
-export function NowPlayingGlyph({ paused }: { paused?: boolean }) {
-  return (
-    <span className="aqua-table__now-playing" role="img" aria-label={paused ? 'Paused' : 'Now playing'}>
-      <Glyph name={paused ? 'pause' : 'speaker'} />
-    </span>
-  );
-}

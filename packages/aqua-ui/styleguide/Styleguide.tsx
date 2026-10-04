@@ -10,8 +10,8 @@
 import { useEffect, useMemo, type ReactNode } from 'react';
 import { BRANDING } from '@now-playing/contracts';
 import tokens from '../src/styles/tokens.json';
-import { AquaProvider, ToastProvider, Button, Checkbox, PopUpMenu, ProgressBar, SearchField, SegmentedControl, SourceList, SourceIcon, Glyph, TrackScrubber, BarSearch, Slider, StatusDot, MusicList } from '../src/index.js';
-import { Card, ControlsDemo, IconsDemo, OverlaysDemo, PageDemo, ResultsDemo, ShellDemo, StatesDemo, makeRows, makeTracks } from '../gallery/specimens.js';
+import { ToastProvider, Button, Checkbox, PopUpMenu, ProgressBar, SegmentedControl, Glyph, TrackScrubber, BarSearch, Slider, StatusDot, MusicList } from '../src/index.js';
+import { Card, ControlsDemo, IconsDemo, OverlaysDemo, PageDemo, StatesDemo, makeTracks } from '../gallery/specimens.js';
 import { ContextMenuSpecimen, EqualizerSpecimen, PageFurnitureSpecimen, SearchPopoverSpecimen, ShareStripSpecimen, SheetSpecimen, ToastSpecimen } from './page-specimens.js';
 import { ConstellationField, SpectrumSpecimen } from './visualisers.js';
 import { Mockups } from './Mockups.js';
@@ -70,8 +70,6 @@ const LIBRARY_IN_PLAYER = USAGE.library.filter((item) => item.player);
 const LIBRARY_UNUSED = USAGE.library.filter((item) => !item.player && !item.hub && !item.companion);
 const LIBRARY_IN_WINDOWS = USAGE.library.filter((item) => item.hub || item.companion);
 const KIT_NAMES = [...new Set([...USAGE.kits.hub, ...USAGE.kits.companion])].sort();
-
-const rows = makeRows(24);
 
 /* ------------------------------------------------------------- pieces */
 
@@ -142,11 +140,9 @@ const NAV: NavGroup[] = [
       { href: '#shell', label: 'The served shell (player)' },
       { href: '#page', label: 'The page skin (library)' },
       { href: '#window', label: 'The Airwave window (hub, companion)' },
-      { href: '#library-window', label: 'The earlier window skin' },
       { href: '#controls', label: 'Library controls' },
       { href: '#overlays', label: 'Overlays' },
       { href: '#states', label: 'States' },
-      { href: '#results', label: 'Results and grid' },
       { href: '#icons', label: 'Icons' },
       { href: '#products', label: 'By product' },
     ],
@@ -187,7 +183,7 @@ export function Styleguide() {
   }, []);
 
   return (
-    <AquaProvider active reducedMotion={undefined}>
+    <>
       <ToastProvider>
         <div className="sg">
           <nav className="sg__rail" aria-label="Sections">
@@ -306,7 +302,7 @@ export function Styleguide() {
                 <div className="sg__grp">
                   <b>The component library</b>
                   <p>
-                    --aqua-*, --np-*, --lib-* · aqua.css, aqua-window.css, aqua-media.css, now-playing.css · <code>packages/aqua-ui</code> React components · imported by the player's
+                    --aqua-*, --np-*, --lib-* · aqua.css, now-playing.css · <code>packages/aqua-ui</code> React components · imported by the player's
                     React source, the gallery and this guide; no served product (DEC-026)
                   </p>
                 </div>
@@ -356,21 +352,6 @@ export function Styleguide() {
                 <div className="sg__row aqua-root">
                   <span className="sg__wrong-button">Save</span>
                   <span className="sg__verdict sg__verdict--no">Aqua 10.2 · a decade early — drawn once here, as the thing not to do</span>
-                </div>
-              </Bed>
-              <h3 className="sg__h3">Selection</h3>
-              <Bed caption="The source list's selected row is the blue gel gradient with white text, as in every OS X sidebar; the music list's selected row is the same blue at the page skin's tint; the sorted column is the palest tint of the three.">
-                <div className="sg__row aqua-root" style={{ alignItems: 'flex-start' }}>
-                  <div style={{ width: 196, height: 150, border: '1px solid #747474', overflow: 'hidden' }}>
-                    <SourceList
-                      selectedId="work"
-                      onSelect={() => undefined}
-                      groups={[
-                        { id: 'cal', label: 'Calendars', items: [{ id: 'home', label: 'Home', icon: <SourceIcon name="library" /> }, { id: 'work', label: 'Work', icon: <SourceIcon name="playlists" />, count: 3 }] },
-                        { id: 'shared', label: 'Shared', items: [{ id: 'club', label: 'Listening Club', icon: <SourceIcon name="groups" />, status: 'no hub', disabled: true }] },
-                      ]}
-                    />
-                  </div>
                 </div>
               </Bed>
               <h3 className="sg__h3">Controls that keep the gel</h3>
@@ -515,10 +496,7 @@ box-shadow:
   inset 0 1px 0 rgb(255 255 255 / 90%),   /* the pixel of light on the top edge */
   0 1px 0 rgb(255 255 255 / 55%);         /* the surface beneath catching it */`}</div>
               <h3 className="sg__h3">Recessed fields</h3>
-              <Bed caption="Wells run the other way: shadowed at the top inside, with the lower lip catching light. Same source, opposite surface. The window skin's search field and the page skin's search pill are the same idea at two heights (22 px and 26 px).">
-                <div className="sg__row aqua-root">
-                  <SearchField value="" onChange={() => undefined} shortcut />
-                </div>
+              <Bed caption="Wells run the other way: shadowed at the top inside, with the lower lip catching light. Same source, opposite surface. The page skin's search pill is one, 26 px high.">
                 <div className="np-app" style={{ width: 380 }}>
                   <BarSearch label="Search your music" value="" onChange={() => undefined} placeholder="Search your music" />
                 </div>
@@ -707,20 +685,6 @@ box-shadow:
               </ul>
             </Section>
 
-            <Section id="library-window" title="The earlier window skin — in the library, worn by no product">
-              <p>
-                Before the Airwave designs, the hub and the companion were built from this: a framed window with traffic lights, a unified toolbar carrying the transport and the
-                LCD, a source list, a work area with a table, and a bottom bar. The components are still in <code>packages/aqua-ui</code> and still tested, and nothing was deleted,
-                but no product renders this window any more (DEC-026). It is shown so the library stays documented, not as a pattern to build on.
-              </p>
-              <ShellDemo rows={rows} />
-              <p className="sg__note">
-                Every part of that window is a library component: <code>AquaWindow</code>, <code>Toolbar</code>, <code>TrafficLights</code>, <code>Transport</code>, <code>LcdDisplay</code>,{' '}
-                <code>Scrubber</code>, <code>VolumeSlider</code>, <code>SearchField</code>, <code>SegmentedControl</code>, <code>AvatarButton</code>, <code>SourceList</code>,{' '}
-                <code>WorkArea</code>, <code>Content</code>, <code>AquaTable</code>, <code>Marquee</code>, <code>NowPlayingGlyph</code>, <code>BottomBar</code>, <code>IconButton</code>.
-              </p>
-            </Section>
-
             <Section id="controls" title="Library controls">
               <p>
                 The component library's controls, in both of its skins. The player's React source imports them; the hub and the companion do not — their controls are the Airwave
@@ -733,17 +697,17 @@ box-shadow:
 
             <Section id="overlays" title="Overlays">
               <p>
-                Sheets attach to their window; alerts stand alone; menus open where they are asked for and return focus to what asked. Press the buttons. These are the component
-                library's overlays; the Airwave windows' confirmation sheets are drawn in the mockups.
+                Sheets attach to their window; alerts stand alone; toasts confirm what just happened and get out of the way. Press the buttons. These are the component library's
+                overlays; the Airwave windows' confirmation sheets are drawn in the mockups.
               </p>
               <OverlaysDemo />
             </Section>
 
             <Section id="states" title="States — the group people skip">
               <p>
-                Every screen owes an answer for empty, loading, offline, partial, refused and out-of-date. <code>UnavailableCapabilityState</code> exists so that “this cannot work here” is a
-                designed state carrying its reason, rather than a blank pane. These are the component library's state panels; in the Airwave windows the same answers are one quiet
-                line inside the list's well (see The Airwave window).
+                Every screen owes an answer for empty, loading, offline, partial, refused and out-of-date. The component library draws two of them as panels,{' '}
+                <code>EmptyState</code> and <code>LoadingState</code>; the rest are said in the view's own words where the choice is made. In the Airwave windows the same answers
+                are one quiet line inside the list's well (see The Airwave window).
               </p>
               <div style={{ display: 'grid', gap: 12 }}>
                 <StatesDemo />
@@ -758,15 +722,10 @@ box-shadow:
               </Bed>
             </Section>
 
-            <Section id="results" title="Results and grid">
-              <p>The library window skin's results popover — the same idea as the page's, at the toolbar's height — and the artwork grid. No product renders either today.</p>
-              <ResultsDemo />
-            </Section>
-
             <Section id="icons" title="Icons">
               <p>
-                Three families in the component library: sixteen-pixel colour source icons for the sidebar, single-colour glyphs for everything else, and the avatar set. The
-                Airwave windows draw their own: six 26-pixel tools for the hub (<code>docker-container/src/web/icons.tsx</code>) and four tools and three row glyphs for the
+                Two families in the component library: single-colour glyphs for every control, and the platform marks that say where a track comes from. The Airwave windows draw
+                their own: six 26-pixel tools for the hub (<code>docker-container/src/web/icons.tsx</code>) and four tools and three row glyphs for the
                 companion (<code>windows-companion/src/renderer/icons.tsx</code>), as their designs drew them; both sets are in the mockups.
               </p>
               <IconsDemo />
@@ -825,25 +784,28 @@ box-shadow:
               <p>
                 <code>packages/aqua-ui</code> exports {USAGE.library.length} components.{' '}
                 {LIBRARY_IN_WINDOWS.length ? <b>{LIBRARY_IN_WINDOWS.length} are imported by the hub or the companion. </b> : 'The hub and the companion import none of them. '}
-                {LIBRARY_IN_PLAYER.length} are imported by the player's React source in <code>music-player/src</code>, which is kept and tested but is not what the player serves
-                (DEC-019); {LIBRARY_UNUSED.length} are imported by no product at all.
+                {LIBRARY_IN_PLAYER.length === USAGE.library.length ? `All ${USAGE.library.length}` : LIBRARY_IN_PLAYER.length} are imported by the player's React source in{' '}
+                <code>music-player/src</code>, which is kept and tested but is not what the player serves (DEC-019). A component no product imports is removed from the library
+                rather than kept as legacy.
               </p>
-              <h4 className="sg__h4">Still used by the player's React source ({LIBRARY_IN_PLAYER.length})</h4>
+              <h4 className="sg__h4">Imported by the player's React source ({LIBRARY_IN_PLAYER.length})</h4>
               <p className="sg-paths">
                 {LIBRARY_IN_PLAYER.map((item) => (
                   <code key={item.name}>{item.name}</code>
                 ))}
               </p>
-              <h4 className="sg__h4">Unused legacy — imported by no product ({LIBRARY_UNUSED.length})</h4>
-              <p className="sg-paths">
-                {LIBRARY_UNUSED.map((item) => (
-                  <code key={item.name}>{item.name}</code>
-                ))}
-              </p>
+              {LIBRARY_UNUSED.length ? (
+                <>
+                  <h4 className="sg__h4">Imported by no product ({LIBRARY_UNUSED.length}) — remove these</h4>
+                  <p className="sg-paths">
+                    {LIBRARY_UNUSED.map((item) => (
+                      <code key={item.name}>{item.name}</code>
+                    ))}
+                  </p>
+                </>
+              ) : null}
               <p className="sg__note">
-                Unused does not mean deleted: the library, its stylesheets and its tests stay as they are, and the gallery and this guide still render them. It means a change to
-                one of these reaches no running product. The player's shell also draws its search popover, sheets, toast and equalizer window from its own markup rather than
-                through a component.
+                The player's shell also draws its search popover, sheets, toast and equalizer window from its own markup rather than through a component.
               </p>
             </Section>
 
@@ -956,6 +918,6 @@ box-shadow:
           </main>
         </div>
       </ToastProvider>
-    </AquaProvider>
+    </>
   );
 }

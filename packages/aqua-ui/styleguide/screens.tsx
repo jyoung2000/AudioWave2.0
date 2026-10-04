@@ -29,7 +29,7 @@
  */
 import { useState, type ReactNode } from 'react';
 import { BRANDING } from '@now-playing/contracts';
-import { AquaTable, Button, Checkbox, KeyValueList, Panel, PanelSection, SegmentedControl, SourceBadge, SourceIcon, StatusDot, TextField, type ColumnDef } from '../src/index.js';
+import { AquaTable, Button, Checkbox, KeyValueList, Panel, PanelSection, SegmentedControl, SourceBadge, StatusDot, TextField, type ColumnDef } from '../src/index.js';
 import { PageDemo } from '../gallery/specimens.js';
 import { CONSTELLATION_ALBUMS, ConstellationField, SpectrumSpecimen, type FixtureAlbum } from './visualisers.js';
 import {
@@ -504,5 +504,3 @@ function EngineScreen() {
     </div>
   );
 }
-
-export { SourceIcon };

@@ -31,17 +31,3 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(function Che
     </label>
   );
 });
-
-export interface RadioProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'children'> {
-  children: ReactNode;
-}
-
-export const Radio = forwardRef<HTMLInputElement, RadioProps>(function Radio({ children, className, ...rest }, ref) {
-  return (
-    <label className={['aqua-check', 'aqua-check--radio', className].filter(Boolean).join(' ')}>
-      <input ref={ref} type="radio" className="aqua-check__input" {...rest} />
-      <span className="aqua-check__box" aria-hidden="true" />
-      <span className="aqua-check__label">{children}</span>
-    </label>
-  );
-});

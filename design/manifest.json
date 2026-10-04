@@ -41,8 +41,6 @@
     "stylesheets": {
       "paths": [
         "packages/aqua-ui/src/styles/aqua.css",
-        "packages/aqua-ui/src/styles/aqua-window.css",
-        "packages/aqua-ui/src/styles/aqua-media.css",
         "packages/aqua-ui/src/styles/now-playing.css"
       ],
       "owns": "The component library’s custom properties (light scheme on :root, dark and touch layers after it). Mirror tokens.json by hand; see tokenMap. Loaded by the player’s React source, the gallery and this guide — not by the hub or the companion."
@@ -57,7 +55,7 @@
     },
     "components": {
       "path": "packages/aqua-ui/src",
-      "owns": "The component library: every shared React control, shell, overlay and state. Imported by the player’s React source in music-player/src (kept, not served — DEC-019), the gallery and this guide. The hub and the companion import only the Airwave stylesheets and AquaArt from this package; the styleguide lists which components no product imports (DEC-026)."
+      "owns": "The component library: every shared React control, shell, overlay and state. Imported by the player’s React source in music-player/src (kept, not served — DEC-019), the gallery and this guide; it exports only what the player imports, and the styleguide’s usage scan lists any component no product imports so it can be removed. The hub and the companion import only the Airwave stylesheets and AquaArt from this package (DEC-026)."
     },
     "rules": {
       "path": "design/ux-rules.json",

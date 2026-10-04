@@ -1,15 +1,15 @@
 /*
- * Only the shared half of the stylesheet loads from here: tokens, base, and the controls every
- * product renders. The three chrome stylesheets are imported by the products that actually draw
- * that chrome, because CSS does not tree-shake and a product should not carry rules for markup it
- * never produces:
+ * The component library's public face: exactly what the player's React source imports, and nothing
+ * else. The styleguide reads this file to list every component and which product imports it; a
+ * component no product imports is removed rather than kept here as legacy.
  *
- *   @now-playing/aqua-ui/window.css        window frame, work area, source list, bottom bar
- *   @now-playing/aqua-ui/media.css         toolbar transport, LCD, scrubber, search, results
+ * Only the shared stylesheet loads from here: tokens, base, and the controls. The page skin is a
+ * separate import, because CSS does not tree-shake and only the player draws that page:
+ *
  *   @now-playing/aqua-ui/now-playing.css   the 2010 page: status bar, hero, iTunes 10 list
  *
- * The player is a page and loads the third; the hub's admin GUI is a window and loads the first.
- * The bundle budget in `tests/perf` is what turned this from a preference into a rule.
+ * The hub and the companion import none of the components — only the Airwave stylesheets
+ * (airwave-window.css, airwave-hub.css) and AquaArt (@now-playing/aqua-ui/airwave-art).
  */
 import './styles/aqua.css';
 // Design overrides, on top of everything the library ships. Empty by default; see the file's note
@@ -30,23 +30,8 @@ export * from './components/Slider.js';
 export * from './components/ProgressBar.js';
 export * from './components/SegmentedControl.js';
 export * from './components/Badge.js';
-export * from './components/Avatar.js';
-export * from './components/Window.js';
-export * from './components/Toolbar.js';
-export * from './components/Transport.js';
-export * from './components/LcdDisplay.js';
-export * from './components/Scrubber.js';
-export * from './components/VolumeSlider.js';
-export * from './components/SearchField.js';
-export * from './components/ResultsPopover.js';
-export * from './components/SourceList.js';
 export * from './components/AquaTable.js';
-export * from './components/ArtworkGrid.js';
-export * from './components/Tabs.js';
-export * from './components/ToolTabs.js';
-export * from './components/Marquee.js';
 export * from './components/Sheet.js';
-export * from './components/Menu.js';
 export * from './components/Toast.js';
 export * from './components/States.js';
 export * from './components/Panel.js';
@@ -54,9 +39,10 @@ export * from './components/PageBar.js';
 export * from './components/SectionStrip.js';
 export * from './components/Hero.js';
 
-// The page skin's list and stage, shared by the player, the gallery and the styleguide.
+// The page skin's list and stage, shared by the player, the gallery and the styleguide. MusicList's
+// row menu, marquee and overlay scroller (music-list-behaviours.tsx, Marquee.tsx) are its own parts
+// and stay private to it.
 export * from './components/MusicList.js';
-export * from './components/music-list-behaviours.js';
 export * from './components/JewelStage.js';
 export * from './lib/track-source.js';
 export * from './lib/provider-artwork.js';
