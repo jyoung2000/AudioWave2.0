@@ -8,7 +8,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { checkTokens, darkProperties, normalizeCssValue, rootProperties, runChecks, unionMembers } from '../../../../scripts/styleguide-lib.mjs';
+import { checkShellShots, checkTokens, darkProperties, normalizeCssValue, rootProperties, runChecks, shellHash, unionMembers } from '../../../../scripts/styleguide-lib.mjs';
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
 const read = (path: string): string => readFileSync(`${root}${path}`, 'utf8');
@@ -61,5 +61,25 @@ describe('token drift', () => {
     expect(normalizeCssValue('0 1px 1px rgba(0,0,0,0.25)')).toBe(normalizeCssValue('0 1px 1px rgb(0 0 0 / 25%)'));
     expect(normalizeCssValue('#FFF')).toBe(normalizeCssValue('#ffffff'));
     expect(normalizeCssValue('"Helvetica Neue", helvetica')).toBe(normalizeCssValue('Helvetica Neue, Helvetica'));
+  });
+});
+
+describe('the served shell’s screenshots', () => {
+  const shell = ['<!doctype html>', '<title>Airwave</title>', ''].join(String.fromCharCode(10));
+  const record = { source: 'music-player/index.html', sourceHash: shellHash(shell), files: ['player-desktop-now-playing.png'] };
+
+  it('pass while the shell is the one they were taken from, whatever its line endings', () => {
+    const crlf = shell.split(String.fromCharCode(10)).join(String.fromCharCode(13, 10));
+    expect(checkShellShots({ record, source: crlf, present: () => true })).toEqual([]);
+  });
+
+  it('catch screenshots taken from an older shell', () => {
+    const errors = checkShellShots({ record, source: `${shell}<p>changed</p>`, present: () => true });
+    expect(errors.join()).toContain('Run pnpm build:player and pnpm styleguide:shell');
+  });
+
+  it('catch a listed screenshot that is missing, and a missing record', () => {
+    expect(checkShellShots({ record, source: shell, present: () => false }).join()).toContain('player-desktop-now-playing.png is listed in shots.json but missing');
+    expect(checkShellShots({ record: null, source: shell, present: () => true }).join()).toContain('no shots.json');
   });
 });

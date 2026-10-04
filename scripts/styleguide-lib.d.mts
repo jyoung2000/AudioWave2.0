@@ -1,4 +1,16 @@
 export function sourceFingerprint(root: string): string;
+export function shellHash(text: string): string;
+export interface ShellShots {
+  source: string;
+  sourceHash: string;
+  takenAt?: string;
+  files?: string[];
+}
+export function checkShellShots(input: {
+  record: ShellShots | null;
+  source: string;
+  present: (file: string) => boolean;
+}): string[];
 export function rootProperties(css: string): Record<string, string>;
 export function darkProperties(css: string): Record<string, string>;
 export function normalizeCssValue(value: string | number): string;

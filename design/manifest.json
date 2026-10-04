@@ -103,6 +103,12 @@
     "entry": "packages/aqua-ui/styleguide/Styleguide.tsx",
     "html": "docs/design/styleguide.html",
     "pdf": "docs/design/styleguide.pdf",
+    "shell": {
+      "shots": "packages/aqua-ui/styleguide/shell",
+      "source": "music-player/index.html",
+      "script": "scripts/styleguide-shell-shots.mjs",
+      "about": "The served player, photographed at 1280 × 860 and 390 × 844 from pnpm build:player. shots.json records the hash of the shell they were taken from; pnpm styleguide:check fails when the shell has changed since."
+    },
     "fingerprintInputs": [
       "packages/aqua-ui/src",
       "packages/aqua-ui/styleguide",
@@ -186,6 +192,7 @@
     "build:window-css": "pnpm build:window-css — regenerates airwave-window.css and airwave-hub.css from design/frontends/airwave-companion.html and airwave-hub.html.",
     "styleguide:build": "pnpm styleguide:build — rebuilds docs/design/styleguide.html from the sources above (same as pnpm build:styleguide).",
     "styleguide:check": "pnpm styleguide:check — sources and evidence exist, rule IDs are unique, every discovered screen is in the ledger, tokens.json matches the stylesheets (the library’s and the Airwave window’s), and the committed HTML was built from the current sources.",
+    "styleguide:shell": "pnpm styleguide:shell — after pnpm build:player, retakes the served player's screenshots for The served shell (packages/aqua-ui/styleguide/shell) and records which shell they show.",
     "styleguide:pdf": "pnpm styleguide:pdf — prints the committed HTML to docs/design/styleguide.pdf with Playwright’s Chromium (set NP_STYLEGUIDE_BROWSER to use an installed Chrome or Edge).",
     "e2e": "pnpm --filter @now-playing/aqua-ui test:e2e — measures every mockup at every size.",
     "conformance": "pnpm test:unit — includes packages/aqua-ui/tests/unit/aqua-conformance.test.ts and design-sources.test.ts."

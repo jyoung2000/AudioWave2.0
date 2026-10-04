@@ -17,6 +17,7 @@ import { ConstellationField, SpectrumSpecimen } from './visualisers.js';
 import { Mockups } from './Mockups.js';
 import { DeviceFrame, type DeviceSpec } from './DeviceFrame.js';
 import { AirwaveKitSpecimen, HUB_CSS, prepareAirwaveDocument } from './airwave-screens.js';
+import { ShellShots } from './shell-shots.js';
 import { Brand, Coverage, DarkScheme, Discord, Governance, Interaction, Journeys, Platforms, Principles, PrintContents, PrintCover, Screens, type NavGroup } from './Governance.js';
 
 /* ------------------------------------------------------------------ data */
@@ -138,7 +139,8 @@ const NAV: NavGroup[] = [
   {
     group: 'Elements',
     items: [
-      { href: '#page', label: 'The page (player)' },
+      { href: '#shell', label: 'The served shell (player)' },
+      { href: '#page', label: 'The page skin (library)' },
       { href: '#window', label: 'The Airwave window (hub, companion)' },
       { href: '#library-window', label: 'The earlier window skin' },
       { href: '#controls', label: 'Library controls' },
@@ -262,8 +264,8 @@ export function Styleguide() {
                       library.
                     </td>
                     <td>
-                      The <code>player-shell-*</code> rows in Every screen and the <code>NP-*</code> rules. The page skin in Elements is the component library's version of the
-                      same look, kept in <code>music-player/src</code> but not served.
+                      The served shell in Elements (screenshots of the production build), the <code>player-shell-*</code> rows in Every screen and the <code>NP-*</code> rules.
+                      The page skin is the component library's version of the same look, kept in <code>music-player/src</code> but not served.
                     </td>
                   </tr>
                   <tr>
@@ -549,6 +551,16 @@ box-shadow:
                 drift. Two variables carry most of it — <code>--aqua-anim-state: paused</code> and <code>--aqua-sheet-travel: 0</code> — so a new animation should read one of them rather
                 than inventing a third.
               </p>
+            </Section>
+
+            <Section id="shell" title="The served shell — the player as it is served" chapter>
+              <p>
+                What a listener opens is <code>music-player/index.html</code>, the Airwave design served as the shell (DEC-019), and what Android and the local helper ship
+                too. It is one document with its own stylesheet and scripts, so it cannot be put inside one of this guide's frames; it is shown here as it is, photographed
+                from the production build. The page skin in the next chapter is the component library's version of the same look — the React interface kept in{' '}
+                <code>music-player/src</code> — and is not what is served.
+              </p>
+              <ShellShots />
             </Section>
 
             <Section id="page" title="The page — what the player is made of" chapter>

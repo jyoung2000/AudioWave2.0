@@ -44,7 +44,8 @@
     "build:styleguide": "pnpm --filter @now-playing/aqua-ui build:styleguide",
     "styleguide:build": "pnpm build:styleguide",
     "styleguide:check": "node scripts/styleguide-check.mjs",
-    "styleguide:pdf": "node scripts/export-styleguide-pdf.mjs"
+    "styleguide:pdf": "node scripts/export-styleguide-pdf.mjs",
+    "styleguide:shell": "node scripts/styleguide-shell-shots.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
