@@ -191,7 +191,7 @@ export class DownloadService {
     if (!listAuthorized || listAuthorized.kind !== 'external-tool') this.refused('external-tool', input.ownerId, basis, meta, actorDisplayName);
     const probe = await adapter.probe(listAuthorized.url);
     const base: CreateDownloadInput = { source: { provider: 'external-tool', providerTrackId: null, url: null, locator: null, title: null, artistName: null }, authorization: input.authorization, target: input.target, ownerId: input.ownerId };
-    const existing = this.repo.activeSourceUrls(input.ownerId);
+    const existing = this.repo.activeSourceUrls(input.ownerId, input.target.format);
     const skipped: DownloadBatchResult['batch']['skipped'] = [];
     const created = (job: DownloadRecord, details: Record<string, unknown> = {}): void => {
       this.audit.record({ actor: { kind: 'device', id: input.ownerId, displayName: actorDisplayName }, action: 'download.create', outcome: 'success', target: { kind: 'download', id: job.id }, ip: meta.ip, correlationId: meta.correlationId, details: { provider: 'external-tool', basis, format: input.target.format, ...details } });

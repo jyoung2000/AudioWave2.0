@@ -5,7 +5,7 @@ import { DOWNLOAD_BATCH_CAP, type ProviderCapabilities, type ProviderDescriptor,
 import { DomainError, hostMatches, validateOutboundUrl } from '@now-playing/domain';
 import { versionOf } from '@now-playing/domain/tool-install';
 import { fromSpotdl, fromYtDlp, type MediaProbe } from '../../media/media-metadata.js';
-import { lastError, runTool, ToolRunError } from '../../media/run-tool.js';
+import { lastError, resolveExecutable, runTool, ToolRunError } from '../../media/run-tool.js';
 import type { AuthorizedDownload, DownloadContext, ProviderTestResult } from '../adapter.js';
 import { BaseAdapter, caps, healthy, REVIEWED_AT, result } from './base.js';
 
@@ -320,13 +320,14 @@ export class ExternalToolAdapter extends BaseAdapter {
     }
     const parsed = new URL(url);
     const preset = this.presetFor(parsed);
+    const ffmpeg = resolveExecutable(where.ffmpeg);
     if (!preset) throw new DomainError('setup-required', 'No external tool command is configured');
     const binary = this.binaryFor(preset);
     if (preset.tool === 'spotdl') {
       if (!existsSync(binary)) throw new DomainError('setup-required', 'spotDL is not on this hub yet, so Spotify links cannot be saved. The hub sets it up by itself when it can reach github.com.');
-      if (!where.ffmpeg) throw new DomainError('unsupported', 'spotDL needs FFmpeg, and this hub has none');
+      if (!ffmpeg) throw new DomainError('unsupported', 'spotDL needs FFmpeg, and this hub has none');
     }
-    return { binary, args: preset.download({ url, outputDir: where.outputDir, ffmpeg: where.ffmpeg, node: process.execPath }), mode: 'directory', preset };
+    return { binary, args: preset.download({ url, outputDir: where.outputDir, ffmpeg, node: process.execPath }), mode: 'directory', preset };
   }
 
   /** The environment a run of `preset` gets: the hub's tool environment, and for spotDL a new home of its own. */
@@ -419,7 +420,7 @@ export class ExternalToolAdapter extends BaseAdapter {
   private async readMetadata(preset: ToolPreset, url: string, signal?: AbortSignal): Promise<MediaProbe> {
     const binary = this.binaryFor(preset);
     if (!existsSync(binary)) throw new DomainError('setup-required', `${preset.displayName} is not on this hub yet`);
-    const ffmpeg = await this.ffmpeg();
+    const ffmpeg = resolveExecutable(await this.ffmpeg());
     const runDir = preset.needsHome ? this.makeRunDir(preset.tool) : null;
     try {
       const saveFile = join(runDir ?? '', 'save.spotdl');

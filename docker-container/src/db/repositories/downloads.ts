@@ -145,11 +145,14 @@ export class DownloadsRepository {
   }
 
   /**
-   * Source URLs this requester already has a download for that is not failed or cancelled — what a
-   * playlist request skips as a duplicate rather than fetching twice.
+   * Source URLs this requester already has a download for, in `format`, that is not failed or
+   * cancelled — what a playlist request skips as a duplicate rather than fetching twice. The same
+   * track asked for in another format is a different file, and is not a duplicate.
    */
-  activeSourceUrls(ownerId: string): Set<string> {
-    const rows = this.db.prepare<[string], { url: string | null }>("SELECT json_extract(source, '$.url') AS url FROM download_jobs WHERE owner_id = ? AND state NOT IN ('failed', 'cancelled')").all(ownerId);
+  activeSourceUrls(ownerId: string, format: DownloadJob['target']['format']): Set<string> {
+    const rows = this.db
+      .prepare<[string, string], { url: string | null }>("SELECT json_extract(source, '$.url') AS url FROM download_jobs WHERE owner_id = ? AND json_extract(target, '$.format') = ? AND state NOT IN ('failed', 'cancelled')")
+      .all(ownerId, format);
     return new Set(rows.map((r) => r.url).filter((u): u is string => typeof u === 'string'));
   }
 

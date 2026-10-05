@@ -8,8 +8,9 @@
  */
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, dirname, isAbsolute, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { resolveExecutable } from '../../src/media/run-tool.js';
 import { toolEnvironment, toolScratchDir } from '../../src/media/tool-env.js';
 import { ExternalToolAdapter } from '../../src/providers/adapters/external-tool.js';
 
@@ -36,6 +37,15 @@ describe('the tool environment', () => {
   it('on Windows also points TEMP and TMP there, and keeps SystemRoot', () => {
     const env = toolEnvironment('D:/data/tmp/tools', { Path: 'C:/Windows', SystemRoot: 'C:/Windows', TEMP: 'C:/t' }, 'win32');
     expect(env).toEqual({ PATH: 'C:/Windows', SystemRoot: 'C:/Windows', TEMP: 'D:/data/tmp/tools', TMP: 'D:/data/tmp/tools', TMPDIR: 'D:/data/tmp/tools' });
+  });
+
+  it('hands a tool FFmpeg’s full path, because `--ffmpeg-location ffmpeg` is read as a path and finds nothing', () => {
+    // Found in the container on 2026-10-04: the hub knew FFmpeg as `ffmpeg`, and yt-dlp said "ffmpeg not found".
+    const dir = dirname(process.execPath);
+    const resolved = resolveExecutable(basename(process.execPath).replace(/\.exe$/i, ''), { PATH: dir, Path: dir });
+    expect(resolved && isAbsolute(resolved)).toBe(true);
+    expect(resolveExecutable('/usr/bin/ffmpeg')).toBe('/usr/bin/ffmpeg');
+    expect(resolveExecutable(null)).toBeNull();
   });
 
   it('a hub with no disk leaves the default in place', () => {

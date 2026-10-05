@@ -199,6 +199,10 @@ describe('a playlist link', () => {
     expect(again.batch.created).toBe(0);
     expect(again.batch.id).toBeNull();
     expect(again.batch.skipped.filter((s) => s.reason === 'duplicate')).toHaveLength(4);
+    // The same tracks in another format are other files, so they are not duplicates.
+    const asMp3 = (await batch('https://soundcloud.com/forss/sets/soulhack', 'public-domain', 'mp3')).json() as DownloadBatchResult;
+    expect(asMp3.batch.created).toBe(3);
+    await hub.ctx.downloads.idle();
   });
 
   it('is refused by the one-job endpoint, which says where to send it', async () => {

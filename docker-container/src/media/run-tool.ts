@@ -8,7 +8,8 @@
  * that floods its output cannot fill the hub's memory.
  */
 import { spawn } from 'node:child_process';
-import { toolCommand } from '@now-playing/domain/tool-install';
+import { isAbsolute } from 'node:path';
+import { findOnPath, toolCommand } from '@now-playing/domain/tool-install';
 
 export interface RunToolOptions {
   env: NodeJS.ProcessEnv;
@@ -83,6 +84,16 @@ export function runTool(binary: string, args: readonly string[], options: RunToo
       else resolvePromise({ stdout: Buffer.concat(chunks).toString('utf8'), stderr });
     });
   });
+}
+
+/**
+ * A program's full path. The hub may know FFmpeg as just `ffmpeg` (found on PATH); a tool told
+ * `--ffmpeg-location ffmpeg` reads that as a path and finds nothing, so it is given the file itself.
+ */
+export function resolveExecutable(path: string | null, env: NodeJS.ProcessEnv = process.env): string | null {
+  if (!path) return null;
+  if (isAbsolute(path) || /[\\/]/.test(path)) return path;
+  return findOnPath(path, env) ?? path;
 }
 
 /** The last useful line a tool wrote to stderr, for a message a person reads. */

@@ -159,7 +159,8 @@ export function planFinalise(input: { file: string; inputExtension: string; work
   const args = ['-hide_banner', '-loglevel', 'error', '-y', '-i', input.file, '-f', 'ffmetadata', '-i', metadataFile];
   if (cover) args.push('-i', cover);
   args.push('-map', '0:a:0');
-  if (cover) args.push('-map', '2:v:0', '-c:v', 'copy', '-disposition:v:0', 'attached_pic');
+  // "Cover (front)" is what makes ID3 call the picture the front cover rather than "Other".
+  if (cover) args.push('-map', '2:v:0', '-c:v', 'copy', '-disposition:v:0', 'attached_pic', '-metadata:s:v:0', 'comment=Cover (front)');
   args.push(...codec);
   // Ogg keeps its comments on the audio stream; the other containers keep them on the file.
   if (ogg) args.push('-map_metadata', '-1', '-map_metadata:s:a:0', '1:g');
