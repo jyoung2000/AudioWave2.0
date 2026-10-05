@@ -550,6 +550,54 @@
       ]
     },
     {
+      "id": "UX-DL-001",
+      "group": "feedback",
+      "title": "A download carries clean tags and its cover, or says what it lacks",
+      "contract": "A file the helper or the companion downloads with yt-dlp has the thumbnail embedded as cover art (JPEG) and clean tags: a YouTube upload’s title is cleaned (“(Official Video)”, “(4K Remaster)”, frame rates and a trailing “- Official …” go; “Artist - Song” splits; the channel is the artist when the title names none), featured artists are written into the artist tag as “Artist feat. Guest” (more: “Artist feat. Guest & Other”) with the main artist alone as album artist, a source’s own album and genre are kept (a site category is not a genre), and the date is the whole release or upload date, YYYY-MM-DD. Each song of a playlist gets its own. The cleaning happens on the link’s description in the helper, never on a command line. Without FFmpeg nothing can be embedded: the file is saved as the site sent it and the finished job says so in words. spotDL embeds its own tags and art. The library keeps the whole date beside the year.",
+      "example": "ffprobe of a downloaded file: title=Big Buck Bunny, artist=Blender, album_artist=Blender, date=2014-11-10, and an attached picture. Without FFmpeg: “Saved as the site sent it: FFmpeg is not on this PC, so there is no cover art and the title, artist and date were not written into the file.”",
+      "authority": "adopted",
+      "owners": [
+        "local-helper/src/jobs.ts",
+        "packages/domain/src/media-tags.ts",
+        "packages/domain/src/titles.ts",
+        "packages/contracts/src/entities/library.ts",
+        "music-player/src/lib/library.ts",
+        "windows-companion/src/main/library.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "local-helper/tests/unit/download-tags.test.ts",
+          "name": "embeds the thumbnail as JPEG cover art and writes the tags when FFmpeg is here"
+        },
+        {
+          "type": "test",
+          "path": "local-helper/tests/unit/download-tags.test.ts",
+          "name": "describes, cleans, then downloads from the cleaned description"
+        },
+        {
+          "type": "test",
+          "path": "local-helper/tests/unit/download-tags.test.ts",
+          "name": "writes features into the artist tag as \"A feat. B\", and the album artist alone"
+        },
+        {
+          "type": "test",
+          "path": "local-helper/tests/unit/download-tags.test.ts",
+          "name": "without FFmpeg, downloads in one go and says what the file lacks"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/media-tags.test.ts",
+          "name": "takes the date tag first, then the release date, then the original release date"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/titles.test.ts",
+          "name": "takes \"4K Remaster\", frame rates and a trailing \" - Official …\" off as noise"
+        }
+      ]
+    },
+    {
       "id": "UX-A11Y-001",
       "group": "feedback",
       "title": "Roles are true and colour is never the only signal",
@@ -2051,6 +2099,75 @@
           "type": "test",
           "path": "music-player/tests/e2e/np/preview.spec.ts",
           "name": "a row with no clip says so instead of pretending"
+        }
+      ]
+    },
+    {
+      "id": "NP-FIND-002",
+      "group": "np-find",
+      "title": "A pasted link says what it is, keylessly, and a playlist becomes its songs",
+      "contract": "A YouTube, SoundCloud, Bandcamp or Spotify link pasted into the header search becomes a row at once and fills in from the best source that answers: the paired hub first, then the companion on this PC — its yt-dlp or spotDL reading the link with no account or key (GET /helper/v1/resolve) — then the site’s oEmbed. A later, lesser answer only fills what a better one left empty. The details line under the title gains the release date (or, failing that, the upload date) as YYYY-MM-DD; the companion also supplies duration, album, features and art. A pasted playlist, set or album is replaced by its songs, each a row with its own address that can be added and fetched on its own, under a count that names the list — “Title: N songs” — and says “(the first 200 of M)” when the cap of 200 left some out. An entry the site lists by address alone shows its address as a name until its page of rows is on screen, when it is looked up. The companion answers a page it has vetted, or the token; it never answers another device on the network, because reading a link runs a tool.",
+      "example": "Pasting https://www.youtube.com/watch?v=dQw4w9WgXcQ: “Never Gonna Give You Up” — “Rick Astley — YouTube · 2009-10-25”, 3:33. Pasting a YouTube playlist: “Team Fortress 2 [2010 Version]: 29 songs”.",
+      "authority": "adopted",
+      "owners": [
+        "music-player/scripts/make-shell.py",
+        "music-player/index.html",
+        "local-helper/src/resolve.ts",
+        "local-helper/src/server.ts",
+        "packages/contracts/src/api/local-helper.ts",
+        "packages/domain/src/media-tags.ts",
+        "packages/domain/src/titles.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/links.spec.ts",
+          "name": "a pasted YouTube link: the companion’s answer lands over oEmbed’s, with the date on the details line"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/links.spec.ts",
+          "name": "with no companion, a pasted link still resolves through oEmbed and nothing asks a local port"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/links.spec.ts",
+          "name": "a pasted playlist becomes its songs, each its own row, under a count that names the list and the cap"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/links.spec.ts",
+          "name": "a set listed by address alone shows each entry’s own words once its page is on screen"
+        },
+        {
+          "type": "test",
+          "path": "local-helper/tests/integration/helper-resolve.test.ts",
+          "name": "reads a YouTube video: clean title and artist, the whole date, the duration and the art"
+        },
+        {
+          "type": "test",
+          "path": "local-helper/tests/integration/helper-resolve.test.ts",
+          "name": "lists a playlist’s songs, each with its own address, and says the count and the cap"
+        },
+        {
+          "type": "test",
+          "path": "local-helper/tests/integration/helper-resolve.test.ts",
+          "name": "reads a Spotify track through spotDL save, in a home of its own that is gone afterwards"
+        },
+        {
+          "type": "test",
+          "path": "local-helper/tests/integration/helper-resolve.test.ts",
+          "name": "answers a vetted page without the token, and no page only with it"
+        },
+        {
+          "type": "test",
+          "path": "local-helper/tests/integration/helper-resolve.test.ts",
+          "name": "refuses a host off the allowlist, a private address and a non-https link before starting anything"
+        },
+        {
+          "type": "test",
+          "path": "local-helper/tests/security/helper-lan.test.ts",
+          "name": "refuses every other route from the network, even with the token"
         }
       ]
     },
