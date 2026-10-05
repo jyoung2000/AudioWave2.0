@@ -131,8 +131,14 @@ const BUNDLES: Bundle[] = [
      *
      * And to 2403 for Live TV from the paired hub (the hub keeps the companion's copy, so a player
      * away from the companion's PC still gets channels) — measured, 2 KB of inline shell script.
+     *
+     * And to 2409 for pasted links read by the companion (NP-FIND-002, 2026-10-04): the resolve
+     * step beside the hub/oEmbed chain, a playlist's songs as rows with their count and cap, the
+     * per-entry lookup and the date on the details line — measured, 5 KB of inline shell script —
+     * plus the full release date the library indexer reads (UX-DL-001: `releaseDateOf` and the
+     * contract's `releaseDate`, in the lazily loaded scanner chunk) — 1 KB. The entry is unmoved.
      */
-    totalBudgetKb: 2403,
+    totalBudgetKb: 2409,
     // Three.js belongs to the constellation and the jewel case; the tag reader only to a scan.
     mustBeSplit: ['three', 'music-metadata'],
   },
