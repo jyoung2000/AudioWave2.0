@@ -27,7 +27,7 @@
  * pass flags to a subprocess is a page that can run anything.
  */
 import { z } from 'zod';
-import { IsoDateTime } from '../common.js';
+import { CalendarDate, IsoDateTime } from '../common.js';
 import { DownloadAuthorizationBasis, OutputFormat } from '../entities/jobs.js';
 
 /** Bumped when a change would make an older player misread a newer helper, or the reverse. */
@@ -206,8 +206,68 @@ export type HelperTvGuideEntry = z.infer<typeof HelperTvGuideEntry>;
 export const HelperTvGuide = z.object({ generatedAt: IsoDateTime, guide: z.array(HelperTvGuideEntry) });
 export type HelperTvGuide = z.infer<typeof HelperTvGuide>;
 
+/** The most entries a resolved playlist, set or album lists. The same cap a download of one has. */
+export const HELPER_RESOLVE_CAP = 200;
+
+/** Which site a resolved link is on. */
+export const HelperResolveSource = z.enum(['youtube', 'soundcloud', 'bandcamp', 'spotify', 'other']);
+export type HelperResolveSource = z.infer<typeof HelperResolveSource>;
+
+/**
+ * One song, as the site describes it, with the title cleaned the way a download's tags are
+ * (`cleanTags` in `@now-playing/domain`). `title` is null only for an entry of a set the site lists
+ * by address alone (SoundCloud does); resolve that entry's own `url` for the rest.
+ */
+export const HelperResolvedTrack = z.object({
+  url: z.string().max(2048).nullable(),
+  title: z.string().max(300).nullable(),
+  artist: z.string().max(300).nullable(),
+  featured: z.array(z.string().max(300)).max(8),
+  album: z.string().max(300).nullable(),
+  genre: z.string().max(60).nullable(),
+  durationSec: z.number().nonnegative().nullable(),
+  /** `YYYY-MM-DD` or `YYYY-MM`: the release date when the site has one, otherwise the upload date. */
+  date: CalendarDate.nullable(),
+  year: z.number().int().min(1000).max(3000).nullable(),
+  artworkUrl: z.string().max(2048).nullable(),
+  trackNumber: z.number().int().positive().nullable(),
+});
+export type HelperResolvedTrack = z.infer<typeof HelperResolvedTrack>;
+
+/**
+ * `GET /helper/v1/resolve?url=` — what a pasted link is, read keylessly by the tools on this PC:
+ * yt-dlp for YouTube, SoundCloud and Bandcamp, spotDL (`save`) for Spotify. A single song is `track`;
+ * a playlist, set or album is `collection`, with at most `HELPER_RESOLVE_CAP` entries — `total` is
+ * how many the site says there are, when it says, and `capped` is true when some were left out.
+ */
+export const HelperResolved = z.object({
+  source: HelperResolveSource,
+  kind: z.enum(['track', 'collection']),
+  url: z.string().max(2048),
+  track: HelperResolvedTrack.nullable(),
+  collection: z
+    .object({
+      title: z.string().max(300),
+      artist: z.string().max(300).nullable(),
+      artworkUrl: z.string().max(2048).nullable(),
+      date: CalendarDate.nullable(),
+      entries: z.array(HelperResolvedTrack).max(HELPER_RESOLVE_CAP),
+      total: z.number().int().nonnegative().nullable(),
+      cap: z.number().int().positive(),
+      capped: z.boolean(),
+    })
+    .nullable(),
+  resolvedAt: IsoDateTime,
+});
+export type HelperResolved = z.infer<typeof HelperResolved>;
+
 export const HELPER_ROUTES = {
   health: '/helper/v1/health',
+  /**
+   * `?url=` — what a pasted link is (HelperResolved). No token from a vetted page, the radio route's
+   * rule; never reachable from another device, because it starts a tool.
+   */
+  resolve: '/helper/v1/resolve',
   fetch: '/helper/v1/fetch',
   backupEstimate: '/helper/v1/backup/estimate',
   /** The merged Live TV channel list (HelperTvChannels). No token, same rule as the radio route: a vetted page only. */
