@@ -9,7 +9,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { boot, playRow, resetToLibrary, seed, watchErrors } from './_shell';
 
-type Motion = { spin: number; turn: number; angle: number; tilt: number; pitch: number; spinning: number; bpm: number | null; prefs: Record<string, unknown>; preview: { running: boolean; frames: number } };
+type Motion = { spin: number; turn: number; angle: number; tilt: number; pitch: number; out: number; spinning: number; bpm: number | null; prefs: Record<string, unknown>; preview: { running: boolean; frames: number } };
 const motion = (page: Page) => page.evaluate(() => (window as unknown as { NP_DISC: { motion(): Motion } }).NP_DISC.motion());
 
 let errors: string[];
@@ -98,8 +98,9 @@ test('the angle and the tilt are the listener’s, and Reset Position puts the d
   // Dragged somewhere else on the player, then Reset Position: back at 120° and no extra tilt.
   await choose(page, 'cfgDiscTurn', 'off');
   await backToPlayer(page);
-  // The stage idles while Settings covers it; let it catch up, so the disc is out to be held.
-  await page.waitForTimeout(2500);
+  // A drag holds the disc only once it is out of the case: wait for that, not for a fixed time (a slow
+  // runner draws the opening at a fraction of this machine's rate).
+  await expect.poll(async () => (await motion(page)).out, { message: 'the disc is out of its case', timeout: 30_000 }).toBeGreaterThan(0.95);
   const box = (await page.locator('#stage').boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();

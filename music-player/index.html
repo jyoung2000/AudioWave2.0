@@ -19614,7 +19614,7 @@ let discPreviewState = () => ({ running: false, frames: 0 });
   discPreviewState = () => ({ running, frames, turn: pTurn, spin: pSpeed });
 })();
 window.NP_DISC = Object.freeze({
-  motion: () => ({ spin: discSpinRate(), turn: discTurnRate(), angle: turn, tilt: discTilt, pitch: pitchRad(), spinning: spinSpeed, bpm: songBpm, prefs: Object.assign({}, discPrefs), preview: discPreviewState() }),
+  motion: () => ({ spin: discSpinRate(), turn: discTurnRate(), angle: turn, tilt: discTilt, pitch: pitchRad(), out: lastDiscT, spinning: spinSpeed, bpm: songBpm, prefs: Object.assign({}, discPrefs), preview: discPreviewState() }),
 });
 
 /* ---------- context loss ----------

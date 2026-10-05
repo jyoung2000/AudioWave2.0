@@ -1779,7 +1779,7 @@ replace("  const spinTarget = playing ? DISC_SPIN : 0;\n",
 replace("renderer.setAnimationLoop(tick);\n",
         "renderer.setAnimationLoop(tick);\n"
         "window.NP_DISC = Object.freeze({\n"
-        "  motion: () => ({ spin: discSpinRate(), turn: discTurnRate(), angle: turn, tilt: discTilt, pitch: pitchRad(), spinning: spinSpeed, bpm: songBpm, prefs: Object.assign({}, discPrefs), preview: discPreviewState() }),\n"
+        "  motion: () => ({ spin: discSpinRate(), turn: discTurnRate(), angle: turn, tilt: discTilt, pitch: pitchRad(), out: lastDiscT, spinning: spinSpeed, bpm: songBpm, prefs: Object.assign({}, discPrefs), preview: discPreviewState() }),\n"
         "});\n")
 
 

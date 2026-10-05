@@ -16,7 +16,8 @@ jobs:
   verify:
     name: Lint, typecheck, test, build (Linux)
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # The player's browser suite alone is ~27 minutes on a fast desktop and longer on a runner.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
