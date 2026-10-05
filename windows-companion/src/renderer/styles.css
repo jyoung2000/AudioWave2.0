@@ -491,10 +491,11 @@ dialog.sheet::backdrop {
 }
 
 .sheet__acts {
+  /* The window's button spacing (8px, as .barrow and .panefoot), 12px under the question: the hub's sheet. */
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  margin-top: 16px;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 /* A sheet has one default button, and it is blue for as long as the sheet is open. */
