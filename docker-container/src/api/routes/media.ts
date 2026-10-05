@@ -84,7 +84,22 @@ export function registerMediaRoutes(app: FastifyInstance, ctx: HubContext): void
     return job;
   });
 
-  registerRoute(app, ctx, routes.downloadsAction, ({ params, principal }) => ctx.downloads.action(params.jobId, params.action, principal.kind === 'admin' ? null : actorId(principal)));
+  registerRoute(app, ctx, routes.downloadsCreateBatch, async ({ body, principal, ip, correlationId, reply }) => {
+    const result = await ctx.downloads.createBatch(
+      {
+        url: body.url,
+        authorization: { basis: body.authorization.basis, evidence: body.authorization.evidence, acknowledged: true },
+        target: { destination: body.target.destination, directoryId: body.target.directoryId, filenameTemplate: body.target.filenameTemplate, format: body.target.format, quality: body.target.quality },
+        ownerId: actorId(principal),
+      },
+      { ip, correlationId },
+      actorDisplayName(principal),
+    );
+    reply.status(201);
+    return result;
+  });
+
+  registerRoute(app, ctx, routes.downloadsAction,({ params, principal }) => ctx.downloads.action(params.jobId, params.action, principal.kind === 'admin' ? null : actorId(principal)));
 
   registerRoute(app, ctx, routes.downloadsFormats, async () => {
     const report = await ctx.downloads.formats();

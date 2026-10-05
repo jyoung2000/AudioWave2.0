@@ -195,6 +195,16 @@ for the user" — and this is the posture now:
   the companion (`docker-container/src/media/tools.ts`; `NP_AUTO_TOOLS=0` turns the fetching off).
   The limits were never the switch and they have not moved: allowlisted hosts, no cookies, and a
   rights basis on every single request. An administrator can still turn it off under Providers.
+- **The hub carries spotDL too, takes playlist links, and tags what it saves.** The owner decided
+  on 2026-10-04 that the hub's downloads should match the companion's (design/decisions.md
+  DEC-036). The image ships spotDL beside yt-dlp — verified the same way, and set up by the hub
+  itself where the image is not in use — for open.spotify.com links only. A playlist, set or album
+  link becomes one download per entry, at most 200, and the answer says when a list was longer and
+  which entries were skipped (already downloaded, not on the allowlist, listed as unavailable). The
+  request names **one** rights basis, and it is checked against every entry, not only the list. A
+  link pasted into the player shows its real title without a YouTube key, because the hub asks the
+  tool what the link is. And every file is tagged — title, artist, featured artists, album, release
+  date — with its cover embedded.
 - **The Android app carries it**, and that is a change of posture worth naming rather than sliding
   past. Until it existed, someone had to go and install yt-dlp themselves, and that was itself a
   decision; in the app it arrives bundled. What stands in for that decision is the per-fetch rights
@@ -204,10 +214,28 @@ for the user" — and this is the posture now:
 
 ## The optional external tool
 
-The hub calls an external media tool — yt-dlp unless an administrator configures another — for
-content you own or are authorized to download. Since the owner's decision of 2026-10-03 it is **ready
-without setup**; an administrator can turn it off, and every request still has to name its rights
-basis.
+The hub calls an external media tool — yt-dlp, and spotDL for open.spotify.com links, unless an
+administrator configures another — for content you own or are authorized to download. Since the
+owner's decision of 2026-10-03 it is **ready without setup**; an administrator can turn it off, and
+every request still has to name its rights basis.
+
+What it does with a link, step by step:
+
+1. **Reading it.** `GET /providers/resolve` and `POST /downloads/batch` ask the tool what the link is
+   (`yt-dlp --ignore-config --dump-single-json --no-download --flat-playlist`, or `spotdl save` in an
+   empty home directory of its own), with the URL last behind `--` and no shell. The answer is the
+   site's own data: a title, a channel or artist, a date, a cover — or a list of entries.
+2. **One job per entry.** A list becomes up to 200 jobs, each with the tags its entry came with and
+   the request's single rights basis. A repeated request skips what is already downloading or
+   downloaded.
+3. **Downloading.** Each job runs the tool in a directory of its own and takes the one audio file it
+   leaves there. yt-dlp extracts the audio without re-encoding it and embeds what it read and the
+   thumbnail (as JPEG); spotDL fetches a matching recording from YouTube Music — another recording of
+   the same song, never Spotify's own audio, which nothing here touches.
+4. **Tagging.** The hub's FFmpeg writes the cleaned title, artist, featured artists, album, release
+   date, genre and source into the file from a metadata file (a title can never become a flag), and
+   carries the cover across: an attached picture for MP3, M4A and FLAC, the `METADATA_BLOCK_PICTURE`
+   comment for Opus. Converting to another format is the same pass, so it keeps both.
 
 It is constrained whether or not anyone configured it: an allowlist of hosts, no cookies passed to it, serialized execution
 with timeouts, and no DRM handling. It exists because "I own this and want a copy" is a legitimate

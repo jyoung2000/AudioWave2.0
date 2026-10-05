@@ -194,7 +194,9 @@ export class SearchService {
     for (const adapter of this.registry.enabledAdapters()) {
       if (!this.registry.isConfigured(adapter.id)) continue;
       try {
-        const result = await this.rateLimiter.run(adapter.id, 'P0', () => adapter.resolve(trimmed), { timeoutMs: 12_000 });
+        // Keyed adapters are registered first, so a configured YouTube, SoundCloud or Spotify answers
+        // before the external tool's keyless reading, which runs the tool and takes longer.
+        const result = await this.rateLimiter.run(adapter.id, 'P0', () => adapter.resolve(trimmed), { timeoutMs: adapter.resolveTimeoutMs ?? 12_000 });
         if (result) return this.enrichment ? this.enrichment.enrichResult(result, 200) : result;
       } catch {
         // A provider that cannot resolve this link is not an error for the caller; try the next one.

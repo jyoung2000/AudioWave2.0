@@ -27,6 +27,25 @@ describe('HubTools', () => {
     expect(tools.locate('ffmpeg')).toBeNull();
   });
 
+  it('finds spotDL where the image puts it, beside yt-dlp', () => {
+    const shipped = join(root, 'shipped-spotdl');
+    writeFileSync(shipped, 'x');
+    const tools = new HubTools({ toolsDir: join(root, 'tools'), imagePaths: { spotdl: shipped }, env: { PATH: '' }, log: quiet });
+    expect(tools.locate('spotdl')).toBe(shipped);
+    expect(tools.status().spotdl).toEqual({ present: true, reason: null });
+  });
+
+  it('finds spotDL in its own folder and on PATH', () => {
+    const toolsDir = join(root, 'tools');
+    mkdirSync(toolsDir);
+    writeFileSync(join(toolsDir, binaryName('spotdl')), 'x');
+    expect(new HubTools({ toolsDir, imagePaths: {}, env: { PATH: '' }, log: quiet }).locate('spotdl')).toBe(join(toolsDir, binaryName('spotdl')));
+    const bin = join(root, 'bin');
+    mkdirSync(bin);
+    writeFileSync(join(bin, binaryName('spotdl')), 'x');
+    expect(new HubTools({ toolsDir: join(root, 'none'), imagePaths: {}, env: { PATH: bin }, log: quiet }).locate('spotdl')).toBe(join(bin, binaryName('spotdl')));
+  });
+
   it('prefers the copy the image shipped', () => {
     const shipped = join(root, 'shipped-yt-dlp');
     writeFileSync(shipped, 'x');
@@ -53,11 +72,11 @@ describe('HubTools', () => {
       },
     });
     await tools.ensure();
-    expect(asked).toEqual(['yt-dlp', 'ffmpeg']);
-    expect(landed).toEqual(['yt-dlp', 'ffmpeg']);
-    expect(tools.status()).toEqual({ 'yt-dlp': { present: true, reason: null }, ffmpeg: { present: true, reason: null } });
+    expect(asked).toEqual(['yt-dlp', 'ffmpeg', 'spotdl']);
+    expect(landed).toEqual(['yt-dlp', 'ffmpeg', 'spotdl']);
+    expect(tools.status()).toEqual({ 'yt-dlp': { present: true, reason: null }, ffmpeg: { present: true, reason: null }, spotdl: { present: true, reason: null } });
     await tools.ensure();
-    expect(asked, 'present tools are left alone').toEqual(['yt-dlp', 'ffmpeg']);
+    expect(asked, 'present tools are left alone').toEqual(['yt-dlp', 'ffmpeg', 'spotdl']);
   });
 
   it('does not fetch FFmpeg where the system package is the right copy', async () => {
@@ -74,8 +93,9 @@ describe('HubTools', () => {
       },
     });
     await tools.ensure();
-    expect(asked).toEqual(['yt-dlp']);
+    expect(asked).toEqual(['yt-dlp', 'spotdl']);
     expect(tools.status()['yt-dlp']).toEqual({ present: false, reason: 'no network' });
+    expect(tools.status().spotdl).toEqual({ present: false, reason: 'no network' });
   });
 
   it('treats a failed setup as a reason, not a crash', async () => {

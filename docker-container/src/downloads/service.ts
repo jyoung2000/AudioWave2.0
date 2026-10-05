@@ -17,15 +17,17 @@
  * cancel or pause stops the transfer (or the FFmpeg/external-tool child) and the runner never
  * writes over a state somebody else set while it was working.
  */
-import { toolEnvironment, toolScratchDir } from '../media/tool-env.js';
 import { createHash } from 'node:crypto';
-import { createReadStream, createWriteStream, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs';
+import { createReadStream, createWriteStream, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync } from 'node:fs';
 import { spawn } from 'node:child_process';
-import { join } from 'node:path';
+import { extname, join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { Readable } from 'node:stream';
-import type { DownloadJob, JobState } from '@now-playing/contracts';
+import { DOWNLOAD_BATCH_CAP, type DownloadBatchResult, type DownloadJob, type DownloadSource, type DownloadTags, type JobState } from '@now-playing/contracts';
 import { DomainError, renderFilenameTemplate, sanitizeFilename, uuidv7 } from '@now-playing/domain';
+import { toolCommand } from '@now-playing/domain/tool-install';
+import { fromSpotdl, fromYtDlp, isCollectionUrl, mergeTags, titleFromUrl, type ProbedEntry } from '../media/media-metadata.js';
+import { FORMAT_ARGS, FORMAT_EXTENSIONS, planFinalise, readExisting } from './finalise.js';
 import type { AuditService } from '../auth/audit.js';
 import type { HubConfig } from '../config.js';
 import type { DownloadRecord, DownloadsRepository } from '../db/repositories/downloads.js';
@@ -35,7 +37,7 @@ import type { MetricsRegistry } from '../metrics/registry.js';
 import type { ProviderRegistry } from '../providers/registry.js';
 import type { RateLimitManager } from '../providers/rate-limit-manager.js';
 import type { SafeHttpClient } from '../providers/http.js';
-import type { AuthorizedDownload } from '../providers/adapter.js';
+import type { AuthorizedDownload, ProviderAdapter } from '../providers/adapter.js';
 import type { Logger } from 'pino';
 import { backoffMs } from '../util.js';
 import type { ExternalToolAdapter } from '../providers/adapters/external-tool.js';
@@ -64,13 +66,15 @@ export interface JobProgressSink {
   (job: DownloadJob): void;
 }
 
-const FORMAT_EXTENSIONS: Record<string, string> = { original: '', mp3: '.mp3', aac: '.m4a', opus: '.opus', flac: '.flac' };
-const FORMAT_ARGS: Record<string, string[]> = {
-  mp3: ['-c:a', 'libmp3lame', '-q:a', '2'],
-  aac: ['-c:a', 'aac', '-b:a', '256k'],
-  opus: ['-c:a', 'libopus', '-b:a', '160k'],
-  flac: ['-c:a', 'flac'],
-};
+export interface CreateBatchInput {
+  url: string;
+  authorization: CreateDownloadInput['authorization'];
+  target: CreateDownloadInput['target'];
+  ownerId: string;
+}
+
+/** Files a tool leaves beside the audio: its notes, the thumbnail it embedded, its partial downloads. */
+const SIDECAR = /\.(info\.json|spotdl|json|jpe?g|png|webp|part|ytdl|temp|tmp|m3u8?|lrc|txt|description)$/i;
 
 /** Thrown inside a runner when the job was cancelled, paused or deleted underneath it. */
 class JobSuperseded extends Error {
@@ -158,27 +162,120 @@ export class DownloadService {
   /** Ask the adapter whether this is permitted *before* creating the job, so a refusal is immediate. */
   async create(input: CreateDownloadInput, meta: { ip: string | null; correlationId: string | null }, actorDisplayName: string): Promise<DownloadJob> {
     const providerId = input.source.provider;
-    if (!this.providers.has(providerId)) throw new DomainError('not-found', `Unknown provider ${providerId}`);
-    if (!this.providers.isEnabled(providerId)) throw new DomainError('forbidden', `${providerId} is disabled`);
-    const adapter = this.providers.get(providerId);
+    const adapter = this.adapterFor(providerId);
     const id = input.source.providerTrackId ?? input.source.url;
     if (!id) throw new DomainError('validation', 'A download needs a provider track id or a URL');
+    if (providerId === 'external-tool' && isCollectionUrl(id)) throw new DomainError('validation', 'That link is a playlist, set or album. Send it to POST /downloads/batch, which makes one download per entry.');
 
     const authorized = await adapter.getAuthorizedDownload(id, { actorId: input.ownerId, basis: input.authorization.basis });
-    if (!authorized) {
-      this.audit.record({ actor: { kind: 'device', id: input.ownerId, displayName: actorDisplayName }, action: 'download.refused', outcome: 'denied', target: { kind: 'provider', id: providerId }, ip: meta.ip, correlationId: meta.correlationId, details: { basis: input.authorization.basis } });
-      throw new DomainError('forbidden', `${this.providers.descriptor(providerId).displayName} does not permit downloading this item on the basis "${input.authorization.basis}". A stream is not a download.`);
+    if (!authorized) this.refused(providerId, input.ownerId, input.authorization.basis, meta, actorDisplayName);
+    // A requester may suggest tags; the batch a job belongs to is only ever the hub's to set.
+    const job = this.insertJob(input, { ...input.source, batch: null }, authorized.kind === 'external-tool' ? null : (authorized.sizeBytes ?? null));
+    this.audit.record({ actor: { kind: 'device', id: input.ownerId, displayName: actorDisplayName }, action: 'download.create', outcome: 'success', target: { kind: 'download', id: job.id }, ip: meta.ip, correlationId: meta.correlationId, details: { provider: providerId, basis: input.authorization.basis, format: input.target.format } });
+    this.kick();
+    const { outputPath: _p, ...rest } = job;
+    return rest;
+  }
+
+  /**
+   * A link through the external tool, which may name a list: one job per entry (at most
+   * `DOWNLOAD_BATCH_CAP`), each with the tags the listing gave it, all under the request's one
+   * rights basis — which is checked against every entry, not only the list. Entries this requester
+   * already has, entries the listing marks unavailable, and entries on a host the tool may not
+   * reach are skipped and named in the answer. A single-track link makes one job.
+   */
+  async createBatch(input: CreateBatchInput, meta: { ip: string | null; correlationId: string | null }, actorDisplayName: string): Promise<DownloadBatchResult> {
+    const adapter = this.adapterFor('external-tool') as ExternalToolAdapter;
+    const basis = input.authorization.basis;
+    const listAuthorized = await adapter.getAuthorizedDownload(input.url, { actorId: input.ownerId, basis });
+    if (!listAuthorized || listAuthorized.kind !== 'external-tool') this.refused('external-tool', input.ownerId, basis, meta, actorDisplayName);
+    const probe = await adapter.probe(listAuthorized.url);
+    const base: CreateDownloadInput = { source: { provider: 'external-tool', providerTrackId: null, url: null, locator: null, title: null, artistName: null }, authorization: input.authorization, target: input.target, ownerId: input.ownerId };
+    const existing = this.repo.activeSourceUrls(input.ownerId, input.target.format);
+    const skipped: DownloadBatchResult['batch']['skipped'] = [];
+    const created = (job: DownloadRecord, details: Record<string, unknown> = {}): void => {
+      this.audit.record({ actor: { kind: 'device', id: input.ownerId, displayName: actorDisplayName }, action: 'download.create', outcome: 'success', target: { kind: 'download', id: job.id }, ip: meta.ip, correlationId: meta.correlationId, details: { provider: 'external-tool', basis, format: input.target.format, ...details } });
+    };
+
+    if (probe.kind === 'track') {
+      const url = listAuthorized.url;
+      const summary = { id: null, kind: 'track' as const, title: probe.tags.title, listed: 1, cap: DOWNLOAD_BATCH_CAP, capped: false };
+      if (existing.has(url)) {
+        skipped.push({ url, title: probe.tags.title, reason: 'duplicate' });
+        return { batch: { ...summary, created: 0, skipped }, items: [], message: 'There is already a download of this track, so no new one was made.' };
+      }
+      const job = this.insertJob(base, { ...base.source, url, title: probe.tags.title, artistName: probe.tags.artist, tags: probe.tags, batch: null }, null);
+      created(job);
+      this.kick();
+      const { outputPath: _p, ...rest } = job;
+      return { batch: { ...summary, created: 1, skipped }, items: [rest], message: `Downloading “${probe.tags.title}”.` };
     }
 
+    const listed = Math.max(probe.listed ?? 0, probe.entries.length);
+    const capped = listed > DOWNLOAD_BATCH_CAP;
+    const take: ProbedEntry[] = [];
+    const seen = new Set<string>();
+    for (const entry of probe.entries) {
+      if (take.length >= DOWNLOAD_BATCH_CAP) break;
+      const title = entry.tags?.title ?? titleFromUrl(entry.url);
+      if (entry.unavailable) {
+        skipped.push({ url: entry.url, title, reason: 'unavailable' });
+        continue;
+      }
+      // The rights basis covers every entry, and every entry must be on a host the tool may reach.
+      const authorized = await adapter.getAuthorizedDownload(entry.url, { actorId: input.ownerId, basis });
+      if (!authorized || authorized.kind !== 'external-tool') {
+        skipped.push({ url: entry.url, title, reason: 'not-allowed' });
+        continue;
+      }
+      if (seen.has(authorized.url) || existing.has(authorized.url)) {
+        skipped.push({ url: authorized.url, title, reason: 'duplicate' });
+        continue;
+      }
+      seen.add(authorized.url);
+      take.push({ ...entry, url: authorized.url });
+    }
+
+    const batchId = uuidv7(this.clock.now());
+    const items: DownloadJob[] = take.map((entry, index) => {
+      const job = this.insertJob(base, { ...base.source, url: entry.url, title: entry.tags?.title ?? titleFromUrl(entry.url), artistName: entry.tags?.artist ?? null, tags: entry.tags, batch: { id: batchId, title: probe.title, index, total: take.length } }, null);
+      created(job, { batch: batchId });
+      const { outputPath: _p, ...rest } = job;
+      return rest;
+    });
+    this.metrics.increment('downloads.batches');
+    this.kick();
+    const parts = [`${probe.title ? `“${probe.title}”` : 'This list'}: ${items.length} download${items.length === 1 ? '' : 's'} made`];
+    if (capped) parts.push(`it lists ${listed} entries and one request takes at most ${DOWNLOAD_BATCH_CAP}`);
+    if (skipped.length) parts.push(`${skipped.length} skipped`);
+    return {
+      batch: { id: items.length ? batchId : null, kind: 'playlist', title: probe.title, listed: probe.listed ?? probe.entries.length, created: items.length, cap: DOWNLOAD_BATCH_CAP, capped, skipped: skipped.slice(0, DOWNLOAD_BATCH_CAP) },
+      items,
+      message: `${parts.join('; ')}.`.slice(0, 500),
+    };
+  }
+
+  private adapterFor(providerId: string): ProviderAdapter {
+    if (!this.providers.has(providerId)) throw new DomainError('not-found', `Unknown provider ${providerId}`);
+    if (!this.providers.isEnabled(providerId)) throw new DomainError('forbidden', `${providerId} is disabled`);
+    return this.providers.get(providerId);
+  }
+
+  private refused(providerId: string, ownerId: string, basis: string, meta: { ip: string | null; correlationId: string | null }, actorDisplayName: string): never {
+    this.audit.record({ actor: { kind: 'device', id: ownerId, displayName: actorDisplayName }, action: 'download.refused', outcome: 'denied', target: { kind: 'provider', id: providerId }, ip: meta.ip, correlationId: meta.correlationId, details: { basis } });
+    throw new DomainError('forbidden', `${this.providers.descriptor(providerId).displayName} does not permit downloading this item on the basis "${basis}". A stream is not a download.`);
+  }
+
+  private insertJob(input: CreateDownloadInput, source: DownloadSource, bytesTotal: number | null): DownloadRecord {
     const now = this.nowIso();
     const job: DownloadRecord = {
       id: uuidv7(this.clock.now()),
       state: 'queued',
       ownerId: input.ownerId,
-      source: input.source,
+      source,
       authorization: { basis: input.authorization.basis, evidence: input.authorization.evidence ?? null, acknowledgedAt: now },
       target: { destination: input.target.destination, directoryId: input.target.directoryId ?? null, filenameTemplate: input.target.filenameTemplate ?? '{artist} - {title}', format: input.target.format, quality: input.target.quality ?? null },
-      progress: { bytesDone: 0, bytesTotal: authorized.kind === 'external-tool' ? null : (authorized.sizeBytes ?? null), speedBps: null, percent: null, stage: 'preflight' },
+      progress: { bytesDone: 0, bytesTotal, speedBps: null, percent: null, stage: 'preflight' },
       attempts: 0,
       maxAttempts: 5,
       nextRetryAt: null,
@@ -193,11 +290,8 @@ export class DownloadService {
     };
     this.repo.insert(job);
     this.metrics.increment('downloads.created');
-    this.audit.record({ actor: { kind: 'device', id: input.ownerId, displayName: actorDisplayName }, action: 'download.create', outcome: 'success', target: { kind: 'download', id: job.id }, ip: meta.ip, correlationId: meta.correlationId, details: { provider: providerId, basis: input.authorization.basis, format: input.target.format } });
     this.emit(job);
-    this.kick();
-    const { outputPath: _p, ...rest } = job;
-    return rest;
+    return job;
   }
 
   action(jobId: string, action: 'cancel' | 'pause' | 'resume' | 'retry', ownerId: string | null): DownloadJob {
@@ -242,15 +336,27 @@ export class DownloadService {
   }
 
   private cleanupPartial(job: DownloadRecord): void {
-    for (const suffix of ['.part', ...Object.keys(FORMAT_ARGS).map((f) => `.part.${f}`)]) {
-      const path = join(this.partDir(), `${job.id}${suffix}`);
+    // The `.part` file, the job's working directory (the tool's output, the tags file, the cover) and
+    // anything an older build left under the job's name.
+    let names: string[];
+    try {
+      names = readdirSync(this.partDir()).filter((name) => name.startsWith(job.id));
+    } catch {
+      return;
+    }
+    for (const name of names) {
       try {
-        if (existsSync(path)) rmSync(path, { force: true });
+        rmSync(join(this.partDir(), name), { recursive: true, force: true, maxRetries: 2, retryDelay: 100 });
       } catch (err) {
         // The runner may still hold the file open; it removes it again when it unwinds.
         this.log.debug({ module: 'downloads', job: job.id, err: err instanceof Error ? err.message : String(err) }, 'could not remove partial file yet');
       }
     }
+  }
+
+  /** A directory of the job's own: the tool's output, the tags file and the cover go here. */
+  private workDir(job: DownloadRecord): string {
+    return join(this.partDir(), `${job.id}.d`);
   }
 
   /**
@@ -331,38 +437,44 @@ export class DownloadService {
       signal.throwIfAborted();
 
       job = this.saveRunning(job, { progress: { ...job.progress, stage: 'downloading' } });
-      const bytes = await this.fetchToFile(authorized, part, job, signal);
+      const downloaded = await this.fetchToFile(authorized, part, job, signal);
       signal.throwIfAborted();
+      // What the tool reported about the track fills the gaps in what the job already knew.
+      if (downloaded.reported) {
+        const tags = mergeTags(job.source.tags, downloaded.reported);
+        const knewTags = Boolean(job.source.tags);
+        job = this.saveRunning(job, { source: { ...job.source, tags, title: knewTags ? (job.source.title ?? tags?.title ?? null) : (tags?.title ?? job.source.title), artistName: knewTags ? (job.source.artistName ?? tags?.artist ?? null) : (tags?.artist ?? job.source.artistName) } });
+      }
 
-      job = this.saveRunning(job, { progress: { ...job.progress, stage: 'verifying', bytesDone: bytes, percent: 100 } });
-      const checksum = await hashFile(part);
+      job = this.saveRunning(job, { progress: { ...job.progress, stage: 'verifying', bytesDone: downloaded.bytes, percent: 100 } });
+      const checksum = await hashFile(downloaded.path);
       // Deduplicate: a completed job with the same checksum already has the bytes.
       const duplicate = this.repo.findCompletedByChecksum(checksum);
       if (duplicate?.outputPath && existsSync(duplicate.outputPath)) {
-        rmSync(part, { force: true });
+        this.cleanupPartial(job);
         this.saveRunning(job, { state: 'completed', checksumSha256: checksum, resultSizeBytes: duplicate.resultSizeBytes, resultLocator: duplicate.resultLocator, outputPath: duplicate.outputPath, completedAt: this.nowIso(), error: null, progress: { ...job.progress, stage: 'done', percent: 100 } });
         this.metrics.increment('downloads.deduplicated');
         return;
       }
 
-      let finalPart = part;
-      if (job.target.format !== 'original') {
-        job = this.saveRunning(job, { progress: { ...job.progress, stage: 'converting' } });
-        finalPart = await this.convert(part, job.target.format, signal);
-        rmSync(part, { force: true });
-      }
+      // Tags, cover and format, in one FFmpeg pass.
+      const inputExtension = downloaded.extension || extensionOf(authorized.filename);
+      if (job.target.format !== 'original') job = this.saveRunning(job, { progress: { ...job.progress, stage: 'converting' } });
+      const finalised = await this.finalise(job, downloaded.path, inputExtension, signal);
+      const finalPart = finalised?.output ?? downloaded.path;
 
       job = this.saveRunning(job, { progress: { ...job.progress, stage: 'finalizing' } });
-      const finalChecksum = finalPart === part ? checksum : await hashFile(finalPart);
+      const finalChecksum = finalPart === downloaded.path ? checksum : await hashFile(finalPart);
       // Last chance to notice a cancel before the file becomes part of the blob store.
       signal.throwIfAborted();
       const current = this.repo.find(job.id);
       if (!current || current.state !== 'running') throw new JobSuperseded();
-      const extension = FORMAT_EXTENSIONS[job.target.format] || extensionOf(authorized.filename) || '.audio';
+      const extension = finalised?.extension ?? (FORMAT_EXTENSIONS[job.target.format] || inputExtension || '.audio');
       const filename = sanitizeFilename(renderFilenameTemplate(job.target.filenameTemplate, { artist: job.source.artistName ?? 'Unknown Artist', title: job.source.title ?? authorized.filename, provider: job.source.provider }, extension));
       const blobPath = join(this.blobDir(), `${finalChecksum}${extension}`);
       if (!existsSync(blobPath)) renameSync(finalPart, blobPath);
       else rmSync(finalPart, { force: true });
+      this.cleanupPartial(job);
       const size = statSync(blobPath).size;
 
       this.library.putBlob({ sha256: finalChecksum, size_bytes: size, relative_path: `blobs/${finalChecksum}${extension}`, mime: null, track_id: null, owner_id: job.ownerId, created_at: this.nowIso() });
@@ -406,11 +518,11 @@ export class DownloadService {
     }
   }
 
-  private async fetchToFile(authorized: AuthorizedDownload, part: string, job: DownloadRecord, signal: AbortSignal): Promise<number> {
+  private async fetchToFile(authorized: AuthorizedDownload, part: string, job: DownloadRecord, signal: AbortSignal): Promise<Downloaded> {
     if (authorized.kind === 'file') {
       if (!existsSync(authorized.path)) throw new DomainError('not-found', 'The source file is no longer on disk');
       await pipeline(createReadStream(authorized.path), createWriteStream(part), { signal });
-      return statSync(part).size;
+      return { path: part, bytes: statSync(part).size, extension: extensionOf(authorized.filename), reported: null };
     }
     if (authorized.kind === 'http') {
       // The rate limiter's signal bounds the wait for headers; the body is governed below by the
@@ -472,43 +584,79 @@ export class DownloadService {
       } finally {
         if (idleTimer) clearTimeout(idleTimer);
       }
-      return statSync(part).size;
+      return { path: part, bytes: statSync(part).size, extension: extensionOf(authorized.filename), reported: null };
     }
     return this.runExternalTool(authorized, part, job, signal);
   }
 
   /**
-   * Run the administrator-configured tool. No shell, no cookies, argument template only, hard
-   * timeout, and the tool writes to our `.part` path so it cannot choose its own destination.
+   * Run the external tool. No shell, no cookies, a command line built from the preset (or the
+   * operator's template), a hard timeout. A preset runs in a directory of the job's own and the hub
+   * takes the one audio file that appears there — the tool picks the extension (`--extract-audio`
+   * turns a WebM into `.opus`; spotDL names its files itself) but never the place. An operator's
+   * template writes the `.part` path it is given, exactly as before.
    */
-  private async runExternalTool(authorized: Extract<AuthorizedDownload, { kind: 'external-tool' }>, part: string, job: DownloadRecord, signal: AbortSignal): Promise<number> {
+  private async runExternalTool(authorized: Extract<AuthorizedDownload, { kind: 'external-tool' }>, part: string, job: DownloadRecord, signal: AbortSignal): Promise<Downloaded> {
     const adapter = this.providers.get('external-tool') as ExternalToolAdapter;
     if (!this.providers.isEnabled('external-tool')) throw new DomainError('forbidden', 'The external media tool is disabled');
-    const template = adapter.commandTemplate();
-    const [binary, ...rest] = template;
-    if (!binary) throw new DomainError('setup-required', 'No external tool command is configured');
-    const args = rest.map((a) => a.replace('{output}', part).replace('{url}', authorized.url));
-    if (!args.some((a) => a.includes(part))) args.push(part);
-    this.log.info({ module: 'downloads', job: job.id, binary }, 'running external media tool');
-    await runChild(binary, args, { stdio: ['ignore', 'pipe', 'pipe'], env: toolEnvironment(toolScratchDir(this.config.dataDir)) }, adapter.timeoutMs(), signal, {
+    const info = await this.ffmpeg();
+    const workDir = this.workDir(job);
+    rmSync(workDir, { recursive: true, force: true });
+    mkdirSync(workDir, { recursive: true });
+    const plan = adapter.downloadPlan(authorized.url, { outputDir: workDir, output: part, ffmpeg: info.available ? info.path : null });
+    // spotDL keeps settings in its home directory: a new, empty one inside the job's, every run.
+    const home = plan.preset?.needsHome ? join(workDir, '.home') : null;
+    if (home) mkdirSync(home, { recursive: true });
+    this.log.info({ module: 'downloads', job: job.id, binary: plan.binary, tool: plan.preset?.tool ?? 'template' }, 'running external media tool');
+    await runChild(plan.binary, plan.args, { stdio: ['ignore', 'pipe', 'pipe'], env: adapter.toolEnvironment(home) }, adapter.timeoutMs(), signal, {
       spawnError: (message) => new DomainError('unavailable', `The external tool could not be started: ${message}`),
       exitError: (code, stderr) => new DomainError('unavailable', `The external tool exited with code ${code}: ${stderr.slice(-300)}`),
     });
-    if (!existsSync(part)) throw new DomainError('unavailable', 'The external tool produced no file');
-    return statSync(part).size;
+    if (plan.mode === 'file') {
+      if (!existsSync(part)) throw new DomainError('unavailable', 'The external tool produced no file');
+      return { path: part, bytes: statSync(part).size, extension: extensionOf(authorized.filename), reported: null };
+    }
+    const produced = readdirSync(workDir).filter((name) => !name.startsWith('.') && !SIDECAR.test(name) && statSync(join(workDir, name)).isFile());
+    if (!produced.length) throw new DomainError('unavailable', 'The external tool finished without producing a file');
+    if (produced.length > 1) throw new DomainError('validation', `The external tool produced ${produced.length} files, and a download job is one track. Send a playlist link to POST /downloads/batch.`);
+    const file = join(workDir, produced[0]!);
+    return { path: file, bytes: statSync(file).size, extension: extname(file).toLowerCase(), reported: plan.preset ? this.readReported(plan.preset.tool, join(workDir, plan.preset.infoFile), authorized.url) : null };
   }
 
-  private async convert(input: string, format: DownloadJob['target']['format'], signal: AbortSignal): Promise<string> {
+  /** What the tool wrote about the track beside it (`media.info.json`, `song.spotdl`), as tags. */
+  private readReported(tool: 'yt-dlp' | 'spotdl', path: string, url: string): DownloadTags | null {
+    try {
+      if (!existsSync(path)) return null;
+      const json: unknown = JSON.parse(readFileSync(path, 'utf8'));
+      const probe = tool === 'spotdl' ? fromSpotdl(json, url) : fromYtDlp(json, url);
+      return probe?.kind === 'track' ? probe.tags : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * One FFmpeg pass: the job's tags over the file's own, the cover carried across, and the format
+   * asked for (`finalise.ts`). Null when there is nothing to do — the original was asked for and
+   * there is nothing to tag it with, or no FFmpeg to do it with.
+   */
+  private async finalise(job: DownloadRecord, input: string, inputExtension: string, signal: AbortSignal): Promise<{ output: string; extension: string } | null> {
     const info = await this.ffmpeg();
-    if (!info.available || !info.path) throw new DomainError('unsupported', 'FFmpeg is not available in this build, so the file cannot be converted. Choose "original".');
-    const args = FORMAT_ARGS[format];
-    if (!args) throw new DomainError('validation', `Unsupported output format ${format}`);
-    const output = `${input}.${format}`;
-    await runChild(info.path, ['-hide_banner', '-loglevel', 'error', '-y', '-i', input, ...args, output], { stdio: ['ignore', 'ignore', 'pipe'] }, FFMPEG_TIMEOUT_MS, signal, {
+    const converting = job.target.format !== 'original';
+    if (!info.available || !info.path) {
+      if (converting) throw new DomainError('unsupported', 'FFmpeg is not available in this build, so the file cannot be converted. Choose "original".');
+      return null;
+    }
+    if (converting && !FORMAT_ARGS[job.target.format]) throw new DomainError('validation', `Unsupported output format ${job.target.format}`);
+    const workDir = this.workDir(job);
+    mkdirSync(workDir, { recursive: true });
+    const plan = planFinalise({ file: input, inputExtension, workDir, format: job.target.format, tags: job.source.tags, existing: await readExisting(input), sourceUrl: job.source.url });
+    if (!plan) return null;
+    await runChild(info.path, plan.args, { stdio: ['ignore', 'ignore', 'pipe'] }, FFMPEG_TIMEOUT_MS, signal, {
       spawnError: (message) => new DomainError('unavailable', `FFmpeg could not be started: ${message}`),
       exitError: (code, stderr, timedOut) => new DomainError('unavailable', timedOut ? `FFmpeg did not finish within ${FFMPEG_TIMEOUT_MS / 60_000} minutes` : `FFmpeg failed (code ${code}): ${stderr.slice(-300)}`),
     });
-    return output;
+    return { output: plan.output, extension: plan.extension };
   }
 
   /** Available output formats, from what the bundled FFmpeg build can actually encode. */
@@ -524,7 +672,7 @@ export class DownloadService {
     });
     return {
       formats: [
-        entry('original', null, false, 'Byte-for-byte copy of the source; no re-encoding, no quality loss'),
+        entry('original', null, false, 'The source’s own audio, not re-encoded, so no quality loss. A file from the external tool is tagged on the way in.'),
         entry('mp3', 'libmp3lame', true, 'VBR ~190 kbps (-q:a 2). Re-encoding a lossy source loses more quality.'),
         entry('aac', 'aac', true, '256 kbps CBR. Re-encoding a lossy source loses more quality.'),
         entry('opus', 'libopus', true, '160 kbps VBR; best quality per byte at this bitrate.'),
@@ -578,6 +726,16 @@ export class DownloadService {
   }
 }
 
+interface Downloaded {
+  /** The downloaded file: the `.part` file, or the one the tool wrote in the job's directory. */
+  path: string;
+  bytes: number;
+  /** Its real extension, when known (`.opus`, `.m4a`, `.mp3`), or ''. */
+  extension: string;
+  /** What the tool wrote about the track, when it wrote anything. */
+  reported: DownloadTags | null;
+}
+
 function extensionOf(filename: string): string {
   const m = /\.[A-Za-z0-9]{1,5}$/.exec(filename);
   return m ? m[0].toLowerCase() : '';
@@ -597,7 +755,9 @@ function runChild(
       rejectPromise(signal.reason instanceof Error ? signal.reason : new Error('Aborted'));
       return;
     }
-    const child = spawn(binary, args, { stdio: options.stdio, shell: false, ...(options.env ? { env: options.env } : {}) });
+    // A tool that is a JavaScript file is run with this Node (how the tests stand in for the real ones).
+    const { command, prefix } = toolCommand(binary);
+    const child = spawn(command, [...prefix, ...args], { stdio: options.stdio, shell: false, windowsHide: true, ...(options.env ? { env: options.env } : {}) });
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;

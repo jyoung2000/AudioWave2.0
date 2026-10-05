@@ -1,90 +1,147 @@
 /**
  * The external tool is the most dangerous provider in the hub: it is the only one that starts a
- * process. So the preset that makes it usable is pinned here rather than trusted to review.
+ * process. So the presets that make it usable are pinned here rather than trusted to review.
  *
  * Two properties matter more than the rest. Nothing a user typed may reach the command line as a
- * flag, and the tool must be told to ignore configuration files — because a `yt-dlp.conf` left in
- * the container's home directory can add `--exec`, which would turn "download this" into "run this".
+ * flag — the URL is always the last argument, behind `--` — and the tool must not read a
+ * configuration file: yt-dlp is told `--ignore-config` first, because a `yt-dlp.conf` left in the
+ * container's home directory can add `--exec`; spotDL, which has no such flag, gets a new, empty
+ * home directory on every run.
  */
 import { describe, expect, it } from 'vitest';
-import { ExternalToolAdapter, TOOL_PRESETS } from '../../src/providers/adapters/external-tool.js';
+import { ExternalToolAdapter, TOOL_PRESETS, type DownloadArgsContext } from '../../src/providers/adapters/external-tool.js';
 
-function adapter(extra: Record<string, string>): ExternalToolAdapter {
-  const instance = new ExternalToolAdapter();
+function adapter(extra: Record<string, string>, locate: (tool: 'yt-dlp' | 'spotdl') => string | null = () => null): ExternalToolAdapter {
+  const instance = new ExternalToolAdapter(locate);
   instance.configure({ enabled: true, clientId: null, clientSecret: null, apiKey: null, applicationId: null, redirectUri: null, contactEmail: null, extra });
   return instance;
 }
 
-describe('the yt-dlp preset', () => {
-  const preset = TOOL_PRESETS['yt-dlp']!;
+/** A link written to be read as flags, if anything were careless enough to let it. */
+const HOSTILE = 'https://www.youtube.com/watch?v=x&--exec=rm%20-rf%20/';
+const ctx = (url = HOSTILE, ffmpeg: string | null = '/usr/bin/ffmpeg'): DownloadArgsContext => ({ url, outputDir: '/data/partial/job.d', ffmpeg, node: '/usr/local/bin/node' });
 
-  it('tells the tool to ignore configuration files, first', () => {
-    expect(preset.args[0]).toBe('--ignore-config');
+describe('the yt-dlp preset', () => {
+  const preset = TOOL_PRESETS['yt-dlp'];
+  const args = preset.download(ctx());
+
+  it('tells the tool to ignore configuration files, first — for downloads and for reading links', () => {
+    expect(args[0]).toBe('--ignore-config');
+    expect(preset.metadata({ url: HOSTILE, ffmpeg: null, node: null, saveFile: '', listLimit: 201 })![0]).toBe('--ignore-config');
   });
 
   it('puts the URL last and behind a separator, so nothing in it reads as a flag', () => {
-    expect(preset.args.at(-2)).toBe('--');
-    expect(preset.args.at(-1)).toBe('{url}');
+    expect(args.at(-2)).toBe('--');
+    expect(args.at(-1)).toBe(HOSTILE);
+    expect(args.filter((a) => a.includes('--exec'))).toEqual([HOSTILE]);
+    const metadata = preset.metadata({ url: HOSTILE, ffmpeg: null, node: null, saveFile: '', listLimit: 201 })!;
+    expect(metadata.slice(-2)).toEqual(['--', HOSTILE]);
   });
 
-  it('writes exactly where the hub told it to', () => {
-    // No --extract-audio: yt-dlp's extractor renames the file it was given, and a hub download job
-    // names one path. The hub's own FFmpeg step does the converting.
-    expect(preset.args).toContain('{output}');
-    expect(preset.args).not.toContain('--extract-audio');
-    expect(preset.args).not.toContain('-x');
+  it('writes into the job’s own directory, and nowhere it chooses', () => {
+    const output = args[args.indexOf('--output') + 1]!;
+    expect(output.replaceAll('\\', '/')).toBe('/data/partial/job.d/media.%(ext)s');
   });
 
-  it('takes one track, because that is what a download job is', () => {
-    expect(preset.args).toContain('--no-playlist');
+  it('tags the file and embeds its cover, converted to JPEG, with the hub’s FFmpeg', () => {
+    expect(args).toEqual(expect.arrayContaining(['--extract-audio', '--embed-metadata', '--embed-thumbnail', '--write-info-json']));
+    expect(args[args.indexOf('--convert-thumbnails') + 1]).toBe('jpg');
+    expect(args[args.indexOf('--ffmpeg-location') + 1]).toBe('/usr/bin/ffmpeg');
+  });
+
+  it('without FFmpeg saves the file as it came, rather than failing on steps it cannot do', () => {
+    const bare = preset.download(ctx(HOSTILE, null));
+    expect(bare).not.toContain('--extract-audio');
+    expect(bare).not.toContain('--embed-thumbnail');
+    expect(bare).not.toContain('--ffmpeg-location');
+    expect(bare.slice(-2)).toEqual(['--', HOSTILE]);
+  });
+
+  it('runs YouTube’s player script with this Node, not a runtime it would fetch', () => {
+    expect(args[args.indexOf('--js-runtimes') + 1]).toBe('node:/usr/local/bin/node');
+  });
+
+  it('takes one track per job; reading a link lists at most one more entry than a batch takes', () => {
+    expect(args).toContain('--no-playlist');
+    const metadata = preset.metadata({ url: HOSTILE, ffmpeg: null, node: null, saveFile: '', listLimit: 201 })!;
+    expect(metadata).toEqual(expect.arrayContaining(['--dump-single-json', '--no-download', '--flat-playlist']));
+    expect(metadata[metadata.indexOf('--playlist-end') + 1]).toBe('201');
   });
 
   it('never offers to carry credentials', () => {
-    const flags = preset.args.join(' ');
-    expect(flags).not.toMatch(/--cookies/);
-    expect(flags).not.toMatch(/--exec/);
-    expect(flags).not.toMatch(/--netrc/);
+    const flags = [...preset.download(ctx('https://youtu.be/x')), ...preset.metadata({ url: 'https://youtu.be/x', ffmpeg: null, node: null, saveFile: '', listLimit: 2 })!].join(' ');
+    expect(flags).not.toMatch(/--cookies|--exec|--netrc|--username|--password/);
+  });
+});
+
+describe('the spotDL preset', () => {
+  const preset = TOOL_PRESETS.spotdl;
+  const url = 'https://open.spotify.com/track/4PTG3Z6ehGkBFwjybzWkR8';
+  const args = preset.download(ctx(url));
+
+  it('takes only open.spotify.com links', () => {
+    expect(preset.allowedHosts).toEqual(['open.spotify.com']);
   });
 
-  it('has no spotDL companion, and that is deliberate', () => {
-    // spotDL turns one link into a set of tracks and wants a directory; a hub job is one path.
-    // The local helper gives each job its own directory, so spotDL belongs there instead.
-    expect(Object.keys(TOOL_PRESETS)).toEqual(['yt-dlp']);
+  it('downloads the one link it is given, last and behind a separator', () => {
+    expect(args.slice(-3)).toEqual(['download', '--', url]);
+  });
+
+  it('names its file inside the job’s directory and writes what it knew beside it', () => {
+    expect(args[args.indexOf('--output') + 1]!.replaceAll('\\', '/')).toBe('/data/partial/job.d/{track-id}.{output-ext}');
+    expect(args[args.indexOf('--save-file') + 1]!.replaceAll('\\', '/')).toBe('/data/partial/job.d/song.spotdl');
+    expect(preset.infoFile).toBe('song.spotdl');
+  });
+
+  it('uses the hub’s FFmpeg, keeps no cache, and gets a home of its own every run', () => {
+    expect(args[args.indexOf('--ffmpeg') + 1]).toBe('/usr/bin/ffmpeg');
+    expect(args).toContain('--no-cache');
+    expect(preset.needsHome).toBe(true);
+    expect(args.join(' ')).not.toMatch(/--config|--cookie-file|--user-auth|--client-secret|--auth-token/);
+  });
+
+  it('reads a link with `save`, and refuses to try without FFmpeg (spotDL will not start without it)', () => {
+    expect(preset.metadata({ url, ffmpeg: '/usr/bin/ffmpeg', node: null, saveFile: '/tmp/x/save.spotdl', listLimit: 201 })!.slice(-3)).toEqual(['save', '--', url]);
+    expect(preset.metadata({ url, ffmpeg: null, node: null, saveFile: '/tmp/x/save.spotdl', listLimit: 201 })).toBeNull();
   });
 });
 
 describe('choosing a preset', () => {
-  it('fills in both the command and the hosts, so nothing else is required', () => {
-    const instance = adapter({ preset: 'yt-dlp' });
-    expect(instance.requiredConfig()).toEqual([]);
-    expect(instance.commandTemplate()[0]).toBe('/usr/local/bin/yt-dlp');
-    expect(instance.allowedHosts()).toContain('music.youtube.com');
-  });
-
-  it('needs no setup at all: with nothing configured, yt-dlp is the tool', () => {
+  it('needs no setup at all: with nothing configured, yt-dlp and spotDL are the tools', () => {
     const instance = adapter({});
+    expect(instance.presets().map((p) => p.tool)).toEqual(['yt-dlp', 'spotdl']);
     expect(instance.preset()?.displayName).toBe('yt-dlp');
     expect(instance.requiredConfig()).toEqual([]);
-    expect(instance.commandTemplate().at(-1)).toBe('{url}');
-    expect(instance.allowedHosts()).toContain('soundcloud.com');
+    expect(instance.allowedHosts()).toEqual(expect.arrayContaining(['soundcloud.com', 'music.youtube.com', 'open.spotify.com']));
   });
 
-  it('runs the copy the hub found or set up for itself, unless an operator named another', () => {
-    const instance = new ExternalToolAdapter((id) => (id === 'yt-dlp' ? '/data/tools/yt-dlp' : null));
-    instance.configure({ enabled: true, clientId: null, clientSecret: null, apiKey: null, applicationId: null, redirectUri: null, contactEmail: null, extra: {} });
-    expect(instance.commandTemplate()[0]).toBe('/data/tools/yt-dlp');
-    instance.configure({ enabled: true, clientId: null, clientSecret: null, apiKey: null, applicationId: null, redirectUri: null, contactEmail: null, extra: { binary: '/opt/yt-dlp' } });
-    expect(instance.commandTemplate()[0]).toBe('/opt/yt-dlp');
+  it('sends a Spotify link to spotDL and everything else to yt-dlp', () => {
+    const instance = adapter({});
+    expect(instance.presetFor(new URL('https://open.spotify.com/track/x'))?.tool).toBe('spotdl');
+    expect(instance.presetFor(new URL('https://youtu.be/x'))?.tool).toBe('yt-dlp');
   });
 
-  it('lets an operator add hosts but never quietly lose the preset’s own', () => {
-    const instance = adapter({ preset: 'yt-dlp', allowedHosts: 'example.org' });
+  it('a named preset is that tool alone, with its own hosts', () => {
+    const instance = adapter({ preset: 'yt-dlp' });
+    expect(instance.presets().map((p) => p.tool)).toEqual(['yt-dlp']);
+    expect(instance.allowedHosts()).not.toContain('open.spotify.com');
+    expect(instance.commandTemplate()[0]).toBe('/usr/local/bin/yt-dlp');
+  });
+
+  it('runs the copies the hub found or set up for itself, unless an operator named another', () => {
+    const locate = (id: 'yt-dlp' | 'spotdl'): string => `/data/tools/${id}`;
+    expect(adapter({}, locate).commandTemplate()[0]).toBe('/data/tools/yt-dlp');
+    expect(adapter({}, locate).binaryFor(TOOL_PRESETS.spotdl)).toBe('/data/tools/spotdl');
+    expect(adapter({ binary: '/opt/yt-dlp' }, locate).commandTemplate()[0]).toBe('/opt/yt-dlp');
+    // A named binary is the first tool's; it never stands in for spotDL.
+    expect(adapter({ binary: '/opt/yt-dlp' }, locate).binaryFor(TOOL_PRESETS.spotdl)).toBe('/data/tools/spotdl');
+  });
+
+  it('lets an operator add hosts but never quietly lose the presets’ own', () => {
+    const instance = adapter({ allowedHosts: 'example.org' });
     expect(instance.allowedHosts()).toContain('example.org');
     expect(instance.allowedHosts()).toContain('youtu.be');
-  });
-
-  it('lets an operator point at a different binary without rewriting the command line', () => {
-    expect(adapter({ preset: 'yt-dlp', binary: '/opt/yt-dlp' }).commandTemplate()[0]).toBe('/opt/yt-dlp');
+    expect(instance.allowedHosts()).toContain('open.spotify.com');
   });
 
   it('falls back to a hand-written template, and asks for both halves of it', () => {
@@ -94,15 +151,34 @@ describe('choosing a preset', () => {
     expect(instance.allowedHosts()).toEqual(['example.org']);
   });
 
+  it('fills a template’s {output} and {url} as data: the URL only as a whole argument, never spliced', () => {
+    const instance = adapter({ command: '/usr/bin/mytool -o {output} --page={url} {url}', allowedHosts: 'example.org' });
+    const plan = instance.downloadPlan('https://example.org/a$&b', { outputDir: '/d', output: '/d/job.part', ffmpeg: null });
+    expect(plan.mode).toBe('file');
+    expect(plan.args).toEqual(['-o', '/d/job.part', '--page={url}', 'https://example.org/a$&b']);
+  });
+
   it('treats an unknown preset name as no preset, rather than as a command it invented', () => {
     const instance = adapter({ preset: 'something-else' });
     expect(instance.preset()).toBeNull();
     expect(instance.commandTemplate()).toEqual([]);
     expect(instance.requiredConfig()).toEqual(['command', 'allowedHosts']);
   });
+
+  it('will not plan a Spotify download without spotDL or without FFmpeg', () => {
+    expect(() => adapter({}, () => null).downloadPlan('https://open.spotify.com/track/x', { outputDir: '/d', output: '/d/p', ffmpeg: '/usr/bin/ffmpeg' })).toThrow(/spotDL is not on this hub/);
+    expect(() => adapter({}, () => process.execPath).downloadPlan('https://open.spotify.com/track/x', { outputDir: '/d', output: '/d/p', ffmpeg: null })).toThrow(/needs FFmpeg/);
+  });
 });
 
 describe('what it reports', () => {
+  it('names the tools that are on this hub in the Providers row', () => {
+    expect(adapter({}, (id) => (id === 'spotdl' ? process.execPath : null)).descriptor().displayName).toBe('External media tool (yt-dlp, spotDL)');
+    const without = adapter({}, () => null).descriptor();
+    expect(without.displayName).toBe('External media tool (yt-dlp)');
+    expect(without.limitations.join(' ')).toMatch(/spotDL is not on this hub yet/);
+  });
+
   it('refuses to call a missing binary present', async () => {
     const result = await adapter({ preset: 'yt-dlp', binary: '/nope/yt-dlp' }).test();
     expect(result.ok).toBe(false);
@@ -110,9 +186,7 @@ describe('what it reports', () => {
   });
 
   it('says the tool is still on its way when it is not on this machine yet', async () => {
-    const instance = new ExternalToolAdapter(() => '/nope/yt-dlp');
-    instance.configure({ enabled: true, clientId: null, clientSecret: null, apiKey: null, applicationId: null, redirectUri: null, contactEmail: null, extra: {} });
-    const result = await instance.test();
+    const result = await adapter({}, () => '/nope/yt-dlp').test();
     expect(result.ok).toBe(false);
     expect(result.message).toMatch(/not found/i);
     expect(result.message).toMatch(/sets it up/i);

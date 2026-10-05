@@ -14,6 +14,8 @@ import {
   DownloadAuthorizationBasis,
   DownloadDestination,
   DownloadJob,
+  DownloadSource,
+  DOWNLOAD_BATCH_CAP,
   Group,
   GroupHistoryEntry,
   GroupMembership,
@@ -310,6 +312,32 @@ export const FormatAvailability = z.object({
 });
 export type FormatAvailability = z.infer<typeof FormatAvailability>;
 
+/** What a download request names besides its source: why it is allowed, and where it goes. */
+export const DownloadAuthorizationInput = z.object({ basis: DownloadAuthorizationBasis, evidence: z.string().max(500).optional(), acknowledged: z.literal(true) });
+export const DownloadTargetInput = z.object({ destination: DownloadDestination.exclude(['ask']), directoryId: z.string().max(200).optional(), filenameTemplate: z.string().max(200).optional(), format: OutputFormat.default('original'), quality: z.string().max(40).optional() });
+
+/**
+ * The answer to a playlist link: one job per entry, every one carrying the request's single rights
+ * basis. `listed` is what the source said it holds; at most `cap` entries are taken, and `capped`
+ * says when that left some out. Entries already downloading or downloaded for this requester, and
+ * entries on hosts the tool may not reach, are skipped and named.
+ */
+export const DownloadBatchResult = z.object({
+  batch: z.object({
+    id: Uuid.nullable().describe('Null when the link was a single track'),
+    kind: z.enum(['track', 'playlist']),
+    title: z.string().max(300).nullable(),
+    listed: z.number().int().nonnegative().nullable(),
+    created: z.number().int().nonnegative(),
+    cap: z.number().int().positive(),
+    capped: z.boolean(),
+    skipped: z.array(z.object({ url: z.string().max(2048).nullable(), title: z.string().max(300).nullable(), reason: z.enum(['duplicate', 'not-allowed', 'unavailable']) })).max(DOWNLOAD_BATCH_CAP),
+  }),
+  items: z.array(DownloadJob).max(DOWNLOAD_BATCH_CAP),
+  message: z.string().max(500),
+});
+export type DownloadBatchResult = z.infer<typeof DownloadBatchResult>;
+
 export const TasteProfileView = z.object({
   ownerId: Uuid,
   computedAt: IsoDateTime,
@@ -547,7 +575,8 @@ export const routes = {
 
   /* downloads */
   downloadsList: defineRoute({ method: 'GET', path: '/downloads', operationId: 'listDownloads', summary: 'Download jobs', tags: ['downloads'], auth: 'admin-or-device', response: z.object({ items: z.array(DownloadJob) }) }),
-  downloadsCreate: defineRoute({ method: 'POST', path: '/downloads', operationId: 'createDownload', summary: 'Create an authorized download job (capability-gated)', tags: ['downloads'], auth: 'admin-or-device', scopes: ['downloads:request'], rateLimit: 'write', body: z.object({ source: DownloadJob.shape.source, authorization: z.object({ basis: DownloadAuthorizationBasis, evidence: z.string().max(500).optional(), acknowledged: z.literal(true) }), target: z.object({ destination: DownloadDestination.exclude(['ask']), directoryId: z.string().max(200).optional(), filenameTemplate: z.string().max(200).optional(), format: OutputFormat.default('original'), quality: z.string().max(40).optional() }) }), response: DownloadJob, responseStatus: 201 }),
+  downloadsCreate: defineRoute({ method: 'POST', path: '/downloads', operationId: 'createDownload', summary: 'Create an authorized download job (capability-gated). A playlist, set or album link is refused here: use POST /downloads/batch', tags: ['downloads'], auth: 'admin-or-device', scopes: ['downloads:request'], rateLimit: 'write', body: z.object({ source: DownloadSource.omit({ batch: true }), authorization: DownloadAuthorizationInput, target: DownloadTargetInput }), response: DownloadJob, responseStatus: 201 }),
+  downloadsCreateBatch: defineRoute({ method: 'POST', path: '/downloads/batch', operationId: 'createDownloadBatch', summary: `A link through the external media tool: one job per entry of a playlist, set or album (at most ${DOWNLOAD_BATCH_CAP}, duplicates skipped), or one job for a single track. One rights basis covers every entry.`, tags: ['downloads'], auth: 'admin-or-device', scopes: ['downloads:request'], rateLimit: 'write', body: z.object({ url: z.string().url().max(2048), authorization: DownloadAuthorizationInput, target: DownloadTargetInput }), response: DownloadBatchResult, responseStatus: 201 }),
   downloadsAction: defineRoute({ method: 'POST', path: '/downloads/:jobId/:action', operationId: 'downloadAction', summary: 'cancel | pause | resume | retry', tags: ['downloads'], auth: 'admin-or-device', params: z.object({ jobId: Uuid, action: z.enum(['cancel', 'pause', 'resume', 'retry']) }), response: DownloadJob }),
   downloadsFormats: defineRoute({ method: 'GET', path: '/downloads/formats', operationId: 'downloadFormats', summary: 'Output formats available from the bundled FFmpeg build', tags: ['downloads'], auth: 'admin-or-device', setupRequired: false, response: z.object({ formats: z.array(FormatAvailability), ffmpeg: z.object({ available: z.boolean(), version: z.string().nullable(), encoders: z.array(z.string()) }) }) }),
   downloadsStorage: defineRoute({ method: 'GET', path: '/downloads/storage', operationId: 'downloadStorage', summary: 'Storage and cleanup state', tags: ['downloads'], auth: 'admin', response: z.object({ dataDir: z.string(), freeBytes: z.number().int().nullable(), totalBytes: z.number().int().nullable(), usedByDownloadsBytes: z.number().int(), partialFiles: z.number().int(), cleanupPolicy: z.object({ keepFailedDays: z.number().int(), keepPartialHours: z.number().int() }), directories: z.array(z.object({ id: z.string(), name: z.string(), relativePath: z.string() })) }) }),

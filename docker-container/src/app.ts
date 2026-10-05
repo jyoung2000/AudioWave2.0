@@ -135,7 +135,7 @@ export async function buildApp(deps: HubDeps): Promise<HubApp> {
     ffmpegCache ??= await (deps.ffmpegLocator ?? (() => detectFfmpeg(config.ffmpegPath, own ? [own] : [])))();
     return ffmpegCache;
   };
-  // yt-dlp and FFmpeg, found or fetched: downloads work without anyone setting anything up.
+  // yt-dlp, FFmpeg and spotDL, found or fetched: downloads work without anyone setting anything up.
   const tools = new HubTools({
     toolsDir: config.dataDir === ':memory:' ? null : join(config.dataDir, 'tools'),
     log,
@@ -171,7 +171,17 @@ export async function buildApp(deps: HubDeps): Promise<HubApp> {
   providers.register(new SoundCloudAdapter(http, clock));
   providers.register(new SpotifyAdapter(http, clock));
   providers.register(new BandcampAdapter((url) => musicbrainz.lookupUrl(url)));
-  providers.register(new ExternalToolAdapter((tool) => tools.locate(tool), () => toolEnvironment(toolScratchDir(config.dataDir))));
+  providers.register(
+    new ExternalToolAdapter(
+      (tool) => tools.locate(tool),
+      () => toolEnvironment(toolScratchDir(config.dataDir)),
+      async () => {
+        const info = await ffmpeg();
+        return info.available ? info.path : null;
+      },
+      () => toolScratchDir(config.dataDir),
+    ),
+  );
   providers.register(new DeezerAdapter(http));
   providers.register(new AcousticBrainzAdapter(http));
   providers.register(new LastFmAdapter(http));

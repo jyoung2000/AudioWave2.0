@@ -357,13 +357,16 @@ test('the whole pass: hub set up, player paired, group joined, invite declined, 
     await test.step('09 — the image’s downloader really starts, and the hub says so', async () => {
       const list = await request.get(`${HUB_URL}/api/v1/providers`, { headers: { 'x-csrf-token': csrf } });
       expect(list.status()).toBe(200);
-      const items = ((await list.json()) as { items: Array<{ provider: string; enabled: boolean; configured: boolean }> }).items;
-      expect(items.find((p) => p.provider === 'external-tool'), 'the downloader is ready without setup').toMatchObject({ enabled: true, configured: true });
-      // The operator's Test button: runs the tool now, in the downloads' environment.
+      const items = ((await list.json()) as { items: Array<{ provider: string; displayName: string; enabled: boolean; configured: boolean }> }).items;
+      // The image ships spotDL beside yt-dlp (DEC-036), and the row names both.
+      expect(items.find((p) => p.provider === 'external-tool'), 'the downloader is ready without setup, with spotDL').toMatchObject({ enabled: true, configured: true, displayName: 'External media tool (yt-dlp, spotDL)' });
+      // The operator's Test button: runs both tools now, in the downloads' environment.
       const tested = await request.post(`${HUB_URL}/api/v1/providers/external-tool/test`, { headers: { 'x-csrf-token': csrf } });
       expect(tested.status()).toBe(200);
       const result = (await tested.json()) as { ok: boolean; message: string };
       expect(result, `yt-dlp answered --version inside the container (${result.message})`).toMatchObject({ ok: true });
+      // spotDL unpacks a much larger runtime than yt-dlp; a "spotDL <version>" here means it really started.
+      expect(result.message, 'spotDL answered --version inside the container').toMatch(/spotDL \d+\.\d+/);
       // And what Overview and Providers show: the same answer, not the file's existence.
       const overview = await request.get(`${HUB_URL}/api/v1/metrics/overview`, { headers: { 'x-csrf-token': csrf } });
       expect(overview.status()).toBe(200);

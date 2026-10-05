@@ -137,8 +137,11 @@ const BUNDLES: Bundle[] = [
      * per-entry lookup and the date on the details line — measured, 5 KB of inline shell script —
      * plus the full release date the library indexer reads (UX-DL-001: `releaseDateOf` and the
      * contract's `releaseDate`, in the lazily loaded scanner chunk) — 1 KB. The entry is unmoved.
+     *
+     * And to 2410 when the hub's download batches merged in (2026-10-04): the contracts the player
+     * bundles gained `DownloadTags` and `DownloadBatchRef` on a download's source — measured, 1 KB.
      */
-    totalBudgetKb: 2409,
+    totalBudgetKb: 2410,
     // Three.js belongs to the constellation and the jewel case; the tag reader only to a scan.
     mustBeSplit: ['three', 'music-metadata'],
   },

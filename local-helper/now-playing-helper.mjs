@@ -19616,18 +19616,46 @@ var DownloadAuthorizationBasis = external_exports.enum([
 ]);
 var DownloadDestination = external_exports.enum(["ask", "windows", "player", "both", "hub"]);
 var OutputFormat = external_exports.enum(["original", "mp3", "aac", "opus", "flac"]);
+var DownloadTags = external_exports.object({
+  title: external_exports.string().min(1).max(300),
+  artist: external_exports.string().max(300).nullable().default(null),
+  featured: external_exports.array(external_exports.string().max(200)).max(20).default([]),
+  album: external_exports.string().max(300).nullable().default(null),
+  albumArtist: external_exports.string().max(300).nullable().default(null),
+  date: external_exports.string().regex(/^\d{4}(-\d{2}(-\d{2})?)?$/).nullable().default(null),
+  genre: external_exports.string().max(100).nullable().default(null),
+  trackNumber: external_exports.number().int().positive().max(9999).nullable().default(null),
+  discNumber: external_exports.number().int().positive().max(999).nullable().default(null),
+  durationMs: external_exports.number().int().nonnegative().nullable().default(null),
+  artworkUrl: external_exports.string().url().max(2048).nullable().default(null),
+  license: external_exports.string().max(200).nullable().default(null)
+});
+var DOWNLOAD_BATCH_CAP = 200;
+var DownloadBatchRef = external_exports.object({
+  id: Uuid,
+  title: external_exports.string().max(300).nullable().default(null),
+  /** Zero-based position among the entries the hub took. */
+  index: external_exports.number().int().nonnegative(),
+  /** How many jobs the batch made (after the cap and duplicates). */
+  total: external_exports.number().int().positive()
+});
+var DownloadSource = external_exports.object({
+  provider: ProviderId,
+  providerTrackId: external_exports.string().max(200).nullable().default(null),
+  url: external_exports.string().url().nullable().default(null),
+  locator: MediaLocator.nullable().default(null),
+  title: external_exports.string().max(300).nullable().default(null),
+  artistName: external_exports.string().max(300).nullable().default(null),
+  /** Tags for the file. A requester may suggest them; what the tool reports fills the gaps. */
+  tags: DownloadTags.nullable().optional(),
+  /** Set by the hub when the job came from a playlist link (`POST /downloads/batch`). */
+  batch: DownloadBatchRef.nullable().optional()
+});
 var DownloadJob = external_exports.object({
   id: Uuid,
   state: JobState,
   ownerId: external_exports.string().max(200).describe("Device id or admin"),
-  source: external_exports.object({
-    provider: ProviderId,
-    providerTrackId: external_exports.string().max(200).nullable().default(null),
-    url: external_exports.string().url().nullable().default(null),
-    locator: MediaLocator.nullable().default(null),
-    title: external_exports.string().max(300).nullable().default(null),
-    artistName: external_exports.string().max(300).nullable().default(null)
-  }),
+  source: DownloadSource,
   authorization: external_exports.object({
     basis: DownloadAuthorizationBasis,
     evidence: external_exports.string().max(500).nullable().default(null),
@@ -20616,6 +20644,22 @@ var FormatAvailability = external_exports.object({
   reason: external_exports.string().nullable(),
   qualityNote: external_exports.string()
 });
+var DownloadAuthorizationInput = external_exports.object({ basis: DownloadAuthorizationBasis, evidence: external_exports.string().max(500).optional(), acknowledged: external_exports.literal(true) });
+var DownloadTargetInput = external_exports.object({ destination: DownloadDestination.exclude(["ask"]), directoryId: external_exports.string().max(200).optional(), filenameTemplate: external_exports.string().max(200).optional(), format: OutputFormat.default("original"), quality: external_exports.string().max(40).optional() });
+var DownloadBatchResult = external_exports.object({
+  batch: external_exports.object({
+    id: Uuid.nullable().describe("Null when the link was a single track"),
+    kind: external_exports.enum(["track", "playlist"]),
+    title: external_exports.string().max(300).nullable(),
+    listed: external_exports.number().int().nonnegative().nullable(),
+    created: external_exports.number().int().nonnegative(),
+    cap: external_exports.number().int().positive(),
+    capped: external_exports.boolean(),
+    skipped: external_exports.array(external_exports.object({ url: external_exports.string().max(2048).nullable(), title: external_exports.string().max(300).nullable(), reason: external_exports.enum(["duplicate", "not-allowed", "unavailable"]) })).max(DOWNLOAD_BATCH_CAP)
+  }),
+  items: external_exports.array(DownloadJob).max(DOWNLOAD_BATCH_CAP),
+  message: external_exports.string().max(500)
+});
 var TasteProfileView = external_exports.object({
   ownerId: Uuid,
   computedAt: IsoDateTime,
@@ -20795,7 +20839,8 @@ var routes = {
   profilesAdminAvatarDelete: defineRoute({ method: "DELETE", path: "/admin/profiles/:id/avatar", operationId: "adminRemoveProfileAvatar", summary: "Remove a profile picture (moderation)", tags: ["profiles"], auth: "admin", rateLimit: "write", params: external_exports.object({ id: Uuid }), response: Ok }),
   /* downloads */
   downloadsList: defineRoute({ method: "GET", path: "/downloads", operationId: "listDownloads", summary: "Download jobs", tags: ["downloads"], auth: "admin-or-device", response: external_exports.object({ items: external_exports.array(DownloadJob) }) }),
-  downloadsCreate: defineRoute({ method: "POST", path: "/downloads", operationId: "createDownload", summary: "Create an authorized download job (capability-gated)", tags: ["downloads"], auth: "admin-or-device", scopes: ["downloads:request"], rateLimit: "write", body: external_exports.object({ source: DownloadJob.shape.source, authorization: external_exports.object({ basis: DownloadAuthorizationBasis, evidence: external_exports.string().max(500).optional(), acknowledged: external_exports.literal(true) }), target: external_exports.object({ destination: DownloadDestination.exclude(["ask"]), directoryId: external_exports.string().max(200).optional(), filenameTemplate: external_exports.string().max(200).optional(), format: OutputFormat.default("original"), quality: external_exports.string().max(40).optional() }) }), response: DownloadJob, responseStatus: 201 }),
+  downloadsCreate: defineRoute({ method: "POST", path: "/downloads", operationId: "createDownload", summary: "Create an authorized download job (capability-gated). A playlist, set or album link is refused here: use POST /downloads/batch", tags: ["downloads"], auth: "admin-or-device", scopes: ["downloads:request"], rateLimit: "write", body: external_exports.object({ source: DownloadSource.omit({ batch: true }), authorization: DownloadAuthorizationInput, target: DownloadTargetInput }), response: DownloadJob, responseStatus: 201 }),
+  downloadsCreateBatch: defineRoute({ method: "POST", path: "/downloads/batch", operationId: "createDownloadBatch", summary: `A link through the external media tool: one job per entry of a playlist, set or album (at most ${DOWNLOAD_BATCH_CAP}, duplicates skipped), or one job for a single track. One rights basis covers every entry.`, tags: ["downloads"], auth: "admin-or-device", scopes: ["downloads:request"], rateLimit: "write", body: external_exports.object({ url: external_exports.string().url().max(2048), authorization: DownloadAuthorizationInput, target: DownloadTargetInput }), response: DownloadBatchResult, responseStatus: 201 }),
   downloadsAction: defineRoute({ method: "POST", path: "/downloads/:jobId/:action", operationId: "downloadAction", summary: "cancel | pause | resume | retry", tags: ["downloads"], auth: "admin-or-device", params: external_exports.object({ jobId: Uuid, action: external_exports.enum(["cancel", "pause", "resume", "retry"]) }), response: DownloadJob }),
   downloadsFormats: defineRoute({ method: "GET", path: "/downloads/formats", operationId: "downloadFormats", summary: "Output formats available from the bundled FFmpeg build", tags: ["downloads"], auth: "admin-or-device", setupRequired: false, response: external_exports.object({ formats: external_exports.array(FormatAvailability), ffmpeg: external_exports.object({ available: external_exports.boolean(), version: external_exports.string().nullable(), encoders: external_exports.array(external_exports.string()) }) }) }),
   downloadsStorage: defineRoute({ method: "GET", path: "/downloads/storage", operationId: "downloadStorage", summary: "Storage and cleanup state", tags: ["downloads"], auth: "admin", response: external_exports.object({ dataDir: external_exports.string(), freeBytes: external_exports.number().int().nullable(), totalBytes: external_exports.number().int().nullable(), usedByDownloadsBytes: external_exports.number().int(), partialFiles: external_exports.number().int(), cleanupPolicy: external_exports.object({ keepFailedDays: external_exports.number().int(), keepPartialHours: external_exports.number().int() }), directories: external_exports.array(external_exports.object({ id: external_exports.string(), name: external_exports.string(), relativePath: external_exports.string() })) }) }),
