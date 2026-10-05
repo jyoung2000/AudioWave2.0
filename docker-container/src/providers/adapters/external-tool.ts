@@ -74,7 +74,7 @@ export const TOOL_PRESETS: Record<PresetTool, ToolPreset> = {
     tool: 'yt-dlp',
     displayName: 'yt-dlp',
     binary: '/usr/local/bin/yt-dlp',
-    allowedHosts: ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be', 'soundcloud.com', 'on.soundcloud.com', 'bandcamp.com', 'archive.org'],
+    allowedHosts: ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be', 'soundcloud.com', 'on.soundcloud.com', 'bandcamp.com', '*.bandcamp.com', 'archive.org'],
     note: 'Shipped in the image, and set up by the hub itself anywhere else. Keeping it current matters: yt-dlp works by tracking sites that change, so an old copy fails confusingly rather than safely.',
     download: ({ url, outputDir, ffmpeg, node }) => [
       '--ignore-config',

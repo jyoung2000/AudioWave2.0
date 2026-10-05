@@ -141,3 +141,31 @@ test('a set listed by address alone shows each entry’s own words once its page
   // Only the page on screen was looked up: the set, then its first five entries.
   await expect.poll(() => looked.slice(1).sort()).toEqual(urls.slice(0, 5).sort());
 });
+
+test('a paired hub that reads a Spotify link slowly still lands its answer, without holding the faster one back', async ({ page }) => {
+  // spotDL takes 20-50 s on the hub; the player used to give the hub 8 s, first and alone, so a
+  // phone with no companion never saw the hub's answer for a Spotify link.
+  const SPOTIFY = 'https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT';
+  const HUB = 'http://192.168.1.20:4546';
+  const ACCT = { base: HUB, credentialId: '00000000-0000-4000-8000-0000000000aa', secret: 'x'.repeat(40), scopes: ['search:use'], hubName: 'TOWER', deviceId: 'd1' };
+  await page.route('**/noembed.com/**', (r) => r.fulfill(json({ title: 'Never Gonna Give You Up', author_name: 'Rick Astley' })));
+  let hubAsked = 0;
+  await page.route(`${HUB}/api/v1/providers/resolve?**`, async (r) => {
+    hubAsked += 1;
+    await new Promise((done) => setTimeout(done, 9_000));
+    await r.fulfill(
+      json({ provider: 'external-tool', kind: 'track', providerId: SPOTIFY, title: 'Never Gonna Give You Up', artistName: 'Rick Astley', albumName: 'Whenever You Need Somebody', durationMs: 213_000, canonicalUrl: SPOTIFY, artworkUrl: 'https://i.scdn.co/image/ab67616d0000b273baf89eb11ec7c657805d2da0' }),
+    );
+  });
+  await boot(page);
+  await page.evaluate(async (a) => {
+    await (window as unknown as { kv: { set(k: string, v: unknown): Promise<void> } }).kv.set('player:hub', a);
+  }, ACCT);
+  await paste(page, SPOTIFY);
+  const row = page.locator('.srch__row').first();
+  // The quick answer shows first, while the hub is still reading.
+  await expect(row.locator('.srch__title')).toHaveText('Never Gonna Give You Up', { timeout: 5_000 });
+  // Nine seconds later — past the old limit — the hub's answer fills in the length.
+  await expect(row.locator('.srch__time')).toHaveText('3:33', { timeout: 20_000 });
+  expect(hubAsked).toBe(1);
+});

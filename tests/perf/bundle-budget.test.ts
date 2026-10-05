@@ -140,8 +140,11 @@ const BUNDLES: Bundle[] = [
      *
      * And to 2410 when the hub's download batches merged in (2026-10-04): the contracts the player
      * bundles gained `DownloadTags` and `DownloadBatchRef` on a download's source — measured, 1 KB.
+     *
+     * And to 2411 for asking the hub alongside the rest rather than first, with a longer wait for
+     * Spotify links (spotDL takes 20-50 s) — measured, under 1 KB of inline shell script.
      */
-    totalBudgetKb: 2410,
+    totalBudgetKb: 2411,
     // Three.js belongs to the constellation and the jewel case; the tag reader only to a scan.
     mustBeSplit: ['three', 'music-metadata'],
   },

@@ -54,6 +54,15 @@ class ToolsTest {
   }
 
   @Test
+  fun `takes a Bandcamp artist's own page, and not a look-alike host`() {
+    assertTrue(Tools.hostAllowed("someartist.bandcamp.com", Tools.allowedHosts))
+    assertTrue(Tools.hostAllowed("music.youtube.com", Tools.allowedHosts))
+    assertTrue(!Tools.hostAllowed("evilbandcamp.com", Tools.allowedHosts))
+    assertTrue(!Tools.hostAllowed("bandcamp.com.evil.example", Tools.allowedHosts))
+    assertTrue(!Tools.hostAllowed("evilyoutube.com", Tools.allowedHosts))
+  }
+
+  @Test
   fun `takes its allow-list from the generated file, not a second copy`() {
     assertEquals(AllowedHosts.hosts, Tools.allowedHosts)
     assertTrue("the allow-list must not be empty", Tools.allowedHosts.isNotEmpty())

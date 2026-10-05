@@ -23,6 +23,7 @@ object AllowedHosts {
     "on.soundcloud.com",
     "open.spotify.com",
     "bandcamp.com",
+    "*.bandcamp.com",
     "archive.org",
   )
 }

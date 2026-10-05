@@ -206,6 +206,13 @@ describe('what it reports', () => {
     expect(result.message).toMatch(/host\(s\) allowlisted/);
   });
 
+  it('takes a Bandcamp artist’s own page, and not a look-alike host', async () => {
+    const instance = adapter({ preset: 'yt-dlp' });
+    expect(await instance.getAuthorizedDownload('https://someartist.bandcamp.com/track/a-song', { basis: 'purchased-export', actorId: 'device' })).not.toBeNull();
+    expect(await instance.getAuthorizedDownload('https://evilbandcamp.com/track/a-song', { basis: 'purchased-export', actorId: 'device' })).toBeNull();
+    expect(await instance.getAuthorizedDownload('https://bandcamp.com.evil.example/track/a-song', { basis: 'purchased-export', actorId: 'device' })).toBeNull();
+  });
+
   it('stays unavailable for a download with no rights basis', async () => {
     const instance = adapter({ preset: 'yt-dlp' });
     const authorized = await instance.getAuthorizedDownload('https://music.youtube.com/watch?v=x', { basis: 'hub-hosted', actorId: 'device' });

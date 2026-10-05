@@ -187,7 +187,7 @@ export class SearchService {
       const allowedHosts = this.registry
         .enabledAdapters()
         .flatMap((a) => a.allowedHosts())
-        .concat(['youtube.com', 'www.youtube.com', 'youtu.be', 'music.youtube.com', 'open.spotify.com', 'soundcloud.com', 'on.soundcloud.com', 'bandcamp.com']);
+        .concat(['youtube.com', 'www.youtube.com', 'youtu.be', 'music.youtube.com', 'open.spotify.com', 'soundcloud.com', 'on.soundcloud.com', 'bandcamp.com', '*.bandcamp.com']);
       const check = validateOutboundUrl(trimmed, { allowedHosts, allowedSchemes: ['https:'] });
       if (!check.ok) throw new DomainError('validation', `That link cannot be resolved: ${check.reason ?? 'not an allowed host'}`);
     }

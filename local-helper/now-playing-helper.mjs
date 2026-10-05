@@ -20425,6 +20425,8 @@ var HELPER_DEFAULT_HOSTS = [
   "on.soundcloud.com",
   "open.spotify.com",
   "bandcamp.com",
+  // Bandcamp keeps its music on each artist subdomain (artist.bandcamp.com/track/...).
+  "*.bandcamp.com",
   "archive.org"
 ];
 

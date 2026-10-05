@@ -199,6 +199,14 @@ describe('the URLs it will fetch', () => {
     expect(checkFetchUrl('https://open.spotify.com/track/x', HELPER_DEFAULT_HOSTS).ok).toBe(true);
   });
 
+  it('takes a Bandcamp artist’s own page, which is where Bandcamp keeps its music', () => {
+    expect(checkFetchUrl('https://someartist.bandcamp.com/track/a-song', HELPER_DEFAULT_HOSTS).ok).toBe(true);
+    expect(checkFetchUrl('https://someartist.bandcamp.com/album/a-record', HELPER_DEFAULT_HOSTS).ok).toBe(true);
+    // A subdomain pattern, not a suffix: a look-alike host is still refused.
+    expect(checkFetchUrl('https://evilbandcamp.com/track/x', HELPER_DEFAULT_HOSTS).ok).toBe(false);
+    expect(checkFetchUrl('https://bandcamp.com.evil.example/track/x', HELPER_DEFAULT_HOSTS).ok).toBe(false);
+  });
+
   it('refuses anything else, including this machine', () => {
     expect(checkFetchUrl('https://evil.example/x', HELPER_DEFAULT_HOSTS).ok).toBe(false);
     // The one that matters: this program runs inside someone's network.

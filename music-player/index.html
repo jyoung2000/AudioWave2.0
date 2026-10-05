@@ -8441,7 +8441,8 @@ window.AW.startStats = function () {
         function () {
           return hubAcctFor().then(function (acct) {
             if (!acct) throw new Error('not paired');
-            return getJSON(acct.base + '/api/v1/providers/resolve?url=' + enc, false, 8000, hubAuth(acct)).then(function (d) {
+            /* The hub reads Spotify through spotDL, which takes 20-50 s; everything else answers in seconds. */
+            return getJSON(acct.base + '/api/v1/providers/resolve?url=' + enc, false, r.u.indexOf('open.spotify.com/') >= 0 ? 90000 : 20000, hubAuth(acct)).then(function (d) {
               var rr = fromHub({ results: [d] })[0];
               if (!rr) throw new Error('empty');
               if (!r.bpm && rr.bpm) r.bpm = rr.bpm;
@@ -8477,10 +8478,13 @@ window.AW.startStats = function () {
           });
         },
       ];
+      /* The hub is asked alongside the rest, not before it: a slow answer (a Spotify link) must not
+         hold back what oEmbed can say at once, and when it lands it outranks it. */
+      tries[0]().then(function (m) { put(3, m); }, function () { /* not paired, or it could not read the link */ });
       (function step(i) {
         if (i >= tries.length || mine !== seq) return;
         tries[i]().then(function (m) { put(i === 0 ? 3 : 1, m); }, function () { step(i + 1); });
-      })(0);
+      })(1);
     }
 
     /* The companion's answer (HelperResolved). A song fills the row; a playlist, set or album

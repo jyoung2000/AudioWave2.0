@@ -143,6 +143,21 @@ object Tools {
     runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0" }.getOrDefault("0")
 
   /**
+   * Whether [host] is on [patterns]. A plain entry takes the host and its subdomains (`youtube.com`
+   * takes `music.youtube.com`), as this list always has; a `*.` entry, which the helper's contract
+   * uses for Bandcamp's artist pages, takes subdomains only. Neither takes a look-alike such as
+   * `evilyoutube.com`.
+   */
+  fun hostAllowed(host: String, patterns: List<String>): Boolean {
+    val h = host.lowercase()
+    return patterns.any { raw ->
+      val p = raw.lowercase()
+      if (p.startsWith("*.")) h.endsWith(p.substring(1)) && h.length > p.length - 1
+      else h == p || h.endsWith(".$p")
+    }
+  }
+
+  /**
    * Whether a fetch may name this address.
    *
    * https only, on the allowlist, and never something that resolves inside a network — the same
@@ -154,7 +169,7 @@ object Tools {
     val host = uri.host?.lowercase() ?: return "That address names no host."
     if (uri.userInfo != null) return "An address carrying credentials is refused."
     if (isLocal(host)) return "Addresses on this device or this network are refused."
-    val allowed = allowedHosts.any { host == it || host.endsWith(".$it") }
+    val allowed = hostAllowed(host, allowedHosts)
     return if (allowed) null else "Host $host is not on the allowlist."
   }
 

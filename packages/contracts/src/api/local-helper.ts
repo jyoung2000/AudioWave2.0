@@ -298,5 +298,7 @@ export const HELPER_DEFAULT_HOSTS: readonly string[] = [
   'on.soundcloud.com',
   'open.spotify.com',
   'bandcamp.com',
+  // Bandcamp keeps its music on each artist subdomain (artist.bandcamp.com/track/...).
+  '*.bandcamp.com',
   'archive.org',
 ];
