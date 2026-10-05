@@ -120,7 +120,7 @@ export async function readTrack(absolutePath: string, relativePath: string, fold
     albumArtistName = common.albumartist?.trim() ?? null;
     year = typeof common.year === 'number' && common.year > 0 ? common.year : null;
     // The whole date, when the tags carry more than a year (a download from the helper always does).
-    releaseDate = releaseDateOf(common);
+    releaseDate = releaseDateOf(common, metadata.native);
     genre = common.genre?.[0]?.trim() ?? null;
     for (const g of common.genre ?? []) if (g.trim()) genres.push(g.trim());
     trackNumber = common.track?.no ?? null;

@@ -22450,7 +22450,7 @@ var Jobs = class {
       if (record2.cancelled) return;
       if (infoFile) args = ytDlpArgs(record2.job, record2.directory, ffmpeg, limits, { infoFile });
     }
-    this.patch(record2, { state: "running", stage: "fetching" });
+    this.patch(record2, { state: "running", stage: "fetching", message: null });
     await this.spawnTool(record2, command, [...prefix, ...args], env, (chunk) => this.readProgress(record2, chunk.toString()));
     if (record2.cancelled) return;
     this.patch(record2, { stage: "finalizing" });

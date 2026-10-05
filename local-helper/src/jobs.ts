@@ -284,7 +284,8 @@ export class Jobs {
       if (record.cancelled) return;
       if (infoFile) args = ytDlpArgs(record.job, record.directory, ffmpeg, limits, { infoFile });
     }
-    this.patch(record, { state: 'running', stage: 'fetching' });
+    // The metadata pass's line is done with; the tool's own progress replaces it from here.
+    this.patch(record, { state: 'running', stage: 'fetching', message: null });
     await this.spawnTool(record, command, [...prefix, ...args], env, (chunk) => this.readProgress(record, chunk.toString()));
 
     if (record.cancelled) return;

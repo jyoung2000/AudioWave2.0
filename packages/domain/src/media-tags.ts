@@ -84,8 +84,31 @@ export function isoDate(value: unknown): string | null {
  * downloads write), then the release date, then the original release date. music-metadata names
  * them `date`, `releasedate` and `originaldate`.
  */
-export function releaseDateOf(common: { date?: unknown; releasedate?: unknown; originaldate?: unknown }): string | null {
-  return isoDate(common.date) ?? isoDate(common.releasedate) ?? isoDate(common.originaldate);
+export function releaseDateOf(common: { date?: unknown; releasedate?: unknown; originaldate?: unknown }, native?: Record<string, ReadonlyArray<{ id: string; value: unknown }>>): string | null {
+  return isoDate(common.date) ?? isoDate(common.releasedate) ?? isoDate(common.originaldate) ?? (native ? id3v23Date(native) : null);
+}
+
+/**
+ * ID3v2.3 has no date frame, only a year (`TYER`) and a day and month (`TDAT`, "DDMM") — which is
+ * how FFmpeg writes a whole date into an MP3 when yt-dlp asks for ID3v2.3, as it does. music-metadata
+ * keeps only the year in `common`, so the date is put back together from the native frames.
+ * (ID3v2.2 spells them `TYE` and `TDA`.)
+ */
+export function id3v23Date(native: Record<string, ReadonlyArray<{ id: string; value: unknown }>>): string | null {
+  for (const [yearId, dayId, tags] of [
+    ['TYER', 'TDAT', native['ID3v2.3']],
+    ['TYE', 'TDA', native['ID3v2.2']],
+  ] as const) {
+    if (!tags) continue;
+    const year = tags.find((t) => t.id === yearId)?.value;
+    const day = tags.find((t) => t.id === dayId)?.value;
+    const y = typeof year === 'string' || typeof year === 'number' ? String(year).trim() : '';
+    const dm = typeof day === 'string' ? day.trim() : '';
+    if (!/^\d{4}$/.test(y) || !/^\d{4}$/.test(dm)) continue;
+    const date = isoDate(`${y}-${dm.slice(2, 4)}-${dm.slice(0, 2)}`);
+    if (date) return date;
+  }
+  return null;
 }
 
 function isYouTube(info: MediaInfo): boolean {

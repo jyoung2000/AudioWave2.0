@@ -26,6 +26,17 @@ describe('releaseDateOf', () => {
     expect(releaseDateOf({ date: '2014' })).toBeNull();
     expect(releaseDateOf({})).toBeNull();
   });
+
+  it('puts an MP3’s ID3v2.3 year and day back together, the way FFmpeg wrote them (TYER + TDAT, DDMM)', () => {
+    // The frames music-metadata reported for the real Big Buck Bunny MP3 the helper fetched on 2026-10-04.
+    const native = { 'ID3v2.3': [{ id: 'TIT2', value: 'Big Buck Bunny' }, { id: 'TYER', value: '2014' }, { id: 'TDAT', value: '1011' }] };
+    expect(releaseDateOf({}, native)).toBe('2014-11-10');
+    expect(releaseDateOf({}, { 'ID3v2.2': [{ id: 'TYE', value: '1999' }, { id: 'TDA', value: '3112' }] })).toBe('1999-12-31');
+    expect(releaseDateOf({}, { 'ID3v2.3': [{ id: 'TYER', value: '2014' }] })).toBeNull();
+    expect(releaseDateOf({}, { 'ID3v2.3': [{ id: 'TYER', value: '2014' }, { id: 'TDAT', value: '3102' }] })).toBeNull();
+    // A tag that says the whole date wins over the pieces.
+    expect(releaseDateOf({ date: '2020-01-02' }, native)).toBe('2020-01-02');
+  });
 });
 
 describe('cleanTags', () => {
