@@ -1,0 +1,39 @@
+{
+  "_type": "playlist",
+  "id": "UCSMOQeBJ2RAnuFungnQOxLg",
+  "title": "Blender - Playlists",
+  "channel": "Blender",
+  "uploader": "Blender",
+  "release_year": null,
+  "extractor_key": "YoutubeTab",
+  "webpage_url": "https://www.youtube.com/@BlenderOfficial/playlists",
+  "original_url": "https://www.youtube.com/@BlenderOfficial/playlists",
+  "playlist_count": null,
+  "entries": [
+    {
+      "_type": "url",
+      "id": "PLa1F2ddGya_-I9y1nXALrBqrZNdlUE012",
+      "title": "Blender Conference 2026",
+      "channel": "Playlist",
+      "uploader": "Playlist",
+      "duration": null,
+      "url": "https://www.youtube.com/playlist?list=PLa1F2ddGya_-I9y1nXALrBqrZNdlUE012",
+      "ie_key": "YoutubeTab"
+    },
+    {
+      "_type": "url",
+      "id": "PLa1F2ddGya_8u-HEvmfCVuS_OImW8HaLd",
+      "title": "Blender Conference 2025",
+      "channel": "Playlist",
+      "uploader": "Playlist",
+      "duration": null,
+      "url": "https://www.youtube.com/playlist?list=PLa1F2ddGya_8u-HEvmfCVuS_OImW8HaLd",
+      "ie_key": "YoutubeTab"
+    }
+  ],
+  "thumbnails": [
+    {
+      "url": "https://yt3.googleusercontent.com/ytc/AIdro_nqhez5E1j4YzrCvzTAAB6z_KDFFZznqWv0x-vfY2gsXdY=s0"
+    }
+  ]
+}

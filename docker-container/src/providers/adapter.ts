@@ -92,6 +92,8 @@ export interface ProviderAdapter {
   health(): Promise<ProviderHealth>;
   search(query: string, filters: SearchFilters, cursor: string | null): Promise<ProviderSearchPage>;
   resolve(urlOrId: string): Promise<SearchResult | null>;
+  /** How long `resolve` may take when a pasted link is resolved; the default is twelve seconds. */
+  readonly resolveTimeoutMs?: number;
   getMetadata(id: string): Promise<SearchResult | null>;
   getPreview(id: string): Promise<PlayableRef | null>;
   getPlayable(id: string, context: PlaybackContext): Promise<PlayableRef | null>;

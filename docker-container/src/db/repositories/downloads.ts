@@ -110,8 +110,8 @@ export class DownloadsRepository {
 
   save(job: DownloadRecord): void {
     this.db
-      .prepare('UPDATE download_jobs SET state = ?, progress = ?, attempts = ?, next_retry_at = ?, checksum_sha256 = ?, result_locator = ?, result_size_bytes = ?, error = ?, output_path = ?, updated_at = ?, completed_at = ?, target = ? WHERE id = ?')
-      .run(job.state, JSON.stringify(job.progress), job.attempts, job.nextRetryAt, job.checksumSha256, job.resultLocator ? JSON.stringify(job.resultLocator) : null, job.resultSizeBytes, job.error, job.outputPath, job.updatedAt, job.completedAt, JSON.stringify(job.target), job.id);
+      .prepare('UPDATE download_jobs SET state = ?, progress = ?, attempts = ?, next_retry_at = ?, checksum_sha256 = ?, result_locator = ?, result_size_bytes = ?, error = ?, output_path = ?, updated_at = ?, completed_at = ?, target = ?, source = ? WHERE id = ?')
+      .run(job.state, JSON.stringify(job.progress), job.attempts, job.nextRetryAt, job.checksumSha256, job.resultLocator ? JSON.stringify(job.resultLocator) : null, job.resultSizeBytes, job.error, job.outputPath, job.updatedAt, job.completedAt, JSON.stringify(job.target), JSON.stringify(job.source), job.id);
   }
 
   find(id: string): DownloadRecord | undefined {
@@ -142,6 +142,15 @@ export class DownloadsRepository {
 
   recoverRunning(now: string): number {
     return this.db.prepare("UPDATE download_jobs SET state = 'queued', updated_at = ? WHERE state = 'running'").run(now).changes;
+  }
+
+  /**
+   * Source URLs this requester already has a download for that is not failed or cancelled — what a
+   * playlist request skips as a duplicate rather than fetching twice.
+   */
+  activeSourceUrls(ownerId: string): Set<string> {
+    const rows = this.db.prepare<[string], { url: string | null }>("SELECT json_extract(source, '$.url') AS url FROM download_jobs WHERE owner_id = ? AND state NOT IN ('failed', 'cancelled')").all(ownerId);
+    return new Set(rows.map((r) => r.url).filter((u): u is string => typeof u === 'string'));
   }
 
   findCompletedByChecksum(sha256: string): DownloadRecord | undefined {

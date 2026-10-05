@@ -1,0 +1,22 @@
+{
+  "_type": "video",
+  "id": "293",
+  "title": "Flickermood",
+  "fulltitle": "Flickermood",
+  "track": "Flickermood",
+  "artist": "Forss",
+  "artists": ["Forss"],
+  "uploader": "Forss",
+  "genre": "Electronic",
+  "genres": ["Electronic"],
+  "duration": 213.886,
+  "upload_date": "20070922",
+  "release_date": "20030602",
+  "release_year": 2003,
+  "thumbnail": "https://i1.sndcdn.com/artworks-000067273316-smsiqx-original.jpg",
+  "license": "all-rights-reserved",
+  "extractor_key": "Soundcloud",
+  "webpage_url": "https://soundcloud.com/forss/flickermood",
+  "original_url": "https://soundcloud.com/forss/flickermood",
+  "url": "https://media.example/stripped"
+}

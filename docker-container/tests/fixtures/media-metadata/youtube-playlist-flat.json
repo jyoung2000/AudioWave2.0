@@ -1,0 +1,59 @@
+{
+  "_type": "playlist",
+  "id": "PLa1F2ddGya_-Ymw4YlOjqrdQxiRMJql5x",
+  "title": "Blender Conference 2024",
+  "channel": "Blender",
+  "uploader": "Blender",
+  "release_year": null,
+  "extractor_key": "YoutubeTab",
+  "webpage_url": "https://www.youtube.com/playlist?list=PLa1F2ddGya_-Ymw4YlOjqrdQxiRMJql5x",
+  "original_url": "https://www.youtube.com/playlist?list=PLa1F2ddGya_-Ymw4YlOjqrdQxiRMJql5x",
+  "playlist_count": 87,
+  "entries": [
+    {
+      "_type": "url",
+      "id": "VZ5022VaMmA",
+      "title": "Keynote — Blender Conference 2024",
+      "channel": "Blender",
+      "uploader": "Blender",
+      "duration": 1792,
+      "url": "https://www.youtube.com/watch?v=VZ5022VaMmA",
+      "ie_key": "Youtube"
+    },
+    {
+      "_type": "url",
+      "id": "o_a-mslVsA0",
+      "title": "Virtual Crafting: Photorealism for Design & Marketing — Blender Conference 2024",
+      "channel": "Blender",
+      "uploader": "Blender",
+      "duration": 1536,
+      "url": "https://www.youtube.com/watch?v=o_a-mslVsA0",
+      "ie_key": "Youtube"
+    },
+    {
+      "_type": "url",
+      "id": "sLoO_8j0yKA",
+      "title": "Building a Career around Blender — Blender Conference 2024",
+      "channel": "Blender",
+      "uploader": "Blender",
+      "duration": 1126,
+      "url": "https://www.youtube.com/watch?v=sLoO_8j0yKA",
+      "ie_key": "Youtube"
+    },
+    {
+      "_type": "url",
+      "id": "7e65lrvpupM",
+      "title": "Ghosts of Ruin - Pipeline & Shading for TV productions — Blender Conference 2024",
+      "channel": "Blender",
+      "uploader": "Blender",
+      "duration": 2484,
+      "url": "https://www.youtube.com/watch?v=7e65lrvpupM",
+      "ie_key": "Youtube"
+    }
+  ],
+  "thumbnails": [
+    {
+      "url": "https://i.ytimg.com/vi/VZ5022VaMmA/hqdefault.jpg?sqp=-oaymwExCNACELwBSFryq4qpAyMIARUAAIhCGAHwAQH4Af4JgALQBYoCDAgAEAEYZSBlKGUwDw==&rs=AOn4CLDsq-89DUFyJiGMlKHzYYO-x0K-aQ"
+    }
+  ]
+}
