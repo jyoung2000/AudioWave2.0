@@ -283,6 +283,51 @@ describe('signed in', () => {
     expect(within(row).queryByRole('button', { name: /Set up/i })).toBeNull();
   });
 
+  it('says spotDL is there in the provider’s row, and shows a playlist download as one row per entry', async () => {
+    const now = new Date().toISOString();
+    const job = (index: number, title: string, state: string) => ({
+      id: `0190000${index}-0000-7000-8000-000000000000`,
+      state,
+      ownerId: 'd1',
+      source: { provider: 'external-tool', providerTrackId: null, url: `https://soundcloud.com/forss/t${index}`, locator: null, title, artistName: 'Forss', batch: { id: '01900000-0000-7000-8000-00000000000b', title: 'Soulhack', index, total: 11 } },
+      authorization: { basis: 'public-domain', evidence: null, acknowledgedAt: now },
+      target: { destination: 'hub', directoryId: null, filenameTemplate: '{artist} - {title}', format: 'original', quality: null },
+      progress: { bytesDone: 0, bytesTotal: null, speedBps: null, percent: null, stage: 'preflight' },
+      attempts: 0,
+      maxAttempts: 5,
+      nextRetryAt: null,
+      checksumSha256: null,
+      resultLocator: null,
+      resultSizeBytes: null,
+      error: null,
+      createdAt: now,
+      updatedAt: now,
+      completedAt: null,
+    });
+    const tools = { ...TOOL, provider: 'external-tool', displayName: 'External media tool (yt-dlp, spotDL)' };
+    vi.stubGlobal(
+      'fetch',
+      mockFetch({
+        ...SIGNED_IN,
+        '/providers': { items: [tools], health: [{ ...OVERVIEW.providers[0], provider: 'external-tool' }] },
+        '/downloads': { items: [job(0, 'City Ports', 'completed'), job(1, 'Soulhack', 'queued')] },
+        '/downloads/formats': { formats: [], ffmpeg: { available: true, version: '7.1', encoders: [] } },
+        '/downloads/storage': { dataDir: '/data', freeBytes: null, totalBytes: null, usedByDownloadsBytes: 0, partialFiles: 0, cleanupPolicy: { keepFailedDays: 14, keepPartialHours: 24 }, directories: [] },
+      }),
+    );
+    render(<App />);
+    await signedIn();
+    await userEvent.click(await screen.findByRole('tab', { name: 'Music' }));
+    const providers = await screen.findByRole('table', { name: 'Providers' });
+    expect(await within(providers).findByText('External media tool (yt-dlp, spotDL)')).toBeTruthy();
+    const downloads = await screen.findByRole('table', { name: 'Downloads' });
+    const first = (await within(downloads).findByText('City Ports — Forss')).closest('tr')!;
+    expect(first.textContent).toContain('Soulhack, 1 of 11');
+    const second = within(downloads).getByText('Soulhack — Forss').closest('tr')!;
+    expect(second.textContent).toContain('Soulhack, 2 of 11');
+    expect(within(second).getByText('Waiting')).toBeTruthy();
+  });
+
   it('asks before revoking a device, and Cancel leaves it alone', async () => {
     const device = { id: 'd1', name: 'Kitchen iPad', kind: 'player', scopes: ['library:read'], online: true, lastSeenAt: null, revokedAt: null, platform: 'Safari', ipDisplay: null };
     const fetchMock = mockFetch({ ...SIGNED_IN, '/devices': { items: [device] } });

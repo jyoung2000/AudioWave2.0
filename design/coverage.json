@@ -692,6 +692,7 @@
         "set-up form (secrets write-only; blank keeps what is stored)",
         "saved and tested (result beside the button)",
         "external tool on without setup (DEC-024)",
+        "external tool row names the tools on this hub: (yt-dlp, spotDL) (DEC-036)",
         "requests and limits",
         "details open under their own row; Escape closes them and puts the caret back on the button",
         "Requests and limits lists the providers in use, the rest behind a disclosure"
@@ -766,6 +767,7 @@
         "cancelled",
         "done",
         "cancel (confirm sheet)",
+        "playlist entry: one row each, From names the list and the position (DEC-036)",
         "formats this hub cannot write struck through, with why",
         "storage line"
       ],

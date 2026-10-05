@@ -73,10 +73,15 @@ export function DownloadsView() {
                   const title = [job.source.title, job.source.artistName].filter(Boolean).join(' — ') || job.source.url || 'Untitled';
                   const percent = job.progress.percent === null ? null : Math.round(job.progress.percent);
                   const stage = STAGES[job.progress.stage] ?? 'Working';
+                  // A playlist link is one row per entry; the row says which list, and where in it.
+                  const batch = job.source.batch ? `${job.source.batch.title ?? 'Playlist'}, ${job.source.batch.index + 1} of ${job.source.batch.total}` : null;
                   return (
                     <tr key={job.id}>
-                      <td title={`${title} · ${BASIS_LABELS[job.authorization.basis] ?? 'Allowed'}`}>{title}</td>
-                      <td className="hide-sm">{names.get(job.source.provider) ?? job.source.provider}</td>
+                      <td title={[title, batch, BASIS_LABELS[job.authorization.basis] ?? 'Allowed'].filter(Boolean).join(' · ')}>{title}</td>
+                      <td className="hide-sm" title={batch ?? undefined}>
+                        {names.get(job.source.provider) ?? job.source.provider}
+                        {batch ? <span className="sub"> · {batch}</span> : null}
+                      </td>
                       <td>{FORMAT_LABELS[job.target.format] ?? job.target.format}</td>
                       <td>
                         {job.state === 'completed' ? (
