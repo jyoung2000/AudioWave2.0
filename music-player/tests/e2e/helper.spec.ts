@@ -30,7 +30,11 @@ const ORIGIN = `http://127.0.0.1:${PORT}`;
 let helper: ChildProcess | null = null;
 let scratch = '';
 
-/** Stands in for yt-dlp: answers `--version`, then copies a real track where it was told to. */
+/**
+ * Stands in for yt-dlp: answers `--version`; describes the link when asked for the metadata pass
+ * (`--dump-single-json`, which the helper runs first when FFmpeg is present, so it can write clean
+ * tags); and on the download pass copies a real track where it was told to.
+ */
 function writeStub(directory: string): string {
   const source = join(FIXTURES, readdirSync(FIXTURES).filter((name) => name.endsWith('.wav'))[0]!);
   const path = join(directory, 'stub-yt-dlp.mjs');
@@ -42,6 +46,11 @@ import { join } from 'node:path';
 
 const args = process.argv.slice(2);
 if (args[0] === '--version') { process.stdout.write('2026.09.01\\n'); process.exit(0); }
+if (args.includes('--dump-single-json')) {
+  const url = args[args.length - 1];
+  process.stdout.write(JSON.stringify({ _type: 'video', id: 'test', title: 'Someone - A Link (Official Video)', channel: 'Someone', uploader: 'Someone', duration: 30, upload_date: '20260101', webpage_url: url, extractor: 'youtube', extractor_key: 'Youtube' }) + '\\n');
+  process.exit(0);
+}
 const paths = args[args.indexOf('--paths') + 1];
 process.stdout.write('[download] 100.0% of 1.00MiB\\n');
 copyFileSync(${JSON.stringify(source)}, join(paths, 'Fetched Song.wav'));

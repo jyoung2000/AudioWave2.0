@@ -2314,6 +2314,47 @@
           "name": "not paired: the invite page asks you to pair first"
         }
       ]
+    },
+    {
+      "id": "NP-PREF-014",
+      "group": "np-prefs",
+      "title": "How the disc moves is the listener’s choice",
+      "contract": "Settings ▸ Player ▸ The disc sets whether the disc spins while a song plays (steady, with the song’s tempo, or not at all) and how fast (0.25× to 3×); whether it turns all the way round (steady, with the tempo, held at its angle, or left where it is put) and how fast; its angle (yaw, 0–355°, with presets: the label face on or at an angle, the edge, the playing side) — where it starts and where a held disc stays; and its tilt (pitch, −30° to 80° back). Reset Position puts the disc at that angle and tilt and drops any dragged pose. A live preview at the top shows the disc moving as the settings say, as if a song were playing, and says what it is showing (a song at 120 BPM when tempo is chosen and nothing with a known tempo plays); it draws only while it is on screen. Each choice is saved at once, applies to the playing disc immediately and survives a reload; only the controls that apply are shown. Tempo is the song’s BPM: at 120 BPM the disc moves at the chosen speed, faster songs faster, and one full turn takes 32 beats; a song with no known tempo, and the radio, move at the steady speed. Turn also governs the closed case while nothing plays. The defaults are the motion and pose the player always had, and Reduce animation still slows the spin and stops the turning.",
+      "example": "",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/disc.spec.ts",
+          "name": "the controls start at today’s behaviour, show only what applies, and are kept across a reload"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/disc.spec.ts",
+          "name": "the stage follows the choices: steady, a speed, off, and with the song’s tempo"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/disc.spec.ts",
+          "name": "held one way, the disc settles on that facing while it plays"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/disc.spec.ts",
+          "name": "Reduce animation still wins: a slow spin and no turning, whatever is chosen"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/disc.spec.ts",
+          "name": "the angle and the tilt are the listener’s, and Reset Position puts the disc back there"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/disc.spec.ts",
+          "name": "the preview in Settings draws the disc, and says what it is showing"
+        }
+      ]
     }
   ]
 }

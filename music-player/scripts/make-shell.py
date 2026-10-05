@@ -1529,6 +1529,381 @@ replace("          bpm: d.bpm || null,\n          platform: d.platform,\n       
 replace("(sg.artist ? ' by ' + sg.artist : '') + ' — fetched by the helper on this PC from '",
         "(sg.artist ? ' by ' + sg.artist : '') + (sg.date ? ' (' + sg.date + ')' : '') + ' — fetched by the helper on this PC from '")
 
+
+# ---- the disc: whether and how it spins and turns (NP-PREF-014) -------------------------------------------
+# Settings ▸ Player gains "The disc": Spin (while playing / with the song's tempo / don't) and its speed;
+# Turn (all the way round / with the tempo / hold one way / stay where I leave it), its speed, and which
+# way it faces when held. Saved with the other preferences in cfg.disc; the 3D stage reads it from the
+# prefs events it already follows. Tempo means the song's BPM: at 120 BPM the disc moves at the speed set,
+# faster songs faster; a song with no known tempo moves at the steady speed. Reduce animation still wins.
+replace("        <fieldset class=\"prefs__group\">\n"
+        "          <legend class=\"prefs__legend\">Listening</legend>",
+        "        <fieldset class=\"prefs__group\" id=\"discPrefs\">\n"
+        "          <legend class=\"prefs__legend\">The disc</legend>\n"
+        "          <div class=\"disc-preview\">\n"
+        "            <div class=\"disc-preview__stage\" id=\"discPreview\" role=\"img\" aria-label=\"A preview of the disc, moving the way these settings say\"></div>\n"
+        "            <p class=\"prefs__hint disc-preview__note\" id=\"discPreviewNote\" aria-live=\"polite\"></p>\n"
+        "          </div>\n"
+        "          <div class=\"prefs__row\">\n"
+        "            <label for=\"cfgDiscSpin\">Spin</label>\n"
+        "            <select class=\"prefs__select\" id=\"cfgDiscSpin\">\n"
+        "              <option value=\"steady\">Spin while a song plays</option>\n"
+        "              <option value=\"tempo\">Spin with the song’s tempo</option>\n"
+        "              <option value=\"off\">Don’t spin</option>\n"
+        "            </select>\n"
+        "          </div>\n"
+        "          <div class=\"prefs__row\" id=\"cfgDiscSpinSpeedRow\">\n"
+        "            <label for=\"cfgDiscSpinSpeed\">Spin speed</label>\n"
+        "            <div class=\"weight vol__row\">\n"
+        "              <input type=\"range\" id=\"cfgDiscSpinSpeed\" min=\"0.25\" max=\"3\" step=\"0.25\" aria-describedby=\"cfgDiscSpinSpeedVal\">\n"
+        "              <span class=\"weight__val\" id=\"cfgDiscSpinSpeedVal\"></span>\n"
+        "            </div>\n"
+        "          </div>\n"
+        "          <div class=\"prefs__row\">\n"
+        "            <label for=\"cfgDiscTurn\">Turn</label>\n"
+        "            <select class=\"prefs__select\" id=\"cfgDiscTurn\">\n"
+        "              <option value=\"steady\">Turn all the way round</option>\n"
+        "              <option value=\"tempo\">Turn with the song’s tempo</option>\n"
+        "              <option value=\"lock\">Hold it at its angle</option>\n"
+        "              <option value=\"off\">Stay where I leave it</option>\n"
+        "            </select>\n"
+        "          </div>\n"
+        "          <div class=\"prefs__row\" id=\"cfgDiscTurnSpeedRow\">\n"
+        "            <label for=\"cfgDiscTurnSpeed\">Turn speed</label>\n"
+        "            <div class=\"weight vol__row\">\n"
+        "              <input type=\"range\" id=\"cfgDiscTurnSpeed\" min=\"0.25\" max=\"3\" step=\"0.25\" aria-describedby=\"cfgDiscTurnSpeedVal\">\n"
+        "              <span class=\"weight__val\" id=\"cfgDiscTurnSpeedVal\"></span>\n"
+        "            </div>\n"
+        "          </div>\n"
+        "          <div class=\"prefs__row\" id=\"cfgDiscFacingRow\">\n"
+        "            <label for=\"cfgDiscFacing\">Angle</label>\n"
+        "            <select class=\"prefs__select\" id=\"cfgDiscFacing\">\n"
+        "              <option value=\"front\">The label, face on</option>\n"
+        "              <option value=\"angle\">The label, at an angle</option>\n"
+        "              <option value=\"edge\">The edge</option>\n"
+        "              <option value=\"back\">The playing side</option>\n"
+        "              <option value=\"custom\">My own angle</option>\n"
+        "            </select>\n"
+        "          </div>\n"
+        "          <div class=\"prefs__row\">\n"
+        "            <label for=\"cfgDiscYaw\">Exact angle</label>\n"
+        "            <div class=\"weight vol__row\">\n"
+        "              <input type=\"range\" id=\"cfgDiscYaw\" min=\"0\" max=\"355\" step=\"5\" aria-describedby=\"cfgDiscYawVal\">\n"
+        "              <span class=\"weight__val\" id=\"cfgDiscYawVal\"></span>\n"
+        "            </div>\n"
+        "          </div>\n"
+        "          <div class=\"prefs__row\">\n"
+        "            <label for=\"cfgDiscPitch\">Tilt</label>\n"
+        "            <div class=\"weight vol__row\">\n"
+        "              <input type=\"range\" id=\"cfgDiscPitch\" min=\"-30\" max=\"80\" step=\"5\" aria-describedby=\"cfgDiscPitchVal\">\n"
+        "              <span class=\"weight__val\" id=\"cfgDiscPitchVal\"></span>\n"
+        "            </div>\n"
+        "          </div>\n"
+        "          <div class=\"prefs__row\">\n"
+        "            <span class=\"prefs__label\">Position</span>\n"
+        "            <button class=\"prefs__btn\" type=\"button\" id=\"cfgDiscReset\">Reset Position</button>\n"
+        "          </div>\n"
+        "          <p class=\"prefs__hint\">The angle is where the disc starts, and where it stays when it is held; tilt is how far it leans back, and Reset Position puts it back there after you have dragged it. Tempo follows the song’s BPM: at 120 BPM the disc moves at the speed set, faster songs faster; a song with no known tempo, and the radio, use the steady speed. Turn also covers the closed case while nothing plays. Reduce animation, above, still slows the spin and stops the turning.</p>\n"
+        "        </fieldset>\n"
+        "\n"
+        "        <fieldset class=\"prefs__group\">\n"
+        "          <legend class=\"prefs__legend\">Listening</legend>")
+
+replace("theme: 'auto', motion: false, stage: true,",
+        "theme: 'auto', motion: false, stage: true,\n"
+        "      disc: { spin: 'steady', spinSpeed: 1, turn: 'steady', turnSpeed: 1, facing: 'front', yaw: 0, pitch: 40 },")
+
+replace("      ['motion', 'stage'].forEach(function (k) {\n"
+        "        if (typeof saved[k] === 'boolean') cfg[k] = saved[k];\n"
+        "      });\n",
+        "      ['motion', 'stage'].forEach(function (k) {\n"
+        "        if (typeof saved[k] === 'boolean') cfg[k] = saved[k];\n"
+        "      });\n"
+        "      if (saved.disc && typeof saved.disc === 'object') {\n"
+        "        var sd = saved.disc;\n"
+        "        if (/^(steady|tempo|off)$/.test(sd.spin)) cfg.disc.spin = sd.spin;\n"
+        "        if (/^(steady|tempo|lock|off)$/.test(sd.turn)) cfg.disc.turn = sd.turn;\n"
+        "        if (/^(front|angle|edge|back|custom)$/.test(sd.facing)) cfg.disc.facing = sd.facing;\n"
+        "        if (typeof sd.yaw === 'number' && sd.yaw >= 0 && sd.yaw < 360) cfg.disc.yaw = sd.yaw;\n"
+        "        if (typeof sd.pitch === 'number' && sd.pitch >= -30 && sd.pitch <= 80) cfg.disc.pitch = sd.pitch;\n"
+        "        ['spinSpeed', 'turnSpeed'].forEach(function (k) {\n"
+        "          if (typeof sd[k] === 'number' && sd[k] >= 0.25 && sd[k] <= 3) cfg.disc[k] = sd[k];\n"
+        "        });\n"
+        "      }\n")
+
+replace("      document.getElementById('cfgStage').checked = cfg.stage;\n",
+        "      document.getElementById('cfgStage').checked = cfg.stage;\n"
+        "      discFill();\n")
+
+replace("    document.getElementById('cfgStage').addEventListener('change', function () {\n"
+        "      cfg.stage = this.checked; cfgSave(); applyPlayer(); setStatus('Saved.');\n"
+        "    });\n",
+        "    document.getElementById('cfgStage').addEventListener('change', function () {\n"
+        "      cfg.stage = this.checked; cfgSave(); applyPlayer(); setStatus('Saved.');\n"
+        "    });\n"
+        "\n"
+        "    /* The disc (NP-PREF-014). Each control saves at once, like the rest of this pane; a speed\n"
+        "       shows on the stage while it is being dragged and is saved when it is let go. */\n"
+        "    function discSpeedText(v) { return (Math.round(v * 100) / 100) + '×'; }\n"
+        "    function discFill() {\n"
+        "      var d = cfg.disc;\n"
+        "      document.getElementById('cfgDiscSpin').value = d.spin;\n"
+        "      document.getElementById('cfgDiscTurn').value = d.turn;\n"
+        "      document.getElementById('cfgDiscFacing').value = d.facing;\n"
+        "      document.getElementById('cfgDiscSpinSpeed').value = String(d.spinSpeed);\n"
+        "      document.getElementById('cfgDiscTurnSpeed').value = String(d.turnSpeed);\n"
+        "      document.getElementById('cfgDiscSpinSpeedVal').textContent = discSpeedText(d.spinSpeed);\n"
+        "      document.getElementById('cfgDiscTurnSpeedVal').textContent = discSpeedText(d.turnSpeed);\n"
+        "      document.getElementById('cfgDiscSpinSpeedRow').hidden = d.spin === 'off';\n"
+        "      document.getElementById('cfgDiscTurnSpeedRow').hidden = d.turn === 'off' || d.turn === 'lock';\n"
+        "      document.getElementById('cfgDiscYaw').value = String(d.yaw);\n"
+        "      document.getElementById('cfgDiscPitch').value = String(d.pitch);\n"
+        "      document.getElementById('cfgDiscYawVal').textContent = d.yaw + '°';\n"
+        "      document.getElementById('cfgDiscPitchVal').textContent = d.pitch + '°';\n"
+        "    }\n"
+        "    var DISC_PRESET_YAW = { front: 0, angle: 45, edge: 90, back: 180 };\n"
+        "    function discPresetOf(yaw) {\n"
+        "      for (var k in DISC_PRESET_YAW) if (DISC_PRESET_YAW[k] === yaw) return k;\n"
+        "      return 'custom';\n"
+        "    }\n"
+        "    /* Tells the stage to put the disc at the chosen angle and tilt now, dropping any dragged pose. */\n"
+        "    function discPlace() { document.dispatchEvent(new CustomEvent('disc:place')); }\n"
+        "    document.getElementById('cfgDiscFacing').addEventListener('change', function () {\n"
+        "      if (this.value !== 'custom') cfg.disc.yaw = DISC_PRESET_YAW[this.value];\n"
+        "      cfg.disc.facing = this.value; cfgSave(); discFill(); applyPlayer(); discPlace(); setStatus('Saved.');\n"
+        "    });\n"
+        "    [['cfgDiscYaw', 'yaw'], ['cfgDiscPitch', 'pitch']].forEach(function (p) {\n"
+        "      var el = document.getElementById(p[0]);\n"
+        "      el.addEventListener('input', function () {\n"
+        "        cfg.disc[p[1]] = +this.value;\n"
+        "        if (p[1] === 'yaw') cfg.disc.facing = discPresetOf(cfg.disc.yaw);\n"
+        "        discFill(); applyPlayer(); discPlace();\n"
+        "      });\n"
+        "      el.addEventListener('change', function () { cfgSave(); setStatus('Saved.'); });\n"
+        "    });\n"
+        "    document.getElementById('cfgDiscReset').addEventListener('click', function () {\n"
+        "      discPlace(); setStatus('The disc is back at its angle and tilt.');\n"
+        "    });\n"
+        "    [['cfgDiscSpin', 'spin'], ['cfgDiscTurn', 'turn']].forEach(function (p) {\n"
+        "      document.getElementById(p[0]).addEventListener('change', function () {\n"
+        "        cfg.disc[p[1]] = this.value; cfgSave(); discFill(); applyPlayer(); setStatus('Saved.');\n"
+        "      });\n"
+        "    });\n"
+        "    [['cfgDiscSpinSpeed', 'spinSpeed'], ['cfgDiscTurnSpeed', 'turnSpeed']].forEach(function (p) {\n"
+        "      var el = document.getElementById(p[0]);\n"
+        "      el.addEventListener('input', function () {\n"
+        "        cfg.disc[p[1]] = +this.value;\n"
+        "        document.getElementById(p[0] + 'Val').textContent = discSpeedText(+this.value);\n"
+        "        applyPlayer();\n"
+        "      });\n"
+        "      el.addEventListener('change', function () { cfgSave(); setStatus('Saved.'); });\n"
+        "    });\n")
+
+# ---- the stage follows cfg.disc, and the song's tempo -------------------------------------------------------
+replace("function applyStagePrefs(c) {\n"
+        "  reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches || !!c.motion;\n"
+        "  stageOn = c.stage !== false;\n"
+        "}\n",
+        "function applyStagePrefs(c) {\n"
+        "  reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches || !!c.motion;\n"
+        "  stageOn = c.stage !== false;\n"
+        "  discPrefs = Object.assign({}, DISC_DEFAULTS, c.disc || {});\n"
+        "}\n"
+        "\n"
+        "/* How the disc moves (NP-PREF-014): the listener's choice, from Settings ▸ Player ▸ The disc. */\n"
+        "const DISC_DEFAULTS = { spin: 'steady', spinSpeed: 1, turn: 'steady', turnSpeed: 1, facing: 'front', yaw: 0, pitch: 40 };\n"
+        "let discPrefs = Object.assign({}, DISC_DEFAULTS);\n"
+        "/* The playing song's tempo, when it is known. The radio has none. */\n"
+        "let songBpm = null, songKey = '';\n"
+        "const keyOf = (t, a) => String(t || '').toLowerCase() + '\\u0001' + String(a || '').toLowerCase();\n"
+        "document.addEventListener('library:play', e => {\n"
+        "  const s = e.detail && e.detail.song;\n"
+        "  songKey = s ? keyOf(s.title, s.artist) : '';\n"
+        "  songBpm = s && s.bpm > 0 ? +s.bpm : null;\n"
+        "});\n"
+        "document.addEventListener('library:bpm', e => {\n"
+        "  const d = e.detail || {};\n"
+        "  if (songKey && keyOf(d.title, d.artist) === songKey && d.bpm > 0) songBpm = +d.bpm;\n"
+        "});\n"
+        "document.addEventListener('radio:station', () => { songBpm = null; songKey = ''; });\n"
+        "/* After the defaults above exist: the stage can start after the preferences were announced. */\n"
+        "if (window.NP_PREFS) applyStagePrefs(window.NP_PREFS);\n")
+
+replace("const DISC_SPIN = reduceMotion ? 1.0 : 8.0;   // about its own axis\n",
+        "const DISC_SPIN = reduceMotion ? 1.0 : 8.0;   // about its own axis\n"
+        "const DISC_SPIN_BASE = 8.0;                   // rad/s at 1×, before Reduce animation\n"
+        "const DISC_TURN_BASE = 0.42;                  // rad/s at 1×: about one turn in fifteen seconds\n"
+        "/* The listener's angle (yaw) and tilt (pitch), in degrees in the preferences. */\n"
+        "const yawRad = () => ((discPrefs.yaw || 0) * Math.PI) / 180;\n"
+        "const pitchRad = () => (-(typeof discPrefs.pitch === 'number' ? discPrefs.pitch : 40) * Math.PI) / 180;\n"
+        "/* At 120 BPM the chosen speed; faster songs faster, within reason. */\n"
+        "const tempoScale = () => (songBpm ? Math.min(2.5, Math.max(0.4, songBpm / 120)) : 1);\n"
+        "function discSpinRate() {\n"
+        "  if (discPrefs.spin === 'off') return 0;\n"
+        "  const rate = DISC_SPIN_BASE * discPrefs.spinSpeed * (discPrefs.spin === 'tempo' ? tempoScale() : 1);\n"
+        "  return reduceMotion ? Math.min(rate, 1.0) : rate;\n"
+        "}\n"
+        "function discTurnRate() {\n"
+        "  if (reduceMotion || discPrefs.turn === 'off' || discPrefs.turn === 'lock') return 0;\n"
+        "  /* With the tempo: one full turn every 32 beats — eight bars of 4/4. */\n"
+        "  if (discPrefs.turn === 'tempo' && songBpm) return TWO_PI * (songBpm / 60) / 32 * discPrefs.turnSpeed;\n"
+        "  return DISC_TURN_BASE * discPrefs.turnSpeed;\n"
+        "}\n"
+        "/* The closed case turns while nothing plays only when the disc is allowed to turn. */\n"
+        "function caseTurnScale() {\n"
+        "  if (discPrefs.turn === 'off' || discPrefs.turn === 'lock') return 0;\n"
+        "  return discPrefs.turnSpeed * (discPrefs.turn === 'tempo' ? tempoScale() : 1);\n"
+        "}\n")
+
+replace("  } else if (!dragging && !reduceMotion) {\n"
+        "    baseRY += SPIN * dt;\n",
+        "  } else if (!dragging && !reduceMotion) {\n"
+        "    baseRY += SPIN * caseTurnScale() * dt;\n")
+
+replace("  if (playing && !holdingDisc) turn += DISC_TURN * dt;\n",
+        "  if (playing && !holdingDisc) {\n"
+        "    if (discPrefs.turn === 'lock') {\n"
+        "      // settle on the nearest copy of the chosen facing, never the long way round\n"
+        "      const want = yawRad();\n"
+        "      const target = want + Math.round((turn - want) / TWO_PI) * TWO_PI;\n"
+        "      turn += (target - turn) * (1 - Math.pow(0.02, dt));\n"
+        "    } else {\n"
+        "      turn += discTurnRate() * dt;\n"
+        "    }\n"
+        "  }\n")
+
+replace("  const spinTarget = playing ? DISC_SPIN : 0;\n",
+        "  const spinTarget = playing ? discSpinRate() : 0;\n")
+
+# What the stage is doing, for the e2e suite and for anyone checking a setting took: read-only.
+replace("renderer.setAnimationLoop(tick);\n",
+        "renderer.setAnimationLoop(tick);\n"
+        "window.NP_DISC = Object.freeze({\n"
+        "  motion: () => ({ spin: discSpinRate(), turn: discTurnRate(), angle: turn, tilt: discTilt, pitch: pitchRad(), spinning: spinSpeed, bpm: songBpm, prefs: Object.assign({}, discPrefs), preview: discPreviewState() }),\n"
+        "});\n")
+
+
+# The 3D stage loads three.js asynchronously, so it can start after the preferences were announced and
+# miss them: Reduce animation, "Show the 3D case" and now the disc's motion were ignored on a reload.
+# The preferences in force are kept where the stage reads them as it starts.
+replace("      document.dispatchEvent(new CustomEvent('prefs:change', { detail: { cfg: cfg } }));\n",
+        "      window.NP_PREFS = cfg;   // read by the 3D stage when it starts later than this\n"
+        "      document.dispatchEvent(new CustomEvent('prefs:change', { detail: { cfg: cfg } }));\n")
+
+
+# The disc's speed sliders keep their value beside them, at a width a slider can be read at.
+replace("  .vol__row .weight__val { min-width: 34px; text-align: right; }\n",
+        "  .vol__row .weight__val { min-width: 34px; text-align: right; }\n"
+        "  #discPrefs .vol__row { flex-wrap: nowrap; max-width: 320px; }\n"
+        "  #discPrefs .vol__row input[type=\"range\"] { flex: 1 1 auto; min-width: 0; }\n")
+
+
+# The disc's tilt is the listener's (NP-PREF-014); 40° back is the angle it always had.
+replace("    DISC_TILT + discTilt + Math.sin(idleT * 1.7) * 0.05 * wob,\n",
+        "    pitchRad() + discTilt + Math.sin(idleT * 1.7) * 0.05 * wob,\n")
+
+# Reset Position, and a new angle or tilt chosen in Settings: the disc goes there now and the dragged pose is dropped.
+replace("poseStore.load().then(pose => {\n",
+        "document.addEventListener('disc:place', () => {\n"
+        "  turn = yawRad();\n"
+        "  discTilt = 0;\n"
+        "  savePose(true);\n"
+        "});\n"
+        "\n"
+        "poseStore.load().then(pose => {\n")
+
+# A live preview in Settings ▸ Player ▸ The disc: a copy of the real disc, lit the way the stage lights it, moving
+# the way the settings say, as if a song were playing. Its own small renderer, running only while it is on screen.
+replace("window.NP_DISC = Object.freeze({\n",
+        "let discPreviewState = () => ({ running: false, frames: 0 });\n"
+        "(function discPreview() {\n"
+        "  const host = document.getElementById('discPreview');\n"
+        "  const note = document.getElementById('discPreviewNote');\n"
+        "  if (!host) return;\n"
+        "  let r = null, sc = null, cam = null, pivot = null, spinner = null, raf = 0, last = 0, frames = 0;\n"
+        "  let running = false, pTurn = 0, pSpin = 0, pSpeed = 0;\n"
+        "  function build() {\n"
+        "    r = new THREE.WebGLRenderer({ antialias: true, alpha: true, stencil: false });\n"
+        "    r.setPixelRatio(Math.min(window.devicePixelRatio, 2));\n"
+        "    r.outputColorSpace = THREE.SRGBColorSpace;\n"
+        "    r.toneMapping = THREE.ACESFilmicToneMapping;\n"
+        "    r.domElement.style.width = '100%';\n"
+        "    r.domElement.style.height = '100%';\n"
+        "    host.appendChild(r.domElement);\n"
+        "    sc = new THREE.Scene();\n"
+        "    const pm = new THREE.PMREMGenerator(r);\n"
+        "    sc.environment = pm.fromScene(new RoomEnvironment(), 0.03).texture;\n"
+        "    sc.environmentIntensity = 0.85;\n"
+        "    pm.dispose();\n"
+        "    sc.add(box1.clone(), box2.clone(), back.clone(), rim.clone(), fill.clone());\n"
+        "    pivot = new THREE.Group();\n"
+        "    spinner = disc.clone(true);\n"
+        "    spinner.rotation.set(0, 0, 0);\n"
+        "    pivot.add(spinner);\n"
+        "    sc.add(pivot);\n"
+        "    cam = new THREE.PerspectiveCamera(28, 1, 0.1, 40);\n"
+        "    cam.position.set(0, 0, (DISC_R * 1.22) / Math.tan(THREE.MathUtils.degToRad(14)));\n"
+        "    pTurn = yawRad();\n"
+        "  }\n"
+        "  function size() {\n"
+        "    const px = Math.max(1, Math.round(host.clientWidth));\n"
+        "    r.setSize(px, px, false);\n"
+        "  }\n"
+        "  function say() {\n"
+        "    if (!note) return;\n"
+        "    const tempo = discPrefs.spin === 'tempo' || discPrefs.turn === 'tempo';\n"
+        "    note.textContent = !tempo ? 'As it moves while a song plays.'\n"
+        "      : songBpm ? 'As it moves with this song, at ' + Math.round(songBpm) + ' BPM.'\n"
+        "      : 'As it moves with a song at 120 BPM.';\n"
+        "  }\n"
+        "  function loop(t) {\n"
+        "    if (!running) return;\n"
+        "    raf = requestAnimationFrame(loop);\n"
+        "    const dt = Math.min((t - (last || t)) / 1000, 0.05);\n"
+        "    last = t;\n"
+        "    pSpeed += (discSpinRate() - pSpeed) * (1 - Math.pow(0.15, dt));\n"
+        "    pSpin += pSpeed * dt;\n"
+        "    spinner.rotation.z = pSpin;\n"
+        "    if (discPrefs.turn === 'lock' || discPrefs.turn === 'off') {\n"
+        "      const want = yawRad();\n"
+        "      const target = want + Math.round((pTurn - want) / TWO_PI) * TWO_PI;\n"
+        "      pTurn += (target - pTurn) * (1 - Math.pow(0.02, dt));\n"
+        "    } else {\n"
+        "      pTurn += discTurnRate() * dt;\n"
+        "    }\n"
+        "    pivot.rotation.set(pitchRad(), pTurn, 0);   // XYZ: tilt, then turn — the stage's own order\n"
+        "    r.render(sc, cam);\n"
+        "    frames += 1;\n"
+        "  }\n"
+        "  function start() {\n"
+        "    if (running) return;\n"
+        "    if (!r) build();\n"
+        "    size();\n"
+        "    say();\n"
+        "    running = true;\n"
+        "    last = 0;\n"
+        "    raf = requestAnimationFrame(loop);\n"
+        "  }\n"
+        "  function stop() {\n"
+        "    running = false;\n"
+        "    cancelAnimationFrame(raf);\n"
+        "  }\n"
+        "  new IntersectionObserver(es => (es.some(e => e.isIntersecting) ? start() : stop())).observe(host);\n"
+        "  document.addEventListener('disc:place', () => { pTurn = yawRad(); });\n"
+        "  document.addEventListener('prefs:change', say);\n"
+        "  document.addEventListener('library:play', () => setTimeout(say, 0));\n"
+        "  window.addEventListener('resize', () => { if (r && running) size(); });\n"
+        "  discPreviewState = () => ({ running, frames, turn: pTurn, spin: pSpeed });\n"
+        "})();\n"
+        "window.NP_DISC = Object.freeze({\n")
+
+replace("  #discPrefs .vol__row { flex-wrap: nowrap; max-width: 320px; }\n",
+        "  #discPrefs .vol__row { flex-wrap: nowrap; max-width: 320px; }\n"
+        "  .disc-preview { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 2px 0 10px; }\n"
+        "  .disc-preview__stage { width: 200px; height: 200px; max-width: 60vw; max-height: 60vw; }\n"
+        "  .disc-preview__note { margin: 0; text-align: center; }\n"
+        "  #discPrefs #cfgDiscReset { width: auto; flex: none; }\n")
+
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):
     assert bad not in text, f'left behind: {bad}'

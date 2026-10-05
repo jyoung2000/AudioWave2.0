@@ -57,8 +57,13 @@ const BUNDLES: Bundle[] = [
      * now the bridge — db, library, the playback engine, the hub client and the crossfade rules —
      * at about 230KB; the interface itself is inline in the HTML and counted in the total below. The
      * number is lowered to what was measured because a budget with 400KB of slack defends nothing.
+     *
+     * And to 241 for the disc's motion and its preview in Settings (NP-PREF-014): the shell's inline
+     * stage module is bundled into this entry, and the rates, the held angle and tilt, and the preview
+     * that renders a copy of the disc while it is on screen are about 1KB of it, minified. three.js
+     * itself stays behind the dynamic import.
      */
-    entryBudgetKb: 240,
+    entryBudgetKb: 241,
     /*
      * The total rose from 1600 to 1900 when the hero gained the reference's jewel case.
      *
@@ -143,8 +148,16 @@ const BUNDLES: Bundle[] = [
      *
      * And to 2411 for asking the hub alongside the rest rather than first, with a longer wait for
      * Spotify links (spotDL takes 20-50 s) — measured, under 1 KB of inline shell script.
+     *
+     * And to 2417 for the disc's motion (NP-PREF-014): Settings ▸ Player ▸ The disc — spin and turn,
+     * their speeds, a held facing, the song's tempo — and the stage reading the preferences when it
+     * starts after they were announced — measured, 6 KB of inline shell markup and script, counted in
+     * both the shell and the single-file build. The entry is unchanged.
+     *
+     * And to 2423 for the disc's angle, tilt, Reset Position and live preview (NP-PREF-014) —
+     * measured, 6 KB of inline markup and script, counted in both builds; the entry's 1 KB is above.
      */
-    totalBudgetKb: 2411,
+    totalBudgetKb: 2423,
     // Three.js belongs to the constellation and the jewel case; the tag reader only to a scan.
     mustBeSplit: ['three', 'music-metadata'],
   },

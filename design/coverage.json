@@ -1848,8 +1848,17 @@
         "music-player/src/shell/bridge.ts"
       ],
       "components": ["shell markup (design/frontends/airwave-now-playing.html)"],
-      "states": ["appearance", "listening", "defaults"],
-      "rules": ["NP-PREF-003"],
+      "states": [
+        "appearance",
+        "listening",
+        "defaults",
+        "disc: spin steady / with the tempo / off, with its speed",
+        "disc: turn steady / with the tempo / held one way (facing) / left where it is",
+        "disc: no known tempo (steady speed)",
+        "disc: angle (presets or exact) and tilt; Reset Position",
+        "disc: live preview (as if playing; 120 BPM when no tempo is known)"
+      ],
+      "rules": ["NP-PREF-003", "NP-PREF-014"],
       "guideAnchor": "screens",
       "authority": "adopted"
     },
