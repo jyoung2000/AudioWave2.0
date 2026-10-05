@@ -358,6 +358,7 @@ export class Jobs {
     const chunks: Buffer[] = [];
     let size = 0;
     let overflow = false;
+    let failure: unknown = null;
     await this.spawnTool(record, command, [...prefix, ...ytDlpInfoArgs(record.job)], env, (chunk) => {
       if (overflow) return;
       size += chunk.length;
@@ -367,21 +368,32 @@ export class Jobs {
         return;
       }
       chunks.push(chunk);
+    }).catch((error: unknown) => {
+      failure = error;
     });
+    if (record.cancelled) return null;
+    // A playlist with a song the site will not give (removed, DRM) is still described, minus that
+    // song, and yt-dlp exits 1 for it (measured 2026-10-04 on a SoundCloud set). The rest is worth
+    // downloading; only a description that never came is the tool failing.
+    if (failure) {
+      const partial = chunks.length ? parseObject(Buffer.concat(chunks).toString('utf8')) : null;
+      if (!partial || !Array.isArray(partial['entries']) || !partial['entries'].length) throw failure;
+      this.options.log?.('some songs in this playlist could not be described; downloading the rest');
+      const file = join(record.root, 'info.json');
+      writeFileSync(file, JSON.stringify(withCleanTags(partial)));
+      return file;
+    }
     if (overflow) {
       this.options.log?.('the link’s description was too large to clean; downloading without it');
       return null;
     }
-    let info: unknown;
-    try {
-      info = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-    } catch {
+    const info = parseObject(Buffer.concat(chunks).toString('utf8'));
+    if (!info) {
       this.options.log?.('the link’s description was not JSON; downloading without it');
       return null;
     }
-    if (!info || typeof info !== 'object' || Array.isArray(info)) return null;
     const file = join(record.root, 'info.json');
-    writeFileSync(file, JSON.stringify(withCleanTags(info as Record<string, unknown>)));
+    writeFileSync(file, JSON.stringify(withCleanTags(info)));
     return file;
   }
 
@@ -500,7 +512,9 @@ export function ytDlpArgs(job: Pick<HelperJob, 'url' | 'format'>, directory: str
   const rate = rateLimitOf(limits.rateLimitKBps);
   // Built from a whole number here, never from text: `500K` is all the tool ever sees.
   if (rate !== null) args.push('--limit-rate', `${rate}K`);
-  if (source.infoFile) args.push('--load-info-json', source.infoFile);
+  // `--no-clean-infojson`: by default yt-dlp strips `entries` from a description it loads, finds a
+  // playlist empty, and fetches it all again from its URL — untagged (measured 2026-10-04).
+  if (source.infoFile) args.push('--no-clean-infojson', '--load-info-json', source.infoFile);
   else args.push('--', url);
   return args;
 }
@@ -508,17 +522,32 @@ export function ytDlpArgs(job: Pick<HelperJob, 'url' | 'format'>, directory: str
 /** Fields of a description the download never reads, and the bulk of a YouTube one. */
 const UNUSED_INFO_FIELDS = ['automatic_captions', 'subtitles', 'heatmap', 'requested_subtitles', 'description'];
 
+/** Decided when a description is made, and made again by the download: yt-dlp's own list. */
+const LOAD_TIME_FIELDS = new Set(['requested_downloads', 'requested_formats', 'requested_entries', 'filepath', '_filename', 'filename', '_format_sort_fields']);
+
 /**
  * A yt-dlp description with clean tags on every song in it: `meta_title`, `meta_artist`,
  * `meta_album_artist`, `meta_album`, `meta_genre` and `meta_date` (see `cleanTags` and
  * `ytDlpMetaFields` in `@now-playing/domain`), which yt-dlp's metadata step writes in place of its own
  * guesses. A playlist's entries are each cleaned on their own; nesting stops at three levels.
+ *
+ * An entry the site withheld is `null` in the description (yt-dlp, 2026-10-04: a SoundCloud set with
+ * DRM-protected songs). Loaded back, a null entry makes yt-dlp give up on the file and fetch the whole
+ * playlist again from its URL — untagged, and the withheld songs failing again — so those go.
  */
 export function withCleanTags(info: Record<string, unknown>, depth = 0): Record<string, unknown> {
   const out: Record<string, unknown> = { ...info };
   for (const field of UNUSED_INFO_FIELDS) delete out[field];
+  // What yt-dlp's own cleaning would take off before loading (its `sanitize_info`), done here because
+  // the download loads with `--no-clean-infojson` to keep a playlist's entries: the description pass's
+  // own format choice and file names, which the download must make afresh for audio.
+  for (const field of Object.keys(out)) if (field.startsWith('__') || out[field] === null || LOAD_TIME_FIELDS.has(field)) delete out[field];
+  // A loaded description is checked as if an extractor wrote it, and a field next to its plural
+  // ("album_artist" beside "album_artists") is reported as an error. The plural says it all.
+  for (const [single, plural] of [['album_artist', 'album_artists'], ['genre', 'genres'], ['artist', 'artists'], ['creator', 'creators'], ['composer', 'composers']] as const) if (out[plural] !== undefined) delete out[single];
   if (Array.isArray(info['entries'])) {
-    out['entries'] = depth < 3 ? info['entries'].map((entry: unknown) => (entry && typeof entry === 'object' && !Array.isArray(entry) ? withCleanTags(entry as Record<string, unknown>, depth + 1) : entry)) : info['entries'];
+    const entries = (info['entries'] as unknown[]).filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === 'object' && !Array.isArray(entry));
+    out['entries'] = depth < 3 ? entries.map((entry) => withCleanTags(entry, depth + 1)) : entries;
     return out;
   }
   return { ...out, ...ytDlpMetaFields(cleanTags(info)) };
@@ -634,4 +663,14 @@ export function lastMeaningfulLine(stderr: string): string | null {
     .filter((l) => !/^WARNING:/i.test(l));
   const last = lines.at(-1);
   return last ? last.replace(/^ERROR:\s*/i, '').slice(0, 600) : null;
+}
+
+/** JSON that is an object, or null. */
+function parseObject(text: string): Record<string, unknown> | null {
+  try {
+    const value: unknown = JSON.parse(text);
+    return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
 }

@@ -36,7 +36,8 @@ describe('the download’s command line', () => {
 
   it('downloads from the cleaned description when given one: the file is ours, and no URL is on the line', () => {
     const args = ytDlpArgs(job('mp3'), '/tmp/j', { present: true }, {}, { infoFile: '/tmp/root/info.json' });
-    expect(args.slice(-2)).toEqual(['--load-info-json', '/tmp/root/info.json']);
+    // Without --no-clean-infojson yt-dlp drops a loaded playlist's entries and fetches it all again.
+    expect(args.slice(-3)).toEqual(['--no-clean-infojson', '--load-info-json', '/tmp/root/info.json']);
     expect(args).not.toContain('--');
     expect(args).not.toContain('https://www.youtube.com/watch?v=abc');
     expect(args[args.indexOf('--playlist-end') + 1]).toBe('200');
@@ -82,10 +83,13 @@ describe('clean tags on the description', () => {
       title: 'An EP',
       entries: [
         { title: 'One', track: 'One', artist: 'Band', album: 'An EP', upload_date: '20120728', automatic_captions: { en: [] } },
+        // A song the site withheld is null; loaded back, it would make yt-dlp refetch everything.
+        null,
         { title: 'Band - Two (Official Audio)', channel: 'Band', extractor_key: 'Youtube' },
       ],
     });
     const entries = out['entries'] as Array<Record<string, unknown>>;
+    expect(entries).toHaveLength(2);
     expect(entries[0]).toMatchObject({ meta_title: 'One', meta_artist: 'Band', meta_album: 'An EP', meta_date: '2012-07-28' });
     expect(entries[0]).not.toHaveProperty('automatic_captions');
     expect(entries[1]).toMatchObject({ meta_title: 'Two', meta_artist: 'Band' });
@@ -172,6 +176,23 @@ describe('a download, start to finish', () => {
     await answer(calls[0]!.child, '', 1);
     expect(calls).toHaveLength(1);
     expect(done[0]).toMatchObject({ state: 'failed', error: '[youtube] a: Video unavailable' });
+    await jobs.shutdown();
+  });
+
+  it('downloads the rest of a playlist when the site withholds some of its songs', async () => {
+    // What yt-dlp did with a SoundCloud set on 2026-10-04: three songs DRM-protected, the other
+    // three described, exit code 1.
+    const { jobs } = make(true);
+    jobs.create({ url: 'https://soundcloud.com/band/sets/an-ep', tool: 'yt-dlp', format: 'original' });
+    await settle();
+    calls[0]!.child.stderr.write('ERROR: [soundcloud] 75206121: This video is DRM protected\n');
+    await answer(calls[0]!.child, JSON.stringify({ _type: 'playlist', title: 'An EP', entries: [{ title: 'Two', track: 'Two', artist: 'Band', album: 'An EP', upload_date: '20120728' }] }), 1);
+    const second = calls[1]!.args;
+    expect(second.at(-2)).toBe('--load-info-json');
+    const saved = JSON.parse(readFileSync(second.at(-1)!, 'utf8')) as { entries: Array<Record<string, unknown>> };
+    expect(saved.entries[0]).toMatchObject({ meta_title: 'Two', meta_artist: 'Band', meta_album: 'An EP' });
+    calls[1]!.child.emit('close', 1);
+    await settle();
     await jobs.shutdown();
   });
 

@@ -163,6 +163,12 @@ export function cleanTags(info: MediaInfo): CleanTags {
     artist = artists[0] ?? text(info.artist) ?? text(info.creator) ?? channel;
     featured = split.featured;
   }
+  // "The Royal Concept - Gimme Twice" by The Royal Concept: SoundCloud uploaders often repeat
+  // themselves in the title. The artist is already the artist.
+  if (artist) {
+    const prefix = new RegExp(`^${artist.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+[-–—]\\s+(.+)$`, 'i').exec(title);
+    if (prefix) title = prefix[1]!.trim();
+  }
   const date = isoDate(info.release_date) ?? isoDate(info.upload_date);
   const releaseYear = typeof info.release_year === 'number' && Number.isInteger(info.release_year) ? info.release_year : null;
   const year = date ? Number(date.slice(0, 4)) : releaseYear;

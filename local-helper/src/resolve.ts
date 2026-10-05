@@ -187,6 +187,8 @@ export class ResolveError extends Error {
   constructor(
     message: string,
     readonly code: 'busy' | 'tool-missing' | 'failed',
+    /** What the tool printed before it failed, when anything. */
+    readonly output: string = '',
   ) {
     super(message);
   }
@@ -241,7 +243,7 @@ function run(path: string, args: string[], env: NodeJS.ProcessEnv, timeoutMs: nu
       clearTimeout(timer);
       if (timedOut) return reject(new ResolveError('The tool took too long to answer.', 'failed'));
       if (tooBig) return reject(new ResolveError('The tool’s answer was far larger than any link needs.', 'failed'));
-      if (code !== 0) return reject(new ResolveError(lastMeaningfulLine(stderr) ?? `The tool exited with code ${code ?? 'unknown'}.`, 'failed'));
+      if (code !== 0) return reject(new ResolveError(lastMeaningfulLine(stderr) ?? `The tool exited with code ${code ?? 'unknown'}.`, 'failed', Buffer.concat(out).toString('utf8')));
       resolve(Buffer.concat(out).toString('utf8'));
     });
   });
@@ -300,7 +302,12 @@ export function createResolver(options: ResolverOptions): Resolver {
     const ytDlp = tools['yt-dlp'];
     if (!ytDlp.present || !ytDlp.path) throw new ResolveError(ytDlp.installHint ?? 'yt-dlp is not set up on this PC yet.', 'tool-missing');
     return slot(async () => {
-      const stdout = await run(ytDlp.path!, ytDlpResolveArgs(url.toString()), childEnv(), timeouts.ytDlp);
+      const stdout = await run(ytDlp.path!, ytDlpResolveArgs(url.toString()), childEnv(), timeouts.ytDlp).catch((error: unknown) => {
+        // A playlist with a song the site will not give is still described, minus that song, and
+        // yt-dlp exits 1 for it. What it did describe is the answer; nothing described is the failure.
+        if (error instanceof ResolveError && /"entries"\s*:\s*\[\s*\{/.test(error.output)) return error.output;
+        throw error;
+      });
       let info: unknown;
       try {
         info = JSON.parse(stdout);

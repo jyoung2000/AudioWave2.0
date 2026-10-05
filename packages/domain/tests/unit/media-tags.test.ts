@@ -65,6 +65,13 @@ describe('cleanTags', () => {
     });
   });
 
+  it('takes the artist off the front of a title that repeats it', () => {
+    // A SoundCloud set entry, as yt-dlp described it on 2026-10-04.
+    expect(cleanTags({ title: 'The Royal Concept - Gimme Twice', track: 'The Royal Concept - Gimme Twice', artist: 'The Royal Concept', uploader: 'The Royal Concept' })).toMatchObject({ title: 'Gimme Twice', artist: 'The Royal Concept' });
+    expect(cleanTags({ title: 'Some (Band) – Song', artist: 'Some (Band)' })).toMatchObject({ title: 'Song' });
+    expect(cleanTags({ title: 'Song - Remix', artist: 'Band' })).toMatchObject({ title: 'Song - Remix' });
+  });
+
   it('keeps the year when that is all there is', () => {
     expect(cleanTags({ title: 'A', uploader: 'B', release_year: 1999 })).toMatchObject({ date: null, year: 1999 });
   });

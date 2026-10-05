@@ -41,6 +41,11 @@ if (args[0] === 'save') {
 }
 const url = args[args.length - 1];
 if (url.includes('fail')) { process.stderr.write('WARNING: ignore me\\nERROR: [youtube] fail: Video unavailable\\n'); process.exit(1); }
+if (url.includes('partial')) {
+  process.stdout.write(fixture('yt-dlp-youtube-playlist.json'));
+  process.stderr.write('ERROR: [youtube] x: Private video\\n');
+  process.exit(1);
+}
 const map = [['playlist?list=', 'yt-dlp-youtube-playlist.json'], ['/sets/', 'yt-dlp-soundcloud-set.json'], ['soundcloud.com/', 'yt-dlp-soundcloud-track.json'], ['watch?v=', 'yt-dlp-youtube-video.json']];
 const hit = map.find(([needle]) => url.includes(needle));
 if (!hit) { process.stderr.write('ERROR: Unsupported URL\\n'); process.exit(1); }
@@ -171,6 +176,12 @@ describe('what a pasted link is', () => {
     const before = calls().length;
     await resolved('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
     expect(calls().length).toBe(before);
+  });
+
+  it('lists what a playlist could describe when the site withholds some of it (yt-dlp exits 1)', async () => {
+    const body = await resolved('https://www.youtube.com/playlist?list=partial');
+    expect(body.kind).toBe('collection');
+    expect(body.collection!.entries.length).toBeGreaterThan(0);
   });
 
   it('passes the tool’s own reason on when the site says no, and does not remember the failure', async () => {

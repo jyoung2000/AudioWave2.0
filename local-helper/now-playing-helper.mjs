@@ -21574,6 +21574,10 @@ function cleanTags(info) {
     artist = artists[0] ?? text(info.artist) ?? text(info.creator) ?? channel;
     featured = split.featured;
   }
+  if (artist) {
+    const prefix = new RegExp(`^${artist.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s+[-\u2013\u2014]\\s+(.+)$`, "i").exec(title);
+    if (prefix) title = prefix[1].trim();
+  }
   const date5 = isoDate(info.release_date) ?? isoDate(info.upload_date);
   const releaseYear = typeof info.release_year === "number" && Number.isInteger(info.release_year) ? info.release_year : null;
   const year = date5 ? Number(date5.slice(0, 4)) : releaseYear;
@@ -22520,6 +22524,7 @@ var Jobs = class {
     const chunks = [];
     let size = 0;
     let overflow = false;
+    let failure = null;
     await this.spawnTool(record2, command, [...prefix, ...ytDlpInfoArgs(record2.job)], env, (chunk) => {
       if (overflow) return;
       size += chunk.length;
@@ -22529,19 +22534,27 @@ var Jobs = class {
         return;
       }
       chunks.push(chunk);
+    }).catch((error61) => {
+      failure = error61;
     });
+    if (record2.cancelled) return null;
+    if (failure) {
+      const partial2 = chunks.length ? parseObject(Buffer.concat(chunks).toString("utf8")) : null;
+      if (!partial2 || !Array.isArray(partial2["entries"]) || !partial2["entries"].length) throw failure;
+      this.options.log?.("some songs in this playlist could not be described; downloading the rest");
+      const file3 = join7(record2.root, "info.json");
+      writeFileSync2(file3, JSON.stringify(withCleanTags(partial2)));
+      return file3;
+    }
     if (overflow) {
       this.options.log?.("the link\u2019s description was too large to clean; downloading without it");
       return null;
     }
-    let info;
-    try {
-      info = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-    } catch {
+    const info = parseObject(Buffer.concat(chunks).toString("utf8"));
+    if (!info) {
       this.options.log?.("the link\u2019s description was not JSON; downloading without it");
       return null;
     }
-    if (!info || typeof info !== "object" || Array.isArray(info)) return null;
     const file2 = join7(record2.root, "info.json");
     writeFileSync2(file2, JSON.stringify(withCleanTags(info)));
     return file2;
@@ -22624,16 +22637,20 @@ function ytDlpArgs(job, directory, ffmpeg, limits = {}, source = {}) {
   }
   const rate = rateLimitOf(limits.rateLimitKBps);
   if (rate !== null) args.push("--limit-rate", `${rate}K`);
-  if (source.infoFile) args.push("--load-info-json", source.infoFile);
+  if (source.infoFile) args.push("--no-clean-infojson", "--load-info-json", source.infoFile);
   else args.push("--", url2);
   return args;
 }
 var UNUSED_INFO_FIELDS = ["automatic_captions", "subtitles", "heatmap", "requested_subtitles", "description"];
+var LOAD_TIME_FIELDS = /* @__PURE__ */ new Set(["requested_downloads", "requested_formats", "requested_entries", "filepath", "_filename", "filename", "_format_sort_fields"]);
 function withCleanTags(info, depth = 0) {
   const out = { ...info };
   for (const field of UNUSED_INFO_FIELDS) delete out[field];
+  for (const field of Object.keys(out)) if (field.startsWith("__") || out[field] === null || LOAD_TIME_FIELDS.has(field)) delete out[field];
+  for (const [single, plural] of [["album_artist", "album_artists"], ["genre", "genres"], ["artist", "artists"], ["creator", "creators"], ["composer", "composers"]]) if (out[plural] !== void 0) delete out[single];
   if (Array.isArray(info["entries"])) {
-    out["entries"] = depth < 3 ? info["entries"].map((entry) => entry && typeof entry === "object" && !Array.isArray(entry) ? withCleanTags(entry, depth + 1) : entry) : info["entries"];
+    const entries = info["entries"].filter((entry) => Boolean(entry) && typeof entry === "object" && !Array.isArray(entry));
+    out["entries"] = depth < 3 ? entries.map((entry) => withCleanTags(entry, depth + 1)) : entries;
     return out;
   }
   return { ...out, ...ytDlpMetaFields(cleanTags(info)) };
@@ -22702,6 +22719,14 @@ function lastMeaningfulLine(stderr) {
   const lines = stderr.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).filter((l) => !/^WARNING:/i.test(l));
   const last = lines.at(-1);
   return last ? last.replace(/^ERROR:\s*/i, "").slice(0, 600) : null;
+}
+function parseObject(text2) {
+  try {
+    const value = JSON.parse(text2);
+    return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+  } catch {
+    return null;
+  }
 }
 
 // src/resolve.ts
@@ -22847,11 +22872,13 @@ function fromSpotdl(songs, url2, now = /* @__PURE__ */ new Date()) {
   };
 }
 var ResolveError = class extends Error {
-  constructor(message, code) {
+  constructor(message, code, output2 = "") {
     super(message);
     this.code = code;
+    this.output = output2;
   }
   code;
+  output;
 };
 function run2(path, args, env, timeoutMs, spawnImpl = spawn2) {
   const { command, prefix } = toolCommand(path);
@@ -22890,7 +22917,7 @@ function run2(path, args, env, timeoutMs, spawnImpl = spawn2) {
       clearTimeout(timer);
       if (timedOut) return reject(new ResolveError("The tool took too long to answer.", "failed"));
       if (tooBig) return reject(new ResolveError("The tool\u2019s answer was far larger than any link needs.", "failed"));
-      if (code !== 0) return reject(new ResolveError(lastMeaningfulLine(stderr) ?? `The tool exited with code ${code ?? "unknown"}.`, "failed"));
+      if (code !== 0) return reject(new ResolveError(lastMeaningfulLine(stderr) ?? `The tool exited with code ${code ?? "unknown"}.`, "failed", Buffer.concat(out).toString("utf8")));
       resolve3(Buffer.concat(out).toString("utf8"));
     });
   });
@@ -22941,7 +22968,10 @@ function createResolver(options) {
     const ytDlp = tools["yt-dlp"];
     if (!ytDlp.present || !ytDlp.path) throw new ResolveError(ytDlp.installHint ?? "yt-dlp is not set up on this PC yet.", "tool-missing");
     return slot(async () => {
-      const stdout = await run2(ytDlp.path, ytDlpResolveArgs(url2.toString()), childEnv(), timeouts.ytDlp);
+      const stdout = await run2(ytDlp.path, ytDlpResolveArgs(url2.toString()), childEnv(), timeouts.ytDlp).catch((error61) => {
+        if (error61 instanceof ResolveError && /"entries"\s*:\s*\[\s*\{/.test(error61.output)) return error61.output;
+        throw error61;
+      });
       let info;
       try {
         info = JSON.parse(stdout);
