@@ -10,7 +10,7 @@
 # operator decides where their music and database actually live.
 
 # ---------------------------------------------------------------- build stage
-FROM node:22-bookworm-slim AS build
+FROM node:22-trixie-slim AS build
 WORKDIR /repo
 
 RUN corepack enable
@@ -56,9 +56,15 @@ RUN --mount=type=cache,id=npm,target=/root/.npm \
 # network. The script explains why it is not pinned.
 WORKDIR /repo/docker-container
 RUN node scripts/fetch-yt-dlp.mjs /repo/tools
+# spotDL for open.spotify.com links (owner decision 2026-10-04, design/decisions.md DEC-036), through
+# the hub's own verified installer: the release's published SHA-256, then a version check. Skipped
+# without failing the build when GitHub cannot be reached, like yt-dlp; a checksum mismatch, or a
+# verified build that cannot start here, fails it. spotDL's Linux build needs glibc 2.38, which is
+# why both stages are Debian trixie rather than bookworm.
+RUN pnpm exec tsx scripts/fetch-spotdl.ts /repo/tools
 
 # -------------------------------------------------------------- runtime stage
-FROM node:22-bookworm-slim AS runtime
+FROM node:22-trixie-slim AS runtime
 
 # Standard image labels. `nowplaying update` prunes superseded layers by the title label, so it can
 # reclaim space from its own old builds without touching anything else on the machine.

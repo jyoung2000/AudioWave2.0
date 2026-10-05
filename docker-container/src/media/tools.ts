@@ -1,7 +1,8 @@
 /**
  * The hub's own command-line tools: found where they already are, set up where they are not.
  *
- * Owner decision 2026-10-03: downloaders work without setup. The image ships yt-dlp and FFmpeg, so
+ * Owner decision 2026-10-03: downloaders work without setup. The image ships yt-dlp, spotDL (owner
+ * decision 2026-10-04, for open.spotify.com links) and FFmpeg, so
  * in a container this file only ever *finds* things. A hub run straight from Node — a Windows PC,
  * a NAS without Docker — has neither, and used to answer "Binary not found" until someone read the
  * documentation. Now it fetches them once, with the same verified installer the companion uses
@@ -15,12 +16,13 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { binaryName, findOnPath, installTool, type InstallOptions, type InstallOutcome } from '@now-playing/domain/tool-install';
 
-export type HubToolId = 'yt-dlp' | 'ffmpeg';
+export type HubToolId = 'yt-dlp' | 'ffmpeg' | 'spotdl';
 
-const ORDER: readonly HubToolId[] = ['yt-dlp', 'ffmpeg'];
+/** spotDL last: it is the largest download, and it needs FFmpeg to do anything at all. */
+const ORDER: readonly HubToolId[] = ['yt-dlp', 'ffmpeg', 'spotdl'];
 
 /** Where the image puts its copies (docker-container/Dockerfile). */
-const IMAGE_PATHS: Partial<Record<HubToolId, string>> = { 'yt-dlp': '/usr/local/bin/yt-dlp' };
+const IMAGE_PATHS: Partial<Record<HubToolId, string>> = { 'yt-dlp': '/usr/local/bin/yt-dlp', spotdl: '/usr/local/bin/spotdl' };
 
 interface ToolLog {
   info(details: object, message: string): void;
@@ -76,7 +78,7 @@ export class HubTools {
       const present = this.locate(id) !== null;
       return { present, reason: present ? null : (this.reasons.get(id) ?? null) };
     };
-    return { 'yt-dlp': one('yt-dlp'), ffmpeg: one('ffmpeg') };
+    return { 'yt-dlp': one('yt-dlp'), ffmpeg: one('ffmpeg'), spotdl: one('spotdl') };
   }
 
   /** Set up whatever is missing. Never throws: a hub with no network is still a hub. */
