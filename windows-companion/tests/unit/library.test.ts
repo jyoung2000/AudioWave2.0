@@ -88,6 +88,16 @@ describe('scanFolder', () => {
     expect(second.skipped).toBe(2);
   });
 
+  it('keeps the whole release date a file’s tags carry, beside the year (UX-DL-001)', async () => {
+    await writeFile(join(root, 'dated.wav'), Buffer.from(makeToneWav({ seconds: 0.3, notes: [[440, 0.3]] }, { title: 'Dated', artist: 'Fixture Artist', year: '2014-11-10' })));
+    await writeSong('undated.wav');
+    store.addFolder({ id: 'f1', path: root, displayName: 'Music', now: new Date().toISOString() });
+    await scanFolder(store, { id: 'f1', path: root });
+    const items = store.searchTracks({ limit: 100, offset: 0 }).items;
+    expect(items.find((t) => t.title === 'Dated')).toMatchObject({ releaseDate: '2014-11-10', year: 2014 });
+    expect(items.find((t) => t.title === 'undated')?.releaseDate).toBeNull();
+  });
+
   it('re-reads a file whose modification time changed', async () => {
     const path = await writeSong('one.wav');
     store.addFolder({ id: 'f1', path: root, displayName: 'Music', now: new Date().toISOString() });

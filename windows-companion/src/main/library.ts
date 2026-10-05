@@ -17,7 +17,7 @@ import { readdir, stat } from 'node:fs/promises';
 import { extname, join, relative, resolve, sep } from 'node:path';
 import { parseFile } from 'music-metadata';
 import type { AudioFormat, Track, TrackIdentity } from '@now-playing/contracts';
-import { uuidv7 } from '@now-playing/domain';
+import { releaseDateOf, uuidv7 } from '@now-playing/domain';
 import type { CompanionStore, StoredTrack } from './store.js';
 
 export const AUDIO_EXTENSIONS = new Set(['.mp3', '.m4a', '.mp4', '.aac', '.flac', '.ogg', '.oga', '.opus', '.wav', '.wave', '.wma', '.aiff', '.aif', '.alac', '.ape', '.wv', '.mpc', '.dsf', '.dff']);
@@ -100,6 +100,7 @@ export async function readTrack(absolutePath: string, relativePath: string, fold
   let albumName: string | null = null;
   let albumArtistName: string | null = null;
   let year: number | null = null;
+  let releaseDate: string | null = null;
   let genre: string | null = null;
   const genres: string[] = [];
   let trackNumber: number | null = null;
@@ -118,6 +119,8 @@ export async function readTrack(absolutePath: string, relativePath: string, fold
     albumName = common.album?.trim() ?? null;
     albumArtistName = common.albumartist?.trim() ?? null;
     year = typeof common.year === 'number' && common.year > 0 ? common.year : null;
+    // The whole date, when the tags carry more than a year (a download from the helper always does).
+    releaseDate = releaseDateOf(common);
     genre = common.genre?.[0]?.trim() ?? null;
     for (const g of common.genre ?? []) if (g.trim()) genres.push(g.trim());
     trackNumber = common.track?.no ?? null;
@@ -161,6 +164,7 @@ export async function readTrack(absolutePath: string, relativePath: string, fold
     genres,
     tags: [],
     year,
+    releaseDate,
     durationMs,
     bpm,
     bpmSource: bpm !== null ? 'tag' : null,

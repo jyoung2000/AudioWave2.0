@@ -55,6 +55,14 @@ describe('trackFromFile', () => {
     expect(track.artistName).toBe('Test Artist');
     expect(track.albumName).toBe('Test Album');
     expect(track.year).toBe(2011);
+    // A bare year is not a release date: the year field already says it.
+    expect(track.releaseDate).toBeNull();
+  });
+
+  it('keeps the whole release date when the tags carry one, and the year beside it (UX-DL-001)', async () => {
+    const { track } = await trackFromFile(wavFile('Big Buck Bunny.wav', { title: 'Big Buck Bunny', artist: 'Blender', year: '2014-11-10' }), 'Big Buck Bunny.wav', 'root-1', SUPPORT_ALL);
+    expect(track.releaseDate).toBe('2014-11-10');
+    expect(track.year).toBe(2014);
   });
 
   it('falls back to the filename when there are no tags, rather than hiding the file', async () => {
