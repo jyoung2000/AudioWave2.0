@@ -5,7 +5,7 @@
  */
 import { execFile } from 'node:child_process';
 import { statSync } from 'node:fs';
-import { basename, delimiter, join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { promisify } from 'node:util';
 import type { HelperToolId } from '@now-playing/contracts';
 
@@ -22,7 +22,9 @@ export function toolCommand(path: string): { command: string; prefix: string[] }
 /** FFmpeg and ffprobe take `-version`; everything else here takes `--version`. */
 export function versionFlag(path: string, id?: HelperToolId): string {
   if (id === 'ffmpeg') return '-version';
-  return /^(?:ffmpeg|ffprobe)(?:\.exe)?$/i.test(basename(path)) ? '-version' : '--version';
+  // Either separator: a Windows path must be read the same on a Linux hub, where `basename` splits on `/` only.
+  const name = path.split(/[\\/]/).pop() ?? path;
+  return /^(?:ffmpeg|ffprobe)(?:\.exe)?$/i.test(name) ? '-version' : '--version';
 }
 
 /**

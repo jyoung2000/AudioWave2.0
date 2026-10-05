@@ -21887,7 +21887,7 @@ function digestFor(sums, asset) {
 // ../packages/domain/src/tool-install/probe.ts
 import { execFile } from "node:child_process";
 import { statSync as statSync2 } from "node:fs";
-import { basename, delimiter, join as join4 } from "node:path";
+import { delimiter, join as join4 } from "node:path";
 import { promisify } from "node:util";
 var run = promisify(execFile);
 function toolCommand(path) {
@@ -21895,7 +21895,8 @@ function toolCommand(path) {
 }
 function versionFlag(path, id) {
   if (id === "ffmpeg") return "-version";
-  return /^(?:ffmpeg|ffprobe)(?:\.exe)?$/i.test(basename(path)) ? "-version" : "--version";
+  const name = path.split(/[\\/]/).pop() ?? path;
+  return /^(?:ffmpeg|ffprobe)(?:\.exe)?$/i.test(name) ? "-version" : "--version";
 }
 async function versionOf(path, id, timeoutMs = 8e3, env) {
   try {
