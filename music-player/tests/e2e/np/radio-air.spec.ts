@@ -36,7 +36,10 @@ async function tuneWfmt(page: Page): Promise<void> {
   await expect(page.locator('#libScopeLabel')).toHaveText('Chicago', { timeout: 15_000 });
   const row = page.locator('#radioMenu .rlist tbody tr', { hasText: 'WFMT' });
   await expect(row).toBeVisible({ timeout: 15_000 });
-  await row.dblclick();
+  // One click, on the row itself rather than on a point of the screen: a station tunes on a single
+  // click, and on a slow machine the list re-sorts while its now-playing feeds land, so a
+  // double-click's second click (and any click at a stale position) tuned a neighbouring station.
+  await row.dispatchEvent('click');
   await expect(row).toHaveClass(/is-playing/, { timeout: 10_000 });
 }
 

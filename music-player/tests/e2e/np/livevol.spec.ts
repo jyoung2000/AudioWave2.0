@@ -122,6 +122,7 @@ test('the Live TV tab is live before a channel is chosen, and a channel does not
   await q.click('.tb__btn[data-view="tv"]'); await q.waitForTimeout(500);
   x = await st();
   expect(!x.live && x.paused, 'nor does a channel follow you on to TV').toBe(true);
+  await q.goto('about:blank'); // a playing channel holds up the context's teardown on Linux
   await q.context().close();
 });
 
@@ -145,6 +146,7 @@ for (const [w, touch] of [[390, true], [820, true], [1280, false]] as Array<[num
     expect(g.off, tag + ' is centred in its box (off by ' + g.off.toFixed(1) + 'px)').toBeLessThanOrEqual(1);
     expect(g.inside && g.clearOfScrub && g.clearOfNext, tag + ' stays inside its box and clear of its neighbours').toBe(true);
     expect(g.scrubW, tag + ': the scrubber keeps room to be used (' + Math.round(g.scrubW) + 'px)').toBeGreaterThanOrEqual(60);
-    await q.context().close();
+    await q.goto('about:blank'); // a playing channel holds up the context's teardown on Linux
+  await q.context().close();
   });
 }

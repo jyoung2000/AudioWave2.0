@@ -88,6 +88,8 @@ async function searchFor(page: Page, q: string, timeout = 15_000): Promise<void>
 }
 
 test('a pairing that kv.set has finished saving survives an immediate reload, every time', async ({ page }) => {
+  // Five full boots: a minute on a desktop, more on a CI runner.
+  test.setTimeout(180_000);
   // Pass 3's diagnostic caught the flaky search with "paired": false — kv.set returned nothing, so
   // `await kv.set(...)` waited for nothing and a reload could beat the database write. The pairing
   // has no localStorage journal (its secret is kept out of it), so nothing else rescued it.

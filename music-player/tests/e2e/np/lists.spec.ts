@@ -121,10 +121,12 @@ test('the playlist is still there after a reload', async ({ page }) => {
   await name(page, 'Chicago Mix');
   await reload(page);
   await go(page, 'radio'); await radioReady(page); await page.waitForTimeout(300);
-  await page.click('#libMenuBtn'); await page.waitForTimeout(300);
+  await page.click('#libMenuBtn');
+  await expect(page.locator('#radioMenu .ipod__item .ipod__label', { hasText: 'Playlists' })).toBeVisible();
   const after = await page.$$eval('#radioMenu .ipod__item .ipod__label', (n) => n.map((x) => x.textContent!.trim()));
   await page.click(`#radioMenu .ipod__item:nth-child(${after.indexOf('Playlists') + 1})`);
-  await page.waitForTimeout(400);
-  const kept = await page.$$eval('#radioMenu .ipod__item .ipod__label', (n) => n.map((x) => x.textContent!.trim()));
-  expect(kept, 'the playlist is still there after a reload').toEqual(['Chicago Mix']);
+  // Polled, not slept on: a slow runner draws the menu after a fixed 400 ms had already read it.
+  await expect
+    .poll(() => page.$$eval('#radioMenu .ipod__item .ipod__label', (n) => n.map((x) => x.textContent!.trim())), { message: 'the playlist is still there after a reload', timeout: 15_000 })
+    .toEqual(['Chicago Mix']);
 });
