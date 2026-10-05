@@ -299,3 +299,36 @@ test('it is a page at both widths, and a section has its own address', async ({ 
   await boot(page);
   expect(await prefsShown(page), 'and with no hash it opens on the player').toBe(false);
 });
+
+test('the rows added to Settings keep the design’s spacing: one label column, level labels, nothing stretched', async ({ page }) => {
+  await boot(page, '#settings/player');
+  // airwave-now-playing.html: .prefs__row is a 148px label column, a 10px gap, 8px between rows.
+  const row = await page.$eval('#discPrefs .prefs__row', (el) => {
+    const s = getComputedStyle(el);
+    return `${s.gridTemplateColumns.split(' ')[0]} ${s.columnGap} ${s.marginBottom}`;
+  });
+  expect(row).toBe('148px 10px 8px');
+  // A slider row is as tall as its slider: its label sits level with it, not 5px below.
+  const offsets = await page.$$eval('#discPrefs .prefs__row', (rows) =>
+    rows
+      .filter((r) => (r as HTMLElement).offsetParent && r.querySelector('input[type="range"]'))
+      .map((r) => {
+        const label = r.firstElementChild!.getBoundingClientRect();
+        const control = r.lastElementChild!.getBoundingClientRect();
+        return Math.abs(label.top + label.height / 2 - (control.top + control.height / 2));
+      }),
+  );
+  expect(offsets.length).toBeGreaterThan(0);
+  for (const off of offsets) expect(off).toBeLessThanOrEqual(1);
+  // A push button keeps its own width in the controls column, as every other one does.
+  const reset = await page.$eval('#cfgDiscReset', (el) => el.getBoundingClientRect().width);
+  expect(reset).toBeLessThan(200);
+  // Sources ▸ Connections: the PC card's status line stands in the controls column, like the cards above.
+  await page.evaluate(() => {
+    location.hash = '#settings/src';
+  });
+  await expect(page.locator('#pcMsg')).toBeVisible();
+  const msg = await page.$eval('#pcMsg', (el) => Math.round(el.getBoundingClientRect().left));
+  const field = await page.$eval('#pcTicket', (el) => Math.round(el.getBoundingClientRect().left));
+  expect(msg).toBe(field);
+});

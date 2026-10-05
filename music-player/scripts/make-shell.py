@@ -1899,10 +1899,22 @@ replace("window.NP_DISC = Object.freeze({\n",
 
 replace("  #discPrefs .vol__row { flex-wrap: nowrap; max-width: 320px; }\n",
         "  #discPrefs .vol__row { flex-wrap: nowrap; max-width: 320px; }\n"
-        "  .disc-preview { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 2px 0 10px; }\n"
+        "  .disc-preview { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 0 0 8px; }\n"
         "  .disc-preview__stage { width: 200px; height: 200px; max-width: 60vw; max-height: 60vw; }\n"
         "  .disc-preview__note { margin: 0; text-align: center; }\n"
-        "  #discPrefs #cfgDiscReset { width: auto; flex: none; }\n")
+        "  #discPrefs #cfgDiscReset { width: auto; flex: none; justify-self: start; }\n")
+
+# ---- spacing: the additions sit on the design's own rhythm -------------------------------------------------
+# Measured against the design's preference rows (148px labels, a 10px gap, 8px between rows):
+#  - a slider row (.weight.vol__row: the design's own Default volume and the disc's four) kept the
+#    .weight list's 11px bottom margin. The design writes `.vol__row { margin: 0 }`, but `.weight`
+#    comes later in the sheet and wins, so the row grew to 26px and its label sat 5px below the slider;
+#  - the PC card's status line ("Not paired.") stood at the card's edge, while the two cards above put
+#    theirs in the controls column (148px label + 10px gap). On a phone the columns are one, as there.
+replace("</style>\n",
+        "  .prefs__row > .weight.vol__row { margin-bottom: 0; }\n"
+        "  @media (min-width: 720px) { .conn__card > #pcMsg { margin-left: 158px; } }\n"
+        "</style>\n")
 
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):
