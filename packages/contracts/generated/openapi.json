@@ -23926,6 +23926,218 @@
                                     "type": "null"
                                   }
                                 ]
+                              },
+                              "tags": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "title": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 300
+                                      },
+                                      "artist": {
+                                        "default": null,
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 300
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "featured": {
+                                        "default": [],
+                                        "maxItems": 20,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "maxLength": 200
+                                        }
+                                      },
+                                      "album": {
+                                        "default": null,
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 300
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "albumArtist": {
+                                        "default": null,
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 300
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "date": {
+                                        "default": null,
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "pattern": "^\\d{4}(-\\d{2}(-\\d{2})?)?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "genre": {
+                                        "default": null,
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 100
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "trackNumber": {
+                                        "default": null,
+                                        "anyOf": [
+                                          {
+                                            "type": "integer",
+                                            "exclusiveMinimum": 0,
+                                            "maximum": 9999
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "discNumber": {
+                                        "default": null,
+                                        "anyOf": [
+                                          {
+                                            "type": "integer",
+                                            "exclusiveMinimum": 0,
+                                            "maximum": 999
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "durationMs": {
+                                        "default": null,
+                                        "anyOf": [
+                                          {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "artworkUrl": {
+                                        "default": null,
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 2048,
+                                            "format": "uri"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "license": {
+                                        "default": null,
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 200
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "title",
+                                      "artist",
+                                      "featured",
+                                      "album",
+                                      "albumArtist",
+                                      "date",
+                                      "genre",
+                                      "trackNumber",
+                                      "discNumber",
+                                      "durationMs",
+                                      "artworkUrl",
+                                      "license"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "batch": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                                        "description": "UUID (v7 preferred; stable across sync)"
+                                      },
+                                      "title": {
+                                        "default": null,
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 300
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "index": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "total": {
+                                        "type": "integer",
+                                        "exclusiveMinimum": 0,
+                                        "maximum": 9007199254740991
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "title",
+                                      "index",
+                                      "total"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               }
                             },
                             "required": [
@@ -24430,7 +24642,7 @@
       },
       "post": {
         "operationId": "createDownload",
-        "summary": "Create an authorized download job (capability-gated)",
+        "summary": "Create an authorized download job (capability-gated). A playlist, set or album link is refused here: use POST /downloads/batch",
         "tags": [
           "downloads"
         ],
@@ -24673,6 +24885,218 @@
                             {
                               "type": "string",
                               "maxLength": 300
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "tags": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "title": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 300
+                                },
+                                "artist": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 300
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "featured": {
+                                  "default": [],
+                                  "maxItems": 20,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "maxLength": 200
+                                  }
+                                },
+                                "album": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 300
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "albumArtist": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 300
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "date": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "pattern": "^\\d{4}(-\\d{2}(-\\d{2})?)?$"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "genre": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 100
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "trackNumber": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "exclusiveMinimum": 0,
+                                      "maximum": 9999
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "discNumber": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "exclusiveMinimum": 0,
+                                      "maximum": 999
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "durationMs": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "artworkUrl": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 2048,
+                                      "format": "uri"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "license": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 200
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "title",
+                                "artist",
+                                "featured",
+                                "album",
+                                "albumArtist",
+                                "date",
+                                "genre",
+                                "trackNumber",
+                                "discNumber",
+                                "durationMs",
+                                "artworkUrl",
+                                "license"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "batch": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                                  "description": "UUID (v7 preferred; stable across sync)"
+                                },
+                                "title": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 300
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "index": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "total": {
+                                  "type": "integer",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "title",
+                                "index",
+                                "total"
+                              ],
+                              "additionalProperties": false
                             },
                             {
                               "type": "null"
@@ -25369,6 +25793,159 @@
                             "type": "null"
                           }
                         ]
+                      },
+                      "tags": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "title": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 300
+                              },
+                              "artist": {
+                                "default": null,
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "featured": {
+                                "default": [],
+                                "maxItems": 20,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "maxLength": 200
+                                }
+                              },
+                              "album": {
+                                "default": null,
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "albumArtist": {
+                                "default": null,
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "date": {
+                                "default": null,
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "pattern": "^\\d{4}(-\\d{2}(-\\d{2})?)?$"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "genre": {
+                                "default": null,
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 100
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "trackNumber": {
+                                "default": null,
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9999
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "discNumber": {
+                                "default": null,
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 999
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "durationMs": {
+                                "default": null,
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "artworkUrl": {
+                                "default": null,
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 2048,
+                                    "format": "uri"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "license": {
+                                "default": null,
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 200
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "title"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
                       }
                     },
                     "required": [
@@ -25446,6 +26023,1192 @@
                 },
                 "required": [
                   "source",
+                  "authorization",
+                  "target"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/downloads/batch": {
+      "post": {
+        "operationId": "createDownloadBatch",
+        "summary": "A link through the external media tool: one job per entry of a playlist, set or album (at most 200, duplicates skipped), or one job for a single track. One rights basis covers every entry.",
+        "tags": [
+          "downloads"
+        ],
+        "x-route-name": "downloadsCreateBatch",
+        "x-auth": "admin-or-device",
+        "x-scopes": [
+          "downloads:request"
+        ],
+        "x-setup-required": true,
+        "x-rate-limit": "write",
+        "parameters": [],
+        "security": [
+          {
+            "adminSession": []
+          },
+          {
+            "deviceCredential": [
+              "downloads:request"
+            ]
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "batch": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                              "description": "UUID (v7 preferred; stable across sync)"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Null when the link was a single track"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "track",
+                            "playlist"
+                          ]
+                        },
+                        "title": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 300
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "listed": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "created": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "cap": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "capped": {
+                          "type": "boolean"
+                        },
+                        "skipped": {
+                          "maxItems": 200,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "url": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 2048
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "title": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "reason": {
+                                "type": "string",
+                                "enum": [
+                                  "duplicate",
+                                  "not-allowed",
+                                  "unavailable"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "url",
+                              "title",
+                              "reason"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind",
+                        "title",
+                        "listed",
+                        "created",
+                        "cap",
+                        "capped",
+                        "skipped"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "items": {
+                      "maxItems": 200,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                            "description": "UUID (v7 preferred; stable across sync)"
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "queued",
+                              "running",
+                              "paused",
+                              "retrying",
+                              "completed",
+                              "failed",
+                              "cancelled"
+                            ]
+                          },
+                          "ownerId": {
+                            "type": "string",
+                            "maxLength": 200,
+                            "description": "Device id or admin"
+                          },
+                          "source": {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9-]{1,31}$",
+                                "description": "Provider slug, e.g. local, hub, companion, musicbrainz, youtube, soundcloud, bandcamp, spotify, public-domain, external-tool, deezer, acousticbrainz, lastfm"
+                              },
+                              "providerTrackId": {
+                                "default": null,
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 200
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "url": {
+                                "default": null,
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "uri"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "locator": {
+                                "default": null,
+                                "anyOf": [
+                                  {
+                                    "oneOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "const": "browser-handle"
+                                          },
+                                          "deviceId": {
+                                            "type": "string",
+                                            "format": "uuid",
+                                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                                            "description": "UUID (v7 preferred; stable across sync)"
+                                          },
+                                          "handleId": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          }
+                                        },
+                                        "required": [
+                                          "kind",
+                                          "deviceId",
+                                          "handleId"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "const": "opfs"
+                                          },
+                                          "deviceId": {
+                                            "type": "string",
+                                            "format": "uuid",
+                                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                                            "description": "UUID (v7 preferred; stable across sync)"
+                                          },
+                                          "objectId": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          }
+                                        },
+                                        "required": [
+                                          "kind",
+                                          "deviceId",
+                                          "objectId"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "const": "windows-file"
+                                          },
+                                          "deviceId": {
+                                            "type": "string",
+                                            "format": "uuid",
+                                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                                            "description": "UUID (v7 preferred; stable across sync)"
+                                          },
+                                          "fileId": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          }
+                                        },
+                                        "required": [
+                                          "kind",
+                                          "deviceId",
+                                          "fileId"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "const": "hub-blob"
+                                          },
+                                          "hubId": {
+                                            "type": "string",
+                                            "format": "uuid",
+                                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                                            "description": "UUID (v7 preferred; stable across sync)"
+                                          },
+                                          "blobId": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          }
+                                        },
+                                        "required": [
+                                          "kind",
+                                          "hubId",
+                                          "blobId"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "const": "provider"
+                                          },
+                                          "provider": {
+                                            "type": "string",
+                                            "pattern": "^[a-z][a-z0-9-]{1,31}$",
+                                            "description": "Provider slug, e.g. local, hub, companion, musicbrainz, youtube, soundcloud, bandcamp, spotify, public-domain, external-tool, deezer, acousticbrainz, lastfm"
+                                          },
+                                          "providerTrackId": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "canonicalUrl": {
+                                            "type": "string",
+                                            "format": "uri"
+                                          }
+                                        },
+                                        "required": [
+                                          "kind",
+                                          "provider",
+                                          "providerTrackId"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "title": {
+                                "default": null,
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "artistName": {
+                                "default": null,
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "tags": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "title": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 300
+                                      },
+                                      "artist": {
+                                        "default": null,
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 300
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "featured": {
+                                        "default": [],
+                                        "maxItems": 20,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "maxLength": 200
+                                        }
+                                      },
+                                      "album": {
+                                        "default": null,
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 300
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "albumArtist": {
+                                        "default": null,
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 300
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "date": {
+                                        "default": null,
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "pattern": "^\\d{4}(-\\d{2}(-\\d{2})?)?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "genre": {
+                                        "default": null,
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 100
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "trackNumber": {
+                                        "default": null,
+                                        "anyOf": [
+                                          {
+                                            "type": "integer",
+                                            "exclusiveMinimum": 0,
+                                            "maximum": 9999
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "discNumber": {
+                                        "default": null,
+                                        "anyOf": [
+                                          {
+                                            "type": "integer",
+                                            "exclusiveMinimum": 0,
+                                            "maximum": 999
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "durationMs": {
+                                        "default": null,
+                                        "anyOf": [
+                                          {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 9007199254740991
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "artworkUrl": {
+                                        "default": null,
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 2048,
+                                            "format": "uri"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "license": {
+                                        "default": null,
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 200
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "title",
+                                      "artist",
+                                      "featured",
+                                      "album",
+                                      "albumArtist",
+                                      "date",
+                                      "genre",
+                                      "trackNumber",
+                                      "discNumber",
+                                      "durationMs",
+                                      "artworkUrl",
+                                      "license"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "batch": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                                        "description": "UUID (v7 preferred; stable across sync)"
+                                      },
+                                      "title": {
+                                        "default": null,
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 300
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "index": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "total": {
+                                        "type": "integer",
+                                        "exclusiveMinimum": 0,
+                                        "maximum": 9007199254740991
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "title",
+                                      "index",
+                                      "total"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "provider",
+                              "providerTrackId",
+                              "url",
+                              "locator",
+                              "title",
+                              "artistName"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "authorization": {
+                            "type": "object",
+                            "properties": {
+                              "basis": {
+                                "type": "string",
+                                "enum": [
+                                  "user-owned",
+                                  "creator-download",
+                                  "purchased-export",
+                                  "public-domain",
+                                  "licensed",
+                                  "hub-hosted"
+                                ]
+                              },
+                              "evidence": {
+                                "default": null,
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 500
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "acknowledgedAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                                "description": "UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z"
+                              }
+                            },
+                            "required": [
+                              "basis",
+                              "evidence",
+                              "acknowledgedAt"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "target": {
+                            "type": "object",
+                            "properties": {
+                              "destination": {
+                                "type": "string",
+                                "enum": [
+                                  "windows",
+                                  "player",
+                                  "both",
+                                  "hub"
+                                ]
+                              },
+                              "directoryId": {
+                                "default": null,
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 200
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "filenameTemplate": {
+                                "default": "{artist} - {title}",
+                                "type": "string",
+                                "maxLength": 200
+                              },
+                              "format": {
+                                "default": "original",
+                                "type": "string",
+                                "enum": [
+                                  "original",
+                                  "mp3",
+                                  "aac",
+                                  "opus",
+                                  "flac"
+                                ]
+                              },
+                              "quality": {
+                                "default": null,
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 40
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "destination",
+                              "directoryId",
+                              "filenameTemplate",
+                              "format",
+                              "quality"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "progress": {
+                            "type": "object",
+                            "properties": {
+                              "bytesDone": {
+                                "default": 0,
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "bytesTotal": {
+                                "default": null,
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "speedBps": {
+                                "default": null,
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": 0
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "percent": {
+                                "default": null,
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 100
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "stage": {
+                                "default": "preflight",
+                                "type": "string",
+                                "enum": [
+                                  "preflight",
+                                  "downloading",
+                                  "verifying",
+                                  "converting",
+                                  "finalizing",
+                                  "transferring",
+                                  "done"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "bytesDone",
+                              "bytesTotal",
+                              "speedBps",
+                              "percent",
+                              "stage"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "attempts": {
+                            "default": 0,
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "maxAttempts": {
+                            "default": 5,
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "nextRetryAt": {
+                            "default": null,
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                                "description": "UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "checksumSha256": {
+                            "default": null,
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^[a-f0-9]{64}$",
+                                "description": "Lower-case hex SHA-256"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "resultLocator": {
+                            "default": null,
+                            "anyOf": [
+                              {
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "browser-handle"
+                                      },
+                                      "deviceId": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                                        "description": "UUID (v7 preferred; stable across sync)"
+                                      },
+                                      "handleId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "deviceId",
+                                      "handleId"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "opfs"
+                                      },
+                                      "deviceId": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                                        "description": "UUID (v7 preferred; stable across sync)"
+                                      },
+                                      "objectId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "deviceId",
+                                      "objectId"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "windows-file"
+                                      },
+                                      "deviceId": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                                        "description": "UUID (v7 preferred; stable across sync)"
+                                      },
+                                      "fileId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "deviceId",
+                                      "fileId"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "hub-blob"
+                                      },
+                                      "hubId": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                                        "description": "UUID (v7 preferred; stable across sync)"
+                                      },
+                                      "blobId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "hubId",
+                                      "blobId"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "const": "provider"
+                                      },
+                                      "provider": {
+                                        "type": "string",
+                                        "pattern": "^[a-z][a-z0-9-]{1,31}$",
+                                        "description": "Provider slug, e.g. local, hub, companion, musicbrainz, youtube, soundcloud, bandcamp, spotify, public-domain, external-tool, deezer, acousticbrainz, lastfm"
+                                      },
+                                      "providerTrackId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "canonicalUrl": {
+                                        "type": "string",
+                                        "format": "uri"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "provider",
+                                      "providerTrackId"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "resultSizeBytes": {
+                            "default": null,
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "error": {
+                            "default": null,
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 500
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                            "description": "UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                            "description": "UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z"
+                          },
+                          "completedAt": {
+                            "default": null,
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                                "description": "UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "state",
+                          "ownerId",
+                          "source",
+                          "authorization",
+                          "target",
+                          "progress",
+                          "attempts",
+                          "maxAttempts",
+                          "nextRetryAt",
+                          "checksumSha256",
+                          "resultLocator",
+                          "resultSizeBytes",
+                          "error",
+                          "createdAt",
+                          "updatedAt",
+                          "completedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "message": {
+                      "type": "string",
+                      "maxLength": 500
+                    }
+                  },
+                  "required": [
+                    "batch",
+                    "items",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "default": "about:blank",
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "description": "Machine-readable error code",
+                      "type": "string"
+                    },
+                    "correlationId": {
+                      "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated"
+          },
+          "403": {
+            "description": "Forbidden (scope, CSRF, or setup incomplete)"
+          },
+          "429": {
+            "description": "Rate limited; honours Retry-After"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "maxLength": 2048,
+                    "format": "uri"
+                  },
+                  "authorization": {
+                    "type": "object",
+                    "properties": {
+                      "basis": {
+                        "type": "string",
+                        "enum": [
+                          "user-owned",
+                          "creator-download",
+                          "purchased-export",
+                          "public-domain",
+                          "licensed",
+                          "hub-hosted"
+                        ]
+                      },
+                      "evidence": {
+                        "type": "string",
+                        "maxLength": 500
+                      },
+                      "acknowledged": {
+                        "type": "boolean",
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "basis",
+                      "acknowledged"
+                    ]
+                  },
+                  "target": {
+                    "type": "object",
+                    "properties": {
+                      "destination": {
+                        "type": "string",
+                        "enum": [
+                          "windows",
+                          "player",
+                          "both",
+                          "hub"
+                        ]
+                      },
+                      "directoryId": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "filenameTemplate": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "format": {
+                        "default": "original",
+                        "type": "string",
+                        "enum": [
+                          "original",
+                          "mp3",
+                          "aac",
+                          "opus",
+                          "flac"
+                        ]
+                      },
+                      "quality": {
+                        "type": "string",
+                        "maxLength": 40
+                      }
+                    },
+                    "required": [
+                      "destination"
+                    ]
+                  }
+                },
+                "required": [
+                  "url",
                   "authorization",
                   "target"
                 ]
@@ -25724,6 +27487,218 @@
                             {
                               "type": "string",
                               "maxLength": 300
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "tags": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "title": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 300
+                                },
+                                "artist": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 300
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "featured": {
+                                  "default": [],
+                                  "maxItems": 20,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "maxLength": 200
+                                  }
+                                },
+                                "album": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 300
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "albumArtist": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 300
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "date": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "pattern": "^\\d{4}(-\\d{2}(-\\d{2})?)?$"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "genre": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 100
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "trackNumber": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "exclusiveMinimum": 0,
+                                      "maximum": 9999
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "discNumber": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "exclusiveMinimum": 0,
+                                      "maximum": 999
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "durationMs": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "artworkUrl": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 2048,
+                                      "format": "uri"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "license": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 200
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "title",
+                                "artist",
+                                "featured",
+                                "album",
+                                "albumArtist",
+                                "date",
+                                "genre",
+                                "trackNumber",
+                                "discNumber",
+                                "durationMs",
+                                "artworkUrl",
+                                "license"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "batch": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                                  "description": "UUID (v7 preferred; stable across sync)"
+                                },
+                                "title": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 300
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "index": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "total": {
+                                  "type": "integer",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "title",
+                                "index",
+                                "total"
+                              ],
+                              "additionalProperties": false
                             },
                             {
                               "type": "null"

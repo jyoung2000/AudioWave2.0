@@ -21,18 +21,64 @@ export type DownloadDestination = z.infer<typeof DownloadDestination>;
 export const OutputFormat = z.enum(['original', 'mp3', 'aac', 'opus', 'flac']);
 export type OutputFormat = z.infer<typeof OutputFormat>;
 
+/**
+ * What a downloaded file is tagged with. The hub writes these into the file (FFmpeg, from a metadata
+ * file rather than the command line) together with the cover picture the tool embedded. `date` is
+ * the release date as precisely as the source knows it: `YYYY`, `YYYY-MM` or `YYYY-MM-DD`.
+ */
+export const DownloadTags = z.object({
+  title: z.string().min(1).max(300),
+  artist: z.string().max(300).nullable().default(null),
+  featured: z.array(z.string().max(200)).max(20).default([]),
+  album: z.string().max(300).nullable().default(null),
+  albumArtist: z.string().max(300).nullable().default(null),
+  date: z
+    .string()
+    .regex(/^\d{4}(-\d{2}(-\d{2})?)?$/)
+    .nullable()
+    .default(null),
+  genre: z.string().max(100).nullable().default(null),
+  trackNumber: z.number().int().positive().max(9999).nullable().default(null),
+  discNumber: z.number().int().positive().max(999).nullable().default(null),
+  durationMs: z.number().int().nonnegative().nullable().default(null),
+  artworkUrl: z.string().url().max(2048).nullable().default(null),
+  license: z.string().max(200).nullable().default(null),
+});
+export type DownloadTags = z.infer<typeof DownloadTags>;
+
+/** The most jobs one playlist link becomes; the response says when a list was longer. */
+export const DOWNLOAD_BATCH_CAP = 200;
+
+/** A job made from one entry of a playlist, set or album link: which list, and where in it. */
+export const DownloadBatchRef = z.object({
+  id: Uuid,
+  title: z.string().max(300).nullable().default(null),
+  /** Zero-based position among the entries the hub took. */
+  index: z.number().int().nonnegative(),
+  /** How many jobs the batch made (after the cap and duplicates). */
+  total: z.number().int().positive(),
+});
+export type DownloadBatchRef = z.infer<typeof DownloadBatchRef>;
+
+export const DownloadSource = z.object({
+  provider: ProviderId,
+  providerTrackId: z.string().max(200).nullable().default(null),
+  url: z.string().url().nullable().default(null),
+  locator: MediaLocator.nullable().default(null),
+  title: z.string().max(300).nullable().default(null),
+  artistName: z.string().max(300).nullable().default(null),
+  /** Tags for the file. A requester may suggest them; what the tool reports fills the gaps. */
+  tags: DownloadTags.nullable().optional(),
+  /** Set by the hub when the job came from a playlist link (`POST /downloads/batch`). */
+  batch: DownloadBatchRef.nullable().optional(),
+});
+export type DownloadSource = z.infer<typeof DownloadSource>;
+
 export const DownloadJob = z.object({
   id: Uuid,
   state: JobState,
   ownerId: z.string().max(200).describe('Device id or admin'),
-  source: z.object({
-    provider: ProviderId,
-    providerTrackId: z.string().max(200).nullable().default(null),
-    url: z.string().url().nullable().default(null),
-    locator: MediaLocator.nullable().default(null),
-    title: z.string().max(300).nullable().default(null),
-    artistName: z.string().max(300).nullable().default(null),
-  }),
+  source: DownloadSource,
   authorization: z.object({
     basis: DownloadAuthorizationBasis,
     evidence: z.string().max(500).nullable().default(null),
