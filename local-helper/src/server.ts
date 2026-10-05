@@ -26,7 +26,8 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { networkInterfaces } from 'node:os';
 import { BACKUP_PARTS, createEstimator, type BackupPart } from './measure.js';
 import { HELPER_DEFAULT_HOSTS, HELPER_PROTOCOL, HELPER_ROUTES, HelperFetchRequest, HelperToolId, type HelperHealth, type HelperInstallResult, type HelperJob, type HelperToolId as ToolId, type HelperTvChannel, type HelperTvChannels, type HelperTvGuide, type HelperTvGuideEntry, type OutputFormat } from '@now-playing/contracts';
-import { Jobs, type FinishedFile } from './jobs.js';
+import { Jobs, redactPaths, type FinishedFile } from './jobs.js';
+import { ResolveError, createResolver } from './resolve.js';
 import { readStationTitle } from '@now-playing/domain/radio-node';
 import type { StationNowPlaying } from '@now-playing/contracts';
 import { serveApp, type AppSource } from './app.js';
@@ -80,6 +81,8 @@ export interface HelperOptions {
   downloads?: () => { format?: OutputFormat; concurrency?: number; rateLimitKBps?: number | null };
   /** A download finished. The paths are for the process that started the helper, never a response. */
   onJobFinished?: (job: HelperJob, files: FinishedFile[]) => void;
+  /** How long a link lookup may take, per tool. Tests shorten it; absent: 45 s for yt-dlp, 150 s for spotDL. */
+  resolveTimeoutMs?: { ytDlp: number; spotdl: number };
   /** Whether setup may update yt-dlp by itself once a day. Absent means yes. */
   autoUpdate?: () => boolean;
 }
@@ -134,6 +137,7 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
     ...(options.onToolSetupChange ? { onChange: options.onToolSetupChange } : {}),
   });
   const estimate = createEstimator(options.backup ?? { folders: {}, backupDir: null });
+  const links = createResolver({ workDir: options.workDir, tools: resolve_, log: options.log, ...(options.resolveTimeoutMs ? { timeoutMs: options.resolveTimeoutMs } : {}) });
 
   const server = createServer((request, response) => {
     void handle(request, response).catch((error: unknown) => {
@@ -236,6 +240,29 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
       }
       const guide: HelperTvGuide = { generatedAt: new Date().toISOString(), guide: options.tv ? await options.tv.guide() : [] };
       return send(response, 200, guide);
+    }
+
+    // What a pasted link is (NP-FIND-002). The radio route's rule — a vetted page, or the token —
+    // because the player asking is usually one the hub served, which cannot learn the token. It is
+    // not one of the LAN routes and never will be: it starts a tool, and another device on the
+    // network must not be able to make this PC run processes. The URL meets the same allowlist a
+    // download does before anything starts.
+    if (path === HELPER_ROUTES.resolve && request.method === 'GET') {
+      if (origin_ === undefined && !tokenMatches(options.token, header(request, 'x-helper-token'))) {
+        return fail(response, 403, 'origin', 'This origin may not talk to the helper.');
+      }
+      const asked = url.searchParams.get('url') ?? '';
+      if (!asked || asked.length > 2048) return fail(response, 400, 'bad-request', 'Say which link: ?url=');
+      const checked = checkFetchUrl(asked, options.allowedHosts);
+      if (!checked.ok || !checked.url) return fail(response, 400, 'url', checked.reason ?? 'That address is not one this helper will read.');
+      try {
+        return send(response, 200, await links.resolve(checked.url));
+      } catch (error) {
+        const message = redactPaths(error instanceof Error ? error.message : String(error), { directory: options.workDir, root: options.toolsDir }).slice(0, 600);
+        if (error instanceof ResolveError && error.code === 'busy') return fail(response, 429, 'busy', message);
+        if (error instanceof ResolveError && error.code === 'tool-missing') return fail(response, 409, 'tool-missing', message);
+        return fail(response, 502, 'resolve', message || 'The link could not be read.');
+      }
     }
 
     // Everything past here is the API, and everything but health needs the token.

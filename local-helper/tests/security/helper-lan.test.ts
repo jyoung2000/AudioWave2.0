@@ -144,6 +144,8 @@ describe.skipIf(!lanAddress)('with the setting on', () => {
       ['GET', HELPER_ROUTES.job('x'), undefined],
       ['DELETE', HELPER_ROUTES.job('x'), undefined],
       ['GET', '/', undefined],
+      // Reading a link starts a tool on this PC, so it stays this PC's (NP-FIND-002).
+      ['GET', `${HELPER_ROUTES.resolve}?url=${encodeURIComponent('https://www.youtube.com/watch?v=a')}`, undefined],
     ];
     for (const [method, path, body] of attempts) {
       const answer = await ask(lanAddress!, port, path, { method, headers: withToken, ...(body ? { body } : {}) });

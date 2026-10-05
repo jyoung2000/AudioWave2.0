@@ -6,9 +6,9 @@ var __export = (target, all) => {
 };
 
 // src/cli.ts
-import { mkdirSync as mkdirSync4, mkdtempSync as mkdtempSync2, rmSync as rmSync3 } from "node:fs";
-import { spawn as spawn2 } from "node:child_process";
-import { dirname as dirname2, join as join9, resolve as resolve2 } from "node:path";
+import { mkdirSync as mkdirSync5, mkdtempSync as mkdtempSync2, rmSync as rmSync4 } from "node:fs";
+import { spawn as spawn3 } from "node:child_process";
+import { dirname as dirname2, join as join10, resolve as resolve2 } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // ../node_modules/zod/v4/classic/external.js
@@ -773,14 +773,14 @@ function promiseAllObject(promisesObj) {
 }
 function randomString(length = 10) {
   const chars = "abcdefghijklmnopqrstuvwxyz";
-  let str = "";
+  let str2 = "";
   for (let i = 0; i < length; i++) {
-    str += chars[Math.floor(Math.random() * chars.length)];
+    str2 += chars[Math.floor(Math.random() * chars.length)];
   }
-  return str;
+  return str2;
 }
-function esc(str) {
-  return JSON.stringify(str);
+function esc(str2) {
+  return JSON.stringify(str2);
 }
 function slugify(input2) {
   return input2.toLowerCase().trim().replace(/[^\w\s-]/g, "").replace(/[\s_-]+/g, "-").replace(/^-+|-+$/g, "");
@@ -894,8 +894,8 @@ var primitiveTypes = /* @__PURE__ */ new Set([
   "symbol",
   "undefined"
 ]);
-function escapeRegex(str) {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function escapeRegex(str2) {
+  return str2.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 function clone(inst, def, params) {
   const cl = new inst._zod.constr(def ?? inst._zod.def);
@@ -1216,13 +1216,13 @@ function getSizableOrigin(input2) {
   return "unknown";
 }
 var highSurrogate = /[\uD800-\uDBFF]/;
-function codePointLength(str) {
-  const units = str.length;
-  if (!highSurrogate.test(str))
+function codePointLength(str2) {
+  const units = str2.length;
+  if (!highSurrogate.test(str2))
     return units;
   let count = units;
   for (let i = 0; i < units - 1; i++) {
-    if ((str.charCodeAt(i) & 64512) === 55296 && (str.charCodeAt(i + 1) & 64512) === 56320) {
+    if ((str2.charCodeAt(i) & 64512) === 55296 && (str2.charCodeAt(i + 1) & 64512) === 56320) {
       count--;
       i++;
     }
@@ -9093,8 +9093,8 @@ function ko_default() {
 }
 
 // ../node_modules/zod/v4/locales/lt.js
-var capitalizeFirstCharacter = (text) => {
-  return text.charAt(0).toUpperCase() + text.slice(1);
+var capitalizeFirstCharacter = (text2) => {
+  return text2.charAt(0).toUpperCase() + text2.slice(1);
 };
 function getUnitTypeFromNumber(number4) {
   const abs = Math.abs(number4);
@@ -18663,7 +18663,7 @@ function visit(schema, fnOrHandlers) {
     return h ? h(node2, rewritten) : node2;
   };
   const cache = /* @__PURE__ */ new Map();
-  function run2(s) {
+  function run3(s) {
     const cached2 = cache.get(s);
     if (cached2 === RESOLVING) {
       return new $ZodLazy({
@@ -18689,21 +18689,21 @@ function visit(schema, fnOrHandlers) {
         let changed = false;
         const newShape = {};
         for (const k of keys) {
-          const mapped = run2(oldShape[k]);
+          const mapped = run3(oldShape[k]);
           if (mapped !== oldShape[k])
             changed = true;
           newShape[k] = mapped;
         }
         let newCatchall = def.catchall;
         if (def.catchall) {
-          newCatchall = run2(def.catchall);
+          newCatchall = run3(def.catchall);
           if (newCatchall !== def.catchall)
             changed = true;
         }
         return changed ? clone(s, { ...def, shape: newShape, catchall: newCatchall }) : s;
       }
       case "array": {
-        const mapped = run2(def.element);
+        const mapped = run3(def.element);
         return mapped === def.element ? s : clone(s, { ...def, element: mapped });
       }
       case "tuple": {
@@ -18711,14 +18711,14 @@ function visit(schema, fnOrHandlers) {
         let changed = false;
         const newItems = [];
         for (const item of oldItems) {
-          const mapped = run2(item);
+          const mapped = run3(item);
           if (mapped !== item)
             changed = true;
           newItems.push(mapped);
         }
         let newRest = def.rest;
         if (def.rest) {
-          newRest = run2(def.rest);
+          newRest = run3(def.rest);
           if (newRest !== def.rest)
             changed = true;
         }
@@ -18726,12 +18726,12 @@ function visit(schema, fnOrHandlers) {
       }
       case "record":
       case "map": {
-        const newKey = run2(def.keyType);
-        const newVal = run2(def.valueType);
+        const newKey = run3(def.keyType);
+        const newVal = run3(def.valueType);
         return newKey === def.keyType && newVal === def.valueType ? s : clone(s, { ...def, keyType: newKey, valueType: newVal });
       }
       case "set": {
-        const newVal = run2(def.valueType);
+        const newVal = run3(def.valueType);
         return newVal === def.valueType ? s : clone(s, { ...def, valueType: newVal });
       }
       case "union": {
@@ -18739,7 +18739,7 @@ function visit(schema, fnOrHandlers) {
         let changed = false;
         const newOptions = [];
         for (const opt of oldOptions) {
-          const mapped = run2(opt);
+          const mapped = run3(opt);
           if (mapped !== opt)
             changed = true;
           newOptions.push(mapped);
@@ -18747,8 +18747,8 @@ function visit(schema, fnOrHandlers) {
         return changed ? clone(s, { ...def, options: newOptions }) : s;
       }
       case "intersection": {
-        const newLeft = run2(def.left);
-        const newRight = run2(def.right);
+        const newLeft = run3(def.left);
+        const newRight = run3(def.right);
         return newLeft === def.left && newRight === def.right ? s : clone(s, { ...def, left: newLeft, right: newRight });
       }
       case "optional":
@@ -18760,23 +18760,23 @@ function visit(schema, fnOrHandlers) {
       case "nonoptional":
       case "promise":
       case "success": {
-        const newInner = run2(def.innerType);
+        const newInner = run3(def.innerType);
         return newInner === def.innerType ? s : clone(s, { ...def, innerType: newInner });
       }
       case "pipe": {
-        const newIn = run2(def.in);
-        const newOut = run2(def.out);
+        const newIn = run3(def.in);
+        const newOut = run3(def.out);
         return newIn === def.in && newOut === def.out ? s : clone(s, { ...def, in: newIn, out: newOut });
       }
       case "function": {
-        const newInput = run2(def.input);
-        const newOutput = run2(def.output);
+        const newInput = run3(def.input);
+        const newOutput = run3(def.output);
         return newInput === def.input && newOutput === def.output ? s : clone(s, { ...def, input: newInput, output: newOutput });
       }
       case "lazy": {
         const original = def.getter;
         const { _cachedInner, ...rest } = def;
-        return clone(s, { ...rest, getter: () => run2(original()) });
+        return clone(s, { ...rest, getter: () => run3(original()) });
       }
       // A leaf by choice: `parts` are regex fragments, not data positions.
       case "template_literal":
@@ -18807,7 +18807,7 @@ function visit(schema, fnOrHandlers) {
       }
     }
   }
-  return run2(schema);
+  return run3(schema);
 }
 
 // ../node_modules/zod/v4/classic/deep-partial.js
@@ -18895,6 +18895,7 @@ var SCHEMA_VERSIONS = {
 };
 var Uuid = external_exports.uuid().describe("UUID (v7 preferred; stable across sync)");
 var IsoDateTime = external_exports.iso.datetime({ offset: true }).describe("UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z");
+var CalendarDate = external_exports.string().regex(/^\d{4}-(0[1-9]|1[0-2])(-(0[1-9]|[12]\d|3[01]))?$/).describe("Calendar date, YYYY-MM-DD or YYYY-MM");
 var NonEmptyString = external_exports.string().trim().min(1);
 var DisplayName = external_exports.string().trim().min(1).max(80);
 var Sha256Hex = external_exports.string().regex(/^[a-f0-9]{64}$/).describe("Lower-case hex SHA-256");
@@ -19139,6 +19140,12 @@ var Track = SyncedEntityBase.extend({
   genres: external_exports.array(external_exports.string().max(60)).default([]),
   tags: external_exports.array(external_exports.string().max(60)).default([]),
   year: external_exports.number().int().min(1e3).max(3e3).nullable().default(null),
+  /**
+   * The whole release (or upload) date when the file's tags give more than a year: `YYYY-MM-DD`, or
+   * `YYYY-MM`. Optional and without a default, so a track written before it existed is unchanged;
+   * `year` stays the field that sorting and statistics read.
+   */
+  releaseDate: CalendarDate.nullable().optional(),
   durationMs: DurationMs.nullable().default(null),
   bpm: external_exports.number().positive().max(400).nullable().default(null),
   bpmSource: BpmSource.nullable().default(null),
@@ -20327,8 +20334,46 @@ var HelperTvGuideEntry = external_exports.object({
   next: HelperTvProgramme.nullable()
 });
 var HelperTvGuide = external_exports.object({ generatedAt: IsoDateTime, guide: external_exports.array(HelperTvGuideEntry) });
+var HELPER_RESOLVE_CAP = 200;
+var HelperResolveSource = external_exports.enum(["youtube", "soundcloud", "bandcamp", "spotify", "other"]);
+var HelperResolvedTrack = external_exports.object({
+  url: external_exports.string().max(2048).nullable(),
+  title: external_exports.string().max(300).nullable(),
+  artist: external_exports.string().max(300).nullable(),
+  featured: external_exports.array(external_exports.string().max(300)).max(8),
+  album: external_exports.string().max(300).nullable(),
+  genre: external_exports.string().max(60).nullable(),
+  durationSec: external_exports.number().nonnegative().nullable(),
+  /** `YYYY-MM-DD` or `YYYY-MM`: the release date when the site has one, otherwise the upload date. */
+  date: CalendarDate.nullable(),
+  year: external_exports.number().int().min(1e3).max(3e3).nullable(),
+  artworkUrl: external_exports.string().max(2048).nullable(),
+  trackNumber: external_exports.number().int().positive().nullable()
+});
+var HelperResolved = external_exports.object({
+  source: HelperResolveSource,
+  kind: external_exports.enum(["track", "collection"]),
+  url: external_exports.string().max(2048),
+  track: HelperResolvedTrack.nullable(),
+  collection: external_exports.object({
+    title: external_exports.string().max(300),
+    artist: external_exports.string().max(300).nullable(),
+    artworkUrl: external_exports.string().max(2048).nullable(),
+    date: CalendarDate.nullable(),
+    entries: external_exports.array(HelperResolvedTrack).max(HELPER_RESOLVE_CAP),
+    total: external_exports.number().int().nonnegative().nullable(),
+    cap: external_exports.number().int().positive(),
+    capped: external_exports.boolean()
+  }).nullable(),
+  resolvedAt: IsoDateTime
+});
 var HELPER_ROUTES = {
   health: "/helper/v1/health",
+  /**
+   * `?url=` — what a pasted link is (HelperResolved). No token from a vetted page, the radio route's
+   * rule; never reachable from another device, because it starts a tool.
+   */
+  resolve: "/helper/v1/resolve",
   fetch: "/helper/v1/fetch",
   backupEstimate: "/helper/v1/backup/estimate",
   /** The merged Live TV channel list (HelperTvChannels). No token, same rule as the radio route: a vetted page only. */
@@ -21353,6 +21398,48 @@ var DEFAULT_DISCORD_TEMPLATES = {
 // ../packages/domain/src/permissions.ts
 var DISCORD_MINIMAL_PERMISSIONS = 1n << 10n | 1n << 11n | 1n << 14n | 1n << 16n | 1n << 20n | 1n << 21n | 1n << 31n;
 
+// ../packages/domain/src/titles.ts
+var NOISE = /\s*[[(]\s*(official\s*(music\s*)?(video|audio|lyric\s*video|visuali[sz]er)|lyrics?(\s*video)?|audio|visuali[sz]er|hd|hq|4k|\d{2,3}\s?fps|explicit|clean|(4k\s+)?remaster(ed)?(\s*\d{4})?|prod\.?\s+by[^\])]*|music\s*video|mv|m\/v)\s*[\])]/gi;
+var TRAILING_NOISE = /\s+(hd|hq|4k|\d{2,3}\s?fps|official\s+video|official\s+audio|lyrics)\s*$/i;
+var TRAILING_OFFICIAL = /\s+[-–—]\s+official\b[^-–—]*$/i;
+var FEAT_INLINE = /\s*[[(]\s*(?:feat\.?|ft\.?|featuring)\s+([^\])]+)\s*[\])]/i;
+var FEAT_MID = /\s+(?:feat\.?|ft\.?|featuring)\s+(.+?)(?=\s+[-\u2013\u2014]\s)/i;
+var FEAT_TAIL = /\s+(?:feat\.?|ft\.?|featuring)\s+(.+?)\s*$/i;
+function splitNames(s) {
+  return s.split(/\s*(?:,|&|\band\b|\+)\s*/i).map((n) => n.trim()).filter(Boolean);
+}
+function splitFeatured(title) {
+  const m = title.match(FEAT_INLINE) ?? title.match(FEAT_MID) ?? title.match(FEAT_TAIL);
+  if (!m) return { title: title.trim(), featured: [] };
+  return { title: title.replace(m[0], "").trim(), featured: splitNames(m[1]) };
+}
+function stripTrailingNoise(s) {
+  let out = s.trim();
+  for (let i = 0; i < 3; i += 1) {
+    const next = out.replace(TRAILING_NOISE, "").trim();
+    if (next === out) break;
+    out = next;
+  }
+  return out;
+}
+function unquote(s) {
+  return s.replace(/^["“](.+)["”]$/, "$1").trim();
+}
+function cleanVideoTitle(input2) {
+  let raw = stripTrailingNoise(input2.title.replace(NOISE, " ").replace(/\s+/g, " ").trim().replace(TRAILING_OFFICIAL, ""));
+  const { title: noFeat, featured } = splitFeatured(raw);
+  raw = stripTrailingNoise(noFeat);
+  const topic = input2.channel?.match(/^(.+?)\s+-\s+Topic$/);
+  if (topic) return { title: unquote(raw), artist: topic[1].trim(), featured, fromTopicChannel: true };
+  const dash = raw.match(/^(.+?)\s+[-–—]\s+(.+)$/);
+  if (dash) return { title: unquote(dash[2]), artist: dash[1].trim(), featured, fromTopicChannel: false };
+  const quoted = raw.match(/^(.+?)\s+["“](.+)["”]$/);
+  if (quoted) return { title: quoted[2].trim(), artist: quoted[1].trim(), featured, fromTopicChannel: false };
+  const pipe2 = raw.match(/^(.+?)\s+\|\s+(.+)$/);
+  if (pipe2) return { title: pipe2[1].trim(), artist: pipe2[2].trim(), featured, fromTopicChannel: false };
+  return { title: raw, artist: null, featured, fromTopicChannel: false };
+}
+
 // ../packages/domain/src/icy.ts
 var IcyReader = class {
   constructor(metaint) {
@@ -21386,8 +21473,8 @@ var IcyReader = class {
         i += take;
       }
       if (this.metaLeft === 0) {
-        const text = decodeMeta(Uint8Array.from(this.meta));
-        if (text) out.push(text);
+        const text2 = decodeMeta(Uint8Array.from(this.meta));
+        if (text2) out.push(text2);
       }
       if (this.metaLeft <= 0 && this.metaLeft !== -1) {
         this.metaLeft = -1;
@@ -21413,14 +21500,109 @@ function parseStreamTitle(meta3) {
   return title ? title : null;
 }
 function splitOnAir(value) {
-  const text = value.trim();
-  if (!/[\p{L}\p{N}]/u.test(text)) return null;
-  const at = text.indexOf(" - ");
-  if (at < 0) return text ? { artist: null, title: text } : null;
-  const artist = text.slice(0, at).trim();
-  const title = text.slice(at + 3).trim();
+  const text2 = value.trim();
+  if (!/[\p{L}\p{N}]/u.test(text2)) return null;
+  const at = text2.indexOf(" - ");
+  if (at < 0) return text2 ? { artist: null, title: text2 } : null;
+  const artist = text2.slice(0, at).trim();
+  const title = text2.slice(at + 3).trim();
   if (!title) return artist ? { artist: null, title: artist } : null;
   return { artist: artist || null, title };
+}
+
+// ../packages/domain/src/media-tags.ts
+function text(value, max = 300) {
+  return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : null;
+}
+function firstText(value) {
+  return Array.isArray(value) ? value.map((v) => text(v)).find(Boolean) ?? null : text(value);
+}
+function isoDate(value) {
+  if (typeof value !== "string") return null;
+  const s = value.trim();
+  const m = /^(\d{4})(?:[-/.]?(\d{2})(?:[-/.]?(\d{2}))?)?(?:[T ].*)?$/.exec(s);
+  if (!m || !m[2]) return null;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  if (year < 1e3 || year > 3e3 || month < 1 || month > 12) return null;
+  if (!m[3]) return `${m[1]}-${m[2]}`;
+  const day = Number(m[3]);
+  const days = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  if (day < 1 || day > days) return null;
+  return `${m[1]}-${m[2]}-${m[3]}`;
+}
+function isYouTube(info) {
+  if (typeof info.extractor_key === "string" && /^youtube/i.test(info.extractor_key)) return true;
+  try {
+    return typeof info.webpage_url === "string" && /(^|\.)(youtube\.com|youtu\.be)$/i.test(new URL(info.webpage_url).hostname);
+  } catch {
+    return false;
+  }
+}
+function dedupe(names, except) {
+  const seen = new Set(except ? [except.toLowerCase()] : []);
+  const out = [];
+  for (const name of names) {
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+  }
+  return out;
+}
+function cleanTags(info) {
+  const rawTitle = text(info.title) ?? "Untitled";
+  const channel = text(info.channel) ?? text(info.uploader);
+  const artists = Array.isArray(info.artists) ? info.artists.map((a) => text(a)).filter((a) => Boolean(a)) : [];
+  const named = text(info.track);
+  let title;
+  let artist;
+  let featured;
+  if (named) {
+    const split = splitFeatured(named);
+    title = split.title || named;
+    artist = artists[0] ?? text(info.artist) ?? text(info.creator) ?? channel;
+    featured = [...artists.slice(1), ...split.featured];
+  } else if (isYouTube(info)) {
+    const clean = cleanVideoTitle({ title: rawTitle, channel });
+    title = clean.title || rawTitle;
+    artist = clean.artist ?? (clean.fromTopicChannel ? null : channel);
+    featured = clean.featured;
+  } else {
+    const split = splitFeatured(rawTitle);
+    title = split.title || rawTitle;
+    artist = artists[0] ?? text(info.artist) ?? text(info.creator) ?? channel;
+    featured = split.featured;
+  }
+  const date5 = isoDate(info.release_date) ?? isoDate(info.upload_date);
+  const releaseYear = typeof info.release_year === "number" && Number.isInteger(info.release_year) ? info.release_year : null;
+  const year = date5 ? Number(date5.slice(0, 4)) : releaseYear;
+  const trackNumber = typeof info.track_number === "number" && Number.isInteger(info.track_number) && info.track_number > 0 ? info.track_number : null;
+  return {
+    title,
+    artist,
+    featured: dedupe(featured, artist).slice(0, 8),
+    album: text(info.album),
+    genre: text(info.genre, 60) ?? firstText(info.genres),
+    date: date5,
+    year: year !== null && year >= 1e3 && year <= 3e3 ? year : null,
+    trackNumber
+  };
+}
+function artistTag(artist, featured) {
+  if (!artist) return featured.length ? featured.join(" & ") : null;
+  return featured.length ? `${artist} feat. ${featured.join(" & ")}` : artist;
+}
+function ytDlpMetaFields(tags) {
+  const out = { meta_title: tags.title };
+  const artist = artistTag(tags.artist, tags.featured);
+  if (artist) out["meta_artist"] = artist;
+  if (tags.artist) out["meta_album_artist"] = tags.artist;
+  if (tags.album) out["meta_album"] = tags.album;
+  out["meta_genre"] = tags.genre ?? "";
+  if (tags.date) out["meta_date"] = tags.date;
+  else if (tags.year) out["meta_date"] = String(tags.year);
+  return out;
 }
 
 // src/security.ts
@@ -21593,7 +21775,7 @@ function createEstimator(options) {
 
 // src/jobs.ts
 import { execFile as execFile2, spawn } from "node:child_process";
-import { existsSync as existsSync3, mkdirSync as mkdirSync2, readdirSync as readdirSync2, rmSync as rmSync2, statSync as statSync4 } from "node:fs";
+import { existsSync as existsSync3, mkdirSync as mkdirSync2, readdirSync as readdirSync2, rmSync as rmSync2, statSync as statSync4, writeFileSync as writeFileSync2 } from "node:fs";
 import { homedir as homedir2, tmpdir as tmpdir2 } from "node:os";
 import { join as join7, extname as extname2 } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -22258,23 +22440,53 @@ var Jobs = class {
     if (record2.job.tool === "spotdl" && !ffmpeg.present) throw new Error("spotDL needs FFmpeg, and there is none on this machine.");
     if (record2.job.format !== "original" && !ffmpeg.present) throw new Error(`Converting to ${record2.job.format} needs FFmpeg, and there is none on this machine.`);
     const limits = { rateLimitKBps: record2.rateLimitKBps };
-    const args = record2.job.tool === "yt-dlp" ? ytDlpArgs(record2.job, record2.directory, ffmpeg, limits) : spotdlArgs(record2.job, record2.directory, ffmpeg, limits);
+    let args = record2.job.tool === "yt-dlp" ? ytDlpArgs(record2.job, record2.directory, ffmpeg, limits) : spotdlArgs(record2.job, record2.directory, ffmpeg, limits);
     if (record2.cancelled) return;
-    this.patch(record2, { state: "running", stage: "fetching" });
     const env = record2.job.tool === "spotdl" ? childEnv(process.env, { HOME: record2.home, USERPROFILE: record2.home }) : childEnv();
     const { command, prefix } = toolCommand(tool.path);
+    if (record2.job.tool === "yt-dlp" && ffmpeg.present) {
+      this.patch(record2, { state: "running", stage: "preflight", message: "Reading the link\u2019s details\u2026" });
+      const infoFile = await this.prepareInfo(record2, command, prefix, env);
+      if (record2.cancelled) return;
+      if (infoFile) args = ytDlpArgs(record2.job, record2.directory, ffmpeg, limits, { infoFile });
+    }
+    this.patch(record2, { state: "running", stage: "fetching" });
+    await this.spawnTool(record2, command, [...prefix, ...args], env, (chunk) => this.readProgress(record2, chunk.toString()));
+    if (record2.cancelled) return;
+    this.patch(record2, { stage: "finalizing" });
+    const files = this.collect(record2);
+    if (!files.length) throw new Error(`${record2.job.tool} finished without producing an audio file.`);
+    const lost = record2.job.tool === "yt-dlp" && !ffmpeg.present ? { message: FFMPEG_MISSING_NOTE } : {};
+    this.finish(record2, { state: "done", files, ...lost });
+    if (this.options.onFinished) {
+      const done = files.flatMap((file2) => {
+        const path = record2.paths.get(file2.id);
+        return path ? [{ name: file2.name, path }] : [];
+      });
+      try {
+        this.options.onFinished(record2.job, done);
+      } catch (error61) {
+        this.options.log?.(`after a download: ${error61 instanceof Error ? error61.message : String(error61)}`);
+      }
+    }
+  }
+  /**
+   * One run of the tool, killed with its whole tree on cancel or timeout. Resolves when it exits 0;
+   * otherwise rejects with the tool's own last meaningful line.
+   */
+  spawnTool(record2, command, argv, env, onStdout) {
     const spawnImpl = this.options.spawnImpl ?? spawn;
-    await new Promise((resolve3, reject) => {
+    return new Promise((resolve3, reject) => {
       let settle = () => {
       };
       const closed = new Promise((done) => {
         settle = done;
       });
-      const child = spawnImpl(command, [...prefix, ...args], { cwd: record2.directory, stdio: ["ignore", "pipe", "pipe"], env, shell: false, windowsHide: true, detached: process.platform !== "win32" });
+      const child = spawnImpl(command, argv, { cwd: record2.directory, stdio: ["ignore", "pipe", "pipe"], env, shell: false, windowsHide: true, detached: process.platform !== "win32" });
       const timer = setTimeout(() => killTree(child), this.options.timeoutMs);
       record2.running = { child, timer, closed };
       let stderr = "";
-      child.stdout?.on("data", (chunk) => this.readProgress(record2, chunk.toString()));
+      child.stdout?.on("data", onStdout);
       child.stderr?.on("data", (chunk) => {
         stderr = `${stderr}${chunk.toString()}`.slice(-4e3);
       });
@@ -22296,22 +22508,43 @@ var Jobs = class {
         else reject(new Error(lastMeaningfulLine(stderr) ?? `${record2.job.tool} exited with code ${code ?? "unknown"}.`));
       });
     });
-    if (record2.cancelled) return;
-    this.patch(record2, { stage: "finalizing" });
-    const files = this.collect(record2);
-    if (!files.length) throw new Error(`${record2.job.tool} finished without producing an audio file.`);
-    this.finish(record2, { state: "done", files });
-    if (this.options.onFinished) {
-      const done = files.flatMap((file2) => {
-        const path = record2.paths.get(file2.id);
-        return path ? [{ name: file2.name, path }] : [];
-      });
-      try {
-        this.options.onFinished(record2.job, done);
-      } catch (error61) {
-        this.options.log?.(`after a download: ${error61 instanceof Error ? error61.message : String(error61)}`);
+  }
+  /**
+   * The metadata pass: yt-dlp describes the link (`--dump-single-json`), every entry gets clean tags
+   * as `meta_*` fields (`withCleanTags`), and the result is written into the job's own folder for the
+   * download to load (`--load-info-json`). The site is read once — the download reuses what this
+   * read. Returns null when the description could not be used, and the download then names the URL
+   * as it always did; a failure of the tool itself fails the job, with the tool's reason.
+   */
+  async prepareInfo(record2, command, prefix, env) {
+    const chunks = [];
+    let size = 0;
+    let overflow = false;
+    await this.spawnTool(record2, command, [...prefix, ...ytDlpInfoArgs(record2.job)], env, (chunk) => {
+      if (overflow) return;
+      size += chunk.length;
+      if (size > MAX_INFO_BYTES) {
+        overflow = true;
+        chunks.length = 0;
+        return;
       }
+      chunks.push(chunk);
+    });
+    if (overflow) {
+      this.options.log?.("the link\u2019s description was too large to clean; downloading without it");
+      return null;
     }
+    let info;
+    try {
+      info = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    } catch {
+      this.options.log?.("the link\u2019s description was not JSON; downloading without it");
+      return null;
+    }
+    if (!info || typeof info !== "object" || Array.isArray(info)) return null;
+    const file2 = join7(record2.root, "info.json");
+    writeFileSync2(file2, JSON.stringify(withCleanTags(info)));
+    return file2;
   }
   /**
    * yt-dlp with `--newline` puts one progress line per update, which is the whole reason that flag
@@ -22321,18 +22554,18 @@ var Jobs = class {
   readProgress(record2, chunk) {
     if (record2.cancelled) return;
     for (const line of chunk.split(/\r?\n/)) {
-      const text = redactPaths(line.trim(), record2);
-      if (!text) continue;
-      const percent = /^\[download\]\s+([\d.]+)%/.exec(text);
+      const text2 = redactPaths(line.trim(), record2);
+      if (!text2) continue;
+      const percent = /^\[download\]\s+([\d.]+)%/.exec(text2);
       if (percent) {
-        this.patch(record2, { percent: Math.min(100, Number(percent[1])), stage: "fetching", message: text.slice(0, 400) });
+        this.patch(record2, { percent: Math.min(100, Number(percent[1])), stage: "fetching", message: text2.slice(0, 400) });
         continue;
       }
-      if (/^\[(ExtractAudio|Merger|VideoConvertor|EmbedThumbnail|Metadata)\]/.test(text)) {
-        this.patch(record2, { stage: "converting", message: text.slice(0, 400) });
+      if (/^\[(ExtractAudio|Merger|VideoConvertor|EmbedThumbnail|Metadata)\]/.test(text2)) {
+        this.patch(record2, { stage: "converting", message: text2.slice(0, 400) });
         continue;
       }
-      this.patch(record2, { message: text.slice(0, 400) });
+      this.patch(record2, { message: text2.slice(0, 400) });
     }
   }
   collect(record2) {
@@ -22361,16 +22594,22 @@ var Jobs = class {
     this.patch(record2, { stage: "done", finishedAt: (/* @__PURE__ */ new Date()).toISOString(), ...patch });
   }
 };
-function ytDlpArgs(job, directory, ffmpeg, limits = {}) {
+var MAX_INFO_BYTES = 256 * 1024 * 1024;
+var FFMPEG_MISSING_NOTE = "Saved as the site sent it: FFmpeg is not on this PC, so there is no cover art and the title, artist and date were not written into the file.";
+var PLAYLIST_CAP = 200;
+function ytDlpInfoArgs(job) {
+  return ["--ignore-config", "--no-colors", "--no-cache-dir", "--playlist-end", String(PLAYLIST_CAP), "--dump-single-json", "--", urlArgument(job.url)];
+}
+function ytDlpArgs(job, directory, ffmpeg, limits = {}, source = {}) {
+  const url2 = urlArgument(job.url);
   const args = [
     "--ignore-config",
     "--no-colors",
     "--newline",
     "--no-mtime",
     "--no-cache-dir",
-    // A link can point at a whole album; a cap stops one paste from becoming a thousand files.
     "--playlist-end",
-    "200",
+    String(PLAYLIST_CAP),
     "--paths",
     directory,
     "--output",
@@ -22378,27 +22617,40 @@ function ytDlpArgs(job, directory, ffmpeg, limits = {}) {
   ];
   if (ffmpeg.present) {
     if (ffmpeg.path) args.push("--ffmpeg-location", ffmpeg.path);
-    args.push("--extract-audio", "--embed-metadata");
+    args.push("--extract-audio", "--embed-metadata", "--embed-thumbnail", "--convert-thumbnails", "jpg");
     if (job.format !== "original") args.push("--audio-format", job.format);
   } else {
     args.push("--format", "bestaudio/best");
   }
   const rate = rateLimitOf(limits.rateLimitKBps);
   if (rate !== null) args.push("--limit-rate", `${rate}K`);
-  args.push("--", urlArgument(job.url));
+  if (source.infoFile) args.push("--load-info-json", source.infoFile);
+  else args.push("--", url2);
   return args;
+}
+var UNUSED_INFO_FIELDS = ["automatic_captions", "subtitles", "heatmap", "requested_subtitles", "description"];
+function withCleanTags(info, depth = 0) {
+  const out = { ...info };
+  for (const field of UNUSED_INFO_FIELDS) delete out[field];
+  if (Array.isArray(info["entries"])) {
+    out["entries"] = depth < 3 ? info["entries"].map((entry) => entry && typeof entry === "object" && !Array.isArray(entry) ? withCleanTags(entry, depth + 1) : entry) : info["entries"];
+    return out;
+  }
+  return { ...out, ...ytDlpMetaFields(cleanTags(info)) };
 }
 function urlArgument(url2) {
   if (!/^https?:\/\//i.test(url2)) throw new Error("Only http(s) addresses can be handed to a tool.");
   return url2;
 }
 function spotdlArgs(job, directory, ffmpeg, limits = {}) {
-  const args = ["download", "--output", join7(directory, "{artists} - {title}.{output-ext}"), "--format", job.format === "original" ? "mp3" : job.format];
+  const args = ["download", urlArgument(job.url), "--output", join7(directory, "{artists} - {title}.{output-ext}"), "--format", job.format === "original" ? "mp3" : job.format];
   if (ffmpeg.path) args.push("--ffmpeg", ffmpeg.path);
   const rate = rateLimitOf(limits.rateLimitKBps);
   if (rate !== null) args.push("--yt-dlp-args", `--limit-rate ${rate}K`);
-  args.push("--", urlArgument(job.url));
   return args;
+}
+function spotdlSaveArgs(url2, saveFile) {
+  return ["save", urlArgument(url2), "--save-file", saveFile];
 }
 function childEnv(source = process.env, overrides = {}) {
   const keep = ["PATH", "Path", "SYSTEMROOT", "SystemRoot", "COMSPEC", "TEMP", "TMP", "TMPDIR", "LANG", "LC_ALL", "HOME", "USERPROFILE"];
@@ -22422,8 +22674,8 @@ function killTree(child) {
     child.kill("SIGKILL");
   }
 }
-function redactPaths(text, dirs) {
-  let out = text;
+function redactPaths(text2, dirs) {
+  let out = text2;
   for (const known of [dirs.directory, dirs.root, tmpdir2(), homedir2()]) {
     if (!known) continue;
     for (const spelling of /* @__PURE__ */ new Set([known, known.replace(/\\/g, "/")])) {
@@ -22450,6 +22702,272 @@ function lastMeaningfulLine(stderr) {
   const lines = stderr.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).filter((l) => !/^WARNING:/i.test(l));
   const last = lines.at(-1);
   return last ? last.replace(/^ERROR:\s*/i, "").slice(0, 600) : null;
+}
+
+// src/resolve.ts
+import { spawn as spawn2 } from "node:child_process";
+import { mkdirSync as mkdirSync3, readFileSync as readFileSync2, rmSync as rmSync3 } from "node:fs";
+import { join as join8 } from "node:path";
+import { randomUUID as randomUUID2 } from "node:crypto";
+var RESOLVE_TTL_MS = 10 * 60 * 1e3;
+var RESOLVE_CACHE_SIZE = 100;
+var MAX_RUNNING = 2;
+var MAX_WAITING = 8;
+var MAX_OUTPUT_BYTES = 32 * 1024 * 1024;
+function sourceOf(url2) {
+  const host = url2.hostname.toLowerCase();
+  if (/(^|\.)(youtube\.com|youtu\.be)$/.test(host)) return "youtube";
+  if (/(^|\.)soundcloud\.com$/.test(host)) return "soundcloud";
+  if (/(^|\.)bandcamp\.com$/.test(host)) return "bandcamp";
+  if (/(^|\.)spotify\.com$/.test(host)) return "spotify";
+  return "other";
+}
+function ytDlpResolveArgs(url2) {
+  if (!/^https?:\/\//i.test(url2)) throw new Error("Only http(s) addresses can be handed to a tool.");
+  return ["--ignore-config", "--no-colors", "--no-cache-dir", "--no-warnings", "--skip-download", "--flat-playlist", "--playlist-end", String(HELPER_RESOLVE_CAP), "--dump-single-json", "--", url2];
+}
+function str(value, max = 300) {
+  return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : null;
+}
+function num(value) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+}
+function webUrl(value) {
+  const s = str(value, 2048);
+  if (!s) return null;
+  try {
+    const u = new URL(s);
+    return u.protocol === "https:" || u.protocol === "http:" ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+function artworkOf(info) {
+  const direct = webUrl(info["thumbnail"]);
+  if (direct) return direct;
+  const list = Array.isArray(info["thumbnails"]) ? info["thumbnails"] : [];
+  const best = [...list].filter((t2) => t2 && webUrl(t2["url"])).sort((a, b) => (num(b["width"]) ?? 0) - (num(a["width"]) ?? 0))[0];
+  return best ? webUrl(best["url"]) : null;
+}
+function trackFromYtDlp(info, flat = false) {
+  const url2 = webUrl(info["webpage_url"]) ?? webUrl(info["url"]);
+  const hasTitle = Boolean(str(info["title"]) ?? str(info["track"]));
+  if (flat && !hasTitle) {
+    return { url: url2, title: null, artist: null, featured: [], album: str(info["album"]), genre: null, durationSec: num(info["duration"]), date: null, year: null, artworkUrl: artworkOf(info), trackNumber: null };
+  }
+  const tags = cleanTags({ ...info, ...url2 && !info["webpage_url"] ? { webpage_url: url2 } : {}, ...info["ie_key"] && !info["extractor_key"] ? { extractor_key: info["ie_key"] } : {} });
+  return {
+    url: url2,
+    title: tags.title,
+    artist: tags.artist,
+    featured: tags.featured,
+    album: tags.album,
+    genre: tags.genre,
+    durationSec: num(info["duration"]),
+    date: tags.date,
+    year: tags.year,
+    artworkUrl: artworkOf(info),
+    trackNumber: tags.trackNumber
+  };
+}
+function fromYtDlp(info, url2, now = /* @__PURE__ */ new Date()) {
+  const source = sourceOf(url2);
+  const canonical = webUrl(info["webpage_url"]) ?? url2.toString();
+  const entries = Array.isArray(info["entries"]) ? info["entries"] : null;
+  if (info["_type"] === "playlist" || entries) {
+    const list = (entries ?? []).filter((e) => Boolean(e) && typeof e === "object" && !Array.isArray(e));
+    const kept = list.slice(0, HELPER_RESOLVE_CAP).map((e) => trackFromYtDlp(e, true));
+    const total = num(info["playlist_count"]);
+    return {
+      source,
+      kind: "collection",
+      url: canonical,
+      track: null,
+      collection: {
+        title: str(info["title"]) ?? str(info["album"]) ?? "Playlist",
+        artist: str(info["album_artist"]) ?? str(info["uploader"]) ?? str(info["channel"]),
+        artworkUrl: artworkOf(info),
+        date: isoDate(info["release_date"]) ?? isoDate(info["upload_date"]),
+        entries: kept,
+        total: total !== null ? Math.round(total) : null,
+        cap: HELPER_RESOLVE_CAP,
+        capped: total !== null && total > kept.length || list.length > HELPER_RESOLVE_CAP
+      },
+      resolvedAt: now.toISOString()
+    };
+  }
+  return { source, kind: "track", url: canonical, track: trackFromYtDlp(info), collection: null, resolvedAt: now.toISOString() };
+}
+function trackFromSpotdl(song) {
+  const artists = Array.isArray(song["artists"]) ? song["artists"].map((a) => str(a)).filter((a) => Boolean(a)) : [];
+  const artist = artists[0] ?? str(song["artist"]);
+  const genres = Array.isArray(song["genres"]) ? song["genres"].map((g) => str(g, 60)).filter((g) => Boolean(g)) : [];
+  const date5 = isoDate(song["date"]);
+  const yearValue = num(song["year"]);
+  const year = date5 ? Number(date5.slice(0, 4)) : yearValue !== null && Number.isInteger(yearValue) && yearValue >= 1e3 && yearValue <= 3e3 ? yearValue : null;
+  const trackNumber = num(song["track_number"]);
+  return {
+    url: webUrl(song["url"]),
+    title: str(song["name"]),
+    artist,
+    featured: artists.slice(1, 9),
+    album: str(song["album_name"]),
+    genre: genres[0] ?? null,
+    durationSec: num(song["duration"]),
+    date: date5,
+    year,
+    artworkUrl: webUrl(song["cover_url"]),
+    trackNumber: trackNumber !== null && Number.isInteger(trackNumber) && trackNumber > 0 ? trackNumber : null
+  };
+}
+function fromSpotdl(songs, url2, now = /* @__PURE__ */ new Date()) {
+  const list = (Array.isArray(songs) ? songs : []).filter((s) => Boolean(s) && typeof s === "object" && !Array.isArray(s));
+  const isTrack = /^\/(?:intl-[a-z-]+\/)?track\//i.test(url2.pathname);
+  if (isTrack && list[0]) return { source: "spotify", kind: "track", url: webUrl(list[0]["url"]) ?? url2.toString(), track: trackFromSpotdl(list[0]), collection: null, resolvedAt: now.toISOString() };
+  const isAlbum = /^\/(?:intl-[a-z-]+\/)?album\//i.test(url2.pathname);
+  const ordered = isAlbum ? [...list].sort((a, b) => (num(a["disc_number"]) ?? 1) - (num(b["disc_number"]) ?? 1) || (num(a["track_number"]) ?? 0) - (num(b["track_number"]) ?? 0)) : list;
+  const first = ordered[0];
+  const kept = ordered.slice(0, HELPER_RESOLVE_CAP).map(trackFromSpotdl);
+  return {
+    source: "spotify",
+    kind: "collection",
+    url: url2.toString(),
+    track: null,
+    collection: {
+      title: (first && (str(first["list_name"]) ?? (isAlbum ? str(first["album_name"]) : null))) ?? (isAlbum ? "Album" : "Playlist"),
+      artist: first ? isAlbum ? str(first["album_artist"]) : null : null,
+      artworkUrl: first && isAlbum ? webUrl(first["cover_url"]) : null,
+      date: first && isAlbum ? isoDate(first["date"]) : null,
+      entries: kept,
+      total: first && num(first["list_length"]) !== null ? Math.round(num(first["list_length"])) : isAlbum && first && num(first["tracks_count"]) !== null ? Math.round(num(first["tracks_count"])) : ordered.length,
+      cap: HELPER_RESOLVE_CAP,
+      capped: ordered.length > HELPER_RESOLVE_CAP
+    },
+    resolvedAt: now.toISOString()
+  };
+}
+var ResolveError = class extends Error {
+  constructor(message, code) {
+    super(message);
+    this.code = code;
+  }
+  code;
+};
+function run2(path, args, env, timeoutMs, spawnImpl = spawn2) {
+  const { command, prefix } = toolCommand(path);
+  return new Promise((resolve3, reject) => {
+    const child = spawnImpl(command, [...prefix, ...args], { env, shell: false, windowsHide: true, stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32" });
+    const out = [];
+    let size = 0;
+    let stderr = "";
+    let timedOut = false;
+    let tooBig = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      killTree(child);
+    }, timeoutMs);
+    child.stdout?.on("data", (chunk) => {
+      size += chunk.length;
+      if (size > MAX_OUTPUT_BYTES) {
+        if (!tooBig) killTree(child);
+        tooBig = true;
+        return;
+      }
+      out.push(chunk);
+    });
+    child.stderr?.on("data", (chunk) => {
+      stderr = `${stderr}${chunk.toString()}`.slice(-4e3);
+    });
+    child.stdout?.on("error", () => {
+    });
+    child.stderr?.on("error", () => {
+    });
+    child.on("error", (error61) => {
+      clearTimeout(timer);
+      reject(new ResolveError(`The tool could not be started: ${error61.message}`.slice(0, 400), "failed"));
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      if (timedOut) return reject(new ResolveError("The tool took too long to answer.", "failed"));
+      if (tooBig) return reject(new ResolveError("The tool\u2019s answer was far larger than any link needs.", "failed"));
+      if (code !== 0) return reject(new ResolveError(lastMeaningfulLine(stderr) ?? `The tool exited with code ${code ?? "unknown"}.`, "failed"));
+      resolve3(Buffer.concat(out).toString("utf8"));
+    });
+  });
+}
+function createResolver(options) {
+  const cache = /* @__PURE__ */ new Map();
+  const now = options.now ?? Date.now;
+  const timeouts = options.timeoutMs ?? { ytDlp: 45e3, spotdl: 15e4 };
+  let running = 0;
+  const waiting = [];
+  async function slot(work) {
+    if (running >= MAX_RUNNING) {
+      if (waiting.length >= MAX_WAITING) throw new ResolveError("Too many links are being looked up at once. Try again in a moment.", "busy");
+      await new Promise((resolve3) => waiting.push(resolve3));
+    }
+    running += 1;
+    try {
+      return await work();
+    } finally {
+      running -= 1;
+      waiting.shift()?.();
+    }
+  }
+  async function fresh(url2) {
+    const tools = await options.tools();
+    const source = sourceOf(url2);
+    if (source === "spotify") {
+      const spotdl = tools.spotdl;
+      if (!spotdl.present || !spotdl.path) throw new ResolveError(spotdl.installHint ?? "spotDL is not set up on this PC yet.", "tool-missing");
+      return slot(async () => {
+        const dir = join8(options.workDir, "resolve", randomUUID2());
+        mkdirSync3(dir, { recursive: true });
+        try {
+          const file2 = join8(dir, "songs.spotdl");
+          await run2(spotdl.path, spotdlSaveArgs(url2.toString(), file2), childEnv(process.env, { HOME: dir, USERPROFILE: dir }), timeouts.spotdl);
+          let songs;
+          try {
+            songs = JSON.parse(readFileSync2(file2, "utf8"));
+          } catch {
+            throw new ResolveError("spotDL found nothing at that address.", "failed");
+          }
+          return fromSpotdl(songs, url2);
+        } finally {
+          rmSync3(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
+        }
+      });
+    }
+    const ytDlp = tools["yt-dlp"];
+    if (!ytDlp.present || !ytDlp.path) throw new ResolveError(ytDlp.installHint ?? "yt-dlp is not set up on this PC yet.", "tool-missing");
+    return slot(async () => {
+      const stdout = await run2(ytDlp.path, ytDlpResolveArgs(url2.toString()), childEnv(), timeouts.ytDlp);
+      let info;
+      try {
+        info = JSON.parse(stdout);
+      } catch {
+        throw new ResolveError("yt-dlp did not describe that address.", "failed");
+      }
+      if (!info || typeof info !== "object" || Array.isArray(info)) throw new ResolveError("yt-dlp did not describe that address.", "failed");
+      return fromYtDlp(info, url2);
+    });
+  }
+  return {
+    resolve(url2) {
+      const key = url2.toString();
+      const at = now();
+      const hit = cache.get(key);
+      if (hit && at - hit.at < RESOLVE_TTL_MS) return hit.value;
+      const value = fresh(url2);
+      value.catch(() => {
+        if (cache.get(key)?.value === value) cache.delete(key);
+      });
+      cache.delete(key);
+      if (cache.size >= RESOLVE_CACHE_SIZE) cache.delete(cache.keys().next().value);
+      cache.set(key, { at, value });
+      return value;
+    }
+  };
 }
 
 // ../packages/domain/src/radio-node.ts
@@ -22626,8 +23144,8 @@ function headerText(value) {
 }
 
 // src/provision.ts
-import { mkdirSync as mkdirSync3, readFileSync as readFileSync2, renameSync as renameSync2, writeFileSync as writeFileSync2 } from "node:fs";
-import { join as join8 } from "node:path";
+import { mkdirSync as mkdirSync4, readFileSync as readFileSync3, renameSync as renameSync2, writeFileSync as writeFileSync3 } from "node:fs";
+import { join as join9 } from "node:path";
 var SETUP_ORDER = ["yt-dlp", "ffmpeg", "spotdl"];
 var RETRY_AFTER_MS = 6 * 60 * 60 * 1e3;
 var UPDATE_CHECK_MS = 24 * 60 * 60 * 1e3;
@@ -22754,7 +23272,7 @@ function due(iso, afterMs, now) {
 }
 function readState(toolsDir) {
   try {
-    const parsed = JSON.parse(readFileSync2(join8(toolsDir, STATE_FILE), "utf8"));
+    const parsed = JSON.parse(readFileSync3(join9(toolsDir, STATE_FILE), "utf8"));
     if (parsed && typeof parsed === "object" && parsed.tools && typeof parsed.tools === "object") return { version: 1, tools: parsed.tools };
   } catch {
   }
@@ -22762,10 +23280,10 @@ function readState(toolsDir) {
 }
 function writeState(toolsDir, state, log) {
   try {
-    mkdirSync3(toolsDir, { recursive: true });
-    const path = join8(toolsDir, STATE_FILE);
+    mkdirSync4(toolsDir, { recursive: true });
+    const path = join9(toolsDir, STATE_FILE);
     const part = `${path}.${process.pid}.part`;
-    writeFileSync2(part, `${JSON.stringify(state, null, 2)}
+    writeFileSync3(part, `${JSON.stringify(state, null, 2)}
 `);
     renameSync2(part, path);
   } catch (error61) {
@@ -22907,6 +23425,7 @@ async function startHelper(options) {
     ...options.onToolSetupChange ? { onChange: options.onToolSetupChange } : {}
   });
   const estimate = createEstimator(options.backup ?? { folders: {}, backupDir: null });
+  const links = createResolver({ workDir: options.workDir, tools: resolve_, log: options.log, ...options.resolveTimeoutMs ? { timeoutMs: options.resolveTimeoutMs } : {} });
   const server = createServer((request, response) => {
     void handle(request, response).catch((error61) => {
       options.log(`unhandled: ${error61 instanceof Error ? error61.message : String(error61)}`);
@@ -22979,6 +23498,23 @@ async function startHelper(options) {
       }
       const guide = { generatedAt: (/* @__PURE__ */ new Date()).toISOString(), guide: options.tv ? await options.tv.guide() : [] };
       return send(response, 200, guide);
+    }
+    if (path === HELPER_ROUTES.resolve && request.method === "GET") {
+      if (origin_ === void 0 && !tokenMatches(options.token, header(request, "x-helper-token"))) {
+        return fail(response, 403, "origin", "This origin may not talk to the helper.");
+      }
+      const asked = url2.searchParams.get("url") ?? "";
+      if (!asked || asked.length > 2048) return fail(response, 400, "bad-request", "Say which link: ?url=");
+      const checked = checkFetchUrl(asked, options.allowedHosts);
+      if (!checked.ok || !checked.url) return fail(response, 400, "url", checked.reason ?? "That address is not one this helper will read.");
+      try {
+        return send(response, 200, await links.resolve(checked.url));
+      } catch (error61) {
+        const message = redactPaths(error61 instanceof Error ? error61.message : String(error61), { directory: options.workDir, root: options.toolsDir }).slice(0, 600);
+        if (error61 instanceof ResolveError && error61.code === "busy") return fail(response, 429, "busy", message);
+        if (error61 instanceof ResolveError && error61.code === "tool-missing") return fail(response, 409, "tool-missing", message);
+        return fail(response, 502, "resolve", message || "The link could not be read.");
+      }
     }
     if (path !== HELPER_ROUTES.health && !tokenMatches(options.token, header(request, "x-helper-token"))) {
       return fail(response, 401, "token", "This request needs the helper\u2019s token. It is printed when the helper starts.");
@@ -23154,9 +23690,9 @@ function header(request, name) {
   return Array.isArray(value) ? value[0] : value;
 }
 function send(response, status, body) {
-  const text = JSON.stringify(body);
-  response.writeHead(status, { "content-type": "application/json; charset=utf-8", "content-length": Buffer.byteLength(text), "cache-control": "no-store" });
-  response.end(text);
+  const text2 = JSON.stringify(body);
+  response.writeHead(status, { "content-type": "application/json; charset=utf-8", "content-length": Buffer.byteLength(text2), "cache-control": "no-store" });
+  response.end(text2);
 }
 function fail(response, status, error61, message) {
   send(response, status, { error: error61, message });
@@ -23191,8 +23727,8 @@ async function main(argv = process.argv.slice(2), out = (line) => process.stdout
   }
   let runDir;
   try {
-    mkdirSync4(options.workDir, { recursive: true });
-    runDir = mkdtempSync2(join9(options.workDir, "now-playing-run-"));
+    mkdirSync5(options.workDir, { recursive: true });
+    runDir = mkdtempSync2(join10(options.workDir, "now-playing-run-"));
   } catch (error61) {
     out(`Cannot use ${options.workDir} for temporary files: ${error61 instanceof Error ? error61.message : String(error61)}`);
     out("Point somewhere writable with --work-dir <path>.");
@@ -23200,7 +23736,7 @@ async function main(argv = process.argv.slice(2), out = (line) => process.stdout
   }
   const removeRunDir = () => {
     try {
-      rmSync3(runDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+      rmSync4(runDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     } catch {
       out(`Could not remove ${runDir}; it is safe to delete by hand.`);
     }
@@ -23287,7 +23823,7 @@ async function listen(options, app, token, out) {
 function openBrowser(url2) {
   const [command, args] = process.platform === "win32" ? ["cmd", ["/c", "start", "", url2]] : process.platform === "darwin" ? ["open", [url2]] : ["xdg-open", [url2]];
   try {
-    const child = spawn2(command, args, { stdio: "ignore", detached: true, shell: false, windowsHide: true });
+    const child = spawn3(command, args, { stdio: "ignore", detached: true, shell: false, windowsHide: true });
     child.on("error", () => {
     });
     child.unref();
