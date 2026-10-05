@@ -28,6 +28,11 @@ export const Uuid = z.uuid().describe('UUID (v7 preferred; stable across sync)')
 export const IsoDateTime = z.iso
   .datetime({ offset: true })
   .describe('UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z');
+/** A calendar date, `YYYY-MM-DD`, or `YYYY-MM` when only the month is known. Not a timestamp. */
+export const CalendarDate = z
+  .string()
+  .regex(/^\d{4}-(0[1-9]|1[0-2])(-(0[1-9]|[12]\d|3[01]))?$/)
+  .describe('Calendar date, YYYY-MM-DD or YYYY-MM');
 export const NonEmptyString = z.string().trim().min(1);
 export const DisplayName = z.string().trim().min(1).max(80);
 export const Sha256Hex = z

@@ -1484,7 +1484,7 @@
         "token shown",
         "stopping"
       ],
-      "rules": ["VOICE-002", "UX-SETUP-001"],
+      "rules": ["VOICE-002", "UX-SETUP-001", "UX-DL-001"],
       "guideAnchor": "platforms",
       "authority": "observed"
     },
@@ -1555,9 +1555,12 @@
         "empty",
         "results from companion / iTunes",
         "pasted link resolved",
-        "people on the hub"
+        "people on the hub",
+        "pasted link filled in by the companion (duration, date, album, art)",
+        "pasted playlist, set or album: its songs, “Title: N songs”, and “(the first 200 of M)” when capped",
+        "set entry named by its address until its page is on screen"
       ],
-      "rules": ["NP-PRIN-002"],
+      "rules": ["NP-PRIN-002", "NP-FIND-002"],
       "guideAnchor": "screens",
       "authority": "adopted"
     },
@@ -1621,9 +1624,10 @@
         "helper found / not found",
         "fetching",
         "refused by the helper (its reason)",
-        "fetched and playing"
+        "fetched and playing",
+        "the date beside the title, when the link row has one"
       ],
-      "rules": ["UX-SAFE-001", "UX-FEED-001"],
+      "rules": ["UX-SAFE-001", "UX-FEED-001", "NP-FIND-002"],
       "guideAnchor": "screens",
       "authority": "adopted"
     },
@@ -2268,13 +2272,17 @@
       ],
       "failures": [
         "Tool missing: the control is not shown",
-        "Tool error: its own message, without paths"
+        "Tool error: its own message, without paths",
+        "FFmpeg missing: the file is saved as the site sent it, and the job says it has no cover art or tags"
       ],
       "surfaces": ["player-shell-fetch-sheet", "local-helper-cli", "android-system-ui"],
-      "rules": ["UX-PRIN-001", "VOICE-002"],
+      "rules": ["UX-PRIN-001", "VOICE-002", "UX-DL-001", "NP-FIND-002"],
       "evidence": [
         "music-player/tests/e2e/helper.spec.ts",
-        "local-helper/tests/integration/helper-server.test.ts"
+        "local-helper/tests/integration/helper-server.test.ts",
+        "local-helper/tests/unit/download-tags.test.ts",
+        "local-helper/tests/integration/helper-resolve.test.ts",
+        "music-player/tests/e2e/np/links.spec.ts"
       ]
     }
   ],

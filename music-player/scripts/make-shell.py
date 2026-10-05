@@ -1389,6 +1389,142 @@ replace("              (it.channel.run ? esc(clockOf(lvl.at + SLOT)) : '') + '</
         "                ? esc(clockOf(Date.parse(it.channel.guide.now.stop)))\n"
         "                : it.channel.run ? esc(clockOf(lvl.at + SLOT)) : '') + '</td>' +")
 
+# ---- pasted links through the companion (NP-FIND-002) -------------------------------------------------------------
+# A companion on this PC reads a pasted link with its own tools (GET /helper/v1/resolve: yt-dlp, or spotDL for
+# Spotify) and knows what oEmbed cannot — duration, the whole date, album, features, art — keylessly. It is asked
+# beside the chain, not in it: the paired hub still answers first, oEmbed still fills the row in a second, and the
+# companion's answer lands over oEmbed's when it comes (a source never overwrites a better one; it only fills gaps).
+# A playlist, set or album becomes its songs, each a row with its own address (so each can be added and fetched),
+# under a count that names the list and says when the cap left some out. A set entry the site lists by address
+# alone is looked up when its page of rows is on screen. The date joins the details line the row already has.
+replace(r"    var HOSTS = /^(www\.)?(youtube\.com|music\.youtube\.com|youtu\.be|soundcloud\.com|on\.soundcloud\.com|bandcamp\.com|[a-z0-9-]+\.bandcamp\.com)$/i;",
+        r"    var HOSTS = /^(www\.)?(youtube\.com|music\.youtube\.com|youtu\.be|soundcloud\.com|on\.soundcloud\.com|bandcamp\.com|[a-z0-9-]+\.bandcamp\.com|open\.spotify\.com)$/i;")
+replace("      if (/bandcamp/i.test(host)) return 'Bandcamp';\n      return null;",
+        "      if (/bandcamp/i.test(host)) return 'Bandcamp';\n      if (/spotify/i.test(host)) return 'Spotify';\n      return null;")
+replace("        t = segs[1] ? humanize(segs[1]) : 'SoundCloud track';\n      } else {",
+        "        t = segs[1] ? humanize(segs[1]) : 'SoundCloud track';\n"
+        "      } else if (p === 'Spotify') {\n"
+        "        t = segs[0] === 'album' ? 'Spotify album' : segs[0] === 'playlist' ? 'Spotify playlist' : 'Spotify track';\n"
+        "      } else {")
+replace("        msg('Only YouTube, SoundCloud and Bandcamp links work here.');",
+        "        msg('Only YouTube, SoundCloud, Bandcamp and Spotify links work here.');")
+replace("    var results = [], page = 0, hot = -1, state = 'idle', lastQ = '', seq = 0;",
+        "    var results = [], page = 0, hot = -1, state = 'idle', lastQ = '', seq = 0;\n"
+        "    var listInfo = null;   // the pasted playlist the rows came from, for the count line")
+replace("       browser; a paired container, when there is one, beats both */\n"
+        "    function resolveLink(r) {\n"
+        "      var enc = encodeURIComponent(r.u);\n"
+        "      var tries = [\n",
+        "       browser; a paired container, when there is one, beats both, and the\n"
+        "       companion on this PC, when there is one, reads the link with its own\n"
+        "       tools beside them (NP-FIND-002) */\n"
+        "    function resolveLink(r) {\n"
+        "      var enc = encodeURIComponent(r.u);\n"
+        "      var mine = seq;\n"
+        "      r.rank = 0;\n"
+        "      /* rank: hub 3, companion 2, oEmbed and the rest 1. A lower answer that arrives late\n"
+        "         only fills what the better one left empty. */\n"
+        "      function put(rank, m) {\n"
+        "        if (mine !== seq || !m) return;\n"
+        "        if (rank < r.rank) {\n"
+        "          if (!r.d && m.d > 0) r.d = Math.round(m.d);\n"
+        "          if (!r.art && typeof m.art === 'string' && m.art) r.art = m.art;\n"
+        "          if (state === 'list' && results.indexOf(r) >= 0) render();\n"
+        "          return;\n"
+        "        }\n"
+        "        r.rank = rank;\n"
+        "        applyMeta(r, m.t, m.a, m.art, m.d);\n"
+        "      }\n"
+        "      fromCompanion(r, enc, mine, put);\n"
+        "      var tries = [\n")
+replace("      var mine = seq;\n"
+        "      (function step(i) {\n"
+        "        if (i >= tries.length || mine !== seq) return;\n"
+        "        tries[i]().then(function (m) {\n"
+        "          if (mine !== seq) return;\n"
+        "          applyMeta(r, m.t, m.a, m.art, m.d);\n"
+        "        }, function () { step(i + 1); });\n"
+        "      })(0);\n"
+        "    }\n",
+        "      (function step(i) {\n"
+        "        if (i >= tries.length || mine !== seq) return;\n"
+        "        tries[i]().then(function (m) { put(i === 0 ? 3 : 1, m); }, function () { step(i + 1); });\n"
+        "      })(0);\n"
+        "    }\n"
+        "\n"
+        "    /* The companion's answer (HelperResolved). A song fills the row; a playlist, set or album\n"
+        "       replaces it with its songs. Nothing here throws: no companion is the ordinary case. */\n"
+        "    function companionBase() { return window.COMPANION ? String(window.COMPANION).replace(/\\/$/, '') : null; }\n"
+        "    function fromCompanion(r, enc, mine, put) {\n"
+        "      var base = companionBase();\n"
+        "      if (!base) return;\n"
+        "      getJSON(base + '/helper/v1/resolve?url=' + enc, false, 160000).then(function (d) {\n"
+        "        if (mine !== seq || !d) return;\n"
+        "        var c = d.kind === 'collection' ? d.collection : null;\n"
+        "        if (c && Array.isArray(c.entries) && c.entries.length) { listCollection(r, c); return; }\n"
+        "        var x = d.track;\n"
+        "        if (!x || typeof x.title !== 'string' || !x.title) return;\n"
+        "        fillFrom(r, x, r.rank <= 2);\n"
+        "        put(2, { t: x.title, a: x.artist, art: webUrl(x.artworkUrl), d: x.durationSec });\n"
+        "      }).catch(function () { /* no companion, or it could not read the link: the chain stands */ });\n"
+        "    }\n"
+        "    /* What only the companion knows. `lead` is false when the hub already answered: then it\n"
+        "       only fills what the hub left empty. */\n"
+        "    function fillFrom(r, x, lead) {\n"
+        "      if (typeof x.date === 'string' && x.date) r.date = x.date.slice(0, 10);\n"
+        "      if (typeof x.album === 'string' && x.album && (lead || !r.al)) r.al = x.album.slice(0, 80);\n"
+        "      if (Array.isArray(x.featured) && x.featured.length && (lead || !r.feat.length)) r.feat = x.featured.slice(0, 3).map(String);\n"
+        "      if (typeof x.genre === 'string' && x.genre && (lead || !r.genre)) r.genre = x.genre;\n"
+        "    }\n"
+        "    function rowFromResolved(x, platform) {\n"
+        "      /* a set's entry may arrive as an address alone: its path stands in until it is looked up */\n"
+        "      var guess = !x.title && x.url ? parseLink(x.url) : null;\n"
+        "      var row = track(x.title || (guess && guess.t) || 'Untitled', x.artist || (guess && guess.a) || '', '',\n"
+        "                      webUrl(x.artworkUrl), null, webUrl(x.url), platform, x.durationSec || 0);\n"
+        "      fillFrom(row, x, true);\n"
+        "      row.pending = !x.title;\n"
+        "      return row;\n"
+        "    }\n"
+        "    function listCollection(r, c) {\n"
+        "      results = c.entries.map(function (x) { return rowFromResolved(x || {}, r.p); });\n"
+        "      listInfo = { title: String(c.title || 'Playlist'), total: c.total, cap: c.cap, capped: !!c.capped };\n"
+        "      page = 0; hot = -1; state = 'list';\n"
+        "      render();\n"
+        "    }\n"
+        "    /* An entry listed by address alone, looked up once when its page is on screen. */\n"
+        "    function resolveEntry(r) {\n"
+        "      var base = companionBase(), mine = seq;\n"
+        "      if (!base || !r.u) return;\n"
+        "      getJSON(base + '/helper/v1/resolve?url=' + encodeURIComponent(r.u), false, 60000).then(function (d) {\n"
+        "        var x = d && d.track;\n"
+        "        if (mine !== seq || !x || typeof x.title !== 'string' || !x.title) return;\n"
+        "        r.pending = false;\n"
+        "        fillFrom(r, x, true);\n"
+        "        applyMeta(r, x.title, x.artist, webUrl(x.artworkUrl), x.durationSec);\n"
+        "      }).catch(function () { r.pending = false; });\n"
+        "    }\n")
+replace("      visible().forEach(function (r) {\n        if (r.bpm || r.bpmTried) return;",
+        "      visible().forEach(function (r) {\n"
+        "        /* named by its address alone so far: no tempo to look up for a guessed name */\n"
+        "        if (r.pending) { if (!r.pendingAsked) { r.pendingAsked = true; resolveEntry(r); } return; }\n"
+        "        if (r.bpm || r.bpmTried) return;")
+replace("      var tail = r.al ? esc(r.al) : (r.p || '');",
+        "      var tail = (r.al ? esc(r.al) : (r.p || '')) + (r.date ? (r.al || r.p ? ' \\u00b7 ' : '') + esc(r.date) : '');")
+replace("        count.innerHTML = '<b>Results:</b> ' + n + (n === 1 ? ' song' : ' songs');",
+        "        var songs = n + (n === 1 ? ' song' : ' songs');\n"
+        "        count.innerHTML = listInfo\n"
+        "          ? '<b>' + esc(listInfo.title.length > 48 ? listInfo.title.slice(0, 47) + '\\u2026' : listInfo.title) + ':</b> ' + songs +\n"
+        "            (listInfo.capped ? ' (the first ' + listInfo.cap + (listInfo.total ? ' of ' + listInfo.total : '') + ')' : '')\n"
+        "          : '<b>Results:</b> ' + songs;")
+replace("      lastQ = q;\n      page = 0;\n      hot = -1;\n",
+        "      lastQ = q;\n      listInfo = null;\n      page = 0;\n      hot = -1;\n")
+replace("          duration: r.d, bpm: r.bpm,\n",
+        "          duration: r.d, bpm: r.bpm, date: r.date || null,\n")
+replace("          bpm: d.bpm || null,\n          platform: d.platform,\n          url: d.url,\n",
+        "          bpm: d.bpm || null,\n          date: typeof d.date === 'string' ? d.date.slice(0, 10) : null,\n          platform: d.platform,\n          url: d.url,\n")
+replace("(sg.artist ? ' by ' + sg.artist : '') + ' — fetched by the helper on this PC from '",
+        "(sg.artist ? ' by ' + sg.artist : '') + (sg.date ? ' (' + sg.date + ')' : '') + ' — fetched by the helper on this PC from '")
+
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):
     assert bad not in text, f'left behind: {bad}'

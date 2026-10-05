@@ -57,11 +57,13 @@ describe('the command line it builds', () => {
     expect(args[args.indexOf('--format') + 1]).toBe('mp3');
   });
 
-  it('puts the URL last and behind `--` for spotDL too', () => {
+  it('puts the URL straight after spotDL’s operation, the one place spotDL takes it', () => {
+    // spotDL 4.5.2 refuses `--` ("unrecognized arguments: -- https://…", measured 2026-10-04), so the
+    // yt-dlp shape never ran. The URL is still one argument that starts with https://, never a flag.
     const args = spotdlArgs({ url: 'https://open.spotify.com/track/x', format: 'mp3' }, '/tmp/j', { present: true, path: '/usr/bin/ffmpeg' });
-    expect(args[0]).toBe('download');
-    expect(args.at(-2)).toBe('--');
-    expect(args.at(-1)).toBe('https://open.spotify.com/track/x');
+    expect(args.slice(0, 2)).toEqual(['download', 'https://open.spotify.com/track/x']);
+    expect(args).not.toContain('--');
+    expect(args.filter((a) => a === 'https://open.spotify.com/track/x')).toHaveLength(1);
   });
 
   it('refuses to hand a tool anything that is not an http(s) URL', () => {

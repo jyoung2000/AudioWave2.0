@@ -22,16 +22,27 @@ import { startHelper, type Helper } from '../../src/server.js';
 const TOKEN = 'test-token-aaaaaaaaaaaaaaaaaaaaaaaa';
 const ALLOWED_ORIGIN = 'https://player.example';
 
-/** A stand-in for yt-dlp: reports a version, then writes what it was asked to write. */
+/**
+ * A stand-in for yt-dlp: reports a version, describes a link when asked to (the metadata pass a
+ * machine with FFmpeg runs first, UX-DL-001), then writes what it was asked to write — reading the
+ * link back out of the description when it is handed one instead of a URL.
+ */
 const STUB = `#!/usr/bin/env node
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const args = process.argv.slice(2);
 if (args[0] === '--version') { process.stdout.write('2026.09.01\\n'); process.exit(0); }
+if (args.includes('--dump-single-json')) {
+  const link = args[args.length - 1];
+  if (link.includes('fail')) { process.stderr.write('WARNING: ignore me\\nERROR: Video unavailable\\n'); process.exit(1); }
+  process.stdout.write(JSON.stringify({ _type: 'video', title: 'Someone - A Song (Official Video)', channel: 'Someone', extractor_key: 'Youtube', webpage_url: link, upload_date: '20200102' }));
+  process.exit(0);
+}
 const paths = args[args.indexOf('--paths') + 1];
 if (!paths) { process.stderr.write('ERROR: no --paths\\n'); process.exit(1); }
-const url = args[args.length - 1];
+const loaded = args.indexOf('--load-info-json');
+const url = loaded >= 0 ? JSON.parse(readFileSync(args[loaded + 1], 'utf8')).webpage_url : args[args.length - 1];
 if (url.includes('fail')) { process.stderr.write('WARNING: ignore me\\nERROR: Video unavailable\\n'); process.exit(1); }
 process.stdout.write('[download]  12.5% of 3.00MiB\\n');
 process.stdout.write('[download] 100.0% of 3.00MiB\\n');

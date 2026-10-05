@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BpmSource, DurationMs, GenreProfile, IsoDateTime, ProviderId, Sha256Hex, SyncedEntityBase, Uuid } from '../common.js';
+import { BpmSource, CalendarDate, DurationMs, GenreProfile, IsoDateTime, ProviderId, Sha256Hex, SyncedEntityBase, Uuid } from '../common.js';
 import { LocatorAvailability, MediaLocator } from '../locators.js';
 
 export const LibraryRootKind = z.enum(['browser-handle', 'opfs', 'windows-directory', 'hub-directory']);
@@ -83,6 +83,12 @@ export const Track = SyncedEntityBase.extend({
   genres: z.array(z.string().max(60)).default([]),
   tags: z.array(z.string().max(60)).default([]),
   year: z.number().int().min(1000).max(3000).nullable().default(null),
+  /**
+   * The whole release (or upload) date when the file's tags give more than a year: `YYYY-MM-DD`, or
+   * `YYYY-MM`. Optional and without a default, so a track written before it existed is unchanged;
+   * `year` stays the field that sorting and statistics read.
+   */
+  releaseDate: CalendarDate.nullable().optional(),
   durationMs: DurationMs.nullable().default(null),
   bpm: z.number().positive().max(400).nullable().default(null),
   bpmSource: BpmSource.nullable().default(null),

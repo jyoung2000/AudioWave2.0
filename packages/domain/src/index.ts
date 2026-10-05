@@ -21,3 +21,4 @@ export * from './errors.js';
 export * from './genres.js';
 export * from './titles.js';
 export * from './icy.js';
+export * from './media-tags.js';

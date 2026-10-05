@@ -32,6 +32,14 @@ describe('cleanVideoTitle', () => {
     expect(out).toMatchObject({ artist: 'Calvin Harris', title: 'This Is What You Came For', featured: ['Rihanna'] });
   });
 
+  it('takes "4K Remaster", frame rates and a trailing " - Official …" off as noise', () => {
+    expect(cleanVideoTitle({ title: 'Rick Astley - Never Gonna Give You Up (Official Video) (4K Remaster)', channel: 'Rick Astley' })).toMatchObject({ artist: 'Rick Astley', title: 'Never Gonna Give You Up', featured: [] });
+    // No artist in the title once the description is gone: null, for the caller to fill from the channel.
+    expect(cleanVideoTitle({ title: 'Big Buck Bunny 60fps 4K - Official Blender Foundation Short Film', channel: 'Blender' })).toMatchObject({ artist: null, title: 'Big Buck Bunny' });
+    expect(cleanVideoTitle({ title: 'Artist - Song - Official Music Video', channel: 'X' })).toMatchObject({ artist: 'Artist', title: 'Song' });
+    expect(cleanVideoTitle({ title: 'Artist - Song (60 fps)', channel: 'X' })).toMatchObject({ artist: 'Artist', title: 'Song' });
+  });
+
   it('says when the artist came from a Topic channel', () => {
     expect(cleanVideoTitle({ title: 'Song', channel: 'Artist - Topic' }).fromTopicChannel).toBe(true);
     expect(cleanVideoTitle({ title: 'Artist - Song', channel: 'X' }).fromTopicChannel).toBe(false);

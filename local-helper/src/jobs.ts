@@ -14,12 +14,12 @@
  * speed limit, which reaches the tool as a number this file writes and nothing else.
  */
 import { execFile, spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join, extname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { HelperJob, HelperJobFile, HelperToolId, OutputFormat } from '@now-playing/contracts';
-import { sanitizeFilename } from '@now-playing/domain';
+import { cleanTags, sanitizeFilename, ytDlpMetaFields } from '@now-playing/domain';
 import { toolCommand, type ResolvedTool } from './tools.js';
 
 /** How long a killed tool gets to actually exit before its directory is removed anyway. */
@@ -266,27 +266,65 @@ export class Jobs {
     if (record.job.format !== 'original' && !ffmpeg.present) throw new Error(`Converting to ${record.job.format} needs FFmpeg, and there is none on this machine.`);
 
     const limits = { rateLimitKBps: record.rateLimitKBps };
-    const args = record.job.tool === 'yt-dlp' ? ytDlpArgs(record.job, record.directory, ffmpeg, limits) : spotdlArgs(record.job, record.directory, ffmpeg, limits);
+    // Built once up front, so a URL that is not one fails before anything starts.
+    let args = record.job.tool === 'yt-dlp' ? ytDlpArgs(record.job, record.directory, ffmpeg, limits) : spotdlArgs(record.job, record.directory, ffmpeg, limits);
     // Forgotten while the tools were being looked up: there is nothing left to run it for.
     if (record.cancelled) return;
-    this.patch(record, { state: 'running', stage: 'fetching' });
 
     // spotDL has no switch to ignore its config file, and loads it whenever one exists under the
     // home directory. Giving it an empty home of its own is the equivalent of `--ignore-config`.
     const env = record.job.tool === 'spotdl' ? childEnv(process.env, { HOME: record.home, USERPROFILE: record.home }) : childEnv();
     const { command, prefix } = toolCommand(tool.path);
+
+    // yt-dlp with FFmpeg: read the link first, clean every entry's tags here, and download from that.
+    // Without FFmpeg nothing can be embedded, so there is nothing to clean for (UX-DL-001).
+    if (record.job.tool === 'yt-dlp' && ffmpeg.present) {
+      this.patch(record, { state: 'running', stage: 'preflight', message: 'Reading the link’s details…' });
+      const infoFile = await this.prepareInfo(record, command, prefix, env);
+      if (record.cancelled) return;
+      if (infoFile) args = ytDlpArgs(record.job, record.directory, ffmpeg, limits, { infoFile });
+    }
+    // The metadata pass's line is done with; the tool's own progress replaces it from here.
+    this.patch(record, { state: 'running', stage: 'fetching', message: null });
+    await this.spawnTool(record, command, [...prefix, ...args], env, (chunk) => this.readProgress(record, chunk.toString()));
+
+    if (record.cancelled) return;
+    this.patch(record, { stage: 'finalizing' });
+    const files = this.collect(record);
+    if (!files.length) throw new Error(`${record.job.tool} finished without producing an audio file.`);
+    // Said rather than left to be discovered: without FFmpeg the file is whatever the site sent.
+    const lost = record.job.tool === 'yt-dlp' && !ffmpeg.present ? { message: FFMPEG_MISSING_NOTE } : {};
+    this.finish(record, { state: 'done', files, ...lost });
+    if (this.options.onFinished) {
+      const done = files.flatMap((file) => {
+        const path = record.paths.get(file.id);
+        return path ? [{ name: file.name, path }] : [];
+      });
+      try {
+        this.options.onFinished(record.job, done);
+      } catch (error) {
+        this.options.log?.(`after a download: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  }
+
+  /**
+   * One run of the tool, killed with its whole tree on cancel or timeout. Resolves when it exits 0;
+   * otherwise rejects with the tool's own last meaningful line.
+   */
+  private spawnTool(record: Record_, command: string, argv: string[], env: NodeJS.ProcessEnv, onStdout: (chunk: Buffer) => void): Promise<void> {
     const spawnImpl = this.options.spawnImpl ?? spawn;
-    await new Promise<void>((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       let settle: () => void = () => {};
       const closed = new Promise<void>((done) => {
         settle = done;
       });
       // Its own process group elsewhere, so the whole tree can be killed at once; Windows uses taskkill.
-      const child = spawnImpl(command, [...prefix, ...args], { cwd: record.directory, stdio: ['ignore', 'pipe', 'pipe'], env, shell: false, windowsHide: true, detached: process.platform !== 'win32' });
+      const child = spawnImpl(command, argv, { cwd: record.directory, stdio: ['ignore', 'pipe', 'pipe'], env, shell: false, windowsHide: true, detached: process.platform !== 'win32' });
       const timer = setTimeout(() => killTree(child), this.options.timeoutMs);
       record.running = { child, timer, closed };
       let stderr = '';
-      child.stdout?.on('data', (chunk: Buffer) => this.readProgress(record, chunk.toString()));
+      child.stdout?.on('data', onStdout);
       child.stderr?.on('data', (chunk: Buffer) => {
         stderr = `${stderr}${chunk.toString()}`.slice(-4000);
       });
@@ -307,23 +345,56 @@ export class Jobs {
         else reject(new Error(lastMeaningfulLine(stderr) ?? `${record.job.tool} exited with code ${code ?? 'unknown'}.`));
       });
     });
+  }
 
-    if (record.cancelled) return;
-    this.patch(record, { stage: 'finalizing' });
-    const files = this.collect(record);
-    if (!files.length) throw new Error(`${record.job.tool} finished without producing an audio file.`);
-    this.finish(record, { state: 'done', files });
-    if (this.options.onFinished) {
-      const done = files.flatMap((file) => {
-        const path = record.paths.get(file.id);
-        return path ? [{ name: file.name, path }] : [];
-      });
-      try {
-        this.options.onFinished(record.job, done);
-      } catch (error) {
-        this.options.log?.(`after a download: ${error instanceof Error ? error.message : String(error)}`);
+  /**
+   * The metadata pass: yt-dlp describes the link (`--dump-single-json`), every entry gets clean tags
+   * as `meta_*` fields (`withCleanTags`), and the result is written into the job's own folder for the
+   * download to load (`--load-info-json`). The site is read once — the download reuses what this
+   * read. Returns null when the description could not be used, and the download then names the URL
+   * as it always did; a failure of the tool itself fails the job, with the tool's reason.
+   */
+  private async prepareInfo(record: Record_, command: string, prefix: string[], env: NodeJS.ProcessEnv): Promise<string | null> {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    let overflow = false;
+    let failure: unknown = null;
+    await this.spawnTool(record, command, [...prefix, ...ytDlpInfoArgs(record.job)], env, (chunk) => {
+      if (overflow) return;
+      size += chunk.length;
+      if (size > MAX_INFO_BYTES) {
+        overflow = true;
+        chunks.length = 0;
+        return;
       }
+      chunks.push(chunk);
+    }).catch((error: unknown) => {
+      failure = error;
+    });
+    if (record.cancelled) return null;
+    // A playlist with a song the site will not give (removed, DRM) is still described, minus that
+    // song, and yt-dlp exits 1 for it (measured 2026-10-04 on a SoundCloud set). The rest is worth
+    // downloading; only a description that never came is the tool failing.
+    if (failure) {
+      const partial = chunks.length ? parseObject(Buffer.concat(chunks).toString('utf8')) : null;
+      if (!partial || !Array.isArray(partial['entries']) || !partial['entries'].length) throw failure;
+      this.options.log?.('some songs in this playlist could not be described; downloading the rest');
+      const file = join(record.root, 'info.json');
+      writeFileSync(file, JSON.stringify(withCleanTags(partial)));
+      return file;
     }
+    if (overflow) {
+      this.options.log?.('the link’s description was too large to clean; downloading without it');
+      return null;
+    }
+    const info = parseObject(Buffer.concat(chunks).toString('utf8'));
+    if (!info) {
+      this.options.log?.('the link’s description was not JSON; downloading without it');
+      return null;
+    }
+    const file = join(record.root, 'info.json');
+    writeFileSync(file, JSON.stringify(withCleanTags(info)));
+    return file;
   }
 
   /**
@@ -390,16 +461,41 @@ export interface JobLimits {
   rateLimitKBps?: number | null;
 }
 
-export function ytDlpArgs(job: Pick<HelperJob, 'url' | 'format'>, directory: string, ffmpeg: { present: boolean; path?: string | null }, limits: JobLimits = {}): string[] {
+/** The largest description of a link the metadata pass will hold; past it the download goes without. */
+const MAX_INFO_BYTES = 256 * 1024 * 1024;
+
+/** What a job finished without FFmpeg says, so nobody has to find out by looking at the file. */
+export const FFMPEG_MISSING_NOTE = 'Saved as the site sent it: FFmpeg is not on this PC, so there is no cover art and the title, artist and date were not written into the file.';
+
+/** A link can point at a whole album; a cap stops one paste from becoming a thousand files. */
+export const PLAYLIST_CAP = 200;
+
+/**
+ * The metadata pass: describe the link, download nothing. Same first flags as a download, and the URL
+ * last behind `--`.
+ */
+export function ytDlpInfoArgs(job: Pick<HelperJob, 'url'>): string[] {
+  return ['--ignore-config', '--no-colors', '--no-cache-dir', '--playlist-end', String(PLAYLIST_CAP), '--dump-single-json', '--', urlArgument(job.url)];
+}
+
+/**
+ * The download. With FFmpeg it extracts the audio, writes the tags and embeds the thumbnail as cover
+ * art (converted to JPEG, which every container that takes a picture accepts). Given `source.infoFile`
+ * — the cleaned description `withCleanTags` wrote into the job's own folder — it downloads from that
+ * instead of naming the URL again: the tags it writes are then the clean ones, entry by entry, and no
+ * text from the site ever reaches the command line.
+ */
+export function ytDlpArgs(job: Pick<HelperJob, 'url' | 'format'>, directory: string, ffmpeg: { present: boolean; path?: string | null }, limits: JobLimits = {}, source: { infoFile?: string } = {}): string[] {
+  // Checked even when the description is loaded instead, so a job's URL is always a URL.
+  const url = urlArgument(job.url);
   const args = [
     '--ignore-config',
     '--no-colors',
     '--newline',
     '--no-mtime',
     '--no-cache-dir',
-    // A link can point at a whole album; a cap stops one paste from becoming a thousand files.
     '--playlist-end',
-    '200',
+    String(PLAYLIST_CAP),
     '--paths',
     directory,
     '--output',
@@ -407,7 +503,7 @@ export function ytDlpArgs(job: Pick<HelperJob, 'url' | 'format'>, directory: str
   ];
   if (ffmpeg.present) {
     if (ffmpeg.path) args.push('--ffmpeg-location', ffmpeg.path);
-    args.push('--extract-audio', '--embed-metadata');
+    args.push('--extract-audio', '--embed-metadata', '--embed-thumbnail', '--convert-thumbnails', 'jpg');
     if (job.format !== 'original') args.push('--audio-format', job.format);
   } else {
     // No FFmpeg means no extracting and no merging, so ask for a single stream that is already audio.
@@ -416,8 +512,45 @@ export function ytDlpArgs(job: Pick<HelperJob, 'url' | 'format'>, directory: str
   const rate = rateLimitOf(limits.rateLimitKBps);
   // Built from a whole number here, never from text: `500K` is all the tool ever sees.
   if (rate !== null) args.push('--limit-rate', `${rate}K`);
-  args.push('--', urlArgument(job.url));
+  // `--no-clean-infojson`: by default yt-dlp strips `entries` from a description it loads, finds a
+  // playlist empty, and fetches it all again from its URL — untagged (measured 2026-10-04).
+  if (source.infoFile) args.push('--no-clean-infojson', '--load-info-json', source.infoFile);
+  else args.push('--', url);
   return args;
+}
+
+/** Fields of a description the download never reads, and the bulk of a YouTube one. */
+const UNUSED_INFO_FIELDS = ['automatic_captions', 'subtitles', 'heatmap', 'requested_subtitles', 'description'];
+
+/** Decided when a description is made, and made again by the download: yt-dlp's own list. */
+const LOAD_TIME_FIELDS = new Set(['requested_downloads', 'requested_formats', 'requested_entries', 'filepath', '_filename', 'filename', '_format_sort_fields']);
+
+/**
+ * A yt-dlp description with clean tags on every song in it: `meta_title`, `meta_artist`,
+ * `meta_album_artist`, `meta_album`, `meta_genre` and `meta_date` (see `cleanTags` and
+ * `ytDlpMetaFields` in `@now-playing/domain`), which yt-dlp's metadata step writes in place of its own
+ * guesses. A playlist's entries are each cleaned on their own; nesting stops at three levels.
+ *
+ * An entry the site withheld is `null` in the description (yt-dlp, 2026-10-04: a SoundCloud set with
+ * DRM-protected songs). Loaded back, a null entry makes yt-dlp give up on the file and fetch the whole
+ * playlist again from its URL — untagged, and the withheld songs failing again — so those go.
+ */
+export function withCleanTags(info: Record<string, unknown>, depth = 0): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...info };
+  for (const field of UNUSED_INFO_FIELDS) delete out[field];
+  // What yt-dlp's own cleaning would take off before loading (its `sanitize_info`), done here because
+  // the download loads with `--no-clean-infojson` to keep a playlist's entries: the description pass's
+  // own format choice and file names, which the download must make afresh for audio.
+  for (const field of Object.keys(out)) if (field.startsWith('__') || out[field] === null || LOAD_TIME_FIELDS.has(field)) delete out[field];
+  // A loaded description is checked as if an extractor wrote it, and a field next to its plural
+  // ("album_artist" beside "album_artists") is reported as an error. The plural says it all.
+  for (const [single, plural] of [['album_artist', 'album_artists'], ['genre', 'genres'], ['artist', 'artists'], ['creator', 'creators'], ['composer', 'composers']] as const) if (out[plural] !== undefined) delete out[single];
+  if (Array.isArray(info['entries'])) {
+    const entries = (info['entries'] as unknown[]).filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === 'object' && !Array.isArray(entry));
+    out['entries'] = depth < 3 ? entries.map((entry) => withCleanTags(entry, depth + 1)) : entries;
+    return out;
+  }
+  return { ...out, ...ytDlpMetaFields(cleanTags(info)) };
 }
 
 /** A URL on a command line is only ever a URL: it starts with a scheme, so it cannot be read as a flag. */
@@ -432,15 +565,25 @@ function urlArgument(url: string): string {
  * Asking for the original therefore gets MP3, which is what it would have produced anyway.
  */
 export function spotdlArgs(job: Pick<HelperJob, 'url' | 'format'>, directory: string, ffmpeg: { present: boolean; path?: string | null }, limits: JobLimits = {}): string[] {
-  const args = ['download', '--output', join(directory, '{artists} - {title}.{output-ext}'), '--format', job.format === 'original' ? 'mp3' : job.format];
+  // The URL goes straight after the operation. spotDL (4.5.2, measured 2026-10-04) refuses `--`
+  // ("unrecognized arguments: -- https://…") and refuses the query anywhere but there, so the yt-dlp
+  // shape could not run at all. It still cannot be read as a flag: `urlArgument` only passes a string
+  // that starts with http(s)://, and it is one argument, never split.
+  const args = ['download', urlArgument(job.url), '--output', join(directory, '{artists} - {title}.{output-ext}'), '--format', job.format === 'original' ? 'mp3' : job.format];
   if (ffmpeg.path) args.push('--ffmpeg', ffmpeg.path);
   // spotDL fetches through yt-dlp and hands it whatever `--yt-dlp-args` holds. Only the limit, as a
   // number this function formats, ever goes in there.
   const rate = rateLimitOf(limits.rateLimitKBps);
   if (rate !== null) args.push('--yt-dlp-args', `--limit-rate ${rate}K`);
-  // Last and behind `--`, as for yt-dlp.
-  args.push('--', urlArgument(job.url));
   return args;
+}
+
+/**
+ * spotDL's `save`: the songs a Spotify link names, written to `saveFile` as JSON, nothing downloaded.
+ * The URL sits where `spotdlArgs` puts it, for the same reason.
+ */
+export function spotdlSaveArgs(url: string, saveFile: string): string[] {
+  return ['save', urlArgument(url), '--save-file', saveFile];
 }
 
 /**
@@ -461,7 +604,7 @@ export function childEnv(source: NodeJS.ProcessEnv = process.env, overrides: Rec
  * Kill the tool and everything it started. yt-dlp starts FFmpeg, and killing only yt-dlp leaves
  * FFmpeg running with the job's files open — on Windows that means they cannot be deleted.
  */
-function killTree(child: ChildProcess): void {
+export function killTree(child: ChildProcess): void {
   const pid = child.pid;
   if (pid === undefined) return;
   if (process.platform === 'win32') {
@@ -520,4 +663,14 @@ export function lastMeaningfulLine(stderr: string): string | null {
     .filter((l) => !/^WARNING:/i.test(l));
   const last = lines.at(-1);
   return last ? last.replace(/^ERROR:\s*/i, '').slice(0, 600) : null;
+}
+
+/** JSON that is an object, or null. */
+function parseObject(text: string): Record<string, unknown> | null {
+  try {
+    const value: unknown = JSON.parse(text);
+    return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
 }

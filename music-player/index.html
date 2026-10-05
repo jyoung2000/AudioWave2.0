@@ -8106,8 +8106,9 @@ window.AW.startStats = function () {
     var TAIL = 0.7;                // seconds of volume ramp before the cut
     var COMPANION = null;   // no hard-coded local companion: see docs/DEVIATIONS.md
     var results = [], page = 0, hot = -1, state = 'idle', lastQ = '', seq = 0;
+    var listInfo = null;   // the pasted playlist the rows came from, for the count line
 
-    var HOSTS = /^(www\.)?(youtube\.com|music\.youtube\.com|youtu\.be|soundcloud\.com|on\.soundcloud\.com|bandcamp\.com|[a-z0-9-]+\.bandcamp\.com)$/i;
+    var HOSTS = /^(www\.)?(youtube\.com|music\.youtube\.com|youtu\.be|soundcloud\.com|on\.soundcloud\.com|bandcamp\.com|[a-z0-9-]+\.bandcamp\.com|open\.spotify\.com)$/i;
     var NOTE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.6 3 9.8 5.2a1 1 0 0 0-.8 1v9.7a3.1 3.1 0 1 0 1.6 2.7V9.6l7.6-1.7v5.6a3.1 3.1 0 1 0 1.6 2.7V3.8a.8.8 0 0 0-1-.8z"/></svg>';
     var PLATFORMS = [
       { name: 'YouTube',    ini: 'YT', find: 'https://www.youtube.com/results?search_query=' },
@@ -8363,6 +8364,7 @@ window.AW.startStats = function () {
       if (/youtu/i.test(host)) return 'YouTube';
       if (/soundcloud/i.test(host)) return 'SoundCloud';
       if (/bandcamp/i.test(host)) return 'Bandcamp';
+      if (/spotify/i.test(host)) return 'Spotify';
       return null;
     }
 
@@ -8390,6 +8392,8 @@ window.AW.startStats = function () {
       } else if (p === 'SoundCloud') {
         a = segs[0] ? humanize(segs[0]) : '';
         t = segs[1] ? humanize(segs[1]) : 'SoundCloud track';
+      } else if (p === 'Spotify') {
+        t = segs[0] === 'album' ? 'Spotify album' : segs[0] === 'playlist' ? 'Spotify playlist' : 'Spotify track';
       } else {
         var sub = u.hostname.split('.')[0].toLowerCase();
         a = (sub !== 'bandcamp' && sub !== 'www') ? humanize(sub) : '';
@@ -8410,9 +8414,27 @@ window.AW.startStats = function () {
     /* the site's own oEmbed goes first because it's authoritative, but
        neither YouTube's nor SoundCloud's sends CORS headers, so in practice
        noembed.com (which relays them with ACAO *) does the real work in a
-       browser; a paired container, when there is one, beats both */
+       browser; a paired container, when there is one, beats both, and the
+       companion on this PC, when there is one, reads the link with its own
+       tools beside them (NP-FIND-002) */
     function resolveLink(r) {
       var enc = encodeURIComponent(r.u);
+      var mine = seq;
+      r.rank = 0;
+      /* rank: hub 3, companion 2, oEmbed and the rest 1. A lower answer that arrives late
+         only fills what the better one left empty. */
+      function put(rank, m) {
+        if (mine !== seq || !m) return;
+        if (rank < r.rank) {
+          if (!r.d && m.d > 0) r.d = Math.round(m.d);
+          if (!r.art && typeof m.art === 'string' && m.art) r.art = m.art;
+          if (state === 'list' && results.indexOf(r) >= 0) render();
+          return;
+        }
+        r.rank = rank;
+        applyMeta(r, m.t, m.a, m.art, m.d);
+      }
+      fromCompanion(r, enc, mine, put);
       var tries = [
         /* Paired first: the hub's resolve carries the enrichment cache — album, features,
            genre, tempo — which no oEmbed can. Unpaired, this try fails at once. */
@@ -8455,14 +8477,62 @@ window.AW.startStats = function () {
           });
         },
       ];
-      var mine = seq;
       (function step(i) {
         if (i >= tries.length || mine !== seq) return;
-        tries[i]().then(function (m) {
-          if (mine !== seq) return;
-          applyMeta(r, m.t, m.a, m.art, m.d);
-        }, function () { step(i + 1); });
+        tries[i]().then(function (m) { put(i === 0 ? 3 : 1, m); }, function () { step(i + 1); });
       })(0);
+    }
+
+    /* The companion's answer (HelperResolved). A song fills the row; a playlist, set or album
+       replaces it with its songs. Nothing here throws: no companion is the ordinary case. */
+    function companionBase() { return window.COMPANION ? String(window.COMPANION).replace(/\/$/, '') : null; }
+    function fromCompanion(r, enc, mine, put) {
+      var base = companionBase();
+      if (!base) return;
+      getJSON(base + '/helper/v1/resolve?url=' + enc, false, 160000).then(function (d) {
+        if (mine !== seq || !d) return;
+        var c = d.kind === 'collection' ? d.collection : null;
+        if (c && Array.isArray(c.entries) && c.entries.length) { listCollection(r, c); return; }
+        var x = d.track;
+        if (!x || typeof x.title !== 'string' || !x.title) return;
+        fillFrom(r, x, r.rank <= 2);
+        put(2, { t: x.title, a: x.artist, art: webUrl(x.artworkUrl), d: x.durationSec });
+      }).catch(function () { /* no companion, or it could not read the link: the chain stands */ });
+    }
+    /* What only the companion knows. `lead` is false when the hub already answered: then it
+       only fills what the hub left empty. */
+    function fillFrom(r, x, lead) {
+      if (typeof x.date === 'string' && x.date) r.date = x.date.slice(0, 10);
+      if (typeof x.album === 'string' && x.album && (lead || !r.al)) r.al = x.album.slice(0, 80);
+      if (Array.isArray(x.featured) && x.featured.length && (lead || !r.feat.length)) r.feat = x.featured.slice(0, 3).map(String);
+      if (typeof x.genre === 'string' && x.genre && (lead || !r.genre)) r.genre = x.genre;
+    }
+    function rowFromResolved(x, platform) {
+      /* a set's entry may arrive as an address alone: its path stands in until it is looked up */
+      var guess = !x.title && x.url ? parseLink(x.url) : null;
+      var row = track(x.title || (guess && guess.t) || 'Untitled', x.artist || (guess && guess.a) || '', '',
+                      webUrl(x.artworkUrl), null, webUrl(x.url), platform, x.durationSec || 0);
+      fillFrom(row, x, true);
+      row.pending = !x.title;
+      return row;
+    }
+    function listCollection(r, c) {
+      results = c.entries.map(function (x) { return rowFromResolved(x || {}, r.p); });
+      listInfo = { title: String(c.title || 'Playlist'), total: c.total, cap: c.cap, capped: !!c.capped };
+      page = 0; hot = -1; state = 'list';
+      render();
+    }
+    /* An entry listed by address alone, looked up once when its page is on screen. */
+    function resolveEntry(r) {
+      var base = companionBase(), mine = seq;
+      if (!base || !r.u) return;
+      getJSON(base + '/helper/v1/resolve?url=' + encodeURIComponent(r.u), false, 60000).then(function (d) {
+        var x = d && d.track;
+        if (mine !== seq || !x || typeof x.title !== 'string' || !x.title) return;
+        r.pending = false;
+        fillFrom(r, x, true);
+        applyMeta(r, x.title, x.artist, webUrl(x.artworkUrl), x.durationSec);
+      }).catch(function () { r.pending = false; });
     }
 
     /* ---- BPM, lazily, for whatever page is showing ----
@@ -8475,6 +8545,8 @@ window.AW.startStats = function () {
     function enrich() {
       if (state !== 'list') return;
       visible().forEach(function (r) {
+        /* named by its address alone so far: no tempo to look up for a guessed name */
+        if (r.pending) { if (!r.pendingAsked) { r.pendingAsked = true; resolveEntry(r); } return; }
         if (r.bpm || r.bpmTried) return;
         var key = (r.a + '|' + r.t).toLowerCase();
         if (!bpmCache[key]) {
@@ -8693,7 +8765,7 @@ window.AW.startStats = function () {
       /* Features and album lead when enrichment knows them; the platform stays as the tail
          when there is no album to name. */
       var who = r.a ? esc(r.a) + (r.feat && r.feat.length ? ' feat. ' + esc(r.feat.join(', ')) : '') : '';
-      var tail = r.al ? esc(r.al) : (r.p || '');
+      var tail = (r.al ? esc(r.al) : (r.p || '')) + (r.date ? (r.al || r.p ? ' \u00b7 ' : '') + esc(r.date) : '');
       var sub = who ? (tail ? who + ' \u2014 ' + tail : who) : tail;
       var links = r.links.map(function (l) {
         return '<a class="srch__pf" data-len="' + l.ini.length + '" href="' + esc(l.url) + '"' +
@@ -8730,7 +8802,7 @@ window.AW.startStats = function () {
       document.dispatchEvent(new CustomEvent('library:add', {
         detail: {
           title: r.t, artist: r.a, album: r.al,
-          duration: r.d, bpm: r.bpm,
+          duration: r.d, bpm: r.bpm, date: r.date || null,
           platform: r.p || (r.links[0] && r.links[0].name) || 'YouTube',
           url: r.u || (r.links[0] && r.links[0].url) || '',
         },
@@ -8770,7 +8842,7 @@ window.AW.startStats = function () {
         live.textContent = 'Search unavailable';
       } else if (state === 'badlink') {
         count.innerHTML = 'Search';
-        msg('Only YouTube, SoundCloud and Bandcamp links work here.');
+        msg('Only YouTube, SoundCloud, Bandcamp and Spotify links work here.');
         live.textContent = 'Unsupported link';
       } else if (state === 'empty') {
         count.innerHTML = '<b>Results:</b> 0 songs';
@@ -8778,7 +8850,11 @@ window.AW.startStats = function () {
         live.textContent = 'No results';
       } else if (state === 'list') {
         var n = results.length;
-        count.innerHTML = '<b>Results:</b> ' + n + (n === 1 ? ' song' : ' songs');
+        var songs = n + (n === 1 ? ' song' : ' songs');
+        count.innerHTML = listInfo
+          ? '<b>' + esc(listInfo.title.length > 48 ? listInfo.title.slice(0, 47) + '\u2026' : listInfo.title) + ':</b> ' + songs +
+            (listInfo.capped ? ' (the first ' + listInfo.cap + (listInfo.total ? ' of ' + listInfo.total : '') + ')' : '')
+          : '<b>Results:</b> ' + songs;
         body.innerHTML = '<div role="listbox" id="srchList" aria-label="Search results">' +
           visible().map(rowHTML).join('') + '</div>';
         var pg = pages();
@@ -8837,6 +8913,7 @@ window.AW.startStats = function () {
       stopPreview();
       pop.classList.remove('is-stale');
       lastQ = q;
+      listInfo = null;
       page = 0;
       hot = -1;
       var link = urlish(q) ? parseLink(q) : null;
@@ -9530,6 +9607,7 @@ window.AW.startStats = function () {
           album: String(d.album || '').slice(0, 80),
           duration: Math.max(0, Math.round(d.duration || 0)),
           bpm: d.bpm || null,
+          date: typeof d.date === 'string' ? d.date.slice(0, 10) : null,
           platform: d.platform,
           url: d.url,
         };
@@ -17475,7 +17553,7 @@ window.AW.startStats = function () {
         });
       }
       fetchSheet._song = sg;
-      fetchSheet.querySelector('#npFetchMsg').textContent = '“' + sg.title + '”' + (sg.artist ? ' by ' + sg.artist : '') + ' — fetched by the helper on this PC from ' + sg.url.replace(/^https?:\/\//, '').split('/')[0] + ', then played from this device.';
+      fetchSheet.querySelector('#npFetchMsg').textContent = '“' + sg.title + '”' + (sg.artist ? ' by ' + sg.artist : '') + (sg.date ? ' (' + sg.date + ')' : '') + ' — fetched by the helper on this PC from ' + sg.url.replace(/^https?:\/\//, '').split('/')[0] + ', then played from this device.';
       fetchSheet.querySelector('#npFetchState').textContent = '';
       [].forEach.call(fetchSheet.querySelectorAll('input[name="npBasis"]'), function (x) { x.checked = false; });
       window.NP_TOOLS.detect().then(function (h) {

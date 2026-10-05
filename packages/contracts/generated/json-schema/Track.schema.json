@@ -171,6 +171,18 @@
         }
       ]
     },
+    "releaseDate": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^\\d{4}-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01]))?$",
+          "description": "Calendar date, YYYY-MM-DD or YYYY-MM"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "durationMs": {
       "default": null,
       "anyOf": [
