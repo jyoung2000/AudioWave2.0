@@ -149,8 +149,10 @@ describe('the command itself', () => {
       // directory loses the DLL beside it. All the script asks of these two is `dirname "$0"` and
       // `basename "$0"`, which is a few lines of shell on any platform.
       const shims: Record<string, string> = {
-        dirname: ['#!/usr/bin/env sh', 'case "$1" in', '  */*) printf "%s\\n" "${1%/*}" ;;', '  *) printf ".\\n" ;;', 'esac', ''].join('\n'),
-        basename: ['#!/usr/bin/env sh', 'printf "%s\\n" "${1##*/}"', ''].join('\n'),
+        // `/bin/sh`, not `/usr/bin/env sh`: env looks `sh` up on PATH, and this PATH has none on Linux
+        // (Git's sh, which the Windows run adds, finds `/bin/sh` inside its own root).
+        dirname: ['#!/bin/sh', 'case "$1" in', '  */*) printf "%s\\n" "${1%/*}" ;;', '  *) printf ".\\n" ;;', 'esac', ''].join('\n'),
+        basename: ['#!/bin/sh', 'printf "%s\\n" "${1##*/}"', ''].join('\n'),
       };
       for (const [tool, body] of Object.entries(shims)) {
         const shim = join(bare, tool);
@@ -243,10 +245,19 @@ describe('update', () => {
 
 describe('scheduling', () => {
   it('explains what to do when neither systemd nor cron is available', () => {
+    // Exclusive: only the stand-ins below and the shell's own tools. Inheriting PATH found the real
+    // crontab on a Linux machine — which made the test pass there by scheduling a real job.
     const empty = mkdtempSync(join(tmpdir(), 'np-nosched-'));
     try {
+      for (const [tool, body] of Object.entries({
+        dirname: ['#!/bin/sh', 'case "$1" in', '  */*) printf "%s\\n" "${1%/*}" ;;', '  *) printf ".\\n" ;;', 'esac', ''].join('\n'),
+        basename: ['#!/bin/sh', 'printf "%s\\n" "${1##*/}"', ''].join('\n'),
+      })) {
+        writeFileSync(join(empty, tool), body);
+        chmodSync(join(empty, tool), 0o755);
+      }
       mkdirSync(dataDir, { recursive: true });
-      const result = run(['schedule', '--weekly'], { path: empty });
+      const result = run(['schedule', '--weekly'], { path: empty, exclusive: true });
       expect(result.status).not.toBe(0);
       expect(result.output).toMatch(/launchd|Task Scheduler|NAS/);
     } finally {

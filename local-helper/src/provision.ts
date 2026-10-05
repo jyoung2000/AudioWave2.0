@@ -341,6 +341,11 @@ export class ToolProvisioner {
 
   /** A manual install of one tool, queued behind whatever is running. */
   async install(id: HelperToolId): Promise<InstallOutcome> {
+    // A tool with no published build for this system (FFmpeg off Windows) is the package manager's:
+    // say so, instead of running a pass that skips it and answering with a vague failure.
+    if (!toolSource(id, this.options.platform ?? process.platform, this.options.arch ?? process.arch)) {
+      return { installed: false, version: null, reason: installHint(id, false) };
+    }
     const result = await this.run({ only: [id], force: true, ignoreBackoff: true });
     return result.outcomes[id] ?? { installed: false, version: null, reason: `${id} could not be set up.` };
   }

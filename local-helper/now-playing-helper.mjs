@@ -23435,6 +23435,9 @@ var ToolProvisioner = class {
   }
   /** A manual install of one tool, queued behind whatever is running. */
   async install(id) {
+    if (!toolSource(id, this.options.platform ?? process.platform, this.options.arch ?? process.arch)) {
+      return { installed: false, version: null, reason: installHint(id, false) };
+    }
     const result = await this.run({ only: [id], force: true, ignoreBackoff: true });
     return result.outcomes[id] ?? { installed: false, version: null, reason: `${id} could not be set up.` };
   }
