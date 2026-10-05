@@ -187,6 +187,44 @@ test('no pane scrolls sideways, at the window width the design is drawn for or a
   }
 });
 
+test('the panes keep the design’s spacing: pane, groups, label column, lists and the button rows', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 860 });
+  await page.goto('/');
+  const css = (selector: string, props: string[]) =>
+    page.evaluate(
+      ([s, p]) => {
+        const el = document.querySelector(s as string);
+        if (!el) return null;
+        const style = getComputedStyle(el);
+        return (p as string[]).map((name) => style.getPropertyValue(name)).join(' ');
+      },
+      [selector, props] as const,
+    );
+  // airwave-hub.html: `.pane` 18px 20px 20px, groups 16px apart, a legend 2px over its content.
+  expect(await css('.pane', ['padding-top', 'padding-right', 'padding-bottom', 'padding-left'])).toBe('18px 20px 20px 20px');
+  await page.getByRole('tab', { name: 'Devices' }).click();
+  expect(await css('.pane legend', ['margin-bottom'])).toBe('2px');
+  // The permission list is the design's `#scopes` well: 4px 8px under its heading.
+  expect(await css('fieldset.scopes', ['padding-top', 'padding-right', 'padding-bottom', 'padding-left'])).toBe('4px 8px 4px 8px');
+  await page.getByRole('tab', { name: 'System' }).click();
+  await expect(page.locator('#network .kv dd').first()).toBeVisible();
+  // One label column per pane: the read-only list lines its values up with the controls (158px).
+  const columns = await page.evaluate(() => {
+    const control = document.querySelector('#network .pref > .v')!.getBoundingClientRect().left;
+    const value = document.querySelector('#network .kv dd')!.getBoundingClientRect().left;
+    return { control: Math.round(control), value: Math.round(value) };
+  });
+  expect(columns.value, 'the list’s values start where the controls do').toBe(columns.control);
+  expect(await css('.pane .barrow', ['margin-top', 'column-gap'])).toBe('7px 8px');
+  // The pane's foot sits a group's gap under the last list, as the companion's does.
+  await page.getByRole('tab', { name: 'Overview' }).click();
+  const foot = await page.evaluate(() => {
+    const f = document.querySelector('.pane > .panefoot')!;
+    return Math.round(f.getBoundingClientRect().top - f.previousElementSibling!.getBoundingClientRect().bottom);
+  });
+  expect(foot).toBe(16);
+});
+
 test('backup settings are saved with Save, the schedule says when the next one runs, and an archive downloads', async ({ page }) => {
   await page.goto('/#backup');
   const folder = page.getByLabel('Save backups to:');

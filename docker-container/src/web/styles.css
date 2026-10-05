@@ -110,8 +110,11 @@ h1.titlebar {
   margin-top: 16px;
 }
 section:not(:last-of-type) > .group--last,
-section:not(:last-of-type) > fieldset:last-child {
-  /* A section that is not the pane's last keeps the ordinary gap under it. */
+section:not(:last-of-type) > fieldset:last-child,
+section:has(+ .panefoot) > .group--last,
+section:has(+ .panefoot) > fieldset:last-child {
+  /* A section that is not the pane's last keeps the ordinary gap under it, and so does one with the
+     pane's foot under it: the foot's rule sits a group's gap below the last list, as in the companion. */
   margin-bottom: 16px;
 }
 .subhead {
@@ -287,11 +290,12 @@ a.push:active {
   }
 }
 .scopes {
+  /* The design's list of permissions: a 4px 8px well under its heading (airwave-hub.html, #scopes). */
   margin: 10px 0 0;
-  padding: 0 2px;
+  padding: 4px 8px;
 }
 .scopes legend {
-  margin: 0 0 4px -2px;
+  margin: 0 0 4px -8px;
   font-weight: 400;
 }
 .scopes .chk {
@@ -399,6 +403,13 @@ a.push:active {
   margin: 8px 0 4px;
 }
 
+/* A read-only list beside a preference grid lines its values up with the controls' column (158px). */
+@media (min-width: 641px) {
+  .kv {
+    grid-template-columns: 158px minmax(0, 1fr);
+  }
+}
+
 /* ---------------------------------------------------------------- sign-in */
 .signin {
   max-width: 400px;
@@ -432,7 +443,8 @@ a.push:active {
   gap: 12px;
   align-items: flex-start;
   width: min(440px, 100%);
-  padding: 14px 16px 14px;
+  /* The same sheet the companion drops: 16px 18px 14px round it, 12px over its buttons, 8px between. */
+  padding: 16px 18px 14px;
   background: var(--win-body);
   border: 1px solid var(--win-outline);
   border-top: 0;
@@ -484,9 +496,6 @@ a.push:active {
   }
   .rows li:has(> .push) .name {
     flex-basis: 100%;
-  }
-  .tbl .acts .push + .push {
-    margin-left: 2px;
   }
   .pairing-extra {
     align-items: flex-start;
