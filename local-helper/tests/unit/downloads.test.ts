@@ -28,7 +28,7 @@ describe('a speed limit', () => {
   it('reaches spotDL through its yt-dlp arguments, and only the limit goes there', () => {
     const args = spotdlArgs({ url: 'https://open.spotify.com/track/x', format: 'mp3' }, '/tmp/j', { present: true }, { rateLimitKBps: 2048 });
     expect(args[args.indexOf('--yt-dlp-args') + 1]).toBe('--limit-rate 2048K');
-    expect(args.at(-2)).toBe('--');
+    expect(args[1]).toBe('https://open.spotify.com/track/x');
   });
 
   it('is left out when there is none, or when it is not a sensible number', () => {
@@ -64,6 +64,13 @@ describe('how many run at once', () => {
     return child;
   }) as unknown as typeof spawn;
   const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+  /** The metadata pass, answered: yt-dlp prints the link's description and exits. */
+  const answerInfo = async (child: FakeChild, info: unknown) => {
+    child.stdout.write(JSON.stringify(info));
+    await settle();
+    child.emit('close', 0);
+    await settle();
+  };
   /** Ends every fake process, and whatever the queue starts after them, so shutdown has nothing to wait for. */
   const drain = async (jobs: Jobs) => {
     for (let i = 0; i < 10 && jobs.busy(); i += 1) {
@@ -100,13 +107,15 @@ describe('how many run at once', () => {
     const jobs = new Jobs({ workDir: root, timeoutMs: 60_000, tools, spawnImpl, onFinished: (j, files) => finished.push({ id: j.id, files }) });
     const made = jobs.create({ url: 'https://www.youtube.com/watch?v=a', tool: 'yt-dlp', format: 'original' });
     await settle();
-    writeFileSync(join(children[0]!.cwd, 'Song.opus'), 'audio');
-    children[0]!.child.emit('close', 0);
+    // With FFmpeg, the link is described first (UX-DL-001); then the download runs.
+    await answerInfo(children[0]!.child, { title: 'Song', extractor_key: 'Youtube' });
+    writeFileSync(join(children[1]!.cwd, 'Song.opus'), 'audio');
+    children[1]!.child.emit('close', 0);
     await settle();
     expect(finished).toHaveLength(1);
     expect(finished[0]!.id).toBe(made.id);
     expect(finished[0]!.files.map((f) => f.name)).toEqual(['Song.opus']);
-    expect(finished[0]!.files[0]!.path).toBe(join(children[0]!.cwd, 'Song.opus'));
+    expect(finished[0]!.files[0]!.path).toBe(join(children[1]!.cwd, 'Song.opus'));
     // The job the page reads still names files by id only.
     expect(JSON.stringify(jobs.get(made.id))).not.toContain(root);
     await drain(jobs);

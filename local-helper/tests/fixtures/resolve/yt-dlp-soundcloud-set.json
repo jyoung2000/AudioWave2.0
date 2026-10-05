@@ -1,0 +1,64 @@
+{
+  "_type": "playlist",
+  "id": "2284613",
+  "title": "The Royal Concept EP",
+  "album": "The Royal Concept EP",
+  "album_artist": "The Royal Concept",
+  "uploader": "The Royal Concept",
+  "playlist_count": 6,
+  "upload_date": "20120728",
+  "genre": "Indie/pop",
+  "webpage_url": "https://soundcloud.com/the-concept-band/sets/the-royal-concept-ep",
+  "extractor_key": "SoundcloudSet",
+  "thumbnail": "https://i1.sndcdn.com/artworks-000030896212-o16m9v-original.jpg",
+  "entries": [
+    {
+      "_type": "url_transparent",
+      "ie_key": "Soundcloud",
+      "id": "75206121",
+      "url": "https://soundcloud.com/the-concept-band/world-on-fire-1",
+      "album": "The Royal Concept EP",
+      "album_artist": "The Royal Concept"
+    },
+    {
+      "_type": "url_transparent",
+      "ie_key": "Soundcloud",
+      "id": "47127625",
+      "url": "https://soundcloud.com/the-concept-band/gimme-twice-mastered",
+      "album": "The Royal Concept EP",
+      "album_artist": "The Royal Concept"
+    },
+    {
+      "_type": "url_transparent",
+      "ie_key": "Soundcloud",
+      "id": "47127627",
+      "url": "https://soundcloud.com/the-concept-band/goldrushed-mastered",
+      "album": "The Royal Concept EP",
+      "album_artist": "The Royal Concept"
+    },
+    {
+      "_type": "url_transparent",
+      "ie_key": "Soundcloud",
+      "id": "30510138",
+      "url": "https://soundcloud.com/the-concept-band/the-concept-d-d-dance",
+      "album": "The Royal Concept EP",
+      "album_artist": "The Royal Concept"
+    },
+    {
+      "_type": "url_transparent",
+      "ie_key": "Soundcloud",
+      "id": "47127629",
+      "url": "https://soundcloud.com/the-concept-band/in-the-end-mastered",
+      "album": "The Royal Concept EP",
+      "album_artist": "The Royal Concept"
+    },
+    {
+      "_type": "url_transparent",
+      "ie_key": "Soundcloud",
+      "id": "47127631",
+      "url": "https://api-v2.soundcloud.com/tracks/47127631",
+      "album": "The Royal Concept EP",
+      "album_artist": "The Royal Concept"
+    }
+  ]
+}
