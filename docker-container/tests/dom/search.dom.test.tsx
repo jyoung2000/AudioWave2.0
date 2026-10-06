@@ -98,6 +98,8 @@ describe('the search (UX-SEARCH-001, UX-SEARCH-002)', () => {
     expect(within(services).getByText('iTunes').parentElement?.textContent).toContain('3 found');
     expect(within(services).getByText('SoundCloud').parentElement?.textContent).toMatch(/resting/);
     await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Done: 9 songs, 3 artists, 2 albums. SoundCloud did not answer.'));
+    // Which platforms were searched (the line above) and which only contributed links.
+    expect(screen.getByText('Linked, not searched: Spotify.')).toBeTruthy();
     expect(searches[0]).toMatchObject({ fields: { q: 'harbour' }, sections: ['tracks', 'artists', 'albums'], providers: ['itunes', 'deezer', 'musicbrainz', 'youtube', 'soundcloud'] });
   });
 

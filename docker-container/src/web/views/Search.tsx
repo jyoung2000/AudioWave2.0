@@ -200,6 +200,7 @@ export function SearchView({ client = hubCatalog }: { client?: CatalogClient }) 
             ))}
           </ul>
         ) : null}
+        {results.done?.linkedOnly.length ? <p className="note srcs__links">Linked, not searched: {results.done.linkedOnly.map(platformLabel).join(', ')}.</p> : null}
         <p className="sr" role="status" aria-live="polite">
           {summary}
         </p>

@@ -519,6 +519,10 @@ a.push:active {
 .srcs li {
   white-space: nowrap;
 }
+.srcs__links {
+  margin: 4px 0 0;
+  font-size: 11px;
+}
 .srcs__state {
   color: var(--ink-quiet);
 }

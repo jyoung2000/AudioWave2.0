@@ -425,6 +425,8 @@ const search = [
     },
     totals: { tracks: 9, artists: 3, albums: 2 },
     resolve: null,
+    // Spotify came only as MusicBrainz's link for one song: linked, not searched.
+    linkedOnly: ['spotify'],
   },
 ];
 

@@ -1073,7 +1073,9 @@
         "albums": 2
       },
       "resolve": null,
-      "linkedOnly": []
+      "linkedOnly": [
+        "spotify"
+      ]
     }
   ],
   "searchPage2": [
