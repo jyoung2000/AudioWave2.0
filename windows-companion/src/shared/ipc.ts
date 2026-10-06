@@ -11,7 +11,29 @@
  * (docs/PRIVACY.md).
  */
 import { z } from 'zod';
-import { EqPreset, OutputFormat, Playlist, Track } from '@now-playing/contracts';
+import {
+  CATALOG_COLLECTION_CAP,
+  CATALOG_MAX_LIMIT,
+  CATALOG_PAGE_MAX,
+  CatalogAlbumDetail,
+  CatalogArtistDetail,
+  CatalogCollectionRef,
+  CatalogEnrichment,
+  CatalogLyrics,
+  CatalogProviderId,
+  CatalogResolveResult,
+  CatalogSearchChunk,
+  CatalogSection,
+  CatalogSource,
+  CatalogTrack,
+  DownloadAuthorizationBasis,
+  EqPreset,
+  HelperJob,
+  OutputFormat,
+  Playlist,
+  SavedCollection,
+  Track,
+} from '@now-playing/contracts';
 import { IPC_CHANNELS, IPC_EVENT_NAMES, type IpcChannel, type IpcEvent } from './channels.js';
 
 /* ------------------------------------------------------------------ library */
@@ -426,6 +448,38 @@ export type StorageReport = z.infer<typeof StorageReport>;
 
 const ToolId = z.enum(['yt-dlp', 'spotdl', 'ffmpeg']);
 
+/* ------------------------------------------------------------------- catalog */
+
+/**
+ * The music catalog (DEC-039), asked of the embedded helper's `/helper/v1/catalog/*` by the main
+ * process: the renderer's content security policy keeps it to this app, and the helper's token stays
+ * in the main process. A search answers at once; its chunks arrive as `event:catalog-chunk`, tagged
+ * with the `searchId` the window chose, until the `done` chunk. Every other read answers with its
+ * result, or null and the reason in words.
+ */
+export const CatalogSearchId = z.string().regex(/^[A-Za-z0-9_-]{1,80}$/);
+
+export const CatalogSearchIpc = z.strictObject({
+  searchId: CatalogSearchId,
+  q: z.string().max(400).default(''),
+  track: z.string().max(200).optional(),
+  artist: z.string().max(200).optional(),
+  album: z.string().max(200).optional(),
+  sections: z.array(CatalogSection).min(1).max(3),
+  providers: z.array(CatalogProviderId).min(1).max(5),
+  offset: z.number().int().min(0).max(1000).default(0),
+  limit: z.number().int().min(1).max(CATALOG_MAX_LIMIT).default(25),
+});
+export type CatalogSearchIpc = z.infer<typeof CatalogSearchIpc>;
+
+/** Which sections the Search tool shows and which services it asks, kept on this PC. */
+export const CatalogFilter = z.object({ sections: z.array(CatalogSection).min(1).max(3), providers: z.array(CatalogProviderId).min(1).max(5) });
+export type CatalogFilter = z.infer<typeof CatalogFilter>;
+
+const Answer = <T extends z.ZodType>(result: T) => z.object({ result: result.nullable(), reason: z.string().max(600).nullable() });
+const ListPage = { offset: z.number().int().min(0).max(CATALOG_COLLECTION_CAP).default(0), limit: z.number().int().min(1).max(CATALOG_PAGE_MAX).default(50) };
+const SavedList = z.object({ items: z.array(SavedCollection) });
+
 /**
  * Every channel, with the shape of its request and its result.
  *
@@ -519,6 +573,25 @@ export const IPC = {
   'tv:add': { request: z.object({ kind: TvLinkKind, url: z.string().min(1).max(2048) }), response: z.object({ link: TvLink.nullable(), reason: z.string().nullable() }) },
   'tv:remove': { request: z.object({ id: z.string().min(1).max(80) }), response: z.object({ ok: z.boolean() }) },
   'tv:refresh': { request: z.object({ id: z.string().min(1).max(80) }), response: z.object({ link: TvLink.nullable(), reason: z.string().nullable() }) },
+
+  /** Starts a search; answers when it has finished (or failed, with the reason). Chunks come as `event:catalog-chunk`. */
+  'catalog:search': { request: CatalogSearchIpc, response: z.object({ reason: z.string().max(600).nullable() }) },
+  /** Stops a search the window no longer wants (a new one typed over it): the helper stops asking. */
+  'catalog:cancel': { request: z.object({ searchId: CatalogSearchId }), response: z.object({ ok: z.boolean() }) },
+  'catalog:album': { request: z.strictObject({ id: z.string().min(3).max(260), ...ListPage }), response: Answer(CatalogAlbumDetail) },
+  'catalog:artist': { request: z.strictObject({ id: z.string().min(3).max(260), albumsOffset: z.number().int().min(0).max(500).default(0) }), response: Answer(CatalogArtistDetail) },
+  /** Any page of a pasted link's list: every song, page by page (no 200 cap). */
+  'catalog:resolve': { request: z.strictObject({ url: z.string().min(1).max(2048), ...ListPage }), response: Answer(CatalogResolveResult) },
+  'catalog:lyrics': { request: z.strictObject({ title: z.string().min(1).max(300), artist: z.string().min(1).max(300), album: z.string().max(300).optional(), durationSec: z.number().int().min(1).max(7200).optional() }), response: Answer(CatalogLyrics) },
+  'catalog:enrich': { request: z.strictObject({ isrc: z.string().max(20).optional(), title: z.string().max(300).optional(), artist: z.string().max(300).optional(), durationSec: z.number().int().min(1).max(7200).optional() }), response: Answer(CatalogEnrichment) },
+  /** The helper's download path, as every download on this PC: from the song's best source, saved where Settings says. */
+  'catalog:download': { request: z.strictObject({ track: CatalogTrack, basis: DownloadAuthorizationBasis, format: OutputFormat.optional() }), response: z.object({ job: HelperJob.nullable(), source: CatalogSource.nullable(), reason: z.string().max(600).nullable() }) },
+  /** Starred albums and playlists, kept in this PC's library (the shared SavedCollection shape). */
+  'catalog:saved': { request: z.void(), response: SavedList },
+  'catalog:save': { request: SavedCollection, response: SavedList },
+  'catalog:unsave': { request: CatalogCollectionRef.pick({ platform: true, kind: true, id: true }), response: SavedList },
+  'catalog:filter': { request: z.void(), response: CatalogFilter },
+  'catalog:filter:set': { request: CatalogFilter, response: CatalogFilter },
 } as const satisfies Record<IpcChannel, { request: z.ZodType; response: z.ZodType }>;
 
 export type IpcRequest<C extends IpcChannel> = z.infer<(typeof IPC)[C]['request']>;
@@ -533,6 +606,8 @@ export const IPC_EVENTS = {
   'event:awsp-status': AwspStatus,
   'event:tv-links': TvLinks,
   'event:notice': z.object({ kind: z.enum(['info', 'warning', 'error']), message: z.string() }),
+  /** One chunk of a running search, for the window that started it. */
+  'event:catalog-chunk': z.object({ searchId: CatalogSearchId, chunk: CatalogSearchChunk }),
 } as const satisfies Record<IpcEvent, z.ZodType>;
 
 export type IpcEventPayload<E extends IpcEvent> = z.infer<(typeof IPC_EVENTS)[E]>;
