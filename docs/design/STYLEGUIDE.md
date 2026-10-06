@@ -53,13 +53,23 @@ its accessible name, not only in a tooltip.
 
 ## 2. Three apps, one system
 
-Each app's interface comes from its own design file in [`design/frontends/`](../../design/frontends/).
-The design file is the authority for how its app looks; this guide and the ledgers in `design/` are
-the authority for what the three share — the rules, the words, every screen, and the checks.
+Each app's interface began as its own hand-made design file, kept frozen in
+[`design/frontends/origin/`](../../design/frontends/origin/) (DEC-038): the generators still read
+them, and every change since is an asserted step in a generator or a change to the product's own
+source. This guide and the ledgers in `design/` are the authority for what the three share — the
+rules, the words, every screen, and the checks.
+
+What each app looks like **now** is its living mockup, [`design/frontends/airwave-*.html`](../../design/frontends/):
+one standalone file per app, generated from the app by `pnpm mockups:build` — every screen and state
+as the app drew it on sample data, readable markup beside verbatim copies of the app's stylesheets,
+with a navigator in the corner. Open one straight from disk. It is regenerated whenever the app
+changes (`pnpm verify` fails otherwise), and the owner may edit it by hand: `pnpm mockups:diff`
+shows what an edit changes, and AGENTS.md ("Living mockups") is how it is carried into the app.
 
 | | Airwave (player) | Airwave Hub | Airwave Companion |
 |---|---|---|---|
-| Design | `airwave-now-playing.html` | `airwave-hub.html` | `airwave-companion.html` |
+| Living mockup | `airwave-now-playing.html` | `airwave-hub.html` | `airwave-companion.html` |
+| Hand-made design (frozen, `origin/`) | `airwave-now-playing.html` | `airwave-hub.html` | `airwave-companion.html` |
 | How it reaches the product | served as the shell: `make-shell.py` writes `music-player/index.html` from it | `pnpm build:window-css` writes `airwave-window.css` + `airwave-hub.css` from it | `pnpm build:window-css` writes `airwave-window.css` from it |
 | Controls | the design's own script, inside the shell | AquaArt (`@now-playing/aqua-ui/airwave-art`) + `docker-container/src/web/ui.tsx` | AquaArt + `windows-companion/src/renderer/ui.tsx` |
 | Its own styles | inline in the shell | `docker-container/src/web/styles.css` | `windows-companion/src/renderer/styles.css` |
@@ -533,14 +543,16 @@ size that product is shown at, and fails with the full list of anything too smal
 ## 11. Changing any of this
 
 1. **Tokens first.** In the component library a new colour or size goes in `tokens.json` and then
-   into the stylesheet as a custom property. In an Airwave window it goes in the design file's
-   `:root`, then `pnpm build:window-css`, then the `airwave` group of `tokens.json`. A literal hex
-   in a component is a bug.
+   into the stylesheet as a custom property. In an Airwave window it is an asserted edit to the
+   window kit's `:root` in `make-window-css.py` (the design files are frozen), then
+   `pnpm build:window-css`, then the `airwave` group of `tokens.json`. A literal hex in a component
+   is a bug.
 2. **Both schemes.** Define the light value on bare `:root`; redefine only what changes inside the
    dark guard.
-3. **The right source.** An Airwave window changes in its design file (and AquaArt in
-   `src/airwave/aqua-art.ts`, kept line for line with the designs' script); the player's shell
-   changes in `airwave-now-playing.html`; a library control changes in both of its skins.
+3. **The right source.** An Airwave window's kit changes through `make-window-css.py`'s asserted
+   edits (and AquaArt in `src/airwave/aqua-art.ts`), the rest of a window in its product's views
+   and `styles.css`; the player's shell changes through a new step in `make-shell.py`; a library
+   control changes in both of its skins. Then `pnpm mockups:build` regenerates the living mockups.
 4. **Say why in the CSS.** Every unobvious value in these stylesheets carries a comment explaining
    what it is reconstructing. Keep that up — it is what made the Snow Leopard button correction
    findable.
