@@ -13,9 +13,10 @@ import { boot, playRow, resetToLibrary, seed, stubOffline, watchErrors } from '.
 let errors: string[];
 test.beforeEach(async ({ page }) => {
   errors = watchErrors(page);
-  await page.route('**/itunes.apple.com/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
-    results: [{ trackName: 'Harbour Lights Live', artistName: 'Cassette Bloom', collectionName: 'Pier 9', artworkUrl100: null, previewUrl: 'about:blank', trackTimeMillis: 251000 },
-      { trackName: "O'Malley's <b>Reel</b>", artistName: 'Test & Co', collectionName: 'X', artworkUrl100: null, previewUrl: null, trackTimeMillis: 120000 }] }) }));
+  // iTunes in its own shape, for songs only: with no hub or companion the browser asks it itself (DEC-039).
+  await page.route('**/itunes.apple.com/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(new URL(r.request().url()).searchParams.get('entity') !== 'song' ? { results: [] } : {
+    results: [{ wrapperType: 'track', kind: 'song', trackId: 71, trackName: 'Harbour Lights Live', artistName: 'Cassette Bloom', collectionName: 'Pier 9', trackViewUrl: 'https://music.apple.com/us/album/pier-9/70?i=71', artworkUrl100: null, previewUrl: 'about:blank', trackTimeMillis: 251000 },
+      { wrapperType: 'track', kind: 'song', trackId: 72, trackName: "O'Malley's <b>Reel</b>", artistName: 'Test & Co', collectionName: 'X', trackViewUrl: 'https://music.apple.com/us/album/x/73?i=72', artworkUrl100: null, previewUrl: null, trackTimeMillis: 120000 }] }) }));
   await stubOffline(page);
   await boot(page);
 });

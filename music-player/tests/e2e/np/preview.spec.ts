@@ -140,10 +140,12 @@ test('a low-confidence row keeps the platform’s own words: no album, no chip',
 });
 
 test('a hub that never answers leaves the chain to iTunes inside the deadline', async ({ page }) => {
+  // With no hub answering and no companion, this browser asks iTunes itself, in iTunes's own shape.
   await page.route('**/itunes.apple.com/**', (r) => r.fulfill({
-    status: 200, contentType: 'application/json',
-    body: JSON.stringify({ results: [{ trackName: 'Fallback Song', artistName: 'Someone', collectionName: 'LP', trackTimeMillis: 180000, previewUrl: 'https://audio-ssl.itunes.apple.com/x.m4a' }] }),
+    status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' },
+    body: JSON.stringify(new URL(r.request().url()).searchParams.get('entity') !== 'song' ? { results: [] } : { results: [{ wrapperType: 'track', kind: 'song', trackId: 81, trackName: 'Fallback Song', artistName: 'Someone', collectionName: 'LP', trackViewUrl: 'https://music.apple.com/us/album/lp/80?i=81', trackTimeMillis: 180000, previewUrl: 'https://audio-ssl.itunes.apple.com/x.m4a' }] }),
   }));
+  for (const u of ['**/api.deezer.com/**', '**/musicbrainz.org/**', '**/lrclib.net/**']) await page.route(u, (r) => r.abort());
   await page.route(`${HUB}/**`, () => { /* black hole: the hub never answers */ });
   await boot(page);
   await page.evaluate(async (a) => {
