@@ -305,4 +305,15 @@ export const HELPER_DEFAULT_HOSTS: readonly string[] = [
   // Bandcamp keeps its music on each artist subdomain (artist.bandcamp.com/track/...).
   '*.bandcamp.com',
   'archive.org',
+  // The music catalog (DEC-039): the keyless services its routes call (CATALOG_API_HOSTS), and the
+  // hosts their artwork and 30-second previews come from, so the list still says what this touches.
+  'itunes.apple.com',
+  'api.deezer.com',
+  'musicbrainz.org',
+  'coverartarchive.org',
+  'api.song.link',
+  'lrclib.net',
+  '*.mzstatic.com',
+  'audio-ssl.itunes.apple.com',
+  '*.dzcdn.net',
 ];

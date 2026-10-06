@@ -151,6 +151,8 @@ export function trackFromSpotdl(song: Record<string, unknown>): HelperResolvedTr
     year,
     artworkUrl: webUrl(song['cover_url']),
     trackNumber: trackNumber !== null && Number.isInteger(trackNumber) && trackNumber > 0 ? trackNumber : null,
+    isrc: typeof song['isrc'] === 'string' && /^[A-Z]{2}[A-Z0-9]{3}[0-9]{7}$/.test(song['isrc']) ? song['isrc'] : null,
+    matchUrl: webUrl(song['download_url']),
   };
 }
 
@@ -208,7 +210,7 @@ export interface ResolverOptions {
  * Runs one tool to completion, no shell, with the whole tree killed at the deadline (yt-dlp and
  * spotDL are self-unpacking programs that start a second process; killing only the first leaves it).
  */
-function run(path: string, args: string[], env: NodeJS.ProcessEnv, timeoutMs: number, spawnImpl: typeof spawn = spawn): Promise<string> {
+function run(path: string, args: string[], env: NodeJS.ProcessEnv, timeoutMs: number, signal?: AbortSignal, spawnImpl: typeof spawn = spawn): Promise<string> {
   const { command, prefix } = toolCommand(path);
   return new Promise((resolve, reject) => {
     const child = spawnImpl(command, [...prefix, ...args], { env, shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32' });
@@ -221,6 +223,11 @@ function run(path: string, args: string[], env: NodeJS.ProcessEnv, timeoutMs: nu
       timedOut = true;
       killTree(child);
     }, timeoutMs);
+    // A page that stopped listening (a search typed over) stops the tool too.
+    const onAbort = (): void => killTree(child);
+    if (signal?.aborted) onAbort();
+    signal?.addEventListener('abort', onAbort, { once: true });
+    child.on('close', () => signal?.removeEventListener('abort', onAbort));
     child.stdout?.on('data', (chunk: Buffer) => {
       size += chunk.length;
       if (size > MAX_OUTPUT_BYTES) {
@@ -250,7 +257,13 @@ function run(path: string, args: string[], env: NodeJS.ProcessEnv, timeoutMs: nu
 }
 
 export interface Resolver {
-  resolve(url: URL): Promise<HelperResolved>;
+  /** `match`: for a Spotify song, also spotDL's YouTube Music match (`save --preload`). */
+  resolve(url: URL, options?: { match?: boolean }): Promise<HelperResolved>;
+  /**
+   * One page of a catalog search through yt-dlp (DEC-039). `args` are the domain's `toolSearchArgs`,
+   * checked for that shape again; the run shares the two slots link lookups use.
+   */
+  search(args: readonly string[], signal?: AbortSignal): Promise<unknown>;
 }
 
 export function createResolver(options: ResolverOptions): Resolver {
@@ -274,7 +287,7 @@ export function createResolver(options: ResolverOptions): Resolver {
     }
   }
 
-  async function fresh(url: URL): Promise<HelperResolved> {
+  async function fresh(url: URL, match = false): Promise<HelperResolved> {
     const tools = await options.tools();
     const source = sourceOf(url);
     if (source === 'spotify') {
@@ -286,7 +299,7 @@ export function createResolver(options: ResolverOptions): Resolver {
         try {
           const file = join(dir, 'songs.spotdl');
           // An empty home of its own: spotDL reads a config file from the home directory otherwise.
-          await run(spotdl.path!, spotdlSaveArgs(url.toString(), file), childEnv(process.env, { HOME: dir, USERPROFILE: dir }), timeouts.spotdl);
+          await run(spotdl.path!, spotdlSaveArgs(url.toString(), file, { preload: match && /^\/(?:intl-[a-z-]+\/)?track\//i.test(url.pathname) }), childEnv(process.env, { HOME: dir, USERPROFILE: dir }), timeouts.spotdl);
           let songs: unknown;
           try {
             songs = JSON.parse(readFileSync(file, 'utf8'));
@@ -320,12 +333,25 @@ export function createResolver(options: ResolverOptions): Resolver {
   }
 
   return {
-    resolve(url: URL): Promise<HelperResolved> {
-      const key = url.toString();
+    async search(args: readonly string[], signal?: AbortSignal): Promise<unknown> {
+      if (args[0] !== '--ignore-config' || args.at(-2) !== '--' || !/^(yt|sc)search[0-9]{1,3}:./.test(args.at(-1) ?? '')) throw new ResolveError('That is not a catalog search.', 'failed');
+      const tools = await options.tools();
+      const ytDlp = tools['yt-dlp'];
+      if (!ytDlp.present || !ytDlp.path) throw new ResolveError(ytDlp.installHint ?? 'yt-dlp is not set up on this PC yet.', 'tool-missing');
+      const stdout = await slot(() => run(ytDlp.path!, [...args], childEnv(), timeouts.ytDlp, signal));
+      try {
+        return JSON.parse(stdout) as unknown;
+      } catch {
+        throw new ResolveError('yt-dlp gave an answer that is not JSON.', 'failed');
+      }
+    },
+    resolve(url: URL, resolveOptions: { match?: boolean } = {}): Promise<HelperResolved> {
+      const match = resolveOptions.match === true && sourceOf(url) === 'spotify';
+      const key = `${url.toString()}${match ? '#match' : ''}`;
       const at = now();
       const hit = cache.get(key);
       if (hit && at - hit.at < RESOLVE_TTL_MS) return hit.value;
-      const value = fresh(url);
+      const value = fresh(url, match);
       // A failure is not remembered: the next paste may find the tool set up, or the site back.
       value.catch(() => {
         if (cache.get(key)?.value === value) cache.delete(key);

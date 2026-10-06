@@ -580,10 +580,12 @@ export function spotdlArgs(job: Pick<HelperJob, 'url' | 'format'>, directory: st
 
 /**
  * spotDL's `save`: the songs a Spotify link names, written to `saveFile` as JSON, nothing downloaded.
- * The URL sits where `spotdlArgs` puts it, for the same reason.
+ * The URL sits where `spotdlArgs` puts it, for the same reason. `preload` also has spotDL find the
+ * YouTube Music recording it would download (its `download_url`), which the catalog shows as the
+ * song's second source (DEC-039); it searches, so it is only asked for one song at a time.
  */
-export function spotdlSaveArgs(url: string, saveFile: string): string[] {
-  return ['save', urlArgument(url), '--save-file', saveFile];
+export function spotdlSaveArgs(url: string, saveFile: string, options: { preload?: boolean } = {}): string[] {
+  return ['save', urlArgument(url), '--save-file', saveFile, ...(options.preload ? ['--preload'] : [])];
 }
 
 /**

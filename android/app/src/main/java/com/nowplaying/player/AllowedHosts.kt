@@ -25,5 +25,14 @@ object AllowedHosts {
     "bandcamp.com",
     "*.bandcamp.com",
     "archive.org",
+    "itunes.apple.com",
+    "api.deezer.com",
+    "musicbrainz.org",
+    "coverartarchive.org",
+    "api.song.link",
+    "lrclib.net",
+    "*.mzstatic.com",
+    "audio-ssl.itunes.apple.com",
+    "*.dzcdn.net",
   )
 }

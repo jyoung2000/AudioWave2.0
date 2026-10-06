@@ -33,6 +33,10 @@ import type { StationNowPlaying } from '@now-playing/contracts';
 import { serveApp, type AppSource } from './app.js';
 import { LAN_READ_ROUTES, checkFetchUrl, hostAllowed, isLoopbackAddress, lanHostAllowed, lanPageAllowed, originAllowed, tokenMatches, type OriginPolicy } from './security.js';
 import { cachedResolver, publicTool, type ResolvedTool } from './tools.js';
+import { CatalogAlbumRequest, CatalogArtistRequest, CatalogEnrichRequest, CatalogLyricsRequest, CatalogResolveRequest, CatalogSearchRequest, HELPER_CATALOG_ROUTES, NDJSON_CONTENT_TYPE } from '@now-playing/contracts';
+import { DomainError } from '@now-playing/domain';
+import { ndjsonLine, type CatalogFetch } from '@now-playing/domain/catalog';
+import { createHelperCatalog } from './catalog.js';
 import { ToolProvisioner } from './provision.js';
 
 const MAX_BODY_BYTES = 64 * 1024;
@@ -85,6 +89,8 @@ export interface HelperOptions {
   resolveTimeoutMs?: { ytDlp: number; spotdl: number };
   /** Whether setup may update yt-dlp by itself once a day. Absent means yes. */
   autoUpdate?: () => boolean;
+  /** How the music catalog reaches its services. Tests pass a fixture fetch; absent: the guarded fetch. */
+  catalogFetch?: CatalogFetch;
 }
 
 /** This PC's own network addresses (IPv4, not loopback): what a device on the LAN puts in `Host`. */
@@ -138,6 +144,7 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
   });
   const estimate = createEstimator(options.backup ?? { folders: {}, backupDir: null });
   const links = createResolver({ workDir: options.workDir, tools: resolve_, log: options.log, ...(options.resolveTimeoutMs ? { timeoutMs: options.resolveTimeoutMs } : {}) });
+  const catalog = createHelperCatalog({ version: options.version, links, allowedHosts: options.allowedHosts, fetch: options.catalogFetch });
 
   const server = createServer((request, response) => {
     void handle(request, response).catch((error: unknown) => {
@@ -265,6 +272,15 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
       }
     }
 
+    // The music catalog (DEC-039): the resolve route's rule — a vetted page, or the token — because
+    // the player asking is usually one the hub served. Never a LAN route: search runs yt-dlp.
+    if (Object.values(HELPER_CATALOG_ROUTES).includes(path as (typeof HELPER_CATALOG_ROUTES)[keyof typeof HELPER_CATALOG_ROUTES]) && request.method === 'GET') {
+      if (origin_ === undefined && !tokenMatches(options.token, header(request, 'x-helper-token'))) {
+        return fail(response, 403, 'origin', 'This origin may not talk to the helper.');
+      }
+      return catalogRoute(path, url, response);
+    }
+
     // Everything past here is the API, and everything but health needs the token.
     if (path !== HELPER_ROUTES.health && !tokenMatches(options.token, header(request, 'x-helper-token'))) {
       return fail(response, 401, 'token', 'This request needs the helper’s token. It is printed when the helper starts.');
@@ -383,6 +399,63 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
     }
 
     return fail(response, 404, 'not-found', 'No such route.');
+  }
+
+  /** `/helper/v1/catalog/*`: the hub's catalog answers, from this PC. */
+  async function catalogRoute(path: string, url: URL, response: ServerResponse): Promise<void> {
+    const params = Object.fromEntries(url.searchParams);
+    const invalid = (issues: { message: string }[]): void => fail(response, 400, 'validation', `That request is not one this helper understands: ${issues[0]?.message ?? 'invalid'}.`);
+    try {
+      if (path === HELPER_CATALOG_ROUTES.search) {
+        const parsed = CatalogSearchRequest.safeParse(params);
+        if (!parsed.success) return invalid(parsed.error.issues);
+        const q = parsed.data;
+        const controller = new AbortController();
+        response.once('close', () => controller.abort());
+        const input = { q: q.q, track: q.track, artist: q.artist, album: q.album, sections: q.sections, providers: q.providers, offset: q.offset, limit: q.limit };
+        if (q.stream === '0') return send(response, 200, await catalog.searchAll(input, controller.signal));
+        response.writeHead(200, { 'content-type': `${NDJSON_CONTENT_TYPE}; charset=utf-8`, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
+        for await (const chunk of catalog.search(input, controller.signal)) {
+          if (response.destroyed) break;
+          response.write(ndjsonLine(chunk));
+        }
+        return void response.end();
+      }
+      if (path === HELPER_CATALOG_ROUTES.album) {
+        const parsed = CatalogAlbumRequest.safeParse(params);
+        if (!parsed.success) return invalid(parsed.error.issues);
+        return send(response, 200, await catalog.album(parsed.data.id, parsed.data.offset, parsed.data.limit));
+      }
+      if (path === HELPER_CATALOG_ROUTES.artist) {
+        const parsed = CatalogArtistRequest.safeParse(params);
+        if (!parsed.success) return invalid(parsed.error.issues);
+        return send(response, 200, await catalog.artist(parsed.data.id, parsed.data));
+      }
+      if (path === HELPER_CATALOG_ROUTES.resolve) {
+        const parsed = CatalogResolveRequest.safeParse(params);
+        if (!parsed.success) return invalid(parsed.error.issues);
+        return send(response, 200, await catalog.resolve(parsed.data.url, parsed.data.offset, parsed.data.limit));
+      }
+      if (path === HELPER_CATALOG_ROUTES.lyrics) {
+        const parsed = CatalogLyricsRequest.safeParse(params);
+        if (!parsed.success) return invalid(parsed.error.issues);
+        const l = parsed.data;
+        return send(response, 200, await catalog.lyrics({ title: l.title, artist: l.artist, ...(l.album ? { album: l.album } : {}), ...(l.durationSec ? { durationSec: l.durationSec } : {}) }));
+      }
+      const parsed = CatalogEnrichRequest.safeParse(params);
+      if (!parsed.success) return invalid(parsed.error.issues);
+      const e = parsed.data;
+      const input = { isrc: e.isrc ?? null, title: e.title ?? null, artist: e.artist ?? null, durationMs: e.durationSec ? e.durationSec * 1000 : null };
+      return send(response, 200, e.links === '1' ? await catalog.enrichWithLinks(input) : await catalog.enrich(input));
+    } catch (error) {
+      if (response.headersSent) return void response.end();
+      if (error instanceof DomainError) {
+        if (error.retryAfterSeconds !== undefined) response.setHeader('retry-after', String(error.retryAfterSeconds));
+        return fail(response, error.status, error.code, error.message.slice(0, 600));
+      }
+      options.log(`catalog: ${error instanceof Error ? error.message : String(error)}`);
+      return fail(response, 502, 'catalog', 'The music services could not be read just now.');
+    }
   }
 
   function applyCors(response: ServerResponse, origin_: string | undefined): void {
