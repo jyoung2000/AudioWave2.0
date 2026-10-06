@@ -16,8 +16,8 @@ jobs:
   verify:
     name: Lint, typecheck, test, build (Linux)
     runs-on: ubuntu-latest
-    # The player's browser suite alone is ~27 minutes on a fast desktop and longer on a runner.
-    timeout-minutes: 90
+    # The player's full browser suite runs in the sharded job below; this one keeps everything else.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -70,8 +70,14 @@ jobs:
             docs/design/styleguide.html
             docs/design/styleguide.pdf
           if-no-files-found: error
-      - name: Accessibility and end-to-end tests
-        run: pnpm test:a11y && pnpm test:e2e && pnpm test:local
+      - name: Dependency audit (high and critical fail the build)
+        run: pnpm audit --audit-level=high
+      - name: Accessibility, hub, styleguide and single-file browser tests
+        run: |
+          pnpm test:a11y
+          pnpm --filter @now-playing/hub test:e2e
+          pnpm --filter @now-playing/aqua-ui test:e2e
+          pnpm test:local
       - name: Upload the single-file player
         uses: actions/upload-artifact@v4
         with:
@@ -90,8 +96,45 @@ jobs:
             music-player/playwright-report-local
             docker-container/playwright-report
           if-no-files-found: ignore
-      - name: Dependency audit (high and critical fail the build)
-        run: pnpm audit --audit-level=high
+
+  player-e2e:
+    # The player's suite is ~180 browser tests on one worker (they share a preview server and storage):
+    # 50-80 minutes on a runner, so it is split four ways and each quarter runs on its own machine.
+    name: Player browser tests (${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Build all products
+        run: pnpm generate && pnpm build
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Player end-to-end tests, shard ${{ matrix.shard }} of 4
+        run: pnpm --filter @now-playing/music-player test:e2e --shard=${{ matrix.shard }}/4
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-player-${{ matrix.shard }}
+          path: music-player/playwright-report
+          if-no-files-found: ignore
 
   docker:
     name: Hub image
