@@ -625,5 +625,13 @@ const document = {
 };
 
 const out = join(import.meta.dirname, 'catalog-stock.json');
-writeFileSync(out, `${JSON.stringify(document, null, 2)}\n`);
+// Written as the repository's Prettier writes JSON, so `pnpm format:check` holds.
+const prettier = await import('prettier');
+writeFileSync(
+  out,
+  await prettier.format(JSON.stringify(document), {
+    ...(await prettier.resolveConfig(out)),
+    filepath: out,
+  }),
+);
 console.info(`wrote ${out}`);

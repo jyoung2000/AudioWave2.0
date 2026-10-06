@@ -82,9 +82,7 @@
           "id": "deezer:9101",
           "title": "Harbour Lights",
           "artist": "Cassette Bloom",
-          "artists": [
-            "Cassette Bloom"
-          ],
+          "artists": ["Cassette Bloom"],
           "album": "Harbour Lights",
           "albumArtist": "Cassette Bloom",
           "durationMs": 214000,
@@ -113,9 +111,7 @@
           "id": "apple-music:8103",
           "title": "Harbour Morning (Acoustic)",
           "artist": "Alder Quartet",
-          "artists": [
-            "Alder Quartet"
-          ],
+          "artists": ["Alder Quartet"],
           "album": "First Light Sessions",
           "albumArtist": "Alder Quartet",
           "durationMs": 212000,
@@ -144,9 +140,7 @@
           "id": "apple-music:8107",
           "title": "Night Harbour",
           "artist": "Velvet Orchard",
-          "artists": [
-            "Velvet Orchard"
-          ],
+          "artists": ["Velvet Orchard"],
           "album": "Small Hours",
           "albumArtist": "Velvet Orchard",
           "durationMs": 198000,
@@ -278,9 +272,7 @@
           "id": "deezer:9101",
           "title": "Harbour Lights",
           "artist": "Cassette Bloom",
-          "artists": [
-            "Cassette Bloom"
-          ],
+          "artists": ["Cassette Bloom"],
           "album": "Harbour Lights",
           "albumArtist": "Cassette Bloom",
           "durationMs": 214000,
@@ -316,9 +308,7 @@
           "id": "deezer:9102",
           "title": "Harbour Wall",
           "artist": "Cassette Bloom",
-          "artists": [
-            "Cassette Bloom"
-          ],
+          "artists": ["Cassette Bloom"],
           "album": "Harbour Lights",
           "albumArtist": "Cassette Bloom",
           "durationMs": 187000,
@@ -347,9 +337,7 @@
           "id": "deezer:9106",
           "title": "Harbour Fog",
           "artist": "Low Tide Signal",
-          "artists": [
-            "Low Tide Signal"
-          ],
+          "artists": ["Low Tide Signal"],
           "album": "Coastal Static",
           "albumArtist": "Low Tide Signal",
           "durationMs": 302000,
@@ -378,9 +366,7 @@
           "id": "deezer:9108",
           "title": "Ember Season",
           "artist": "Cassette Bloom",
-          "artists": [
-            "Cassette Bloom"
-          ],
+          "artists": ["Cassette Bloom"],
           "album": "Harbour Lights",
           "albumArtist": "Cassette Bloom",
           "durationMs": 203000,
@@ -409,9 +395,7 @@
           "id": "deezer:9116",
           "title": "Harbour Waltz",
           "artist": "Fennel Grove Trio",
-          "artists": [
-            "Fennel Grove Trio"
-          ],
+          "artists": ["Fennel Grove Trio"],
           "album": "Brass & Bramble",
           "albumArtist": "Fennel Grove Trio",
           "durationMs": 189000,
@@ -568,9 +552,7 @@
           "id": "deezer:9101",
           "title": "Harbour Lights",
           "artist": "Cassette Bloom",
-          "artists": [
-            "Cassette Bloom"
-          ],
+          "artists": ["Cassette Bloom"],
           "album": "Harbour Lights",
           "albumArtist": "Cassette Bloom",
           "durationMs": 214000,
@@ -613,9 +595,7 @@
           "id": "deezer:9102",
           "title": "Harbour Wall",
           "artist": "Cassette Bloom",
-          "artists": [
-            "Cassette Bloom"
-          ],
+          "artists": ["Cassette Bloom"],
           "album": "Harbour Lights",
           "albumArtist": "Cassette Bloom",
           "durationMs": 187000,
@@ -651,9 +631,7 @@
           "id": "apple-music:8103",
           "title": "Harbour Morning (Acoustic)",
           "artist": "Alder Quartet",
-          "artists": [
-            "Alder Quartet"
-          ],
+          "artists": ["Alder Quartet"],
           "album": "First Light Sessions",
           "albumArtist": "Alder Quartet",
           "durationMs": 212000,
@@ -689,9 +667,7 @@
           "id": "youtube:mockHS0004",
           "title": "Harbourside",
           "artist": "Birch Ensemble",
-          "artists": [
-            "Birch Ensemble"
-          ],
+          "artists": ["Birch Ensemble"],
           "album": null,
           "albumArtist": "Birch Ensemble",
           "durationMs": 233000,
@@ -720,9 +696,7 @@
           "id": "youtube:mockPH0005",
           "title": "Paper Harbour (Live)",
           "artist": "Birch Ensemble",
-          "artists": [
-            "Birch Ensemble"
-          ],
+          "artists": ["Birch Ensemble"],
           "album": null,
           "albumArtist": "Birch Ensemble",
           "durationMs": 251000,
@@ -811,9 +785,7 @@
           "id": "deezer:9106",
           "title": "Harbour Fog",
           "artist": "Low Tide Signal",
-          "artists": [
-            "Low Tide Signal"
-          ],
+          "artists": ["Low Tide Signal"],
           "album": "Coastal Static",
           "albumArtist": "Low Tide Signal",
           "durationMs": 302000,
@@ -909,9 +881,7 @@
           "id": "apple-music:8103",
           "title": "Harbour Morning (Acoustic)",
           "artist": "Alder Quartet",
-          "artists": [
-            "Alder Quartet"
-          ],
+          "artists": ["Alder Quartet"],
           "album": "First Light Sessions",
           "albumArtist": "Alder Quartet",
           "durationMs": 212000,
@@ -1051,31 +1021,13 @@
         }
       ],
       "page": {
-        "tracks": {
-          "offset": 0,
-          "limit": 25,
-          "hasMore": true
-        },
-        "artists": {
-          "offset": 0,
-          "limit": 25,
-          "hasMore": false
-        },
-        "albums": {
-          "offset": 0,
-          "limit": 25,
-          "hasMore": false
-        }
+        "tracks": { "offset": 0, "limit": 25, "hasMore": true },
+        "artists": { "offset": 0, "limit": 25, "hasMore": false },
+        "albums": { "offset": 0, "limit": 25, "hasMore": false }
       },
-      "totals": {
-        "tracks": 9,
-        "artists": 3,
-        "albums": 2
-      },
+      "totals": { "tracks": 9, "artists": 3, "albums": 2 },
       "resolve": null,
-      "linkedOnly": [
-        "spotify"
-      ]
+      "linkedOnly": ["spotify"]
     }
   ],
   "searchPage2": [
@@ -1156,9 +1108,7 @@
           "id": "deezer:9102",
           "title": "Harbour Wall",
           "artist": "Cassette Bloom",
-          "artists": [
-            "Cassette Bloom"
-          ],
+          "artists": ["Cassette Bloom"],
           "album": "Harbour Lights",
           "albumArtist": "Cassette Bloom",
           "durationMs": 187000,
@@ -1187,9 +1137,7 @@
           "id": "deezer:9122",
           "title": "Morning Ferry",
           "artist": "Quiet Atlas",
-          "artists": [
-            "Quiet Atlas"
-          ],
+          "artists": ["Quiet Atlas"],
           "album": "Paper Maps",
           "albumArtist": "Quiet Atlas",
           "durationMs": 182000,
@@ -1278,9 +1226,7 @@
           "id": "apple-music:8119",
           "title": "Lantern Street",
           "artist": "Quiet Atlas",
-          "artists": [
-            "Quiet Atlas"
-          ],
+          "artists": ["Quiet Atlas"],
           "album": "Paper Maps",
           "albumArtist": "Quiet Atlas",
           "durationMs": 236000,
@@ -1406,19 +1352,11 @@
         }
       ],
       "page": {
-        "tracks": {
-          "offset": 25,
-          "limit": 25,
-          "hasMore": false
-        },
+        "tracks": { "offset": 25, "limit": 25, "hasMore": false },
         "artists": null,
         "albums": null
       },
-      "totals": {
-        "tracks": 3,
-        "artists": 0,
-        "albums": 0
-      },
+      "totals": { "tracks": 3, "artists": 0, "albums": 0 },
       "resolve": null,
       "linkedOnly": []
     }
@@ -1437,16 +1375,8 @@
         "url": "https://open.spotify.com/playlist/0MockHarbourMix0000001"
       },
       "status": [],
-      "page": {
-        "tracks": null,
-        "artists": null,
-        "albums": null
-      },
-      "totals": {
-        "tracks": 0,
-        "artists": 0,
-        "albums": 0
-      },
+      "page": { "tracks": null, "artists": null, "albums": null },
+      "totals": { "tracks": 0, "artists": 0, "albums": 0 },
       "resolve": "https://open.spotify.com/playlist/0MockHarbourMix0000001",
       "linkedOnly": []
     }
@@ -1479,9 +1409,7 @@
             "id": "spotify:0MockSpotifyTrack00001",
             "title": "Harbour Lights",
             "artist": "Cassette Bloom",
-            "artists": [
-              "Cassette Bloom"
-            ],
+            "artists": ["Cassette Bloom"],
             "album": "Harbour Lights",
             "albumArtist": "Cassette Bloom",
             "durationMs": 214000,
@@ -1510,9 +1438,7 @@
             "id": "spotify:0MockSpotifyTrack00002",
             "title": "Harbour Morning (Acoustic)",
             "artist": "Alder Quartet",
-            "artists": [
-              "Alder Quartet"
-            ],
+            "artists": ["Alder Quartet"],
             "album": "First Light Sessions",
             "albumArtist": "Alder Quartet",
             "durationMs": 212000,
@@ -1541,9 +1467,7 @@
             "id": "spotify:0MockSpotifyTrack00003",
             "title": "Harbour Fog",
             "artist": "Low Tide Signal",
-            "artists": [
-              "Low Tide Signal"
-            ],
+            "artists": ["Low Tide Signal"],
             "album": "Coastal Static",
             "albumArtist": "Low Tide Signal",
             "durationMs": 302000,
@@ -1572,9 +1496,7 @@
             "id": "spotify:0MockSpotifyTrack00004",
             "title": "Night Harbour",
             "artist": "Velvet Orchard",
-            "artists": [
-              "Velvet Orchard"
-            ],
+            "artists": ["Velvet Orchard"],
             "album": "Small Hours",
             "albumArtist": "Velvet Orchard",
             "durationMs": 198000,
@@ -1603,9 +1525,7 @@
             "id": "spotify:0MockSpotifyTrack00005",
             "title": "Morning Ferry",
             "artist": "Quiet Atlas",
-            "artists": [
-              "Quiet Atlas"
-            ],
+            "artists": ["Quiet Atlas"],
             "album": "Paper Maps",
             "albumArtist": "Quiet Atlas",
             "durationMs": 182000,
@@ -1634,9 +1554,7 @@
             "id": "spotify:0MockSpotifyTrack00006",
             "title": "Harbourside",
             "artist": "Birch Ensemble",
-            "artists": [
-              "Birch Ensemble"
-            ],
+            "artists": ["Birch Ensemble"],
             "album": null,
             "albumArtist": "Birch Ensemble",
             "durationMs": 233000,
@@ -1720,9 +1638,7 @@
           "id": "deezer:9101",
           "title": "Harbour Lights",
           "artist": "Cassette Bloom",
-          "artists": [
-            "Cassette Bloom"
-          ],
+          "artists": ["Cassette Bloom"],
           "album": "Harbour Lights",
           "albumArtist": "Cassette Bloom",
           "durationMs": 214000,
@@ -1765,9 +1681,7 @@
           "id": "deezer:9102",
           "title": "Harbour Wall",
           "artist": "Cassette Bloom",
-          "artists": [
-            "Cassette Bloom"
-          ],
+          "artists": ["Cassette Bloom"],
           "album": "Harbour Lights",
           "albumArtist": "Cassette Bloom",
           "durationMs": 187000,
@@ -1803,9 +1717,7 @@
           "id": "deezer:9108",
           "title": "Ember Season",
           "artist": "Cassette Bloom",
-          "artists": [
-            "Cassette Bloom"
-          ],
+          "artists": ["Cassette Bloom"],
           "album": "Harbour Lights",
           "albumArtist": "Cassette Bloom",
           "durationMs": 203000,
@@ -1870,9 +1782,7 @@
         "id": "deezer:9101",
         "title": "Harbour Lights",
         "artist": "Cassette Bloom",
-        "artists": [
-          "Cassette Bloom"
-        ],
+        "artists": ["Cassette Bloom"],
         "album": "Harbour Lights",
         "albumArtist": "Cassette Bloom",
         "durationMs": 214000,
@@ -1915,9 +1825,7 @@
         "id": "deezer:9102",
         "title": "Harbour Wall",
         "artist": "Cassette Bloom",
-        "artists": [
-          "Cassette Bloom"
-        ],
+        "artists": ["Cassette Bloom"],
         "album": "Harbour Lights",
         "albumArtist": "Cassette Bloom",
         "durationMs": 187000,
@@ -1953,9 +1861,7 @@
         "id": "deezer:9108",
         "title": "Ember Season",
         "artist": "Cassette Bloom",
-        "artists": [
-          "Cassette Bloom"
-        ],
+        "artists": ["Cassette Bloom"],
         "album": "Harbour Lights",
         "albumArtist": "Cassette Bloom",
         "durationMs": 203000,
@@ -2013,11 +1919,7 @@
         "rank": 130
       }
     ],
-    "albumsPage": {
-      "offset": 0,
-      "limit": 12,
-      "hasMore": false
-    }
+    "albumsPage": { "offset": 0, "limit": 12, "hasMore": false }
   },
   "lyrics": {
     "found": true,
@@ -2034,10 +1936,7 @@
     "isrc": "QZAAA2600101",
     "musicbrainzRecordingId": "0f0c0a00-0000-4000-8000-000000009101",
     "genre": "Indie Pop",
-    "genres": [
-      "indie pop",
-      "dream pop"
-    ],
+    "genres": ["indie pop", "dream pop"],
     "label": "Pier Records",
     "releaseDate": "2026-03-14",
     "year": 2026,
