@@ -1,7 +1,7 @@
 /**
  * The Airwave Hub window.
  *
- * One window, always: the centred Snow Leopard window `design/frontends/airwave-hub.html` draws — a
+ * One window, always: the centred Snow Leopard window `design/frontends/origin/airwave-hub.html` draws — a
  * title bar and six icon tabs on one chrome sheet, the pane scrolling under it, a status strip at
  * the foot. What changes with the session is what the window lets through:
  *

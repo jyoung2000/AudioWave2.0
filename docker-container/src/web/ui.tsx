@@ -1,7 +1,7 @@
 /**
  * The Airwave Hub window kit, in React.
  *
- * Every piece here renders the markup `design/frontends/airwave-hub.html` uses, with the class
+ * Every piece here renders the markup `design/frontends/origin/airwave-hub.html` uses, with the class
  * names its stylesheets (`@now-playing/aqua-ui/airwave-window.css` and `airwave-hub.css`) style:
  * `.push` buttons, `.field` inputs, `.pop` pop-ups, `.chk` checkboxes, `.well` list boxes, `.rows`,
  * `.tbl`, `.sdot`, `.kv`. Nothing here invents a look; it only saves each view from repeating the

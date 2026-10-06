@@ -1,0 +1,4052 @@
+{
+  "recordedAt": "2026-10-06T06:28:16.916Z",
+  "base": "http://127.0.0.1:4546",
+  "phases": {
+    "signed-out": {
+      "GET /api/v1/auth/session": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "authenticated": false,
+          "setupComplete": false
+        }
+      }
+    },
+    "first-run": {
+      "POST /api/v1/auth/login": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "authenticated": true,
+          "username": "admin",
+          "mustChangePassword": true,
+          "csrfToken": "mockup-csrf-token",
+          "setupComplete": false,
+          "expiresAt": "2026-10-06T18:27:41.044Z"
+        }
+      },
+      "GET /api/v1/auth/session": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "authenticated": true,
+          "username": "admin",
+          "mustChangePassword": true,
+          "csrfToken": "mockup-csrf-token",
+          "setupComplete": false,
+          "expiresAt": "2026-10-06T18:27:41.044Z"
+        }
+      },
+      "GET /api/v1/providers": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "items": [
+            {
+              "provider": "hub",
+              "displayName": "Hub library",
+              "role": "library",
+              "authType": "device-credential",
+              "authScopes": ["library:read"],
+              "groupCompatible": true,
+              "discordCompatible": true,
+              "reviewedAt": "2026-09-03",
+              "limitations": [
+                "Files must be placed under the data volume library directory",
+                "Formats browsers cannot decode are listed but not playable in the PWA"
+              ],
+              "capabilities": {
+                "metadata": "available",
+                "search": "available",
+                "preview": "available",
+                "playback": "available",
+                "importLikes": "unsupported",
+                "importPlaylists": "unsupported",
+                "creatorDownload": "unsupported",
+                "userOwnedDownload": "available",
+                "groupSync": "exact",
+                "eq": "available"
+              },
+              "enabled": true,
+              "configured": true
+            },
+            {
+              "provider": "public-domain",
+              "displayName": "Public domain",
+              "role": "audio-source",
+              "authType": "none",
+              "authScopes": [],
+              "attribution": "Synthetic fixture",
+              "groupCompatible": true,
+              "discordCompatible": true,
+              "reviewedAt": "2026-09-03",
+              "limitations": [
+                "Serves the directory configured by NP_PUBLIC_DOMAIN_DIR (defaults to the generated test fixtures)"
+              ],
+              "capabilities": {
+                "metadata": "available",
+                "search": "available",
+                "preview": "available",
+                "playback": "available",
+                "importLikes": "unsupported",
+                "importPlaylists": "unsupported",
+                "creatorDownload": "available",
+                "userOwnedDownload": "available",
+                "groupSync": "exact",
+                "eq": "available"
+              },
+              "enabled": true,
+              "configured": true
+            },
+            {
+              "provider": "companion",
+              "displayName": "Windows companion libraries",
+              "role": "library",
+              "authType": "device-credential",
+              "authScopes": ["library:share"],
+              "groupCompatible": true,
+              "discordCompatible": false,
+              "reviewedAt": "2026-09-03",
+              "limitations": [
+                "Playback and download require the owning companion to authorize a transfer to the hub first"
+              ],
+              "capabilities": {
+                "metadata": "available",
+                "search": "available",
+                "preview": "restricted",
+                "playback": "restricted",
+                "importLikes": "unsupported",
+                "importPlaylists": "unsupported",
+                "creatorDownload": "unsupported",
+                "userOwnedDownload": "restricted",
+                "groupSync": "unsupported",
+                "eq": "available",
+                "reason": "Available after the owning companion transfers the file to the hub"
+              },
+              "enabled": true,
+              "configured": true
+            },
+            {
+              "provider": "musicbrainz",
+              "displayName": "MusicBrainz",
+              "role": "metadata-only",
+              "docsUrl": "https://musicbrainz.org/doc/MusicBrainz_API",
+              "authType": "none",
+              "authScopes": [],
+              "attribution": "Data from MusicBrainz",
+              "rateStrategy": "1 request/second, single concurrency, descriptive User-Agent",
+              "cachePolicy": "24 h",
+              "groupCompatible": false,
+              "discordCompatible": false,
+              "reviewedAt": "2026-09-03",
+              "limitations": [
+                "Metadata only; never streams or downloads audio",
+                "Requests without a contact email in the User-Agent are throttled by MusicBrainz"
+              ],
+              "capabilities": {
+                "metadata": "requires_auth",
+                "search": "requires_auth",
+                "preview": "unsupported",
+                "playback": "unsupported",
+                "importLikes": "unsupported",
+                "importPlaylists": "unsupported",
+                "creatorDownload": "unsupported",
+                "userOwnedDownload": "unsupported",
+                "groupSync": "unsupported",
+                "eq": "unsupported",
+                "reason": "Needs setting up: add a contact email under Music ▸ Providers."
+              },
+              "enabled": true,
+              "configured": false
+            },
+            {
+              "provider": "youtube",
+              "displayName": "YouTube",
+              "role": "audio-source",
+              "docsUrl": "https://developers.google.com/youtube/v3",
+              "authType": "api-key",
+              "authScopes": ["https://www.googleapis.com/auth/youtube.readonly"],
+              "attribution": "YouTube",
+              "rateStrategy": "10,000 units/day; search costs 100 units; results cached 1 h; background discovery shed first",
+              "cachePolicy": "1 h search, 24 h metadata",
+              "groupCompatible": true,
+              "discordCompatible": false,
+              "reviewedAt": "2026-09-03",
+              "limitations": [
+                "Plays only inside the embedded YouTube player; audio is not available to the EQ",
+                "No downloads",
+                "Group sync is best effort (embedded players cannot be aligned exactly)",
+                "Requires an API key restricted to this hub; OAuth client id/secret for library import"
+              ],
+              "capabilities": {
+                "metadata": "requires_auth",
+                "search": "requires_auth",
+                "preview": "unsupported",
+                "playback": "requires_auth",
+                "importLikes": "requires_auth",
+                "importPlaylists": "requires_auth",
+                "creatorDownload": "unsupported",
+                "userOwnedDownload": "unsupported",
+                "groupSync": "best_effort",
+                "eq": "unsupported",
+                "reason": "Needs setting up: add an API key under Music ▸ Providers."
+              },
+              "enabled": true,
+              "configured": false
+            },
+            {
+              "provider": "soundcloud",
+              "displayName": "SoundCloud",
+              "role": "audio-source",
+              "docsUrl": "https://developers.soundcloud.com/docs/api/guide.html",
+              "authType": "oauth-pkce",
+              "authScopes": ["non-expiring"],
+              "attribution": "on SoundCloud",
+              "rateStrategy": "Client-level limits; 429 Retry-After honoured; app token reused until expiry",
+              "cachePolicy": "1 h",
+              "groupCompatible": true,
+              "discordCompatible": true,
+              "reviewedAt": "2026-09-03",
+              "limitations": [
+                "Only tracks marked playable stream; preview-only tracks play 30 s",
+                "Downloads only when the creator enabled them",
+                "App registration currently requires a request form"
+              ],
+              "capabilities": {
+                "metadata": "requires_auth",
+                "search": "requires_auth",
+                "preview": "restricted",
+                "playback": "restricted",
+                "importLikes": "requires_auth",
+                "importPlaylists": "requires_auth",
+                "creatorDownload": "restricted",
+                "userOwnedDownload": "unsupported",
+                "groupSync": "best_effort",
+                "eq": "restricted",
+                "reason": "Needs setting up: add a client ID and a client secret under Music ▸ Providers."
+              },
+              "enabled": true,
+              "configured": false
+            },
+            {
+              "provider": "spotify",
+              "displayName": "Spotify",
+              "role": "metadata-only",
+              "docsUrl": "https://developer.spotify.com/documentation/web-api",
+              "authType": "oauth-pkce",
+              "authScopes": ["user-library-read", "playlist-read-private"],
+              "attribution": "Spotify",
+              "rateStrategy": "30-second rolling window; Retry-After honoured; batch endpoints; playlist snapshot_id checks",
+              "cachePolicy": "1 h",
+              "groupCompatible": false,
+              "discordCompatible": false,
+              "reviewedAt": "2026-09-03",
+              "limitations": [
+                "No audio through the hub: Spotify playback requires the Web Playback SDK, Premium and the browser",
+                "Preview clips are unavailable to new API applications",
+                "Development-mode apps allow only allowlisted users; extended quota is required for multi-user use"
+              ],
+              "capabilities": {
+                "metadata": "requires_auth",
+                "search": "requires_auth",
+                "preview": "unsupported",
+                "playback": "restricted",
+                "importLikes": "requires_auth",
+                "importPlaylists": "requires_auth",
+                "creatorDownload": "unsupported",
+                "userOwnedDownload": "unsupported",
+                "groupSync": "unsupported",
+                "eq": "unsupported",
+                "reason": "Needs setting up: add a client ID and a client secret under Music ▸ Providers."
+              },
+              "enabled": true,
+              "configured": false
+            },
+            {
+              "provider": "bandcamp",
+              "displayName": "Bandcamp",
+              "role": "metadata-only",
+              "docsUrl": "https://bandcamp.com/developer",
+              "authType": "none",
+              "authScopes": [],
+              "attribution": "Bandcamp",
+              "groupCompatible": false,
+              "discordCompatible": false,
+              "reviewedAt": "2026-09-03",
+              "limitations": [
+                "No public API: only deep links are supported",
+                "Purchases are imported from your own Bandcamp download export via the Windows companion"
+              ],
+              "capabilities": {
+                "metadata": "restricted",
+                "search": "unsupported",
+                "preview": "unsupported",
+                "playback": "unsupported",
+                "importLikes": "unsupported",
+                "importPlaylists": "unsupported",
+                "creatorDownload": "unsupported",
+                "userOwnedDownload": "unsupported",
+                "groupSync": "unsupported",
+                "eq": "unsupported",
+                "reason": "Bandcamp offers no public API; open the link at Bandcamp to listen or buy"
+              },
+              "enabled": true,
+              "configured": true
+            },
+            {
+              "provider": "external-tool",
+              "displayName": "External media tool (yt-dlp)",
+              "role": "tool",
+              "authType": "local",
+              "authScopes": [],
+              "groupCompatible": false,
+              "discordCompatible": false,
+              "reviewedAt": "2026-09-03",
+              "limitations": [
+                "Ready without setup: yt-dlp and spotDL, limited to the hosts on its list; an administrator can turn it off",
+                "Only for content you own or are licensed to download; the request records the rights basis",
+                "No cookies, credentials or DRM circumvention; the tool runs without a shell and with a timeout",
+                "A playlist, set or album link becomes one download per entry (at most 200), each tagged with its title, artist, date and cover",
+                "spotDL is not on this hub yet, so open.spotify.com links cannot be read or saved"
+              ],
+              "capabilities": {
+                "metadata": "restricted",
+                "search": "unsupported",
+                "preview": "unsupported",
+                "playback": "unsupported",
+                "importLikes": "unsupported",
+                "importPlaylists": "unsupported",
+                "creatorDownload": "restricted",
+                "userOwnedDownload": "restricted",
+                "groupSync": "unsupported",
+                "eq": "unsupported",
+                "reason": "Only for allowlisted hosts and content you have rights to"
+              },
+              "enabled": true,
+              "configured": true
+            },
+            {
+              "provider": "deezer",
+              "displayName": "Deezer (tempo)",
+              "role": "metadata-only",
+              "docsUrl": "https://developers.deezer.com/api",
+              "authType": "none",
+              "authScopes": [],
+              "attribution": "Tempo data from Deezer",
+              "rateStrategy": "Public API; 50 requests per 5 s; backoff on 4xx",
+              "cachePolicy": "stored on the canonical row",
+              "groupCompatible": false,
+              "discordCompatible": false,
+              "limitations": [
+                "Tempo is present for a subset of the catalogue and 0 means unmeasured; no audio, no previews."
+              ],
+              "reviewedAt": "2026-09-03",
+              "capabilities": {
+                "metadata": "available",
+                "search": "unsupported",
+                "preview": "unsupported",
+                "playback": "unsupported",
+                "importLikes": "unsupported",
+                "importPlaylists": "unsupported",
+                "creatorDownload": "unsupported",
+                "userOwnedDownload": "unsupported",
+                "groupSync": "unsupported",
+                "eq": "unsupported",
+                "reason": "Tempo and duration only; never audio"
+              },
+              "enabled": true,
+              "configured": true
+            },
+            {
+              "provider": "acousticbrainz",
+              "displayName": "AcousticBrainz (tempo archive)",
+              "role": "metadata-only",
+              "docsUrl": "https://acousticbrainz.org/data",
+              "authType": "none",
+              "authScopes": [],
+              "attribution": "AcousticBrainz (CC0)",
+              "rateStrategy": "Archive; one lookup per recording, never retried on 404",
+              "cachePolicy": "stored on the canonical row",
+              "groupCompatible": false,
+              "discordCompatible": false,
+              "limitations": [
+                "Archive frozen in 2022: nothing released since is known; needs a MusicBrainz recording id."
+              ],
+              "reviewedAt": "2026-09-03",
+              "capabilities": {
+                "metadata": "available",
+                "search": "unsupported",
+                "preview": "unsupported",
+                "playback": "unsupported",
+                "importLikes": "unsupported",
+                "importPlaylists": "unsupported",
+                "creatorDownload": "unsupported",
+                "userOwnedDownload": "unsupported",
+                "groupSync": "unsupported",
+                "eq": "unsupported",
+                "reason": "Archived analysis by MusicBrainz id; collection ended in 2022"
+              },
+              "enabled": true,
+              "configured": true
+            },
+            {
+              "provider": "lastfm",
+              "displayName": "Last.fm (tags)",
+              "role": "metadata-only",
+              "docsUrl": "https://www.last.fm/api",
+              "authType": "api-key",
+              "authScopes": [],
+              "attribution": "Tags from Last.fm",
+              "rateStrategy": "5 requests per second per key",
+              "cachePolicy": "stored on the canonical row",
+              "groupCompatible": false,
+              "discordCompatible": false,
+              "limitations": [
+                "Tags are community text and arrive weighted by votes; without an API key nothing is fetched."
+              ],
+              "reviewedAt": "2026-09-03",
+              "capabilities": {
+                "metadata": "requires_auth",
+                "search": "unsupported",
+                "preview": "unsupported",
+                "playback": "unsupported",
+                "importLikes": "unsupported",
+                "importPlaylists": "unsupported",
+                "creatorDownload": "unsupported",
+                "userOwnedDownload": "unsupported",
+                "groupSync": "unsupported",
+                "eq": "unsupported",
+                "reason": "Needs setting up: add an API key under Music ▸ Providers."
+              },
+              "enabled": true,
+              "configured": false
+            }
+          ],
+          "health": [
+            {
+              "provider": "hub",
+              "status": "ok",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:41.101Z"
+            },
+            {
+              "provider": "public-domain",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:41.101Z",
+              "lastError": "NP_PUBLIC_DOMAIN_DIR is not set"
+            },
+            {
+              "provider": "companion",
+              "status": "ok",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:41.101Z"
+            },
+            {
+              "provider": "musicbrainz",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:41.101Z",
+              "lastError": "Missing contactEmail"
+            },
+            {
+              "provider": "youtube",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:41.101Z",
+              "lastError": "Missing apiKey"
+            },
+            {
+              "provider": "soundcloud",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:41.101Z",
+              "lastError": "Missing clientId, clientSecret"
+            },
+            {
+              "provider": "spotify",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:41.101Z",
+              "lastError": "Missing clientId, clientSecret"
+            },
+            {
+              "provider": "bandcamp",
+              "status": "ok",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:41.101Z"
+            },
+            {
+              "provider": "external-tool",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:41.101Z",
+              "lastError": "/usr/local/bin/yt-dlp is not on this hub yet"
+            },
+            {
+              "provider": "deezer",
+              "status": "ok",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:41.121Z"
+            },
+            {
+              "provider": "acousticbrainz",
+              "status": "ok",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:41.121Z"
+            },
+            {
+              "provider": "lastfm",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:41.121Z",
+              "lastError": "Missing apiKey"
+            }
+          ]
+        }
+      },
+      "GET /api/v1/hub": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "hubId": "01a10fe5-73b2-708f-8b86-87c61a216028",
+          "name": "Airwave Hub",
+          "version": "0.1.0",
+          "contractsVersion": "1.0.0",
+          "protocolVersion": 1,
+          "minSupportedProtocolVersion": 1,
+          "publicKey": "J_Csj1lzwXF-0Y3NPxBhPy2DrdO33mmH5-r7wDo-5F0",
+          "fingerprint": "999B-07D3-2899-310E-DDC8-D6EC-569B-0D84",
+          "bindMode": "localhost",
+          "publicEndpoint": null,
+          "setupComplete": false,
+          "codeOnlyPairingAvailable": false
+        }
+      },
+      "GET /api/v1/network": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "bindMode": "localhost",
+          "bindAddress": "127.0.0.1",
+          "port": 4546,
+          "publicEndpoint": null,
+          "trustedProxyCidrs": [],
+          "ipLogging": {
+            "mode": "truncated",
+            "retentionDays": 7
+          },
+          "tlsTerminatedByProxy": false,
+          "restartRequired": false,
+          "warnings": []
+        }
+      },
+      "GET /api/v1/metrics/overview": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "hub": {
+            "hubId": "01a10fe5-73b2-708f-8b86-87c61a216028",
+            "name": "Airwave Hub",
+            "version": "0.1.0",
+            "contractsVersion": "1.0.0",
+            "protocolVersion": 1,
+            "minSupportedProtocolVersion": 1,
+            "publicKey": "J_Csj1lzwXF-0Y3NPxBhPy2DrdO33mmH5-r7wDo-5F0",
+            "fingerprint": "999B-07D3-2899-310E-DDC8-D6EC-569B-0D84",
+            "bindMode": "localhost",
+            "publicEndpoint": null,
+            "setupComplete": false,
+            "codeOnlyPairingAvailable": false
+          },
+          "uptimeSeconds": 3,
+          "startedAt": "2026-10-06T06:27:37.936Z",
+          "connections": {
+            "active": 0,
+            "players": 0,
+            "companions": 0,
+            "historical": 0,
+            "reconnects": 0,
+            "wsErrors": 0
+          },
+          "pairing": {
+            "pending": 0,
+            "attempts": 0,
+            "failures": 0
+          },
+          "groups": [],
+          "providers": [
+            {
+              "provider": "hub",
+              "status": "ok",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:41.124Z"
+            },
+            {
+              "provider": "public-domain",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:41.124Z",
+              "lastError": "NP_PUBLIC_DOMAIN_DIR is not set"
+            },
+            {
+              "provider": "companion",
+              "status": "ok",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:41.124Z"
+            },
+            {
+              "provider": "musicbrainz",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:41.124Z",
+              "lastError": "Missing contactEmail"
+            },
+            {
+              "provider": "youtube",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:41.124Z",
+              "lastError": "Missing apiKey"
+            },
+            {
+              "provider": "soundcloud",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:41.124Z",
+              "lastError": "Missing clientId, clientSecret"
+            },
+            {
+              "provider": "spotify",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:41.124Z",
+              "lastError": "Missing clientId, clientSecret"
+            },
+            {
+              "provider": "bandcamp",
+              "status": "ok",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:41.124Z"
+            },
+            {
+              "provider": "external-tool",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:41.124Z",
+              "lastError": "/usr/local/bin/yt-dlp is not on this hub yet"
+            },
+            {
+              "provider": "deezer",
+              "status": "ok",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:41.144Z"
+            },
+            {
+              "provider": "acousticbrainz",
+              "status": "ok",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:41.144Z"
+            },
+            {
+              "provider": "lastfm",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:41.144Z",
+              "lastError": "Missing apiKey"
+            }
+          ],
+          "jobs": {
+            "queued": 0,
+            "running": 0,
+            "failed": 0,
+            "completed": 0
+          },
+          "discord": {
+            "enabled": false,
+            "configured": false,
+            "gateway": "stopped",
+            "voice": "idle",
+            "commandsRegistered": false,
+            "commandsRegisteredAt": null,
+            "messageContentIntent": "unknown",
+            "latencyMs": null,
+            "reconnects": 0,
+            "errors": 0,
+            "uptimeSeconds": 0,
+            "currentGuildId": null,
+            "currentVoiceChannelId": null,
+            "currentTrackTitle": null,
+            "lastError": null,
+            "warnings": [
+              "The bot has no token yet. Paste one in Bot token, then choose Save and Start.",
+              "No group is chosen in Group it controls, so commands have nothing to play to.",
+              "Prefix commands only work once Discord lets the bot read messages: turn on Message Content Intent for the bot in Discord’s Developer Portal. Slash commands work without it.",
+              "The bot answers in every server it is invited to. To limit it, list server IDs in Server allowlist.",
+              "The hub’s Discord service isn’t running, so the bot can’t start. Install the hub again with the Discord option (see the Discord bot guide), then choose Save and Start."
+            ]
+          },
+          "database": {
+            "migrationVersion": 7,
+            "sizeBytes": 4096,
+            "lastBackupAt": null,
+            "walMode": true
+          },
+          "storage": {
+            "dataDir": "/data",
+            "freeBytes": 45563621376,
+            "totalBytes": 1023139958784
+          },
+          "alerts": [
+            {
+              "level": "error",
+              "message": "The admin password is still “admin”. Most of the hub is off until it’s changed."
+            },
+            {
+              "level": "error",
+              "message": "The data volume is 96% full. Downloads and backups will start failing."
+            },
+            {
+              "level": "info",
+              "message": "No backup has been taken yet. System ▸ Backup makes one."
+            }
+          ],
+          "memoryRssBytes": 111607808
+        }
+      }
+    },
+    "setting-up": {
+      "POST /api/v1/auth/change-password": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "authenticated": true,
+          "username": "admin",
+          "mustChangePassword": false,
+          "csrfToken": "mockup-csrf-token",
+          "setupComplete": true,
+          "expiresAt": "2026-10-06T18:27:43.809Z"
+        }
+      },
+      "GET /api/v1/auth/session": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "authenticated": true,
+          "username": "admin",
+          "mustChangePassword": false,
+          "csrfToken": "mockup-csrf-token",
+          "setupComplete": true,
+          "expiresAt": "2026-10-06T18:27:43.809Z"
+        }
+      },
+      "GET /api/v1/devices": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "items": []
+        }
+      },
+      "GET /api/v1/library/roots": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "items": []
+        }
+      },
+      "GET /api/v1/metrics/overview": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "hub": {
+            "hubId": "01a10fe5-73b2-708f-8b86-87c61a216028",
+            "name": "Airwave Hub",
+            "version": "0.1.0",
+            "contractsVersion": "1.0.0",
+            "protocolVersion": 1,
+            "minSupportedProtocolVersion": 1,
+            "publicKey": "J_Csj1lzwXF-0Y3NPxBhPy2DrdO33mmH5-r7wDo-5F0",
+            "fingerprint": "999B-07D3-2899-310E-DDC8-D6EC-569B-0D84",
+            "bindMode": "localhost",
+            "publicEndpoint": null,
+            "setupComplete": true,
+            "codeOnlyPairingAvailable": false
+          },
+          "uptimeSeconds": 11,
+          "startedAt": "2026-10-06T06:27:37.936Z",
+          "connections": {
+            "active": 0,
+            "players": 0,
+            "companions": 0,
+            "historical": 0,
+            "reconnects": 0,
+            "wsErrors": 0
+          },
+          "pairing": {
+            "pending": 0,
+            "attempts": 0,
+            "failures": 0
+          },
+          "groups": [],
+          "providers": [
+            {
+              "provider": "hub",
+              "status": "ok",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:48.831Z"
+            },
+            {
+              "provider": "public-domain",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:48.831Z",
+              "lastError": "NP_PUBLIC_DOMAIN_DIR is not set"
+            },
+            {
+              "provider": "companion",
+              "status": "ok",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:48.831Z"
+            },
+            {
+              "provider": "musicbrainz",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:48.831Z",
+              "lastError": "Missing contactEmail"
+            },
+            {
+              "provider": "youtube",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:48.831Z",
+              "lastError": "Missing apiKey"
+            },
+            {
+              "provider": "soundcloud",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:48.831Z",
+              "lastError": "Missing clientId, clientSecret"
+            },
+            {
+              "provider": "spotify",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:48.831Z",
+              "lastError": "Missing clientId, clientSecret"
+            },
+            {
+              "provider": "bandcamp",
+              "status": "ok",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:48.831Z"
+            },
+            {
+              "provider": "external-tool",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:48.831Z",
+              "lastError": "/usr/local/bin/yt-dlp is not on this hub yet"
+            },
+            {
+              "provider": "deezer",
+              "status": "ok",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:48.846Z"
+            },
+            {
+              "provider": "acousticbrainz",
+              "status": "ok",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:48.846Z"
+            },
+            {
+              "provider": "lastfm",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:27:48.846Z",
+              "lastError": "Missing apiKey"
+            }
+          ],
+          "jobs": {
+            "queued": 0,
+            "running": 0,
+            "failed": 0,
+            "completed": 0
+          },
+          "discord": {
+            "enabled": false,
+            "configured": false,
+            "gateway": "stopped",
+            "voice": "idle",
+            "commandsRegistered": false,
+            "commandsRegisteredAt": null,
+            "messageContentIntent": "unknown",
+            "latencyMs": null,
+            "reconnects": 0,
+            "errors": 0,
+            "uptimeSeconds": 0,
+            "currentGuildId": null,
+            "currentVoiceChannelId": null,
+            "currentTrackTitle": null,
+            "lastError": null,
+            "warnings": [
+              "The bot has no token yet. Paste one in Bot token, then choose Save and Start.",
+              "No group is chosen in Group it controls, so commands have nothing to play to.",
+              "Prefix commands only work once Discord lets the bot read messages: turn on Message Content Intent for the bot in Discord’s Developer Portal. Slash commands work without it.",
+              "The bot answers in every server it is invited to. To limit it, list server IDs in Server allowlist.",
+              "The hub’s Discord service isn’t running, so the bot can’t start. Install the hub again with the Discord option (see the Discord bot guide), then choose Save and Start."
+            ]
+          },
+          "database": {
+            "migrationVersion": 7,
+            "sizeBytes": 4096,
+            "lastBackupAt": null,
+            "walMode": true
+          },
+          "storage": {
+            "dataDir": "/data",
+            "freeBytes": 45562667008,
+            "totalBytes": 1023139958784
+          },
+          "alerts": [
+            {
+              "level": "error",
+              "message": "The data volume is 96% full. Downloads and backups will start failing."
+            },
+            {
+              "level": "info",
+              "message": "No backup has been taken yet. System ▸ Backup makes one."
+            }
+          ],
+          "memoryRssBytes": 123273216
+        }
+      }
+    },
+    "signed-in": {
+      "GET /api/v1/devices": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "items": [
+            {
+              "id": "01a10fe5-a01d-70e6-b8b7-c15177ebca06",
+              "schemaVersion": 1,
+              "createdAt": "2026-10-06T06:27:49.405Z",
+              "updatedAt": "2026-10-06T06:27:49.405Z",
+              "deletedAt": null,
+              "kind": "player",
+              "name": "Kitchen speaker",
+              "publicKeyFingerprint": "D8E0-806F-F584-4C2B-0CF5-16D3-61AA-639D",
+              "publicKey": "kitchenspeaker-device-key-0000000000",
+              "appVersion": "0.1.0",
+              "protocolVersion": 1,
+              "scopes": ["library:read", "group:member", "search:use"],
+              "lastSeenAt": null,
+              "revokedAt": null,
+              "hubUserId": "01a10fe5-a01e-708d-b73b-27a1a82f3bff",
+              "online": false,
+              "latencyMs": null,
+              "connectedGroupId": null,
+              "connectedAt": null,
+              "ipDisplay": null,
+              "syncDriftMs": null,
+              "transferState": null,
+              "credentialCount": 1
+            },
+            {
+              "id": "01a10fe5-a05d-70df-808f-e217752d3bc8",
+              "schemaVersion": 1,
+              "createdAt": "2026-10-06T06:27:49.469Z",
+              "updatedAt": "2026-10-06T06:27:49.469Z",
+              "deletedAt": null,
+              "kind": "companion",
+              "name": "Studio PC",
+              "publicKeyFingerprint": "94D6-00E4-D711-5217-3F72-BA29-ECC6-93D5",
+              "publicKey": "studiopc-device-key-0000000000",
+              "appVersion": "0.1.0",
+              "protocolVersion": 1,
+              "scopes": ["library:read", "library:share", "files:serve"],
+              "lastSeenAt": null,
+              "revokedAt": null,
+              "hubUserId": "01a10fe5-a05e-7021-898f-53a731bcb257",
+              "online": false,
+              "latencyMs": null,
+              "connectedGroupId": null,
+              "connectedAt": null,
+              "ipDisplay": null,
+              "syncDriftMs": null,
+              "transferState": null,
+              "credentialCount": 1
+            }
+          ]
+        }
+      },
+      "GET /api/v1/pairing/sessions": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "items": [
+            {
+              "id": "01a10fe5-a02d-7046-b6fc-a76b5af23de9",
+              "hubId": "01a10fe5-73b2-708f-8b86-87c61a216028",
+              "deviceKind": "companion",
+              "requestedScopes": ["library:read", "library:share", "files:serve"],
+              "createdBy": "admin",
+              "createdAt": "2026-10-06T06:27:49.422Z",
+              "expiresAt": "2026-10-06T06:37:49.422Z",
+              "attempts": 0,
+              "maxAttempts": 5,
+              "state": "consumed",
+              "claimedDeviceName": "Studio PC",
+              "claimedPublicKey": "studiopc-device-key-0000000000",
+              "claimedAppVersion": "0.1.0",
+              "claimedProtocolVersion": 1,
+              "verificationFingerprint": "21DC-D40E-6E31",
+              "consumedAt": "2026-10-06T06:27:49.469Z",
+              "resultingDeviceId": "01a10fe5-a05d-70df-808f-e217752d3bc8"
+            },
+            {
+              "id": "01a10fe5-9fe0-70ab-b20f-04ae52a51755",
+              "hubId": "01a10fe5-73b2-708f-8b86-87c61a216028",
+              "deviceKind": "player",
+              "requestedScopes": ["library:read", "group:member", "search:use"],
+              "createdBy": "admin",
+              "createdAt": "2026-10-06T06:27:49.344Z",
+              "expiresAt": "2026-10-06T06:37:49.344Z",
+              "attempts": 0,
+              "maxAttempts": 5,
+              "state": "consumed",
+              "claimedDeviceName": "Kitchen speaker",
+              "claimedPublicKey": "kitchenspeaker-device-key-0000000000",
+              "claimedAppVersion": "0.1.0",
+              "claimedProtocolVersion": 1,
+              "verificationFingerprint": "F5C8-4A65-92FA",
+              "consumedAt": "2026-10-06T06:27:49.405Z",
+              "resultingDeviceId": "01a10fe5-a01d-70e6-b8b7-c15177ebca06"
+            }
+          ]
+        }
+      },
+      "GET /api/v1/hub": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "hubId": "01a10fe5-73b2-708f-8b86-87c61a216028",
+          "name": "Airwave Hub",
+          "version": "0.1.0",
+          "contractsVersion": "1.0.0",
+          "protocolVersion": 1,
+          "minSupportedProtocolVersion": 1,
+          "publicKey": "J_Csj1lzwXF-0Y3NPxBhPy2DrdO33mmH5-r7wDo-5F0",
+          "fingerprint": "999B-07D3-2899-310E-DDC8-D6EC-569B-0D84",
+          "bindMode": "localhost",
+          "publicEndpoint": null,
+          "setupComplete": true,
+          "codeOnlyPairingAvailable": false
+        }
+      },
+      "GET /api/v1/admin/profiles": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "items": [
+            {
+              "id": "01a10fe5-a01e-708d-b73b-27a1a82f3bff",
+              "displayName": "Kitchen speaker",
+              "avatarUrl": null,
+              "playlistCount": 0,
+              "claimed": false,
+              "updatedAt": "2026-10-06T06:27:49.406Z"
+            },
+            {
+              "id": "01a10fe5-a05e-7021-898f-53a731bcb257",
+              "displayName": "Studio PC",
+              "avatarUrl": null,
+              "playlistCount": 0,
+              "claimed": false,
+              "updatedAt": "2026-10-06T06:27:49.470Z"
+            }
+          ]
+        }
+      },
+      "GET /api/v1/metrics/overview": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "hub": {
+            "hubId": "01a10fe5-73b2-708f-8b86-87c61a216028",
+            "name": "Airwave Hub",
+            "version": "0.1.0",
+            "contractsVersion": "1.0.0",
+            "protocolVersion": 1,
+            "minSupportedProtocolVersion": 1,
+            "publicKey": "J_Csj1lzwXF-0Y3NPxBhPy2DrdO33mmH5-r7wDo-5F0",
+            "fingerprint": "999B-07D3-2899-310E-DDC8-D6EC-569B-0D84",
+            "bindMode": "localhost",
+            "publicEndpoint": null,
+            "setupComplete": true,
+            "codeOnlyPairingAvailable": false
+          },
+          "uptimeSeconds": 36,
+          "startedAt": "2026-10-06T06:27:37.936Z",
+          "connections": {
+            "active": 0,
+            "players": 0,
+            "companions": 0,
+            "historical": 0,
+            "reconnects": 0,
+            "wsErrors": 0
+          },
+          "pairing": {
+            "pending": 0,
+            "attempts": 2,
+            "failures": 0
+          },
+          "groups": [
+            {
+              "groupId": "01a10fe5-a06d-709d-9469-badda23fe07d",
+              "name": "Kitchen",
+              "queueLength": 0,
+              "listeners": 0,
+              "status": "idle"
+            },
+            {
+              "groupId": "01a10fe5-a07c-70fd-bc68-d1aff0113e2a",
+              "name": "Friday night",
+              "queueLength": 0,
+              "listeners": 0,
+              "status": "idle"
+            }
+          ],
+          "providers": [
+            {
+              "provider": "hub",
+              "status": "ok",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:28:13.830Z"
+            },
+            {
+              "provider": "public-domain",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:28:13.830Z",
+              "lastError": "NP_PUBLIC_DOMAIN_DIR is not set"
+            },
+            {
+              "provider": "companion",
+              "status": "ok",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:28:13.830Z"
+            },
+            {
+              "provider": "musicbrainz",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:28:13.830Z",
+              "lastError": "Missing contactEmail"
+            },
+            {
+              "provider": "youtube",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:28:13.830Z",
+              "lastError": "Missing apiKey"
+            },
+            {
+              "provider": "soundcloud",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:28:13.830Z",
+              "lastError": "Missing clientId, clientSecret"
+            },
+            {
+              "provider": "spotify",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:28:13.830Z",
+              "lastError": "Missing clientId, clientSecret"
+            },
+            {
+              "provider": "bandcamp",
+              "status": "ok",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:28:13.830Z"
+            },
+            {
+              "provider": "external-tool",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:28:13.830Z",
+              "lastError": "/usr/local/bin/yt-dlp is not on this hub yet"
+            },
+            {
+              "provider": "deezer",
+              "status": "ok",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:28:13.845Z"
+            },
+            {
+              "provider": "acousticbrainz",
+              "status": "ok",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:28:13.845Z"
+            },
+            {
+              "provider": "lastfm",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:28:13.845Z",
+              "lastError": "Missing apiKey"
+            }
+          ],
+          "jobs": {
+            "queued": 0,
+            "running": 0,
+            "failed": 0,
+            "completed": 0
+          },
+          "discord": {
+            "enabled": false,
+            "configured": false,
+            "gateway": "stopped",
+            "voice": "idle",
+            "commandsRegistered": false,
+            "commandsRegisteredAt": null,
+            "messageContentIntent": "unknown",
+            "latencyMs": null,
+            "reconnects": 0,
+            "errors": 0,
+            "uptimeSeconds": 0,
+            "currentGuildId": null,
+            "currentVoiceChannelId": null,
+            "currentTrackTitle": null,
+            "lastError": null,
+            "warnings": [
+              "The bot has no token yet. Paste one in Bot token, then choose Save and Start.",
+              "No group is chosen in Group it controls, so commands have nothing to play to.",
+              "Prefix commands only work once Discord lets the bot read messages: turn on Message Content Intent for the bot in Discord’s Developer Portal. Slash commands work without it.",
+              "The bot answers in every server it is invited to. To limit it, list server IDs in Server allowlist.",
+              "The hub’s Discord service isn’t running, so the bot can’t start. Install the hub again with the Discord option (see the Discord bot guide), then choose Save and Start."
+            ]
+          },
+          "database": {
+            "migrationVersion": 7,
+            "sizeBytes": 643072,
+            "lastBackupAt": "2026-10-06T06:27:49.580Z",
+            "walMode": true
+          },
+          "storage": {
+            "dataDir": "/data",
+            "freeBytes": 45560786944,
+            "totalBytes": 1023139958784
+          },
+          "alerts": [
+            {
+              "level": "error",
+              "message": "The data volume is 96% full. Downloads and backups will start failing."
+            }
+          ],
+          "memoryRssBytes": 135094272
+        }
+      },
+      "GET /api/v1/library/roots": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "items": [
+            {
+              "id": "01a10fe5-908f-7034-80f1-e520a03e7392",
+              "schemaVersion": 1,
+              "createdAt": "2026-10-06T06:27:45.423Z",
+              "updatedAt": "2026-10-06T06:27:49.214Z",
+              "deletedAt": null,
+              "deviceId": "01a10fe5-73b2-708f-8b86-87c61a216028",
+              "kind": "hub-directory",
+              "displayName": "Albums",
+              "handleId": "albums",
+              "status": "connected",
+              "lastScanAt": "2026-10-06T06:27:49.214Z",
+              "lastScanError": null,
+              "trackCount": 5,
+              "watch": true,
+              "scanCheckpoint": null
+            },
+            {
+              "id": "01a10fe5-9099-7000-9b6c-05d52c8a719d",
+              "schemaVersion": 1,
+              "createdAt": "2026-10-06T06:27:45.433Z",
+              "updatedAt": "2026-10-06T06:27:49.216Z",
+              "deletedAt": null,
+              "deviceId": "01a10fe5-73b2-708f-8b86-87c61a216028",
+              "kind": "hub-directory",
+              "displayName": "Live recordings",
+              "handleId": "live",
+              "status": "connected",
+              "lastScanAt": "2026-10-06T06:27:49.216Z",
+              "lastScanError": null,
+              "trackCount": 1,
+              "watch": true,
+              "scanCheckpoint": null
+            }
+          ]
+        }
+      },
+      "GET /api/v1/library/tracks?limit=100": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "items": [
+            {
+              "id": "01a10fe5-9f56-7035-9da1-35ede8eb8830",
+              "schemaVersion": 1,
+              "createdAt": "2026-10-06T06:27:49.206Z",
+              "updatedAt": "2026-10-06T06:27:49.206Z",
+              "deletedAt": null,
+              "title": "Harbour Morning",
+              "artistId": null,
+              "artistName": "Alder Quartet",
+              "albumId": null,
+              "albumName": "First Light",
+              "albumArtistName": null,
+              "discNumber": null,
+              "trackNumber": null,
+              "genre": null,
+              "genres": [],
+              "tags": [],
+              "year": null,
+              "durationMs": 3000,
+              "bpm": null,
+              "bpmSource": null,
+              "featuredArtists": [],
+              "genreProfile": {},
+              "identity": {
+                "contentHash": "49637cfd49abf46005a030d020a03f62908265ecd609f220aee271d3cd6bfb48",
+                "quickHash": null,
+                "isrc": null,
+                "musicbrainzRecordingId": null,
+                "musicbrainzReleaseId": null,
+                "acoustidId": null,
+                "providerIds": {
+                  "hub": ["01a10fe5-9f56-7035-9da1-35ede8eb8830"]
+                }
+              },
+              "locators": [
+                {
+                  "kind": "hub-blob",
+                  "hubId": "01a10fe5-73b2-708f-8b86-87c61a216028",
+                  "blobId": "49637cfd49abf46005a030d020a03f62908265ecd609f220aee271d3cd6bfb48"
+                }
+              ],
+              "artworkId": null,
+              "format": {
+                "mime": "audio/wav",
+                "sizeBytes": 48122,
+                "container": "WAVE",
+                "codec": "PCM",
+                "sampleRateHz": 8000,
+                "bitrateKbps": 128,
+                "channels": 1,
+                "lossless": true
+              },
+              "rootId": "01a10fe5-908f-7034-80f1-e520a03e7392",
+              "unsupportedReason": null,
+              "liked": false,
+              "explicit": null,
+              "popularity": null
+            },
+            {
+              "id": "01a10fe5-9f58-7029-8bfd-2d0f08a0ee18",
+              "schemaVersion": 1,
+              "createdAt": "2026-10-06T06:27:49.208Z",
+              "updatedAt": "2026-10-06T06:27:49.208Z",
+              "deletedAt": null,
+              "title": "Gantry",
+              "artistId": null,
+              "artistName": "Alder Quartet",
+              "albumId": null,
+              "albumName": "First Light",
+              "albumArtistName": null,
+              "discNumber": null,
+              "trackNumber": null,
+              "genre": null,
+              "genres": [],
+              "tags": [],
+              "year": null,
+              "durationMs": 4000,
+              "bpm": null,
+              "bpmSource": null,
+              "featuredArtists": [],
+              "genreProfile": {},
+              "identity": {
+                "contentHash": "4052f9973b31d0e4196b9e1ac1e38b58403d7a5625dd9dfff89987fbee06fe59",
+                "quickHash": null,
+                "isrc": null,
+                "musicbrainzRecordingId": null,
+                "musicbrainzReleaseId": null,
+                "acoustidId": null,
+                "providerIds": {
+                  "hub": ["01a10fe5-9f58-7029-8bfd-2d0f08a0ee18"]
+                }
+              },
+              "locators": [
+                {
+                  "kind": "hub-blob",
+                  "hubId": "01a10fe5-73b2-708f-8b86-87c61a216028",
+                  "blobId": "4052f9973b31d0e4196b9e1ac1e38b58403d7a5625dd9dfff89987fbee06fe59"
+                }
+              ],
+              "artworkId": null,
+              "format": {
+                "mime": "audio/wav",
+                "sizeBytes": 64114,
+                "container": "WAVE",
+                "codec": "PCM",
+                "sampleRateHz": 8000,
+                "bitrateKbps": 128,
+                "channels": 1,
+                "lossless": true
+              },
+              "rootId": "01a10fe5-908f-7034-80f1-e520a03e7392",
+              "unsupportedReason": null,
+              "liked": false,
+              "explicit": null,
+              "popularity": null
+            },
+            {
+              "id": "01a10fe5-9f5a-70db-bfaf-2def4c52b1d0",
+              "schemaVersion": 1,
+              "createdAt": "2026-10-06T06:27:49.210Z",
+              "updatedAt": "2026-10-06T06:27:49.210Z",
+              "deletedAt": null,
+              "title": "Blue Hour",
+              "artistId": null,
+              "artistName": "Alder Quartet",
+              "albumId": null,
+              "albumName": "First Light",
+              "albumArtistName": null,
+              "discNumber": null,
+              "trackNumber": null,
+              "genre": null,
+              "genres": [],
+              "tags": [],
+              "year": null,
+              "durationMs": 3000,
+              "bpm": null,
+              "bpmSource": null,
+              "featuredArtists": [],
+              "genreProfile": {},
+              "identity": {
+                "contentHash": "ab4ca8f9cda6df62a60d4ba6047c1da6b8e93a73c7cba4fb7144262d9c484e4f",
+                "quickHash": null,
+                "isrc": null,
+                "musicbrainzRecordingId": null,
+                "musicbrainzReleaseId": null,
+                "acoustidId": null,
+                "providerIds": {
+                  "hub": ["01a10fe5-9f5a-70db-bfaf-2def4c52b1d0"]
+                }
+              },
+              "locators": [
+                {
+                  "kind": "hub-blob",
+                  "hubId": "01a10fe5-73b2-708f-8b86-87c61a216028",
+                  "blobId": "ab4ca8f9cda6df62a60d4ba6047c1da6b8e93a73c7cba4fb7144262d9c484e4f"
+                }
+              ],
+              "artworkId": null,
+              "format": {
+                "mime": "audio/wav",
+                "sizeBytes": 48116,
+                "container": "WAVE",
+                "codec": "PCM",
+                "sampleRateHz": 8000,
+                "bitrateKbps": 128,
+                "channels": 1,
+                "lossless": true
+              },
+              "rootId": "01a10fe5-908f-7034-80f1-e520a03e7392",
+              "unsupportedReason": null,
+              "liked": false,
+              "explicit": null,
+              "popularity": null
+            },
+            {
+              "id": "01a10fe5-9f5b-70c9-a7c8-1005ca192adf",
+              "schemaVersion": 1,
+              "createdAt": "2026-10-06T06:27:49.211Z",
+              "updatedAt": "2026-10-06T06:27:49.211Z",
+              "deletedAt": null,
+              "title": "Paper Harbour",
+              "artistId": null,
+              "artistName": "Birch Ensemble",
+              "albumId": null,
+              "albumName": "Late Shift",
+              "albumArtistName": null,
+              "discNumber": null,
+              "trackNumber": null,
+              "genre": null,
+              "genres": [],
+              "tags": [],
+              "year": null,
+              "durationMs": 5000,
+              "bpm": null,
+              "bpmSource": null,
+              "featuredArtists": [],
+              "genreProfile": {},
+              "identity": {
+                "contentHash": "f6fe7609ac35266c22497764b5bf8a53d8b9addcb715f0bec9cda9a6c7c010b7",
+                "quickHash": null,
+                "isrc": null,
+                "musicbrainzRecordingId": null,
+                "musicbrainzReleaseId": null,
+                "acoustidId": null,
+                "providerIds": {
+                  "hub": ["01a10fe5-9f5b-70c9-a7c8-1005ca192adf"]
+                }
+              },
+              "locators": [
+                {
+                  "kind": "hub-blob",
+                  "hubId": "01a10fe5-73b2-708f-8b86-87c61a216028",
+                  "blobId": "f6fe7609ac35266c22497764b5bf8a53d8b9addcb715f0bec9cda9a6c7c010b7"
+                }
+              ],
+              "artworkId": null,
+              "format": {
+                "mime": "audio/wav",
+                "sizeBytes": 80122,
+                "container": "WAVE",
+                "codec": "PCM",
+                "sampleRateHz": 8000,
+                "bitrateKbps": 128,
+                "channels": 1,
+                "lossless": true
+              },
+              "rootId": "01a10fe5-908f-7034-80f1-e520a03e7392",
+              "unsupportedReason": null,
+              "liked": false,
+              "explicit": null,
+              "popularity": null
+            },
+            {
+              "id": "01a10fe5-9f5d-70a7-bef4-6fca87f87d4c",
+              "schemaVersion": 1,
+              "createdAt": "2026-10-06T06:27:49.213Z",
+              "updatedAt": "2026-10-06T06:27:49.213Z",
+              "deletedAt": null,
+              "title": "Closing Hour",
+              "artistId": null,
+              "artistName": "Birch Ensemble",
+              "albumId": null,
+              "albumName": "Late Shift",
+              "albumArtistName": null,
+              "discNumber": null,
+              "trackNumber": null,
+              "genre": null,
+              "genres": [],
+              "tags": [],
+              "year": null,
+              "durationMs": 4000,
+              "bpm": null,
+              "bpmSource": null,
+              "featuredArtists": [],
+              "genreProfile": {},
+              "identity": {
+                "contentHash": "15f79fa2810686f4f01e32bbeff598ae5c34aec560cb5168914e0f38e0daf3da",
+                "quickHash": null,
+                "isrc": null,
+                "musicbrainzRecordingId": null,
+                "musicbrainzReleaseId": null,
+                "acoustidId": null,
+                "providerIds": {
+                  "hub": ["01a10fe5-9f5d-70a7-bef4-6fca87f87d4c"]
+                }
+              },
+              "locators": [
+                {
+                  "kind": "hub-blob",
+                  "hubId": "01a10fe5-73b2-708f-8b86-87c61a216028",
+                  "blobId": "15f79fa2810686f4f01e32bbeff598ae5c34aec560cb5168914e0f38e0daf3da"
+                }
+              ],
+              "artworkId": null,
+              "format": {
+                "mime": "audio/wav",
+                "sizeBytes": 64122,
+                "container": "WAVE",
+                "codec": "PCM",
+                "sampleRateHz": 8000,
+                "bitrateKbps": 128,
+                "channels": 1,
+                "lossless": true
+              },
+              "rootId": "01a10fe5-908f-7034-80f1-e520a03e7392",
+              "unsupportedReason": null,
+              "liked": false,
+              "explicit": null,
+              "popularity": null
+            },
+            {
+              "id": "01a10fe5-9f5f-701d-b93f-6e15b15a741d",
+              "schemaVersion": 1,
+              "createdAt": "2026-10-06T06:27:49.215Z",
+              "updatedAt": "2026-10-06T06:27:49.215Z",
+              "deletedAt": null,
+              "title": "Signal Fade (live)",
+              "artistId": null,
+              "artistName": "Cassette Bloom",
+              "albumId": null,
+              "albumName": "Live from Pier 9",
+              "albumArtistName": null,
+              "discNumber": null,
+              "trackNumber": null,
+              "genre": null,
+              "genres": [],
+              "tags": [],
+              "year": null,
+              "durationMs": 6000,
+              "bpm": null,
+              "bpmSource": null,
+              "featuredArtists": [],
+              "genreProfile": {},
+              "identity": {
+                "contentHash": "09db0e9ede0e7f35dbce39516eb9fc6fe9ff00b878981d1254ff6aa659147b1a",
+                "quickHash": null,
+                "isrc": null,
+                "musicbrainzRecordingId": null,
+                "musicbrainzReleaseId": null,
+                "acoustidId": null,
+                "providerIds": {
+                  "hub": ["01a10fe5-9f5f-701d-b93f-6e15b15a741d"]
+                }
+              },
+              "locators": [
+                {
+                  "kind": "hub-blob",
+                  "hubId": "01a10fe5-73b2-708f-8b86-87c61a216028",
+                  "blobId": "09db0e9ede0e7f35dbce39516eb9fc6fe9ff00b878981d1254ff6aa659147b1a"
+                }
+              ],
+              "artworkId": null,
+              "format": {
+                "mime": "audio/wav",
+                "sizeBytes": 96134,
+                "container": "WAVE",
+                "codec": "PCM",
+                "sampleRateHz": 8000,
+                "bitrateKbps": 128,
+                "channels": 1,
+                "lossless": true
+              },
+              "rootId": "01a10fe5-9099-7000-9b6c-05d52c8a719d",
+              "unsupportedReason": null,
+              "liked": false,
+              "explicit": null,
+              "popularity": null
+            }
+          ],
+          "nextCursor": null,
+          "total": 6
+        }
+      },
+      "GET /api/v1/providers": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "items": [
+            {
+              "provider": "hub",
+              "displayName": "Hub library",
+              "role": "library",
+              "authType": "device-credential",
+              "authScopes": ["library:read"],
+              "groupCompatible": true,
+              "discordCompatible": true,
+              "reviewedAt": "2026-09-03",
+              "limitations": [
+                "Files must be placed under the data volume library directory",
+                "Formats browsers cannot decode are listed but not playable in the PWA"
+              ],
+              "capabilities": {
+                "metadata": "available",
+                "search": "available",
+                "preview": "available",
+                "playback": "available",
+                "importLikes": "unsupported",
+                "importPlaylists": "unsupported",
+                "creatorDownload": "unsupported",
+                "userOwnedDownload": "available",
+                "groupSync": "exact",
+                "eq": "available"
+              },
+              "enabled": true,
+              "configured": true
+            },
+            {
+              "provider": "public-domain",
+              "displayName": "Public domain",
+              "role": "audio-source",
+              "authType": "none",
+              "authScopes": [],
+              "attribution": "Synthetic fixture",
+              "groupCompatible": true,
+              "discordCompatible": true,
+              "reviewedAt": "2026-09-03",
+              "limitations": [
+                "Serves the directory configured by NP_PUBLIC_DOMAIN_DIR (defaults to the generated test fixtures)"
+              ],
+              "capabilities": {
+                "metadata": "available",
+                "search": "available",
+                "preview": "available",
+                "playback": "available",
+                "importLikes": "unsupported",
+                "importPlaylists": "unsupported",
+                "creatorDownload": "available",
+                "userOwnedDownload": "available",
+                "groupSync": "exact",
+                "eq": "available"
+              },
+              "enabled": true,
+              "configured": true
+            },
+            {
+              "provider": "companion",
+              "displayName": "Windows companion libraries",
+              "role": "library",
+              "authType": "device-credential",
+              "authScopes": ["library:share"],
+              "groupCompatible": true,
+              "discordCompatible": false,
+              "reviewedAt": "2026-09-03",
+              "limitations": [
+                "Playback and download require the owning companion to authorize a transfer to the hub first"
+              ],
+              "capabilities": {
+                "metadata": "available",
+                "search": "available",
+                "preview": "restricted",
+                "playback": "restricted",
+                "importLikes": "unsupported",
+                "importPlaylists": "unsupported",
+                "creatorDownload": "unsupported",
+                "userOwnedDownload": "restricted",
+                "groupSync": "unsupported",
+                "eq": "available",
+                "reason": "Available after the owning companion transfers the file to the hub"
+              },
+              "enabled": true,
+              "configured": true
+            },
+            {
+              "provider": "musicbrainz",
+              "displayName": "MusicBrainz",
+              "role": "metadata-only",
+              "docsUrl": "https://musicbrainz.org/doc/MusicBrainz_API",
+              "authType": "none",
+              "authScopes": [],
+              "attribution": "Data from MusicBrainz",
+              "rateStrategy": "1 request/second, single concurrency, descriptive User-Agent",
+              "cachePolicy": "24 h",
+              "groupCompatible": false,
+              "discordCompatible": false,
+              "reviewedAt": "2026-09-03",
+              "limitations": [
+                "Metadata only; never streams or downloads audio",
+                "Requests without a contact email in the User-Agent are throttled by MusicBrainz"
+              ],
+              "capabilities": {
+                "metadata": "requires_auth",
+                "search": "requires_auth",
+                "preview": "unsupported",
+                "playback": "unsupported",
+                "importLikes": "unsupported",
+                "importPlaylists": "unsupported",
+                "creatorDownload": "unsupported",
+                "userOwnedDownload": "unsupported",
+                "groupSync": "unsupported",
+                "eq": "unsupported",
+                "reason": "Needs setting up: add a contact email under Music ▸ Providers."
+              },
+              "enabled": true,
+              "configured": false
+            },
+            {
+              "provider": "youtube",
+              "displayName": "YouTube",
+              "role": "audio-source",
+              "docsUrl": "https://developers.google.com/youtube/v3",
+              "authType": "api-key",
+              "authScopes": ["https://www.googleapis.com/auth/youtube.readonly"],
+              "attribution": "YouTube",
+              "rateStrategy": "10,000 units/day; search costs 100 units; results cached 1 h; background discovery shed first",
+              "cachePolicy": "1 h search, 24 h metadata",
+              "groupCompatible": true,
+              "discordCompatible": false,
+              "reviewedAt": "2026-09-03",
+              "limitations": [
+                "Plays only inside the embedded YouTube player; audio is not available to the EQ",
+                "No downloads",
+                "Group sync is best effort (embedded players cannot be aligned exactly)",
+                "Requires an API key restricted to this hub; OAuth client id/secret for library import"
+              ],
+              "capabilities": {
+                "metadata": "requires_auth",
+                "search": "requires_auth",
+                "preview": "unsupported",
+                "playback": "requires_auth",
+                "importLikes": "requires_auth",
+                "importPlaylists": "requires_auth",
+                "creatorDownload": "unsupported",
+                "userOwnedDownload": "unsupported",
+                "groupSync": "best_effort",
+                "eq": "unsupported",
+                "reason": "Needs setting up: add an API key under Music ▸ Providers."
+              },
+              "enabled": true,
+              "configured": false
+            },
+            {
+              "provider": "soundcloud",
+              "displayName": "SoundCloud",
+              "role": "audio-source",
+              "docsUrl": "https://developers.soundcloud.com/docs/api/guide.html",
+              "authType": "oauth-pkce",
+              "authScopes": ["non-expiring"],
+              "attribution": "on SoundCloud",
+              "rateStrategy": "Client-level limits; 429 Retry-After honoured; app token reused until expiry",
+              "cachePolicy": "1 h",
+              "groupCompatible": true,
+              "discordCompatible": true,
+              "reviewedAt": "2026-09-03",
+              "limitations": [
+                "Only tracks marked playable stream; preview-only tracks play 30 s",
+                "Downloads only when the creator enabled them",
+                "App registration currently requires a request form"
+              ],
+              "capabilities": {
+                "metadata": "requires_auth",
+                "search": "requires_auth",
+                "preview": "restricted",
+                "playback": "restricted",
+                "importLikes": "requires_auth",
+                "importPlaylists": "requires_auth",
+                "creatorDownload": "restricted",
+                "userOwnedDownload": "unsupported",
+                "groupSync": "best_effort",
+                "eq": "restricted",
+                "reason": "Needs setting up: add a client ID and a client secret under Music ▸ Providers."
+              },
+              "enabled": true,
+              "configured": false
+            },
+            {
+              "provider": "spotify",
+              "displayName": "Spotify",
+              "role": "metadata-only",
+              "docsUrl": "https://developer.spotify.com/documentation/web-api",
+              "authType": "oauth-pkce",
+              "authScopes": ["user-library-read", "playlist-read-private"],
+              "attribution": "Spotify",
+              "rateStrategy": "30-second rolling window; Retry-After honoured; batch endpoints; playlist snapshot_id checks",
+              "cachePolicy": "1 h",
+              "groupCompatible": false,
+              "discordCompatible": false,
+              "reviewedAt": "2026-09-03",
+              "limitations": [
+                "No audio through the hub: Spotify playback requires the Web Playback SDK, Premium and the browser",
+                "Preview clips are unavailable to new API applications",
+                "Development-mode apps allow only allowlisted users; extended quota is required for multi-user use"
+              ],
+              "capabilities": {
+                "metadata": "requires_auth",
+                "search": "requires_auth",
+                "preview": "unsupported",
+                "playback": "restricted",
+                "importLikes": "requires_auth",
+                "importPlaylists": "requires_auth",
+                "creatorDownload": "unsupported",
+                "userOwnedDownload": "unsupported",
+                "groupSync": "unsupported",
+                "eq": "unsupported",
+                "reason": "Needs setting up: add a client ID and a client secret under Music ▸ Providers."
+              },
+              "enabled": true,
+              "configured": false
+            },
+            {
+              "provider": "bandcamp",
+              "displayName": "Bandcamp",
+              "role": "metadata-only",
+              "docsUrl": "https://bandcamp.com/developer",
+              "authType": "none",
+              "authScopes": [],
+              "attribution": "Bandcamp",
+              "groupCompatible": false,
+              "discordCompatible": false,
+              "reviewedAt": "2026-09-03",
+              "limitations": [
+                "No public API: only deep links are supported",
+                "Purchases are imported from your own Bandcamp download export via the Windows companion"
+              ],
+              "capabilities": {
+                "metadata": "restricted",
+                "search": "unsupported",
+                "preview": "unsupported",
+                "playback": "unsupported",
+                "importLikes": "unsupported",
+                "importPlaylists": "unsupported",
+                "creatorDownload": "unsupported",
+                "userOwnedDownload": "unsupported",
+                "groupSync": "unsupported",
+                "eq": "unsupported",
+                "reason": "Bandcamp offers no public API; open the link at Bandcamp to listen or buy"
+              },
+              "enabled": true,
+              "configured": true
+            },
+            {
+              "provider": "external-tool",
+              "displayName": "External media tool (yt-dlp)",
+              "role": "tool",
+              "authType": "local",
+              "authScopes": [],
+              "groupCompatible": false,
+              "discordCompatible": false,
+              "reviewedAt": "2026-09-03",
+              "limitations": [
+                "Ready without setup: yt-dlp and spotDL, limited to the hosts on its list; an administrator can turn it off",
+                "Only for content you own or are licensed to download; the request records the rights basis",
+                "No cookies, credentials or DRM circumvention; the tool runs without a shell and with a timeout",
+                "A playlist, set or album link becomes one download per entry (at most 200), each tagged with its title, artist, date and cover",
+                "spotDL is not on this hub yet, so open.spotify.com links cannot be read or saved"
+              ],
+              "capabilities": {
+                "metadata": "restricted",
+                "search": "unsupported",
+                "preview": "unsupported",
+                "playback": "unsupported",
+                "importLikes": "unsupported",
+                "importPlaylists": "unsupported",
+                "creatorDownload": "restricted",
+                "userOwnedDownload": "restricted",
+                "groupSync": "unsupported",
+                "eq": "unsupported",
+                "reason": "Only for allowlisted hosts and content you have rights to"
+              },
+              "enabled": true,
+              "configured": true
+            },
+            {
+              "provider": "deezer",
+              "displayName": "Deezer (tempo)",
+              "role": "metadata-only",
+              "docsUrl": "https://developers.deezer.com/api",
+              "authType": "none",
+              "authScopes": [],
+              "attribution": "Tempo data from Deezer",
+              "rateStrategy": "Public API; 50 requests per 5 s; backoff on 4xx",
+              "cachePolicy": "stored on the canonical row",
+              "groupCompatible": false,
+              "discordCompatible": false,
+              "limitations": [
+                "Tempo is present for a subset of the catalogue and 0 means unmeasured; no audio, no previews."
+              ],
+              "reviewedAt": "2026-09-03",
+              "capabilities": {
+                "metadata": "available",
+                "search": "unsupported",
+                "preview": "unsupported",
+                "playback": "unsupported",
+                "importLikes": "unsupported",
+                "importPlaylists": "unsupported",
+                "creatorDownload": "unsupported",
+                "userOwnedDownload": "unsupported",
+                "groupSync": "unsupported",
+                "eq": "unsupported",
+                "reason": "Tempo and duration only; never audio"
+              },
+              "enabled": true,
+              "configured": true
+            },
+            {
+              "provider": "acousticbrainz",
+              "displayName": "AcousticBrainz (tempo archive)",
+              "role": "metadata-only",
+              "docsUrl": "https://acousticbrainz.org/data",
+              "authType": "none",
+              "authScopes": [],
+              "attribution": "AcousticBrainz (CC0)",
+              "rateStrategy": "Archive; one lookup per recording, never retried on 404",
+              "cachePolicy": "stored on the canonical row",
+              "groupCompatible": false,
+              "discordCompatible": false,
+              "limitations": [
+                "Archive frozen in 2022: nothing released since is known; needs a MusicBrainz recording id."
+              ],
+              "reviewedAt": "2026-09-03",
+              "capabilities": {
+                "metadata": "available",
+                "search": "unsupported",
+                "preview": "unsupported",
+                "playback": "unsupported",
+                "importLikes": "unsupported",
+                "importPlaylists": "unsupported",
+                "creatorDownload": "unsupported",
+                "userOwnedDownload": "unsupported",
+                "groupSync": "unsupported",
+                "eq": "unsupported",
+                "reason": "Archived analysis by MusicBrainz id; collection ended in 2022"
+              },
+              "enabled": true,
+              "configured": true
+            },
+            {
+              "provider": "lastfm",
+              "displayName": "Last.fm (tags)",
+              "role": "metadata-only",
+              "docsUrl": "https://www.last.fm/api",
+              "authType": "api-key",
+              "authScopes": [],
+              "attribution": "Tags from Last.fm",
+              "rateStrategy": "5 requests per second per key",
+              "cachePolicy": "stored on the canonical row",
+              "groupCompatible": false,
+              "discordCompatible": false,
+              "limitations": [
+                "Tags are community text and arrive weighted by votes; without an API key nothing is fetched."
+              ],
+              "reviewedAt": "2026-09-03",
+              "capabilities": {
+                "metadata": "requires_auth",
+                "search": "unsupported",
+                "preview": "unsupported",
+                "playback": "unsupported",
+                "importLikes": "unsupported",
+                "importPlaylists": "unsupported",
+                "creatorDownload": "unsupported",
+                "userOwnedDownload": "unsupported",
+                "groupSync": "unsupported",
+                "eq": "unsupported",
+                "reason": "Needs setting up: add an API key under Music ▸ Providers."
+              },
+              "enabled": true,
+              "configured": false
+            }
+          ],
+          "health": [
+            {
+              "provider": "hub",
+              "status": "ok",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:28:06.331Z"
+            },
+            {
+              "provider": "public-domain",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:28:06.331Z",
+              "lastError": "NP_PUBLIC_DOMAIN_DIR is not set"
+            },
+            {
+              "provider": "companion",
+              "status": "ok",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:28:06.331Z"
+            },
+            {
+              "provider": "musicbrainz",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:28:06.331Z",
+              "lastError": "Missing contactEmail"
+            },
+            {
+              "provider": "youtube",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:28:06.331Z",
+              "lastError": "Missing apiKey"
+            },
+            {
+              "provider": "soundcloud",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:28:06.331Z",
+              "lastError": "Missing clientId, clientSecret"
+            },
+            {
+              "provider": "spotify",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:28:06.331Z",
+              "lastError": "Missing clientId, clientSecret"
+            },
+            {
+              "provider": "bandcamp",
+              "status": "ok",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:28:06.331Z"
+            },
+            {
+              "provider": "external-tool",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:28:06.331Z",
+              "lastError": "/usr/local/bin/yt-dlp is not on this hub yet"
+            },
+            {
+              "provider": "deezer",
+              "status": "ok",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:28:06.356Z"
+            },
+            {
+              "provider": "acousticbrainz",
+              "status": "ok",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:28:06.356Z"
+            },
+            {
+              "provider": "lastfm",
+              "status": "unconfigured",
+              "circuit": "closed",
+              "checkedAt": "2026-10-06T06:28:06.356Z",
+              "lastError": "Missing apiKey"
+            }
+          ]
+        }
+      },
+      "GET /api/v1/downloads": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "items": []
+        }
+      },
+      "GET /api/v1/downloads/storage": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "dataDir": "/data",
+          "freeBytes": 45562982400,
+          "totalBytes": 1023139958784,
+          "usedByDownloadsBytes": 0,
+          "partialFiles": 0,
+          "cleanupPolicy": {
+            "keepFailedDays": 14,
+            "keepPartialHours": 24
+          },
+          "directories": [
+            {
+              "id": "01a10fe5-908f-7034-80f1-e520a03e7392",
+              "name": "Albums",
+              "relativePath": "albums"
+            },
+            {
+              "id": "01a10fe5-9099-7000-9b6c-05d52c8a719d",
+              "name": "Live recordings",
+              "relativePath": "live"
+            }
+          ]
+        }
+      },
+      "GET /api/v1/live-tv/summary": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "channelCount": 0,
+          "guideCount": 0,
+          "updatedAt": null,
+          "sourceDevice": null
+        }
+      },
+      "GET /api/v1/providers/usage": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "items": [
+            {
+              "provider": "hub",
+              "health": {
+                "provider": "hub",
+                "status": "ok",
+                "circuit": "closed",
+                "checkedAt": "2026-10-06T06:27:56.228Z"
+              },
+              "budget": {
+                "perMinute": 60,
+                "perDay": null,
+                "usedMinute": 0,
+                "usedDay": 0,
+                "shedding": []
+              },
+              "queueDepth": {
+                "P0": 0,
+                "P1": 0,
+                "P2": 0,
+                "P3": 0,
+                "P4": 0
+              },
+              "concurrency": {
+                "limit": 4,
+                "inFlight": 0
+              }
+            },
+            {
+              "provider": "public-domain",
+              "health": {
+                "provider": "public-domain",
+                "status": "unconfigured",
+                "circuit": "closed",
+                "checkedAt": "2026-10-06T06:27:56.228Z",
+                "lastError": "NP_PUBLIC_DOMAIN_DIR is not set"
+              },
+              "budget": {
+                "perMinute": 60,
+                "perDay": null,
+                "usedMinute": 0,
+                "usedDay": 0,
+                "shedding": []
+              },
+              "queueDepth": {
+                "P0": 0,
+                "P1": 0,
+                "P2": 0,
+                "P3": 0,
+                "P4": 0
+              },
+              "concurrency": {
+                "limit": 4,
+                "inFlight": 0
+              }
+            },
+            {
+              "provider": "companion",
+              "health": {
+                "provider": "companion",
+                "status": "ok",
+                "circuit": "closed",
+                "checkedAt": "2026-10-06T06:27:56.228Z"
+              },
+              "budget": {
+                "perMinute": 60,
+                "perDay": null,
+                "usedMinute": 0,
+                "usedDay": 0,
+                "shedding": []
+              },
+              "queueDepth": {
+                "P0": 0,
+                "P1": 0,
+                "P2": 0,
+                "P3": 0,
+                "P4": 0
+              },
+              "concurrency": {
+                "limit": 4,
+                "inFlight": 0
+              }
+            },
+            {
+              "provider": "musicbrainz",
+              "health": {
+                "provider": "musicbrainz",
+                "status": "unconfigured",
+                "circuit": "closed",
+                "checkedAt": "2026-10-06T06:27:56.228Z",
+                "lastError": "Missing contactEmail"
+              },
+              "budget": {
+                "perMinute": 60,
+                "perDay": null,
+                "usedMinute": 6,
+                "usedDay": 6,
+                "shedding": []
+              },
+              "queueDepth": {
+                "P0": 0,
+                "P1": 0,
+                "P2": 0,
+                "P3": 0,
+                "P4": 0
+              },
+              "concurrency": {
+                "limit": 4,
+                "inFlight": 0
+              }
+            },
+            {
+              "provider": "youtube",
+              "health": {
+                "provider": "youtube",
+                "status": "unconfigured",
+                "circuit": "closed",
+                "checkedAt": "2026-10-06T06:27:56.228Z",
+                "lastError": "Missing apiKey"
+              },
+              "budget": {
+                "perMinute": 60,
+                "perDay": null,
+                "usedMinute": 0,
+                "usedDay": 0,
+                "shedding": []
+              },
+              "queueDepth": {
+                "P0": 0,
+                "P1": 0,
+                "P2": 0,
+                "P3": 0,
+                "P4": 0
+              },
+              "concurrency": {
+                "limit": 4,
+                "inFlight": 0
+              }
+            },
+            {
+              "provider": "soundcloud",
+              "health": {
+                "provider": "soundcloud",
+                "status": "unconfigured",
+                "circuit": "closed",
+                "checkedAt": "2026-10-06T06:27:56.228Z",
+                "lastError": "Missing clientId, clientSecret"
+              },
+              "budget": {
+                "perMinute": 60,
+                "perDay": null,
+                "usedMinute": 0,
+                "usedDay": 0,
+                "shedding": []
+              },
+              "queueDepth": {
+                "P0": 0,
+                "P1": 0,
+                "P2": 0,
+                "P3": 0,
+                "P4": 0
+              },
+              "concurrency": {
+                "limit": 4,
+                "inFlight": 0
+              }
+            },
+            {
+              "provider": "spotify",
+              "health": {
+                "provider": "spotify",
+                "status": "unconfigured",
+                "circuit": "closed",
+                "checkedAt": "2026-10-06T06:27:56.228Z",
+                "lastError": "Missing clientId, clientSecret"
+              },
+              "budget": {
+                "perMinute": 60,
+                "perDay": null,
+                "usedMinute": 0,
+                "usedDay": 0,
+                "shedding": []
+              },
+              "queueDepth": {
+                "P0": 0,
+                "P1": 0,
+                "P2": 0,
+                "P3": 0,
+                "P4": 0
+              },
+              "concurrency": {
+                "limit": 4,
+                "inFlight": 0
+              }
+            },
+            {
+              "provider": "bandcamp",
+              "health": {
+                "provider": "bandcamp",
+                "status": "ok",
+                "circuit": "closed",
+                "checkedAt": "2026-10-06T06:27:56.228Z"
+              },
+              "budget": {
+                "perMinute": 60,
+                "perDay": null,
+                "usedMinute": 0,
+                "usedDay": 0,
+                "shedding": []
+              },
+              "queueDepth": {
+                "P0": 0,
+                "P1": 0,
+                "P2": 0,
+                "P3": 0,
+                "P4": 0
+              },
+              "concurrency": {
+                "limit": 4,
+                "inFlight": 0
+              }
+            },
+            {
+              "provider": "external-tool",
+              "health": {
+                "provider": "external-tool",
+                "status": "unconfigured",
+                "circuit": "closed",
+                "checkedAt": "2026-10-06T06:27:56.228Z",
+                "lastError": "/usr/local/bin/yt-dlp is not on this hub yet"
+              },
+              "budget": {
+                "perMinute": 60,
+                "perDay": null,
+                "usedMinute": 0,
+                "usedDay": 0,
+                "shedding": []
+              },
+              "queueDepth": {
+                "P0": 0,
+                "P1": 0,
+                "P2": 0,
+                "P3": 0,
+                "P4": 0
+              },
+              "concurrency": {
+                "limit": 4,
+                "inFlight": 0
+              }
+            },
+            {
+              "provider": "deezer",
+              "health": {
+                "provider": "deezer",
+                "status": "ok",
+                "circuit": "closed",
+                "checkedAt": "2026-10-06T06:27:56.250Z"
+              },
+              "budget": {
+                "perMinute": 60,
+                "perDay": null,
+                "usedMinute": 0,
+                "usedDay": 0,
+                "shedding": []
+              },
+              "queueDepth": {
+                "P0": 0,
+                "P1": 0,
+                "P2": 0,
+                "P3": 0,
+                "P4": 0
+              },
+              "concurrency": {
+                "limit": 4,
+                "inFlight": 0
+              }
+            },
+            {
+              "provider": "acousticbrainz",
+              "health": {
+                "provider": "acousticbrainz",
+                "status": "ok",
+                "circuit": "closed",
+                "checkedAt": "2026-10-06T06:27:56.250Z"
+              },
+              "budget": {
+                "perMinute": 60,
+                "perDay": null,
+                "usedMinute": 0,
+                "usedDay": 0,
+                "shedding": []
+              },
+              "queueDepth": {
+                "P0": 0,
+                "P1": 0,
+                "P2": 0,
+                "P3": 0,
+                "P4": 0
+              },
+              "concurrency": {
+                "limit": 4,
+                "inFlight": 0
+              }
+            },
+            {
+              "provider": "lastfm",
+              "health": {
+                "provider": "lastfm",
+                "status": "unconfigured",
+                "circuit": "closed",
+                "checkedAt": "2026-10-06T06:27:56.250Z",
+                "lastError": "Missing apiKey"
+              },
+              "budget": {
+                "perMinute": 60,
+                "perDay": null,
+                "usedMinute": 0,
+                "usedDay": 0,
+                "shedding": []
+              },
+              "queueDepth": {
+                "P0": 0,
+                "P1": 0,
+                "P2": 0,
+                "P3": 0,
+                "P4": 0
+              },
+              "concurrency": {
+                "limit": 4,
+                "inFlight": 0
+              }
+            }
+          ]
+        }
+      },
+      "GET /api/v1/recommendations/config": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "version": 1,
+          "actionWeights": {
+            "immediateSkip": -5,
+            "earlySkip": -3,
+            "partial": 0.5,
+            "majority": 2,
+            "completed": 3,
+            "replay": 4,
+            "like": 6,
+            "unlike": -4,
+            "playlistAdd": 7,
+            "playlistRemove": -3,
+            "favorite": 10,
+            "dislike": -6,
+            "save": 5,
+            "download": 2,
+            "recommendationAccepted": 1,
+            "recommendationDismissed": -1
+          },
+          "skipThresholds": {
+            "immediateFraction": 0.1,
+            "immediateSeconds": 10,
+            "earlyFraction": 0.3,
+            "partialFraction": 0.5
+          },
+          "skipIntelligence": {
+            "artistDistinctTracks": 3,
+            "genreDistinctTracks": 3,
+            "windowDays": 30,
+            "artistShare": 0.5,
+            "genreShare": 0.25
+          },
+          "decay": {
+            "halfLifeDays": 45,
+            "pruneBelow": 0.01
+          },
+          "penalties": {
+            "repeat": 0.35,
+            "repeatWindowDays": 7,
+            "excludeRecentlyPlayed": true,
+            "skip": 0.15,
+            "skipMax": 0.45,
+            "overexposure": 0.1,
+            "overexposureMax": 0.4
+          },
+          "diversity": {
+            "maxPerArtist": 2,
+            "maxPerArtistLargeList": 3,
+            "largeListThreshold": 40,
+            "maxGenreShare": 0.4,
+            "tiers": {
+              "strong": 0.4,
+              "related": 0.3,
+              "emerging": 0.2,
+              "experimental": 0.1
+            },
+            "strongArtistAffinity": 0.35,
+            "knownGenreAffinity": 0.2
+          },
+          "ranking": {
+            "tasteMatch": 0.25,
+            "artistAffinity": 0.15,
+            "genreAffinity": 0.15,
+            "collaborative": 0.1,
+            "recency": 0.05,
+            "popularityFit": 0.05,
+            "moodContext": 0.05,
+            "discoveryBonus": 0.05,
+            "tempoFit": 0.15
+          },
+          "explorationRate": 0.1,
+          "coldStart": {
+            "minEvents": 20,
+            "minMeaningfulListens": 10,
+            "minArtists": 3
+          },
+          "limits": {
+            "maxTracks": 5000,
+            "maxArtists": 2000,
+            "maxAlbums": 2000,
+            "maxGenres": 300,
+            "maxTags": 500,
+            "maxPlaylistContexts": 64,
+            "maxMoodContexts": 32,
+            "maxSessionContexts": 20,
+            "appliedEventIds": 4096,
+            "recentPlays": 400,
+            "artistHistory": 30,
+            "skipRecords": 64
+          },
+          "candidates": {
+            "perSource": 60,
+            "topArtists": 10,
+            "topGenres": 6,
+            "topTags": 8,
+            "topTracks": 20,
+            "recentDays": 14,
+            "newReleaseYears": 1,
+            "similarityThreshold": 0.45,
+            "relatedArtistMin": 0.45,
+            "relatedPerArtist": 6
+          },
+          "modes": {
+            "for-you": {
+              "multipliers": {},
+              "tiers": null,
+              "popularityInverted": false,
+              "excludeOwned": false,
+              "excludeKnownArtists": false,
+              "excludeTopArtists": false
+            },
+            "playlist": {
+              "multipliers": {
+                "moodContext": 3
+              },
+              "tiers": {
+                "strong": 0.3,
+                "related": 0.4,
+                "emerging": 0.2,
+                "experimental": 0.1
+              },
+              "popularityInverted": false,
+              "excludeOwned": false,
+              "excludeKnownArtists": false,
+              "excludeTopArtists": false
+            },
+            "genre": {
+              "multipliers": {},
+              "tiers": null,
+              "popularityInverted": false,
+              "excludeOwned": false,
+              "excludeKnownArtists": false,
+              "excludeTopArtists": false
+            },
+            "similar": {
+              "multipliers": {
+                "tasteMatch": 2
+              },
+              "tiers": {
+                "strong": 0.3,
+                "related": 0.4,
+                "emerging": 0.2,
+                "experimental": 0.1
+              },
+              "popularityInverted": false,
+              "excludeOwned": false,
+              "excludeKnownArtists": false,
+              "excludeTopArtists": false
+            },
+            "deep": {
+              "multipliers": {
+                "discoveryBonus": 3
+              },
+              "tiers": {
+                "strong": 0,
+                "related": 0.1,
+                "emerging": 0.45,
+                "experimental": 0.45
+              },
+              "popularityInverted": true,
+              "excludeOwned": true,
+              "excludeKnownArtists": true,
+              "excludeTopArtists": true
+            },
+            "new-releases": {
+              "multipliers": {
+                "recency": 3
+              },
+              "tiers": {
+                "strong": 0.5,
+                "related": 0.3,
+                "emerging": 0.15,
+                "experimental": 0.05
+              },
+              "popularityInverted": false,
+              "excludeOwned": true,
+              "excludeKnownArtists": false,
+              "excludeTopArtists": false
+            },
+            "recent": {
+              "multipliers": {
+                "recency": 3
+              },
+              "tiers": null,
+              "popularityInverted": false,
+              "excludeOwned": false,
+              "excludeKnownArtists": false,
+              "excludeTopArtists": false
+            }
+          }
+        }
+      },
+      "GET /api/v1/downloads/formats": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "formats": [
+            {
+              "format": "original",
+              "available": true,
+              "lossy": false,
+              "reason": null,
+              "qualityNote": "The source’s own audio, not re-encoded, so no quality loss. A file from the external tool is tagged on the way in."
+            },
+            {
+              "format": "mp3",
+              "available": true,
+              "lossy": true,
+              "reason": null,
+              "qualityNote": "VBR ~190 kbps (-q:a 2). Re-encoding a lossy source loses more quality."
+            },
+            {
+              "format": "aac",
+              "available": true,
+              "lossy": true,
+              "reason": null,
+              "qualityNote": "256 kbps CBR. Re-encoding a lossy source loses more quality."
+            },
+            {
+              "format": "opus",
+              "available": true,
+              "lossy": true,
+              "reason": null,
+              "qualityNote": "160 kbps VBR; best quality per byte at this bitrate."
+            },
+            {
+              "format": "flac",
+              "available": true,
+              "lossy": false,
+              "reason": null,
+              "qualityNote": "Lossless, but no better than the source: converting from a lossy file cannot restore it."
+            }
+          ],
+          "ffmpeg": {
+            "available": true,
+            "version": "9.0-full_build-www.gyan.dev",
+            "encoders": ["libmp3lame", "aac", "libopus", "libvorbis", "flac", "alac", "pcm_s16le"]
+          }
+        }
+      },
+      "GET /api/v1/groups": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "items": [
+            {
+              "id": "01a10fe5-a06d-709d-9469-badda23fe07d",
+              "schemaVersion": 1,
+              "createdAt": "2026-10-06T06:27:49.484Z",
+              "updatedAt": "2026-10-06T06:27:49.484Z",
+              "deletedAt": null,
+              "hubId": "01a10fe5-73b2-708f-8b86-87c61a216028",
+              "name": "Kitchen",
+              "ownerId": "admin",
+              "status": "active",
+              "settings": {
+                "maxQueuePerUser": 25,
+                "duplicatePolicy": "reject-in-queue",
+                "cooldownSeconds": 0,
+                "fairQueue": false,
+                "voteSkipThreshold": 0.5,
+                "maxTrackDurationMs": 1200000,
+                "guestsMayRequest": true,
+                "driftHardSeekThresholdMs": 400,
+                "driftSoftCorrectMs": 60
+              },
+              "inviteCodeHash": null,
+              "members": [
+                {
+                  "id": "01a10fe5-a06d-7082-a3d6-5e4a3163c653",
+                  "schemaVersion": 1,
+                  "createdAt": "2026-10-06T06:27:49.484Z",
+                  "updatedAt": "2026-10-06T06:27:49.484Z",
+                  "deletedAt": null,
+                  "groupId": "01a10fe5-a06d-709d-9469-badda23fe07d",
+                  "memberId": "admin",
+                  "memberKind": "admin",
+                  "role": "owner",
+                  "displayName": "admin",
+                  "joinedAt": "2026-10-06T06:27:49.484Z",
+                  "revokedAt": null,
+                  "shareAggregate": false,
+                  "lastRequestAt": null,
+                  "online": false,
+                  "latencyMs": null
+                }
+              ],
+              "queueLength": 0,
+              "listenerCount": 0,
+              "playback": {
+                "groupId": "01a10fe5-a06d-709d-9469-badda23fe07d",
+                "revision": 0,
+                "sourceRevision": 0,
+                "status": "idle",
+                "currentItemId": null,
+                "startAt": null,
+                "positionMs": 0,
+                "pausedAt": null,
+                "syncGrade": "exact",
+                "syncReason": null,
+                "updatedAt": "2026-10-06T06:27:49.484Z"
+              },
+              "currentTrackTitle": null,
+              "myRole": "owner"
+            },
+            {
+              "id": "01a10fe5-a07c-70fd-bc68-d1aff0113e2a",
+              "schemaVersion": 1,
+              "createdAt": "2026-10-06T06:27:49.500Z",
+              "updatedAt": "2026-10-06T06:27:49.500Z",
+              "deletedAt": null,
+              "hubId": "01a10fe5-73b2-708f-8b86-87c61a216028",
+              "name": "Friday night",
+              "ownerId": "admin",
+              "status": "active",
+              "settings": {
+                "maxQueuePerUser": 25,
+                "duplicatePolicy": "reject-in-queue",
+                "cooldownSeconds": 0,
+                "fairQueue": false,
+                "voteSkipThreshold": 0.5,
+                "maxTrackDurationMs": 1200000,
+                "guestsMayRequest": true,
+                "driftHardSeekThresholdMs": 400,
+                "driftSoftCorrectMs": 60
+              },
+              "inviteCodeHash": null,
+              "members": [
+                {
+                  "id": "01a10fe5-a07c-7048-b5b4-dcb0426aa491",
+                  "schemaVersion": 1,
+                  "createdAt": "2026-10-06T06:27:49.500Z",
+                  "updatedAt": "2026-10-06T06:27:49.500Z",
+                  "deletedAt": null,
+                  "groupId": "01a10fe5-a07c-70fd-bc68-d1aff0113e2a",
+                  "memberId": "admin",
+                  "memberKind": "admin",
+                  "role": "owner",
+                  "displayName": "admin",
+                  "joinedAt": "2026-10-06T06:27:49.500Z",
+                  "revokedAt": null,
+                  "shareAggregate": false,
+                  "lastRequestAt": null,
+                  "online": false,
+                  "latencyMs": null
+                }
+              ],
+              "queueLength": 0,
+              "listenerCount": 0,
+              "playback": {
+                "groupId": "01a10fe5-a07c-70fd-bc68-d1aff0113e2a",
+                "revision": 0,
+                "sourceRevision": 0,
+                "status": "idle",
+                "currentItemId": null,
+                "startAt": null,
+                "positionMs": 0,
+                "pausedAt": null,
+                "syncGrade": "exact",
+                "syncReason": null,
+                "updatedAt": "2026-10-06T06:27:49.500Z"
+              },
+              "currentTrackTitle": null,
+              "myRole": "owner"
+            }
+          ]
+        }
+      },
+      "GET /api/v1/shares": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "items": [
+            {
+              "id": "01a10fe5-a0ad-704c-95ae-685c730a401a",
+              "kind": "album",
+              "targetId": "First Light",
+              "title": "First Light",
+              "ownerId": "admin",
+              "tokenHint": "0vNtNe",
+              "allowStream": true,
+              "allowDownload": false,
+              "expiresAt": "2026-10-13T06:27:49.549Z",
+              "maxAccesses": null,
+              "accessCount": 0,
+              "playCount": 0,
+              "createdAt": "2026-10-06T06:27:49.549Z",
+              "revokedAt": null,
+              "url": null,
+              "reachable": false,
+              "warning": "The hub is reachable only on this machine; set a public endpoint (Admin → Network) to share links with others."
+            }
+          ]
+        }
+      },
+      "GET /api/v1/shares/sources": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "playlists": [],
+          "albums": [
+            {
+              "id": "First Light",
+              "title": "First Light",
+              "artistName": "Alder Quartet",
+              "trackCount": 3
+            },
+            {
+              "id": "Late Shift",
+              "title": "Late Shift",
+              "artistName": "Birch Ensemble",
+              "trackCount": 2
+            },
+            {
+              "id": "Live from Pier 9",
+              "title": "Live from Pier 9",
+              "artistName": "Cassette Bloom",
+              "trackCount": 1
+            }
+          ]
+        }
+      },
+      "GET /api/v1/discord/config": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "id": "01a10fe5-ce47-70a3-89f0-3990d51f0ce9",
+          "enabled": false,
+          "applicationId": null,
+          "publicKey": null,
+          "tokenSource": "none",
+          "tokenLast4": null,
+          "guildAllowlist": [],
+          "defaultGroupId": null,
+          "designatedChannels": {},
+          "voiceChannelOverrides": {},
+          "djRoleIds": [],
+          "adminRoleIds": [],
+          "requestPolicy": {
+            "maxRequestsPerUser": 10,
+            "cooldownSeconds": 5,
+            "maxTrackDurationMs": 1200000,
+            "maxPlaylistItems": 50,
+            "voteSkipThreshold": 0.5,
+            "guestsMayRequest": true
+          },
+          "autoPostNowPlaying": true,
+          "updateInsteadOfSpam": true,
+          "prefixEnabled": true,
+          "prefix": "!",
+          "idleDisconnectSeconds": 300,
+          "updatedAt": "2026-10-06T06:28:01.223Z"
+        }
+      },
+      "GET /api/v1/discord/status": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "enabled": false,
+          "configured": false,
+          "gateway": "stopped",
+          "voice": "idle",
+          "commandsRegistered": false,
+          "commandsRegisteredAt": null,
+          "messageContentIntent": "unknown",
+          "latencyMs": null,
+          "reconnects": 0,
+          "errors": 0,
+          "uptimeSeconds": 0,
+          "currentGuildId": null,
+          "currentVoiceChannelId": null,
+          "currentTrackTitle": null,
+          "lastError": null,
+          "warnings": [
+            "The bot has no token yet. Paste one in Bot token, then choose Save and Start.",
+            "No group is chosen in Group it controls, so commands have nothing to play to.",
+            "Prefix commands only work once Discord lets the bot read messages: turn on Message Content Intent for the bot in Discord’s Developer Portal. Slash commands work without it.",
+            "The bot answers in every server it is invited to. To limit it, list server IDs in Server allowlist.",
+            "The hub’s Discord service isn’t running, so the bot can’t start. Install the hub again with the Discord option (see the Discord bot guide), then choose Save and Start."
+          ]
+        }
+      },
+      "GET /api/v1/discord/invite-url": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "url": null,
+          "permissions": "3230720",
+          "scopes": ["bot", "applications.commands"],
+          "reason": "Save a bot token first. The invite link is made from it."
+        }
+      },
+      "GET /api/v1/network": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "bindMode": "localhost",
+          "bindAddress": "127.0.0.1",
+          "port": 4546,
+          "publicEndpoint": null,
+          "trustedProxyCidrs": [],
+          "ipLogging": {
+            "mode": "truncated",
+            "retentionDays": 7
+          },
+          "tlsTerminatedByProxy": false,
+          "restartRequired": false,
+          "warnings": []
+        }
+      },
+      "GET /api/v1/backup": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "items": [
+            {
+              "id": "backup-20261006T062749Z",
+              "createdAt": "2026-10-06T06:27:49.580Z",
+              "sizeBytes": 643072,
+              "relativePath": "backups/backup-20261006T062749Z.sqlite"
+            }
+          ]
+        }
+      },
+      "GET /api/v1/backup/settings": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "location": "backups",
+          "include": {
+            "credentials": true,
+            "activity": true,
+            "caches": true
+          },
+          "schedule": {
+            "frequency": "daily",
+            "time": "03:00",
+            "weekday": 0
+          },
+          "keep": 7,
+          "path": "/data/backups",
+          "dataDir": "/data",
+          "locationFixed": false,
+          "nextRunAt": "2026-10-06T08:00:00.000Z",
+          "lastRunAt": null
+        }
+      },
+      "GET /api/v1/logs?level=info&limit=300": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "items": [
+            {
+              "time": "2026-10-06T06:27:39.177Z",
+              "level": "warn",
+              "msg": "Open http://localhost:4546 and sign in with admin / admin. You will be asked to set a real password before anything else is enabled.",
+              "correlationId": null,
+              "module": "hub",
+              "data": {
+                "levelName": "warn"
+              }
+            }
+          ]
+        }
+      },
+      "GET /api/v1/backup/space": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "path": "/data/backups",
+          "freeBytes": 45560991744,
+          "totalBytes": 1023139958784,
+          "lastArchiveBytes": 643072,
+          "keep": 7
+        }
+      },
+      "GET /api/v1/diagnostics/bundle": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "schemaVersion": 1,
+          "generatedAt": "2026-10-06T06:28:03.783Z",
+          "redactions": [
+            "Provider client secrets and API keys (never stored in plaintext, never included)",
+            "OAuth access and refresh tokens for every connected account",
+            "The Discord bot token",
+            "Device credential secrets and their hashes",
+            "Pairing codes and claim secrets",
+            "Admin password hashes and session identifiers",
+            "Full IP addresses (only the configured privacy form appears)",
+            "Raw listening history and any per-track play record",
+            "Filesystem paths outside the hub data volume",
+            "Share link tokens (only their hints)"
+          ],
+          "sections": {
+            "versions": {
+              "hub": "0.1.0",
+              "contracts": "1.0.0",
+              "protocol": 1,
+              "minProtocol": 1,
+              "node": "v22.23.2",
+              "platform": "win32/x64"
+            },
+            "network": {
+              "bindMode": "localhost",
+              "publicEndpointConfigured": false,
+              "ipLoggingMode": "truncated",
+              "trustedProxyCount": 0
+            },
+            "setup": {
+              "complete": true
+            },
+            "database": {
+              "migrationVersion": 7,
+              "sizeBytes": 643072,
+              "lastBackupAt": "2026-10-06T06:27:49.580Z",
+              "walMode": true
+            },
+            "storage": {
+              "dataDirConfigured": true,
+              "freeBytes": 45560979456,
+              "totalBytes": 1023139958784
+            },
+            "providers": [
+              {
+                "provider": "hub",
+                "status": "ok",
+                "circuit": "closed",
+                "checkedAt": "2026-10-06T06:28:03.761Z"
+              },
+              {
+                "provider": "public-domain",
+                "status": "unconfigured",
+                "circuit": "closed",
+                "checkedAt": "2026-10-06T06:28:03.761Z",
+                "lastError": "NP_PUBLIC_DOMAIN_DIR is not set"
+              },
+              {
+                "provider": "companion",
+                "status": "ok",
+                "circuit": "closed",
+                "checkedAt": "2026-10-06T06:28:03.761Z"
+              },
+              {
+                "provider": "musicbrainz",
+                "status": "unconfigured",
+                "circuit": "closed",
+                "checkedAt": "2026-10-06T06:28:03.761Z",
+                "lastError": "Missing contactEmail"
+              },
+              {
+                "provider": "youtube",
+                "status": "unconfigured",
+                "circuit": "closed",
+                "checkedAt": "2026-10-06T06:28:03.761Z",
+                "lastError": "Missing apiKey"
+              },
+              {
+                "provider": "soundcloud",
+                "status": "unconfigured",
+                "circuit": "closed",
+                "checkedAt": "2026-10-06T06:28:03.761Z",
+                "lastError": "Missing clientId, clientSecret"
+              },
+              {
+                "provider": "spotify",
+                "status": "unconfigured",
+                "circuit": "closed",
+                "checkedAt": "2026-10-06T06:28:03.761Z",
+                "lastError": "Missing clientId, clientSecret"
+              },
+              {
+                "provider": "bandcamp",
+                "status": "ok",
+                "circuit": "closed",
+                "checkedAt": "2026-10-06T06:28:03.761Z"
+              },
+              {
+                "provider": "external-tool",
+                "status": "unconfigured",
+                "circuit": "closed",
+                "checkedAt": "2026-10-06T06:28:03.761Z",
+                "lastError": "/usr/local/bin/yt-dlp is not on this hub yet"
+              },
+              {
+                "provider": "deezer",
+                "status": "ok",
+                "circuit": "closed",
+                "checkedAt": "2026-10-06T06:28:03.781Z"
+              },
+              {
+                "provider": "acousticbrainz",
+                "status": "ok",
+                "circuit": "closed",
+                "checkedAt": "2026-10-06T06:28:03.781Z"
+              },
+              {
+                "provider": "lastfm",
+                "status": "unconfigured",
+                "circuit": "closed",
+                "checkedAt": "2026-10-06T06:28:03.781Z",
+                "lastError": "Missing apiKey"
+              }
+            ],
+            "capabilities": [
+              {
+                "provider": "hub",
+                "enabled": true,
+                "configured": true,
+                "capabilities": {
+                  "metadata": "available",
+                  "search": "available",
+                  "preview": "available",
+                  "playback": "available",
+                  "importLikes": "unsupported",
+                  "importPlaylists": "unsupported",
+                  "creatorDownload": "unsupported",
+                  "userOwnedDownload": "available",
+                  "groupSync": "exact",
+                  "eq": "available"
+                }
+              },
+              {
+                "provider": "public-domain",
+                "enabled": true,
+                "configured": true,
+                "capabilities": {
+                  "metadata": "available",
+                  "search": "available",
+                  "preview": "available",
+                  "playback": "available",
+                  "importLikes": "unsupported",
+                  "importPlaylists": "unsupported",
+                  "creatorDownload": "available",
+                  "userOwnedDownload": "available",
+                  "groupSync": "exact",
+                  "eq": "available"
+                }
+              },
+              {
+                "provider": "companion",
+                "enabled": true,
+                "configured": true,
+                "capabilities": {
+                  "metadata": "available",
+                  "search": "available",
+                  "preview": "restricted",
+                  "playback": "restricted",
+                  "importLikes": "unsupported",
+                  "importPlaylists": "unsupported",
+                  "creatorDownload": "unsupported",
+                  "userOwnedDownload": "restricted",
+                  "groupSync": "unsupported",
+                  "eq": "available",
+                  "reason": "Available after the owning companion transfers the file to the hub"
+                }
+              },
+              {
+                "provider": "musicbrainz",
+                "enabled": true,
+                "configured": false,
+                "capabilities": {
+                  "metadata": "requires_auth",
+                  "search": "requires_auth",
+                  "preview": "unsupported",
+                  "playback": "unsupported",
+                  "importLikes": "unsupported",
+                  "importPlaylists": "unsupported",
+                  "creatorDownload": "unsupported",
+                  "userOwnedDownload": "unsupported",
+                  "groupSync": "unsupported",
+                  "eq": "unsupported",
+                  "reason": "Needs setting up: add a contact email under Music ▸ Providers."
+                }
+              },
+              {
+                "provider": "youtube",
+                "enabled": true,
+                "configured": false,
+                "capabilities": {
+                  "metadata": "requires_auth",
+                  "search": "requires_auth",
+                  "preview": "unsupported",
+                  "playback": "requires_auth",
+                  "importLikes": "requires_auth",
+                  "importPlaylists": "requires_auth",
+                  "creatorDownload": "unsupported",
+                  "userOwnedDownload": "unsupported",
+                  "groupSync": "best_effort",
+                  "eq": "unsupported",
+                  "reason": "Needs setting up: add an API key under Music ▸ Providers."
+                }
+              },
+              {
+                "provider": "soundcloud",
+                "enabled": true,
+                "configured": false,
+                "capabilities": {
+                  "metadata": "requires_auth",
+                  "search": "requires_auth",
+                  "preview": "restricted",
+                  "playback": "restricted",
+                  "importLikes": "requires_auth",
+                  "importPlaylists": "requires_auth",
+                  "creatorDownload": "restricted",
+                  "userOwnedDownload": "unsupported",
+                  "groupSync": "best_effort",
+                  "eq": "restricted",
+                  "reason": "Needs setting up: add a client ID and a client secret under Music ▸ Providers."
+                }
+              },
+              {
+                "provider": "spotify",
+                "enabled": true,
+                "configured": false,
+                "capabilities": {
+                  "metadata": "requires_auth",
+                  "search": "requires_auth",
+                  "preview": "unsupported",
+                  "playback": "restricted",
+                  "importLikes": "requires_auth",
+                  "importPlaylists": "requires_auth",
+                  "creatorDownload": "unsupported",
+                  "userOwnedDownload": "unsupported",
+                  "groupSync": "unsupported",
+                  "eq": "unsupported",
+                  "reason": "Needs setting up: add a client ID and a client secret under Music ▸ Providers."
+                }
+              },
+              {
+                "provider": "bandcamp",
+                "enabled": true,
+                "configured": true,
+                "capabilities": {
+                  "metadata": "restricted",
+                  "search": "unsupported",
+                  "preview": "unsupported",
+                  "playback": "unsupported",
+                  "importLikes": "unsupported",
+                  "importPlaylists": "unsupported",
+                  "creatorDownload": "unsupported",
+                  "userOwnedDownload": "unsupported",
+                  "groupSync": "unsupported",
+                  "eq": "unsupported",
+                  "reason": "Bandcamp offers no public API; open the link at Bandcamp to listen or buy"
+                }
+              },
+              {
+                "provider": "external-tool",
+                "enabled": true,
+                "configured": true,
+                "capabilities": {
+                  "metadata": "restricted",
+                  "search": "unsupported",
+                  "preview": "unsupported",
+                  "playback": "unsupported",
+                  "importLikes": "unsupported",
+                  "importPlaylists": "unsupported",
+                  "creatorDownload": "restricted",
+                  "userOwnedDownload": "restricted",
+                  "groupSync": "unsupported",
+                  "eq": "unsupported",
+                  "reason": "Only for allowlisted hosts and content you have rights to"
+                }
+              },
+              {
+                "provider": "deezer",
+                "enabled": true,
+                "configured": true,
+                "capabilities": {
+                  "metadata": "available",
+                  "search": "unsupported",
+                  "preview": "unsupported",
+                  "playback": "unsupported",
+                  "importLikes": "unsupported",
+                  "importPlaylists": "unsupported",
+                  "creatorDownload": "unsupported",
+                  "userOwnedDownload": "unsupported",
+                  "groupSync": "unsupported",
+                  "eq": "unsupported",
+                  "reason": "Tempo and duration only; never audio"
+                }
+              },
+              {
+                "provider": "acousticbrainz",
+                "enabled": true,
+                "configured": true,
+                "capabilities": {
+                  "metadata": "available",
+                  "search": "unsupported",
+                  "preview": "unsupported",
+                  "playback": "unsupported",
+                  "importLikes": "unsupported",
+                  "importPlaylists": "unsupported",
+                  "creatorDownload": "unsupported",
+                  "userOwnedDownload": "unsupported",
+                  "groupSync": "unsupported",
+                  "eq": "unsupported",
+                  "reason": "Archived analysis by MusicBrainz id; collection ended in 2022"
+                }
+              },
+              {
+                "provider": "lastfm",
+                "enabled": true,
+                "configured": false,
+                "capabilities": {
+                  "metadata": "requires_auth",
+                  "search": "unsupported",
+                  "preview": "unsupported",
+                  "playback": "unsupported",
+                  "importLikes": "unsupported",
+                  "importPlaylists": "unsupported",
+                  "creatorDownload": "unsupported",
+                  "userOwnedDownload": "unsupported",
+                  "groupSync": "unsupported",
+                  "eq": "unsupported",
+                  "reason": "Needs setting up: add an API key under Music ▸ Providers."
+                }
+              }
+            ],
+            "connections": {
+              "active": 0,
+              "players": 0,
+              "companions": 0,
+              "historical": 0,
+              "reconnects": 0,
+              "wsErrors": 0
+            },
+            "jobs": {
+              "queued": 0,
+              "running": 0,
+              "failed": 0,
+              "completed": 0,
+              "tasks": [
+                {
+                  "name": "pairing.expire",
+                  "intervalMs": 30000,
+                  "runs": 0,
+                  "failures": 0,
+                  "lastError": null,
+                  "lastRunAt": null,
+                  "nextRunAt": "2026-10-06T06:28:09.170Z"
+                },
+                {
+                  "name": "auth.purgeSessions",
+                  "intervalMs": 300000,
+                  "runs": 0,
+                  "failures": 0,
+                  "lastError": null,
+                  "lastRunAt": null,
+                  "nextRunAt": "2026-10-06T06:32:39.170Z"
+                },
+                {
+                  "name": "groups.timers",
+                  "intervalMs": 1000,
+                  "runs": 4,
+                  "failures": 0,
+                  "lastError": null,
+                  "lastRunAt": "2026-10-06T06:27:59.198Z",
+                  "nextRunAt": "2026-10-06T06:28:00.198Z"
+                },
+                {
+                  "name": "metrics.sample",
+                  "intervalMs": 60000,
+                  "runs": 0,
+                  "failures": 0,
+                  "lastError": null,
+                  "lastRunAt": null,
+                  "nextRunAt": "2026-10-06T06:28:39.170Z"
+                },
+                {
+                  "name": "metrics.purge",
+                  "intervalMs": 21600000,
+                  "runs": 0,
+                  "failures": 0,
+                  "lastError": null,
+                  "lastRunAt": null,
+                  "nextRunAt": "2026-10-06T12:27:39.170Z"
+                },
+                {
+                  "name": "downloads.maintenance",
+                  "intervalMs": 30000,
+                  "runs": 0,
+                  "failures": 0,
+                  "lastError": null,
+                  "lastRunAt": null,
+                  "nextRunAt": "2026-10-06T06:28:09.170Z"
+                },
+                {
+                  "name": "downloads.pump",
+                  "intervalMs": 5000,
+                  "runs": 4,
+                  "failures": 0,
+                  "lastError": null,
+                  "lastRunAt": "2026-10-06T06:27:59.198Z",
+                  "nextRunAt": "2026-10-06T06:28:04.198Z"
+                },
+                {
+                  "name": "transfers.reconcile",
+                  "intervalMs": 60000,
+                  "runs": 0,
+                  "failures": 0,
+                  "lastError": null,
+                  "lastRunAt": null,
+                  "nextRunAt": "2026-10-06T06:28:39.170Z"
+                },
+                {
+                  "name": "files.maintenance",
+                  "intervalMs": 3600000,
+                  "runs": 0,
+                  "failures": 0,
+                  "lastError": null,
+                  "lastRunAt": null,
+                  "nextRunAt": "2026-10-06T07:27:39.170Z"
+                },
+                {
+                  "name": "sync.compact",
+                  "intervalMs": 3600000,
+                  "runs": 0,
+                  "failures": 0,
+                  "lastError": null,
+                  "lastRunAt": null,
+                  "nextRunAt": "2026-10-06T07:27:39.170Z"
+                },
+                {
+                  "name": "shares.purge",
+                  "intervalMs": 3600000,
+                  "runs": 0,
+                  "failures": 0,
+                  "lastError": null,
+                  "lastRunAt": null,
+                  "nextRunAt": "2026-10-06T07:27:39.170Z"
+                },
+                {
+                  "name": "library.maintenance",
+                  "intervalMs": 3600000,
+                  "runs": 0,
+                  "failures": 0,
+                  "lastError": null,
+                  "lastRunAt": null,
+                  "nextRunAt": "2026-10-06T07:27:39.170Z"
+                },
+                {
+                  "name": "providers.cachePurge",
+                  "intervalMs": 1800000,
+                  "runs": 0,
+                  "failures": 0,
+                  "lastError": null,
+                  "lastRunAt": null,
+                  "nextRunAt": "2026-10-06T06:57:39.170Z"
+                },
+                {
+                  "name": "accounts.maintenance",
+                  "intervalMs": 600000,
+                  "runs": 0,
+                  "failures": 0,
+                  "lastError": null,
+                  "lastRunAt": null,
+                  "nextRunAt": "2026-10-06T06:37:39.170Z"
+                },
+                {
+                  "name": "discovery.cachePurge",
+                  "intervalMs": 3600000,
+                  "runs": 0,
+                  "failures": 0,
+                  "lastError": null,
+                  "lastRunAt": null,
+                  "nextRunAt": "2026-10-06T07:27:39.170Z"
+                },
+                {
+                  "name": "audit.purge",
+                  "intervalMs": 43200000,
+                  "runs": 0,
+                  "failures": 0,
+                  "lastError": null,
+                  "lastRunAt": null,
+                  "nextRunAt": "2026-10-06T18:27:39.170Z"
+                },
+                {
+                  "name": "releases.refresh",
+                  "intervalMs": 21600000,
+                  "runs": 0,
+                  "failures": 0,
+                  "lastError": null,
+                  "lastRunAt": null,
+                  "nextRunAt": "2026-10-06T12:27:39.170Z"
+                },
+                {
+                  "name": "backup.schedule",
+                  "intervalMs": 60000,
+                  "runs": 0,
+                  "failures": 0,
+                  "lastError": null,
+                  "lastRunAt": null,
+                  "nextRunAt": "2026-10-06T06:28:39.170Z"
+                },
+                {
+                  "name": "accounts.scheduleRefresh",
+                  "intervalMs": 300000,
+                  "runs": 0,
+                  "failures": 0,
+                  "lastError": null,
+                  "lastRunAt": null,
+                  "nextRunAt": "2026-10-06T06:32:39.170Z"
+                },
+                {
+                  "name": "discovery.profiles",
+                  "intervalMs": 3600000,
+                  "runs": 0,
+                  "failures": 0,
+                  "lastError": null,
+                  "lastRunAt": null,
+                  "nextRunAt": "2026-10-06T07:27:39.170Z"
+                },
+                {
+                  "name": "jobs.recover",
+                  "intervalMs": 600000,
+                  "runs": 0,
+                  "failures": 0,
+                  "lastError": null,
+                  "lastRunAt": null,
+                  "nextRunAt": "2026-10-06T06:37:39.170Z"
+                }
+              ],
+              "discovery": {
+                "completed": 4,
+                "queued": 3
+              }
+            },
+            "sync": {
+              "tracks": 0,
+              "artists": 0,
+              "albums": 0,
+              "playlists": 0,
+              "playlistItems": 0,
+              "eqPresets": 0,
+              "eqBindings": 0,
+              "listeningEvents": 0,
+              "aggregateProfiles": 0,
+              "transferJobs": 0,
+              "availability": 0
+            },
+            "discord": {
+              "enabled": false,
+              "configured": false,
+              "gateway": "stopped",
+              "voice": "idle",
+              "commandsRegistered": false,
+              "commandsRegisteredAt": null,
+              "messageContentIntent": "unknown",
+              "latencyMs": null,
+              "reconnects": 0,
+              "errors": 0,
+              "uptimeSeconds": 0,
+              "currentGuildId": null,
+              "currentVoiceChannelId": null,
+              "currentTrackTitle": null,
+              "lastError": null,
+              "warnings": [
+                "The bot has no token yet. Paste one in Bot token, then choose Save and Start.",
+                "No group is chosen in Group it controls, so commands have nothing to play to.",
+                "Prefix commands only work once Discord lets the bot read messages: turn on Message Content Intent for the bot in Discord’s Developer Portal. Slash commands work without it.",
+                "The bot answers in every server it is invited to. To limit it, list server IDs in Server allowlist.",
+                "The hub’s Discord service isn’t running, so the bot can’t start. Install the hub again with the Discord option (see the Discord bot guide), then choose Save and Start."
+              ]
+            },
+            "ffmpeg": {
+              "available": true,
+              "version": "9.0-full_build-www.gyan.dev",
+              "encoderCount": 7
+            },
+            "counters": {
+              "audit.success": 19,
+              "backup.created": 1,
+              "groups.created": 2,
+              "http.op.addLibraryRoot": 2,
+              "http.op.adminListProfiles": 1,
+              "http.op.backupSpace": 1,
+              "http.op.changePassword": 1,
+              "http.op.claimPairing": 2,
+              "http.op.completePairing": 2,
+              "http.op.confirmPairing": 2,
+              "http.op.createBackup": 1,
+              "http.op.createGroup": 2,
+              "http.op.createInvite": 1,
+              "http.op.createPairingSession": 2,
+              "http.op.createShare": 1,
+              "http.op.discordInviteUrl": 1,
+              "http.op.discordStatus": 1,
+              "http.op.downloadFormats": 1,
+              "http.op.downloadStorage": 2,
+              "http.op.getBackupSettings": 1,
+              "http.op.getDiscordConfig": 1,
+              "http.op.getHubIdentity": 3,
+              "http.op.getLiveTvSummary": 1,
+              "http.op.getNetwork": 2,
+              "http.op.getRecommendationConfig": 1,
+              "http.op.getSession": 3,
+              "http.op.healthz": 1,
+              "http.op.listBackups": 1,
+              "http.op.listDevices": 2,
+              "http.op.listDownloads": 1,
+              "http.op.listGroups": 2,
+              "http.op.listLibraryRoots": 2,
+              "http.op.listLibraryTracks": 16,
+              "http.op.listLogs": 1,
+              "http.op.listPairingSessions": 1,
+              "http.op.listProviders": 3,
+              "http.op.listShares": 1,
+              "http.op.listShareSources": 2,
+              "http.op.login": 2,
+              "http.op.metricsOverview": 5,
+              "http.op.providerUsage": 1,
+              "http.op.putBackupSettings": 1,
+              "http.op.scanLibrary": 1,
+              "http.requests": 82,
+              "jobs.completed.enrich-track": 3,
+              "jobs.completed.sync-library": 1,
+              "jobs.enqueued.enrich-track": 6,
+              "jobs.enqueued.sync-library": 1,
+              "jobs.retried.enrich-track": 3,
+              "library.scans": 2,
+              "pairing.attempts": 2,
+              "pairing.completed": 2,
+              "pairing.sessions_created": 2,
+              "providers.musicbrainz.errors": 3,
+              "providers.musicbrainz.ok": 3,
+              "shares.created": 1,
+              "library.tracks": 6
+            },
+            "histograms": {
+              "http.latency_ms": {
+                "count": 82,
+                "sum": 932.065500000017,
+                "p50": 0.9923999999991793,
+                "p95": 65.65639999999985,
+                "p99": 276.00350000000253,
+                "max": 276.00350000000253
+              },
+              "jobs.duration_ms.enrich-track": {
+                "count": 3,
+                "sum": 2556,
+                "p50": 1041,
+                "p95": 1046,
+                "p99": 1046,
+                "max": 1046
+              },
+              "jobs.duration_ms.sync-library": {
+                "count": 1,
+                "sum": 29,
+                "p50": 29,
+                "p95": 29,
+                "p99": 29,
+                "max": 29
+              },
+              "providers.musicbrainz.latency_ms": {
+                "count": 3,
+                "sum": 2554,
+                "p50": 1041,
+                "p95": 1046,
+                "p99": 1046,
+                "max": 1046
+              }
+            },
+            "alerts": [
+              {
+                "level": "error",
+                "message": "The data volume is 96% full. Downloads and backups will start failing."
+              }
+            ],
+            "recentErrors": []
+          }
+        }
+      },
+      "GET /api/v1/groups/01a10fe5-a06d-709d-9469-badda23fe07d/invites": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "items": [
+            {
+              "inviteId": "01a10fe5-a08c-70d8-9422-cf0d5d586d72",
+              "role": "member",
+              "createdBy": "admin",
+              "createdAt": "2026-10-06T06:27:49.516Z",
+              "expiresAt": "2026-10-06T07:27:49.516Z",
+              "toProfileId": null,
+              "toName": null,
+              "state": "open",
+              "usedBy": null,
+              "answeredAt": null
+            }
+          ]
+        }
+      },
+      "GET /api/v1/groups/01a10fe5-a06d-709d-9469-badda23fe07d": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "id": "01a10fe5-a06d-709d-9469-badda23fe07d",
+          "schemaVersion": 1,
+          "createdAt": "2026-10-06T06:27:49.484Z",
+          "updatedAt": "2026-10-06T06:27:49.484Z",
+          "deletedAt": null,
+          "hubId": "01a10fe5-73b2-708f-8b86-87c61a216028",
+          "name": "Kitchen",
+          "ownerId": "admin",
+          "status": "active",
+          "settings": {
+            "maxQueuePerUser": 25,
+            "duplicatePolicy": "reject-in-queue",
+            "cooldownSeconds": 0,
+            "fairQueue": false,
+            "voteSkipThreshold": 0.5,
+            "maxTrackDurationMs": 1200000,
+            "guestsMayRequest": true,
+            "driftHardSeekThresholdMs": 400,
+            "driftSoftCorrectMs": 60
+          },
+          "inviteCodeHash": null,
+          "members": [
+            {
+              "id": "01a10fe5-a06d-7082-a3d6-5e4a3163c653",
+              "schemaVersion": 1,
+              "createdAt": "2026-10-06T06:27:49.484Z",
+              "updatedAt": "2026-10-06T06:27:49.484Z",
+              "deletedAt": null,
+              "groupId": "01a10fe5-a06d-709d-9469-badda23fe07d",
+              "memberId": "admin",
+              "memberKind": "admin",
+              "role": "owner",
+              "displayName": "admin",
+              "joinedAt": "2026-10-06T06:27:49.484Z",
+              "revokedAt": null,
+              "shareAggregate": false,
+              "lastRequestAt": null,
+              "online": false,
+              "latencyMs": null
+            }
+          ],
+          "queueLength": 0,
+          "listenerCount": 0,
+          "playback": {
+            "groupId": "01a10fe5-a06d-709d-9469-badda23fe07d",
+            "revision": 0,
+            "sourceRevision": 0,
+            "status": "idle",
+            "currentItemId": null,
+            "startAt": null,
+            "positionMs": 0,
+            "pausedAt": null,
+            "syncGrade": "exact",
+            "syncReason": null,
+            "updatedAt": "2026-10-06T06:27:49.484Z"
+          },
+          "currentTrackTitle": null,
+          "myRole": "owner"
+        }
+      },
+      "GET /api/v1/groups/01a10fe5-a06d-709d-9469-badda23fe07d/sync": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "serverTime": "2026-10-06T06:28:10.357Z",
+          "playback": {
+            "groupId": "01a10fe5-a06d-709d-9469-badda23fe07d",
+            "revision": 0,
+            "sourceRevision": 0,
+            "status": "idle",
+            "currentItemId": null,
+            "startAt": null,
+            "positionMs": 0,
+            "pausedAt": null,
+            "syncGrade": "exact",
+            "syncReason": null,
+            "updatedAt": "2026-10-06T06:27:49.484Z"
+          },
+          "members": [
+            {
+              "memberId": "admin",
+              "driftMs": null,
+              "dspLatencyMs": null,
+              "online": false
+            }
+          ]
+        }
+      },
+      "GET /api/v1/groups/01a10fe5-a06d-709d-9469-badda23fe07d/queue": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "queue": {
+            "id": "01a10fe5-a06d-70ce-b2d9-e416a1b1acfc",
+            "mode": "group",
+            "deviceId": null,
+            "groupId": "01a10fe5-a06d-709d-9469-badda23fe07d",
+            "items": [],
+            "currentIndex": -1,
+            "revision": 0,
+            "context": null,
+            "repeat": "off",
+            "shuffle": false,
+            "shuffleSeed": null,
+            "fairQueue": false,
+            "positionMs": 0,
+            "updatedAt": "2026-10-06T06:27:49.484Z"
+          },
+          "playback": {
+            "groupId": "01a10fe5-a06d-709d-9469-badda23fe07d",
+            "revision": 0,
+            "sourceRevision": 0,
+            "status": "idle",
+            "currentItemId": null,
+            "startAt": null,
+            "positionMs": 0,
+            "pausedAt": null,
+            "syncGrade": "exact",
+            "syncReason": null,
+            "updatedAt": "2026-10-06T06:27:49.484Z"
+          },
+          "serverTime": "2026-10-06T06:28:10.358Z"
+        }
+      },
+      "GET /api/v1/groups/01a10fe5-a06d-709d-9469-badda23fe07d/now-playing": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "mode": "solo",
+          "groupId": "01a10fe5-a06d-709d-9469-badda23fe07d",
+          "title": null,
+          "artistName": null,
+          "albumName": null,
+          "artworkUrl": null,
+          "source": null,
+          "canonicalUrl": null,
+          "durationMs": null,
+          "positionMs": 0,
+          "requester": null,
+          "syncGrade": "unsupported",
+          "warning": null,
+          "serverTime": "2026-10-06T06:28:12.364Z",
+          "groupName": "Kitchen"
+        }
+      },
+      "GET /api/v1/groups/01a10fe5-a06d-709d-9469-badda23fe07d/history?limit=25": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "items": [],
+          "nextCursor": null
+        }
+      }
+    },
+    "pairing": {
+      "POST /api/v1/pairing/sessions": {
+        "status": 201,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "sessionId": "01a10fe6-01c4-70a2-bb8c-94f57f2cc27e",
+          "code": "VPZ25-20XTQ",
+          "expiresAt": "2026-10-06T06:38:14.404Z",
+          "deepLink": "nowplaying://pair#eyJ2IjoxLCJjb2RlIjoiVlBaMjUyMFhUUSIsImVuZHBvaW50IjoiaHR0cDovL2xvY2FsaG9zdDo0NTcxIiwiaHViSWQiOiIwMWExMGZlNS03M2IyLTcwOGYtOGI4Ni04N2M2MWEyMTYwMjgiLCJmcCI6Ijk5OUItMDdEMy0yODk5LTMxMEUtRERDOC1ENkVDLTU2OUItMEQ4NCIsImV4cCI6MTc5MTI2ODY5NH0",
+          "qrSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 63 63\" shape-rendering=\"crispEdges\"><path fill=\"#ffffff\" d=\"M0 0h63v63H0z\"/><path stroke=\"#000000\" d=\"M1 1.5h7m3 0h1m8 0h1m2 0h1m2 0h2m2 0h3m4 0h2m4 0h3m2 0h1m3 0h2m1 0h7M1 2.5h1m5 0h1m5 0h1m1 0h5m1 0h1m1 0h1m1 0h1m1 0h1m4 0h1m2 0h1m1 0h1m3 0h2m2 0h2m2 0h1m2 0h2m1 0h1m5 0h1M1 3.5h1m1 0h3m1 0h1m1 0h4m1 0h2m2 0h1m4 0h1m3 0h2m1 0h3m4 0h2m1 0h1m2 0h1m5 0h1m1 0h3m1 0h1m1 0h3m1 0h1M1 4.5h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h1m1 0h2m2 0h1m2 0h1m3 0h1m1 0h1m4 0h2m1 0h2m4 0h1m1 0h1m1 0h1m1 0h4m1 0h1m1 0h1m1 0h3m1 0h1M1 5.5h1m1 0h3m1 0h1m1 0h1m1 0h1m2 0h1m1 0h2m1 0h1m1 0h2m2 0h2m2 0h5m2 0h1m1 0h1m1 0h4m4 0h1m2 0h2m2 0h1m1 0h3m1 0h1M1 6.5h1m5 0h1m1 0h1m1 0h1m2 0h2m1 0h2m2 0h1m1 0h3m2 0h2m3 0h5m1 0h2m2 0h4m1 0h4m3 0h1m5 0h1M1 7.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M9 8.5h1m3 0h1m1 0h1m1 0h1m4 0h1m1 0h1m4 0h1m3 0h1m1 0h2m4 0h1m1 0h1m2 0h3m1 0h1M1 9.5h1m1 0h5m3 0h3m2 0h1m1 0h1m1 0h1m1 0h2m2 0h1m1 0h7m2 0h3m4 0h1m4 0h5m1 0h5M3 10.5h2m3 0h3m1 0h1m7 0h1m1 0h1m1 0h2m3 0h1m6 0h3m2 0h4m3 0h2m4 0h3M1 11.5h2m3 0h2m1 0h1m1 0h4m1 0h2m1 0h2m4 0h1m3 0h4m1 0h1m6 0h1m1 0h1m3 0h5m1 0h1m3 0h1m1 0h3M5 12.5h2m2 0h2m3 0h2m2 0h1m9 0h1m1 0h3m1 0h1m3 0h1m1 0h1m3 0h3m4 0h1m5 0h1m2 0h1M1 13.5h1m4 0h4m3 0h2m2 0h2m1 0h4m6 0h1m1 0h1m1 0h4m1 0h1m3 0h1m2 0h1m1 0h2m2 0h1m1 0h3m1 0h1m1 0h2M1 14.5h1m1 0h1m6 0h1m2 0h1m2 0h3m4 0h9m6 0h1m1 0h1m1 0h2m1 0h1m2 0h3m3 0h2m3 0h3M3 15.5h3m1 0h6m1 0h2m2 0h3m1 0h1m2 0h2m2 0h2m1 0h1m1 0h1m2 0h1m3 0h3m1 0h2m2 0h1m4 0h4m1 0h3M1 16.5h2m2 0h2m1 0h2m4 0h8m1 0h2m1 0h1m1 0h1m1 0h4m1 0h3m1 0h1m1 0h2m5 0h1m1 0h4m3 0h1m2 0h2M4 17.5h1m1 0h2m1 0h1m2 0h1m5 0h1m1 0h1m2 0h4m2 0h1m1 0h3m1 0h4m1 0h1m3 0h1m3 0h5m1 0h3m1 0h1m1 0h2M2 18.5h1m10 0h1m1 0h1m2 0h2m1 0h1m3 0h2m2 0h2m1 0h2m2 0h3m1 0h4m1 0h1m2 0h3m3 0h2m1 0h1m1 0h1M1 19.5h1m3 0h5m2 0h5m1 0h3m1 0h2m2 0h4m1 0h1m2 0h1m1 0h1m1 0h2m2 0h4m1 0h1m3 0h4m1 0h6M1 20.5h1m8 0h2m3 0h1m1 0h1m2 0h1m2 0h3m1 0h1m2 0h7m1 0h1m1 0h1m1 0h2m1 0h2m4 0h3m2 0h1m3 0h2M2 21.5h2m1 0h4m1 0h1m2 0h2m5 0h1m3 0h1m2 0h1m2 0h3m4 0h1m4 0h3m2 0h4m1 0h3m1 0h1m1 0h3M2 22.5h1m3 0h1m1 0h4m1 0h2m2 0h2m2 0h2m6 0h1m2 0h1m3 0h3m1 0h1m1 0h2m1 0h1m2 0h3m3 0h2m5 0h1M3 23.5h1m3 0h1m3 0h3m2 0h1m1 0h3m5 0h1m1 0h2m1 0h2m1 0h1m4 0h1m3 0h1m1 0h2m1 0h1m3 0h5m3 0h2M1 24.5h3m1 0h1m4 0h2m1 0h1m1 0h1m4 0h1m1 0h1m3 0h1m2 0h4m1 0h1m1 0h1m4 0h1m3 0h1m1 0h4m2 0h1m1 0h1m1 0h1m3 0h1M1 25.5h1m2 0h1m2 0h4m1 0h3m1 0h1m2 0h1m5 0h2m2 0h2m2 0h1m1 0h6m1 0h3m3 0h3m3 0h3m3 0h2M5 26.5h1m9 0h4m2 0h2m1 0h1m1 0h3m1 0h1m2 0h2m1 0h1m1 0h1m3 0h2m1 0h1m2 0h2m4 0h2m1 0h5M2 27.5h1m2 0h4m2 0h2m1 0h1m1 0h2m1 0h1m1 0h1m4 0h3m2 0h5m1 0h1m3 0h2m2 0h2m1 0h1m1 0h3m1 0h1m1 0h1m3 0h2M8 28.5h1m1 0h3m2 0h1m1 0h2m2 0h1m2 0h1m2 0h1m2 0h3m1 0h4m1 0h3m3 0h2m1 0h1m2 0h1m1 0h2m5 0h2M3 29.5h1m1 0h5m1 0h3m2 0h2m2 0h7m1 0h6m2 0h2m1 0h1m2 0h3m1 0h2m1 0h1m1 0h10M2 30.5h1m1 0h2m3 0h1m1 0h1m2 0h1m3 0h1m4 0h4m1 0h2m3 0h1m4 0h1m1 0h1m1 0h3m1 0h1m1 0h1m4 0h1m3 0h1m2 0h1M4 31.5h2m1 0h1m1 0h1m1 0h1m1 0h2m2 0h3m1 0h1m1 0h4m1 0h2m1 0h1m1 0h5m1 0h1m5 0h5m1 0h1m1 0h1m1 0h1m1 0h1m2 0h2M2 32.5h4m3 0h2m5 0h1m1 0h1m1 0h1m2 0h3m3 0h1m3 0h1m2 0h5m2 0h1m2 0h2m4 0h2m3 0h1m2 0h2M1 33.5h1m2 0h7m3 0h1m4 0h1m1 0h1m2 0h1m1 0h1m1 0h10m6 0h1m3 0h2m1 0h7m1 0h1M2 34.5h1m2 0h1m2 0h2m2 0h1m2 0h1m1 0h2m1 0h2m3 0h1m3 0h1m1 0h3m6 0h1m2 0h2m4 0h2m3 0h3m1 0h1m1 0h2M1 35.5h3m1 0h3m1 0h2m2 0h3m1 0h2m1 0h1m3 0h3m1 0h1m3 0h2m1 0h1m1 0h6m2 0h3m1 0h3m2 0h4m1 0h3M3 36.5h2m1 0h1m1 0h1m1 0h4m1 0h2m1 0h4m1 0h2m1 0h1m2 0h1m7 0h1m1 0h1m3 0h1m2 0h2m1 0h1m1 0h1m1 0h3m2 0h1m2 0h1M3 37.5h1m1 0h1m1 0h1m4 0h2m1 0h1m2 0h3m4 0h2m3 0h4m1 0h4m3 0h1m1 0h1m1 0h1m1 0h3m1 0h2m1 0h1m1 0h1m1 0h1M2 38.5h3m1 0h1m2 0h2m1 0h1m2 0h1m2 0h1m1 0h2m1 0h5m1 0h1m3 0h1m4 0h1m4 0h1m4 0h3m1 0h1m1 0h1m1 0h1m2 0h1M4 39.5h1m1 0h3m1 0h1m1 0h1m2 0h1m1 0h1m1 0h1m1 0h1m3 0h1m2 0h1m7 0h2m3 0h2m1 0h1m1 0h1m1 0h2m2 0h4m3 0h2M3 40.5h1m2 0h1m1 0h2m1 0h2m2 0h1m3 0h1m3 0h1m4 0h5m2 0h2m1 0h1m2 0h2m2 0h3m2 0h6m5 0h1M1 41.5h2m1 0h1m2 0h5m1 0h1m5 0h1m1 0h1m1 0h3m2 0h1m2 0h1m3 0h3m4 0h1m1 0h1m3 0h2m2 0h4m3 0h1m1 0h1M1 42.5h1m6 0h1m1 0h1m1 0h3m1 0h1m3 0h1m1 0h2m1 0h1m2 0h3m1 0h1m3 0h3m3 0h3m1 0h1m3 0h1m1 0h3m1 0h1m1 0h1m2 0h1M1 43.5h2m4 0h2m2 0h1m1 0h3m2 0h5m1 0h2m1 0h5m2 0h1m1 0h1m3 0h4m1 0h1m1 0h1m4 0h1m1 0h3m2 0h3M1 44.5h1m1 0h3m2 0h3m1 0h2m1 0h1m6 0h2m1 0h2m1 0h1m2 0h2m1 0h1m5 0h1m2 0h2m4 0h1m3 0h1m1 0h2M3 45.5h1m1 0h1m1 0h1m1 0h1m1 0h2m1 0h1m2 0h2m1 0h3m2 0h2m1 0h1m1 0h3m1 0h1m1 0h4m2 0h1m1 0h1m3 0h2m1 0h6m1 0h1m2 0h1M1 46.5h1m1 0h1m2 0h1m1 0h2m3 0h1m1 0h1m2 0h1m1 0h1m1 0h1m1 0h2m3 0h1m1 0h1m2 0h1m2 0h2m2 0h5m2 0h1m1 0h1m1 0h1m3 0h1m1 0h1m2 0h1M1 47.5h1m1 0h1m3 0h1m1 0h2m1 0h2m1 0h1m1 0h3m1 0h3m2 0h1m1 0h2m1 0h1m1 0h1m2 0h2m2 0h1m2 0h2m3 0h2m4 0h3m3 0h2M1 48.5h2m3 0h1m2 0h2m2 0h1m1 0h2m2 0h1m1 0h3m1 0h1m2 0h2m2 0h1m1 0h3m2 0h2m4 0h2m1 0h6m1 0h3M1 49.5h3m1 0h1m1 0h3m2 0h2m1 0h6m1 0h1m2 0h2m2 0h9m1 0h1m4 0h1m2 0h6m3 0h1m1 0h1m2 0h1M1 50.5h4m1 0h1m1 0h4m2 0h1m1 0h5m1 0h1m1 0h2m1 0h1m1 0h1m1 0h3m3 0h2m2 0h5m2 0h2m2 0h5m1 0h2M3 51.5h5m1 0h4m1 0h2m4 0h3m3 0h4m1 0h5m3 0h2m3 0h4m1 0h1m1 0h2m1 0h2m4 0h2M1 52.5h3m1 0h1m3 0h2m3 0h3m1 0h2m5 0h1m1 0h3m4 0h1m1 0h1m4 0h1m1 0h6m1 0h1m2 0h1m3 0h1m2 0h2M1 53.5h4m2 0h1m1 0h1m1 0h2m3 0h1m1 0h1m1 0h1m3 0h1m4 0h5m1 0h1m1 0h1m1 0h1m3 0h2m1 0h4m1 0h8M9 54.5h1m1 0h1m1 0h2m1 0h1m2 0h1m1 0h1m1 0h7m3 0h1m4 0h1m2 0h4m3 0h1m1 0h1m2 0h1m3 0h2M1 55.5h7m3 0h1m1 0h1m1 0h2m4 0h1m2 0h1m1 0h1m1 0h2m1 0h1m1 0h3m1 0h3m1 0h1m2 0h1m1 0h3m2 0h3m1 0h1m1 0h1m2 0h2M1 56.5h1m5 0h1m1 0h4m1 0h2m1 0h2m1 0h2m3 0h1m3 0h1m3 0h4m1 0h4m1 0h3m1 0h3m1 0h1m1 0h1m3 0h1M1 57.5h1m1 0h3m1 0h1m1 0h2m1 0h4m4 0h1m1 0h2m1 0h2m1 0h6m3 0h1m5 0h1m4 0h3m2 0h6m1 0h2M1 58.5h1m1 0h3m1 0h1m1 0h7m1 0h3m1 0h2m1 0h3m1 0h1m1 0h2m4 0h3m4 0h2m3 0h1m1 0h1m3 0h4m3 0h1M1 59.5h1m1 0h3m1 0h1m1 0h1m1 0h3m2 0h1m2 0h1m3 0h5m5 0h1m1 0h1m2 0h1m1 0h3m3 0h1m1 0h1m1 0h2m4 0h1m2 0h1m1 0h1M1 60.5h1m5 0h1m4 0h1m1 0h1m1 0h5m1 0h3m2 0h2m1 0h2m1 0h1m3 0h2m1 0h1m1 0h2m5 0h1m3 0h4m4 0h1M1 61.5h7m1 0h2m2 0h1m3 0h2m1 0h2m3 0h3m3 0h2m1 0h1m1 0h3m3 0h3m1 0h6m2 0h1m2 0h1m1 0h3\"/></svg>\n",
+          "hubFingerprint": "999B-07D3-2899-310E-DDC8-D6EC-569B-0D84",
+          "endpointKnown": false,
+          "note": "The hub is reachable only on this machine; set a public endpoint (Admin → Network) to share links with others. The QR code embeds a localhost endpoint that only works on this machine."
+        }
+      },
+      "GET /api/v1/pairing/sessions": {
+        "status": 200,
+        "contentType": "application/json; charset=utf-8",
+        "body": {
+          "items": [
+            {
+              "id": "01a10fe6-01c4-70a2-bb8c-94f57f2cc27e",
+              "hubId": "01a10fe5-73b2-708f-8b86-87c61a216028",
+              "deviceKind": "player",
+              "requestedScopes": [
+                "library:read",
+                "search:use",
+                "group:member",
+                "history:events",
+                "shares:create",
+                "profile:read",
+                "profile:write",
+                "backup:read"
+              ],
+              "createdBy": "admin",
+              "createdAt": "2026-10-06T06:28:14.404Z",
+              "expiresAt": "2026-10-06T06:38:14.404Z",
+              "attempts": 0,
+              "maxAttempts": 5,
+              "state": "pending",
+              "claimedDeviceName": null,
+              "claimedPublicKey": null,
+              "claimedAppVersion": null,
+              "claimedProtocolVersion": null,
+              "verificationFingerprint": null,
+              "consumedAt": null,
+              "resultingDeviceId": null
+            },
+            {
+              "id": "01a10fe5-a02d-7046-b6fc-a76b5af23de9",
+              "hubId": "01a10fe5-73b2-708f-8b86-87c61a216028",
+              "deviceKind": "companion",
+              "requestedScopes": ["library:read", "library:share", "files:serve"],
+              "createdBy": "admin",
+              "createdAt": "2026-10-06T06:27:49.422Z",
+              "expiresAt": "2026-10-06T06:37:49.422Z",
+              "attempts": 0,
+              "maxAttempts": 5,
+              "state": "consumed",
+              "claimedDeviceName": "Studio PC",
+              "claimedPublicKey": "studiopc-device-key-0000000000",
+              "claimedAppVersion": "0.1.0",
+              "claimedProtocolVersion": 1,
+              "verificationFingerprint": "21DC-D40E-6E31",
+              "consumedAt": "2026-10-06T06:27:49.469Z",
+              "resultingDeviceId": "01a10fe5-a05d-70df-808f-e217752d3bc8"
+            },
+            {
+              "id": "01a10fe5-9fe0-70ab-b20f-04ae52a51755",
+              "hubId": "01a10fe5-73b2-708f-8b86-87c61a216028",
+              "deviceKind": "player",
+              "requestedScopes": ["library:read", "group:member", "search:use"],
+              "createdBy": "admin",
+              "createdAt": "2026-10-06T06:27:49.344Z",
+              "expiresAt": "2026-10-06T06:37:49.344Z",
+              "attempts": 0,
+              "maxAttempts": 5,
+              "state": "consumed",
+              "claimedDeviceName": "Kitchen speaker",
+              "claimedPublicKey": "kitchenspeaker-device-key-0000000000",
+              "claimedAppVersion": "0.1.0",
+              "claimedProtocolVersion": 1,
+              "verificationFingerprint": "F5C8-4A65-92FA",
+              "consumedAt": "2026-10-06T06:27:49.405Z",
+              "resultingDeviceId": "01a10fe5-a01d-70e6-b8b7-c15177ebca06"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

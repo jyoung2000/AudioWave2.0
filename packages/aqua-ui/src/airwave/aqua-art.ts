@@ -2,7 +2,7 @@
  * AquaArt: the Airwave window's drawn controls — the Snow Leopard push button and the 10.4 pop-up
  * and checkbox.
  *
- * One port of the `AquaArt` script that `design/frontends/airwave-hub.html` and
+ * One port of the `AquaArt` script that `design/frontends/origin/airwave-hub.html` and
  * `airwave-companion.html` both carry, kept line for line with it: each control is drawn as an SVG
  * from colour profiles sampled row by row from the reference and handed to CSS as a `border-image`
  * source on `:root` (`--aq-btn-22`, `--aq-def-22`, `--aq-pop-22`, `--aq-cb-14` and their `-down`,

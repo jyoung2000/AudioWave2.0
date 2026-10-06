@@ -206,6 +206,15 @@ const hasChromium = () => {
   }
 };
 
+/** The mockups render in whichever Chrome this machine has: an installed one, or Playwright's. */
+const hasMockupBrowser = () => {
+  const named = process.env.NP_MOCKUP_BROWSER || process.env.NP_STYLEGUIDE_BROWSER || process.env.PW_CHROMIUM_PATH;
+  if (named && existsSync(named)) return null;
+  const installed = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe', '/usr/bin/google-chrome', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'];
+  if (installed.some((path) => existsSync(path))) return null;
+  return hasChromium();
+};
+
 run('generate', 'pnpm', ['generate']);
 run('generated-up-to-date', 'git', ['diff', '--exit-code', '--', 'packages/contracts/generated', 'packages/test-fixtures/generated']);
 check('licenses-up-to-date', licensesUpToDate);
@@ -228,6 +237,10 @@ run('test:perf', 'pnpm', ['test:perf']);
 run('build:local', 'pnpm', ['build:local']);
 run('local-file-up-to-date', 'git', ['diff', '--exit-code', '--', 'now-playing.html']);
 check('helper-up-to-date', helperUpToDate);
+// The living mockups (design/frontends/airwave-*.html) are rendered from the apps; render them again
+// and compare, so an app change that is not in its mockup is a red gate (DEC-038). Needs a browser:
+// an installed Chrome, or Playwright's Chromium.
+run('mockups-up-to-date', 'pnpm', ['mockups:diff', '--check'], { skipIf: hasMockupBrowser });
 run('test:local', 'pnpm', ['test:local'], { skipIf: hasChromium, artifacts: ['music-player/test-results-local', 'music-player/playwright-report-local'] });
 // The styleguide is built from the products' own components and stylesheets, so the committed copy
 // goes stale the moment either moves — same shape as the single-file player above, and the same

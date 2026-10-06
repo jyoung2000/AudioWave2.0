@@ -1,5 +1,5 @@
 /**
- * The six toolbar icons of the Airwave Hub window, as `design/frontends/airwave-hub.html` draws them.
+ * The six toolbar icons of the Airwave Hub window, as `design/frontends/origin/airwave-hub.html` draws them.
  *
  * They live in their own module, as the companion's do, so the window (`App.tsx`) and the styleguide
  * (`packages/aqua-ui/styleguide/screens.tsx`) draw the same six pictures.

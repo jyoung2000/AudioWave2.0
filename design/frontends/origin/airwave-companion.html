@@ -1,0 +1,1077 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Airwave Companion</title>
+<meta name="description" content="Mockup of the Windows companion app: library folders, Live TV links, secure remote access and settings with downloader status, drawn in the Airwave suite's Snow Leopard window skin.">
+<style>
+/* ============================================================ tokens
+   The window skin: the suite's Snow Leopard reconstruction (AudioWave
+   aqua-window values). The window skin has no dark palette, because Snow
+   Leopard had none (AudioWave DEC-003) — this page renders light in both
+   OS appearances, with an explicit body background. */
+:root, :root:not([data-theme="light"]), :root[data-theme="dark"] {
+  --desktop:        #6d737a;
+  --win-outline:    #747474;
+  --win-body:       #ececec;
+  --content:        #ffffff;
+  --content-muted:  #f7f7f7;
+  --row-stripe:     #f1f6fb;
+  --row-divider:    #d8dee5;
+  --chrome-top:     #f6f6f6;
+  --chrome-upper:   #e5e5e5;
+  --chrome-lower:   #c4c4c4;
+  --chrome-bottom:  #afafaf;
+  --chrome-sep:     #858585;
+  --chrome-hi:      #ffffff;
+  --sel-top:        #69b5f3;
+  --sel-mid:        #378dda;
+  --sel-bot:        #1764b2;
+  --sel-border:     #0f4e8b;
+  --sel-ink:        #ffffff;
+  --aqua-spec:      #eafbff;
+  --aqua-top:       #a9e5ff;
+  --aqua-mid:       #38b6f7;
+  --aqua-lower:     #0d83d6;
+  --aqua-bot:       #075fa6;
+  --aqua-rim:       #07558f;
+  --focus:          #3f9fe8;
+  --ink:            #161616;
+  --ink-2:          #565b60;
+  --ink-3:          #96999c;
+  --lcd-top:        #e1eaeb;
+  --lcd-bot:        #aebcc0;
+  --lcd-ink:        #172326;
+  --danger:         #d64a44;
+  --success:        #4e9d47;
+  --warning:        #d99a1e;
+  --well-edge:      #9a9a9a;
+  --btn-top:        #fefefe;
+  --btn-mid:        #f0f0f0;
+  --btn-bot:        #dcdcdc;
+  --btn-edge:       #9c9c9c;
+  /* Aqua controls: the gel itself is drawn by AquaArt (see the script in
+     <head>); these are the ink and focus ring that go with it. */
+  --aq-ink:         #000000;
+  --aq-ink-off:     #9a9a9a;
+  --aq-ring:        #7ea8e0;
+  --aq-halo:        rgba(88, 145, 225, .75);
+  /* Aqua scroller: the sampled 10.3 thumb gel, the white track */
+  --gel-thumb: linear-gradient(to right, #16407f 0%, #6ea3ec 12%, #8cb8ea 24%, #458ad8 45%, #5fa8f1 58%, #83c9fd 78%, #9fd2ee 92%, #3f6a86 100%);
+  --gel-thumb-down: linear-gradient(to right, #0f2f5e 0%, #4f7fc4 12%, #6b95c8 24%, #336bb0 45%, #4686c9 58%, #62a2d6 78%, #7fb0cc 92%, #2f5068 100%);
+  --gel-stripe: rgba(255, 255, 255, .16);
+  --track-edge: #b9b9b9;
+  --track-lo: #dedede;
+  --track-hi: #fbfbfb;
+  --font: "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: Consolas, "Lucida Console", Menlo, monospace;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--desktop);
+  color: var(--ink);
+  font: 12px/1.5 var(--font);
+  min-height: 100dvh;
+  padding: clamp(0px, 3vw, 34px) clamp(0px, 3vw, 34px) 48px;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+/* ============================================================ window */
+.frame { max-width: 640px; margin: 0 auto; }
+/* A window, not a page: fixed to the screen's height, with the pane
+   scrolling inside it under the toolbar and above the status strip. */
+.win {
+  width: 100%;
+  height: clamp(420px, calc(100dvh - clamp(0px, 3vw, 34px) - 82px), 820px);
+  display: flex;
+  flex-direction: column;
+  background: var(--win-body);
+  border: 1px solid var(--win-outline);
+  border-radius: 6px 6px 5px 5px;
+  box-shadow: 0 22px 46px -14px rgba(0,0,0,.62), 0 4px 12px rgba(0,0,0,.28);
+  overflow: hidden;
+}
+/* Title bar and toolbar: one unified sheet, as Snow Leopard drew utility
+   windows. No traffic lights: in a mockup three circles that close nothing
+   would be decoration (suite rule UX-PRIN-001). */
+.chrome {
+  background: linear-gradient(var(--chrome-top), var(--chrome-upper) 42%, var(--chrome-lower) 88%, var(--chrome-bottom));
+  border-bottom: 1px solid var(--chrome-sep);
+  box-shadow: inset 0 1px 0 var(--chrome-hi);
+}
+.titlebar {
+  height: 26px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  color: #3f4245;
+  text-shadow: 0 1px 0 rgba(255,255,255,.75);
+  letter-spacing: .01em;
+  user-select: none;
+}
+.toolbar {
+  display: flex;
+  justify-content: center;
+  gap: 26px;
+  padding: 2px 12px 6px;
+}
+.tool {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 3px 8px 4px;
+  border-radius: 5px;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #4c5054;
+  text-shadow: 0 1px 0 rgba(255,255,255,.7);
+  cursor: default;
+  min-width: 74px;
+}
+.tool svg { width: 26px; height: 26px; display: block; }
+.tool[aria-selected="true"] { background: rgba(0,0,0,.15); box-shadow: inset 0 1px 3px rgba(0,0,0,.28), 0 1px 0 rgba(255,255,255,.55); }
+.tool:not([aria-selected="true"]):hover { background: rgba(0,0,0,.06); }
+.tool:active { background: rgba(0,0,0,.2); }
+
+/* ============================================================ panes */
+.pane { padding: 18px 20px 20px; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.chrome, .status { flex: none; }
+
+/* ============================================================ Aqua scroller
+   Always shown, as it was in 10.6: a white track with a sunken edge and the
+   blue gel thumb with its faint stripes. Chromium (and so the Windows app's
+   shell) draws this; Firefox gets the nearest standard colours. */
+.pane::-webkit-scrollbar { width: 15px; }
+.pane::-webkit-scrollbar-track {
+  background: linear-gradient(to right, var(--track-lo), var(--track-hi) 45%, var(--track-hi) 70%, var(--track-lo));
+  box-shadow: inset 1px 0 0 var(--track-edge);
+}
+.pane::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 8px;
+  min-height: 40px;
+  background: repeating-linear-gradient(to bottom, var(--gel-stripe) 0 2px, transparent 2px 4px) padding-box, var(--gel-thumb) padding-box;
+}
+.pane::-webkit-scrollbar-thumb:active {
+  background: repeating-linear-gradient(to bottom, var(--gel-stripe) 0 2px, transparent 2px 4px) padding-box, var(--gel-thumb-down) padding-box;
+}
+@supports not selector(::-webkit-scrollbar) { .pane { scrollbar-color: #458ad8 var(--track-lo); } }
+.pane[hidden] { display: none; }
+.lead { margin: 0 0 14px; color: var(--ink-2); max-width: 46em; }
+h2 { font-size: 12px; margin: 0 0 2px; }
+fieldset { border: 0; margin: 0 0 16px; padding: 0; min-inline-size: 0; }
+legend { padding: 0; font-weight: 700; margin-bottom: 2px; }
+.hint { color: var(--ink-2); margin: 0 0 7px; }
+.hint code { font-family: var(--mono); font-size: 11px; }
+
+/* The bezelled well that holds every list */
+.well {
+  background: var(--content);
+  border: 1px solid var(--well-edge);
+  border-radius: 2px;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,.22);
+  overflow: hidden;
+}
+.rows { list-style: none; margin: 0; padding: 0; }
+.rows li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  padding: 2px 6px 2px 8px;
+}
+.rows li:nth-child(even) { background: var(--row-stripe); }
+.rows .ic { flex: none; width: 15px; height: 15px; color: #7d97b3; }
+.rows .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 11px; }
+.rows .name b { font-family: var(--font); font-size: 12px; }
+.rows .meta { flex: none; color: var(--ink-2); font-size: 11px; }
+.rows .ok { color: var(--success); font-weight: 700; }
+.rows .bad { color: var(--danger); font-weight: 700; }
+.empty { display: block; padding: 10px 10px 11px; color: var(--ink-3); }
+/* removing is a real command, drawn as the era's round minus */
+.rm {
+  flex: none; appearance: none; border: 0; padding: 0;
+  width: 17px; height: 17px; border-radius: 50%;
+  background: linear-gradient(var(--btn-top), var(--btn-bot));
+  box-shadow: inset 0 0 0 1px var(--btn-edge);
+  color: #5c5c5c; font-weight: 700; line-height: 1;
+  display: grid; place-items: center; cursor: default;
+}
+.rm:hover { color: var(--danger); }
+@media (pointer: coarse) { .rm { width: 22px; height: 22px; } .rows li { min-height: 34px; } }
+.rm:active { filter: brightness(.92); }
+
+/* the bar under a well: add controls */
+.spacebar { position: relative; width: min(360px, 100%); height: 10px; border-radius: 5px; background: #e4e7ea; box-shadow: inset 0 1px 2px rgba(0,0,0,.25); overflow: hidden; }
+.spacebar i { position: absolute; top: 0; bottom: 0; }
+.spacebar .used { left: 0; background: linear-gradient(#b9bec5, #9aa1aa); }
+.spacebar .this { background: var(--gel-thumb); }
+.spacebar.is-short .this { background: linear-gradient(#e98a7e, #c9453a); }
+.barrow { display: flex; gap: 8px; margin-top: 7px; align-items: center; flex-wrap: wrap; }
+/* Snow Leopard push buttons: a matte, brushed-metal pill drawn by AquaArt,
+   so the element keeps its own box, text and focus ring. The numbers in
+   border-image are AquaArt.geo(22): 22px caps, 6px shadow margin either
+   side, 2px above and 8px below. */
+.push, .pop, .box { border: 0 solid transparent; background: none; }
+.push {
+  appearance: none;
+  height: 22px;
+  min-width: 58px;
+  padding: 0 15px;
+  border-radius: 11px;
+  border-image: var(--aq-btn-22) 0 22 fill / 0 22px / 2px 6px 8px;
+  color: var(--aq-ink);
+  line-height: 20px;
+  white-space: nowrap;
+  cursor: default;
+}
+.push:active:not([disabled]) { border-image-source: var(--aq-btn-22-down); }
+.push[disabled] { border-image-source: var(--aq-btn-22-off); color: var(--aq-ink-off); }
+.push:focus-visible, .pop:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--aq-ring), 0 0 2px 3px var(--aq-halo); }
+/* the default button is 10.6 blue and throbs, as it did */
+/* One default per window: a form's Add turns blue while you're typing into
+   it, because that is when Return presses it. */
+form:focus-within > .push--default, form:has(.field:not(:placeholder-shown)) > .push--default { border-image-source: var(--aq-def-22); animation: throb 1.5s ease-in-out infinite; }
+form:focus-within > .push--default:active, form:has(.field:not(:placeholder-shown)) > .push--default:active { border-image-source: var(--aq-def-22-down); animation: none; }
+@keyframes throb { 50% { filter: brightness(1.1) saturate(.82); } }
+@media (prefers-reduced-motion: reduce) { .push--default { animation: none !important; } }
+.field {
+  flex: 1 1 200px;
+  min-width: 0;
+  min-height: 22px;
+  border: 1px solid #8e8e8c;
+  border-radius: 3px;
+  padding: 1px 7px 2px;
+  background: var(--content);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.2);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.field::placeholder { color: var(--ink-3); font-family: var(--font); font-size: 12px; }
+.note { margin: 6px 0 0; color: var(--ink-2); }
+.note--bad { color: var(--danger); }
+
+/* ============================================================ remote */
+.lcd {
+  border: 1px solid #7f8a8e;
+  border-radius: 4px;
+  background: linear-gradient(var(--lcd-top), var(--lcd-bot));
+  box-shadow: inset 0 1px 3px rgba(0,0,0,.25), inset 0 -1px 0 rgba(255,255,255,.45);
+  color: var(--lcd-ink);
+  padding: 12px 14px 13px;
+  display: grid;
+  gap: 3px;
+  justify-items: center;
+  text-align: center;
+}
+.lcd__code {
+  font-family: var(--mono);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-shadow: 0 1px 0 rgba(255,255,255,.5);
+}
+.lcd__sub { font-size: 11px; color: #35464b; }
+.remote-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+@media (max-width: 560px) { .remote-grid { grid-template-columns: 1fr; } }
+.steps { margin: 8px 0 0; padding-left: 18px; }
+.steps li { margin: 3px 0; }
+/* the era's blue-gel checkbox rows */
+.optrow { display: flex; gap: 8px; align-items: flex-start; padding: 7px 2px; }
+.optrow + .optrow { border-top: 1px solid var(--row-divider); }
+.optrow input, .chk input { position: absolute; opacity: 0; width: 18px; height: 18px; margin: 0; }
+/* Aqua checkbox: grey gel off, blue gel with a black tick on */
+.box {
+  flex: none; width: 14px; height: 14px; margin-top: 1px;
+  border-radius: 3px;
+  border-image: var(--aq-cb-14) 0 fill / 0 / 2px 4px 6px;
+  position: relative;
+}
+.optrow input:checked + .box, .chk input:checked + .box { border-image-source: var(--aq-cb-14-on); }
+.optrow:active .box, .chk:active .box { border-image-source: var(--aq-cb-14-down); }
+.optrow:active input:checked + .box, .chk:active input:checked + .box { border-image-source: var(--aq-cb-14-on-down); }
+.optrow input:focus-visible + .box, .chk input:focus-visible + .box { box-shadow: 0 0 0 1px var(--aq-ring), 0 0 2px 3px var(--aq-halo); }
+.optrow .lbl b { display: block; }
+.optrow .lbl span { color: var(--ink-2); }
+.badge { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 8px; font-size: 10px; line-height: 15px; font-weight: 700; color: #fff; background: var(--ink-3); vertical-align: 1px; }
+.badge--on { background: var(--success); }
+
+/* ============================================================ settings */
+/* Snow Leopard preference panes: right-aligned labels in one column,
+   controls in the next. On a phone the labels sit above. */
+.pref { display: grid; grid-template-columns: 158px minmax(0, 1fr); gap: 9px 12px; align-items: center; }
+.pref > .k { text-align: right; color: var(--ink); }
+.pref > .k.top { align-self: start; padding-top: 3px; }
+.pref > .v { min-width: 0; display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+.pref > .v.stack { display: grid; gap: 6px; }
+.pref .sub { color: var(--ink-2); font-size: 11px; flex-basis: 100%; }
+.path { font-family: var(--mono); font-size: 11px; overflow-wrap: anywhere; }
+.chk { display: flex; gap: 7px; align-items: flex-start; position: relative; }
+.chk .box { margin-top: 2px; }
+/* Aqua pop-up button: white body, blue double-arrow segment. Right slice
+   holds the whole 22px segment so only the white body stretches. */
+.pop {
+  appearance: none; -webkit-appearance: none;
+  height: 22px; max-width: 100%;
+  padding: 0 36px 0 10px;
+  border-radius: 4px;
+  border-image: var(--aq-pop-22) 0 30 0 12 fill / 0 30px 0 12px / 2px 6px 8px;
+  color: var(--aq-ink);
+  cursor: default;
+}
+.pop:active { border-image-source: var(--aq-pop-22-down); }
+.pop option { color: var(--ink); background: var(--content); }
+.num { flex: 0 0 64px; width: 64px; text-align: right; }
+.bad-field { border-color: var(--danger); }
+.gear-badge {
+  position: absolute; top: -3px; right: 12px;
+  min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
+  background: linear-gradient(#f07a74, var(--danger)); color: #fff;
+  font-size: 10px; line-height: 16px; text-align: center; text-shadow: none;
+  box-shadow: 0 1px 1px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.6);
+}
+.tool { position: relative; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* downloader rows */
+.rows li.dl { align-items: flex-start; flex-wrap: wrap; gap: 4px 10px; padding: 8px 8px 9px; }
+.sdot { flex: none; width: 10px; height: 10px; margin-top: 3px; border-radius: 50%; box-shadow: inset 0 -1px 1px rgba(0,0,0,.3); background: var(--ink-3); }
+.sdot--ok { background: var(--success); }
+.sdot--warn { background: var(--warning); }
+.sdot--bad { background: var(--danger); }
+.sdot--busy { background: var(--aqua-mid); animation: pulse 1s ease-in-out infinite alternate; }
+@keyframes pulse { to { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .sdot--busy { animation: none; } }
+.dl__main { flex: 1 1 250px; min-width: 0; display: grid; gap: 1px; }
+.dl__main b { font-size: 12px; }
+.dl__main .ver { font-family: var(--mono); font-size: 11px; color: var(--ink-2); font-weight: 400; margin-left: 4px; }
+.dl__state { font-weight: 700; font-size: 11px; }
+.dl__role { color: var(--ink-2); font-size: 11px; }
+.dl__path { font-family: var(--mono); font-size: 10.5px; color: var(--ink-2); overflow-wrap: anywhere; }
+.dl__acts { flex: none; display: flex; gap: 6px; margin-left: auto; align-self: center; }
+.dl__acts .push { padding: 1px 11px 2px; }
+.panefoot { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; border-top: 1px solid var(--row-divider); padding-top: 12px; margin-top: 4px; }
+.panefoot .note { margin: 0; flex: 1 1 220px; }
+@media (max-width: 560px) {
+  .pref { grid-template-columns: minmax(0, 1fr); gap: 3px 0; }
+  .pref > .k { text-align: left; font-weight: 700; margin-top: 8px; }
+  .pref > .k.top { padding-top: 0; }
+  .toolbar { gap: 2px; }
+  .tool { min-width: 0; flex: 1 1 0; padding-inline: 2px; }
+  .gear-badge { right: calc(50% - 22px); }
+}
+
+/* ============================================================ status strip */
+.status {
+  border-top: 1px solid var(--chrome-sep);
+  background: linear-gradient(var(--chrome-upper), var(--chrome-lower));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.6);
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 12px;
+  color: #43464a;
+  font-size: 11px;
+  text-shadow: 0 1px 0 rgba(255,255,255,.6);
+}
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); box-shadow: inset 0 -1px 1px rgba(0,0,0,.3), 0 0 3px rgba(78,157,71,.8); }
+.status .spacer { flex: 1; }
+
+/* the "this is a mockup" plate under the window */
+.plate { max-width: 640px; margin: 14px auto 0; color: #d9dde2; font-size: 11px; text-align: center; text-shadow: 0 1px 1px rgba(0,0,0,.4); }
+</style>
+<script>
+/* ---------- Aqua controls (Snow Leopard push button; 10.4 pop-up and checkbox) ----------
+   Drawn as SVG from colour profiles sampled pixel row by pixel row from the
+   reference, then handed to CSS as border-image sources on :root. A material
+   is its gradient, so the 22 sampled rows travel together here rather than
+   as 22 tokens; CSS only chooses which drawing a control wears. Because the
+   drawings live in custom properties, controls rendered later pick them up. */
+var AquaArt = (function () {
+  'use strict';
+  var PROF = {"cancel":[[234,234,233],[211,212,210],[115,115,113],[167,167,167],[200,200,198],[209,209,207],[216,216,214],[220,220,220],[218,218,218],[206,206,206],[198,198,198],[200,200,200],[208,208,208],[210,210,210],[216,216,216],[225,225,225],[236,236,236],[247,247,247],[252,252,252],[253,253,253],[254,254,254],[254,254,254],[254,254,254],[248,248,248],[107,107,107],[119,119,119],[132,132,132],[168,168,168],[201,200,200]],"save":[[231,239,248],[210,228,245],[57,78,100],[116,143,170],[154,183,212],[169,198,227],[175,203,234],[180,207,240],[172,202,233],[157,188,222],[144,177,215],[143,179,219],[152,187,227],[157,190,230],[166,197,234],[174,207,241],[185,219,247],[191,227,252],[198,236,255],[200,241,255],[205,244,255],[206,243,255],[208,243,255],[194,224,235],[96,119,131],[113,129,139],[139,147,155],[171,175,183],[211,211,215]],"popup":[[231,226,223],[226,222,220],[167,165,161],[216,216,213],[234,235,234],[232,233,232],[230,231,230],[228,229,228],[229,229,229],[234,234,234],[239,237,238],[241,240,240],[243,242,242],[246,245,245],[247,247,247],[250,250,250],[253,253,253],[255,255,255],[255,255,255],[255,255,255],[255,255,253],[255,255,253],[245,243,242],[109,108,107],[178,174,172],[234,229,227],[228,223,221],[227,220,219]],"arrow":[[235,234,229],[219,235,230],[60,79,114],[150,179,223],[183,215,248],[171,206,239],[153,189,233],[131,167,223],[115,158,215],[121,165,218],[133,178,216],[142,187,224],[147,195,241],[151,199,248],[157,210,250],[164,213,247],[168,219,249],[170,224,251],[175,231,255],[182,238,255],[188,237,253],[192,233,244],[181,211,217],[94,113,121],[166,176,183],[224,226,227],[230,223,224],[224,217,215]]};
+  var P = {
+    cancel: { rimW: 8.896, rimBlur: 3.201, rimOp: 0.501, rimExt: 1.193, rimBot: 0.446, olW: 0.267, olOp: 0.534,
+              sh1dy: 1.842, sh1op: 0.432, sh1blur: 0.933, sh1in: 0.755, sh2dy: 5, sh2op: 0.291, sh2blur: 1.5 },
+    save:   { rimW: 11.848, rimBlur: 2.534, rimOp: 0.529, rimExt: 1.2, rimBot: 0.331, olW: 2.881, olOp: 0.557,
+              sh1dy: 1.786, sh1op: 0.313, sh1blur: 0.933, sh1in: 0, sh2dy: 4.141, sh2op: 0.316, sh2blur: 1.5 },
+    popup:  { r: 4, shBlur: 0.8, shDy: 0.778, shOp: 0.371, segOp: 0.144, rimW: 0.5, rimOp: 0.315, apex: 5.1 }
+  };
+  var DOWN = { save: [0.62, 0.72, 0.86], cancel: [0.78, 0.78, 0.78] };
+  var uid = 0;
+  function rgb(c) { return 'rgb(' + (c[0] | 0) + ',' + (c[1] | 0) + ',' + (c[2] | 0) + ')'; }
+  function stops(rows) {
+    return rows.map(function (c, i) { return '<stop offset="' + ((i + 0.5) / rows.length).toFixed(4) + '" stop-color="' + rgb(c) + '"/>'; }).join('');
+  }
+  function resample(rows, n) {
+    var out = [];
+    for (var i = 0; i < n; i++) {
+      var t = (i + 0.5) * rows.length / n - 0.5, a = Math.max(0, Math.floor(t)), b = Math.min(rows.length - 1, a + 1), f = Math.min(1, Math.max(0, t - a));
+      out.push(rows[a].map(function (v, j) { return v * (1 - f) + rows[b][j] * f; }));
+    }
+    return out;
+  }
+  function tint(rows, k) { return rows.map(function (c) { return c.map(function (v, i) { return v * k[i]; }); }); }
+  function pill(x, y, w, h, r) { return 'M' + (x + r) + ',' + y + 'H' + (x + w - r) + 'A' + r + ',' + r + ' 0 0 1 ' + (x + w - r) + ',' + (y + h) + 'H' + (x + r) + 'A' + r + ',' + r + ' 0 0 1 ' + (x + r) + ',' + y + 'Z'; }
+  function rr(x, y, w, h, r) { return 'M' + (x + r) + ',' + y + 'H' + (x + w - r) + 'Q' + (x + w) + ',' + y + ' ' + (x + w) + ',' + (y + r) + 'V' + (y + h - r) + 'Q' + (x + w) + ',' + (y + h) + ' ' + (x + w - r) + ',' + (y + h) + 'H' + (x + r) + 'Q' + x + ',' + (y + h) + ' ' + x + ',' + (y + h - r) + 'V' + (y + r) + 'Q' + x + ',' + y + ' ' + (x + r) + ',' + y + 'Z'; }
+  function svg(w, h, body) { return '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">' + body + '</svg>'; }
+  var WASH = function (d) { return '<path d="' + d + '" fill="#fff" opacity=".45"/>'; };
+  /* How far each drawing reaches past its control: CSS uses the same numbers
+     for border-image-outset and -slice. */
+  function geo(H) { var B = Math.ceil(8 * H / 22); return { M: 6, T: 2, B: B, slice: 6 + Math.ceil(H / 2 * 1.25) + 2, sw: Math.round(22 + (H - 22) / 2) }; }
+
+  /* Push buttons are Snow Leopard's (10.6), not 10.4's: a matte, metallic
+     pill — pale brushed grey with a soft sheen, a hairline graphite edge that
+     darkens toward the bottom, and a one-pixel shadow — rather than a gel.
+     Pressing turns it blue, as 10.6 did; the default button is the calmer
+     10.6 blue. kind 'cancel' is the ordinary button, 'save' the default. */
+  var METAL = {
+    cancel: { face: [[0, '#fdfdfd'], [0.1, '#f5f5f5'], [0.46, '#e9e9e9'], [0.5, '#dfdfdf'], [0.82, '#e4e4e4'], [1, '#f0f0f0']],
+              edge: ['#a3a3a3', '#6c6c6c'], hi: 0.9 },
+    save:   { face: [[0, '#e3f0fd'], [0.1, '#bcdaf8'], [0.46, '#8cbcef'], [0.5, '#6ea6e8'], [0.82, '#88bdf0'], [1, '#b5dcfa']],
+              edge: ['#5a86bd', '#2c5184'], hi: 0.75 },
+    down:   { face: [[0, '#c5dcf5'], [0.1, '#9cc3ee'], [0.46, '#6a9fe0'], [0.5, '#4f8ad6'], [0.82, '#6aa2e2'], [1, '#93c4f0']],
+              edge: ['#3f6aa3', '#1d3e6e'], hi: 0.45 },
+    defdown:{ face: [[0, '#a9c9ec'], [0.1, '#7fabe0'], [0.46, '#4f86d0'], [0.5, '#3a73c4'], [0.82, '#5089d2'], [1, '#7cb0e6']],
+              edge: ['#2d5588', '#16325a'], hi: 0.35 }
+  };
+  function button(kind, H, st) {
+    st = st || {};
+    var m = METAL[st.down ? (kind === 'save' ? 'defdown' : 'down') : kind];
+    var g = geo(H), W = 60, r = H / 2, M = g.M, id = 'aq' + (uid++), w = W + 2 * M, h = 2 + H + g.B;
+    var d = pill(M, 2, W, H, r), inner = pill(M + 0.5, 2.5, W - 1, H - 1, r - 0.5), hl = pill(M + 1, 3, W - 2, H - 2, r - 1);
+    var face = m.face.map(function (s) { return '<stop offset="' + s[0] + '" stop-color="' + s[1] + '"/>'; }).join('');
+    return svg(w, h,
+      '<defs><linearGradient id="' + id + 'f" x1="0" y1="0" x2="0" y2="1">' + face + '</linearGradient>' +
+      '<linearGradient id="' + id + 'e" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + m.edge[0] + '"/><stop offset="1" stop-color="' + m.edge[1] + '"/></linearGradient>' +
+      '<linearGradient id="' + id + 'h" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="' + m.hi + '"/><stop offset=".35" stop-color="#fff" stop-opacity="0"/></linearGradient>' +
+      /* a faint brushed grain, lengthwise, so the face reads as metal not paint */
+      '<pattern id="' + id + 'g" width="7" height="3" patternUnits="userSpaceOnUse"><rect width="7" height="1" fill="#fff" opacity=".22"/><rect y="2" width="7" height="1" fill="#000" opacity=".025"/></pattern>' +
+      '<filter id="' + id + 's" x="-10%" y="-40%" width="120%" height="180%"><feGaussianBlur stdDeviation=".6"/></filter></defs>' +
+      '<path d="' + pill(M, 3, W, H, r) + '" opacity=".22" filter="url(#' + id + 's)"/>' +
+      '<path d="' + d + '" fill="url(#' + id + 'f)"/>' +
+      '<path d="' + d + '" fill="url(#' + id + 'g)"/>' +
+      '<path d="' + hl + '" fill="none" stroke="url(#' + id + 'h)" stroke-width="1"/>' +
+      '<path d="' + inner + '" fill="none" stroke="url(#' + id + 'e)" stroke-width="1"/>' +
+      (st.off ? WASH(d) : ''));
+  }
+
+  function popup(H, st) {
+    st = st || {};
+    var p = P.popup, g = geo(H), W = 80, r = p.r, M = g.M, SW = g.sw, id = 'aq' + (uid++);
+    var body = resample(PROF.popup.slice(2, 24), H), arr = resample(PROF.arrow.slice(2, 24), H);
+    if (st.down) { body = tint(body, [0.82, 0.82, 0.82]); arr = tint(arr, [0.62, 0.74, 0.9]); }
+    var d = rr(M, 2, W, H, r), ax = M + W - SW, cy = 2 + H / 2, cx = ax + SW / 2, w = W + 2 * M, h = 2 + H + g.B;
+    return svg(w, h,
+      '<defs><linearGradient id="' + id + 'b" gradientUnits="userSpaceOnUse" x1="0" y1="2" x2="0" y2="' + (2 + H) + '">' + stops(body) + '</linearGradient>' +
+      '<linearGradient id="' + id + 'a" gradientUnits="userSpaceOnUse" x1="0" y1="2" x2="0" y2="' + (2 + H) + '">' + stops(arr) + '</linearGradient>' +
+      '<clipPath id="' + id + 'c"><path d="' + d + '"/></clipPath>' +
+      '<filter id="' + id + 'f" x="-10%" y="-50%" width="120%" height="200%"><feGaussianBlur stdDeviation="' + p.shBlur + '"/></filter></defs>' +
+      '<path d="' + rr(M, 2 + p.shDy, W, H, r) + '" opacity="' + p.shOp + '" filter="url(#' + id + 'f)"/>' +
+      '<path d="' + d + '" fill="url(#' + id + 'b)"/>' +
+      '<g clip-path="url(#' + id + 'c)"><rect x="' + ax + '" y="0" width="' + (SW + M) + '" height="' + (H + 4) + '" fill="url(#' + id + 'a)"/>' +
+      '<rect x="' + ax + '" y="2" width="1" height="' + H + '" fill="#2a4f86" opacity="' + p.segOp + '"/>' +
+      '<path d="' + rr(ax, 2, SW, H, r) + '" fill="none" stroke="#062a66" stroke-width="' + p.rimW + '" opacity="' + p.rimOp + '"/></g>' +
+      '<path d="M' + (cx - 3) + ',' + (cy - 1) + 'H' + (cx + 3) + 'L' + cx + ',' + (cy - 11 + p.apex) + 'Z M' + (cx - 3) + ',' + (cy + 1) + 'H' + (cx + 3) + 'L' + cx + ',' + (cy + 11 - p.apex) + 'Z"/>' +
+      (st.off ? WASH(d) : ''));
+  }
+
+  function checkbox(S, st) {
+    st = st || {};
+    var on = !!st.on, kind = on ? 'save' : 'cancel', p = P[kind], id = 'aq' + (uid++), M = 4, r = 3.2, k = S / 22;
+    var body = resample(PROF[kind].slice(2, 24), S);
+    if (st.down) body = tint(body, DOWN[kind]);
+    var d = rr(M, 2, S, S, r), rc = on ? '#06204a' : '#000', w = S + 2 * M, h = S + 8, s = S / 14;
+    var mark = on ? '<path transform="translate(' + M + ',2) scale(' + s + ')" d="M3.2,7.6 L6.2,11 L13.6,-0.6" fill="none" stroke="#000" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>' : '';
+    return svg(w, h,
+      '<defs><linearGradient id="' + id + 'b" gradientUnits="userSpaceOnUse" x1="0" y1="2" x2="0" y2="' + (2 + S) + '">' + stops(body) + '</linearGradient>' +
+      '<clipPath id="' + id + 'c"><path d="' + d + '"/></clipPath>' +
+      '<filter id="' + id + 'f1" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="' + (p.sh1blur * k).toFixed(3) + '"/></filter>' +
+      '<filter id="' + id + 'f2" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="' + (p.sh2blur * k).toFixed(3) + '"/></filter>' +
+      '<filter id="' + id + 'fr" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="' + (p.rimBlur * k * 0.8).toFixed(3) + '"/></filter>' +
+      '<linearGradient id="' + id + 'mv" gradientUnits="userSpaceOnUse" x1="0" y1="2" x2="0" y2="' + (2 + S) + '"><stop offset=".45" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="' + p.rimBot + '"/></linearGradient>' +
+      '<mask id="' + id + 'm" maskUnits="userSpaceOnUse" x="0" y="0" width="' + w + '" height="' + h + '"><rect width="100%" height="100%" fill="url(#' + id + 'mv)"/></mask></defs>' +
+      '<path d="' + rr(M, 2 + p.sh2dy * k, S, S, r) + '" opacity="' + (p.sh2op * 0.8) + '" filter="url(#' + id + 'f2)"/>' +
+      '<path d="' + rr(M, 2 + p.sh1dy * k, S, S, r) + '" opacity="' + p.sh1op + '" filter="url(#' + id + 'f1)"/>' +
+      '<path d="' + d + '" fill="url(#' + id + 'b)"/>' +
+      '<g clip-path="url(#' + id + 'c)" mask="url(#' + id + 'm)"><path d="' + d + '" fill="none" stroke="' + rc + '" stroke-width="' + (p.rimW * k * 0.7).toFixed(2) + '" opacity="' + (p.rimOp * 0.5) + '" filter="url(#' + id + 'fr)"/>' +
+      '<path d="' + d + '" fill="none" stroke="' + rc + '" stroke-width="1.1" opacity="' + Math.max(0.45, p.olOp) + '"/></g>' +
+      mark + (st.off ? WASH(d) : ''));
+  }
+
+  function uri(s) { return 'url("data:image/svg+xml,' + encodeURIComponent(s) + '")'; }
+
+  /* Publishes every drawing as a custom property, e.g. --aq-btn-22,
+     --aq-btn-22-down, --aq-def-22-off, --aq-pop-30, --aq-cb-14-on-down. */
+  function install(sizes, root) {
+    root = root || document.documentElement;
+    var set = function (n, s) { root.style.setProperty(n, uri(s)); };
+    (sizes.btn || []).forEach(function (H) {
+      [['btn', 'cancel'], ['def', 'save']].forEach(function (b) {
+        set('--aq-' + b[0] + '-' + H, button(b[1], H));
+        set('--aq-' + b[0] + '-' + H + '-down', button(b[1], H, { down: 1 }));
+        set('--aq-' + b[0] + '-' + H + '-off', button(b[1], H, { off: 1 }));
+      });
+    });
+    (sizes.pop || []).forEach(function (H) {
+      set('--aq-pop-' + H, popup(H));
+      set('--aq-pop-' + H + '-down', popup(H, { down: 1 }));
+      set('--aq-pop-' + H + '-off', popup(H, { off: 1 }));
+    });
+    (sizes.cb || []).forEach(function (S) {
+      [['', {}], ['-on', { on: 1 }]].forEach(function (v) {
+        set('--aq-cb-' + S + v[0], checkbox(S, v[1]));
+        set('--aq-cb-' + S + v[0] + '-down', checkbox(S, Object.assign({ down: 1 }, v[1])));
+        set('--aq-cb-' + S + v[0] + '-off', checkbox(S, Object.assign({ off: 1 }, v[1])));
+      });
+    });
+  }
+  return { button: button, popup: popup, checkbox: checkbox, geo: geo, install: install };
+})();
+AquaArt.install({ btn: [22], pop: [22], cb: [14] });
+</script>
+</head>
+<body>
+<div class="frame">
+<div class="win" role="application" aria-label="Airwave Companion">
+  <div class="chrome">
+    <div class="titlebar">Airwave Companion</div>
+    <div class="toolbar" role="tablist" aria-label="Sections">
+      <button class="tool" role="tab" id="t-lib" aria-selected="true" aria-controls="p-lib">
+        <svg viewBox="0 0 26 26" aria-hidden="true"><path d="M2.5 8.5 A 1.5 1.5 0 0 1 4 7 h6 l2 2.5 h10 a1.5 1.5 0 0 1 1.5 1.5 v8 A 1.5 1.5 0 0 1 22 20.5 H4 A 1.5 1.5 0 0 1 2.5 19 Z" fill="#7d97b3" stroke="#4c637c" stroke-width="1.1"/><path d="M2.5 12 h21" stroke="#a9bccd" stroke-width="1"/></svg>
+        Library
+      </button>
+      <button class="tool" role="tab" id="t-tv" aria-selected="false" aria-controls="p-tv" tabindex="-1">
+        <svg viewBox="0 0 26 26" aria-hidden="true"><rect x="3" y="6.5" width="20" height="13" rx="2" fill="#5b6770" stroke="#39424a" stroke-width="1.1"/><rect x="5" y="8.5" width="16" height="9" rx="1" fill="#9fd2ee"/><path d="M9 22.5 h8" stroke="#39424a" stroke-width="1.6" stroke-linecap="round"/></svg>
+        Live&nbsp;TV
+      </button>
+      <button class="tool" role="tab" id="t-remote" aria-selected="false" aria-controls="p-remote" tabindex="-1">
+        <svg viewBox="0 0 26 26" aria-hidden="true"><path d="M13 19 a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" fill="#4c637c"/><path d="M6.5 16.5a9 9 0 0 1 13 0M3.5 12.5a14 14 0 0 1 19 0M9.5 19.2a4.6 4.6 0 0 1 7 0" fill="none" stroke="#4c637c" stroke-width="2" stroke-linecap="round"/></svg>
+        Remote
+      </button>
+      <button class="tool" role="tab" id="t-set" aria-selected="false" aria-controls="p-set" tabindex="-1">
+        <svg viewBox="0 0 26 26" aria-hidden="true"><circle cx="13" cy="13" r="8.3" fill="none" stroke="#4c637c" stroke-width="3.4" stroke-dasharray="3.26 3.26"/><circle cx="13" cy="13" r="6.6" fill="#7d97b3" stroke="#4c637c" stroke-width="1.1"/><circle cx="13" cy="13" r="2.4" fill="#e3e3e3" stroke="#4c637c" stroke-width="1"/></svg>
+        Settings<span class="gear-badge" id="setBadge" hidden aria-hidden="true"></span><span class="sr" id="setBadgeSr"></span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ================================================== Library -->
+  <section class="pane" id="p-lib" role="tabpanel" aria-labelledby="t-lib">
+    <p class="lead">The folders on this PC that Airwave plays from. The companion watches them and passes what it finds to the container, so every device sees the same library.</p>
+    <fieldset>
+      <legend>Saved Music</legend>
+      <div class="well"><ul class="rows" id="rows-music" aria-label="Music folders"></ul></div>
+      <div class="barrow"><button class="push" type="button" data-add="music">Add Folder…</button></div>
+    </fieldset>
+    <fieldset>
+      <legend>Saved TV</legend>
+      <div class="well"><ul class="rows" id="rows-tv" aria-label="TV folders"></ul></div>
+      <div class="barrow"><button class="push" type="button" data-add="tv">Add Folder…</button></div>
+    </fieldset>
+    <fieldset style="margin-bottom:2px">
+      <legend>Saved Movies</legend>
+      <div class="well"><ul class="rows" id="rows-movies" aria-label="Movie folders"></ul></div>
+      <div class="barrow"><button class="push" type="button" data-add="movies">Add Folder…</button></div>
+    </fieldset>
+  </section>
+
+  <!-- ================================================== Live TV -->
+  <section class="pane" id="p-tv" role="tabpanel" aria-labelledby="t-tv" hidden>
+    <p class="lead">Channel playlists and programme guides for the Live TV tab. Paste a link and it is checked, kept here, and passed to the container.</p>
+    <fieldset>
+      <legend>Channel playlists (M3U)</legend>
+      <p class="hint">One or more <code>.m3u</code> / <code>.m3u8</code> links. Every channel they list appears in the guide.</p>
+      <div class="well"><ul class="rows" id="rows-m3u" aria-label="M3U links"></ul></div>
+      <form class="barrow" data-link="m3u" novalidate>
+        <input class="field" type="url" placeholder="https://example.com/channels.m3u8" aria-label="M3U link">
+        <button class="push push--default" type="submit">Add</button>
+      </form>
+      <p class="note note--bad" id="err-m3u" hidden>That doesn’t look like an M3U link — it should end in <b>.m3u</b> or <b>.m3u8</b>.</p>
+    </fieldset>
+    <fieldset style="margin-bottom:2px">
+      <legend>Programme guides (EPG)</legend>
+      <p class="hint">XMLTV links. The guide fills the <b>Now</b>, <b>Next</b> and <b>Until</b> columns.</p>
+      <div class="well"><ul class="rows" id="rows-epg" aria-label="EPG links"></ul></div>
+      <form class="barrow" data-link="epg" novalidate>
+        <input class="field" type="url" placeholder="https://example.com/guide.xml" aria-label="EPG link">
+        <button class="push push--default" type="submit">Add</button>
+      </form>
+      <p class="note note--bad" id="err-epg" hidden>That doesn’t look like a guide link — it should be an <b>.xml</b> or <b>.xml.gz</b> XMLTV file.</p>
+    </fieldset>
+  </section>
+
+  <!-- ================================================== Remote -->
+  <section class="pane" id="p-remote" role="tabpanel" aria-labelledby="t-remote" hidden>
+    <p class="lead">Reach this PC from the Airwave player wherever you are. Every connection is encrypted, and only devices you pair here can connect.</p>
+    <div class="remote-grid">
+      <fieldset style="margin:0">
+        <legend>Pair a device</legend>
+        <div class="lcd" role="status">
+          <span class="lcd__code" id="pairCode">417 302</span>
+          <span class="lcd__sub" id="pairSub">Code expires in <span id="pairTtl">9:41</span></span>
+        </div>
+        <div class="barrow"><button class="push" type="button" id="newCode">New Code</button></div>
+        <ol class="steps">
+          <li>Open the player and choose <b>Settings&nbsp;▸ Sources&nbsp;▸ Connections</b>.</li>
+          <li>Enter this code.</li>
+          <li>The device appears below — that’s it.</li>
+        </ol>
+      </fieldset>
+      <fieldset style="margin:0">
+        <legend>How devices may connect</legend>
+        <div class="well" style="box-shadow:none;background:transparent;border:0">
+          <label class="optrow"><input type="checkbox" checked id="optWifi"><span class="box"></span>
+            <span class="lbl"><b>On your home network (Wi‑Fi)</b><span>Paired devices find this PC by themselves. Nothing leaves the network.</span></span></label>
+          <label class="optrow"><input type="checkbox" checked id="optAway"><span class="box"></span>
+            <span class="lbl"><b>Away from home (mobile data)</b><span>Paired devices reach this PC through the container’s public https address, or a tunnel you run such as Tailscale. The companion never opens a port on its own.</span></span></label>
+        </div>
+        <p class="note">Every connection is encrypted. A pairing code works once and expires after ten minutes.</p>
+      </fieldset>
+    </div>
+    <fieldset style="margin:16px 0 2px">
+      <legend>Paired devices</legend>
+      <div class="well"><ul class="rows" id="rows-devices" aria-label="Paired devices"></ul></div>
+    </fieldset>
+  </section>
+
+  <!-- ================================================== Settings -->
+  <section class="pane" id="p-set" role="tabpanel" aria-labelledby="t-set" hidden>
+    <p class="lead">The tools this PC downloads with, and how the companion behaves on this PC. Changes take effect as you make them.</p>
+
+    <fieldset>
+      <legend>Downloaders</legend>
+      <p class="hint">The copies on this PC. The container keeps its own; spotDL runs only here.</p>
+      <div class="well"><ul class="rows" id="rows-dl" aria-label="Downloaders" aria-live="polite"></ul></div>
+      <div class="barrow">
+        <button class="push" type="button" id="dlCheckAll">Check All</button>
+        <span class="note" style="margin:0" id="dlChecked">Last checked 3 hours ago</span>
+      </div>
+      <div class="pref" style="margin-top:10px">
+        <span class="k"></span>
+        <div class="v"><label class="chk"><input type="checkbox" data-pref="autoUpdate"><span class="box"></span><span>Update downloaders automatically<br><span class="note" style="margin:0">Sites change often. An out-of-date yt-dlp is the usual reason a download fails.</span></span></label></div>
+      </div>
+      <p class="note">Downloaders fetch only what a site offers. The companion doesn’t strip DRM, get round a provider’s terms or read browser cookies.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>General</legend>
+      <div class="pref">
+        <span class="k top">On this PC:</span>
+        <div class="v stack">
+          <label class="chk"><input type="checkbox" data-pref="startup"><span class="box"></span><span>Start when Windows starts</span></label>
+          <label class="chk"><input type="checkbox" data-pref="tray"><span class="box"></span><span>Keep running in the notification area when the window closes</span></label>
+          <label class="chk"><input type="checkbox" data-pref="appUpdates"><span class="box"></span><span>Check for new versions of the companion</span></label>
+          <label class="chk"><input type="checkbox" data-pref="notify"><span class="box"></span><span>Show a notification when a download finishes</span></label>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Downloads</legend>
+      <div class="pref">
+        <span class="k" id="k-dest">Save to:</span>
+        <div class="v"><span class="path" id="destPath" aria-labelledby="k-dest destPath"></span><button class="push" type="button" id="destPick">Choose…</button></div>
+        <label class="k" for="pAudio">Audio format:</label>
+        <div class="v"><select class="pop" id="pAudio" data-pref="audio">
+          <option value="orig">Keep original</option><option value="mp3">MP3 · 320 kbps</option><option value="m4a">AAC (M4A) · 256 kbps</option><option value="opus">Opus · 160 kbps</option><option value="flac">FLAC · lossless</option>
+        </select></div>
+        <label class="k" for="pVideo">Video quality:</label>
+        <div class="v"><select class="pop" id="pVideo" data-pref="video">
+          <option value="best">Best available</option><option value="2160">Up to 4K</option><option value="1080">Up to 1080p</option><option value="720">Up to 720p</option><option value="480">Up to 480p</option>
+        </select></div>
+        <label class="k" for="pJobs">At the same time:</label>
+        <div class="v"><input class="field num" type="number" id="pJobs" min="1" max="6" step="1" data-pref="jobs"><span>downloads (1–6)</span></div>
+        <label class="k" for="pSpeed">Speed limit:</label>
+        <div class="v"><select class="pop" id="pSpeed" data-pref="speed">
+          <option value="0">No limit</option><option value="20">20 MB/s</option><option value="10">10 MB/s</option><option value="5">5 MB/s</option><option value="1">1 MB/s</option>
+        </select></div>
+        <span class="k top">When finished:</span>
+        <div class="v stack">
+          <label class="chk"><input type="checkbox" data-pref="tags"><span class="box"></span><span>Add artwork and tags</span></label>
+          <label class="chk"><input type="checkbox" data-pref="toLibrary"><span class="box"></span><span>Add to the library so every device sees it</span></label>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Network</legend>
+      <div class="pref">
+        <label class="k top" for="pPort">Local helper port:</label>
+        <div class="v"><span class="path">127.0.0.1&thinsp;:</span><input class="field num" type="number" id="pPort" min="1024" max="65535" data-pref="port" aria-describedby="portErr"><span class="sub note--bad" id="portErr" hidden>Use a port from 1024 to 65535.</span><span class="sub">The player on this PC talks to the companion here.</span></div>
+        <span class="k top">Other devices:</span>
+        <div class="v"><label class="chk"><input type="checkbox" data-pref="lan"><span class="box"></span><span>Let devices on this network use the helper without pairing<br><span class="note" style="margin:0">Off is safer. Paired devices connect through <b>Remote</b> either way.</span></span></label></div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Backup</legend>
+      <div class="pref">
+        <span class="k" id="k-bk">Back up to:</span>
+        <div class="v"><span class="path" id="bkPath" aria-labelledby="k-bk bkPath"></span><button class="push" type="button" id="bkPick">Choose…</button><span class="sub">A folder on this PC or a drive you plug in. The Docker container keeps its own backups.</span></div>
+        <span class="k top">Space:</span>
+        <div class="v stack" style="gap:3px">
+          <span id="bkSpace"></span>
+          <div class="spacebar" id="bkBar" role="img"><i class="used"></i><i class="this"></i></div>
+          <span class="sub" id="bkSpaceKey"></span>
+        </div>
+        <span class="k top">What:</span>
+        <div class="v stack">
+          <label class="chk"><input type="checkbox" data-pref="bkMusic"><span class="box"></span><span>Music</span></label>
+          <label class="chk"><input type="checkbox" data-pref="bkTv"><span class="box"></span><span>TV</span></label>
+          <label class="chk"><input type="checkbox" data-pref="bkMovies"><span class="box"></span><span>Movies</span></label>
+          <label class="chk"><input type="checkbox" data-pref="bkLists"><span class="box"></span><span>Playlists</span></label>
+          <label class="chk"><input type="checkbox" data-pref="bkEq"><span class="box"></span><span>EQ presets</span></label>
+          <label class="chk"><input type="checkbox" data-pref="bkAlgo"><span class="box"></span><span>Recommendation algorithms <span class="sub">— yours from the player, as airwave-algorithm files</span></span></label>
+          <label class="chk"><input type="checkbox" data-pref="bkSettings"><span class="box"></span><span>These settings</span></label>
+        </div>
+        <label class="k" for="pBkWhen">How often:</label>
+        <div class="v"><select class="pop" id="pBkWhen" data-pref="bkWhen"><option value="manual">Only when I click Back Up Now</option><option value="daily">Every night</option><option value="weekly">Every week</option></select></div>
+        <label class="k" for="pBkKeep">Keep:</label>
+        <div class="v"><select class="pop" id="pBkKeep" data-pref="bkKeep"><option value="3">The last 3 backups</option><option value="5">The last 5 backups</option><option value="10">The last 10 backups</option><option value="0">Every backup</option></select></div>
+        <span class="k"></span>
+        <div class="v"><button class="push push--now" type="button" id="bkNow">Back Up Now</button><span class="note" id="bkState" style="margin:0"></span></div>
+      </div>
+      <div class="well" style="margin-top:10px"><ul class="rows" id="rows-bk" aria-label="Backups"></ul></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Storage and privacy</legend>
+      <div class="pref">
+        <span class="k top">Settings are kept in:</span>
+        <div class="v"><span class="path">C:\Users\jalon\AppData\Roaming\Now Playing Companion</span><span class="sub">Installed version. The portable version keeps them in a <span class="path">NowPlayingCompanion-data</span> folder beside the app.</span><button class="push" type="button" data-say="Opens the folder in File Explorer.">Show in Explorer</button></div>
+        <span class="k">Cache:</span>
+        <div class="v"><span id="cacheSize">1.2 GB</span><button class="push" type="button" id="cacheClear">Clear Cache</button></div>
+        <span class="k top">Logs:</span>
+        <div class="v"><button class="push" type="button" data-say="Opens the logs folder in File Explorer.">Open Logs Folder</button><button class="push" type="button" data-say="Saves a .zip of the logs, with folder paths removed, for you to send.">Export Logs…</button>
+          <label class="chk" style="flex-basis:100%"><input type="checkbox" data-pref="verbose"><span class="box"></span><span>Keep detailed logs</span></label></div>
+      </div>
+      <p class="note">No telemetry. Folder paths never leave this PC; the container only gets what’s in them.</p>
+    </fieldset>
+
+    <div class="panefoot">
+      <p class="note" id="setNote" role="status">Settings are kept on this PC.</p>
+      <button class="push" type="button" id="setDefaults">Restore Defaults</button>
+    </div>
+  </section>
+
+  <div class="status">
+    <span class="dot" id="hubDot"></span>
+    <span id="hubLine">Connected to the Airwave container · library synced just now</span>
+    <span class="spacer"></span>
+    <span id="countLine"></span>
+  </div>
+</div>
+<p class="plate">Mockup — every control works on sample data in this page; nothing is stored or sent anywhere.</p>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  /* In-memory state only: a mockup keeps nothing. */
+  var state = {
+    music:  ['C:\\Users\\jalon\\Music', 'D:\\Archive\\Vinyl Rips'],
+    tv:     ['D:\\Media\\TV'],
+    movies: ['D:\\Media\\Movies'],
+    m3u:    [{ url: 'https://iptv.example.com/basic.m3u8', ok: true, n: '112 channels' }],
+    epg:    [{ url: 'https://iptv.example.com/guide.xml', ok: true, n: '7-day guide' }],
+    devices: [
+      { name: 'Jalon’s Phone', how: 'away · https', last: 'now' },
+      { name: 'Living Room PC', how: 'home · Wi‑Fi', last: 'yesterday' }
+    ]
+  };
+  var FAKE_PICKS = ['C:\\Users\\jalon\\Videos', 'E:\\Recordings', 'D:\\Downloads\\Keep', 'C:\\Users\\Public\\Media'];
+  var $ = function (s) { return document.querySelector(s); };
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+  /* ---------- toolbar tabs (arrow keys move, as a radiogroup would) ---------- */
+  var tabs = [].slice.call(document.querySelectorAll('.tool'));
+  function show(tab) {
+    tabs.forEach(function (t) {
+      var on = t === tab;
+      t.setAttribute('aria-selected', on);
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+    });
+  }
+  tabs.forEach(function (t, i) {
+    t.addEventListener('click', function () { show(t); });
+    t.addEventListener('keydown', function (e) {
+      var d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+      if (!d) return;
+      e.preventDefault();
+      var n = tabs[(i + d + tabs.length) % tabs.length];
+      show(n); n.focus();
+    });
+  });
+
+  /* ---------- folder lists ---------- */
+  var FOLDER_ICON = '<svg class="ic" viewBox="0 0 15 15" aria-hidden="true"><path d="M1 4.2 A 1.2 1.2 0 0 1 2.2 3 h3.4 l1.2 1.6 h6 A 1.2 1.2 0 0 1 14 5.8 v5 A 1.2 1.2 0 0 1 12.8 12 H2.2 A 1.2 1.2 0 0 1 1 10.8 Z" fill="currentColor"/></svg>';
+  var LINK_ICON = '<svg class="ic" viewBox="0 0 15 15" aria-hidden="true"><circle cx="7.5" cy="7.5" r="5.6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M2 7.5h11M7.5 2c-2.8 3.4-2.8 7.6 0 11 2.8-3.4 2.8-7.6 0-11z" fill="none" stroke="currentColor" stroke-width="1.1"/></svg>';
+  var DEV_ICON = '<svg class="ic" viewBox="0 0 15 15" aria-hidden="true"><rect x="4" y="1.5" width="7" height="12" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="7.5" cy="11.2" r=".9" fill="currentColor"/></svg>';
+
+  function rmButton(label, fn) {
+    var b = el('button', 'rm'); b.type = 'button'; b.textContent = '–';
+    b.setAttribute('aria-label', label);
+    b.addEventListener('click', fn);
+    return b;
+  }
+  function renderFolders(kind) {
+    var ul = $('#rows-' + kind); ul.textContent = '';
+    if (!state[kind].length) { ul.appendChild(el('li')).appendChild(el('span', 'empty', 'No folders yet — add the one this PC keeps these in.')); return; }
+    state[kind].forEach(function (path, i) {
+      var li = el('li');
+      li.insertAdjacentHTML('beforeend', FOLDER_ICON);
+      li.appendChild(el('span', 'name', path));
+      li.appendChild(el('span', 'meta', 'watched'));
+      li.appendChild(rmButton('Remove ' + path, function () { state[kind].splice(i, 1); renderFolders(kind); sync(); }));
+      ul.appendChild(li);
+    });
+  }
+  [].forEach.call(document.querySelectorAll('[data-add]'), function (b) {
+    b.addEventListener('click', function () {
+      /* the real app opens the Windows folder picker; the mockup picks a plausible one */
+      var kind = b.dataset.add;
+      var pick = FAKE_PICKS.find(function (p) {
+        return state.music.indexOf(p) < 0 && state.tv.indexOf(p) < 0 && state.movies.indexOf(p) < 0;
+      }) || 'C:\\Users\\jalon\\New Folder';
+      state[kind].push(pick);
+      renderFolders(kind); sync();
+    });
+  });
+
+  /* ---------- link lists ---------- */
+  function renderLinks(kind) {
+    var ul = $('#rows-' + kind); ul.textContent = '';
+    if (!state[kind].length) { ul.appendChild(el('li')).appendChild(el('span', 'empty', kind === 'm3u' ? 'No playlists yet.' : 'No guides yet — the guide will list channels without programmes.')); return; }
+    state[kind].forEach(function (row, i) {
+      var li = el('li');
+      li.insertAdjacentHTML('beforeend', LINK_ICON);
+      li.appendChild(el('span', 'name', row.url));
+      li.appendChild(el('span', row.ok ? 'meta ok' : 'meta bad', row.ok ? '✓ ' + row.n : 'unreachable'));
+      li.appendChild(rmButton('Remove ' + row.url, function () { state[kind].splice(i, 1); renderLinks(kind); sync(); }));
+      ul.appendChild(li);
+    });
+  }
+  var LOOKS = { m3u: /^https?:\/\/\S+\.m3u8?(\?\S*)?$/i, epg: /^https?:\/\/\S+\.xml(\.gz)?(\?\S*)?$/i };
+  [].forEach.call(document.querySelectorAll('form[data-link]'), function (f) {
+    f.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var kind = f.dataset.link, input = f.querySelector('input'), err = $('#err-' + kind);
+      var url = input.value.trim();
+      var good = LOOKS[kind].test(url);
+      err.hidden = good;
+      if (!good) return;
+      state[kind].push({ url: url, ok: true, n: kind === 'm3u' ? 'checking…' : 'checking…' });
+      input.value = '';
+      renderLinks(kind); sync();
+      /* the mockup's "container" answers a moment later */
+      setTimeout(function () {
+        var row = state[kind][state[kind].length - 1];
+        if (row) { row.n = kind === 'm3u' ? (40 + Math.floor(Math.random() * 160)) + ' channels' : '7-day guide'; renderLinks(kind); }
+      }, 900);
+    });
+  });
+
+  /* ---------- remote ---------- */
+  function renderDevices() {
+    var ul = $('#rows-devices'); ul.textContent = '';
+    if (!state.devices.length) { ul.appendChild(el('li')).appendChild(el('span', 'empty', 'Nothing paired yet — enter the code on a device to pair it.')); return; }
+    state.devices.forEach(function (d, i) {
+      var li = el('li');
+      li.insertAdjacentHTML('beforeend', DEV_ICON);
+      var name = el('span', 'name'); name.appendChild(el('b', null, d.name)); li.appendChild(name);
+      li.appendChild(el('span', 'meta', d.how + ' · last seen ' + d.last));
+      li.appendChild(rmButton('Revoke ' + d.name, function () { state.devices.splice(i, 1); renderDevices(); sync(); }));
+      ul.appendChild(li);
+    });
+  }
+  var ttl = 581;
+  function code() { return (100 + Math.floor(Math.random() * 900)) + ' ' + (100 + Math.floor(Math.random() * 900)); }
+  $('#newCode').addEventListener('click', function () { $('#pairCode').textContent = code(); ttl = 600; });
+  setInterval(function () {
+    if (ttl <= 0) { $('#pairCode').textContent = code(); ttl = 600; }
+    ttl--;
+    $('#pairTtl').textContent = Math.floor(ttl / 60) + ':' + String(ttl % 60).padStart(2, '0');
+  }, 1000);
+  $('#optAway').addEventListener('change', sync);
+  $('#optWifi').addEventListener('change', sync);
+
+  /* ---------- settings: downloaders ---------- */
+  var TOOLS = 'C:\\Users\\jalon\\AppData\\Roaming\\Now Playing Companion\\tools\\';
+  var dls = [
+    { id: 'ytdlp', name: 'yt-dlp', role: 'Audio and video from the sites it supports', ver: '2026.07.21', latest: '2026.09.14', path: TOOLS + 'yt-dlp.exe', st: 'old' },
+    { id: 'spotdl', name: 'spotDL', role: 'Finds the audio for a playlist you link. Runs on this PC only.', ver: '4.2.11', latest: '4.2.11', path: TOOLS + 'spotdl.exe', st: 'ok' },
+    { id: 'ffmpeg', name: 'FFmpeg', role: 'Converts, tags and joins what the others fetch', ver: null, latest: '7.1', path: null, st: 'missing' }
+  ];
+  var ST = {
+    ok:       { dot: 'ok',   text: 'Up to date' },
+    old:      { dot: 'warn', text: function (d) { return 'Update available · ' + d.latest; } },
+    missing:  { dot: 'bad',  text: 'Not installed. Downloads can’t be converted without it.' },
+    checking: { dot: 'busy', text: 'Checking…' },
+    working:  { dot: 'busy', text: function (d) { return d.ver ? 'Updating…' : 'Installing…'; } }
+  };
+  function dlButton(label, fn, off) { var b = el('button', 'push', label); b.type = 'button'; b.disabled = !!off; b.addEventListener('click', fn); return b; }
+  function renderDl() {
+    var ul = $('#rows-dl'); ul.textContent = '';
+    dls.forEach(function (d) {
+      var s = ST[d.st], busy = d.st === 'checking' || d.st === 'working';
+      var li = el('li', 'dl');
+      li.appendChild(el('span', 'sdot sdot--' + s.dot)).setAttribute('aria-hidden', 'true');
+      var main = el('span', 'dl__main');
+      var h = el('span'); h.appendChild(el('b', null, d.name)); if (d.ver) h.appendChild(el('span', 'ver', d.ver));
+      main.appendChild(h);
+      main.appendChild(el('span', 'dl__state', typeof s.text === 'function' ? s.text(d) : s.text));
+      main.appendChild(el('span', 'dl__role', d.role));
+      if (d.path) main.appendChild(el('span', 'dl__path', d.path));
+      li.appendChild(main);
+      var acts = el('span', 'dl__acts');
+      acts.appendChild(dlButton('Check', function () { check(d); }, busy || d.st === 'missing'));
+      if (d.st === 'missing') acts.appendChild(dlButton('Install', function () { update(d); }, busy));
+      else acts.appendChild(dlButton('Update', function () { update(d); }, busy || d.ver === d.latest));
+      li.appendChild(acts);
+      ul.appendChild(li);
+    });
+    sync();
+  }
+  /* the mockup's checks answer after a moment, as `--version` and a release lookup would */
+  function check(d) {
+    var was = d.st; d.st = 'checking'; renderDl();
+    setTimeout(function () { d.st = !d.ver ? 'missing' : d.ver === d.latest ? 'ok' : 'old'; renderDl(); $('#dlChecked').textContent = 'Last checked just now'; }, 700);
+  }
+  function update(d) {
+    d.st = 'working'; renderDl();
+    setTimeout(function () { d.ver = d.latest; d.path = d.path || TOOLS + d.id + '.exe'; d.st = 'ok'; renderDl(); }, 1400);
+  }
+  $('#dlCheckAll').addEventListener('click', function () { dls.forEach(function (d) { if (d.st !== 'working') check(d); }); });
+
+  /* ---------- settings: local preferences ---------- */
+  var DEFAULTS = { autoUpdate: true, startup: true, tray: true, appUpdates: true, notify: false,
+    dest: 'C:\\Users\\jalon\\Music\\Downloads', audio: 'orig', video: '1080', jobs: 2, speed: '0',
+    tags: true, toLibrary: true, port: 17342, lan: false, verbose: false,
+    bkPath: 'D:\\Backups\\Airwave', bkMusic: true, bkTv: false, bkMovies: false, bkLists: true, bkEq: true, bkAlgo: true, bkSettings: true, bkWhen: 'weekly', bkKeep: '5' };
+  var prefs = JSON.parse(JSON.stringify(DEFAULTS));
+  var prefEls = [].slice.call(document.querySelectorAll('[data-pref]'));
+  function applyPrefs() {
+    prefEls.forEach(function (c) {
+      var v = prefs[c.dataset.pref];
+      if (c.type === 'checkbox') c.checked = v; else c.value = v;
+    });
+    $('#destPath').textContent = prefs.dest;
+    $('#portErr').hidden = true; $('#pPort').classList.remove('bad-field');
+  }
+  function say(t) { $('#setNote').textContent = t; }
+  prefEls.forEach(function (c) {
+    c.addEventListener('change', function () {
+      var k = c.dataset.pref;
+      if (c.type === 'checkbox') prefs[k] = c.checked;
+      else if (k === 'jobs') { var n = Math.min(6, Math.max(1, Math.round(+c.value || 1))); prefs.jobs = n; c.value = n; }
+      else if (k === 'port') {
+        var p = +c.value, ok = Number.isInteger(p) && p >= 1024 && p <= 65535;
+        $('#portErr').hidden = ok; c.classList.toggle('bad-field', !ok);
+        if (!ok) return;
+        prefs.port = p; say('The helper now listens on 127.0.0.1:' + p + '. Players on this PC find it there.');
+        return;
+      }
+      else prefs[k] = c.value;
+      say('Saved. Settings are kept on this PC.');
+    });
+  });
+  var DESTS = ['D:\\Media\\Downloads', 'C:\\Users\\jalon\\Downloads\\Airwave', 'C:\\Users\\jalon\\Music\\Downloads'];
+  $('#destPick').addEventListener('click', function () {
+    /* the real app opens the Windows folder picker */
+    prefs.dest = DESTS[(DESTS.indexOf(prefs.dest) + 1) % DESTS.length];
+    $('#destPath').textContent = prefs.dest; say('Downloads now go to ' + prefs.dest + '.');
+  });
+  $('#cacheClear').addEventListener('click', function () {
+    $('#cacheSize').textContent = 'Empty'; this.disabled = true; say('Cache cleared. Artwork and guide data will be fetched again as needed.');
+  });
+  [].forEach.call(document.querySelectorAll('[data-say]'), function (b) {
+    b.addEventListener('click', function () { say(b.dataset.say + ' (Mockup — nothing opens here.)'); });
+  });
+  $('#setDefaults').addEventListener('click', function () {
+    prefs = JSON.parse(JSON.stringify(DEFAULTS)); applyPrefs(); say('Defaults restored. Downloaders and folders are unchanged.');
+  });
+  applyPrefs();
+
+  /* ---------- settings: backup ---------- */
+  var BK_PICKS = ['D:\\Backups\\Airwave', 'E:\\Airwave Backup', 'C:\\Users\\jalon\\Documents\\Airwave Backups'];
+  /* what each folder's drive reports: free and total, in GB */
+  function esc(t) { return String(t).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
+  var BK_DISK = { 'D:\\Backups\\Airwave': [612.4, 1000], 'E:\\Airwave Backup': [88.6, 250], 'C:\\Users\\jalon\\Documents\\Airwave Backups': [41.3, 476] };
+  var BK_WHAT = [['bkMusic', 'Music', 18.2], ['bkTv', 'TV', 64.0], ['bkMovies', 'Movies', 212.5], ['bkLists', 'Playlists', 0.001], ['bkEq', 'EQ presets', 0.0001], ['bkAlgo', 'Algorithms', 0.0001], ['bkSettings', 'Settings', 0.0001]];
+  var backups = [
+    { when: 'Sep 14, 2:00 AM', what: 'Music, Playlists, EQ presets, Algorithms, Settings', size: '18.2 GB' },
+    { when: 'Sep 7, 2:00 AM', what: 'Music, Playlists, EQ presets, Algorithms, Settings', size: '18.1 GB' }
+  ];
+  function gb(x) { return x >= 1000 ? (x / 1000).toFixed(x >= 10000 ? 0 : 1).replace(/\.0$/, '') + ' TB' : x >= 100 ? Math.round(x) + ' GB' : x >= 1 ? x.toFixed(1) + ' GB' : Math.max(1, Math.round(x * 1024 * 1024)) + ' KB'; }
+  function renderBk() {
+    $('#bkPath').textContent = prefs.bkPath;
+    var ul = $('#rows-bk'); ul.textContent = '';
+    var keep = +prefs.bkKeep || backups.length;
+    backups.slice(0, keep).forEach(function (b) {
+      var li = el('li'); var n = el('span', 'name'); n.appendChild(el('b', null, b.when)); n.appendChild(document.createTextNode('  ' + b.what)); li.appendChild(n);
+      li.appendChild(el('span', 'meta', b.size));
+      var r = el('button', 'push', 'Restore…'); r.type = 'button'; r.addEventListener('click', function () { say('Restores the backup from ' + b.when + ' — you choose which parts first.'); }); li.appendChild(r);
+      ul.appendChild(li);
+    });
+    if (!backups.length) ul.appendChild(el('li')).appendChild(el('span', 'empty', 'No backups yet.'));
+    var what = BK_WHAT.filter(function (x) { return prefs[x[0]]; });
+    var need = what.reduce(function (a, x) { return a + x[2]; }, 0), disk = BK_DISK[prefs.bkPath] || [100, 500];
+    var short = need > disk[0], used = disk[1] - disk[0];
+    $('#bkSpace').innerHTML = '<b>' + gb(disk[0]) + ' free</b> of ' + gb(disk[1]) + ' on ' + esc(prefs.bkPath.split('\\')[0]) + (what.length ? ' · this backup needs about ' + gb(need) : '') +
+      (short ? ' · <b style="color:#b3261e">not enough space</b>' : '');
+    var bar = $('#bkBar'); bar.classList.toggle('is-short', short);
+    bar.querySelector('.used').style.width = (used / disk[1] * 100) + '%';
+    bar.querySelector('.this').style.left = (used / disk[1] * 100) + '%';
+    bar.querySelector('.this').style.width = (Math.min(need, disk[0]) / disk[1] * 100) + '%';
+    bar.setAttribute('aria-label', gb(used) + ' used, this backup ' + gb(need) + ', ' + gb(disk[0]) + ' free');
+    $('#bkSpaceKey').textContent = short ? 'Choose a bigger drive, or untick Movies or TV.' : 'Grey is in use, blue is this backup; ' + gb(Math.max(0, disk[0] - need)) + ' stays free after it.';
+    $('#bkNow').disabled = !what.length || short;
+    $('#bkState').textContent = what.length ? 'About ' + gb(what.reduce(function (a, x) { return a + x[2]; }, 0)) + ' · ' + { manual: 'when you click', daily: 'every night at 2 AM', weekly: 'every Sunday at 2 AM' }[prefs.bkWhen] : 'Tick something to back up.';
+  }
+  $('#bkPick').addEventListener('click', function () {
+    /* the real app opens the Windows folder picker */
+    prefs.bkPath = BK_PICKS[(BK_PICKS.indexOf(prefs.bkPath) + 1) % BK_PICKS.length]; renderBk(); say('Backups now go to ' + prefs.bkPath + '.');
+  });
+  prefEls.forEach(function (c) { if (/^bk/.test(c.dataset.pref)) c.addEventListener('change', renderBk); });
+  $('#bkNow').addEventListener('click', function () {
+    var btn = this, what = BK_WHAT.filter(function (x) { return prefs[x[0]]; }), pct = 0;
+    btn.disabled = true;
+    var t = setInterval(function () {
+      pct += 20; $('#bkState').textContent = 'Backing up to ' + prefs.bkPath + '… ' + pct + '%';
+      if (pct < 100) return;
+      clearInterval(t);
+      backups.unshift({ when: 'Just now', what: what.map(function (x) { return x[1]; }).join(', '), size: gb(what.reduce(function (a, x) { return a + x[2]; }, 0)) });
+      renderBk(); say('Backed up to ' + prefs.bkPath + '.');
+    }, 300);
+  });
+  var _apply = applyPrefs; applyPrefs = function () { _apply(); renderBk(); };
+  renderBk();
+
+  /* ---------- status strip ---------- */
+  function sync() {
+    var folders = state.music.length + state.tv.length + state.movies.length;
+    $('#countLine').textContent = folders + ' folders · ' + state.m3u.length + ' playlists · ' + state.epg.length + ' guides · ' + state.devices.length + ' devices';
+    $('#hubLine').textContent = 'Connected to the Airwave container · synced just now';
+    var need = dls.filter(function (d) { return d.st === 'old' || d.st === 'missing'; }).length;
+    var badge = $('#setBadge');
+    badge.hidden = !need; badge.textContent = need;
+    $('#setBadgeSr').textContent = need ? ', ' + need + (need > 1 ? ' downloaders need' : ' downloader needs') + ' attention' : '';
+  }
+  renderFolders('music'); renderFolders('tv'); renderFolders('movies');
+  renderLinks('m3u'); renderLinks('epg'); renderDevices(); renderDl();
+  var tabFromHash = { '#library': 't-lib', '#tv': 't-tv', '#remote': 't-remote', '#settings': 't-set' }[location.hash];
+  if (tabFromHash) show(document.getElementById(tabFromHash));
+})();
+</script>
+</body>
+</html>

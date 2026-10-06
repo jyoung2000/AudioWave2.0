@@ -1,8 +1,10 @@
 """
-Build music-player/index.html (the shell) from design/frontends/airwave-now-playing.html.
+Build music-player/index.html (the shell) from design/frontends/origin/airwave-now-playing.html.
 
-The frontend file is read-only reference material; this script is the record of every edit the
-player makes to it, each asserted against the exact text it replaces so a drift in the source is a
+The frontend file is read-only reference material, frozen in design/frontends/origin/ (DEC-038; the
+living mockup design/frontends/airwave-now-playing.html is generated from the player, not read
+here). This script is the record of every edit the player makes to it — a change to the shell's
+markup or CSS is a new step below, never an edit to either file — each asserted against the exact text it replaces so a drift in the source is a
 loud failure, not a silent one. Run it to regenerate the shell:  python scripts/make-shell.py
 
 What changes, and why (see .agents/plans/2026-09-21-airwave-oneshot.md, Step C):
@@ -22,7 +24,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-SRC = ROOT / 'design' / 'frontends' / 'airwave-now-playing.html'
+SRC = ROOT / 'design' / 'frontends' / 'origin' / 'airwave-now-playing.html'
 DST = ROOT / 'music-player' / 'index.html'
 
 text = SRC.read_text(encoding='utf-8')

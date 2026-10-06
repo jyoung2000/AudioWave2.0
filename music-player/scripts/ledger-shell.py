@@ -27,7 +27,7 @@ for s in c['surfaces']:
 
 def surface(sid, title, entry, states, rules, extra=()):
     return {'id': f'player-shell-{sid}', 'kind': 'screen', 'product': 'player', 'platform': 'web', 'title': title, 'entry': entry,
-            'sourcePaths': SHELL + list(extra), 'components': ['shell markup (design/frontends/airwave-now-playing.html)'],
+            'sourcePaths': SHELL + list(extra), 'components': ['shell markup (design/frontends/origin/airwave-now-playing.html)'],
             'states': states, 'rules': rules, 'guideAnchor': 'screens', 'authority': 'adopted'}
 
 NEW = [

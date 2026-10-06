@@ -1,0 +1,1271 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Airwave Hub</title>
+<meta name="description" content="Mockup of the Airwave Hub (the docker-container admin): overview, device pairing, library, providers, downloads, groups, sharing, Discord, network, backup and diagnostics, in the companion app's Snow Leopard window skin.">
+<style>
+/* ============================================================ tokens
+   The window skin: the suite's Snow Leopard reconstruction (AudioWave
+   aqua-window values). The window skin has no dark palette, because Snow
+   Leopard had none (AudioWave DEC-003) — this page renders light in both
+   OS appearances, with an explicit body background. */
+:root, :root:not([data-theme="light"]), :root[data-theme="dark"] {
+  --desktop:        #6d737a;
+  --win-outline:    #747474;
+  --win-body:       #ececec;
+  --content:        #ffffff;
+  --content-muted:  #f7f7f7;
+  --row-stripe:     #f1f6fb;
+  --row-divider:    #d8dee5;
+  --chrome-top:     #f6f6f6;
+  --chrome-upper:   #e5e5e5;
+  --chrome-lower:   #c4c4c4;
+  --chrome-bottom:  #afafaf;
+  --chrome-sep:     #858585;
+  --chrome-hi:      #ffffff;
+  --sel-top:        #69b5f3;
+  --sel-mid:        #378dda;
+  --sel-bot:        #1764b2;
+  --sel-border:     #0f4e8b;
+  --sel-ink:        #ffffff;
+  --aqua-spec:      #eafbff;
+  --aqua-top:       #a9e5ff;
+  --aqua-mid:       #38b6f7;
+  --aqua-lower:     #0d83d6;
+  --aqua-bot:       #075fa6;
+  --aqua-rim:       #07558f;
+  --focus:          #3f9fe8;
+  --ink:            #161616;
+  --ink-2:          #565b60;
+  --ink-3:          #96999c;
+  --lcd-top:        #e1eaeb;
+  --lcd-bot:        #aebcc0;
+  --lcd-ink:        #172326;
+  --danger:         #d64a44;
+  --success:        #4e9d47;
+  --warning:        #d99a1e;
+  --well-edge:      #9a9a9a;
+  --btn-top:        #fefefe;
+  --btn-mid:        #f0f0f0;
+  --btn-bot:        #dcdcdc;
+  --btn-edge:       #9c9c9c;
+  /* Aqua controls: the gel itself is drawn by AquaArt (see the script in
+     <head>); these are the ink and focus ring that go with it. */
+  --aq-ink:         #000000;
+  --aq-ink-off:     #9a9a9a;
+  --aq-ring:        #7ea8e0;
+  --aq-halo:        rgba(88, 145, 225, .75);
+  /* Aqua scroller: the sampled 10.3 thumb gel, the white track */
+  --gel-thumb: linear-gradient(to right, #16407f 0%, #6ea3ec 12%, #8cb8ea 24%, #458ad8 45%, #5fa8f1 58%, #83c9fd 78%, #9fd2ee 92%, #3f6a86 100%);
+  --gel-thumb-down: linear-gradient(to right, #0f2f5e 0%, #4f7fc4 12%, #6b95c8 24%, #336bb0 45%, #4686c9 58%, #62a2d6 78%, #7fb0cc 92%, #2f5068 100%);
+  --gel-stripe: rgba(255, 255, 255, .16);
+  --track-edge: #b9b9b9;
+  --track-lo: #dedede;
+  --warn-bg:        #fbf3dc;
+  --head-top:       #f8f8f8;
+  --head-bot:       #dadada;
+  --head-rule:      #adadad;
+  --head-ink:       #3a3d41;
+  --warn-edge:      #d8b75e;
+  --track-hi: #fbfbfb;
+  --font: "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: Consolas, "Lucida Console", Menlo, monospace;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--desktop);
+  color: var(--ink);
+  font: 12px/1.5 var(--font);
+  min-height: 100dvh;
+  padding: clamp(0px, 3vw, 34px) clamp(0px, 3vw, 34px) 48px;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+/* ============================================================ window */
+.frame { max-width: 640px; margin: 0 auto; }
+/* A window, not a page: fixed to the screen's height, with the pane
+   scrolling inside it under the toolbar and above the status strip. */
+.win {
+  width: 100%;
+  height: clamp(420px, calc(100dvh - clamp(0px, 3vw, 34px) - 82px), 820px);
+  display: flex;
+  flex-direction: column;
+  background: var(--win-body);
+  border: 1px solid var(--win-outline);
+  border-radius: 6px 6px 5px 5px;
+  box-shadow: 0 22px 46px -14px rgba(0,0,0,.62), 0 4px 12px rgba(0,0,0,.28);
+  overflow: hidden;
+}
+/* Title bar and toolbar: one unified sheet, as Snow Leopard drew utility
+   windows. No traffic lights: in a mockup three circles that close nothing
+   would be decoration (suite rule UX-PRIN-001). */
+.chrome {
+  background: linear-gradient(var(--chrome-top), var(--chrome-upper) 42%, var(--chrome-lower) 88%, var(--chrome-bottom));
+  border-bottom: 1px solid var(--chrome-sep);
+  box-shadow: inset 0 1px 0 var(--chrome-hi);
+}
+.titlebar {
+  height: 26px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  color: #3f4245;
+  text-shadow: 0 1px 0 rgba(255,255,255,.75);
+  letter-spacing: .01em;
+  user-select: none;
+}
+.toolbar {
+  display: flex;
+  justify-content: center;
+  gap: 26px;
+  padding: 2px 12px 6px;
+}
+.tool {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 3px 8px 4px;
+  border-radius: 5px;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #4c5054;
+  text-shadow: 0 1px 0 rgba(255,255,255,.7);
+  cursor: default;
+  min-width: 74px;
+}
+.tool svg { width: 26px; height: 26px; display: block; }
+.tool[aria-selected="true"] { background: rgba(0,0,0,.15); box-shadow: inset 0 1px 3px rgba(0,0,0,.28), 0 1px 0 rgba(255,255,255,.55); }
+.tool:not([aria-selected="true"]):hover { background: rgba(0,0,0,.06); }
+.tool:active { background: rgba(0,0,0,.2); }
+
+/* ============================================================ panes */
+.pane { padding: 18px 20px 20px; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.chrome, .status { flex: none; }
+
+/* ============================================================ Aqua scroller
+   Always shown, as it was in 10.6: a white track with a sunken edge and the
+   blue gel thumb with its faint stripes. Chromium (and so the Windows app's
+   shell) draws this; Firefox gets the nearest standard colours. */
+.pane::-webkit-scrollbar { width: 15px; }
+.pane::-webkit-scrollbar-track {
+  background: linear-gradient(to right, var(--track-lo), var(--track-hi) 45%, var(--track-hi) 70%, var(--track-lo));
+  box-shadow: inset 1px 0 0 var(--track-edge);
+}
+.pane::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 8px;
+  min-height: 40px;
+  background: repeating-linear-gradient(to bottom, var(--gel-stripe) 0 2px, transparent 2px 4px) padding-box, var(--gel-thumb) padding-box;
+}
+.pane::-webkit-scrollbar-thumb:active {
+  background: repeating-linear-gradient(to bottom, var(--gel-stripe) 0 2px, transparent 2px 4px) padding-box, var(--gel-thumb-down) padding-box;
+}
+@supports not selector(::-webkit-scrollbar) { .pane { scrollbar-color: #458ad8 var(--track-lo); } }
+.pane[hidden] { display: none; }
+.lead { margin: 0 0 14px; color: var(--ink-2); max-width: 46em; }
+h2 { font-size: 12px; margin: 0 0 2px; }
+fieldset { border: 0; margin: 0 0 16px; padding: 0; min-inline-size: 0; }
+legend { padding: 0; font-weight: 700; margin-bottom: 2px; }
+.hint { color: var(--ink-2); margin: 0 0 7px; }
+.hint code { font-family: var(--mono); font-size: 11px; }
+
+/* The bezelled well that holds every list */
+.well {
+  background: var(--content);
+  border: 1px solid var(--well-edge);
+  border-radius: 2px;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,.22);
+  overflow: hidden;
+}
+.rows { list-style: none; margin: 0; padding: 0; }
+.rows li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  padding: 2px 6px 2px 8px;
+}
+.rows li:nth-child(even) { background: var(--row-stripe); }
+.rows .ic { flex: none; width: 15px; height: 15px; color: #7d97b3; }
+.rows .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 11px; }
+.rows .name b { font-family: var(--font); font-size: 12px; }
+.rows .meta { flex: none; color: var(--ink-2); font-size: 11px; }
+.rows .ok { color: var(--success); font-weight: 700; }
+.rows .bad { color: var(--danger); font-weight: 700; }
+.empty { display: block; padding: 10px 10px 11px; color: var(--ink-3); }
+/* removing is a real command, drawn as the era's round minus */
+.rm {
+  flex: none; appearance: none; border: 0; padding: 0;
+  width: 17px; height: 17px; border-radius: 50%;
+  background: linear-gradient(var(--btn-top), var(--btn-bot));
+  box-shadow: inset 0 0 0 1px var(--btn-edge);
+  color: #5c5c5c; font-weight: 700; line-height: 1;
+  display: grid; place-items: center; cursor: default;
+}
+.rm:hover { color: var(--danger); }
+.rm:active { filter: brightness(.92); }
+
+/* the bar under a well: add controls */
+.barrow { display: flex; gap: 8px; margin-top: 7px; align-items: center; flex-wrap: wrap; }
+/* Snow Leopard push buttons: a matte, brushed-metal pill drawn by AquaArt,
+   so the element keeps its own box, text and focus ring. The numbers in
+   border-image are AquaArt.geo(22): 22px caps, 6px shadow margin either
+   side, 2px above and 8px below. */
+.push, .pop, .box { border: 0 solid transparent; background: none; }
+.push {
+  appearance: none;
+  height: 22px;
+  min-width: 58px;
+  padding: 0 15px;
+  border-radius: 11px;
+  border-image: var(--aq-btn-22) 0 22 fill / 0 22px / 2px 6px 8px;
+  color: var(--aq-ink);
+  line-height: 20px;
+  white-space: nowrap;
+  cursor: default;
+}
+.push:active:not([disabled]) { border-image-source: var(--aq-btn-22-down); }
+.push[disabled] { border-image-source: var(--aq-btn-22-off); color: var(--aq-ink-off); }
+.push:focus-visible, .pop:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--aq-ring), 0 0 2px 3px var(--aq-halo); }
+/* the default button is 10.6 blue and throbs, as it did */
+/* One default per window: a form's Add turns blue while you're typing into
+   it, because that is when Return presses it. */
+form:focus-within > .push--default, form:has(.field:not(:placeholder-shown)) > .push--default { border-image-source: var(--aq-def-22); animation: throb 1.5s ease-in-out infinite; }
+form:focus-within > .push--default:active, form:has(.field:not(:placeholder-shown)) > .push--default:active { border-image-source: var(--aq-def-22-down); animation: none; }
+@keyframes throb { 50% { filter: brightness(1.1) saturate(.82); } }
+@media (prefers-reduced-motion: reduce) { .push--default { animation: none !important; } }
+.field {
+  flex: 1 1 200px;
+  min-width: 0;
+  min-height: 22px;
+  border: 1px solid #8e8e8c;
+  border-radius: 3px;
+  padding: 1px 7px 2px;
+  background: var(--content);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.2);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.field::placeholder { color: var(--ink-3); font-family: var(--font); font-size: 12px; }
+.note { margin: 6px 0 0; color: var(--ink-2); }
+.note--bad { color: var(--danger); }
+
+/* ============================================================ remote */
+.lcd {
+  border: 1px solid #7f8a8e;
+  border-radius: 4px;
+  background: linear-gradient(var(--lcd-top), var(--lcd-bot));
+  box-shadow: inset 0 1px 3px rgba(0,0,0,.25), inset 0 -1px 0 rgba(255,255,255,.45);
+  color: var(--lcd-ink);
+  padding: 12px 14px 13px;
+  display: grid;
+  gap: 3px;
+  justify-items: center;
+  text-align: center;
+}
+.lcd__code {
+  font-family: var(--mono);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-shadow: 0 1px 0 rgba(255,255,255,.5);
+}
+.lcd__sub { font-size: 11px; color: #35464b; }
+.remote-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+@media (max-width: 560px) { .remote-grid { grid-template-columns: 1fr; } }
+.steps { margin: 8px 0 0; padding-left: 18px; }
+.steps li { margin: 3px 0; }
+/* the era's blue-gel checkbox rows */
+.optrow { display: flex; gap: 8px; align-items: flex-start; padding: 7px 2px; }
+.optrow + .optrow { border-top: 1px solid var(--row-divider); }
+.optrow input, .chk input { position: absolute; opacity: 0; width: 18px; height: 18px; margin: 0; }
+/* Aqua checkbox: grey gel off, blue gel with a black tick on */
+.box {
+  flex: none; width: 14px; height: 14px; margin-top: 1px;
+  border-radius: 3px;
+  border-image: var(--aq-cb-14) 0 fill / 0 / 2px 4px 6px;
+  position: relative;
+}
+.optrow input:checked + .box, .chk input:checked + .box { border-image-source: var(--aq-cb-14-on); }
+.optrow:active .box, .chk:active .box { border-image-source: var(--aq-cb-14-down); }
+.optrow:active input:checked + .box, .chk:active input:checked + .box { border-image-source: var(--aq-cb-14-on-down); }
+.optrow input:focus-visible + .box, .chk input:focus-visible + .box { box-shadow: 0 0 0 1px var(--aq-ring), 0 0 2px 3px var(--aq-halo); }
+.optrow .lbl b { display: block; }
+.optrow .lbl span { color: var(--ink-2); }
+.badge { display: inline-block; padding: 1px 6px 2px; border-radius: 8px; font-size: 10px; font-weight: 700; color: #fff; background: var(--ink-3); vertical-align: 1px; }
+.badge--on { background: var(--success); }
+
+/* ============================================================ settings */
+/* Snow Leopard preference panes: right-aligned labels in one column,
+   controls in the next. On a phone the labels sit above. */
+.pref { display: grid; grid-template-columns: 158px minmax(0, 1fr); gap: 9px 12px; align-items: center; }
+.pref > .k { text-align: right; color: var(--ink); }
+.pref > .k.top { align-self: start; padding-top: 3px; }
+.pref > .v { min-width: 0; display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+.pref > .v.stack { display: grid; gap: 6px; }
+.pref .sub { color: var(--ink-2); font-size: 11px; flex-basis: 100%; }
+.path { font-family: var(--mono); font-size: 11px; overflow-wrap: anywhere; }
+.chk { display: flex; gap: 7px; align-items: flex-start; position: relative; }
+.chk .box { margin-top: 2px; }
+/* Aqua pop-up button: white body, blue double-arrow segment. Right slice
+   holds the whole 22px segment so only the white body stretches. */
+.pop {
+  appearance: none; -webkit-appearance: none;
+  height: 22px; max-width: 100%;
+  padding: 0 36px 0 10px;
+  border-radius: 4px;
+  border-image: var(--aq-pop-22) 0 30 0 12 fill / 0 30px 0 12px / 2px 6px 8px;
+  color: var(--aq-ink);
+  cursor: default;
+}
+.pop:active { border-image-source: var(--aq-pop-22-down); }
+.pop option { color: var(--ink); background: var(--content); }
+.num { flex: 0 0 64px; width: 64px; text-align: right; }
+.bad-field { border-color: var(--danger); }
+.gear-badge {
+  position: absolute; top: -3px; right: 12px;
+  min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
+  background: linear-gradient(#f07a74, var(--danger)); color: #fff;
+  font-size: 10px; line-height: 16px; text-align: center; text-shadow: none;
+  box-shadow: 0 1px 1px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.6);
+}
+.tool { position: relative; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* downloader rows */
+.rows li.dl { align-items: flex-start; flex-wrap: wrap; gap: 4px 10px; padding: 8px 8px 9px; }
+.sdot { flex: none; width: 10px; height: 10px; margin-top: 3px; border-radius: 50%; box-shadow: inset 0 -1px 1px rgba(0,0,0,.3); background: var(--ink-3); }
+.sdot--ok { background: var(--success); }
+.sdot--warn { background: var(--warning); }
+.sdot--bad { background: var(--danger); }
+.sdot--busy { background: var(--aqua-mid); animation: pulse 1s ease-in-out infinite alternate; }
+@keyframes pulse { to { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .sdot--busy { animation: none; } }
+.dl__main { flex: 1 1 250px; min-width: 0; display: grid; gap: 1px; }
+.dl__main b { font-size: 12px; }
+.dl__main .ver { font-family: var(--mono); font-size: 11px; color: var(--ink-2); font-weight: 400; margin-left: 4px; }
+.dl__state { font-weight: 700; font-size: 11px; }
+.dl__role { color: var(--ink-2); font-size: 11px; }
+.dl__path { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); overflow-wrap: anywhere; }
+.dl__acts { flex: none; display: flex; gap: 6px; margin-left: auto; align-self: center; }
+.dl__acts .push { padding: 1px 11px 2px; }
+.panefoot { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; border-top: 1px solid var(--row-divider); padding-top: 12px; margin-top: 4px; }
+.panefoot .note { margin: 0; flex: 1 1 220px; }
+@media (max-width: 560px) {
+  .pref { grid-template-columns: minmax(0, 1fr); gap: 3px 0; }
+  .pref > .k { text-align: left; font-weight: 700; margin-top: 8px; }
+  .pref > .k.top { padding-top: 0; }
+  .toolbar { gap: 2px; }
+  .tool { min-width: 0; flex: 1 1 0; padding-inline: 2px; }
+  .gear-badge { right: calc(50% - 22px); }
+}
+
+/* ============================================================ status strip */
+.status {
+  border-top: 1px solid var(--chrome-sep);
+  background: linear-gradient(var(--chrome-upper), var(--chrome-lower));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.6);
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 12px;
+  color: #43464a;
+  font-size: 11px;
+  text-shadow: 0 1px 0 rgba(255,255,255,.6);
+}
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); box-shadow: inset 0 -1px 1px rgba(0,0,0,.3), 0 0 3px rgba(78,157,71,.8); }
+.status .spacer { flex: 1; }
+
+/* the "this is a mockup" plate under the window */
+.plate { max-width: 640px; margin: 14px auto 0; color: #d9dde2; font-size: 11px; text-align: center; text-shadow: 0 1px 1px rgba(0,0,0,.4); }
+
+/* ============================================================ hub additions */
+.frame, .plate { max-width: 780px; }
+.tool { min-width: 66px; }
+.toolbar { gap: 8px; flex-wrap: nowrap; }
+.sub { font-size: 11px; color: var(--ink-2); font-weight: 400; }
+.gate {
+  display: flex; gap: 12px; align-items: flex-start; margin: 0 0 16px; padding: 10px 12px;
+  border: 1px solid var(--warn-edge); border-radius: 4px; background: var(--warn-bg);
+}
+.gate[hidden] { display: none; }
+.gate__icon { flex: none; width: 26px; height: 26px; }
+.gate__body { flex: 1; min-width: 0; }
+.gate__body p { margin: 2px 0 8px; color: var(--ink-2); }
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+.tile { padding: 9px 11px 10px; border: 1px solid var(--well-edge); border-radius: 4px; background: var(--content); box-shadow: inset 0 1px 2px rgba(0,0,0,.12); min-width: 0; }
+.tile h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 4px; font-size: 11px; color: var(--ink-2); }
+.tile .big { display: block; font-size: 21px; font-weight: 300; line-height: 1.15; }
+.tile .sm { display: block; font-size: 11px; color: var(--ink-2); }
+.tbl { width: 100%; border-collapse: collapse; font-size: 11px; table-layout: fixed; }
+.tbl th {
+  text-align: left; font-weight: 700; color: var(--head-ink); padding: 3px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: linear-gradient(var(--head-top), var(--head-bot)); border-bottom: 1px solid var(--head-rule); text-shadow: 0 1px 0 rgba(255,255,255,.8);
+}
+.tbl td { padding: 4px 8px; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; }
+.tbl tbody tr:nth-child(even) { background: var(--row-stripe); }
+.tbl .num { text-align: right; font-variant-numeric: tabular-nums; }
+.tbl .mono, .mono { font-family: var(--mono); font-size: 11px; }
+.tbl .acts { text-align: right; white-space: nowrap; overflow: visible; }
+.tbl .acts .push { min-width: 0; padding: 0 10px; }
+.tbl .acts .push + .push { margin-left: 4px; }
+.plain .name { font-family: var(--font); font-size: 12px; }
+.caps { display: flex; flex-wrap: wrap; gap: 3px; }
+.cap { display: inline-block; padding: 0 5px; border-radius: 7px; font-size: 10px; line-height: 15px; background: #e4e8ee; color: #43474d; }
+.cap--yes { background: #d9ecd6; color: #245b20; }
+.cap--part { background: #f3e6c8; color: #6d4b05; }
+.cap--no { background: #eee; color: #9a9a9a; text-decoration: line-through; }
+.tag { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 8px; font-size: 10px; line-height: 15px; font-weight: 700; color: #fff; background: #8a8f98; vertical-align: 1px; }
+.tag--plan { background: #b0781c; }
+.bar { position: relative; height: 10px; border-radius: 5px; background: #d6d9dd; box-shadow: inset 0 1px 2px rgba(0,0,0,.25); overflow: hidden; }
+.bar > i { position: absolute; inset: 0 auto 0 0; border-radius: 5px; background: var(--gel-thumb); }
+.spacebar > i { border-radius: 0; }
+.spacebar > i.used { background: linear-gradient(#b9bec5, #9aa1aa); }
+.spacebar.is-short > i.this { background: linear-gradient(#e98a7e, #c9453a); }
+.invcode { font: 700 17px/1 Menlo, Consolas, monospace; letter-spacing: .12em; }
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+.kv { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 5px 12px; margin: 0; }
+.kv dt { text-align: right; color: var(--ink-2); }
+.kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.log { margin: 0; padding: 6px 8px; max-height: 170px; overflow: auto; font: 10.5px/1.5 var(--mono); white-space: pre-wrap; color: #2a2e33; }
+.log .w { color: #8a5a00; } .log .e { color: var(--danger); }
+.drift { font-family: var(--mono); font-size: 11px; }
+.drift.ok { color: var(--success); } .drift.warn { color: #8a5a00; }
+.eqz { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; margin-right: 6px; vertical-align: -1px; }
+.eqz i { width: 3px; background: var(--aqua-mid); border-radius: 1px; animation: eqz .9s ease-in-out infinite alternate; }
+.eqz i:nth-child(2) { animation-delay: .3s; } .eqz i:nth-child(3) { animation-delay: .6s; }
+@keyframes eqz { from { height: 3px; } to { height: 12px; } }
+@media (prefers-reduced-motion: reduce) { .eqz i { animation: none; height: 8px; } }
+.locked { opacity: .55; pointer-events: none; }
+/* default buttons outside a form are always the blue one */
+button.push--default:not(form *) { border-image-source: var(--aq-def-22); }
+button.push--default:not(form *):active { border-image-source: var(--aq-def-22-down); }
+@media (max-width: 640px) {
+  .toolbar { justify-content: flex-start; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; padding-inline: 8px; }
+  .toolbar::-webkit-scrollbar { display: none; }
+  .tool { flex: 0 0 auto; min-width: 64px; scroll-snap-align: center; }
+  .tiles { grid-template-columns: 1fr 1fr; }
+  .split { grid-template-columns: 1fr; }
+  .kv { grid-template-columns: 1fr; gap: 0; }
+  .kv dt { text-align: left; margin-top: 6px; }
+  .tbl .hide-sm { display: none; }
+  .tool { font-size: 10px; }
+}
+</style>
+<script>
+/* ---------- Aqua controls (Snow Leopard push button; 10.4 pop-up and checkbox) ----------
+   Drawn as SVG from colour profiles sampled pixel row by pixel row from the
+   reference, then handed to CSS as border-image sources on :root. A material
+   is its gradient, so the 22 sampled rows travel together here rather than
+   as 22 tokens; CSS only chooses which drawing a control wears. Because the
+   drawings live in custom properties, controls rendered later pick them up. */
+var AquaArt = (function () {
+  'use strict';
+  var PROF = {"cancel":[[234,234,233],[211,212,210],[115,115,113],[167,167,167],[200,200,198],[209,209,207],[216,216,214],[220,220,220],[218,218,218],[206,206,206],[198,198,198],[200,200,200],[208,208,208],[210,210,210],[216,216,216],[225,225,225],[236,236,236],[247,247,247],[252,252,252],[253,253,253],[254,254,254],[254,254,254],[254,254,254],[248,248,248],[107,107,107],[119,119,119],[132,132,132],[168,168,168],[201,200,200]],"save":[[231,239,248],[210,228,245],[57,78,100],[116,143,170],[154,183,212],[169,198,227],[175,203,234],[180,207,240],[172,202,233],[157,188,222],[144,177,215],[143,179,219],[152,187,227],[157,190,230],[166,197,234],[174,207,241],[185,219,247],[191,227,252],[198,236,255],[200,241,255],[205,244,255],[206,243,255],[208,243,255],[194,224,235],[96,119,131],[113,129,139],[139,147,155],[171,175,183],[211,211,215]],"popup":[[231,226,223],[226,222,220],[167,165,161],[216,216,213],[234,235,234],[232,233,232],[230,231,230],[228,229,228],[229,229,229],[234,234,234],[239,237,238],[241,240,240],[243,242,242],[246,245,245],[247,247,247],[250,250,250],[253,253,253],[255,255,255],[255,255,255],[255,255,255],[255,255,253],[255,255,253],[245,243,242],[109,108,107],[178,174,172],[234,229,227],[228,223,221],[227,220,219]],"arrow":[[235,234,229],[219,235,230],[60,79,114],[150,179,223],[183,215,248],[171,206,239],[153,189,233],[131,167,223],[115,158,215],[121,165,218],[133,178,216],[142,187,224],[147,195,241],[151,199,248],[157,210,250],[164,213,247],[168,219,249],[170,224,251],[175,231,255],[182,238,255],[188,237,253],[192,233,244],[181,211,217],[94,113,121],[166,176,183],[224,226,227],[230,223,224],[224,217,215]]};
+  var P = {
+    cancel: { rimW: 8.896, rimBlur: 3.201, rimOp: 0.501, rimExt: 1.193, rimBot: 0.446, olW: 0.267, olOp: 0.534,
+              sh1dy: 1.842, sh1op: 0.432, sh1blur: 0.933, sh1in: 0.755, sh2dy: 5, sh2op: 0.291, sh2blur: 1.5 },
+    save:   { rimW: 11.848, rimBlur: 2.534, rimOp: 0.529, rimExt: 1.2, rimBot: 0.331, olW: 2.881, olOp: 0.557,
+              sh1dy: 1.786, sh1op: 0.313, sh1blur: 0.933, sh1in: 0, sh2dy: 4.141, sh2op: 0.316, sh2blur: 1.5 },
+    popup:  { r: 4, shBlur: 0.8, shDy: 0.778, shOp: 0.371, segOp: 0.144, rimW: 0.5, rimOp: 0.315, apex: 5.1 }
+  };
+  var DOWN = { save: [0.62, 0.72, 0.86], cancel: [0.78, 0.78, 0.78] };
+  var uid = 0;
+  function rgb(c) { return 'rgb(' + (c[0] | 0) + ',' + (c[1] | 0) + ',' + (c[2] | 0) + ')'; }
+  function stops(rows) {
+    return rows.map(function (c, i) { return '<stop offset="' + ((i + 0.5) / rows.length).toFixed(4) + '" stop-color="' + rgb(c) + '"/>'; }).join('');
+  }
+  function resample(rows, n) {
+    var out = [];
+    for (var i = 0; i < n; i++) {
+      var t = (i + 0.5) * rows.length / n - 0.5, a = Math.max(0, Math.floor(t)), b = Math.min(rows.length - 1, a + 1), f = Math.min(1, Math.max(0, t - a));
+      out.push(rows[a].map(function (v, j) { return v * (1 - f) + rows[b][j] * f; }));
+    }
+    return out;
+  }
+  function tint(rows, k) { return rows.map(function (c) { return c.map(function (v, i) { return v * k[i]; }); }); }
+  function pill(x, y, w, h, r) { return 'M' + (x + r) + ',' + y + 'H' + (x + w - r) + 'A' + r + ',' + r + ' 0 0 1 ' + (x + w - r) + ',' + (y + h) + 'H' + (x + r) + 'A' + r + ',' + r + ' 0 0 1 ' + (x + r) + ',' + y + 'Z'; }
+  function rr(x, y, w, h, r) { return 'M' + (x + r) + ',' + y + 'H' + (x + w - r) + 'Q' + (x + w) + ',' + y + ' ' + (x + w) + ',' + (y + r) + 'V' + (y + h - r) + 'Q' + (x + w) + ',' + (y + h) + ' ' + (x + w - r) + ',' + (y + h) + 'H' + (x + r) + 'Q' + x + ',' + (y + h) + ' ' + x + ',' + (y + h - r) + 'V' + (y + r) + 'Q' + x + ',' + y + ' ' + (x + r) + ',' + y + 'Z'; }
+  function svg(w, h, body) { return '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">' + body + '</svg>'; }
+  var WASH = function (d) { return '<path d="' + d + '" fill="#fff" opacity=".45"/>'; };
+  /* How far each drawing reaches past its control: CSS uses the same numbers
+     for border-image-outset and -slice. */
+  function geo(H) { var B = Math.ceil(8 * H / 22); return { M: 6, T: 2, B: B, slice: 6 + Math.ceil(H / 2 * 1.25) + 2, sw: Math.round(22 + (H - 22) / 2) }; }
+
+  /* Push buttons are Snow Leopard's (10.6), not 10.4's: a matte, metallic
+     pill — pale brushed grey with a soft sheen, a hairline graphite edge that
+     darkens toward the bottom, and a one-pixel shadow — rather than a gel.
+     Pressing turns it blue, as 10.6 did; the default button is the calmer
+     10.6 blue. kind 'cancel' is the ordinary button, 'save' the default. */
+  var METAL = {
+    cancel: { face: [[0, '#fdfdfd'], [0.1, '#f5f5f5'], [0.46, '#e9e9e9'], [0.5, '#dfdfdf'], [0.82, '#e4e4e4'], [1, '#f0f0f0']],
+              edge: ['#a3a3a3', '#6c6c6c'], hi: 0.9 },
+    save:   { face: [[0, '#e3f0fd'], [0.1, '#bcdaf8'], [0.46, '#8cbcef'], [0.5, '#6ea6e8'], [0.82, '#88bdf0'], [1, '#b5dcfa']],
+              edge: ['#5a86bd', '#2c5184'], hi: 0.75 },
+    down:   { face: [[0, '#c5dcf5'], [0.1, '#9cc3ee'], [0.46, '#6a9fe0'], [0.5, '#4f8ad6'], [0.82, '#6aa2e2'], [1, '#93c4f0']],
+              edge: ['#3f6aa3', '#1d3e6e'], hi: 0.45 },
+    defdown:{ face: [[0, '#a9c9ec'], [0.1, '#7fabe0'], [0.46, '#4f86d0'], [0.5, '#3a73c4'], [0.82, '#5089d2'], [1, '#7cb0e6']],
+              edge: ['#2d5588', '#16325a'], hi: 0.35 }
+  };
+  function button(kind, H, st) {
+    st = st || {};
+    var m = METAL[st.down ? (kind === 'save' ? 'defdown' : 'down') : kind];
+    var g = geo(H), W = 60, r = H / 2, M = g.M, id = 'aq' + (uid++), w = W + 2 * M, h = 2 + H + g.B;
+    var d = pill(M, 2, W, H, r), inner = pill(M + 0.5, 2.5, W - 1, H - 1, r - 0.5), hl = pill(M + 1, 3, W - 2, H - 2, r - 1);
+    var face = m.face.map(function (s) { return '<stop offset="' + s[0] + '" stop-color="' + s[1] + '"/>'; }).join('');
+    return svg(w, h,
+      '<defs><linearGradient id="' + id + 'f" x1="0" y1="0" x2="0" y2="1">' + face + '</linearGradient>' +
+      '<linearGradient id="' + id + 'e" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + m.edge[0] + '"/><stop offset="1" stop-color="' + m.edge[1] + '"/></linearGradient>' +
+      '<linearGradient id="' + id + 'h" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="' + m.hi + '"/><stop offset=".35" stop-color="#fff" stop-opacity="0"/></linearGradient>' +
+      /* a faint brushed grain, lengthwise, so the face reads as metal not paint */
+      '<pattern id="' + id + 'g" width="7" height="3" patternUnits="userSpaceOnUse"><rect width="7" height="1" fill="#fff" opacity=".22"/><rect y="2" width="7" height="1" fill="#000" opacity=".025"/></pattern>' +
+      '<filter id="' + id + 's" x="-10%" y="-40%" width="120%" height="180%"><feGaussianBlur stdDeviation=".6"/></filter></defs>' +
+      '<path d="' + pill(M, 3, W, H, r) + '" opacity=".22" filter="url(#' + id + 's)"/>' +
+      '<path d="' + d + '" fill="url(#' + id + 'f)"/>' +
+      '<path d="' + d + '" fill="url(#' + id + 'g)"/>' +
+      '<path d="' + hl + '" fill="none" stroke="url(#' + id + 'h)" stroke-width="1"/>' +
+      '<path d="' + inner + '" fill="none" stroke="url(#' + id + 'e)" stroke-width="1"/>' +
+      (st.off ? WASH(d) : ''));
+  }
+
+  function popup(H, st) {
+    st = st || {};
+    var p = P.popup, g = geo(H), W = 80, r = p.r, M = g.M, SW = g.sw, id = 'aq' + (uid++);
+    var body = resample(PROF.popup.slice(2, 24), H), arr = resample(PROF.arrow.slice(2, 24), H);
+    if (st.down) { body = tint(body, [0.82, 0.82, 0.82]); arr = tint(arr, [0.62, 0.74, 0.9]); }
+    var d = rr(M, 2, W, H, r), ax = M + W - SW, cy = 2 + H / 2, cx = ax + SW / 2, w = W + 2 * M, h = 2 + H + g.B;
+    return svg(w, h,
+      '<defs><linearGradient id="' + id + 'b" gradientUnits="userSpaceOnUse" x1="0" y1="2" x2="0" y2="' + (2 + H) + '">' + stops(body) + '</linearGradient>' +
+      '<linearGradient id="' + id + 'a" gradientUnits="userSpaceOnUse" x1="0" y1="2" x2="0" y2="' + (2 + H) + '">' + stops(arr) + '</linearGradient>' +
+      '<clipPath id="' + id + 'c"><path d="' + d + '"/></clipPath>' +
+      '<filter id="' + id + 'f" x="-10%" y="-50%" width="120%" height="200%"><feGaussianBlur stdDeviation="' + p.shBlur + '"/></filter></defs>' +
+      '<path d="' + rr(M, 2 + p.shDy, W, H, r) + '" opacity="' + p.shOp + '" filter="url(#' + id + 'f)"/>' +
+      '<path d="' + d + '" fill="url(#' + id + 'b)"/>' +
+      '<g clip-path="url(#' + id + 'c)"><rect x="' + ax + '" y="0" width="' + (SW + M) + '" height="' + (H + 4) + '" fill="url(#' + id + 'a)"/>' +
+      '<rect x="' + ax + '" y="2" width="1" height="' + H + '" fill="#2a4f86" opacity="' + p.segOp + '"/>' +
+      '<path d="' + rr(ax, 2, SW, H, r) + '" fill="none" stroke="#062a66" stroke-width="' + p.rimW + '" opacity="' + p.rimOp + '"/></g>' +
+      '<path d="M' + (cx - 3) + ',' + (cy - 1) + 'H' + (cx + 3) + 'L' + cx + ',' + (cy - 11 + p.apex) + 'Z M' + (cx - 3) + ',' + (cy + 1) + 'H' + (cx + 3) + 'L' + cx + ',' + (cy + 11 - p.apex) + 'Z"/>' +
+      (st.off ? WASH(d) : ''));
+  }
+
+  function checkbox(S, st) {
+    st = st || {};
+    var on = !!st.on, kind = on ? 'save' : 'cancel', p = P[kind], id = 'aq' + (uid++), M = 4, r = 3.2, k = S / 22;
+    var body = resample(PROF[kind].slice(2, 24), S);
+    if (st.down) body = tint(body, DOWN[kind]);
+    var d = rr(M, 2, S, S, r), rc = on ? '#06204a' : '#000', w = S + 2 * M, h = S + 8, s = S / 14;
+    var mark = on ? '<path transform="translate(' + M + ',2) scale(' + s + ')" d="M3.2,7.6 L6.2,11 L13.6,-0.6" fill="none" stroke="#000" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>' : '';
+    return svg(w, h,
+      '<defs><linearGradient id="' + id + 'b" gradientUnits="userSpaceOnUse" x1="0" y1="2" x2="0" y2="' + (2 + S) + '">' + stops(body) + '</linearGradient>' +
+      '<clipPath id="' + id + 'c"><path d="' + d + '"/></clipPath>' +
+      '<filter id="' + id + 'f1" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="' + (p.sh1blur * k).toFixed(3) + '"/></filter>' +
+      '<filter id="' + id + 'f2" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="' + (p.sh2blur * k).toFixed(3) + '"/></filter>' +
+      '<filter id="' + id + 'fr" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="' + (p.rimBlur * k * 0.8).toFixed(3) + '"/></filter>' +
+      '<linearGradient id="' + id + 'mv" gradientUnits="userSpaceOnUse" x1="0" y1="2" x2="0" y2="' + (2 + S) + '"><stop offset=".45" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="' + p.rimBot + '"/></linearGradient>' +
+      '<mask id="' + id + 'm" maskUnits="userSpaceOnUse" x="0" y="0" width="' + w + '" height="' + h + '"><rect width="100%" height="100%" fill="url(#' + id + 'mv)"/></mask></defs>' +
+      '<path d="' + rr(M, 2 + p.sh2dy * k, S, S, r) + '" opacity="' + (p.sh2op * 0.8) + '" filter="url(#' + id + 'f2)"/>' +
+      '<path d="' + rr(M, 2 + p.sh1dy * k, S, S, r) + '" opacity="' + p.sh1op + '" filter="url(#' + id + 'f1)"/>' +
+      '<path d="' + d + '" fill="url(#' + id + 'b)"/>' +
+      '<g clip-path="url(#' + id + 'c)" mask="url(#' + id + 'm)"><path d="' + d + '" fill="none" stroke="' + rc + '" stroke-width="' + (p.rimW * k * 0.7).toFixed(2) + '" opacity="' + (p.rimOp * 0.5) + '" filter="url(#' + id + 'fr)"/>' +
+      '<path d="' + d + '" fill="none" stroke="' + rc + '" stroke-width="1.1" opacity="' + Math.max(0.45, p.olOp) + '"/></g>' +
+      mark + (st.off ? WASH(d) : ''));
+  }
+
+  function uri(s) { return 'url("data:image/svg+xml,' + encodeURIComponent(s) + '")'; }
+
+  /* Publishes every drawing as a custom property, e.g. --aq-btn-22,
+     --aq-btn-22-down, --aq-def-22-off, --aq-pop-30, --aq-cb-14-on-down. */
+  function install(sizes, root) {
+    root = root || document.documentElement;
+    var set = function (n, s) { root.style.setProperty(n, uri(s)); };
+    (sizes.btn || []).forEach(function (H) {
+      [['btn', 'cancel'], ['def', 'save']].forEach(function (b) {
+        set('--aq-' + b[0] + '-' + H, button(b[1], H));
+        set('--aq-' + b[0] + '-' + H + '-down', button(b[1], H, { down: 1 }));
+        set('--aq-' + b[0] + '-' + H + '-off', button(b[1], H, { off: 1 }));
+      });
+    });
+    (sizes.pop || []).forEach(function (H) {
+      set('--aq-pop-' + H, popup(H));
+      set('--aq-pop-' + H + '-down', popup(H, { down: 1 }));
+      set('--aq-pop-' + H + '-off', popup(H, { off: 1 }));
+    });
+    (sizes.cb || []).forEach(function (S) {
+      [['', {}], ['-on', { on: 1 }]].forEach(function (v) {
+        set('--aq-cb-' + S + v[0], checkbox(S, v[1]));
+        set('--aq-cb-' + S + v[0] + '-down', checkbox(S, Object.assign({ down: 1 }, v[1])));
+        set('--aq-cb-' + S + v[0] + '-off', checkbox(S, Object.assign({ off: 1 }, v[1])));
+      });
+    });
+  }
+  return { button: button, popup: popup, checkbox: checkbox, geo: geo, install: install };
+})();
+AquaArt.install({ btn: [22], pop: [22], cb: [14] });
+</script>
+</head>
+<body>
+<div class="frame">
+<div class="win" role="application" aria-label="Airwave Hub">
+  <div class="chrome">
+    <div class="titlebar">Airwave Hub</div>
+    <div class="toolbar" role="tablist" aria-label="Sections">
+      <button class="tool" role="tab" id="t-ov" aria-selected="true" aria-controls="p-ov">
+        <svg viewBox="0 0 26 26" aria-hidden="true"><rect x="3" y="4" width="20" height="16" rx="2" fill="#e9eef3" stroke="#4c637c" stroke-width="1.1"/><rect x="6" y="13" width="3" height="4" fill="#7d97b3"/><rect x="11.5" y="9" width="3" height="8" fill="#7d97b3"/><rect x="17" y="7" width="3" height="10" fill="#4c637c"/><path d="M9 23h8" stroke="#4c637c" stroke-width="1.6" stroke-linecap="round"/></svg>
+        Overview</button>
+      <button class="tool" role="tab" id="t-dev" aria-selected="false" aria-controls="p-dev" tabindex="-1">
+        <svg viewBox="0 0 26 26" aria-hidden="true"><rect x="8" y="3" width="10" height="20" rx="2" fill="#5b6770" stroke="#39424a" stroke-width="1.1"/><rect x="9.6" y="5.5" width="6.8" height="13" rx=".6" fill="#9fd2ee"/><circle cx="13" cy="20.8" r=".9" fill="#dfe6ea"/></svg>
+        Devices</button>
+      <button class="tool" role="tab" id="t-music" aria-selected="false" aria-controls="p-music" tabindex="-1">
+        <svg viewBox="0 0 26 26" aria-hidden="true"><path d="M20 3.5 10 5.8a1 1 0 0 0-.8 1v10.3a3.2 3.2 0 1 0 1.7 2.8V10.2l7.7-1.8v6.1a3.2 3.2 0 1 0 1.7 2.8V4.4a.8.8 0 0 0-1-.9z" fill="#7d97b3" stroke="#4c637c" stroke-width=".9"/></svg>
+        Music</button>
+      <button class="tool" role="tab" id="t-grp" aria-selected="false" aria-controls="p-grp" tabindex="-1">
+        <svg viewBox="0 0 26 26" aria-hidden="true"><circle cx="8" cy="9" r="3.2" fill="#9fb3c8" stroke="#4c637c"/><circle cx="18" cy="9" r="3.2" fill="#9fb3c8" stroke="#4c637c"/><circle cx="13" cy="11" r="3.6" fill="#7d97b3" stroke="#4c637c"/><path d="M3 21c.5-4 3-6 5-6M23 21c-.5-4-3-6-5-6M6.5 22c.6-4.6 3.4-7 6.5-7s5.9 2.4 6.5 7z" fill="#7d97b3" stroke="#4c637c" stroke-linejoin="round"/></svg>
+        Groups</button>
+      <button class="tool" role="tab" id="t-share" aria-selected="false" aria-controls="p-share" tabindex="-1">
+        <svg viewBox="0 0 26 26" aria-hidden="true"><path d="M11 15a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4L12.8 6.8" fill="none" stroke="#4c637c" stroke-width="2.2" stroke-linecap="round"/><path d="M15 11a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.4-1.4" fill="none" stroke="#7d97b3" stroke-width="2.2" stroke-linecap="round"/></svg>
+        Sharing</button>
+      <button class="tool" role="tab" id="t-sys" aria-selected="false" aria-controls="p-sys" tabindex="-1">
+        <svg viewBox="0 0 26 26" aria-hidden="true"><circle cx="13" cy="13" r="8.3" fill="none" stroke="#4c637c" stroke-width="3.4" stroke-dasharray="3.26 3.26"/><circle cx="13" cy="13" r="6.6" fill="#7d97b3" stroke="#4c637c" stroke-width="1.1"/><circle cx="13" cy="13" r="2.4" fill="#e3e3e3" stroke="#4c637c"/></svg>
+        System<span class="gear-badge" id="sysBadge" aria-hidden="true">1</span></button>
+    </div>
+  </div>
+
+  <!-- ================================================== Overview -->
+  <section class="pane" id="p-ov" role="tabpanel" aria-labelledby="t-ov">
+    <div class="gate" id="gate" role="region" aria-labelledby="gateH">
+      <svg class="gate__icon" viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2.5 24 22H2z" fill="#f2c14e" stroke="#9a6a08" stroke-linejoin="round"/><path d="M13 9v6.5" stroke="#3b2a05" stroke-width="2.2" stroke-linecap="round"/><circle cx="13" cy="18.8" r="1.3" fill="#3b2a05"/></svg>
+      <div class="gate__body">
+        <b id="gateH">Choose a real password</b>
+        <p>You’re signed in as <b>admin / admin</b>. Until you change it, the hub stays on this machine: no pairing, no providers, no group listening, no Discord bot and no remote access. The server enforces this, not this page.</p>
+        <form class="barrow" id="gateForm" novalidate>
+          <input class="field" type="password" id="pw1" placeholder="New password" aria-label="New password" autocomplete="new-password">
+          <input class="field" type="password" id="pw2" placeholder="Again" aria-label="New password again" autocomplete="new-password">
+          <button class="push push--default" type="submit">Set Password</button>
+        </form>
+        <p class="note note--bad" id="gateErr" hidden></p>
+      </div>
+    </div>
+    <div class="tiles" id="tiles"></div>
+    <fieldset>
+      <legend>Needs attention</legend>
+      <div class="well"><ul class="rows" id="rows-attn" aria-label="Needs attention"></ul></div>
+    </fieldset>
+    <fieldset style="margin-bottom:2px">
+      <legend>Provider health</legend>
+      <div class="well"><ul class="rows" id="rows-health" aria-label="Provider health"></ul></div>
+    </fieldset>
+  </section>
+
+  <!-- ================================================== Devices -->
+  <section class="pane" id="p-dev" role="tabpanel" aria-labelledby="t-dev" hidden>
+    <p class="lead">Players, companion apps and other hubs that may use this hub. Each gets only the permissions you tick when you pair it.</p>
+    <div class="split">
+      <fieldset style="margin:0">
+        <legend>Pair a device</legend>
+        <div class="pref" style="grid-template-columns:96px minmax(0,1fr)">
+          <label class="k" for="devKind">Device type:</label>
+          <div class="v"><select class="pop" id="devKind"><option value="player">Player</option><option value="companion">Windows companion</option><option value="hub">Another hub</option></select></div>
+        </div>
+        <p class="hint" style="margin:10px 0 4px"><b>What this device may do</b></p>
+        <div id="scopes" class="well" style="padding:4px 8px;background:transparent;box-shadow:none;border:0"></div>
+        <div class="barrow"><button class="push push--default" type="button" id="pairStart" data-gated>Start Pairing…</button><span class="note" data-gate-note style="margin:0">Choose a real password first.</span></div>
+      </fieldset>
+      <fieldset style="margin:0">
+        <legend>Pairing code</legend>
+        <div class="lcd" role="status" id="pairLcd">
+          <span class="lcd__code" id="pairCode">— — —</span>
+          <span class="lcd__sub" id="pairSub">Start pairing to get a code</span>
+        </div>
+        <p class="note">Enter it on the device. A code works once, for ten minutes, and the device’s fingerprint is shown here before you confirm it.</p>
+        <p class="hint" style="margin:12px 0 4px"><b>Pending pairings</b></p>
+        <div class="well"><ul class="rows" id="rows-pending" aria-label="Pending pairings"></ul></div>
+      </fieldset>
+    </div>
+    <fieldset style="margin:16px 0 2px">
+      <legend>Paired devices</legend>
+      <div class="well"><table class="tbl" id="tbl-devices"><colgroup><col><col style="width:22%"><col style="width:16%"><col style="width:18%" class="hide-sm"><col style="width:74px"></colgroup>
+        <thead><tr><th>Name</th><th>Type</th><th>Permissions</th><th class="hide-sm">Last seen</th><th></th></tr></thead><tbody></tbody></table></div>
+    </fieldset>
+  </section>
+
+  <!-- ================================================== Music -->
+  <section class="pane" id="p-music" role="tabpanel" aria-labelledby="t-music" hidden>
+    <p class="lead">What the hub plays from, where it looks things up, and what it may save. Everything here is shared by every paired device.</p>
+    <fieldset>
+      <legend>Library folders</legend>
+      <p class="hint">Paths inside the container’s data volume. The Windows companion’s folders arrive through it, not here.</p>
+      <div class="well"><table class="tbl" id="tbl-folders"><colgroup><col style="width:32%"><col class="hide-sm"><col style="width:72px"><col style="width:150px"></colgroup>
+        <thead><tr><th>Name</th><th class="hide-sm">Path</th><th class="num">Tracks</th><th></th></tr></thead><tbody></tbody></table></div>
+      <form class="barrow" id="folderForm" novalidate>
+        <input class="field" id="fName" placeholder="Display name" aria-label="Display name" style="flex:0 1 160px">
+        <input class="field" id="fPath" placeholder="/data/music/…" aria-label="Path inside the data volume">
+        <button class="push" type="submit">Add Folder</button>
+      </form>
+      <p class="note note--bad" id="folderErr" hidden>Use a path inside the data volume, starting with <b>/data/</b>.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Providers</legend>
+      <p class="hint">Used through their own APIs and within their terms. What each can do is what its terms allow, not what would be convenient.</p>
+      <div class="well"><table class="tbl" id="tbl-prov"><colgroup><col style="width:26%"><col class="hide-sm" style="width:18%"><col><col style="width:92px"></colgroup>
+        <thead><tr><th>Provider</th><th class="hide-sm">Role</th><th>What it can do</th><th></th></tr></thead><tbody></tbody></table></div>
+      <div id="provDetail" hidden style="margin-top:10px"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Downloads</legend>
+      <div class="well"><table class="tbl" id="tbl-jobs"><colgroup><col><col class="hide-sm" style="width:18%"><col style="width:12%"><col style="width:26%"></colgroup>
+        <thead><tr><th>Item</th><th class="hide-sm">From</th><th>Format</th><th>Progress</th></tr></thead><tbody></tbody></table></div>
+      <div class="pref" style="margin-top:10px">
+        <span class="k top">Output formats:</span>
+        <div class="v" id="formats"></div>
+        <span class="k">Storage:</span>
+        <div class="v"><span id="storeLine"></span></div>
+      </div>
+      <p class="note">A stream never implies a download. Where a provider doesn’t allow saving, there’s no button — not one that fails.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Live TV from the companion <span class="tag tag--plan">Planned</span></legend>
+      <p class="hint">The companion’s Live TV tab sends its channel playlists and guides here. The hub doesn’t keep them yet — this is where they’d be listed.</p>
+      <div class="well"><ul class="rows" id="rows-tv" aria-label="Live TV sources"></ul></div>
+    </fieldset>
+
+    <fieldset style="margin-bottom:2px">
+      <legend>Recommendations</legend>
+      <p class="hint">The same engine, names and limits as the player’s Settings ▸ Recommendations; these are the hub’s defaults for everyone.</p>
+      <div class="pref">
+        <label class="k" for="rExp">Exploration (0–1):</label><div class="v"><input class="field num" type="number" id="rExp" min="0" max="1" step="0.05" value="0.10"></div>
+        <label class="k" for="rHalf">Half-life (days):</label><div class="v"><input class="field num" type="number" id="rHalf" min="1" max="365" value="45"></div>
+        <label class="k" for="rMax">Most tracks per artist:</label><div class="v"><input class="field num" type="number" id="rMax" min="1" max="20" value="3"></div>
+      </div>
+    </fieldset>
+  </section>
+
+  <!-- ================================================== Groups -->
+  <section class="pane" id="p-grp" role="tabpanel" aria-labelledby="t-grp" hidden>
+    <p class="lead">Listening together: one queue, one clock, every member kept in step. Drift is how far each device is from the group’s clock.</p>
+    <fieldset>
+      <legend>Groups</legend>
+      <div class="well"><table class="tbl" id="tbl-groups"><colgroup><col><col style="width:30%"><col style="width:14%"><col style="width:74px"></colgroup>
+        <thead><tr><th>Group</th><th>State</th><th class="num">Members</th><th></th></tr></thead><tbody></tbody></table></div>
+      <div class="barrow"><input class="field" id="grpName" placeholder="New group’s name" maxlength="80" aria-label="New group’s name" style="width:220px" data-gated><button class="push" type="button" id="grpNew" data-gated>New Group</button></div>
+      <p class="note" data-gate-note>Group listening starts once a real password is set.</p>
+    </fieldset>
+    <div id="grpDetail"></div>
+  </section>
+
+  <!-- ================================================== Sharing -->
+  <section class="pane" id="p-share" role="tabpanel" aria-labelledby="t-share" hidden>
+    <fieldset>
+      <legend>Shared links</legend>
+      <p class="hint">Links that let someone without an account open a playlist or album. Unreachable to others until the hub has a public https address (System ▸ Network).</p>
+      <div class="well"><table class="tbl" id="tbl-shares"><colgroup><col style="width:28%"><col><col class="hide-sm" style="width:16%"><col style="width:74px"></colgroup>
+        <thead><tr><th>What</th><th>Link</th><th class="hide-sm">Expires</th><th></th></tr></thead><tbody></tbody></table></div>
+      <form class="barrow" id="shareForm">
+        <select class="pop" id="shWhat" aria-label="What to share"><option>Late Night (playlist)</option><option>Harbour Lights (album)</option><option>Road Trip (playlist)</option></select>
+        <select class="pop" id="shTtl" aria-label="Expires"><option value="1">1 day</option><option value="7" selected>7 days</option><option value="30">30 days</option><option value="0">Never</option></select>
+        <button class="push" type="submit" data-gated>Create Link</button>
+      </form>
+    </fieldset>
+    <fieldset style="margin-bottom:2px">
+      <legend>Discord bot</legend>
+      <p class="hint">Runs as its own container, so a Discord outage can’t take the hub down. Start it with <span class="mono">./nowplaying install --discord</span>.</p>
+      <div class="pref">
+        <span class="k">Status:</span>
+        <div class="v"><span class="sdot" id="botDot" aria-hidden="true" style="margin:0"></span><span id="botLine"></span></div>
+        <label class="k" for="botToken">Bot token:</label>
+        <div class="v"><input class="field" type="password" id="botToken" placeholder="Paste the token" data-gated><span class="sub" style="flex-basis:100%">Encrypted at rest with the installation key.</span></div>
+        <label class="k" for="botGuilds">Server allowlist:</label>
+        <div class="v"><input class="field mono" id="botGuilds" value="112233445566778899" data-gated></div>
+        <label class="k" for="botPrefix">Prefix:</label>
+        <div class="v"><input class="field num" id="botPrefix" value="!np" style="text-align:left" data-gated></div>
+        <label class="k" for="botDj">DJ role IDs:</label>
+        <div class="v"><input class="field mono" id="botDj" placeholder="Anyone may queue" data-gated></div>
+        <label class="k" for="botGroup">Group it controls:</label>
+        <div class="v"><select class="pop" id="botGroup" data-gated><option>Living Room</option><option>Office</option></select></div>
+        <span class="k"></span>
+        <div class="v"><button class="push push--default" type="button" id="botSave" data-gated>Save and Start</button><button class="push" type="button" id="botInvite" data-gated>Invite the Bot…</button></div>
+      </div>
+    </fieldset>
+  </section>
+
+  <!-- ================================================== System -->
+  <section class="pane" id="p-sys" role="tabpanel" aria-labelledby="t-sys" hidden>
+    <fieldset>
+      <legend>Network</legend>
+      <div class="pref">
+        <label class="k" for="bind">Reachable from:</label>
+        <div class="v"><select class="pop" id="bind" data-gated><option value="localhost">This machine only</option><option value="lan">Your network</option><option value="remote">The internet</option></select>
+          <span class="sub" style="flex-basis:100%" id="bindNote"></span></div>
+        <label class="k" for="endpoint">Public address:</label>
+        <div class="v"><input class="field mono" id="endpoint" placeholder="https://music.example.com" data-gated><span class="note note--bad" id="endErr" hidden style="flex-basis:100%;margin:0">Use an https address.</span></div>
+        <label class="k" for="proxies">Trusted proxies:</label>
+        <div class="v"><input class="field mono" id="proxies" placeholder="Leave empty unless a proxy you run sits in front" data-gated></div>
+        <label class="k" for="iplog">IPs in logs:</label>
+        <div class="v"><select class="pop" id="iplog"><option value="truncated">Truncated</option><option value="hashed">Hashed</option><option value="full">Full</option></select></div>
+      </div>
+      <p class="hint" style="margin:12px 0 4px"><b>What works where</b></p>
+      <div class="well"><table class="tbl" id="tbl-where"><colgroup><col><col style="width:20%"><col style="width:20%"><col style="width:20%"></colgroup>
+        <thead><tr><th></th><th>This machine</th><th>Your network</th><th>Internet</th></tr></thead><tbody></tbody></table></div>
+      <p class="note">The hub never opens a port for you: no UPnP, no hole punching, no relay. Changing the published port in <span class="mono">compose.yaml</span> is up to you.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Backup</legend>
+      <div class="pref">
+        <label class="k" for="bkPath">Save backups to:</label>
+        <div class="v"><input class="field mono" id="bkPath" value="/data/backups"><span class="note note--bad" id="bkPathErr" hidden style="flex-basis:100%;margin:0">Use a path inside the container, starting with /.</span>
+          <span class="sub" style="flex-basis:100%">A path inside the container. To keep backups off the data volume, mount a host folder there in <span class="mono">compose.yaml</span> — for example <span class="mono">/mnt/user/backups/airwave:/backups</span> — and use <span class="mono">/backups</span>.</span></div>
+        <span class="k top">Space:</span>
+        <div class="v" style="display:grid;gap:4px"><span id="bkSpace"></span><div class="bar spacebar" id="bkBar" role="img" style="width:min(360px,100%)"><i class="used"></i><i class="this"></i></div><span class="sub" id="bkSpaceKey"></span></div>
+        <span class="k top">Include:</span>
+        <div class="v" id="bkInc" style="display:grid;gap:4px"></div>
+        <label class="k" for="bkWhen">How often:</label>
+        <div class="v"><select class="pop" id="bkWhen"><option value="manual">Only when I click Back Up Now</option><option value="daily">Every night</option><option value="weekly" selected>Every week</option></select></div>
+        <label class="k" for="bkKeep">Keep:</label>
+        <div class="v"><select class="pop" id="bkKeep"><option value="4">The last 4</option><option value="8" selected>The last 8</option><option value="0">All of them</option></select></div>
+      </div>
+      <div class="well" style="margin-top:10px"><table class="tbl" id="tbl-backups"><colgroup><col><col style="width:20%"><col style="width:98px"></colgroup>
+        <thead><tr><th>Archive</th><th class="num">Size</th><th></th></tr></thead><tbody></tbody></table></div>
+      <div class="barrow"><button class="push" type="button" id="bkNow">Back Up Now</button><button class="push" type="button" data-say="Exports playlists, EQ presets and settings as one file.">Export…</button><button class="push" type="button" data-say="Imports a file exported from this or another hub.">Import…</button></div>
+      <p class="note" id="bkKeyNote">An archive with provider credentials holds the installation key, which decrypts them. Keep it as safe as a password.</p>
+    </fieldset>
+
+    <fieldset style="margin-bottom:2px">
+      <legend>Diagnostics</legend>
+      <div class="pref">
+        <label class="k" for="lvl">Log level:</label>
+        <div class="v"><select class="pop" id="lvl"><option>error</option><option>warn</option><option selected>info</option><option>debug</option></select><button class="push" type="button" data-say="Saves recent logs and the hub’s state as a .zip for a bug report.">Support Bundle…</button></div>
+      </div>
+      <div class="well" style="margin-top:10px"><pre class="log" id="log" aria-label="Log lines"></pre></div>
+    </fieldset>
+  </section>
+
+  <div class="status">
+    <span class="dot" id="hubDot"></span>
+    <span id="hubLine"></span>
+    <span class="spacer"></span>
+    <span id="countLine"></span>
+  </div>
+</div>
+<p class="plate">Mockup of the hub in the Docker container — every control works on sample data in this page; nothing is stored or sent anywhere.</p>
+</div>
+<script>
+(function () {
+  'use strict';
+  /* In-memory sample data. The shapes follow the hub's own contracts:
+     device kinds and permission scopes, provider roles and capabilities,
+     output formats, bind modes and IP logging. */
+  var $ = function (s) { return document.querySelector(s); };
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function esc(t) { return String(t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function btn(label, fn, cls, dis) { var b = el('button', 'push' + (cls ? ' ' + cls : ''), label); b.type = 'button'; if (dis) b.disabled = true; b.addEventListener('click', fn); return b; }
+
+  var H = {
+    gated: true,
+    devices: [
+      { name: 'Jalon’s Phone', kind: 'player', scopes: 6, seen: 'now', online: true },
+      { name: 'Airwave Companion — DESKTOP-7Q', kind: 'companion', scopes: 6, seen: '2 min ago', online: true },
+      { name: 'Living Room PC', kind: 'player', scopes: 5, seen: 'yesterday', online: false }
+    ],
+    pending: [],
+    folders: [
+      { name: 'Music', path: '/data/music', tracks: 4211 },
+      { name: 'Vinyl rips', path: '/data/music/vinyl', tracks: 601 }
+    ],
+    providers: [
+      { id: 'local', name: 'Hub library', role: 'Audio source', st: 'ok', caps: { Search: 'yes', Stream: 'yes', 'Group sync': 'yes', Download: 'yes' }, note: 'Files in the data volume. Downloads only of files you own.', auth: 'none' },
+      { id: 'companion', name: 'Windows companion library', role: 'Library', st: 'ok', caps: { Search: 'yes', Stream: 'part', 'Group sync': 'part', Download: 'part' }, note: 'Plays and downloads after the owning companion transfers a file.', auth: 'none' },
+      { id: 'musicbrainz', name: 'MusicBrainz', role: 'Metadata only', st: 'ok', caps: { Search: 'yes', Stream: 'no', 'Group sync': 'no', Download: 'no' }, note: 'Identifies and catalogues music; never an audio source. One request a second.', auth: 'email' },
+      { id: 'youtube', name: 'YouTube', role: 'Audio source (embed)', st: 'unconfigured', caps: { Search: 'yes', Stream: 'part', 'Group sync': 'part', Download: 'no' }, note: 'Plays in the browser through the official embed. No audio download. 10,000 API units a day.', auth: 'key' },
+      { id: 'soundcloud', name: 'SoundCloud', role: 'Audio source', st: 'ok', caps: { Search: 'yes', Stream: 'part', 'Group sync': 'part', Download: 'part' }, note: 'Streams tracks marked playable; downloads only where the artist allows it.', auth: 'oauth' },
+      { id: 'spotify', name: 'Spotify', role: 'Metadata and library import', st: 'degraded', caps: { Search: 'yes', Stream: 'part', 'Group sync': 'no', Download: 'no' }, note: 'Imports your likes and playlists. Playback only with Premium, in the browser. The app is in development mode, which limits who can sign in.', auth: 'oauth' },
+      { id: 'bandcamp', name: 'Bandcamp', role: 'Discovery and links', st: 'ok', caps: { Search: 'no', Stream: 'no', 'Group sync': 'no', Download: 'part' }, note: 'No public API. Links open at Bandcamp; purchases you download arrive through the companion as a .zip.', auth: 'none' },
+      { id: 'tool', name: 'External media tool (yt-dlp)', role: 'Tool', st: 'disabled', caps: { Search: 'no', Stream: 'no', 'Group sync': 'no', Download: 'part' }, note: 'Off by default. Only allowlisted sites, only content you own or may download, no cookies, no DRM bypass.', auth: 'admin' }
+    ],
+    formats: { original: true, mp3: true, aac: true, opus: false, flac: true },
+    jobs: [
+      { t: 'Harbour Lights — Blue Hour', from: 'Hub library', f: 'flac', p: 1 },
+      { t: 'Live at Pier 9 (set)', from: 'SoundCloud', f: 'original', p: 0.46 },
+      { t: 'Late Night (playlist, 14)', from: 'Hub library', f: 'mp3', p: 0 }
+    ],
+    tv: [
+      { url: 'https://iptv.example.com/basic.m3u8', what: '112 channels', from: 'DESKTOP-7Q' },
+      { url: 'https://iptv.example.com/guide.xml', what: '7-day guide', from: 'DESKTOP-7Q' }
+    ],
+    groups: [
+      { id: 'lr', name: 'Living Room', playing: true, track: 'Closing Hour — Fennel Grove', pos: 104, len: 236,
+        members: [{ d: 'Jalon’s Phone', ms: 4, g: 'exact' }, { d: 'Living Room PC', ms: 18, g: 'near' }, { d: 'Discord (Harbour server)', ms: 160, g: 'best_effort' }],
+        queue: ['Ember Line — Fennel Grove', 'Gantry — Cassette Bloom', 'Long Wave — Fennel Grove'],
+        hist: ['Blue Hour — Cassette Bloom · 12:02', 'Harbour Lights — Cassette Bloom · 11:58'],
+        invites: [{ code: 'K7Q2M4XP', role: 'member', exp: Date.now() + 5.5 * 36e5, by: 'admin' }, { code: 'BD29FW6H', role: 'member', exp: Date.now() - 1, by: 'Jalon’s Phone', used: 'Mara’s iPad' }] },
+      { id: 'of', name: 'Office', playing: false, track: 'Nothing playing', pos: 0, len: 0, members: [], queue: [], hist: ['Last Ferry — Cassette Bloom · yesterday'], invites: [] }
+    ],
+    grpSel: 'lr',
+    shares: [
+      { what: 'Late Night (playlist)', link: 'https://music.example.com/s/k7Q2mX', exp: 'in 5 days' },
+      { what: 'Harbour Lights (album)', link: 'https://music.example.com/s/9wPe3a', exp: 'never' }
+    ],
+    bot: false,
+    backups: [
+      { name: 'nowplaying-20260919T031500Z.tar.gz', size: '412 MB' },
+      { name: 'nowplaying-20260912T031500Z.tar.gz', size: '398 MB' }
+    ]
+  };
+  var SCOPES = [
+    ['library:read', 'Browse the library'], ['search:use', 'Search'], ['playlists:sync', 'Sync playlists'], ['eq:sync', 'Sync EQ presets'],
+    ['history:aggregate', 'Send listening totals'], ['history:events', 'Send each play'], ['group:member', 'Join groups'], ['group:admin', 'Run groups'],
+    ['downloads:request', 'Ask for downloads'], ['transfers:receive', 'Receive files'], ['files:serve', 'Serve its own files'], ['library:share', 'Share from the library'], ['shares:create', 'Create shared links']];
+  var DEF = {
+    player: ['library:read', 'search:use', 'playlists:sync', 'eq:sync', 'history:aggregate', 'group:member'],
+    companion: ['library:read', 'playlists:sync', 'eq:sync', 'history:aggregate', 'downloads:request', 'files:serve'],
+    hub: ['library:read', 'search:use']
+  };
+  var KIND = { player: 'Player', companion: 'Windows companion', hub: 'Hub' };
+
+  /* ---------- tabs ---------- */
+  var tabs = [].slice.call(document.querySelectorAll('.tool'));
+  function show(tab) { tabs.forEach(function (t) { var on = t === tab; t.setAttribute('aria-selected', on); t.tabIndex = on ? 0 : -1; document.getElementById(t.getAttribute('aria-controls')).hidden = !on; }); }
+  tabs.forEach(function (t, i) {
+    t.addEventListener('click', function () { show(t); });
+    t.addEventListener('keydown', function (e) { var d = { ArrowRight: 1, ArrowLeft: -1 }[e.key]; if (!d) return; e.preventDefault(); var n = tabs[(i + d + tabs.length) % tabs.length]; show(n); n.focus(); });
+  });
+
+  /* ---------- the first-run gate ---------- */
+  function gate() {
+    $('#gate').hidden = !H.gated;
+    [].forEach.call(document.querySelectorAll('[data-gated]'), function (x) { x.disabled = H.gated; });
+    [].forEach.call(document.querySelectorAll('[data-gate-note]'), function (x) { x.hidden = !H.gated; });
+    $('#sysBadge').hidden = !H.gated;
+    renderAll();
+  }
+  $('#gateForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var a = $('#pw1').value, b = $('#pw2').value, err = $('#gateErr');
+    var why = a.length < 10 ? 'Use at least 10 characters.' : a.toLowerCase() === 'admin' ? 'That’s the default password.' : a !== b ? 'The two don’t match.' : '';
+    err.textContent = why; err.hidden = !why;
+    if (why) return;
+    H.gated = false; gate();
+  });
+
+  /* ---------- overview ---------- */
+  var ST = { ok: ['ok', 'Working'], degraded: ['warn', 'Limited'], unconfigured: ['bad', 'Needs setting up'], disabled: ['', 'Off'], down: ['bad', 'Down'] };
+  function tile(h, big, sm, dot) { return '<div class="tile"><h3>' + (dot ? '<span class="sdot sdot--' + dot + '" style="margin:0"></span>' : '') + esc(h) + '</h3><span class="big">' + esc(big) + '</span><span class="sm">' + esc(sm) + '</span></div>'; }
+  function renderOverview() {
+    var on = H.devices.filter(function (d) { return d.online; }).length;
+    var tracks = H.folders.reduce(function (a, f) { return a + f.tracks; }, 0);
+    var good = H.providers.filter(function (p) { return p.st === 'ok'; }).length;
+    var live = H.groups.filter(function (g) { return g.playing; }).length;
+    $('#tiles').innerHTML =
+      tile('Hub', 'v2.3.0', 'Up 3 days · port 4546', 'ok') +
+      tile('Devices', H.devices.length + ' paired', on + ' online now', on ? 'ok' : '') +
+      tile('Groups', H.gated ? 'Off' : live + ' playing', H.gated ? 'Starts once a password is set' : H.groups.length + ' groups', H.gated ? '' : 'ok') +
+      tile('Library', tracks.toLocaleString('en-US') + ' tracks', H.folders.length + ' folders · scanned today') +
+      tile('Providers', good + ' of ' + H.providers.length + ' working', 'MusicBrainz, SoundCloud and more', good < H.providers.length ? 'warn' : 'ok') +
+      tile('Storage', '18.4 GB', 'Last backup ' + (H.backups[0].name.indexOf('0919') > 0 ? '2 days ago' : 'just now'));
+    var attn = [];
+    if (H.gated) attn.push(['bad', 'The admin password is still “admin”. Most of the hub is off until it’s changed.']);
+    H.providers.forEach(function (p) { if (p.st === 'unconfigured') attn.push(['bad', p.name + ' has no API key, so searching it is off.']); if (p.st === 'degraded') attn.push(['warn', p.name + ': the app is in development mode, which limits who can sign in.']); });
+    if ($('#bind').value === 'localhost' && !H.gated) attn.push(['', 'Reachable from this machine only. Change it in System ▸ Network when you want other devices in.']);
+    var ul = $('#rows-attn'); ul.textContent = '';
+    if (!attn.length) ul.appendChild(el('li')).appendChild(el('span', 'empty', 'Nothing needs you.'));
+    attn.forEach(function (a) { var li = el('li'); li.appendChild(el('span', 'sdot' + (a[0] ? ' sdot--' + a[0] : ''))).setAttribute('aria-hidden', 'true'); li.appendChild(el('span', null, a[1])); ul.appendChild(li); });
+    var hl = $('#rows-health'); hl.textContent = '';
+    H.providers.forEach(function (p) {
+      var li = el('li'); var s = ST[p.st];
+      li.appendChild(el('span', 'sdot' + (s[0] ? ' sdot--' + s[0] : ''))).setAttribute('aria-hidden', 'true');
+      var n = el('span', 'name'); n.appendChild(el('b', null, p.name)); li.appendChild(n);
+      li.appendChild(el('span', 'meta', s[1])); hl.appendChild(li);
+    });
+  }
+
+  /* ---------- devices ---------- */
+  function renderScopes() {
+    var kind = $('#devKind').value, box = $('#scopes'); box.textContent = '';
+    SCOPES.forEach(function (sc) {
+      var l = el('label', 'chk'); l.style.margin = '3px 0';
+      var i = el('input'); i.type = 'checkbox'; i.value = sc[0]; i.checked = DEF[kind].indexOf(sc[0]) >= 0;
+      l.appendChild(i); l.appendChild(el('span', 'box'));
+      var t = el('span', null, sc[1] + ' '); t.appendChild(el('span', 'sub mono', sc[0])); l.appendChild(t); box.appendChild(l);
+    });
+  }
+  $('#devKind').addEventListener('change', renderScopes);
+  var ttl = 0, timer = 0;
+  $('#pairStart').addEventListener('click', function () {
+    var n = document.querySelectorAll('#scopes input:checked').length;
+    if (!n) { $('#pairSub').textContent = 'Tick at least one thing the device may do.'; return; }
+    $('#pairCode').textContent = (100 + Math.floor(Math.random() * 900)) + ' ' + (100 + Math.floor(Math.random() * 900));
+    ttl = 600; clearInterval(timer);
+    timer = setInterval(function () { ttl--; $('#pairSub').textContent = 'Waiting for the device · ' + Math.floor(ttl / 60) + ':' + String(ttl % 60).padStart(2, '0'); if (ttl <= 0) { clearInterval(timer); $('#pairCode').textContent = '— — —'; $('#pairSub').textContent = 'Expired. Start again.'; } }, 1000);
+    $('#pairSub').textContent = 'Waiting for the device · 10:00';
+    /* the mockup's device answers after a moment */
+    setTimeout(function () { H.pending = [{ name: KIND[$('#devKind').value] + ' — new', kind: $('#devKind').value, fp: 'A1F3 9C2E 44B0', scopes: n }]; renderPending(); }, 1500);
+  });
+  function renderPending() {
+    var ul = $('#rows-pending'); ul.textContent = '';
+    if (!H.pending.length) { ul.appendChild(el('li')).appendChild(el('span', 'empty', 'None waiting.')); return; }
+    H.pending.forEach(function (p, i) {
+      var li = el('li'); var n = el('span', 'name'); n.appendChild(el('b', null, p.name)); n.appendChild(document.createTextNode('  ' + p.fp)); li.appendChild(n);
+      li.appendChild(btn('Confirm', function () { H.devices.unshift({ name: p.name, kind: p.kind, scopes: p.scopes, seen: 'now', online: true }); H.pending.splice(i, 1); clearInterval(timer); $('#pairCode').textContent = '— — —'; $('#pairSub').textContent = 'Paired. Start pairing to add another.'; renderAll(); }, 'push--default'));
+      li.appendChild(btn('Refuse', function () { H.pending.splice(i, 1); renderPending(); }));
+      ul.appendChild(li);
+    });
+  }
+  function renderDevices() {
+    var tb = $('#tbl-devices tbody'); tb.textContent = '';
+    H.devices.forEach(function (d, i) {
+      var tr = el('tr');
+      var td = el('td'); td.appendChild(el('span', 'sdot' + (d.online ? ' sdot--ok' : ''))).style.cssText = 'display:inline-block;margin:0 6px 0 0;vertical-align:-1px'; td.appendChild(document.createTextNode(d.name)); tr.appendChild(td);
+      tr.appendChild(el('td', null, KIND[d.kind])); tr.appendChild(el('td', null, d.scopes + ' of ' + SCOPES.length)); tr.appendChild(el('td', 'hide-sm', d.seen));
+      var a = el('td', 'acts'); a.appendChild(btn('Revoke', function () { H.devices.splice(i, 1); renderAll(); })); tr.appendChild(a);
+      tb.appendChild(tr);
+    });
+  }
+
+  /* ---------- music ---------- */
+  function renderFolders() {
+    var tb = $('#tbl-folders tbody'); tb.textContent = '';
+    H.folders.forEach(function (f, i) {
+      var tr = el('tr'); var nm = el('td', null, f.name); nm.title = f.path; tr.appendChild(nm); tr.appendChild(el('td', 'mono hide-sm', f.path)); tr.appendChild(el('td', 'num', f.tracks.toLocaleString('en-US')));
+      var a = el('td', 'acts');
+      a.appendChild(btn('Scan', function (e) { var b = e.currentTarget; b.disabled = true; b.textContent = 'Scanning…'; setTimeout(function () { f.tracks += Math.floor(Math.random() * 6); renderAll(); }, 900); }));
+      a.appendChild(btn('Remove', function () { H.folders.splice(i, 1); renderAll(); }));
+      tr.appendChild(a); tb.appendChild(tr);
+    });
+  }
+  $('#folderForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var p = $('#fPath').value.trim(), n = $('#fName').value.trim(), ok = /^\/data\/\S+/.test(p);
+    $('#folderErr').hidden = ok; if (!ok) return;
+    H.folders.push({ name: n || p.split('/').pop(), path: p, tracks: 0 }); $('#fPath').value = ''; $('#fName').value = ''; renderAll();
+  });
+  var CAPW = { yes: 'cap--yes', part: 'cap--part', no: 'cap--no' };
+  function renderProviders() {
+    var tb = $('#tbl-prov tbody'); tb.textContent = '';
+    H.providers.forEach(function (p) {
+      var tr = el('tr'), s = ST[p.st];
+      var td = el('td'); td.appendChild(el('span', 'sdot' + (s[0] ? ' sdot--' + s[0] : ''))).style.cssText = 'display:inline-block;margin:0 6px 0 0;vertical-align:-1px'; td.appendChild(el('b', null, p.name)); td.title = s[1]; tr.appendChild(td);
+      tr.appendChild(el('td', 'hide-sm', p.role));
+      var c = el('td'); var w = el('span', 'caps'); Object.keys(p.caps).forEach(function (k) { var x = el('span', 'cap ' + CAPW[p.caps[k]], k); x.title = k + ': ' + { yes: 'yes', part: 'partly — see details', no: 'no' }[p.caps[k]]; w.appendChild(x); }); c.appendChild(w); tr.appendChild(c);
+      var a = el('td', 'acts'); a.appendChild(btn(p.auth === 'none' ? 'Details' : 'Set Up', function () { showProvider(p); }, null, H.gated && p.auth !== 'none')); tr.appendChild(a);
+      tb.appendChild(tr);
+    });
+  }
+  function showProvider(p) {
+    var box = $('#provDetail'); box.hidden = false;
+    var fields = { key: '<label class="k" for="pk">API key:</label><div class="v"><input class="field mono" id="pk" type="password" placeholder="From the Google Cloud console"></div>',
+      oauth: '<label class="k" for="pc">Client ID:</label><div class="v"><input class="field mono" id="pc" value="' + (p.st === 'ok' || p.st === 'degraded' ? '4f0c…e21a' : '') + '"></div><label class="k" for="ps">Client secret:</label><div class="v"><input class="field mono" id="ps" type="password" value="••••••••"></div>',
+      email: '<label class="k" for="pe">Contact email:</label><div class="v"><input class="field" id="pe" value="jalon@example.com"></div>',
+      admin: '<span class="k"></span><div class="v"><label class="chk"><input type="checkbox" id="toolOn"' + (p.st !== 'disabled' ? ' checked' : '') + '><span class="box"></span><span>Turn on, for content I own or may download</span></label></div>',
+      none: '' }[p.auth];
+    box.innerHTML = '<div class="tile"><h3>' + esc(p.name) + ' <span class="sub">· ' + esc(p.role) + '</span></h3><p style="margin:4px 0 10px">' + esc(p.note) + '</p>' +
+      (fields ? '<div class="pref">' + fields + '<span class="k"></span><div class="v"><button class="push push--default" type="button" id="provSave">Save and Test</button><span class="note" id="provMsg" style="margin:0"></span></div></div>' : '') + '</div>';
+    var sv = $('#provSave');
+    if (sv) sv.addEventListener('click', function () {
+      $('#provMsg').textContent = 'Testing…';
+      setTimeout(function () {
+        if (p.auth === 'key') { var ok = ($('#pk').value || '').length > 10; p.st = ok ? 'ok' : 'unconfigured'; $('#provMsg').textContent = ok ? 'Key works. Searching YouTube is on.' : 'That key was refused.'; }
+        else if (p.auth === 'admin') { p.st = $('#toolOn').checked ? 'ok' : 'disabled'; $('#provMsg').textContent = p.st === 'ok' ? 'On. Only allowlisted sites.' : 'Off.'; }
+        else $('#provMsg').textContent = 'Connected.';
+        renderAll();
+      }, 700);
+    });
+  }
+  function renderJobs() {
+    var tb = $('#tbl-jobs tbody'); tb.textContent = '';
+    H.jobs.forEach(function (j) {
+      var tr = el('tr'); tr.appendChild(el('td', null, j.t)); tr.appendChild(el('td', 'hide-sm', j.from)); tr.appendChild(el('td', 'mono', j.f));
+      var td = el('td'); if (j.p >= 1) td.appendChild(el('span', 'ok', '✓ Done')); else if (!j.p) td.appendChild(el('span', 'sub', 'Waiting')); else { var b = el('div', 'bar'); b.appendChild(el('i')).style.width = Math.round(j.p * 100) + '%'; b.title = Math.round(j.p * 100) + '%'; td.appendChild(b); }
+      tr.appendChild(td); tb.appendChild(tr);
+    });
+    var box = $('#formats'); if (!box.childNodes.length) Object.keys(H.formats).forEach(function (k) {
+      var l = el('label', 'chk'); var i = el('input'); i.type = 'checkbox'; i.checked = H.formats[k]; i.addEventListener('change', function () { H.formats[k] = i.checked; });
+      l.appendChild(i); l.appendChild(el('span', 'box')); l.appendChild(el('span', null, { original: 'Original', mp3: 'MP3', aac: 'AAC', opus: 'Opus', flac: 'FLAC' }[k])); box.appendChild(l);
+    });
+    $('#storeLine').textContent = '/data/downloads · 6.1 GB used · 212 GB free';
+  }
+  setInterval(function () { H.jobs.forEach(function (j) { if (j.p > 0 && j.p < 1) j.p = Math.min(1, j.p + 0.03); }); if (H.jobs[1].p >= 1 && !H.jobs[2].p) H.jobs[2].p = 0.02; renderJobs(); }, 1200);
+  function renderTv() {
+    var ul = $('#rows-tv'); ul.textContent = '';
+    H.tv.forEach(function (t) { var li = el('li'); li.appendChild(el('span', 'name', t.url)); li.appendChild(el('span', 'meta', t.what + ' · from ' + t.from)); ul.appendChild(li); });
+  }
+
+  /* ---------- groups ---------- */
+  function fmt(s) { return Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0'); }
+  function renderGroups() {
+    var tb = $('#tbl-groups tbody'); tb.textContent = '';
+    H.groups.forEach(function (g) {
+      var tr = el('tr'); tr.appendChild(el('td', null, g.name));
+      var st = el('td'); if (g.playing && !H.gated) st.innerHTML = '<span class="eqz" aria-hidden="true"><i></i><i></i><i></i></span>Playing'; else st.textContent = H.gated ? 'Off' : 'Paused'; tr.appendChild(st);
+      tr.appendChild(el('td', 'num', String(g.members.length)));
+      var a = el('td', 'acts'); a.appendChild(btn('Open', function () { H.grpSel = g.id; renderGroups(); }, null, H.gated)); tr.appendChild(a);
+      tb.appendChild(tr);
+    });
+    var g = H.groups.filter(function (x) { return x.id === H.grpSel; })[0], d = $('#grpDetail');
+    if (!g || H.gated) { d.innerHTML = ''; return; }
+    var GR = { exact: ['ok', 'exact'], near: ['ok', 'near'], best_effort: ['warn', 'best effort'] };
+    d.innerHTML = '<fieldset><legend>' + esc(g.name) + '</legend><div class="split">' +
+      '<div><p class="hint"><b>State</b></p><div class="tile"><span class="sm">' + (g.playing ? 'Playing' : 'Paused') + '</span><span class="big" style="font-size:15px;font-weight:700">' + esc(g.track) + '</span>' +
+        (g.len ? '<div class="bar" style="margin:8px 0 4px"><i id="gpos" style="width:' + (g.pos / g.len * 100) + '%"></i></div><span class="sm mono" id="gtime">' + fmt(g.pos) + ' / ' + fmt(g.len) + '</span>' : '') + '</div>' +
+        '<div class="barrow"><button class="push" type="button" id="gPlay">' + (g.playing ? 'Pause' : 'Play') + '</button><button class="push" type="button" id="gSkip"' + (g.queue.length ? '' : ' disabled') + '>Skip</button></div>' +
+        '<p class="hint" style="margin-top:12px"><b>Members and drift</b></p><div class="well"><ul class="rows">' +
+        (g.members.length ? g.members.map(function (m) { return '<li><span class="name"><b>' + esc(m.d) + '</b></span><span class="drift ' + GR[m.g][0] + '">' + (m.ms >= 0 ? '+' : '') + m.ms + ' ms</span><span class="meta">' + GR[m.g][1] + '</span></li>'; }).join('') : '<li><span class="empty">Nobody has joined.</span></li>') + '</ul></div></div>' +
+      '<div><p class="hint"><b>Queue</b></p><div class="well"><ul class="rows">' + (g.queue.length ? g.queue.map(function (q, i) { return '<li><span class="meta">' + (i + 1) + '</span><span class="name"><b>' + esc(q) + '</b></span></li>'; }).join('') : '<li><span class="empty">Empty.</span></li>') + '</ul></div>' +
+        '<p class="hint" style="margin-top:12px"><b>Recent history</b></p><div class="well"><ul class="rows plain">' + (g.hist.length ? g.hist.map(function (h) { return '<li><span class="name">' + esc(h) + '</span></li>'; }).join('') : '<li><span class="empty">Nothing played yet.</span></li>') + '</ul></div></div>' +
+      '</div><p class="note">Discord members follow at best effort: the bot gets the same queue, but a voice channel can’t be timed to the millisecond.</p></fieldset>' +
+      '<fieldset><legend>Invites to ' + esc(g.name) + '</legend>' +
+        '<p class="hint">Each invite lets one person join, then stops working. Send the link: it opens the invite page in Now Playing, where they join or decline. Someone who isn’t paired yet is asked to pair first.</p>' +
+        '<div class="pref"><label class="k" for="invTtl">Works for:</label><div class="v"><select class="pop" id="invTtl"><option value="1">1 hour</option><option value="6">6 hours</option><option value="24" selected>24 hours</option></select></div>' +
+        '<label class="k" for="invRole">Joins as:</label><div class="v"><select class="pop" id="invRole"><option value="member" selected>Member — can add to the queue</option><option value="guest">Guest — listens only</option><option value="admin">Admin — can invite and remove people</option></select></div>' +
+        '<span class="k"></span><div class="v"><button class="push push--default" type="button" id="invMake">Make Invite Link</button></div></div>' +
+        '<div id="invNew"></div>' +
+        '<div class="well" style="margin-top:10px"><table class="tbl" id="tbl-inv"><colgroup><col style="width:24%"><col style="width:16%"><col><col style="width:98px"></colgroup>' +
+          '<thead><tr><th>Code</th><th>Role</th><th>State</th><th></th></tr></thead><tbody>' +
+          (g.invites.length ? g.invites.map(function (v, i) {
+            var dead = v.used || v.exp < Date.now(), left = Math.round((v.exp - Date.now()) / 36e5 * 10) / 10;
+            return '<tr><td class="mono">' + esc(v.code) + '</td><td>' + esc(v.role.charAt(0).toUpperCase() + v.role.slice(1)) + '</td><td>' +
+              (v.used ? 'Used by ' + esc(v.used) : v.exp < Date.now() ? 'Expired' : 'Open · ' + (left < 1 ? Math.max(1, Math.round(left * 60)) + ' min' : left + ' h') + ' left') + ' <span class="sub">· made by ' + esc(v.by) + '</span></td>' +
+              '<td class="acts">' + (dead ? '' : '<button class="push" type="button" data-inv-x="' + i + '">Withdraw</button>') + '</td></tr>';
+          }).join('') : '<tr><td colspan="4" class="empty">No invites yet.</td></tr>') +
+        '</tbody></table></div>' +
+        '<p class="note">Listing and withdrawing invites, and sending one to a person, are the routes docs/hub-group-invites.md adds. Today the hub makes codes and joins with them.</p></fieldset>';
+    $('#invMake').addEventListener('click', function () {
+      var code = Array.from({ length: 8 }, function () { return 'ABCDEFGHJKMNPQRSTVWXYZ23456789'.charAt(Math.floor(Math.random() * 30)); }).join('');
+      var v = { code: code, role: $('#invRole').value, exp: Date.now() + (+$('#invTtl').value) * 36e5, by: 'admin' };
+      g.invites.unshift(v);
+      var hub = ($('#endpoint').value.trim() || 'http://192.168.1.20:4546').replace(/\/+$/, '');
+      var link = 'now-playing.html#invite/' + code + '?hub=' + encodeURIComponent(hub) + '&g=' + encodeURIComponent(g.name).replace(/%20/g, '+') + '&from=admin' + (v.role !== 'member' ? '&r=' + v.role : '');
+      renderGroups();
+      $('#invNew').innerHTML = '<div class="tile" style="margin-top:10px"><span class="sm">New invite · works once · ' + $('#invTtl').selectedOptions[0].textContent + '</span><span class="invcode">' + code + '</span>' +
+        '<div class="barrow"><input class="field mono" readonly id="invLink" aria-label="Invite link" style="flex:1;min-width:0" value="' + esc(link) + '"><button class="push push--default" type="button" id="invCopy">Copy Link</button></div></div>';
+      $('#invCopy').addEventListener('click', function () { $('#invLink').select(); say('Copied the invite link for ' + g.name + '.'); });
+      log('info', 'group ' + g.id + ': invite created (' + v.role + ', ' + $('#invTtl').value + ' h)');
+    });
+    [].forEach.call(d.querySelectorAll('[data-inv-x]'), function (b) { b.addEventListener('click', function () { var v = g.invites[+b.dataset.invX]; v.exp = Date.now() - 1; v.used = null; renderGroups(); say('Withdrew invite ' + v.code + '.'); }); });
+    $('#gPlay').addEventListener('click', function () { g.playing = !g.playing; renderAll(); });
+    var sk = $('#gSkip'); if (sk) sk.addEventListener('click', function () { g.hist.unshift(g.track.split(' · ')[0] + ' · now'); g.track = g.queue.shift(); g.pos = 0; renderAll(); });
+  }
+  $('#grpNew').addEventListener('click', function () {
+    var n = $('#grpName').value.trim();
+    if (!n) { $('#grpName').focus(); say('Name the group first.'); return; }
+    var id = 'g' + Date.now().toString(36);
+    H.groups.push({ id: id, name: n.slice(0, 80), playing: false, track: 'Nothing playing', pos: 0, len: 0, members: [], queue: [], hist: [], invites: [] });
+    H.grpSel = id; $('#grpName').value = '';
+    renderAll(); log('info', 'group ' + id + ': created “' + n + '”');
+    say('Created “' + n + '”. Make an invite link below to bring people in.');
+  });
+  $('#grpName').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('#grpNew').click(); });
+  setInterval(function () {
+    H.groups.forEach(function (g) { if (g.playing && g.len && !H.gated) { g.pos += 1; if (g.pos >= g.len) g.pos = 0; } });
+    var g = H.groups.filter(function (x) { return x.id === H.grpSel; })[0];
+    if (g && $('#gpos')) { $('#gpos').style.width = (g.pos / g.len * 100) + '%'; $('#gtime').textContent = fmt(g.pos) + ' / ' + fmt(g.len); }
+  }, 1000);
+
+  /* ---------- sharing ---------- */
+  function renderShares() {
+    var tb = $('#tbl-shares tbody'); tb.textContent = '';
+    if (!H.shares.length) { var tr0 = el('tr'); var c0 = el('td', 'sub', 'No shared links.'); c0.colSpan = 4; tr0.appendChild(c0); tb.appendChild(tr0); }
+    H.shares.forEach(function (s, i) {
+      var tr = el('tr'); tr.appendChild(el('td', null, s.what)); tr.appendChild(el('td', 'mono', s.link)); tr.appendChild(el('td', 'hide-sm', s.exp));
+      var a = el('td', 'acts'); a.appendChild(btn('Revoke', function () { H.shares.splice(i, 1); renderShares(); })); tr.appendChild(a); tb.appendChild(tr);
+    });
+  }
+  $('#shareForm').addEventListener('submit', function (e) {
+    e.preventDefault(); var d = +$('#shTtl').value;
+    H.shares.unshift({ what: $('#shWhat').value, link: 'https://music.example.com/s/' + Math.random().toString(36).slice(2, 8), exp: d ? 'in ' + d + (d === 1 ? ' day' : ' days') : 'never' }); renderShares();
+  });
+  function renderBot() {
+    var dot = $('#botDot'); dot.className = 'sdot' + (H.bot ? ' sdot--ok' : '');
+    $('#botLine').textContent = H.gated ? 'Off until a real password is set.' : H.bot ? 'Online in 1 server · controls “' + $('#botGroup').value + '”' : 'Not running. Paste a token and start it.';
+  }
+  $('#botSave').addEventListener('click', function () { if (($('#botToken').value || '').length < 20) { $('#botLine').textContent = 'That doesn’t look like a bot token.'; return; } H.bot = true; renderBot(); });
+  $('#botInvite').addEventListener('click', function () { $('#botLine').textContent = 'Opens Discord’s invite page for this bot. (Mockup — nothing opens here.)'; });
+
+  /* ---------- system ---------- */
+  var WHERE = [
+    ['Player and companion', ['yes', 'lan', 'remote']], ['Pairing', ['yes', 'lan', 'remote']], ['Group listening', ['yes', 'lan', 'remote']],
+    ['Shared links', ['no', 'no', 'endpoint']], ['Admin (this page)', ['yes', 'lan', 'remote']]];
+  function renderNet() {
+    var m = $('#bind').value, lvl = { localhost: 0, lan: 1, remote: 2 }[m], hasEnd = /^https:\/\//.test($('#endpoint').value.trim());
+    $('#bindNote').textContent = H.gated ? 'Stays on this machine until a real password is set.' : { localhost: 'Only this computer can reach the hub.', lan: 'Devices on your home network can reach it. Also publish the port in compose.yaml.', remote: 'Needs a public https address and a proxy or tunnel you run.' }[m];
+    var tb = $('#tbl-where tbody'); tb.textContent = '';
+    WHERE.forEach(function (w) {
+      var tr = el('tr'); tr.appendChild(el('td', null, w[0]));
+      [0, 1, 2].forEach(function (i) {
+        var need = w[1][i], ok = need === 'yes' || (need === 'lan' && lvl >= 1) || (need === 'remote' && lvl >= 2) || (need === 'endpoint' && hasEnd && lvl >= 1);
+        if (H.gated && i > 0) ok = false;
+        var td = el('td', ok ? 'ok' : 'sub', ok ? '✓' : '—'); tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+  }
+  $('#bind').addEventListener('change', function () { renderNet(); renderOverview(); });
+  $('#endpoint').addEventListener('change', function () { var v = this.value.trim(); $('#endErr').hidden = !v || /^https:\/\//.test(v); renderNet(); });
+  var BK_INC = [['library', 'Library index and artwork', true, 380], ['playlists', 'Playlists', true, 1], ['eq', 'EQ presets', true, 0.1], ['algo', 'Recommendation algorithms', true, 0.1], ['profiles', 'Profiles and shared playlists', true, 12], ['groups', 'Groups and their history', true, 4], ['creds', 'Settings and provider credentials', true, 0.5]];
+  var bkOn = {}; BK_INC.forEach(function (x) { bkOn[x[0]] = x[2]; });
+  (function () {
+    var box = $('#bkInc');
+    BK_INC.forEach(function (x) {
+      var l = el('label', 'chk'); var i = el('input'); i.type = 'checkbox'; i.checked = x[2];
+      i.addEventListener('change', function () { bkOn[x[0]] = i.checked; $('#bkKeyNote').hidden = !bkOn.creds; renderBackups(); });
+      l.appendChild(i); l.appendChild(el('span', 'box')); l.appendChild(el('span', null, x[1])); box.appendChild(l);
+    });
+    $('#bkPath').addEventListener('change', function () { $('#bkPathErr').hidden = /^\/\S*/.test(this.value.trim()); renderBackups(); });
+    $('#bkKeep').addEventListener('change', function () { renderBackups(); });
+  })();
+  function renderBackups() {
+    var tb = $('#tbl-backups tbody'); tb.textContent = '';
+    var keep = +$('#bkKeep').value; if (keep) H.backups = H.backups.slice(0, keep);
+    var need = BK_INC.filter(function (x) { return bkOn[x[0]]; }).reduce(function (a, x) { return a + x[3]; }, 0);
+    var path = $('#bkPath').value.trim(), onHost = /^\/backups(\/|$)/.test(path);
+    var disk = onHost ? [1840, 4000, 'the host folder mounted at /backups'] : [212, 480, 'the data volume'];   /* GB free, GB total */
+    var short = need / 1000 > disk[0], used = disk[1] - disk[0];
+    $('#bkSpace').innerHTML = '<b>' + disk[0] + ' GB free</b> of ' + disk[1] + ' GB on ' + disk[2] + ' · each archive is about ' + (need >= 1000 ? (need / 1000).toFixed(1) + ' GB' : Math.max(1, Math.round(need)) + ' MB') +
+      ', ' + ($('#bkKeep').value === '0' ? 'and every one is kept' : 'and ' + $('#bkKeep').value + ' are kept (about ' + Math.round(need * +$('#bkKeep').value / 100) / 10 + ' GB)');
+    var bar = $('#bkBar'); bar.classList.toggle('is-short', short);
+    bar.querySelector('.used').style.width = (used / disk[1] * 100) + '%';
+    bar.querySelector('.this').style.left = (used / disk[1] * 100) + '%';
+    bar.querySelector('.this').style.width = Math.max(0.6, Math.min(need / 1000, disk[0]) / disk[1] * 100) + '%';
+    bar.setAttribute('aria-label', used + ' GB used, this backup ' + Math.round(need) + ' MB, ' + disk[0] + ' GB free');
+    $('#bkSpaceKey').textContent = onHost ? 'Measured inside the container, so it’s the host folder’s own disk.' : 'Backups on the data volume share its space with the library and downloads. Mount a host folder at /backups to keep them apart.';
+    $('#bkNow').disabled = !Object.keys(bkOn).some(function (k) { return bkOn[k]; }) || !/^\/\S*/.test(path) || short;
+    H.backups.forEach(function (b) { var tr = el('tr'); var nm = el('td', 'mono', (b.dir || '/data/backups') + '/' + b.name); nm.title = b.inc || ''; tr.appendChild(nm); tr.appendChild(el('td', 'num', b.size)); var a = el('td', 'acts'); a.appendChild(btn('Download', function () { say('Downloads ' + b.name + '.'); })); tr.appendChild(a); tb.appendChild(tr); });
+  }
+  $('#bkNow').addEventListener('click', function () {
+    var b = this; b.disabled = true; b.textContent = 'Backing Up…';
+    setTimeout(function () { var d = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15); var inc = BK_INC.filter(function (x) { return bkOn[x[0]]; }); H.backups.unshift({ name: 'nowplaying-' + d + 'Z.tar.gz', dir: $('#bkPath').value.trim().replace(/\/+$/, ''), inc: inc.map(function (x) { return x[1]; }).join(', '), size: Math.round(inc.reduce(function (a, x) { return a + x[3]; }, 0)) + ' MB' }); b.disabled = false; b.textContent = 'Back Up Now'; renderAll(); log('info', 'backup written: ' + H.backups[0].name); }, 1200);
+  });
+  var LOG = [['info', 'hub listening on 0.0.0.0:4546 (published 127.0.0.1:4546)'], ['info', 'library scan: /data/music — 4211 tracks, 0 changed'], ['warn', 'provider youtube: no api key; search disabled'], ['info', 'group living-room: member joined (Jalon’s Phone, drift +4 ms)'], ['info', 'transfer from companion DESKTOP-7Q: 3 files, verified']];
+  function log(l, t) { LOG.push([l, t]); renderLog(); }
+  function renderLog() {
+    var lv = ['error', 'warn', 'info', 'debug'].indexOf($('#lvl').value), pre = $('#log');
+    pre.innerHTML = LOG.filter(function (x) { return ['error', 'warn', 'info', 'debug'].indexOf(x[0]) <= lv; }).map(function (x, i) { return '<span class="' + (x[0] === 'warn' ? 'w' : x[0] === 'error' ? 'e' : '') + '">12:0' + (i % 10) + ':1' + i + ' ' + x[0].toUpperCase().padEnd(5) + ' ' + esc(x[1]) + '</span>'; }).join('\n');
+  }
+  $('#lvl').addEventListener('change', renderLog);
+  function say(t) { $('#hubLine').textContent = t + ' (Mockup — nothing happens.)'; setTimeout(sync, 3000); }
+  [].forEach.call(document.querySelectorAll('[data-say]'), function (b) { b.addEventListener('click', function () { say(b.dataset.say); }); });
+
+  /* ---------- status strip ---------- */
+  function sync() {
+    var m = { localhost: 'this machine only', lan: 'your network', remote: 'the internet' }[H.gated ? 'localhost' : $('#bind').value];
+    $('#hubLine').textContent = 'Hub running · 127.0.0.1:4546 · reachable from ' + m;
+    $('#countLine').textContent = H.devices.length + ' devices · ' + H.folders.length + ' folders · ' + H.groups.filter(function (g) { return g.playing && !H.gated; }).length + ' playing';
+  }
+  function renderAll() { renderOverview(); renderPending(); renderDevices(); renderFolders(); renderProviders(); renderJobs(); renderTv(); renderGroups(); renderShares(); renderBot(); renderNet(); renderBackups(); renderLog(); sync(); }
+  renderScopes(); gate();
+  var tabFromHash = { '#devices': 't-dev', '#music': 't-music', '#groups': 't-grp', '#sharing': 't-share', '#system': 't-sys' }[location.hash];
+  if (tabFromHash) show(document.getElementById(tabFromHash));
+})();
+</script>
+</body>
+</html>

@@ -6,18 +6,18 @@
   "sources": {
     "designs": {
       "paths": [
-        "design/frontends/airwave-now-playing.html",
-        "design/frontends/airwave-hub.html",
-        "design/frontends/airwave-companion.html"
+        "design/frontends/origin/airwave-now-playing.html",
+        "design/frontends/origin/airwave-hub.html",
+        "design/frontends/origin/airwave-companion.html"
       ],
-      "owns": "How each app looks. The player is the first file served as a shell (music-player/scripts/make-shell.py writes music-player/index.html from it); the hub and the companion are drawn with stylesheets generated from the other two."
+      "owns": "Where each app's look began: the owner's three hand-made designs, frozen as history (DEC-038). They are still the generators' inputs — music-player/scripts/make-shell.py writes music-player/index.html from the player's, and packages/aqua-ui/scripts/make-window-css.py writes the window stylesheets from the other two — but they are not edited: a change is a new asserted step in the generator, or a change to the product's own source."
     },
     "windowStylesheets": {
       "paths": [
         "packages/aqua-ui/src/styles/airwave-window.css",
         "packages/aqua-ui/src/styles/airwave-hub.css"
       ],
-      "owns": "What the hub and the companion wear: the window designs’ own CSS, copied out by packages/aqua-ui/scripts/make-window-css.py (pnpm build:window-css). Generated — change the design file, never these."
+      "owns": "What the hub and the companion wear: the window designs’ own CSS, copied out by packages/aqua-ui/scripts/make-window-css.py (pnpm build:window-css). Generated — never edited by hand; a change to the window kit is an asserted edit in make-window-css.py (DEC-038)."
     },
     "windowArt": {
       "path": "packages/aqua-ui/src/airwave/aqua-art.ts",
@@ -96,6 +96,54 @@
       "discordTemplates": "packages/domain/src/templates.ts"
     }
   },
+  "mockups": {
+    "about": "The living mockups (DEC-038): one standalone file per app, rendered from the app itself by pnpm mockups:build — each screen and state as the app drew it on sample data, beside the app's own stylesheets, readable and editable by hand. They are generated: an app change must regenerate them (pnpm verify's mockups-up-to-date; pnpm styleguide:check compares each file's inputs stamp), and an owner's edit to one is carried into the app by the workflow in AGENTS.md ('Living mockups'), never the other way round.",
+    "tool": "scripts/mockups",
+    "fixtures": [
+      "scripts/mockups/fixtures/player.json",
+      "scripts/mockups/fixtures/hub.json",
+      "scripts/mockups/fixtures/companion.mjs"
+    ],
+    "files": {
+      "player": {
+        "path": "design/frontends/airwave-now-playing.html",
+        "inputs": [
+          "music-player/index.html",
+          "music-player/src/shell",
+          "music-player/vite.config.ts"
+        ]
+      },
+      "hub": {
+        "path": "design/frontends/airwave-hub.html",
+        "inputs": [
+          "docker-container/src/web",
+          "packages/aqua-ui/src/styles/airwave-window.css",
+          "packages/aqua-ui/src/styles/airwave-hub.css",
+          "packages/aqua-ui/src/airwave/aqua-art.ts"
+        ]
+      },
+      "companion": {
+        "path": "design/frontends/airwave-companion.html",
+        "inputs": [
+          "windows-companion/src/renderer",
+          "windows-companion/src/shared",
+          "packages/aqua-ui/src/styles/airwave-window.css",
+          "packages/aqua-ui/src/airwave/aqua-art.ts"
+        ]
+      }
+    }
+  },
+  "generated": [
+    "music-player/index.html",
+    "packages/aqua-ui/src/styles/airwave-window.css",
+    "packages/aqua-ui/src/styles/airwave-hub.css",
+    "design/frontends/airwave-now-playing.html",
+    "design/frontends/airwave-hub.html",
+    "design/frontends/airwave-companion.html",
+    "docs/design/styleguide.html",
+    "docs/design/styleguide.pdf",
+    "now-playing.html"
+  ],
   "guide": {
     "source": "packages/aqua-ui/styleguide",
     "entry": "packages/aqua-ui/styleguide/Styleguide.tsx",
@@ -146,7 +194,7 @@
       "product": "player",
       "path": "music-player",
       "imports": [
-        "design/frontends/airwave-now-playing.html, served as music-player/index.html: imports nothing from aqua-ui",
+        "design/frontends/origin/airwave-now-playing.html, served as music-player/index.html: imports nothing from aqua-ui",
         "@now-playing/aqua-ui and @now-playing/aqua-ui/now-playing.css: the React source in music-player/src, kept but not served (DEC-019)"
       ],
       "skin": "the Airwave player shell (a page)"
@@ -187,13 +235,17 @@
     }
   ],
   "commands": {
-    "build:window-css": "pnpm build:window-css — regenerates airwave-window.css and airwave-hub.css from design/frontends/airwave-companion.html and airwave-hub.html.",
+    "build:window-css": "pnpm build:window-css — regenerates airwave-window.css and airwave-hub.css from design/frontends/origin/airwave-companion.html and airwave-hub.html, then applies the asserted edits make-window-css.py records.",
     "styleguide:build": "pnpm styleguide:build — rebuilds docs/design/styleguide.html from the sources above (same as pnpm build:styleguide).",
     "styleguide:check": "pnpm styleguide:check — sources and evidence exist, rule IDs are unique, every discovered screen is in the ledger, tokens.json matches the stylesheets (the library’s and the Airwave window’s), and the committed HTML was built from the current sources.",
     "styleguide:shell": "pnpm styleguide:shell — after pnpm build:player, retakes the served player's screenshots for The served shell (packages/aqua-ui/styleguide/shell) and records which shell they show.",
     "styleguide:pdf": "pnpm styleguide:pdf — prints the committed HTML to docs/design/styleguide.pdf with Playwright’s Chromium (set NP_STYLEGUIDE_BROWSER to use an installed Chrome or Edge).",
     "e2e": "pnpm --filter @now-playing/aqua-ui test:e2e — measures every mockup at every size.",
-    "conformance": "pnpm test:unit — includes packages/aqua-ui/tests/unit/aqua-conformance.test.ts and design-sources.test.ts."
+    "conformance": "pnpm test:unit — includes packages/aqua-ui/tests/unit/aqua-conformance.test.ts and design-sources.test.ts.",
+    "mockups:build": "pnpm mockups:build [player|hub|companion] — renders the living mockups in design/frontends from the apps (installed Chrome or Playwright Chromium; NP_MOCKUP_BROWSER names one).",
+    "mockups:diff": "pnpm mockups:diff [player|hub|companion] [--check] [--mockups <dir>] — renders the apps into a scratch folder and prints what an edited mockup changes, by section; --check exits 1 on any difference (the mockups-up-to-date gate).",
+    "mockups:export": "pnpm mockups:export <dir> — copies the three mockups to a folder.",
+    "mockups:record-hub": "pnpm build:hub && pnpm mockups:record-hub — re-records the hub answers the hub mockup is drawn with (scripts/mockups/fixtures/hub.json)."
   },
   "verification": {
     "note": "Filled in by whoever last verified the guide at runtime. Source checks are automatic (styleguide:check); `runtime` records what was seen in a running product as it is now, and `superseded` keeps earlier records of interfaces that have since been replaced, which no longer count.",

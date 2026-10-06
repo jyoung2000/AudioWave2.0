@@ -1,0 +1,245 @@
+{
+  "about": "Sample answers for the player's living mockup: the clock it is drawn at, and what a companion's local helper on this PC answers (shapes from packages/contracts/src/api/local-helper.ts; channels and guide as scripts/styleguide-shell-shots.mjs stubs them). No real person's data.",
+  "now": "2026-10-04T19:42:00.000Z",
+  "hubBase": "http://192.168.1.20:4546",
+  "hub": {
+    "/healthz": { "status": "ok", "version": "0.1.0" },
+    "/readyz": { "status": "ok", "checks": { "database": "ok", "library": "ok", "storage": "ok" } },
+    "/api/v1/hub": {
+      "hubId": "01a1040a-7a8d-7095-9b6f-0b1ce4d534e3",
+      "name": "Airwave Hub",
+      "version": "0.1.0",
+      "contractsVersion": "1.0.0",
+      "protocolVersion": 1,
+      "minSupportedProtocolVersion": 1,
+      "publicKey": "gpM-jfm3EmlS8X2LaL4D5vg-U44gQExCyEt8yOtRTBk",
+      "fingerprint": "0E3B-A5CF-B84B-00D1-6248-DE87-59BD-297B",
+      "bindMode": "lan",
+      "publicEndpoint": null,
+      "setupComplete": true,
+      "codeOnlyPairingAvailable": false
+    }
+  },
+  "playlistLink": "https://www.youtube.com/playlist?list=PLmockupHarbourLights",
+  "resolve": {
+    "source": "youtube",
+    "kind": "collection",
+    "url": "https://www.youtube.com/playlist?list=PLmockupHarbourLights",
+    "track": null,
+    "collection": {
+      "title": "Harbour Lights — live sessions",
+      "artist": "Cassette Bloom",
+      "artworkUrl": null,
+      "date": "2026-03-14",
+      "entries": [
+        {
+          "url": "https://www.youtube.com/watch?v=mockup00001",
+          "title": "Signal Fade (live)",
+          "artist": "Cassette Bloom",
+          "featured": [],
+          "album": "Harbour Lights",
+          "genre": "Indie",
+          "durationSec": 244,
+          "date": "2026-03-14",
+          "year": 2026,
+          "artworkUrl": null,
+          "trackNumber": 1
+        },
+        {
+          "url": "https://www.youtube.com/watch?v=mockup00002",
+          "title": "Low Tide Radio",
+          "artist": "Cassette Bloom",
+          "featured": ["Alder Quartet"],
+          "album": "Harbour Lights",
+          "genre": "Indie",
+          "durationSec": 198,
+          "date": "2026-03-14",
+          "year": 2026,
+          "artworkUrl": null,
+          "trackNumber": 2
+        },
+        {
+          "url": "https://www.youtube.com/watch?v=mockup00003",
+          "title": "Lantern Street",
+          "artist": "Cassette Bloom",
+          "featured": [],
+          "album": "Harbour Lights",
+          "genre": "Indie",
+          "durationSec": 271,
+          "date": "2026-03-14",
+          "year": 2026,
+          "artworkUrl": null,
+          "trackNumber": 3
+        },
+        {
+          "url": "https://www.youtube.com/watch?v=mockup00004",
+          "title": "Paper Boats",
+          "artist": "Cassette Bloom",
+          "featured": [],
+          "album": "Harbour Lights",
+          "genre": "Indie",
+          "durationSec": 225,
+          "date": "2026-03-14",
+          "year": 2026,
+          "artworkUrl": null,
+          "trackNumber": 4
+        }
+      ],
+      "total": 4,
+      "cap": 200,
+      "capped": false
+    },
+    "resolvedAt": "2026-10-04T19:41:00.000Z"
+  },
+  "search": {
+    "results": [
+      {
+        "t": "Harbour Morning (acoustic)",
+        "a": "Alder Quartet",
+        "al": "First Light Sessions",
+        "art": null,
+        "u": "https://www.youtube.com/watch?v=mockup00011",
+        "p": "YouTube",
+        "d": 212,
+        "bpm": 92
+      },
+      {
+        "t": "Harbour Wall",
+        "a": "Cassette Bloom",
+        "al": "Harbour Lights",
+        "art": null,
+        "u": "https://soundcloud.com/cassette-bloom-mockup/harbour-wall",
+        "p": "SoundCloud",
+        "d": 187,
+        "bpm": 120
+      },
+      {
+        "t": "Harbourside",
+        "a": "Birch Ensemble",
+        "al": "Late Shift (demos)",
+        "art": null,
+        "u": "https://birch-ensemble-mockup.bandcamp.com/track/harbourside",
+        "p": "Bandcamp",
+        "d": 233,
+        "bpm": null
+      }
+    ]
+  },
+  "helper": {
+    "/helper/v1/backup/estimate": {
+      "parts": {
+        "music": { "bytes": 41205678080, "files": 3812, "measuredAt": "2026-10-04T19:20:00.000Z" },
+        "tv": { "bytes": 18253611008, "files": 64, "measuredAt": "2026-10-04T19:20:00.000Z" },
+        "movies": { "bytes": 52613349376, "files": 22, "measuredAt": "2026-10-04T19:20:00.000Z" }
+      },
+      "destination": null
+    },
+    "/helper/v1/health": {
+      "helper": "now-playing-local-helper",
+      "protocol": 1,
+      "version": "0.1.0",
+      "servesApp": false,
+      "tools": [
+        {
+          "id": "yt-dlp",
+          "present": true,
+          "version": "2026.09.18",
+          "origin": "installed",
+          "installHint": null,
+          "installable": true
+        },
+        {
+          "id": "spotdl",
+          "present": true,
+          "version": "4.4.2",
+          "origin": "installed",
+          "installHint": null,
+          "installable": true
+        },
+        {
+          "id": "ffmpeg",
+          "present": true,
+          "version": "7.1",
+          "origin": "path",
+          "installHint": null,
+          "installable": false
+        }
+      ],
+      "allowedHosts": [
+        "youtube.com",
+        "youtu.be",
+        "soundcloud.com",
+        "bandcamp.com",
+        "open.spotify.com"
+      ],
+      "formats": ["original", "mp3", "aac", "opus", "flac"],
+      "startedAt": "2026-10-04T17:05:00.000Z"
+    },
+    "/helper/v1/tv/channels": {
+      "channels": [
+        {
+          "id": "c-news",
+          "name": "Harbour News",
+          "number": 1,
+          "group": "News",
+          "logo": null,
+          "url": "https://tv.example/news.m3u8",
+          "tvgId": "news.example"
+        },
+        {
+          "id": "c-weather",
+          "name": "Coast Weather",
+          "number": 2,
+          "group": "News",
+          "logo": null,
+          "url": "https://tv.example/weather.m3u8",
+          "tvgId": "weather.example"
+        },
+        {
+          "id": "c-jazz",
+          "name": "Night Jazz",
+          "number": 7,
+          "group": "Music",
+          "logo": null,
+          "url": "https://tv.example/jazz.m3u8",
+          "tvgId": null
+        }
+      ]
+    },
+    "/helper/v1/tv/guide": {
+      "generatedAt": "2026-10-04T19:40:00.000Z",
+      "guide": [
+        {
+          "tvgId": "news.example",
+          "now": {
+            "title": "Evening Report",
+            "start": "2026-10-04T19:30:00.000Z",
+            "stop": "2026-10-04T20:00:00.000Z",
+            "description": null
+          },
+          "next": {
+            "title": "The Late Review",
+            "start": "2026-10-04T20:00:00.000Z",
+            "stop": "2026-10-04T20:30:00.000Z",
+            "description": null
+          }
+        },
+        {
+          "tvgId": "weather.example",
+          "now": {
+            "title": "Tides and Winds",
+            "start": "2026-10-04T19:35:00.000Z",
+            "stop": "2026-10-04T20:05:00.000Z",
+            "description": null
+          },
+          "next": {
+            "title": "Overnight Outlook",
+            "start": "2026-10-04T20:05:00.000Z",
+            "stop": "2026-10-04T20:35:00.000Z",
+            "description": null
+          }
+        }
+      ]
+    }
+  }
+}

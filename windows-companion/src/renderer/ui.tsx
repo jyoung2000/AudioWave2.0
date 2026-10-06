@@ -1,7 +1,7 @@
 /**
  * The design's controls, as components.
  *
- * Each of these is the markup `design/frontends/airwave-companion.html` writes by hand — a `.push`
+ * Each of these is the markup `design/frontends/origin/airwave-companion.html` writes by hand — a `.push`
  * button, a `.chk` checkbox with its drawn `.box`, a `.pop` pop-up, the `.rm` round minus, a `.well`
  * of `.rows` — styled by the design's own stylesheet (`@now-playing/aqua-ui/airwave-window.css`).
  * Nothing here has a look of its own; the components exist so a view cannot get the markup subtly

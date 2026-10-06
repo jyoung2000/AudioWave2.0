@@ -7,6 +7,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, sep } from 'node:path';
+import { inputsHash } from './mockups/lib/inputs.mjs';
 
 const SKIP_DIRS = new Set(['node_modules', 'dist', 'build', '.turbo', 'coverage', 'playwright-report', 'test-results']);
 
@@ -326,6 +327,21 @@ export function runChecks(root, { freshness = true } = {}) {
     const html = exists(manifest.guide.html) ? readText(root, manifest.guide.html) : '';
     const built = /<meta name="styleguide-fingerprint" content="([0-9a-f]+)"/.exec(html)?.[1] ?? null;
     if (built !== fingerprint) errors.push(`freshness: ${manifest.guide.html} was built from ${built ?? 'unknown sources'}, the sources are now ${fingerprint}. Run pnpm styleguide:build.`);
+  }
+
+  // The living mockups were rendered from the sources as they are now (their inputs stamp). The
+  // strict check — render again and compare — is pnpm verify's mockups-up-to-date.
+  if (freshness && manifest.mockups) {
+    for (const [app, mockup] of Object.entries(manifest.mockups.files)) {
+      for (const input of mockup.inputs) need(input, `manifest.mockups.files.${app}`);
+      if (!exists(mockup.path)) {
+        errors.push(`mockups: ${mockup.path} does not exist. Run pnpm mockups:build ${app}.`);
+        continue;
+      }
+      const stamp = /<meta name="mockup-inputs" content="([0-9a-f]+)">/.exec(readText(root, mockup.path))?.[1] ?? null;
+      const current = inputsHash(root, mockup.inputs);
+      if (stamp !== current) errors.push(`mockups: ${mockup.path} was rendered from ${stamp ?? 'unknown sources'}, and its sources are now ${current}. Run pnpm mockups:build ${app} (AGENTS.md, "Living mockups").`);
+    }
   }
 
   const summary = {

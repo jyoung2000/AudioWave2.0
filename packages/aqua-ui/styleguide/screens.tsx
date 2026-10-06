@@ -7,7 +7,7 @@
  *     design's generated stylesheets and each product's own `styles.css`, AquaArt's drawings, and the
  *     products' own window kits and icons — see `./airwave-screens.tsx`.
  *   - **Airwave**, the player, is served as a shell generated from
- *     `design/frontends/airwave-now-playing.html` (design/decisions.md DEC-019). That shell is one
+ *     `design/frontends/origin/airwave-now-playing.html` (design/decisions.md DEC-019). That shell is one
  *     large document with its own scripts and cannot be portalled into a frame, so the player's
  *     screens here are the component library's page skin — the React interface in
  *     `music-player/src`, which shares the shell's look and is kept but no longer served. The frames
@@ -112,7 +112,7 @@ export const PRODUCTS: readonly ProductSpec[] = [
     id: 'player',
     label: BRANDING.products.player,
     skin: 'Page skin (component library)',
-    note: 'The player. These screens are the library’s page skin — the React interface kept in music-player/src. The served player is the shell generated from design/frontends/airwave-now-playing.html, which has the same look, is photographed under The served shell and is recorded surface by surface under Every screen.',
+    note: 'The player. These screens are the library’s page skin — the React interface kept in music-player/src. The served player is the shell generated from design/frontends/origin/airwave-now-playing.html, which has the same look, is photographed under The served shell and is recorded surface by surface under Every screen.',
     isolated: false,
     devices: ['small-phone', 'phone', 'tablet', 'laptop', 'desktop'],
     shown: ['phone', 'laptop'],

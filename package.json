@@ -45,7 +45,11 @@
     "styleguide:build": "pnpm build:styleguide",
     "styleguide:check": "node scripts/styleguide-check.mjs",
     "styleguide:pdf": "node scripts/export-styleguide-pdf.mjs",
-    "styleguide:shell": "node scripts/styleguide-shell-shots.mjs"
+    "styleguide:shell": "node scripts/styleguide-shell-shots.mjs",
+    "mockups:build": "tsx scripts/mockups/cli.mjs build",
+    "mockups:diff": "tsx scripts/mockups/cli.mjs diff",
+    "mockups:export": "tsx scripts/mockups/cli.mjs export",
+    "mockups:record-hub": "tsx scripts/mockups/record-hub.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
