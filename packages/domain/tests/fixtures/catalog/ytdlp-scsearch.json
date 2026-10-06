@@ -1,0 +1,28 @@
+{
+  "_type": "playlist",
+  "id": "get lucky",
+  "title": "get lucky",
+  "extractor_key": "SoundcloudSearch",
+  "entries": [
+    {
+      "_type": "url",
+      "ie_key": "Soundcloud",
+      "id": "1234567",
+      "url": "https://soundcloud.com/example-artist/get-lucky-cover",
+      "title": "Get Lucky (cover)",
+      "uploader": "Example Artist",
+      "duration": 241.5,
+      "thumbnail": "https://i1.sndcdn.com/artworks-000000000000-abcdef-t500x500.jpg"
+    },
+    {
+      "_type": "url",
+      "ie_key": "Soundcloud",
+      "url": "https://soundcloud.com/another-artist/lucky-day"
+    },
+    {
+      "_type": "url",
+      "ie_key": "SoundcloudSet",
+      "url": "https://soundcloud.com/another-artist/sets/a-set"
+    }
+  ]
+}

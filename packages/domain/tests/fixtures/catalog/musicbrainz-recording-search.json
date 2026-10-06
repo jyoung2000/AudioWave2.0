@@ -1,0 +1,89 @@
+{
+  "created": "2026-10-06T16:54:51.587Z",
+  "count": 50,
+  "offset": 0,
+  "recordings": [
+    {
+      "id": "0347d102-b653-4c6c-a0b2-cc9a58c5c585",
+      "score": 100,
+      "artist-credit-id": "2ad79928-9236-33a3-830c-cc909d38f0c7",
+      "title": "Get Lucky",
+      "length": 294000,
+      "disambiguation": "Music Factory DJ Beats version with 8-bar intro and outro",
+      "video": null,
+      "artist-credit": [
+        {
+          "name": "Daft Punk",
+          "artist": {
+            "id": "056e4f3e-d505-4dad-8ec1-d04f521cbb56",
+            "name": "Daft Punk",
+            "sort-name": "Daft Punk"
+          }
+        }
+      ],
+      "first-release-date": "2013",
+      "releases": [
+        {
+          "id": "504091b5-0180-412a-9e75-af971f85822f",
+          "status-id": "518ffc83-5cde-34df-8627-81bff5093d92",
+          "artist-credit-id": "949a7fd5-fe73-3e8f-922e-01ff4ca958f7",
+          "count": 1,
+          "title": "Mastermix: DJ Beats, Volume 8",
+          "status": "Promotion",
+          "release-group": {
+            "id": "4025b0d2-214d-41f3-b6b7-a356480ff6c9",
+            "type-id": "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1",
+            "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+            "title": "Mastermix: DJ Beats, Volume 8",
+            "primary-type": "Album",
+            "secondary-types": ["Compilation"],
+            "secondary-type-ids": ["dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"]
+          },
+          "date": "2013",
+          "country": "GB",
+          "track-count": 15
+        }
+      ]
+    },
+    {
+      "id": "97c21330-5552-41db-ba0d-249f4c833267",
+      "score": 100,
+      "artist-credit-id": "2ad79928-9236-33a3-830c-cc909d38f0c7",
+      "title": "Get Lucky",
+      "video": null,
+      "artist-credit": [
+        {
+          "name": "Daft Punk",
+          "artist": {
+            "id": "056e4f3e-d505-4dad-8ec1-d04f521cbb56",
+            "name": "Daft Punk",
+            "sort-name": "Daft Punk"
+          }
+        }
+      ],
+      "first-release-date": "2024-10-11",
+      "releases": [
+        {
+          "id": "7d36d17d-1a1f-499a-b095-8df9ab6e1669",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "artist-credit-id": "949a7fd5-fe73-3e8f-922e-01ff4ca958f7",
+          "count": 1,
+          "title": "Piece by Piece Full Soundtrack",
+          "status": "Official",
+          "release-group": {
+            "id": "de94f608-aa3e-4f85-b5e0-f5f20826e80e",
+            "type-id": "22a628ad-c082-3c4f-b1b6-d41665107b88",
+            "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+            "title": "Piece by Piece Full Soundtrack",
+            "primary-type": "Album",
+            "secondary-types": ["Soundtrack"],
+            "secondary-type-ids": ["22a628ad-c082-3c4f-b1b6-d41665107b88"]
+          },
+          "date": "2024-10-11",
+          "country": "US",
+          "track-count": 41
+        }
+      ]
+    }
+  ]
+}

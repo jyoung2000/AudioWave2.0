@@ -231,6 +231,10 @@ export const HelperResolvedTrack = z.object({
   year: z.number().int().min(1000).max(3000).nullable(),
   artworkUrl: z.string().max(2048).nullable(),
   trackNumber: z.number().int().positive().nullable(),
+  /** spotDL reports these for a Spotify song (catalog resolve, DEC-039); absent from yt-dlp answers. */
+  isrc: z.string().max(12).nullable().optional(),
+  /** spotDL's own YouTube Music match for a Spotify song, when it made one (`save --preload`). */
+  matchUrl: z.string().max(2048).nullable().optional(),
 });
 export type HelperResolvedTrack = z.infer<typeof HelperResolvedTrack>;
 

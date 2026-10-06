@@ -1,0 +1,40 @@
+{
+  "_type": "playlist",
+  "id": "daft punk get lucky",
+  "title": "daft punk get lucky",
+  "extractor_key": "YoutubeSearch",
+  "webpage_url": "ytsearch3:daft punk get lucky",
+  "entries": [
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "5NV6Rdv1a3I",
+      "url": "https://www.youtube.com/watch?v=5NV6Rdv1a3I",
+      "title": "Daft Punk - Get Lucky (Official Audio) ft. Pharrell Williams, Nile Rodgers",
+      "channel": "Daft Punk",
+      "uploader": "Daft Punk",
+      "duration": 369,
+      "thumbnails": [
+        { "url": "https://i.ytimg.com/vi/5NV6Rdv1a3I/hqdefault.jpg", "height": 360, "width": 480 }
+      ]
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "4D7u5KF7SP8",
+      "url": "https://www.youtube.com/watch?v=4D7u5KF7SP8",
+      "title": "Get Lucky (feat. Pharrell Williams and Nile Rodgers)",
+      "channel": "Daft Punk - Topic",
+      "uploader": "Daft Punk - Topic",
+      "duration": 368
+    },
+    {
+      "_type": "url",
+      "ie_key": "YoutubeTab",
+      "id": "UCxxxxxxxxxxxxxxxxxxxxxx",
+      "url": "https://www.youtube.com/channel/UCxxxxxxxxxxxxxxxxxxxxxx",
+      "title": "Daft Punk",
+      "channel": "Daft Punk"
+    }
+  ]
+}

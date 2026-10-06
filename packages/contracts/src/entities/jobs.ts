@@ -43,6 +43,15 @@ export const DownloadTags = z.object({
   durationMs: z.number().int().nonnegative().nullable().default(null),
   artworkUrl: z.string().url().max(2048).nullable().default(null),
   license: z.string().max(200).nullable().default(null),
+  /** Catalog downloads (DEC-039) also carry these; FFmpeg writes them as the ISRC, publisher (label) and lyrics tags. */
+  isrc: z
+    .string()
+    .regex(/^[A-Z]{2}[A-Z0-9]{3}\d{7}$/)
+    .nullable()
+    .optional(),
+  label: z.string().max(300).nullable().optional(),
+  /** LRC or plain text from LRCLIB, when the hub's catalog setting embeds lyrics. */
+  lyrics: z.string().max(20_000).nullable().optional(),
 });
 export type DownloadTags = z.infer<typeof DownloadTags>;
 

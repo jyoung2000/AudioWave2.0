@@ -9,7 +9,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./radio-node": "./src/radio-node.ts",
-    "./tool-install": "./src/tool-install/index.ts"
+    "./tool-install": "./src/tool-install/index.ts",
+    "./catalog": "./src/catalog/index.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit",

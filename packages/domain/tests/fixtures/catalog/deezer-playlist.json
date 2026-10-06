@@ -1,0 +1,29 @@
+{
+  "id": 908622995,
+  "title": "En mode 60",
+  "description": "Les meilleurs hits des années 60 sont dans cette playlist.",
+  "duration": 9206,
+  "public": true,
+  "is_loved_track": false,
+  "collaborative": false,
+  "nb_tracks": 50,
+  "fans": 22801,
+  "link": "https://www.deezer.com/playlist/908622995",
+  "picture": "https://api.deezer.com/playlist/908622995/image",
+  "picture_small": "https://cdn-images.dzcdn.net/images/playlist/4fd375a41c7779ed7deab64fb1194099/56x56-000000-80-0-0.jpg",
+  "picture_medium": "https://cdn-images.dzcdn.net/images/playlist/4fd375a41c7779ed7deab64fb1194099/250x250-000000-80-0-0.jpg",
+  "picture_big": "https://cdn-images.dzcdn.net/images/playlist/4fd375a41c7779ed7deab64fb1194099/500x500-000000-80-0-0.jpg",
+  "picture_xl": "https://cdn-images.dzcdn.net/images/playlist/4fd375a41c7779ed7deab64fb1194099/1000x1000-000000-80-0-0.jpg",
+  "tracklist": "https://api.deezer.com/playlist/908622995/tracks",
+  "creation_date": "2014-06-27 04:09:31",
+  "add_date": "2026-10-02 22:11:29",
+  "mod_date": "2026-10-02 22:11:29",
+  "md5_image": "4fd375a41c7779ed7deab64fb1194099",
+  "picture_type": "playlist",
+  "creator": {
+    "id": 1,
+    "name": "Pop Editor",
+    "type": "user"
+  },
+  "type": "playlist"
+}

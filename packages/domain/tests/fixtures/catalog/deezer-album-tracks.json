@@ -1,0 +1,80 @@
+{
+  "data": [
+    {
+      "id": 67238728,
+      "readable": true,
+      "title": "Give Life Back to Music",
+      "title_short": "Give Life Back to Music",
+      "title_version": "",
+      "isrc": "USQX91300101",
+      "link": "https://www.deezer.com/track/67238728",
+      "duration": 274,
+      "track_position": 1,
+      "disk_number": 1,
+      "rank": 715949,
+      "explicit_lyrics": false,
+      "explicit_content_lyrics": 0,
+      "explicit_content_cover": 0,
+      "preview": "https://cdnt-preview.dzcdn.net/api/1/1/f/5/7/0/f57885aeb81258994e3d44d33867e85e.mp3?hdnea=exp=0~hmac=fixture",
+      "md5_image": "311bba0fc112d15f72c8b5a65f0456c1",
+      "artist": {
+        "id": 27,
+        "name": "Daft Punk",
+        "tracklist": "https://api.deezer.com/artist/27/top?limit=50",
+        "type": "artist"
+      },
+      "type": "track"
+    },
+    {
+      "id": 67238729,
+      "readable": true,
+      "title": "The Game of Love",
+      "title_short": "The Game of Love",
+      "title_version": "",
+      "isrc": "USQX91300102",
+      "link": "https://www.deezer.com/track/67238729",
+      "duration": 321,
+      "track_position": 2,
+      "disk_number": 1,
+      "rank": 672439,
+      "explicit_lyrics": false,
+      "explicit_content_lyrics": 0,
+      "explicit_content_cover": 0,
+      "preview": "https://cdnt-preview.dzcdn.net/api/1/1/4/7/5/0/475fc61bd3272b9036d4ba0e3837451b.mp3?hdnea=exp=0~hmac=fixture",
+      "md5_image": "311bba0fc112d15f72c8b5a65f0456c1",
+      "artist": {
+        "id": 27,
+        "name": "Daft Punk",
+        "tracklist": "https://api.deezer.com/artist/27/top?limit=50",
+        "type": "artist"
+      },
+      "type": "track"
+    },
+    {
+      "id": 67238730,
+      "readable": true,
+      "title": "Giorgio by Moroder",
+      "title_short": "Giorgio by Moroder",
+      "title_version": "",
+      "isrc": "USQX91300103",
+      "link": "https://www.deezer.com/track/67238730",
+      "duration": 544,
+      "track_position": 3,
+      "disk_number": 1,
+      "rank": 793082,
+      "explicit_lyrics": false,
+      "explicit_content_lyrics": 0,
+      "explicit_content_cover": 0,
+      "preview": "https://cdnt-preview.dzcdn.net/api/1/1/2/2/6/0/226a352b5354e78a964d5dad5875ded9.mp3?hdnea=exp=0~hmac=fixture",
+      "md5_image": "311bba0fc112d15f72c8b5a65f0456c1",
+      "artist": {
+        "id": 27,
+        "name": "Daft Punk",
+        "tracklist": "https://api.deezer.com/artist/27/top?limit=50",
+        "type": "artist"
+      },
+      "type": "track"
+    }
+  ],
+  "total": 13
+}

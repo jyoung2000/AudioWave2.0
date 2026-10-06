@@ -1,0 +1,41 @@
+{
+  "data": [
+    {
+      "id": 494309801,
+      "title": "Random Access Memories (Drumless Edition)",
+      "link": "https://www.deezer.com/album/494309801",
+      "cover": "https://api.deezer.com/album/494309801/image",
+      "cover_small": "https://cdn-images.dzcdn.net/images/cover/bb8b5f188ae380ac3a7c876b70556357/56x56-000000-80-0-0.jpg",
+      "cover_medium": "https://cdn-images.dzcdn.net/images/cover/bb8b5f188ae380ac3a7c876b70556357/250x250-000000-80-0-0.jpg",
+      "cover_big": "https://cdn-images.dzcdn.net/images/cover/bb8b5f188ae380ac3a7c876b70556357/500x500-000000-80-0-0.jpg",
+      "cover_xl": "https://cdn-images.dzcdn.net/images/cover/bb8b5f188ae380ac3a7c876b70556357/1000x1000-000000-80-0-0.jpg",
+      "md5_image": "bb8b5f188ae380ac3a7c876b70556357",
+      "genre_id": 106,
+      "fans": 14891,
+      "release_date": "2023-11-17",
+      "record_type": "album",
+      "tracklist": "https://api.deezer.com/album/494309801/tracks",
+      "explicit_lyrics": false,
+      "type": "album"
+    },
+    {
+      "id": 294609352,
+      "title": "Homework (25th Anniversary Edition)",
+      "link": "https://www.deezer.com/album/294609352",
+      "cover": "https://api.deezer.com/album/294609352/image",
+      "cover_small": "https://cdn-images.dzcdn.net/images/cover/117dcf85bdf0851347403796521d1e9d/56x56-000000-80-0-0.jpg",
+      "cover_medium": "https://cdn-images.dzcdn.net/images/cover/117dcf85bdf0851347403796521d1e9d/250x250-000000-80-0-0.jpg",
+      "cover_big": "https://cdn-images.dzcdn.net/images/cover/117dcf85bdf0851347403796521d1e9d/500x500-000000-80-0-0.jpg",
+      "cover_xl": "https://cdn-images.dzcdn.net/images/cover/117dcf85bdf0851347403796521d1e9d/1000x1000-000000-80-0-0.jpg",
+      "md5_image": "117dcf85bdf0851347403796521d1e9d",
+      "genre_id": 113,
+      "fans": 17940,
+      "release_date": "1997-01-20",
+      "record_type": "album",
+      "tracklist": "https://api.deezer.com/album/294609352/tracks",
+      "explicit_lyrics": false,
+      "type": "album"
+    }
+  ],
+  "total": 38
+}

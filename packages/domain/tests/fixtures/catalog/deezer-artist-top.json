@@ -1,0 +1,73 @@
+{
+  "data": [
+    {
+      "id": 3135553,
+      "readable": true,
+      "title": "One More Time",
+      "title_short": "One More Time",
+      "title_version": "",
+      "link": "https://www.deezer.com/track/3135553",
+      "duration": 320,
+      "rank": 930849,
+      "explicit_lyrics": false,
+      "explicit_content_lyrics": 0,
+      "explicit_content_cover": 0,
+      "preview": "https://cdnt-preview.dzcdn.net/api/1/1/f/8/c/0/f8c5dc3837912dba37c9a1ab3170cc3f.mp3?hdnea=exp=0~hmac=fixture",
+      "md5_image": "5718f7c81c27e0b2417e2a4c45224f8a",
+      "artist": {
+        "id": 27,
+        "name": "Daft Punk",
+        "tracklist": "https://api.deezer.com/artist/27/top?limit=50",
+        "type": "artist"
+      },
+      "album": {
+        "id": 302127,
+        "title": "Discovery",
+        "cover": "https://api.deezer.com/album/302127/image",
+        "cover_small": "https://cdn-images.dzcdn.net/images/cover/5718f7c81c27e0b2417e2a4c45224f8a/56x56-000000-80-0-0.jpg",
+        "cover_medium": "https://cdn-images.dzcdn.net/images/cover/5718f7c81c27e0b2417e2a4c45224f8a/250x250-000000-80-0-0.jpg",
+        "cover_big": "https://cdn-images.dzcdn.net/images/cover/5718f7c81c27e0b2417e2a4c45224f8a/500x500-000000-80-0-0.jpg",
+        "cover_xl": "https://cdn-images.dzcdn.net/images/cover/5718f7c81c27e0b2417e2a4c45224f8a/1000x1000-000000-80-0-0.jpg",
+        "md5_image": "5718f7c81c27e0b2417e2a4c45224f8a",
+        "tracklist": "https://api.deezer.com/album/302127/tracks",
+        "type": "album"
+      },
+      "type": "track"
+    },
+    {
+      "id": 67238732,
+      "readable": true,
+      "title": "Instant Crush (feat. Julian Casablancas)",
+      "title_short": "Instant Crush",
+      "title_version": "(feat. Julian Casablancas)",
+      "link": "https://www.deezer.com/track/67238732",
+      "duration": 337,
+      "rank": 942491,
+      "explicit_lyrics": false,
+      "explicit_content_lyrics": 0,
+      "explicit_content_cover": 0,
+      "preview": "https://cdnt-preview.dzcdn.net/api/1/1/d/6/b/0/d6bc80aadfa1d7625d59a6620f229371.mp3?hdnea=exp=0~hmac=fixture",
+      "md5_image": "311bba0fc112d15f72c8b5a65f0456c1",
+      "artist": {
+        "id": 27,
+        "name": "Daft Punk",
+        "tracklist": "https://api.deezer.com/artist/27/top?limit=50",
+        "type": "artist"
+      },
+      "album": {
+        "id": 6575789,
+        "title": "Random Access Memories",
+        "cover": "https://api.deezer.com/album/6575789/image",
+        "cover_small": "https://cdn-images.dzcdn.net/images/cover/311bba0fc112d15f72c8b5a65f0456c1/56x56-000000-80-0-0.jpg",
+        "cover_medium": "https://cdn-images.dzcdn.net/images/cover/311bba0fc112d15f72c8b5a65f0456c1/250x250-000000-80-0-0.jpg",
+        "cover_big": "https://cdn-images.dzcdn.net/images/cover/311bba0fc112d15f72c8b5a65f0456c1/500x500-000000-80-0-0.jpg",
+        "cover_xl": "https://cdn-images.dzcdn.net/images/cover/311bba0fc112d15f72c8b5a65f0456c1/1000x1000-000000-80-0-0.jpg",
+        "md5_image": "311bba0fc112d15f72c8b5a65f0456c1",
+        "tracklist": "https://api.deezer.com/album/6575789/tracks",
+        "type": "album"
+      },
+      "type": "track"
+    }
+  ],
+  "total": 2
+}

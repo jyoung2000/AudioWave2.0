@@ -1,0 +1,38 @@
+[
+  {
+    "id": 37075924,
+    "name": "Get Lucky",
+    "trackName": "Get Lucky",
+    "artistName": "Daft Punk",
+    "albumName": "Random Access Memories (10th Annyversary)",
+    "duration": 370,
+    "instrumental": false,
+    "hasWordSync": false,
+    "plainLyrics": "Row 0: line of the song\nSecond line of the song\nThird line of the song",
+    "syncedLyrics": "[00:01.00] First line of the song\n[00:05.50] Second line of the song\n[00:10.25] Third line of the song"
+  },
+  {
+    "id": 37082559,
+    "name": "Get Lucky",
+    "trackName": "Get Lucky",
+    "artistName": "Daft Punk",
+    "albumName": "Random Access Memories (2021 LP rip) [24-96]",
+    "duration": 368,
+    "instrumental": false,
+    "hasWordSync": false,
+    "plainLyrics": "Row 1: line of the song\nSecond line of the song\nThird line of the song",
+    "syncedLyrics": "[00:01.00] First line of the song\n[00:05.50] Second line of the song\n[00:10.25] Third line of the song"
+  },
+  {
+    "id": 36883705,
+    "name": "Get Lucky",
+    "trackName": "Get Lucky",
+    "artistName": "Daft Punk",
+    "albumName": "Luzem",
+    "duration": 248,
+    "instrumental": false,
+    "hasWordSync": false,
+    "plainLyrics": "Row 2: line of the song\nSecond line of the song\nThird line of the song",
+    "syncedLyrics": "[00:01.00] First line of the song\n[00:05.50] Second line of the song\n[00:10.25] Third line of the song"
+  }
+]

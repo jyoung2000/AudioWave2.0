@@ -1,0 +1,42 @@
+{
+  "entityUniqueId": "DEEZER_SONG::67238735",
+  "userCountry": "US",
+  "pageUrl": "https://song.link/d/67238735",
+  "entitiesByUniqueId": {
+    "DEEZER_SONG::67238735": {
+      "id": "67238735",
+      "type": "song",
+      "title": "Get Lucky (feat. Pharrell Williams and Nile Rodgers)",
+      "artistName": "Daft Punk",
+      "thumbnailUrl": "https://cdn-images.dzcdn.net/images/cover/311bba0fc112d15f72c8b5a65f0456c1/500x500-000000-80-0-0.jpg",
+      "apiProvider": "deezer",
+      "platforms": ["deezer"]
+    }
+  },
+  "linksByPlatform": {
+    "deezer": {
+      "url": "https://www.deezer.com/track/67238735",
+      "entityUniqueId": "DEEZER_SONG::67238735"
+    },
+    "spotify": {
+      "url": "https://open.spotify.com/track/69kOkLUCkxIZYexIgSG8rq",
+      "entityUniqueId": "SPOTIFY_SONG::69kOkLUCkxIZYexIgSG8rq"
+    },
+    "appleMusic": {
+      "url": "https://music.apple.com/us/album/get-lucky/617154241?i=617154366",
+      "entityUniqueId": "ITUNES_SONG::617154366"
+    },
+    "tidal": {
+      "url": "https://listen.tidal.com/track/20115564",
+      "entityUniqueId": "TIDAL_SONG::20115564"
+    },
+    "youtubeMusic": {
+      "url": "https://music.youtube.com/watch?v=4D7u5KF7SP8",
+      "entityUniqueId": "YOUTUBE_VIDEO::4D7u5KF7SP8"
+    },
+    "napster": {
+      "url": "https://play.napster.com/track/tra.0",
+      "entityUniqueId": "NAPSTER_SONG::tra.0"
+    }
+  }
+}

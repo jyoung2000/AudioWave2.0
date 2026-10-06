@@ -1,0 +1,582 @@
+/**
+ * The catalog engine: one object a server (or the player) builds once and asks everything.
+ *
+ *   search   — every enabled service at once; a chunk as each answers (the "live track feed"),
+ *              rows merged across services as they arrive, every service's state on every chunk.
+ *   album / artist — details by `platform:id`.
+ *   resolve  — what a pasted link is, with every song of an album or playlist.
+ *   lyrics, enrich — LRCLIB; MusicBrainz genre, label, year and the song's other homes.
+ *
+ * Nothing here throws past the fan-out: a service that fails is a status, not an error.
+ */
+import type {
+  CatalogAlbum,
+  CatalogAlbumDetail,
+  CatalogArtist,
+  CatalogArtistDetail,
+  CatalogCollection,
+  CatalogEnrichment,
+  CatalogLyrics,
+  CatalogPlatform,
+  CatalogProviderId,
+  CatalogQuery,
+  CatalogResolveResult,
+  CatalogSearchAggregate,
+  CatalogSearchChunk,
+  CatalogSearchDoneChunk,
+  CatalogSection,
+  CatalogSource,
+  CatalogSourceStatus,
+  CatalogTrack,
+} from '@now-playing/contracts';
+import { CATALOG_COLLECTION_CAP, CATALOG_PLATFORM_LABELS } from '@now-playing/contracts';
+import { DomainError } from '../errors.js';
+import { CatalogHttpError, type CatalogFetch } from './http.js';
+import { ProviderHealth, TtlCache, describeError, statusFor, type Now, type Sleep } from './limits.js';
+import { CatalogMerger, mergeSources, sameRecording } from './merge.js';
+import { ProviderResting, type CatalogProvider, type ProviderResult } from './provider.js';
+import { DeezerClient, DeezerProvider } from './providers/deezer.js';
+import { ItunesClient, ItunesProvider } from './providers/itunes.js';
+import { MusicBrainzClient, MusicBrainzProvider } from './providers/musicbrainz.js';
+import { ToolSearchProvider, type ToolSearchRunner } from './providers/ytdlp.js';
+import { parseCatalogQuery, parseMusicLink, type MusicLink } from './query.js';
+import { LinkReadError, TOOL_PLATFORMS, collectionRef, coversOf, pageOf, trackFromLink, type LinkRead, type LinkReader } from './links.js';
+import { LrclibClient, OdesliClient } from './services.js';
+
+export const ALL_SECTIONS: readonly CatalogSection[] = ['tracks', 'artists', 'albums'];
+const ALL_PROVIDERS: readonly CatalogProviderId[] = ['itunes', 'deezer', 'musicbrainz', 'youtube', 'soundcloud'];
+
+export interface CatalogEngineOptions {
+  fetch: CatalogFetch;
+  /** Sent to MusicBrainz and LRCLIB, which ask applications to name themselves. */
+  userAgent: string;
+  /** Runs yt-dlp searches; without it YouTube and SoundCloud are reported as not available here. */
+  toolSearch?: ToolSearchRunner | undefined;
+  /** Reads YouTube, SoundCloud, Bandcamp and Spotify links with the server's tools. */
+  linkReader?: LinkReader | undefined;
+  /** Which services are switched on (absent: all). Read on every search. */
+  enabled?: (() => Partial<Record<CatalogProviderId, boolean>>) | undefined;
+  /** A SongLink key, when an administrator set one. Read on every use. */
+  odesliKey?: (() => string | null) | undefined;
+  /** The Apple storefront. */
+  country?: string | undefined;
+  now?: Now | undefined;
+  sleep?: Sleep | undefined;
+  /** How many of a search's best rows get their other homes looked up before `done` (default 2). */
+  crossLinkTop?: number | undefined;
+  /** And how long that may take in all (default 5 s). */
+  crossLinkBudgetMs?: number | undefined;
+  /** Per-call timeouts, shortened by tests. */
+  timeouts?: Partial<Record<'itunes' | 'deezer' | 'musicbrainz' | 'tools' | 'lrclib' | 'odesli', number>> | undefined;
+}
+
+export interface CatalogSearchInput {
+  q?: string | undefined;
+  track?: string | undefined;
+  artist?: string | undefined;
+  album?: string | undefined;
+  sections?: readonly CatalogSection[] | undefined;
+  providers?: readonly CatalogProviderId[] | undefined;
+  offset?: number | undefined;
+  limit?: number | undefined;
+}
+
+interface Outcome {
+  provider: CatalogProvider;
+  result: ProviderResult | null;
+  status: CatalogSourceStatus;
+}
+
+export class CatalogEngine {
+  readonly itunes: ItunesClient;
+  readonly deezer: DeezerClient;
+  readonly musicbrainz: MusicBrainzClient;
+  readonly lrclib: LrclibClient;
+  readonly odesli: OdesliClient;
+  readonly health: ProviderHealth;
+  private readonly providers = new Map<CatalogProviderId, CatalogProvider>();
+  private readonly now: Now;
+  private readonly lyricsCache: TtlCache<CatalogLyrics>;
+  private readonly enrichCache: TtlCache<CatalogEnrichment>;
+  private readonly resolveCache: TtlCache<LinkRead>;
+  private readonly searchCache: TtlCache<ProviderResult>;
+  private readonly linksCache: TtlCache<CatalogSource[]>;
+
+  constructor(private readonly options: CatalogEngineOptions) {
+    this.now = options.now ?? Date.now;
+    const t = options.timeouts ?? {};
+    this.itunes = new ItunesClient({ fetch: options.fetch, country: options.country, now: this.now, timeoutMs: t.itunes ?? 8000 });
+    this.deezer = new DeezerClient(options.fetch, t.deezer ?? 8000);
+    this.musicbrainz = new MusicBrainzClient({ fetch: options.fetch, userAgent: options.userAgent, now: this.now, ...(options.sleep ? { sleep: options.sleep } : {}), timeoutMs: t.musicbrainz ?? 10_000 });
+    this.lrclib = new LrclibClient(options.fetch, options.userAgent, t.lrclib ?? 10_000);
+    this.odesli = new OdesliClient(options.fetch, options.odesliKey ?? (() => null), this.now, t.odesli ?? 10_000);
+    this.health = new ProviderHealth(this.now);
+    this.lyricsCache = new TtlCache(24 * 3600_000, 500, this.now);
+    this.enrichCache = new TtlCache(24 * 3600_000, 1000, this.now);
+    this.resolveCache = new TtlCache(10 * 60_000, 100, this.now);
+    this.searchCache = new TtlCache(5 * 60_000, 300, this.now);
+    this.linksCache = new TtlCache(24 * 3600_000, 1000, this.now);
+    this.register(new ItunesProvider(this.itunes));
+    this.register(new DeezerProvider(this.deezer));
+    this.register(new MusicBrainzProvider(this.musicbrainz));
+    if (options.toolSearch) {
+      this.register(new ToolSearchProvider('youtube', options.toolSearch, t.tools ?? 30_000));
+      this.register(new ToolSearchProvider('soundcloud', options.toolSearch, t.tools ?? 30_000));
+    }
+  }
+
+  /** Add or replace a provider (tests, or a server with a provider of its own). */
+  register(provider: CatalogProvider): void {
+    this.providers.set(provider.id, provider);
+  }
+
+  /** Every service's standing right now, for a settings page. */
+  standing(): CatalogSourceStatus[] {
+    const enabled = this.options.enabled?.() ?? {};
+    return ALL_PROVIDERS.map((id) => {
+      if (!this.providers.has(id)) return statusFor(id, { state: 'skipped', error: 'yt-dlp is not available here' });
+      if (enabled[id] === false) return statusFor(id, { state: 'skipped', error: 'Switched off' });
+      const until = this.health.coolingUntil(id);
+      if (until) return statusFor(id, { state: 'cooling-down', retryAt: new Date(until).toISOString(), error: this.health.lastError(id) });
+      return statusFor(id, { state: 'ok', error: this.health.lastError(id) });
+    });
+  }
+
+  /* ------------------------------------------------------------------ search */
+
+  /**
+   * The live feed. First chunk: every service's starting state (pending, skipped, cooling down).
+   * Then one `results` chunk per service as it answers, carrying the rows it added or changed.
+   * Then, for the best rows, a merge-only chunk with their other homes. Last, `done`.
+   */
+  async *search(input: CatalogSearchInput, signal?: AbortSignal): AsyncGenerator<CatalogSearchChunk> {
+    const query = parseCatalogQuery(input);
+    const sections = input.sections?.length ? [...new Set(input.sections)] : [...ALL_SECTIONS];
+    const offset = Math.max(0, input.offset ?? 0);
+    const limit = Math.min(Math.max(1, input.limit ?? 25), 50);
+    let seq = 0;
+    const statuses = new Map<CatalogProviderId, CatalogSourceStatus>();
+    const list = (): CatalogSourceStatus[] => ALL_PROVIDERS.filter((id) => statuses.has(id)).map((id) => statuses.get(id)!);
+
+    if (query.kind === 'url') {
+      yield { type: 'done', seq, query, status: [], page: { tracks: null, artists: null, albums: null }, totals: { tracks: 0, artists: 0, albums: 0 }, resolve: query.url };
+      return;
+    }
+
+    const wanted = new Set(input.providers?.length ? input.providers : ALL_PROVIDERS);
+    const enabled = this.options.enabled?.() ?? {};
+    const running: Array<Promise<Outcome>> = [];
+    const askedSections = new Set<CatalogSection>();
+    for (const id of ALL_PROVIDERS) {
+      if (!wanted.has(id)) continue;
+      const provider = this.providers.get(id);
+      if (!provider) {
+        statuses.set(id, statusFor(id, { state: 'skipped', error: 'yt-dlp is not available here, so this service cannot be searched' }));
+        continue;
+      }
+      if (enabled[id] === false) {
+        statuses.set(id, statusFor(id, { state: 'skipped', error: 'Switched off in the catalog settings' }));
+        continue;
+      }
+      const canSections = sections.filter((s) => provider.sections.includes(s));
+      if (!canSections.length || !provider.supports(query)) {
+        statuses.set(id, statusFor(id, { state: 'skipped', error: query.kind === 'isrc' ? 'It cannot look up an ISRC' : 'It has nothing in the sections asked for' }));
+        continue;
+      }
+      const until = this.health.coolingUntil(id);
+      if (until) {
+        statuses.set(id, statusFor(id, { state: 'cooling-down', retryAt: new Date(until).toISOString(), error: this.health.lastError(id) }));
+        continue;
+      }
+      statuses.set(id, statusFor(id, { state: 'pending' }));
+      canSections.forEach((s) => askedSections.add(s));
+      const tagged = this.ask(provider, query, { offset, limit, sections: canSections }, signal);
+      running.push(tagged);
+    }
+
+    yield { type: 'results', seq: seq++, provider: null, query, tracks: [], artists: [], albums: [], status: list() };
+
+    const merger = new CatalogMerger(query);
+    const full: Partial<Record<CatalogSection, boolean>> = {};
+    const pending = new Map(running.map((p, i) => [i, p.then((o) => ({ o, i }))]));
+    while (pending.size) {
+      const { o, i } = await Promise.race(pending.values());
+      pending.delete(i);
+      statuses.set(o.provider.id, o.status);
+      const changed = o.result ? merger.add(o.result) : { tracks: [], artists: [], albums: [] };
+      for (const [section, more] of Object.entries(o.result?.full ?? {})) if (more) full[section as CatalogSection] = true;
+      yield { type: 'results', seq: seq++, provider: o.provider.id, query, ...changed, status: list() };
+    }
+
+    // The best rows' other homes, within a small budget: MusicBrainz is paced at one call a second.
+    const top = this.options.crossLinkTop ?? 2;
+    if (top > 0 && !signal?.aborted && sections.includes('tracks')) {
+      const deadline = this.now() + (this.options.crossLinkBudgetMs ?? 5000);
+      const candidates = merger
+        .snapshot()
+        .tracks.filter((t) => t.isrc && !t.sources.some((s) => s.platform === 'spotify'))
+        .slice(0, top);
+      for (const track of candidates) {
+        if (this.now() >= deadline || signal?.aborted) break;
+        const found = await this.withDeadline(this.crossLinks(track, signal), deadline - this.now()).catch(() => [] as CatalogSource[]);
+        if (!found.length) continue;
+        const patched = merger.patchTrack(track.id, (t) => ({ ...t, sources: mergeSources(t.sources, found) }));
+        if (patched) yield { type: 'results', seq: seq++, provider: null, query, tracks: [patched], artists: [], albums: [], status: list() };
+      }
+    }
+
+    const snapshot = merger.snapshot();
+    const page = (section: CatalogSection) => (sections.includes(section) && askedSections.has(section) ? { offset, limit, hasMore: Boolean(full[section]) } : null);
+    const done: CatalogSearchDoneChunk = {
+      type: 'done',
+      seq,
+      query,
+      status: list(),
+      page: { tracks: page('tracks'), artists: page('artists'), albums: page('albums') },
+      totals: { tracks: snapshot.tracks.length, artists: snapshot.artists.length, albums: snapshot.albums.length },
+      resolve: null,
+    };
+    yield done;
+  }
+
+  /** The whole search as one answer (`?stream=0`): the feed, folded. */
+  async searchAll(input: CatalogSearchInput, signal?: AbortSignal): Promise<CatalogSearchAggregate> {
+    const tracks = new Map<string, CatalogTrack>();
+    const artists = new Map<string, CatalogArtist>();
+    const albums = new Map<string, CatalogAlbum>();
+    let last: CatalogSearchChunk | null = null;
+    for await (const chunk of this.search(input, signal)) {
+      last = chunk;
+      if (chunk.type !== 'results') continue;
+      for (const t of chunk.tracks) tracks.set(t.id, t);
+      for (const a of chunk.artists) artists.set(a.id, a);
+      for (const a of chunk.albums) albums.set(a.id, a);
+    }
+    const done = last?.type === 'done' ? last : null;
+    const byRank = <T extends { rank: number }>(rows: T[]): T[] => rows.map((row, i) => ({ row, i })).sort((a, b) => b.row.rank - a.row.rank || a.i - b.i).map(({ row }) => row);
+    return {
+      query: done?.query ?? parseCatalogQuery(input),
+      tracks: byRank([...tracks.values()]),
+      artists: byRank([...artists.values()]),
+      albums: byRank([...albums.values()]),
+      status: done?.status ?? [],
+      page: done?.page ?? { tracks: null, artists: null, albums: null },
+      resolve: done?.resolve ?? null,
+    };
+  }
+
+  private async ask(provider: CatalogProvider, query: CatalogQuery, page: { offset: number; limit: number; sections: CatalogSection[] }, outer?: AbortSignal): Promise<Outcome> {
+    const started = this.now();
+    const controller = new AbortController();
+    const onAbort = (): void => controller.abort();
+    outer?.addEventListener('abort', onAbort, { once: true });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const key = JSON.stringify([provider.id, query.kind, query.text, query.track, query.artist, query.album, query.isrc, page.offset, page.limit, [...page.sections].sort()]);
+    try {
+      const work = this.searchCache.get(key, () => provider.search(query, { ...page, signal: controller.signal }));
+      const deadline = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          controller.abort();
+          reject(new CatalogHttpError(`${provider.id} did not answer within ${Math.round(provider.timeoutMs / 1000)} s`, 'timeout'));
+        }, provider.timeoutMs);
+      });
+      const result = await Promise.race([work, deadline]);
+      this.health.success(provider.id);
+      const count = result.tracks.length + result.artists.length + result.albums.length;
+      return { provider, result, status: statusFor(provider.id, { state: count ? 'ok' : 'empty', count, latencyMs: this.now() - started }) };
+    } catch (error) {
+      const latencyMs = this.now() - started;
+      if (error instanceof ProviderResting) {
+        this.health.restUntil(provider.id, error.retryAt, error.message);
+        return { provider, result: null, status: statusFor(provider.id, { state: 'cooling-down', latencyMs, error: error.message, retryAt: new Date(error.retryAt).toISOString() }) };
+      }
+      if (error instanceof CatalogHttpError && error.kind === 'aborted') {
+        return { provider, result: null, status: statusFor(provider.id, { state: 'failed', latencyMs, error: 'The search was cancelled' }) };
+      }
+      this.health.failure(provider.id, error);
+      const until = this.health.coolingUntil(provider.id);
+      const timedOut = error instanceof CatalogHttpError && error.kind === 'timeout';
+      return { provider, result: null, status: statusFor(provider.id, { state: timedOut ? 'timeout' : 'failed', latencyMs, error: describeError(error), retryAt: until ? new Date(until).toISOString() : null }) };
+    } finally {
+      if (timer) clearTimeout(timer);
+      outer?.removeEventListener('abort', onAbort);
+    }
+  }
+
+  private withDeadline<T>(work: Promise<T>, ms: number): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    return Promise.race([work, new Promise<never>((_, reject) => (timer = setTimeout(() => reject(new CatalogHttpError('Out of time', 'timeout')), Math.max(ms, 0))))]).finally(() => clearTimeout(timer));
+  }
+
+  /* ----------------------------------------------------------- cross-links */
+
+  /**
+   * A song's other homes, keylessly: MusicBrainz's links for its ISRC (Spotify, YouTube Music,
+   * Apple Music, Deezer, Tidal, Qobuz… as editors recorded them), Deezer's own ISRC lookup, and —
+   * only with a key — SongLink.
+   */
+  async crossLinks(track: Pick<CatalogTrack, 'isrc' | 'title' | 'artist' | 'durationMs' | 'sources'>, signal?: AbortSignal): Promise<CatalogSource[]> {
+    const found: CatalogSource[] = [];
+    if (track.isrc) {
+      const isrc = track.isrc;
+      found.push(...(await this.linksCache.get(isrc, () => this.musicbrainz.linksByIsrc(isrc, signal)).catch(() => [] as CatalogSource[])));
+      if (!track.sources.some((s) => s.platform === 'deezer') && !found.some((s) => s.platform === 'deezer')) {
+        const dz = await this.deezer.byIsrc(track.isrc, signal).catch(() => null);
+        const source = dz?.sources[0];
+        if (source) found.push({ ...source, matchedBy: 'isrc' });
+      }
+    }
+    if (this.odesli.configured) {
+      const from = track.sources.find((s) => s.platform !== 'musicbrainz') ?? found.find((s) => s.platform !== 'musicbrainz');
+      if (from) {
+        const answer = await this.odesli.links(from.url, signal).catch(() => null);
+        if (answer) found.push(...answer.sources);
+      }
+    }
+    return mergeSources([], found);
+  }
+
+  /* --------------------------------------------------------------- details */
+
+  private split(id: string): { platform: string; native: string } {
+    const at = id.indexOf(':');
+    if (at <= 0) throw new DomainError('validation', 'Say which platform: an id is “platform:id”, as a result’s id is');
+    return { platform: id.slice(0, at), native: id.slice(at + 1) };
+  }
+
+  async album(id: string, offset = 0, limit = 100, signal?: AbortSignal): Promise<CatalogAlbumDetail> {
+    const { platform, native } = this.split(id);
+    if (platform === 'deezer') {
+      const found = await this.upstream(() => this.deezer.album(native, offset, Math.min(limit, CATALOG_COLLECTION_CAP - offset), signal), 'Deezer');
+      if (!found) throw new DomainError('not-found', 'Deezer has no album with that id');
+      const total = found.total ?? found.album.trackCount;
+      const link: MusicLink = { platform: 'deezer', kind: 'album', id: native, url: `https://www.deezer.com/album/${native}` };
+      return {
+        album: found.album,
+        page: { tracks: found.tracks, offset, limit, total, hasMore: offset + found.tracks.length < Math.min(total ?? 0, CATALOG_COLLECTION_CAP), capped: (total ?? 0) > CATALOG_COLLECTION_CAP },
+        collection: collectionRef(link, 'album', found.album.title, found.album.artist),
+      };
+    }
+    if (platform === 'apple-music') {
+      const found = await this.upstream(() => this.itunes.album(native, signal), 'Apple Music');
+      if (!found) throw new DomainError('not-found', 'Apple Music has no album with that id');
+      const url = found.album.sources[0]?.url ?? `https://music.apple.com/album/${native}`;
+      const link: MusicLink = { platform: 'apple-music', kind: 'album', id: native, url };
+      return { album: found.album, page: pageOf(found.tracks, offset, limit, found.album.trackCount ?? found.tracks.length, false), collection: collectionRef(link, 'album', found.album.title, found.album.artist) };
+    }
+    throw new DomainError('unsupported', `Albums are opened from Deezer or Apple Music; ${platform} albums are opened by pasting their link`);
+  }
+
+  async artist(id: string, input: { albumsOffset?: number; albumsLimit?: number; topLimit?: number } = {}, signal?: AbortSignal): Promise<CatalogArtistDetail> {
+    const { platform, native } = this.split(id);
+    const albumsOffset = input.albumsOffset ?? 0;
+    const albumsLimit = input.albumsLimit ?? 25;
+    const topLimit = input.topLimit ?? 10;
+    if (platform === 'deezer') {
+      const found = await this.upstream(() => this.deezer.artist(native, albumsOffset, albumsLimit, topLimit, signal), 'Deezer');
+      if (!found) throw new DomainError('not-found', 'Deezer has no artist with that id');
+      return { artist: found.artist, topTracks: found.topTracks, albums: found.albums, albumsPage: { offset: albumsOffset, limit: albumsLimit, hasMore: found.albumsTotal !== null ? albumsOffset + found.albums.length < found.albumsTotal : found.albums.length >= albumsLimit } };
+    }
+    if (platform === 'apple-music') {
+      const found = await this.upstream(() => this.itunes.artist(native, albumsOffset + albumsLimit, topLimit, signal), 'Apple Music');
+      if (!found) throw new DomainError('not-found', 'Apple Music has no artist with that id');
+      const albums = found.albums.slice(albumsOffset, albumsOffset + albumsLimit);
+      return { artist: found.artist, topTracks: found.topTracks.slice(0, topLimit), albums, albumsPage: { offset: albumsOffset, limit: albumsLimit, hasMore: found.albums.length >= albumsOffset + albumsLimit } };
+    }
+    throw new DomainError('unsupported', `Artists are opened from Deezer or Apple Music, not ${platform}`);
+  }
+
+  private async upstream<T>(work: () => Promise<T>, name: string): Promise<T> {
+    try {
+      return await work();
+    } catch (error) {
+      if (error instanceof DomainError) throw error;
+      if (error instanceof ProviderResting) throw new DomainError('rate-limited', error.message, { retryAfterSeconds: Math.max(1, Math.ceil((error.retryAt - this.now()) / 1000)) });
+      if (error instanceof CatalogHttpError && error.kind === 'rate-limited') throw new DomainError('rate-limited', `${name} asked to slow down`, { retryAfterSeconds: Math.max(1, Math.ceil((error.retryAfterMs ?? 5000) / 1000)) });
+      throw new DomainError('unavailable', `${name} could not be read: ${describeError(error)}`);
+    }
+  }
+
+  /* --------------------------------------------------------------- resolve */
+
+  /** What a pasted link is. Never throws for a link it cannot read: it says why, in `reason`. */
+  async resolve(input: string, offset = 0, limit = 100, signal?: AbortSignal): Promise<CatalogResolveResult> {
+    const resolvedAt = new Date(this.now()).toISOString();
+    const link = parseMusicLink(input);
+    const base = { track: null, collection: null, artist: null, reason: null, resolvedAt };
+    if (!link) return { ...base, url: input.slice(0, 2048), platform: null, kind: 'unsupported', reason: 'That is not a link to music on a platform the catalog reads.' };
+    const answer = (patch: Partial<CatalogResolveResult> & Pick<CatalogResolveResult, 'kind'>): CatalogResolveResult => ({ ...base, url: link.url, platform: link.platform, ...patch });
+    const label = CATALOG_PLATFORM_LABELS[link.platform];
+    try {
+      if (link.platform === 'deezer') return await this.resolveDeezer(link, offset, limit, answer, signal);
+      if (link.platform === 'apple-music') return await this.resolveApple(link, offset, limit, answer, signal);
+      if (TOOL_PLATFORMS.includes(link.platform)) return await this.resolveWithTool(link, offset, limit, answer, signal);
+      return await this.resolveWithOdesli(link, answer, signal);
+    } catch (error) {
+      if (error instanceof DomainError && error.code === 'not-found') return answer({ kind: 'unavailable', reason: `${label} has nothing at that address.` });
+      if (error instanceof DomainError) throw error;
+      return answer({ kind: 'unavailable', reason: `${label} could not be read just now: ${describeError(error)}` });
+    }
+  }
+
+  private async resolveDeezer(link: MusicLink, offset: number, limit: number, answer: (p: Partial<CatalogResolveResult> & Pick<CatalogResolveResult, 'kind'>) => CatalogResolveResult, signal?: AbortSignal): Promise<CatalogResolveResult> {
+    if (!link.id) return answer({ kind: 'unsupported', reason: 'A Deezer short link says nothing until it is opened. Open it, then paste the address it goes to.' });
+    if (link.kind === 'track') {
+      const track = await this.upstream(() => this.deezer.track(link.id!, signal), 'Deezer');
+      return track ? answer({ kind: 'track', track }) : answer({ kind: 'unavailable', reason: 'Deezer has no song at that address.' });
+    }
+    if (link.kind === 'album') {
+      const detail = await this.album(`deezer:${link.id}`, offset, limit, signal);
+      return answer({ kind: 'album', collection: { ref: detail.collection, artworkUrl: detail.album.artworkUrl, covers: coversOf(detail.page.tracks), releaseDate: detail.album.releaseDate, page: detail.page } });
+    }
+    if (link.kind === 'playlist') {
+      const found = await this.upstream(() => this.deezer.playlist(link.id!, offset, Math.min(limit, CATALOG_COLLECTION_CAP - offset), signal), 'Deezer');
+      if (!found) return answer({ kind: 'unavailable', reason: 'Deezer would not list that playlist: it is private or gone.' });
+      const { playlist, tracks } = found;
+      const head = offset === 0 ? tracks : ((await this.upstream(() => this.deezer.playlist(link.id!, 0, 8, signal), 'Deezer'))?.tracks ?? []);
+      const total = playlist.total;
+      const collection: CatalogCollection = {
+        ref: collectionRef(link, 'playlist', playlist.title, playlist.owner, playlist.url),
+        artworkUrl: playlist.artworkUrl,
+        covers: coversOf(head),
+        releaseDate: null,
+        page: { tracks, offset, limit, total, hasMore: offset + tracks.length < Math.min(total ?? 0, CATALOG_COLLECTION_CAP), capped: (total ?? 0) > CATALOG_COLLECTION_CAP },
+      };
+      return answer({ kind: 'playlist', collection });
+    }
+    if (link.kind === 'artist') {
+      const detail = await this.artist(`deezer:${link.id}`, {}, signal);
+      return answer({ kind: 'artist', artist: detail.artist });
+    }
+    return answer({ kind: 'unsupported', reason: 'That Deezer address is not a song, album, playlist or artist.' });
+  }
+
+  private async resolveApple(link: MusicLink, offset: number, limit: number, answer: (p: Partial<CatalogResolveResult> & Pick<CatalogResolveResult, 'kind'>) => CatalogResolveResult, signal?: AbortSignal): Promise<CatalogResolveResult> {
+    if (link.kind === 'track' && link.id) {
+      const track = await this.upstream(() => this.itunes.track(link.id!, signal), 'Apple Music');
+      return track ? answer({ kind: 'track', track }) : answer({ kind: 'unavailable', reason: 'Apple Music has no song at that address in this storefront.' });
+    }
+    if (link.kind === 'album' && link.id) {
+      const detail = await this.album(`apple-music:${link.id}`, offset, limit, signal);
+      const full = await this.upstream(() => this.itunes.album(link.id!, signal), 'Apple Music');
+      return answer({ kind: 'album', collection: { ref: detail.collection, artworkUrl: detail.album.artworkUrl, covers: coversOf(full?.tracks ?? detail.page.tracks), releaseDate: detail.album.releaseDate, page: detail.page } });
+    }
+    if (link.kind === 'artist' && link.id) {
+      const detail = await this.artist(`apple-music:${link.id}`, {}, signal);
+      return answer({ kind: 'artist', artist: detail.artist });
+    }
+    if (link.kind === 'playlist') return answer({ kind: 'unsupported', reason: 'Apple Music playlists are not in Apple’s public API, so they cannot be listed without an Apple developer account. Albums and songs can.' });
+    return answer({ kind: 'unsupported', reason: 'That Apple Music address is not a song, album or artist.' });
+  }
+
+  private async resolveWithTool(link: MusicLink, offset: number, limit: number, answer: (p: Partial<CatalogResolveResult> & Pick<CatalogResolveResult, 'kind'>) => CatalogResolveResult, signal?: AbortSignal): Promise<CatalogResolveResult> {
+    const label = CATALOG_PLATFORM_LABELS[link.platform];
+    const reader = this.options.linkReader;
+    if (!reader) return answer({ kind: 'unsupported', reason: `${label} links are read by yt-dlp or spotDL, which are not available here.` });
+    const match = link.platform === 'spotify' && link.kind === 'track';
+    let read: LinkRead;
+    try {
+      read = await this.resolveCache.get(`${link.url}|${match ? 'match' : ''}`, () => reader(link.url, { signal, match }));
+    } catch (error) {
+      return answer({ kind: 'unavailable', reason: this.unreadable(link, error) });
+    }
+    const platform: CatalogPlatform = link.platform;
+    if (read.kind === 'track') {
+      const track = trackFromLink(read.track, { platform });
+      return track ? answer({ kind: 'track', track }) : answer({ kind: 'unavailable', reason: `${label} described nothing playable at that address.` });
+    }
+    const all = read.entries
+      .slice(0, CATALOG_COLLECTION_CAP)
+      .map((e) => trackFromLink(e, { platform, owner: link.kind === 'album' ? read.owner : null, album: link.kind === 'album' ? read.title : null }))
+      .filter((t): t is CatalogTrack => t !== null);
+    await this.fillCovers(all, reader, signal);
+    const kind: 'album' | 'playlist' = link.kind === 'album' ? 'album' : 'playlist';
+    const collection: CatalogCollection = {
+      ref: collectionRef(link, kind, read.title, read.owner),
+      artworkUrl: read.artworkUrl,
+      covers: coversOf(all),
+      releaseDate: read.date && /^\d{4}(-\d{2}(-\d{2})?)?$/.test(read.date) ? read.date : null,
+      page: pageOf(all, offset, limit, read.total, read.capped || (read.total ?? 0) > CATALOG_COLLECTION_CAP),
+    };
+    if (link.kind === 'artist') {
+      const artist: CatalogArtist = { id: `${platform}:${link.id ?? link.url}`, name: read.owner ?? read.title, pictureUrl: read.artworkUrl, albumCount: null, fans: null, genre: null, sources: [{ platform, id: link.id, url: link.url, previewUrl: null, matchedBy: 'link' }], rank: 0 };
+      return answer({ kind: 'artist', artist, collection });
+    }
+    return answer({ kind, collection });
+  }
+
+  /**
+   * A list whose entries came without artwork (a SoundCloud set lists addresses only) gets its first
+   * four looked up one by one, two at a time, so its mosaic is never blank. Each answer also fills
+   * that entry's title and artist.
+   */
+  private async fillCovers(tracks: CatalogTrack[], reader: LinkReader, signal?: AbortSignal): Promise<void> {
+    const need = 4 - coversOf(tracks).length;
+    if (need <= 0) return;
+    const missing = tracks.map((t, i) => ({ t, i })).filter(({ t }) => !t.artworkUrl).slice(0, Math.min(need + 2, 6));
+    const one = async ({ t, i }: { t: CatalogTrack; i: number }): Promise<void> => {
+      const url = t.sources[0]?.url;
+      if (!url || coversOf(tracks).length >= 4) return;
+      const read = await this.resolveCache.get(`${url}|`, () => reader(url, { signal })).catch(() => null);
+      if (read?.kind !== 'track') return;
+      const filled = trackFromLink(read.track, { platform: t.sources[0]!.platform });
+      if (filled) tracks[i] = { ...filled, id: t.id, album: t.album ?? filled.album, sources: mergeSources(t.sources, filled.sources) };
+    };
+    for (let k = 0; k < missing.length; k += 2) await Promise.all(missing.slice(k, k + 2).map(one));
+  }
+
+  private unreadable(link: MusicLink, error: unknown): string {
+    const said = describeError(error);
+    if (link.platform === 'spotify' && (link.kind === 'playlist' || link.kind === 'unknown')) {
+      return `Spotify would not list this playlist. It is private, or one Spotify made itself (Spotify’s API does not share those with other apps). spotDL said: ${said}`;
+    }
+    if (error instanceof LinkReadError && error.code === 'tool-missing') return said;
+    if (error instanceof LinkReadError && error.code === 'busy') return `Too many links are being read at once. Try again in a moment. (${said})`;
+    return `${CATALOG_PLATFORM_LABELS[link.platform]} could not be read: ${said}`;
+  }
+
+  /** Tidal, Qobuz and Amazon Music publish no keyless API; with a SongLink key their links still resolve. */
+  private async resolveWithOdesli(link: MusicLink, answer: (p: Partial<CatalogResolveResult> & Pick<CatalogResolveResult, 'kind'>) => CatalogResolveResult, signal?: AbortSignal): Promise<CatalogResolveResult> {
+    const label = CATALOG_PLATFORM_LABELS[link.platform];
+    if (!this.odesli.configured) return answer({ kind: 'unsupported', reason: `${label} has no public API to read a link with, and SongLink (which could) now needs a key. An administrator can add one in the catalog settings.` });
+    const found = await this.odesli.links(link.url, signal);
+    if (!found || !found.title) return answer({ kind: 'unavailable', reason: `SongLink did not recognise that ${label} link.` });
+    const own: CatalogSource = { platform: link.platform, id: link.id, url: link.url, previewUrl: null, matchedBy: 'link' };
+    const sources = mergeSources([own], found.sources);
+    if (found.kind === 'album' || link.kind === 'album') {
+      // The album's songs come from the same album on Deezer when SongLink names it there.
+      const dz = sources.find((s) => s.platform === 'deezer' && s.id);
+      if (dz?.id) {
+        const detail = await this.album(`deezer:${dz.id}`, 0, CATALOG_COLLECTION_CAP, signal).catch(() => null);
+        if (detail) return answer({ kind: 'album', collection: { ref: collectionRef(link, 'album', found.title, found.artist), artworkUrl: found.artworkUrl ?? detail.album.artworkUrl, covers: coversOf(detail.page.tracks), releaseDate: detail.album.releaseDate, page: detail.page } });
+      }
+      return answer({ kind: 'album', collection: { ref: collectionRef(link, 'album', found.title, found.artist), artworkUrl: found.artworkUrl, covers: found.artworkUrl ? [found.artworkUrl] : [], releaseDate: null, page: { tracks: [], offset: 0, limit: 1, total: null, hasMore: false, capped: false } }, reason: `${label} albums list their songs only when the same album is on Deezer.` });
+    }
+    const track: CatalogTrack = { id: `${link.platform}:${link.id ?? link.url}`, title: found.title, artist: found.artist ?? '', artists: found.artist ? [found.artist] : [], album: null, albumArtist: null, durationMs: null, isrc: null, artworkUrl: found.artworkUrl, releaseDate: null, year: null, trackNumber: null, discNumber: null, bpm: null, explicit: null, genre: null, label: null, sources, rank: 0 };
+    return answer({ kind: 'track', track });
+  }
+
+  /* ---------------------------------------------------- lyrics, enrichment */
+
+  lyrics(input: { title: string; artist: string; album?: string | undefined; durationSec?: number | undefined }, signal?: AbortSignal): Promise<CatalogLyrics> {
+    const key = JSON.stringify([input.title.toLowerCase(), input.artist.toLowerCase(), input.album?.toLowerCase() ?? null, input.durationSec ?? null]);
+    return this.lyricsCache.get(key, () => this.upstream(() => this.lrclib.lyrics(input, signal), 'LRCLIB'));
+  }
+
+  /** MusicBrainz's genre, label and year for a song, and its other homes. Cached for a day. */
+  enrich(input: { isrc?: string | null | undefined; title?: string | null | undefined; artist?: string | null | undefined; durationMs?: number | null | undefined }, signal?: AbortSignal): Promise<CatalogEnrichment> {
+    const key = input.isrc ? `isrc:${input.isrc}` : JSON.stringify([input.title?.toLowerCase(), input.artist?.toLowerCase(), input.durationMs ? Math.round(input.durationMs / 5000) : null]);
+    return this.enrichCache.get(key, () => this.upstream(() => this.musicbrainz.enrich(input, signal), 'MusicBrainz'));
+  }
+
+  /** Enrichment with the song's other homes added (Deezer by ISRC; SongLink with a key). */
+  async enrichWithLinks(input: { isrc?: string | null | undefined; title?: string | null | undefined; artist?: string | null | undefined; durationMs?: number | null | undefined }, signal?: AbortSignal): Promise<CatalogEnrichment> {
+    const base = await this.enrich(input, signal);
+    const isrc = input.isrc ?? base.isrc;
+    const extra = await this.crossLinks({ isrc, title: input.title ?? '', artist: input.artist ?? '', durationMs: input.durationMs ?? null, sources: base.sources }, signal).catch(() => [] as CatalogSource[]);
+    return { ...base, isrc, sources: mergeSources(base.sources, extra) };
+  }
+
+  /** Whether two rows are one recording (exported for the player's own merging). */
+  static sameRecording = sameRecording;
+}

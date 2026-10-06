@@ -1,0 +1,447 @@
+{
+  "artist-credit": [
+    {
+      "name": "Daft Punk",
+      "joinphrase": " feat. ",
+      "artist": {
+        "id": "056e4f3e-d505-4dad-8ec1-d04f521cbb56",
+        "name": "Daft Punk",
+        "sort-name": "Daft Punk",
+        "genres": [
+          {
+            "count": 2,
+            "name": "club",
+            "disambiguation": "",
+            "id": "bab69b07-8bb9-4415-b666-c37609cef80b"
+          },
+          {
+            "count": 6,
+            "id": "e5bba957-8c91-496a-a675-c6d0c6b51c33",
+            "disambiguation": "",
+            "name": "dance"
+          },
+          {
+            "name": "disco",
+            "id": "a04d680b-b5c5-4f6a-87a3-f9f1ff98e3ea",
+            "disambiguation": "",
+            "count": 4
+          }
+        ]
+      }
+    },
+    {
+      "name": "Pharrell Williams",
+      "joinphrase": " & ",
+      "artist": {
+        "id": "149f91ef-1287-46da-9a8e-87fee02f1471",
+        "name": "Pharrell Williams",
+        "sort-name": "Williams, Pharrell",
+        "genres": [
+          {
+            "count": 5,
+            "name": "contemporary r&b",
+            "id": "4bb4043a-0ee5-4b84-93fa-6ba4567a6ba0",
+            "disambiguation": ""
+          },
+          {
+            "count": 1,
+            "name": "funk",
+            "id": "fe4ba6a1-9873-4fd0-a12b-a70c81818514",
+            "disambiguation": ""
+          },
+          {
+            "name": "hip hop",
+            "id": "52faa157-6bad-4d86-a0ab-d4dec7d2513c",
+            "disambiguation": "",
+            "count": 5
+          }
+        ]
+      }
+    },
+    {
+      "name": "Nile Rodgers",
+      "joinphrase": "",
+      "artist": {
+        "id": "c6d571dd-c0ae-4ac8-9500-780b1b9b25e5",
+        "name": "Nile Rodgers",
+        "sort-name": "Rodgers, Nile",
+        "genres": [
+          {
+            "count": 1,
+            "name": "club",
+            "disambiguation": "",
+            "id": "bab69b07-8bb9-4415-b666-c37609cef80b"
+          },
+          {
+            "name": "contemporary r&b",
+            "id": "4bb4043a-0ee5-4b84-93fa-6ba4567a6ba0",
+            "disambiguation": "",
+            "count": 1
+          },
+          {
+            "count": 1,
+            "name": "dance",
+            "disambiguation": "",
+            "id": "e5bba957-8c91-496a-a675-c6d0c6b51c33"
+          }
+        ]
+      }
+    }
+  ],
+  "disambiguation": "",
+  "title": "Get Lucky",
+  "length": 369000,
+  "isrcs": ["USQX91300108"],
+  "releases": [
+    {
+      "quality": "normal",
+      "packaging": null,
+      "tags": [],
+      "title": "Get Lucky (radio edit)",
+      "text-representation": {
+        "script": null,
+        "language": null
+      },
+      "country": null,
+      "disambiguation": "",
+      "packaging-id": null,
+      "date": "2013-04-19",
+      "genres": [],
+      "barcode": null,
+      "status-id": null,
+      "status": null,
+      "id": "e967be84-9831-4578-a535-c4eb12ec8f8b"
+    },
+    {
+      "tags": [
+        {
+          "name": "disco",
+          "count": 1
+        },
+        {
+          "count": 1,
+          "name": "electronic"
+        }
+      ],
+      "packaging": "Jewel Case",
+      "quality": "normal",
+      "disambiguation": "",
+      "packaging-id": "ec27701a-4a22-37f4-bfac-6616e0f9750a",
+      "country": "DE",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "title": "Random Access Memories",
+      "genres": [
+        {
+          "disambiguation": "",
+          "id": "a04d680b-b5c5-4f6a-87a3-f9f1ff98e3ea",
+          "name": "disco",
+          "count": 1
+        },
+        {
+          "id": "89255676-1f14-4dd8-bbad-fca839d6aff4",
+          "disambiguation": "",
+          "name": "electronic",
+          "count": 1
+        }
+      ],
+      "barcode": "0888837168625",
+      "date": "2013-05-17",
+      "status": "Official",
+      "id": "f6758afb-ecff-410e-8979-b131cfa3c6d3",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe"
+    },
+    {
+      "id": "bbfc83ad-826f-4957-893d-a808105c828b",
+      "status": "Official",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "date": "2013-05-17",
+      "barcode": "0888837168625",
+      "genres": [],
+      "packaging-id": "ec27701a-4a22-37f4-bfac-6616e0f9750a",
+      "disambiguation": "",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "title": "Random Access Memories",
+      "country": "AU",
+      "packaging": "Jewel Case",
+      "tags": [],
+      "quality": "normal"
+    }
+  ],
+  "id": "833f00e1-781f-4edd-90e4-e52712618862",
+  "relations": [
+    {
+      "type": "free streaming",
+      "ended": false,
+      "target-type": "url",
+      "url": {
+        "resource": "https://music.youtube.com/watch?v=4D7u5KF7SP8",
+        "id": "be7cf2d9-0fc6-41af-aaf7-c899461e2bb4"
+      }
+    },
+    {
+      "type": "free streaming",
+      "ended": false,
+      "target-type": "url",
+      "url": {
+        "id": "c0292a21-8f57-4b56-997a-fa6ed7a8f5e7",
+        "resource": "https://open.spotify.com/track/118Opfz7qv2KA1g3Pmyk9T"
+      }
+    },
+    {
+      "type": "free streaming",
+      "ended": false,
+      "target-type": "url",
+      "url": {
+        "id": "2a8a5a4d-0dab-4a08-99f4-0850362f583d",
+        "resource": "https://open.spotify.com/track/2olIQt0rL0hOHau1SJ4xf2"
+      }
+    },
+    {
+      "type": "free streaming",
+      "ended": false,
+      "target-type": "url",
+      "url": {
+        "id": "4dd7e776-ca4d-463d-bc4e-a4db3ccb73ed",
+        "resource": "https://open.spotify.com/track/66xHyI6ITToQPm7PdOzIyn"
+      }
+    },
+    {
+      "type": "free streaming",
+      "ended": false,
+      "target-type": "url",
+      "url": {
+        "id": "73760c48-7afe-4ce8-a6d6-8d3b01a53c91",
+        "resource": "https://open.spotify.com/track/69kOkLUCkxIZYexIgSG8rq"
+      }
+    },
+    {
+      "type": "free streaming",
+      "ended": false,
+      "target-type": "url",
+      "url": {
+        "id": "b72265d2-026b-4948-8992-7175046d57de",
+        "resource": "https://www.deezer.com/track/2271581007"
+      }
+    },
+    {
+      "type": "free streaming",
+      "ended": false,
+      "target-type": "url",
+      "url": {
+        "id": "2eee35a3-f283-4ed2-a772-b8c6192f156d",
+        "resource": "https://www.deezer.com/track/67238735"
+      }
+    },
+    {
+      "type": "free streaming",
+      "ended": false,
+      "target-type": "url",
+      "url": {
+        "resource": "https://www.youtube.com/watch?v=5NV6Rdv1a3I",
+        "id": "710733a3-5c17-4d68-8e68-92bffc339eac"
+      }
+    },
+    {
+      "type": "purchase for download",
+      "ended": false,
+      "target-type": "url",
+      "url": {
+        "id": "1bb429d1-6aad-445a-8313-ea210bb2b64f",
+        "resource": "https://music.apple.com/gb/song/1673536443"
+      }
+    },
+    {
+      "type": "purchase for download",
+      "ended": false,
+      "target-type": "url",
+      "url": {
+        "resource": "https://music.apple.com/gb/song/1771867453",
+        "id": "3b02528f-241a-4977-9f5a-9b938861bc2d"
+      }
+    },
+    {
+      "type": "purchase for download",
+      "ended": false,
+      "target-type": "url",
+      "url": {
+        "id": "5a4c9376-9a9f-46d6-a552-3be6a77ed739",
+        "resource": "https://music.apple.com/us/song/1673536443"
+      }
+    },
+    {
+      "type": "purchase for download",
+      "ended": false,
+      "target-type": "url",
+      "url": {
+        "id": "37a49bed-4486-4335-a173-514e1e26ee26",
+        "resource": "https://open.qobuz.com/track/209446467"
+      }
+    },
+    {
+      "type": "purchase for download",
+      "ended": false,
+      "target-type": "url",
+      "url": {
+        "resource": "https://open.qobuz.com/track/9140031",
+        "id": "e7f77f70-1d70-4d5e-8ec6-5158bfd43b15"
+      }
+    },
+    {
+      "type": "purchase for download",
+      "ended": false,
+      "target-type": "url",
+      "url": {
+        "id": "619acc71-9d47-43a8-b262-0c117468b3c4",
+        "resource": "https://www.beatport.com/track/get-lucky/17721194"
+      }
+    },
+    {
+      "type": "streaming",
+      "ended": false,
+      "target-type": "url",
+      "url": {
+        "resource": "https://music.apple.com/gb/song/1673536443",
+        "id": "1bb429d1-6aad-445a-8313-ea210bb2b64f"
+      }
+    },
+    {
+      "type": "streaming",
+      "ended": false,
+      "target-type": "url",
+      "url": {
+        "resource": "https://music.apple.com/us/song/1673536443",
+        "id": "5a4c9376-9a9f-46d6-a552-3be6a77ed739"
+      }
+    },
+    {
+      "type": "streaming",
+      "ended": false,
+      "target-type": "url",
+      "url": {
+        "resource": "https://music.apple.com/us/song/617154366",
+        "id": "74fedc9f-c847-4644-8e1b-fcab46482700"
+      }
+    },
+    {
+      "type": "streaming",
+      "ended": false,
+      "target-type": "url",
+      "url": {
+        "resource": "https://open.qobuz.com/track/209446467",
+        "id": "37a49bed-4486-4335-a173-514e1e26ee26"
+      }
+    },
+    {
+      "type": "streaming",
+      "ended": false,
+      "target-type": "url",
+      "url": {
+        "id": "e7f77f70-1d70-4d5e-8ec6-5158bfd43b15",
+        "resource": "https://open.qobuz.com/track/9140031"
+      }
+    },
+    {
+      "type": "streaming",
+      "ended": false,
+      "target-type": "url",
+      "url": {
+        "resource": "https://tidal.com/track/20115564",
+        "id": "3a65461f-cec3-4fd1-ab14-7a904a243735"
+      }
+    },
+    {
+      "type": "streaming",
+      "ended": false,
+      "target-type": "url",
+      "url": {
+        "resource": "https://tidal.com/track/211822900",
+        "id": "066074ce-e0f2-4c04-a87e-4655f0a006c0"
+      }
+    },
+    {
+      "type": "streaming",
+      "ended": false,
+      "target-type": "url",
+      "url": {
+        "id": "283a6a86-29b2-4691-ae4f-21d7e6f21e74",
+        "resource": "https://tidal.com/track/293301151"
+      }
+    }
+  ],
+  "video": false,
+  "first-release-date": "2013-04-19",
+  "genres": [
+    {
+      "count": 2,
+      "disambiguation": "",
+      "id": "e5bba957-8c91-496a-a675-c6d0c6b51c33",
+      "name": "dance"
+    },
+    {
+      "id": "a04d680b-b5c5-4f6a-87a3-f9f1ff98e3ea",
+      "disambiguation": "",
+      "name": "disco",
+      "count": 5
+    },
+    {
+      "disambiguation": "",
+      "id": "60f00d05-df4d-496e-8f5a-c45c03a56ad4",
+      "name": "electro",
+      "count": 1
+    },
+    {
+      "count": 5,
+      "disambiguation": "",
+      "id": "89255676-1f14-4dd8-bbad-fca839d6aff4",
+      "name": "electronic"
+    },
+    {
+      "count": 1,
+      "name": "electronica",
+      "id": "53a3cea3-17af-4421-a07a-5824b540aeb5",
+      "disambiguation": ""
+    },
+    {
+      "id": "5acda04e-995d-4f79-9a66-5fe6a977ce15",
+      "disambiguation": "",
+      "name": "french house",
+      "count": 1
+    },
+    {
+      "id": "fe4ba6a1-9873-4fd0-a12b-a70c81818514",
+      "disambiguation": "",
+      "name": "funk",
+      "count": 5
+    },
+    {
+      "count": 1,
+      "id": "a2782cb6-1cd0-477c-a61d-b3f8b42dd1b3",
+      "disambiguation": "",
+      "name": "house"
+    },
+    {
+      "name": "pop",
+      "disambiguation": "",
+      "id": "911c7bbb-172d-4df8-9478-dbff4296e791",
+      "count": 3
+    },
+    {
+      "name": "progressive house",
+      "id": "70adb285-e1f7-458a-823f-5cbda5e291c4",
+      "disambiguation": "",
+      "count": 2
+    },
+    {
+      "name": "synth-pop",
+      "disambiguation": "",
+      "id": "988e91a3-3341-416d-b7f8-7dbef6848dac",
+      "count": 1
+    }
+  ]
+}
