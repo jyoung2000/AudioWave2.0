@@ -1,0 +1,197 @@
+{
+  "about": "Stock songs for the player mockup's search: invented artists and albums, no real recordings. The capture answers the shell's search (iTunes) and tempo (Deezer) lookups from this list, and the mockup's search behaviour filters the same list as you type. Fields: t title, a artist, al album, d seconds, bpm, genre.",
+  "songs": [
+    {
+      "t": "Harbour Lights",
+      "a": "Cassette Bloom",
+      "al": "Harbour Lights",
+      "d": 214,
+      "bpm": 118,
+      "genre": "Indie Pop"
+    },
+    {
+      "t": "Harbour Wall",
+      "a": "Cassette Bloom",
+      "al": "Harbour Lights",
+      "d": 187,
+      "bpm": 120,
+      "genre": "Indie Pop"
+    },
+    {
+      "t": "Harbour Morning (Acoustic)",
+      "a": "Alder Quartet",
+      "al": "First Light Sessions",
+      "d": 212,
+      "bpm": 92,
+      "genre": "Folk"
+    },
+    {
+      "t": "Harbourside",
+      "a": "Birch Ensemble",
+      "al": "Late Shift (Demos)",
+      "d": 233,
+      "bpm": 84,
+      "genre": "Jazz"
+    },
+    {
+      "t": "Paper Harbour (Live)",
+      "a": "Birch Ensemble",
+      "al": "Live at the Granary",
+      "d": 251,
+      "bpm": 88,
+      "genre": "Jazz"
+    },
+    {
+      "t": "Harbour Fog",
+      "a": "Low Tide Signal",
+      "al": "Coastal Static",
+      "d": 302,
+      "bpm": 76,
+      "genre": "Ambient"
+    },
+    {
+      "t": "Night Harbour",
+      "a": "Velvet Orchard",
+      "al": "Small Hours",
+      "d": 198,
+      "bpm": 104,
+      "genre": "Dream Pop"
+    },
+    {
+      "t": "Ember Season",
+      "a": "Cassette Bloom",
+      "al": "Harbour Lights",
+      "d": 203,
+      "bpm": 116,
+      "genre": "Indie Pop"
+    },
+    {
+      "t": "Blue Hour",
+      "a": "Alder Quartet",
+      "al": "First Light",
+      "d": 205,
+      "bpm": 96,
+      "genre": "Folk"
+    },
+    {
+      "t": "Blue Static",
+      "a": "Low Tide Signal",
+      "al": "Coastal Static",
+      "d": 244,
+      "bpm": 72,
+      "genre": "Ambient"
+    },
+    {
+      "t": "Blue Carousel",
+      "a": "Marigold Radio",
+      "al": "Funfair Season",
+      "d": 176,
+      "bpm": 126,
+      "genre": "Indie Rock"
+    },
+    {
+      "t": "Midnight Tram",
+      "a": "Velvet Orchard",
+      "al": "Small Hours",
+      "d": 221,
+      "bpm": 110,
+      "genre": "Dream Pop"
+    },
+    {
+      "t": "Night Shift",
+      "a": "Juniper Avenue",
+      "al": "Overtime",
+      "d": 193,
+      "bpm": 124,
+      "genre": "Synthpop"
+    },
+    {
+      "t": "Neon Pier",
+      "a": "Juniper Avenue",
+      "al": "Overtime",
+      "d": 207,
+      "bpm": 128,
+      "genre": "Synthpop"
+    },
+    {
+      "t": "Copper Moon",
+      "a": "Fennel Grove Trio",
+      "al": "Brass & Bramble",
+      "d": 263,
+      "bpm": 90,
+      "genre": "Jazz"
+    },
+    {
+      "t": "Bramble Waltz",
+      "a": "Fennel Grove Trio",
+      "al": "Brass & Bramble",
+      "d": 189,
+      "bpm": 81,
+      "genre": "Jazz"
+    },
+    {
+      "t": "Gantry Lights",
+      "a": "Marigold Radio",
+      "al": "Funfair Season",
+      "d": 199,
+      "bpm": 132,
+      "genre": "Indie Rock"
+    },
+    {
+      "t": "Tideline (Reprise)",
+      "a": "Alder Quartet",
+      "al": "First Light Sessions",
+      "d": 141,
+      "bpm": 92,
+      "genre": "Folk"
+    },
+    {
+      "t": "Lantern Street",
+      "a": "Quiet Atlas",
+      "al": "Paper Maps",
+      "d": 236,
+      "bpm": 100,
+      "genre": "Singer-Songwriter"
+    },
+    {
+      "t": "Paper Maps",
+      "a": "Quiet Atlas",
+      "al": "Paper Maps",
+      "d": 218,
+      "bpm": 98,
+      "genre": "Singer-Songwriter"
+    },
+    {
+      "t": "Slow Carousel (Strings)",
+      "a": "Birch Ensemble",
+      "al": "Late Shift (Demos)",
+      "d": 274,
+      "bpm": 70,
+      "genre": "Jazz"
+    },
+    {
+      "t": "Morning Ferry",
+      "a": "Quiet Atlas",
+      "al": "Paper Maps",
+      "d": 182,
+      "bpm": 106,
+      "genre": "Singer-Songwriter"
+    },
+    {
+      "t": "Static Bloom",
+      "a": "Low Tide Signal",
+      "al": "Coastal Static",
+      "d": 318,
+      "bpm": 68,
+      "genre": "Ambient"
+    },
+    {
+      "t": "First Light",
+      "a": "Velvet Orchard",
+      "al": "Small Hours",
+      "d": 230,
+      "bpm": 102,
+      "genre": "Dream Pop"
+    }
+  ]
+}

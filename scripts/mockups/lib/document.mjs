@@ -5,6 +5,8 @@
  *                                     source file, so a line here is the same line there
  *   <template data-mock-state="id">   one per screen or state, the app's markup as it was drawn
  *   <script data-mock-runtime>        the mockup's own small navigator (not the app's code)
+ *   <script data-mock-behaviour>      optional: a small script that makes a captured part respond on
+ *                                     stock data (the player's search), its data beside it
  *
  * `sections()` splits a mockup file back into those parts; `pnpm mockups:diff` compares two files
  * section by section.
@@ -14,6 +16,7 @@ import { join } from 'node:path';
 import { escapeAttr, printAttrs, printInner } from './format.mjs';
 
 const RUNTIME = readFileSync(join(import.meta.dirname, 'runtime.js'), 'utf8').replace(/\r\n/g, '\n').trim();
+const behaviourScript = (file) => readFileSync(join(import.meta.dirname, '..', 'behaviours', file), 'utf8').replace(/\r\n/g, '\n').trim();
 
 const attrMap = (list) => new Map(list);
 
@@ -85,6 +88,11 @@ export function writeMockup(doc) {
     lines.push(`<template${printAttrs(meta)}>${inner.replace(/\n$/, '')}\n</template>`);
   }
   lines.push(`<script data-mock-runtime>\n${RUNTIME}\n</script>`);
+  for (const b of doc.behaviours || []) {
+    const data = JSON.stringify(b.data, null, 1).replace(/<\//g, '<\\/');
+    lines.push(`<script type="application/json" data-mock-data="${escapeAttr(b.name)}">\n${data}\n</script>`);
+    lines.push(`<script data-mock-behaviour="${escapeAttr(b.name)}">\n${behaviourScript(b.file)}\n</script>`);
+  }
   lines.push('</body>');
   lines.push('</html>');
   return `${lines.join('\n')}\n`;
@@ -113,6 +121,10 @@ export function sections(text) {
   }
   const runtime = /<script data-mock-runtime>[\s\S]*?<\/script>/.exec(text);
   if (runtime) taken.push([runtime.index, runtime.index + runtime[0].length]);
+  // Behaviours and their stock data are the mockup's tooling, not the app's markup.
+  for (const m of text.matchAll(/<script (?:type="application\/json" data-mock-data|data-mock-behaviour)="[^"]*">[\s\S]*?<\/script>/g)) {
+    taken.push([m.index, m.index + m[0].length]);
+  }
   taken.sort((a, b) => a[0] - b[0]);
   let rest = '';
   let at = 0;

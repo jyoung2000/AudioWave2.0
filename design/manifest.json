@@ -101,6 +101,7 @@
     "tool": "scripts/mockups",
     "fixtures": [
       "scripts/mockups/fixtures/player.json",
+      "scripts/mockups/fixtures/search-catalogue.json",
       "scripts/mockups/fixtures/hub.json",
       "scripts/mockups/fixtures/companion.mjs"
     ],

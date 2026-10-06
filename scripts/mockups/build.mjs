@@ -95,6 +95,7 @@ export async function buildMockups(names, outDir) {
           inputs: inputsHash(ROOT, app.inputs),
           stylesheets,
           states,
+          behaviours: app.behaviours || [],
         });
         if (app.stableIds) html = stableIds(html);
         const file = join(outDir, app.file);

@@ -25,6 +25,20 @@
       ],
       "port": 5174,
       "autoPort": true
+    },
+    {
+      "name": "mockups",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5188",
+        "--bind",
+        "127.0.0.1",
+        "--directory",
+        "design/frontends"
+      ],
+      "port": 5188
     }
   ]
 }

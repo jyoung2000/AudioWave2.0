@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { ROOT, viteBuild } from '../lib/browser.mjs';
 import manifest from '../../../design/manifest.json' with { type: 'json' };
 import fixtures from '../fixtures/player.json' with { type: 'json' };
+import { CATALOGUE, deezerAnswer, itunesAnswer } from '../lib/stock-search.mjs';
 
 const ORIGIN = 'http://127.0.0.1:47910';
 const HELPER = 'http://127.0.0.1:17342';
@@ -98,7 +99,6 @@ const LINKS = [
   { selector: '#ctx [data-act="parent"]', to: 'row-menu-playlists', in: ['row-menu'] },
   { selector: '#ctx .ctx__sub [data-act="new-add"]', to: 'new-playlist-sheet', in: ['row-menu-playlists'] },
   { selector: '#sheetCancel, #sheetCreate', to: 'now-playing', in: ['new-playlist-sheet'] },
-  { selector: '#q', to: 'search', in: ['now-playing'] },
   { selector: '#profile', to: 'settings-stats', in: [...MAIN, 'library', 'recent'] },
   ...SETTINGS.map((id) => ({ selector: `#pt-${id.slice('settings-'.length)}`, to: id, in: [...SETTINGS, 'settings-src-hub'] })),
   { selector: '#prefsBack', to: 'now-playing', in: [...SETTINGS, 'settings-src-hub'] },
@@ -138,6 +138,14 @@ export default {
   unanswered: [/^GET https:\/\/(?:[a-z0-9-]+\.)*(radio-browser\.info|tritondigital\.com|iheart\.com|radio\.co|youtube\.com\/oembed|noembed\.com|deezer\.com|itunes\.apple\.com|musicbrainz\.org|coverartarchive\.org)[/?]/i, /^GET https:\/\/[^ ]+\.(png|jpe?g|ico|svg|webp)(\?|$)/i],
   expectedErrors: [],
   links: LINKS,
+  /** Small readable scripts the mockup runs on its captured markup (not the app's code): search on stock songs. */
+  behaviours: [
+    {
+      name: 'search',
+      file: 'player-search.js',
+      data: { template: 'search', page: 5, clip: 30, songs: CATALOGUE.map(({ t, a, al, d, bpm, art }) => ({ t, a, al, d, bpm, art })) },
+    },
+  ],
 
   async prepare() {
     const dist = await viteBuild({ configFile: 'music-player/vite.config.ts', root: 'music-player', label: 'player' });
@@ -146,6 +154,15 @@ export default {
       origin: ORIGIN,
       now: fixtures.now,
       routes: async (route, url) => {
+        // Search and tempo, answered from the stock songs (lib/stock-search.mjs).
+        if (url.origin === 'https://itunes.apple.com' && url.pathname === '/search') {
+          await route.fulfill(json(itunesAnswer(url.searchParams.get('term') || '')));
+          return true;
+        }
+        if (url.origin === 'https://api.deezer.com') {
+          await route.fulfill({ status: 200, headers: { 'content-type': 'text/javascript' }, body: deezerAnswer(url) });
+          return true;
+        }
         const answer =
           url.origin === HELPER
             ? url.pathname === '/search'
@@ -227,7 +244,21 @@ export default {
     await page.fill('#q', 'harbour');
     await page.press('#q', 'Enter');
     await settle(2500);
-    await snap({ id: 'search', title: 'Search', group: 'Music', note: 'Typing in the search field: this library first, then what the companion finds online.', dismiss: 'now-playing', dismissOutside: '#searchBox' });
+    await snap({ id: 'search', title: 'Search', group: 'Music', note: 'Search runs on Enter: five stock songs a page, each with its cover, a 30-second preview, time and tempo, and + to add it. In this mockup the field searches the stock songs as you type and press Enter; arrows, Page Up/Down and the page buttons move through them.', dismiss: 'now-playing', dismissOutside: '#searchBox' });
+    await page.press('#q', 'PageDown');
+    await settle(1500);
+    await snap({ id: 'search-page-2', title: 'Search ▸ page 2', group: 'Music', note: 'The second page of results, and the dots that count them.', dismiss: 'now-playing', dismissOutside: '#searchBox' });
+    await page.press('#q', 'ArrowDown');
+    await page.press('#q', 'ArrowDown');
+    await settle(300);
+    await snap({ id: 'search-keys', title: 'Search ▸ a row chosen with the keys', group: 'Music', note: 'Arrow keys move the highlight; Enter previews it, Ctrl+Enter adds it.', dismiss: 'now-playing', dismissOutside: '#searchBox' });
+    await page.fill('#q', 'harbour lights');
+    await settle(300);
+    await snap({ id: 'search-stale', title: 'Search ▸ typed, not yet searched', group: 'Music', note: 'Between a keystroke and Enter the rows are the last search’s, dimmed, and the count says what to do.', dismiss: 'now-playing', dismissOutside: '#searchBox' });
+    await page.fill('#q', 'theremin');
+    await page.press('#q', 'Enter');
+    await settle(1500);
+    await snap({ id: 'search-empty', title: 'Search ▸ no matches', group: 'Music', note: 'A search that finds nothing says so, with the words searched for.', dismiss: 'now-playing', dismissOutside: '#searchBox' });
     await page.fill('#q', fixtures.playlistLink);
     await page.press('#q', 'Enter');
     await settle(2500);

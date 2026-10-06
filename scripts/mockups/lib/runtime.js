@@ -57,6 +57,8 @@
     if (focus) focus.focus({ preventScroll: true });
     if (!fromHash) history.replaceState(null, '', '#state=' + t.getAttribute('data-mock-state'));
     panel.update();
+    // Behaviours (the scripts after this one) start again on each state drawn.
+    document.dispatchEvent(new CustomEvent('mockup:show', { detail: { id: t.getAttribute('data-mock-state') } }));
   }
 
   var FORM = 'input, select, textarea, option, label, summary, [contenteditable=""], [contenteditable="true"]';
@@ -159,7 +161,12 @@
     };
   })();
 
-  window.mockup = { show: show, states: order.slice() };
+  window.mockup = {
+    show: show,
+    states: order.slice(),
+    current: function () { return current && current.getAttribute('data-mock-state'); },
+    template: function (id) { return store.get(id) || null; },
+  };
   var start = /#state=([^&]+)/.exec(location.hash);
   show(start && store.has(decodeURIComponent(start[1])) ? decodeURIComponent(start[1]) : order[0], Boolean(start));
 })();
