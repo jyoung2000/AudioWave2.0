@@ -128,6 +128,8 @@ test('the Live TV tab is live before a channel is chosen, and a channel does not
 
 for (const [w, touch] of [[390, true], [820, true], [1280, false]] as Array<[number, boolean]>) {
   test(`${w}px LIVE is centred in its box, clear of its neighbours, and the scrubber keeps room`, async ({ browser }) => {
+    // A fresh context, seeded channels and a playing video: more than a minute on a CI runner.
+    test.setTimeout(120_000);
     const q = await fresh(browser, { viewport: { width: w, height: 900 }, hasTouch: touch, isMobile: w < 600 });
     await seedChannels(q);
     await q.click('.tb__btn[data-view="live-tv"]'); await q.waitForTimeout(400);

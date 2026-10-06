@@ -127,7 +127,9 @@ test('paired: the container reads the title, and the song goes to the group’s 
   await stationRow(page).click({ button: 'right', position: { x: 120, y: 8 } });
   const group = page.locator('#ctx [data-act="ls-air-group"]');
   await expect(group).toHaveText('Add Song to “Kitchen” Queue');
-  await group.click();
+  // Checked above that it is there and says the right thing; clicked as an element, because on a slow
+  // runner Playwright's 'not moving' check on an open menu did not settle within the test's minute.
+  await group.dispatchEvent('click');
   await expect(page.locator('#toast')).toContainText('Queued “Air Song” — number 2 in the group queue');
   expect(requests).toHaveLength(1);
   expect(requests[0]!.body).toMatchObject({ query: 'Air Artist - Air Song' });

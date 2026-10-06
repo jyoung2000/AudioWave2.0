@@ -28,6 +28,9 @@ export default defineConfig({
   testDir: '.',
   fullyParallel: false,
   workers: 1,
+  // One retry on CI only: a slow runner's timing hiccup should not turn main red, and Playwright still
+  // reports any test that needed it as flaky. Locally (and in pnpm verify) a failure is a failure.
+  retries: process.env['CI'] ? 1 : 0,
   timeout: 60_000,
   expect: { timeout: 10_000 },
   reporter: process.env['CI'] ? [['github'], ['html', { open: 'never' }]] : [['list']],

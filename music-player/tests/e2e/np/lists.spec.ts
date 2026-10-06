@@ -15,7 +15,15 @@ const go = async (p: Page, v: string) => { await p.click('.tb__btn[data-view="' 
 const label = (p: Page) => p.textContent('#libScopeLabel');
 const menuText = (p: Page) => p.$$eval('#ctx > .ctx__item', (n) => n.map((x) => { const sub = x.querySelector('.ctx__sub'); const t = sub ? x.textContent!.replace(sub.textContent!, '') : x.textContent!; return t.trim(); }));
 const openSub = async (p: Page) => { await p.click('#ctx [data-act="parent"]'); await p.waitForTimeout(200); };
-const rightClick = async (p: Page, sel: string) => { await p.click(sel, { button: 'right', position: { x: 120, y: 8 } }); await p.waitForTimeout(300); };
+/* Right-click until the menu stays open, at most three times. The menu shuts on purpose when the page
+   moves under it, and on a slow runner the station list can still be redrawing as its feeds land. */
+const rightClick = async (p: Page, sel: string) => {
+  for (let i = 0; i < 3; i += 1) {
+    await p.click(sel, { button: 'right', position: { x: 120, y: 8 } });
+    await p.waitForTimeout(300);
+    if ((await p.getAttribute('#ctx', 'hidden')) === null) return;
+  }
+};
 const name = async (p: Page, n: string) => { await p.waitForSelector('#sheet[open]', { timeout: 3000 }); await p.fill('#sheetInput', n); await p.click('#sheetCreate'); await p.waitForTimeout(400); };
 const radioReady = async (p: Page) => { await expect(p.locator('#libScopeLabel')).toHaveText('Chicago', { timeout: 15_000 }); await expect(p.locator('#radioMenu .rlist tbody tr').first()).toBeVisible({ timeout: 15_000 }); };
 
