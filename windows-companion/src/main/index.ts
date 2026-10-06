@@ -12,10 +12,10 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { writeFile, readFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { format as formatLine } from 'node:util';
-import { CONTRACTS_VERSION, EqPreset, Playlist, WS_PROTOCOL_VERSION, type HelperJob } from '@now-playing/contracts';
+import { CONTRACTS_VERSION, EqPreset, Playlist, WS_PROTOCOL_VERSION, type HelperJob, type SavedCollection } from '@now-playing/contracts';
 import { uuidv7 } from '@now-playing/domain';
 import type { FinishedFile } from '@now-playing/local-helper';
-import { IPC, Preferences, type AppInfo, type BackupSettingsPatch, type FolderKind, type IpcChannel, type LibraryFolder, type PreferencesPatch, type ScanProgress, type StorageReport, type TransferProgress, type TvLinkKind } from '../shared/ipc.js';
+import { IPC, Preferences, type AppInfo, type CatalogFilter, type CatalogSearchIpc, type BackupSettingsPatch, type FolderKind, type IpcChannel, type LibraryFolder, type PreferencesPatch, type ScanProgress, type StorageReport, type TransferProgress, type TvLinkKind } from '../shared/ipc.js';
 import { exportLogs, Log } from './log.js';
 import { probeConnection } from './network.js';
 import { folderBytes, saveDownload } from './storage.js';
@@ -26,6 +26,7 @@ import { FolderWatcher } from './watcher.js';
 import { HubClient } from './hub.js';
 import { BackupManager } from './backup.js';
 import { EmbeddedHelper } from './helper.js';
+import { CompanionCatalog } from './catalog.js';
 import { AwspSupervisor, findAwspBinary } from './awsp.js';
 import { appUrlGuard, applySessionSecurity, applyWindowSecurity, enforceSingleInstance, guardWebContents, isTrustedSender, openExternally } from './security.js';
 import { CompanionStore, openCompanionDb } from './store.js';
@@ -48,6 +49,7 @@ let store: CompanionStore | null = null;
 let hub: HubClient | null = null;
 let backups: BackupManager | null = null;
 let helper: EmbeddedHelper | null = null;
+let catalog: CompanionCatalog | null = null;
 let awsp: AwspSupervisor | null = null;
 let liveTv: LiveTv | null = null;
 let updates: UpdateChecker | null = null;
@@ -701,6 +703,30 @@ function registerHandlers(): void {
   handle('tv:remove', (request) => liveTv!.remove((request as { id: string }).id));
   handle('tv:refresh', (request) => liveTv!.refresh((request as { id: string }).id));
 
+  // The music catalog (DEC-039): the embedded helper's /helper/v1/catalog/*, asked from here.
+  handle('catalog:search', (request) => catalog!.search(request as CatalogSearchIpc));
+  handle('catalog:cancel', (request) => catalog!.cancel((request as { searchId: string }).searchId));
+  handle('catalog:album', (request) => {
+    const r = request as { id: string; offset: number; limit: number };
+    return catalog!.album(r.id, r.offset, r.limit);
+  });
+  handle('catalog:artist', (request) => {
+    const r = request as { id: string; albumsOffset: number };
+    return catalog!.artist(r.id, r.albumsOffset);
+  });
+  handle('catalog:resolve', (request) => {
+    const r = request as { url: string; offset: number; limit: number };
+    return catalog!.resolve(r.url, r.offset, r.limit);
+  });
+  handle('catalog:lyrics', (request) => catalog!.lyrics(request as { title: string; artist: string }));
+  handle('catalog:enrich', (request) => catalog!.enrich(request as { isrc?: string }));
+  handle('catalog:download', (request) => catalog!.download(request as Parameters<CompanionCatalog['download']>[0]));
+  handle('catalog:saved', () => catalog!.saved());
+  handle('catalog:save', (request) => catalog!.save(request as SavedCollection));
+  handle('catalog:unsave', (request) => catalog!.unsave(request as Pick<SavedCollection['ref'], 'platform' | 'kind' | 'id'>));
+  handle('catalog:filter', () => catalog!.filter());
+  handle('catalog:filter:set', (request) => catalog!.setFilter(request as CatalogFilter));
+
   handle('backup:export-playlists', async () => {
     const playlists = store!.listPlaylists();
     if (!playlists.length) return { path: null, count: 0, reason: 'There are no playlists to export.' };
@@ -814,6 +840,14 @@ if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow())))
       onJobFinished: (job, files) => void onDownloadFinished(job, files),
       // The player reads its channels and its now/next from here (GET /helper/v1/tv/…).
       tv: { channels: () => liveTv!.channels(), guide: () => liveTv!.guide() },
+    });
+    catalog = new CompanionCatalog({
+      helper: () => {
+        const status = helper!.status();
+        return { origin: status.origin, token: status.running ? helper!.token() : null, reason: status.reason };
+      },
+      store: store!,
+      send: (payload) => send('event:catalog-chunk', payload),
     });
     applySessionSecurity(session.defaultSession, DEV_SERVER_URL, isAppUrl);
     registerHandlers();
