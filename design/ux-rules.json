@@ -2197,7 +2197,7 @@
       "id": "NP-FIND-003",
       "group": "np-find",
       "title": "Search is music, live: songs, artists and albums in sections, each naming its platforms",
-      "contract": "A search in the header (Enter) asks the catalog — the paired hub's /api/v1/catalog/search with the device credential, else the companion's /helper/v1/catalog/search, else the engine run in this browser against the keyless services that answer a page (iTunes, MusicBrainz and LRCLIB over CORS; Deezer over JSONP) — and reads its NDJSON as it arrives. Rows appear as each service answers and upsert by id (a later chunk's merged copy replaces its row in place); they are sorted by rank, ties by arrival. The popover shows Songs (five), Artists (three) and Albums (three), each section with \"See all\" when there are more. Every row shows each platform it is on as a small badge (Apple Music, Deezer, YouTube, YouTube Music, SoundCloud, Bandcamp, Spotify, MusicBrainz…); a Spotify song says \"plays from YouTube Music\". A quiet line under the count names every service in the engine's states — a count, searching…, nothing, failed, timed out, cooling down until a time, needs yt-dlp — with the reason on hover, and who answered. A failure says plainly what happened. Arrows move through every row of every section, Page Up/Down by five, Enter auditions a song with a clip or opens what it is on, Ctrl/Cmd+Enter adds the song, Escape goes back a level and then closes; the rows are a listbox of groups with options, and a live region says the counts.",
+      "contract": "A search in the header (Enter) asks the catalog — the paired hub's /api/v1/catalog/search with the device credential, else the companion's /helper/v1/catalog/search, else the engine run in this browser against the keyless services that answer a page (iTunes, MusicBrainz and LRCLIB over CORS; Deezer over JSONP) — and reads its NDJSON as it arrives. Rows appear as each service answers and upsert by id (a later chunk's merged copy replaces its row in place); they are sorted by rank, ties by arrival. The popover shows Songs (five), Artists (three) and Albums (three), each section with \"See all\" when there are more. Every row shows each platform it is on as a small badge (Apple Music, Deezer, YouTube, YouTube Music, SoundCloud, Bandcamp, Spotify, MusicBrainz…); a Spotify song says \"plays from YouTube Music\". A quiet line under the count names every service in the engine's states — a count, searching…, nothing, failed, timed out, cooling down until a time, needs yt-dlp — with the reason on hover, and who answered. A failure says plainly what happened. Arrows move through every row of every section (Page Up/Down turn the results page, NP-FIND-004; in a long list they move five rows), Enter auditions a song with a clip or opens what it is on, Ctrl/Cmd+Enter adds the song, Escape goes back a level and then closes; the rows are a listbox of groups with options, and a live region says the counts.",
       "example": "“harbour”: Results: 12 songs · 2 artists · 2 albums — Apple Music 6 · Deezer 9 · MusicBrainz cooling down until 12:05 · YouTube 4 · SoundCloud failed — through the companion on this PC.",
       "authority": "adopted",
       "owners": [
@@ -2243,8 +2243,8 @@
     {
       "id": "NP-FIND-004",
       "group": "np-find",
-      "title": "“See all” is one section that scrolls on until it is all there",
-      "contract": "A section's \"See all\" opens that section alone, under a Back button, with what the overview already had; the next page (offset +25, the same query, that section only) is asked at once and again whenever the list is scrolled near its end or the keys reach its last row, while the server says more may exist (to its offset limit of 1000). A song that a later page brings again — by id or as the same recording — is not shown twice. \"Loading more…\" shows while a page is coming; the end says \"That’s all N songs.\"",
+      "title": "Results page with ‹ › and a page count; “See all” scrolls on until it is all there",
+      "contract": "The results paginate: each page shows the next five songs, three artists and three albums, and the footer's ‹ › and dots turn it with \"Page N of M\" (\"M+\" while a section says more exist). Page Up / Page Down turn it from the field, and the arrows run off a page's last row onto the next and off its first onto the one before. A page beyond what has arrived is fetched, not sliced from the first answer: the same query, that section only, from its next offset (offset / limit / hasMore, as the engine pages), asked a page ahead of the one shown; a page that turns out empty steps back. A section's \"See all\" opens that section alone, under a Back button, with what the results already had; its next page is asked at once and again whenever the list is scrolled near its end or the keys reach its last row, while the server says more may exist (to its offset limit of 1000). A song that a later page brings again — by id or as the same recording — is not shown twice. \"Loading more…\" shows while a page is coming; the end says \"That’s all N songs.\"",
       "example": "",
       "authority": "adopted",
       "owners": [
@@ -2255,6 +2255,11 @@
         "music-player/index.html"
       ],
       "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
+          "name": "the results page: ‹ › and Page Up/Down turn it, with a page count, and later pages are fetched from the next offset"
+        },
         {
           "type": "test",
           "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
@@ -2325,8 +2330,8 @@
       "id": "NP-FIND-007",
       "group": "np-find",
       "title": "A pasted album or playlist is one listing that opens in the music list like an album",
-      "contract": "A pasted album or playlist (catalog/resolve, kind album or playlist) is one listing, not a page of rows: its title, its platform as a badge and in words with its owner and song count, and a cover that is a 2×2 mosaic of the first four songs' covers — or the list's own cover when fewer than four songs have one. Choosing it (or an album's \"Open in Music\") opens it in the music list the way an album opens: the silver bar names it, with \"Playlist · Spotify · N of M songs\", its songs are the rows in the list's order, read page after page (offset/limit) up to the cap of 200, which the bar says as \"(the first 200)\" when it left songs out. The songs are on show, not added: + or the Download key (through the helper) makes one the person's. Clearing the bar returns to the library.",
-      "example": "“Lantern Mix”, Playlist on Spotify · Ada · 230 songs → the bar: Playlist · Spotify · 200 of 230 songs (the first 200) — Lantern Mix ☆ ⓧ.",
+      "contract": "A pasted album or playlist (catalog/resolve, kind album or playlist) is one listing, not a page of rows: its title, its platform as a badge and in words with its owner and song count, and a cover that is a 2×2 mosaic of the first four songs' covers — or the list's own cover when fewer than four songs have one. Choosing it (or an album's \"Open in Music\") opens it in the music list the way an album opens: the silver bar names it and its songs are the rows, in the list's order. Every song loads, from any platform, with no cap: pages of up to 200 (offset / limit) are asked until the server says hasMore is false, the bar saying \"Playlist · Spotify · Loading 400 of 1,250…\" meanwhile and \"1,250 songs\" when done, and the rows already there can be played and fetched while the rest arrive (a server that still caps a list says \"(the first N)\"; one that fails part way says where it stopped). The songs are on show, not added: + or the Download key (through the helper) makes one the person's. Clearing the bar returns to the library.",
+      "example": "“Lantern Mix”, Playlist on Spotify · Ada · 1,250 songs → the bar: Playlist · Spotify · Loading 300 of 1,250… — Lantern Mix ☆ ⓧ, then Playlist · Spotify · 1,250 songs.",
       "authority": "adopted",
       "owners": [
         "music-player/src/shell/search/index.ts",
@@ -2339,7 +2344,7 @@
         {
           "type": "test",
           "path": "music-player/tests/e2e/np/collections.spec.ts",
-          "name": "a pasted playlist: its platform, a 2×2 mosaic, and opened, the music list names it and lists its songs page by page"
+          "name": "a pasted playlist: its platform, a 2×2 mosaic, and opened, the music list names it and loads every song, page by page"
         },
         {
           "type": "test",

@@ -15,6 +15,17 @@ the companion get theirs from another agent). Requirements: `2026-10-06-search-u
   `SavedCollection`s in `library:state.collections`; the library menu's kept Playlists and Albums; the Download key
   for a song on show; `window.NP_FETCH`). The old inline search (and `findLinks` / `.srch__pf`) is gone.
 
+## Paging (owner, 2026-10-06, second round)
+
+- The results paginate (‹ › dots, "Page N of M+", Page Up/Down, arrows across page edges). A page beyond what arrived is
+  fetched per section from its next offset (`done.page[section].offset + limit`, then +25), a page ahead of the one
+  shown; "See all" uses the same fetch and keeps its infinite scroll.
+- An album or playlist opened in the music list loads every song: `catalog/resolve` (or `catalog/album` for Deezer and
+  Apple albums) in pages of 200 from the next offset until `hasMore` is false — no 200 cap in the player. The bar says
+  "Loading 400 of 1,250…" meanwhile and the rows on show stay usable. The engine's whole-playlist paging is the
+  hub/companion agent's (see `2026-10-06-catalog-engine.md`); the player relies only on offset/limit/total/hasMore.
+  Until servers drop the old cap, a capped answer still says "(the first N)".
+
 ## Who answers
 
 1. The paired hub: `/api/v1/catalog/*`, `Authorization: Bearer <credentialId>.<secret>` (as `hubSearch` did). A hub

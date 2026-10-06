@@ -2281,7 +2281,26 @@ replace("    function song(id) { for (var i = 0; i < LIB.length; i++) if (LIB[i]
         "      return null;\n"
         "    }")
 replace("      var rows = LIB.filter(function (sg) { return inView(sg) && inFocus(sg) && inQuery(sg); });",
-        "      var rows = (focus && focus.rows ? focus.rows : LIB).filter(function (sg) { return inView(sg) && inFocus(sg) && inQuery(sg); });")
+        "      var rows = (focus && focus.rows ? focus.rows : LIB).filter(function (sg) { return inView(sg) && inFocus(sg) && inQuery(sg); });\n"
+        "      /* a catalog list is already in its own order: thousands of rows need no sort to keep it */\n"
+        "      if (focus && focus.rows && !sortExplicit) return rows;")
+
+# The pager under the popover (NP-FIND-004): ‹ dots › with the page count, reachable by Tab as well as
+# Page Up / Page Down from the field.
+replace('''        <div class="srch__foot" id="srchFoot" hidden>
+          <button class="srch__page" type="button" id="srchPrev" tabindex="-1" aria-label="Previous page">&#8249;</button>
+          <span class="srch__dots" id="srchDots" aria-hidden="true"></span>
+          <button class="srch__page" type="button" id="srchNext" tabindex="-1" aria-label="Next page">&#8250;</button>
+        </div>''', '''        <div class="srch__foot" id="srchFoot" hidden>
+          <button class="srch__page" type="button" id="srchPrev" aria-label="Previous page">&#8249;</button>
+          <span class="srch__dots" id="srchDots" aria-hidden="true"></span>
+          <button class="srch__page" type="button" id="srchNext" aria-label="Next page">&#8250;</button>
+          <span class="srch__pageof" id="srchPageOf"></span>
+        </div>''')
+replace("  .srch__dots i.is-on { background: var(--srch-dot-on); }\n",
+        "  .srch__dots i.is-on { background: var(--srch-dot-on); }\n"
+        "  .srch__pageof { margin-left: 4px; color: var(--srch-soft); font-size: 10px; font-variant-numeric: tabular-nums; }\n"
+        "  .srch__page:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }\n")
 replace("      var kind = KIND_LABEL[focus.kind] || '';\n",
         "      var kind = focus.kindLabel || KIND_LABEL[focus.kind] || '';\n")
 replace("    function paintScope() {\n      if (!scope) return;\n",
@@ -2307,11 +2326,15 @@ replace("    var say = window.say;\n\n    /* ---- rows ---- */\n",
       for (var i = 0; i < l.length; i++) if (l[i].ref.platform === ref.platform && l[i].ref.kind === ref.kind && l[i].ref.id === ref.id) return i;
       return -1;
     }
+    /* "Playlist \u00b7 Spotify \u00b7 Loading 400 of 1,250\u2026" while pages arrive (the rows are usable meanwhile),
+       then "Playlist \u00b7 Spotify \u00b7 1,250 songs": every song, however long the list. */
     function colKind(c, n) {
       var total = c.trackCount != null ? c.trackCount : null;
+      var num = function (x) { return Number(x).toLocaleString('en-US'); };
       var words = (c.ref.kind === 'album' ? 'Album' : 'Playlist') + ' \u00b7 ' + c.platformLabel;
-      if (n || total) words += ' \u00b7 ' + n + (total && total > n ? ' of ' + total : '') + (n === 1 && !total ? ' song' : ' songs');
-      if (c.capped) words += ' (the first ' + n + ')';
+      if ((c.hasMore || c.loading) && !c.error) words += ' \u00b7 Loading ' + num(n) + (total ? ' of ' + num(total) : '') + '\u2026';
+      else if (n || total) words += ' \u00b7 ' + num(n) + (total && total > n ? ' of ' + num(total) : '') + (n === 1 && !total ? ' song' : ' songs');
+      if (c.capped) words += ' (the first ' + num(n) + ')';
       return words;
     }
     function paintStar() {
@@ -2367,9 +2390,11 @@ replace("    var say = window.say;\n\n    /* ---- rows ---- */\n",
         if (my !== colSeq || focus !== f) return;
         f.col.loading = false;
         f.col.error = (err && err.message) || 'The list could not be read just now.';
+        f.kindLabel = colKind(f.col, f.rows.length);
         paintScope();
         render();
-        if (!f.rows.length) say(f.col.error);
+        /* with rows already on show, the list stays; it says why it stopped */
+        say(f.rows.length ? 'Stopped at ' + f.rows.length + ' songs: ' + f.col.error : f.col.error);
       });
     }
     function savedItems(kind) {

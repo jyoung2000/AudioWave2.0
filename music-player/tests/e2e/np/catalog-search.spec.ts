@@ -116,7 +116,9 @@ test('keys move through every section; Enter opens what it is on, Escape goes ba
   await expect(page.locator('#srchBack')).toBeVisible();
   await page.press('#q', 'Escape');
   await expect(page.locator('#srchCount')).toHaveText('Results: 2 songs · 1 artist · 0 albums');
-  await page.press('#q', 'PageUp');
+  // Back on the results, the keys are on the row they left (the artist); up twice is the first song.
+  await page.press('#q', 'ArrowUp');
+  await page.press('#q', 'ArrowUp');
   await expect(page.locator('#q')).toHaveAttribute('aria-activedescendant', 'srchOpt0');
   await page.press('#q', 'Control+Enter');
   await expect(page.locator('#srchOpt0 .srch__add')).toHaveText('✓');
@@ -152,6 +154,47 @@ test('see all opens one section that scrolls on, page after page, until it is al
   expect(pages.slice(1).every((p) => p.get('sections') === 'tracks')).toBe(true);
   await page.click('#srchBack');
   await expect(page.locator('#srchCount')).toContainText('Results: 25 songs');
+});
+
+test('the results page: ‹ › and Page Up/Down turn it, with a page count, and later pages are fetched from the next offset', async ({ page }) => {
+  const songs = (from: number, n: number) => Array.from({ length: n }, (_, i) => track(`deezer:${from + i}`, `Song ${String(from + i).padStart(2, '0')}`, { rank: 1000 - from - i }));
+  const asked = await companion(page, (path, route) => {
+    const p = params(route);
+    const offset = Number(p.get('offset') ?? 0);
+    // The first answer has twelve songs (after merging) and says more exist; the next page is asked from offset 25.
+    if (offset === 0) return fulfillStream(route, [results(0, 'deezer', 'song', { tracks: songs(1, 12), artists: [artist('deezer:20', 'Lantern Choir')] }, FINAL), done(1, 'song', FINAL, { tracks: true, artists: false, albums: false }, 0)]);
+    return fulfillStream(route, [results(0, 'deezer', 'song', { tracks: songs(13, 8) }, FINAL), done(1, 'song', FINAL, { tracks: false }, offset)]);
+  });
+  await searchFor(page, 'song');
+  const titlesOnPage = () => page.locator('#srchList .srch__sec[aria-label="Songs"] .srch__row:not(.srch__more) .srch__title');
+  await expect(titlesOnPage()).toHaveText(['Song 01', 'Song 02', 'Song 03', 'Song 04', 'Song 05']);
+  await expect(page.locator('#srchFoot')).toBeVisible();
+  await expect(page.locator('#srchPageOf')).toHaveText('Page 1 of 3+');
+  await expect(page.locator('#srchPrev')).toBeDisabled();
+  await page.press('#q', 'PageDown');
+  await expect(titlesOnPage()).toHaveText(['Song 06', 'Song 07', 'Song 08', 'Song 09', 'Song 10']);
+  // Turning on also asks for the page after it, so it is there when it is wanted.
+  await expect(page.locator('#srchPageOf')).toHaveText(/^Page 2 of (3\+|4)$/);
+  // The artist had one page: it is not repeated on the next.
+  await expect(page.locator('#srchList .srch__sec[aria-label="Artists"]')).toHaveCount(0);
+  await page.click('#srchNext');
+  // Page 3 holds songs past the first answer: fetched from offset 25, songs only.
+  await expect(titlesOnPage()).toHaveText(['Song 11', 'Song 12', 'Song 13', 'Song 14', 'Song 15']);
+  await expect(page.locator('#srchPageOf')).toHaveText('Page 3 of 4');
+  const later = asked.map((a) => new URL(`http://x${a}`).searchParams).filter((p) => p.get('offset') !== '0');
+  expect(later.map((p) => [p.get('offset'), p.get('sections')])).toEqual([['25', 'tracks']]);
+  await page.click('#srchNext');
+  await expect(titlesOnPage()).toHaveText(['Song 16', 'Song 17', 'Song 18', 'Song 19', 'Song 20']);
+  await expect(page.locator('#srchNext')).toBeDisabled();
+  await expect(page.locator('#srchPageOf')).toHaveText('Page 4 of 4');
+  // The arrows run off the top of a page onto the one before.
+  await page.press('#q', 'ArrowDown');
+  await page.press('#q', 'ArrowUp');
+  await expect(page.locator('#srchPageOf')).toHaveText('Page 3 of 4');
+  await page.press('#q', 'PageUp');
+  await page.press('#q', 'PageUp');
+  await expect(page.locator('#srchPageOf')).toHaveText('Page 1 of 4');
+  await expect(page.locator('#srchList .srch__sec[aria-label="Artists"] .srch__title')).toHaveText(['Lantern Choir']);
 });
 
 test('the filter keeps its sections and services in the settings store, and the search asks only those', async ({ page }) => {

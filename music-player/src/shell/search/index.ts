@@ -31,7 +31,7 @@ import type {
   CatalogTrackPage,
   SavedCollection,
 } from '@now-playing/contracts';
-import { CATALOG_COLLECTION_CAP, CATALOG_PLATFORM_LABELS, CATALOG_PROVIDERS } from '@now-playing/contracts';
+import { CATALOG_PLATFORM_LABELS, CATALOG_PROVIDERS } from '@now-playing/contracts';
 import { pickDownloadSource, sameRecording } from '@now-playing/domain/catalog';
 import { ask, clients, jsonp, legacyHubSearch, Refused, Unreachable, type CatalogClient, type SearchParams } from './client.js';
 import * as V from './view.js';
@@ -98,16 +98,21 @@ interface Results {
   status: CatalogSourceStatus[];
   done: boolean;
   more: Record<CatalogSection, boolean>;
+  /** The offset each section's next page is asked from, and which sections are being asked now. */
+  next: Record<CatalogSection, number>;
+  pending: Set<CatalogSection>;
+  /** The overview's page (NP-FIND-004). */
+  page: number;
   via: string;
   error: string | null;
 }
 
-const freshResults = (): Results => ({ tracks: new Bag<CatalogTrack>(sameSong), artists: new Bag(), albums: new Bag(), status: [], done: false, more: { tracks: false, artists: false, albums: false }, via: '', error: null });
+const freshResults = (): Results => ({ tracks: new Bag<CatalogTrack>(sameSong), artists: new Bag(), albums: new Bag(), status: [], done: false, more: { tracks: false, artists: false, albums: false }, next: { tracks: 0, artists: 0, albums: 0 }, pending: new Set(), page: 0, via: '', error: null });
 
 type View =
   | { kind: 'results' }
   | { kind: 'link'; url: string; result: CatalogResolveResult | null; error: string | null; client: CatalogClient | null }
-  | { kind: 'all'; section: CatalogSection; res: Results; offset: number; loading: boolean; ctl: AbortController | null }
+  | { kind: 'all'; section: CatalogSection; res: Results; ctl: AbortController }
   | { kind: 'album'; id: string; title: string; detail: CatalogAlbumDetail | null; error: string | null; client: CatalogClient | null }
   | { kind: 'artist'; id: string; name: string; detail: CatalogArtistDetail | null; error: string | null }
   | { kind: 'song'; t: CatalogTrack; enrich: CatalogEnrichment | null; enrichSaid: string | null; lyrics: CatalogLyrics | null; lyricsSaid: string | null };
@@ -150,6 +155,8 @@ export interface ListedCollection {
 
 const PREVIEW_N: Record<CatalogSection, number> = { tracks: 5, artists: 3, albums: 3 };
 const PAGE_LIMIT = 25;
+/** One page of an album's or playlist's songs, as the contract allows (catalog/resolve, catalog/album). */
+const LIST_PAGE = 200;
 const FILTER_KEY = 'player:search';
 const SECTIONS: CatalogSection[] = ['tracks', 'artists', 'albums'];
 
@@ -304,7 +311,7 @@ export function installSearch(): SearchApi {
   function render(): void {
     const v = top();
     back.hidden = stack.length < 2;
-    foot.hidden = true;
+    if (v?.kind !== 'results') foot.hidden = true;
     if (!v) {
       body.innerHTML = '';
       return;
@@ -346,14 +353,27 @@ export function installSearch(): SearchApi {
     }
     const groups: Array<{ label: string | null; opts: Opt[] }> = [];
     for (const s of wanted()) {
-      const bag = s === 'tracks' ? r.tracks : s === 'artists' ? r.artists : r.albums;
-      const opts = sectionRows(r, s, PREVIEW_N[s]);
-      if (opts.length && (bag.size > PREVIEW_N[s] || r.more[s])) opts.push({ kind: 'more', section: s });
+      const bag = bagOf(r, s);
+      const n = PREVIEW_N[s];
+      const opts = sectionRows(r, s, (r.page + 1) * n).slice(r.page * n);
+      if (opts.length && (bag.size > n || r.more[s])) opts.push({ kind: 'more', section: s });
       groups.push({ label: V.SECTION_LABEL[s], opts });
     }
-    count.innerHTML = `<b>Results:</b> ${totalsLine(r)}${r.done ? '' : ' …'}`;
-    body.innerHTML = listbox(groups, 'Search results') + (r.error ? msg(V.esc(r.error)) : '');
-    live.textContent = `${totalsLine(r)}${r.done ? '' : ', still searching'}`;
+    const { known, more } = pageCount(r);
+    count.innerHTML = `<b>Results:</b> ${totalsLine(r)}${r.done && !r.pending.size ? '' : ' …'}`;
+    const shown = groups.some((g) => g.opts.length);
+    body.innerHTML = shown ? listbox(groups, 'Search results') + (r.error ? msg(V.esc(r.error)) : '') : msg(r.pending.size ? `${V.spinner()}<span>Loading page ${r.page + 1}…</span>` : 'Nothing more.');
+    if (!shown) options = [];
+    // The pager: ‹ dots › and "Page 2 of 4" (or "4+" while a section says there is more).
+    const of = Math.max(known, r.page + 1);
+    foot.hidden = known < 2 && !more;
+    if (!foot.hidden) {
+      $('srchDots').innerHTML = Array.from({ length: Math.min(of, 12) }, (_, i) => `<i${i === r.page ? ' class="is-on"' : ''}></i>`).join('');
+      $<HTMLButtonElement>('srchPrev').disabled = r.page === 0;
+      $<HTMLButtonElement>('srchNext').disabled = r.page >= known - 1 && !more;
+      $('srchPageOf').textContent = `Page ${r.page + 1} of ${of}${more ? '+' : ''}`;
+    }
+    live.textContent = `${totalsLine(r)}${r.done ? '' : ', still searching'}${foot.hidden ? '' : `, page ${r.page + 1} of ${of}${more ? ' or more' : ''}`}`;
   }
 
   function renderLink(v: Extract<View, { kind: 'link' }>): void {
@@ -396,7 +416,7 @@ export function installSearch(): SearchApi {
     paintStatus(r.status, r.via);
     count.innerHTML = `<b>${V.SECTION_LABEL[v.section]}:</b> ${V.count(bag.size, v.section)}${r.more[v.section] ? '+' : ''} for “${V.esc(lastLabel)}”`;
     const opts = sectionRows(r, v.section, bag.size);
-    const tail = v.loading ? msg(`${V.spinner()}<span>Loading more…</span>`) : r.error ? msg(V.esc(r.error)) : !r.more[v.section] && bag.size ? `<div class="srch__end">That’s all ${V.count(bag.size, v.section)}.</div>` : '';
+    const tail = r.pending.has(v.section) ? msg(`${V.spinner()}<span>Loading more…</span>`) : r.error ? msg(V.esc(r.error)) : !r.more[v.section] && bag.size ? `<div class="srch__end">That’s all ${V.count(bag.size, v.section)}.</div>` : '';
     body.innerHTML = opts.length ? listbox([{ label: null, opts }], `All ${V.SECTION_LABEL[v.section].toLowerCase()}`) + tail : tail || msg(`${V.spinner()}<span>Loading…</span>`);
     live.textContent = `${V.count(bag.size, v.section)}${r.more[v.section] ? ', more as you scroll' : ''}`;
   }
@@ -508,7 +528,11 @@ export function installSearch(): SearchApi {
       r.albums.upsert(chunk.albums);
     } else {
       r.done = true;
-      for (const s of SECTIONS) r.more[s] = Boolean(chunk.page[s]?.hasMore);
+      for (const s of SECTIONS) {
+        const pg = chunk.page[s];
+        if (pg) r.next[s] = Math.max(r.next[s], pg.offset + pg.limit);
+        r.more[s] = Boolean(pg?.hasMore);
+      }
     }
   }
 
@@ -632,57 +656,101 @@ export function installSearch(): SearchApi {
     if (top() === v) render();
   }
 
+  const bagOf = (r: Results, s: CatalogSection): Bag<CatalogTrack> | Bag<CatalogArtist> | Bag<CatalogAlbum> => (s === 'tracks' ? r.tracks : s === 'artists' ? r.artists : r.albums);
+
+  /** Pages known so far (each section at its overview size), and whether any section says there is more. */
+  function pageCount(r: Results): { known: number; more: boolean } {
+    const ws = wanted();
+    const known = Math.max(1, ...ws.map((s) => Math.ceil(bagOf(r, s).size / PREVIEW_N[s])));
+    return { known, more: ws.some((s) => r.more[s]) };
+  }
+
+  /**
+   * The next page of one section, fetched — not sliced from the first answer: the same query from the
+   * section's next offset (offset/limit/hasMore, as the engine pages). A song a later page brings again
+   * is not shown twice; a page that adds nothing new is followed by the next while there is more.
+   */
+  async function extend(r: Results, s: CatalogSection, signal: AbortSignal, after: () => void): Promise<void> {
+    if (r.pending.has(s) || !r.more[s]) return;
+    r.pending.add(s);
+    const offset = Math.max(r.next[s], PAGE_LIMIT);
+    const mine = seq;
+    const fresh = freshResults();
+    after();
+    try {
+      await stream(params(lastQ, lastAdv, [s], offset), signal, (chunk, client) => {
+        if (mine !== seq) return;
+        upsert(fresh, chunk, client);
+        if (fresh.status.length) r.status = fresh.status;
+        r.via = fresh.via;
+      }, false);
+      r.pending.delete(s);
+      if (mine !== seq) return;
+      const got = bagOf(r, s).append(bagOf(fresh, s).list as never);
+      r.next[s] = offset + PAGE_LIMIT;
+      r.more[s] = fresh.more[s] && r.next[s] <= 1000;
+      r.error = null;
+      if (!got && r.more[s]) return extend(r, s, signal, after);
+    } catch (err) {
+      r.pending.delete(s);
+      if (mine !== seq || signal.aborted) return;
+      r.error = failureWords(err);
+      r.more[s] = false;
+    }
+    after();
+  }
+
+  /** The overview's pager: a page beyond what has arrived asks each section for its next page. */
+  function turnPage(delta: number, hotAt = -1): void {
+    const r = res;
+    if (top()?.kind !== 'results') return;
+    const { known, more } = pageCount(r);
+    const to = Math.max(0, Math.min(r.page + delta, more ? Math.max(known, r.page + 1) : known - 1));
+    if (to === r.page) return;
+    stopPreview();
+    r.page = to;
+    hot = hotAt;
+    const again = (): void => {
+      if (top()?.kind !== 'results' || res !== r) return;
+      // A page that turned out empty once every section has answered steps back to the last one.
+      if (!r.pending.size && r.page > 0 && r.page >= pageCount(r).known) r.page = pageCount(r).known - 1;
+      render();
+    };
+    const signal = ctl?.signal ?? new AbortController().signal;
+    // Fetched a page ahead of what is shown, so turning on finds it there.
+    for (const s of wanted()) if (bagOf(r, s).size < (to + 2) * PREVIEW_N[s]) void extend(r, s, signal, again);
+    render();
+    if (hotAt === -1) body.scrollTop = 0;
+    else if (hotAt === -2) {
+      hot = options.length - 1;
+      applyHot();
+    }
+  }
+
   /** See all: one section, page after page as the list scrolls (NP-FIND-004). */
   function openAll(section: CatalogSection): void {
     stopPreview();
     const r = freshResults();
-    // What the overview already has is the first page; the rest come from offset 25 onward.
+    // What the overview already has comes first; the rest from the section's next offset.
     if (section === 'tracks') r.tracks.upsert(res.tracks.list);
     if (section === 'artists') r.artists.upsert(res.artists.list);
     if (section === 'albums') r.albums.upsert(res.albums.list);
     r.status = res.status;
     r.via = res.via;
     r.more[section] = res.more[section];
+    r.next[section] = res.next[section];
     r.done = true;
-    const v: Extract<View, { kind: 'all' }> = { kind: 'all', section, res: r, offset: 0, loading: false, ctl: null };
+    const v: Extract<View, { kind: 'all' }> = { kind: 'all', section, res: r, ctl: new AbortController() };
     push(v);
     render();
     body.scrollTop = 0;
-    if (res.more[section]) void loadMore(v);
+    void loadMore(v);
   }
 
-  async function loadMore(v: Extract<View, { kind: 'all' }>): Promise<void> {
-    if (v.loading || !v.res.more[v.section]) return;
-    v.loading = true;
-    v.offset += PAGE_LIMIT;
-    const mine = seq;
-    const c = (v.ctl = new AbortController());
-    const r = v.res;
-    const fresh = freshResults();
-    if (top() === v) render();
-    try {
-      await stream(params(lastQ, lastAdv, [v.section], v.offset), c.signal, (chunk, client) => {
-        if (mine !== seq) return;
-        upsert(fresh, chunk, client);
-        r.status = fresh.status;
-        r.via = fresh.via;
-      }, false);
-      if (mine !== seq) return;
-      const bag = v.section === 'tracks' ? r.tracks : v.section === 'artists' ? r.artists : r.albums;
-      const got = v.section === 'tracks' ? bag.append(fresh.tracks.list as never) : v.section === 'artists' ? bag.append(fresh.artists.list as never) : bag.append(fresh.albums.list as never);
-      r.more[v.section] = fresh.more[v.section] && v.offset + PAGE_LIMIT <= 1000;
-      r.error = null;
-      if (!got && r.more[v.section]) {
-        v.loading = false;
-        return loadMore(v);
-      }
-    } catch (err) {
-      if (mine !== seq || c.signal.aborted) return;
-      r.error = failureWords(err);
-      r.more[v.section] = false;
-    }
-    v.loading = false;
-    if (top() === v) render();
+  function loadMore(v: Extract<View, { kind: 'all' }>): Promise<void> {
+    return extend(v.res, v.section, v.ctl.signal, () => {
+      if (top() === v) render();
+    });
   }
 
   body.addEventListener(
@@ -778,7 +846,7 @@ export function installSearch(): SearchApi {
     if (stack.length < 2) return;
     stopPreview();
     const v = stack.pop();
-    if (v?.kind === 'all') v.ctl?.abort();
+    if (v?.kind === 'all') v.ctl.abort();
     const now = top();
     hot = now ? (hotOf.get(now) ?? -1) : -1;
     render();
@@ -808,7 +876,8 @@ export function installSearch(): SearchApi {
   function pager(ref: CatalogCollectionRef): (offset: number) => Promise<CatalogTrackPage> {
     const byId = ref.kind === 'album' && (ref.platform === 'deezer' || ref.platform === 'apple-music');
     return async (offset) => {
-      const { value } = await ask((c) => (byId ? c.album(`${ref.platform}:${ref.id}`, offset, CATALOG_COLLECTION_CAP - offset).then((d) => d.page) : c.resolve(ref.url, offset, Math.min(200, CATALOG_COLLECTION_CAP - offset)).then((r) => {
+      // Pages of up to 200 (the contract's page limit), however long the list: no cap here (owner, 2026-10-06).
+      const { value } = await ask((c) => (byId ? c.album(`${ref.platform}:${ref.id}`, offset, LIST_PAGE).then((d) => d.page) : c.resolve(ref.url, offset, LIST_PAGE).then((r) => {
         if (!r.collection) throw new Refused(r.reason ?? 'The list could not be read again.');
         return r.collection.page;
       })));
@@ -839,7 +908,8 @@ export function installSearch(): SearchApi {
       async more() {
         const page = await next(offset);
         offset = page.offset + page.tracks.length;
-        return { rows: page.tracks.map(songFor), hasMore: page.hasMore && page.tracks.length > 0 && offset < CATALOG_COLLECTION_CAP, total: page.total, capped: page.capped };
+        // Every page until the server says there is no more: a playlist of any length loads whole.
+        return { rows: page.tracks.map(songFor), hasMore: page.hasMore && page.tracks.length > 0, total: page.total, capped: page.capped };
       },
     };
     close();
@@ -1320,6 +1390,11 @@ export function installSearch(): SearchApi {
     const n = options.length;
     if (!n) return;
     const was = hot;
+    // Past the overview page's last row (or before its first) the arrows turn the page.
+    if (top()?.kind === 'results' && Math.abs(delta) === 1 && hot >= 0) {
+      if (delta > 0 && hot === n - 1 && (res.page < pageCount(res).known - 1 || pageCount(res).more)) return turnPage(1, 0);
+      if (delta < 0 && hot === 0 && res.page > 0) return turnPage(-1, -2);
+    }
     hot = Math.max(0, Math.min(n - 1, hot < 0 ? (delta > 0 ? 0 : n - 1) : hot + delta));
     applyHot();
     const v = top();
@@ -1351,9 +1426,11 @@ export function installSearch(): SearchApi {
       move(e.key === 'ArrowDown' ? 1 : -1);
       return;
     }
-    if ((e.key === 'PageDown' || e.key === 'PageUp') && showing && options.length) {
+    if ((e.key === 'PageDown' || e.key === 'PageUp') && showing) {
       e.preventDefault();
-      move(e.key === 'PageDown' ? 5 : -5);
+      // The overview turns its pages; a long list (see all, an album) moves five rows.
+      if (top()?.kind === 'results') turnPage(e.key === 'PageDown' ? 1 : -1);
+      else if (options.length) move(e.key === 'PageDown' ? 5 : -5);
       return;
     }
     if (e.key === 'Enter') {
@@ -1451,6 +1528,8 @@ export function installSearch(): SearchApi {
     activate(hot);
   });
 
+  $('srchPrev').addEventListener('click', () => turnPage(-1));
+  $('srchNext').addEventListener('click', () => turnPage(1));
   back.addEventListener('click', () => {
     goBack();
     input.focus();

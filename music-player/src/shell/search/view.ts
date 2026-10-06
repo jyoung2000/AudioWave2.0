@@ -188,7 +188,7 @@ export function mosaicHTML(c: Pick<CatalogCollection, 'artworkUrl' | 'covers'>, 
 export function collectionWords(c: CatalogCollection): string {
   const kind = c.ref.kind === 'album' ? 'Album' : 'Playlist';
   const n = c.page.total ?? c.page.tracks.length;
-  return [`${kind} on ${CATALOG_PLATFORM_LABELS[c.ref.platform]}`, c.ref.owner, n ? `${n} ${n === 1 ? 'song' : 'songs'}` : null].filter(Boolean).join(' · ');
+  return [`${kind} on ${CATALOG_PLATFORM_LABELS[c.ref.platform]}`, c.ref.owner, n ? `${n.toLocaleString('en-US')} ${n === 1 ? 'song' : 'songs'}` : null].filter(Boolean).join(' · ');
 }
 
 export function collectionRowHTML(c: CatalogCollection, i: number): string {

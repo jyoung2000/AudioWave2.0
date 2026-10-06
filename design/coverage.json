@@ -1561,6 +1561,7 @@
         "empty",
         "searching (rows arriving, upserted by id)",
         "songs, artists and albums in sections, each row with its platform badges",
+        "paged: ‹ › with “Page N of M”, a later page being fetched",
         "a Spotify song: “plays from YouTube Music”",
         "the per-service line: counts, searching, failed, timed out, cooling down until, needs yt-dlp; who answered",
         "no matches for the words searched",
@@ -1582,7 +1583,8 @@
         "NP-FIND-002",
         "NP-FIND-003",
         "NP-FIND-005",
-        "NP-FIND-007"
+        "NP-FIND-007",
+        "NP-FIND-004"
       ],
       "guideAnchor": "screens",
       "authority": "adopted"
@@ -2155,10 +2157,10 @@
       ],
       "components": ["shell markup (design/frontends/origin/airwave-now-playing.html)"],
       "states": [
-        "loading",
-        "rows page by page",
-        "capped (the first 200)",
-        "could not be read (the reason)",
+        "loading (“Loading 400 of 1,250…”, the rows already there usable)",
+        "every song, page by page, no cap",
+        "a server that still caps it (the first N)",
+        "stopped part way or could not be read (the reason)",
         "star off / on"
       ],
       "rules": ["NP-FIND-007", "NP-FIND-008"],
@@ -2478,17 +2480,17 @@
       "steps": [
         "Type a few words in the header search and press Enter: songs, artists and albums arrive in sections as each service answers, every row naming its platforms, the quiet line saying how each service did",
         "Narrow with Filter (sections, services) or the Track / Artist / Album / ISRC fields",
-        "See all songs: the section scrolls on, page after page",
+        "Page through the results with ‹ › or Page Up/Down; See all songs: the section scrolls on, page after page",
         "Open an artist, then one of their albums; open a song for its genre, label, year and lyrics; Back walks it back",
         "Paste a playlist link: one listing with its platform and a 2×2 mosaic",
-        "Open it: the music list names it and lists its songs page by page",
+        "Open it: the music list names it and loads every song, page by page, saying how far it has got",
         "Star it in the silver bar: it is in the library menu under Playlists, and opens again from there"
       ],
       "failures": [
         "A service fails, times out or is resting: the line says so; the rest still answer",
         "Nothing reachable: the search says what happened, in words",
         "A link nobody can read (a private or Spotify-made playlist, an Apple Music playlist, a Tidal link without a SongLink key): the reason",
-        "A list longer than 200 songs: the bar says “(the first 200)”"
+        "A list that stops loading part way: the songs so far stay, and it says why"
       ],
       "surfaces": [
         "player-shell-search-popover",
