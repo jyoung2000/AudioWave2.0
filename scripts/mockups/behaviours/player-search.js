@@ -3,8 +3,8 @@
  *
  * The header field searches as the shell does (music-player/src/shell/search, NP-FIND-003): typing
  * dims the last results and says "Press ⏎ to search"; Enter searches and draws Songs (five, then "See
- * all"), Artists and Albums, every row with the platforms it is on; the arrows move through every
- * section and Page Up/Down by five; Enter or a click on a cover previews a song (the ring fills over
+ * all"), Artists and Albums, every row with the platforms it is on, a page at a time — ‹ › and Page
+ * Up/Down turn the page, which says "Page N of M"; the arrows move through every section; Enter or a click on a cover previews a song (the ring fills over
  * 30 seconds, without sound); + adds it (✓); Clear or Escape closes. Every row is a copy of a row the
  * app drew in the captured "search" state, so it wears the app's own CSS. "See all", an artist, an
  * album, a song's title, Filter and the fields switch lead to the captured states for them (the
@@ -25,7 +25,7 @@
   var dataEl = document.querySelector('script[data-mock-data="search"]');
   if (dataEl) dataEl.remove();
 
-  var S = { found: null, hot: -1, state: 'idle', lastQ: '', added: {} };
+  var S = { found: null, hot: -1, state: 'idle', lastQ: '', added: {}, page: 0 };
   var previewing = null;
 
   function $(id) { return document.getElementById(id); }
@@ -192,20 +192,46 @@
       list.id = 'srchList';
       list.setAttribute('aria-label', 'Search results');
       var i = 0;
-      var songs = f.songs.slice(0, PREVIEW.songs).map(function (s) { return songRow(s, i++); });
-      if (f.songs.length > PREVIEW.songs) songs.push(moreRow(f.songs.length, i++));
-      var artists = f.artists.slice(0, PREVIEW.artists).map(function (a) { return artistRow(a, i++); });
-      var albums = f.albums.slice(0, PREVIEW.albums).map(function (a) { return albumRow(a, i++); });
+      var pg = S.page;
+      var cut = function (list, n) { return list.slice(pg * n, pg * n + n); };
+      var songs = cut(f.songs, PREVIEW.songs).map(function (s) { return songRow(s, i++); });
+      if (songs.length && f.songs.length > PREVIEW.songs) songs.push(moreRow(f.songs.length, i++));
+      var artists = cut(f.artists, PREVIEW.artists).map(function (a) { return artistRow(a, i++); });
+      var albums = cut(f.albums, PREVIEW.albums).map(function (a) { return albumRow(a, i++); });
       if (songs.length) list.appendChild(section('Songs', songs));
       if (artists.length) list.appendChild(section('Artists', artists));
       if (albums.length) list.appendChild(section('Albums', albums));
       $('srchBody').replaceChildren(list);
       applyHot();
-      live.textContent = words;
+      var n = pages();
+      var foot = $('srchFoot');
+      if (foot) {
+        foot.hidden = n < 2;
+        var d = '';
+        for (var k = 0; k < n; k++) d += '<i' + (k === pg ? ' class="is-on"' : '') + '></i>';
+        $('srchDots').innerHTML = d;
+        $('srchPrev').disabled = pg === 0;
+        $('srchNext').disabled = pg >= n - 1;
+        if ($('srchPageOf')) $('srchPageOf').textContent = 'Page ' + (pg + 1) + ' of ' + n;
+      }
+      live.textContent = words + (n > 1 ? ', page ' + (pg + 1) + ' of ' + n : '');
     }
   }
 
   function rows() { return $('srchBody').querySelectorAll('.srch__row[data-i]'); }
+  function pages() {
+    var f = S.found;
+    if (!f) return 1;
+    return Math.max(1, Math.ceil(f.songs.length / PREVIEW.songs), Math.ceil(f.artists.length / PREVIEW.artists), Math.ceil(f.albums.length / PREVIEW.albums));
+  }
+  function turn(by) {
+    var p = Math.max(0, Math.min(pages() - 1, S.page + by));
+    if (p === S.page) return;
+    stopPreview();
+    S.page = p;
+    S.hot = -1;
+    render();
+  }
   function applyHot() {
     var all = rows();
     for (var i = 0; i < all.length; i++) {
@@ -229,6 +255,7 @@
     stopPreview();
     S.lastQ = q;
     S.hot = -1;
+    S.page = 0;
     S.state = 'loading';
     open();
     render();
@@ -291,19 +318,22 @@
     if (!q) return;
     var p = $('srch');
     var id = e && e.detail ? e.detail.id : window.mockup.current();
-    if (p && !p.hidden && q.value.trim() && (id === 'search' || id === 'search-keys' || id === 'search-stale')) {
+    if (p && !p.hidden && q.value.trim() && (id === 'search' || id === 'search-keys' || id === 'search-page-2' || id === 'search-stale')) {
       // The captured overview states: carry on from what they show.
       S.lastQ = id === 'search-stale' ? 'harbour' : q.value.trim();
       S.found = search(S.lastQ);
       S.state = S.found.songs.length ? 'list' : 'empty';
       var hot = p.querySelector('.srch__row.is-hot');
       S.hot = hot ? Number(hot.getAttribute('data-i')) : -1;
+      var on = p.querySelectorAll('#srchDots i');
+      S.page = 0;
+      for (var k = 0; k < on.length; k++) if (on[k].classList.contains('is-on')) S.page = k;
     } else if (p && !p.hidden && q.value.trim()) {
       S.lastQ = q.value.trim();
       S.found = search(S.lastQ);
       S.state = 'view';
     } else {
-      S = { found: null, hot: -1, state: 'idle', lastQ: '', added: S.added };
+      S = { found: null, hot: -1, state: 'idle', lastQ: '', added: S.added, page: 0 };
     }
   }
   document.addEventListener('mockup:show', adopt);
@@ -328,7 +358,8 @@
     }
     if ((e.key === 'PageDown' || e.key === 'PageUp') && showing) {
       e.preventDefault();
-      move(e.key === 'PageDown' ? 5 : -5);
+      if (S.state === 'list') turn(e.key === 'PageDown' ? 1 : -1);
+      else move(e.key === 'PageDown' ? 5 : -5);
       return;
     }
     if (e.key === 'Enter') {
@@ -376,6 +407,8 @@
     if (t.closest('input, label')) return;
     e.preventDefault();
     e.stopPropagation();
+    if (t.closest('#srchPrev')) { turn(-1); return; }
+    if (t.closest('#srchNext')) { turn(1); return; }
     if (t.closest('#srchClear')) { $('q').value = ''; S.state = 'idle'; S.lastQ = ''; close(); $('q').focus(); return; }
     var add = t.closest('[data-add]');
     if (add) { addRow(Number(add.getAttribute('data-add'))); return; }

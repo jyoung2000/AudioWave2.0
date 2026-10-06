@@ -104,14 +104,14 @@ const LINKS = [
   { selector: '#prefsBack', to: 'now-playing', in: [...SETTINGS, 'settings-src-hub'] },
   { selector: '#hubTest', to: 'settings-src-hub', in: ['settings-src'] },
   // The search: its views lead where they led in the app (NP-FIND-003..008).
-  { selector: '.srch__more', to: 'search-see-all', in: ['search', 'search-keys'] },
-  { selector: '.srch__row--artist', to: 'search-artist', in: ['search', 'search-keys'] },
-  { selector: '.srch__row--album', to: 'search-album', in: ['search', 'search-keys', 'search-artist'] },
-  { selector: '#srchList .srch__row:not(.srch__more):not(.srch__row--artist):not(.srch__row--album) .srch__title', to: 'search-song', in: ['search', 'search-keys', 'search-album'] },
+  { selector: '.srch__more', to: 'search-see-all', in: ['search', 'search-keys', 'search-page-2'] },
+  { selector: '.srch__row--artist', to: 'search-artist', in: ['search', 'search-keys', 'search-page-2'] },
+  { selector: '.srch__row--album', to: 'search-album', in: ['search', 'search-keys', 'search-page-2', 'search-artist'] },
+  { selector: '#srchList .srch__row:not(.srch__more):not(.srch__row--artist):not(.srch__row--album) .srch__title', to: 'search-song', in: ['search', 'search-keys', 'search-page-2', 'search-album'] },
   { selector: '#srchBack', to: 'search', in: ['search-see-all', 'search-artist', 'search-album', 'search-song'] },
-  { selector: '#srchFilterBtn', to: 'search-filter', in: ['search', 'search-keys', 'search-see-all'] },
+  { selector: '#srchFilterBtn', to: 'search-filter', in: ['search', 'search-keys', 'search-page-2', 'search-see-all'] },
   { selector: '#srchFilterCancel, #srchFilter button[type="submit"]', to: 'search', in: ['search-filter'] },
-  { selector: '#qMore', to: 'search-advanced', in: ['search', 'search-keys'] },
+  { selector: '#qMore', to: 'search-advanced', in: ['search', 'search-keys', 'search-page-2'] },
   { selector: '#qMore', to: 'search', in: ['search-advanced'] },
   { selector: '.srch__row--coll', to: 'playlist-in-list', in: ['pasted-link'] },
   { selector: '.srch__btn[data-act="list"]', to: 'playlist-in-list', in: ['search-album'] },
@@ -285,6 +285,11 @@ export default {
     await page.press('#q', 'ArrowDown');
     await settle(300);
     await snap({ id: 'search-keys', title: 'Search ▸ a row chosen with the keys', group: 'Search', note: 'Arrow keys move the highlight through every section; Enter previews a song (or opens an artist or album), Ctrl+Enter adds the song, Escape goes back and then closes.', ...pop });
+    await page.press('#q', 'PageDown');
+    await settle(1200);
+    await snap({ id: 'search-page-2', title: 'Search ▸ page 2', group: 'Search', note: 'The results a page at a time: ‹ › and Page Up/Down turn it, and the footer says which page of how many. Later pages are fetched from the catalog as they are wanted.', ...pop });
+    await page.press('#q', 'PageUp');
+    await settle(600);
     await inPop('.srch__more', 1500);
     await snap({ id: 'search-see-all', title: 'Search ▸ See all songs', group: 'Search', note: 'One section alone, under Back: the rest of its pages arrive as it scrolls, until it says that is all.', ...pop });
     await inPop('#srchBack', 600);
