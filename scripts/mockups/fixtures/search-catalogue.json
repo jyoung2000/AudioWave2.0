@@ -1,5 +1,5 @@
 {
-  "about": "Stock songs for the player mockup's search: invented artists and albums, no real recordings. The capture answers the shell's search (iTunes) and tempo (Deezer) lookups from this list, and the mockup's search behaviour filters the same list as you type. Fields: t title, a artist, al album, d seconds, bpm, genre.",
+  "about": "Stock songs for the player mockup's search: invented artists and albums, no real recordings. The capture answers the shell's catalog search, details, lyrics and pasted links (the companion's /helper/v1/catalog/*) from this list, and the mockup's search behaviour filters the same list as you type. Songs: t title, a artist, al album, d seconds, bpm, genre. Albums: year and label. Playlist: a pasted Spotify playlist made of stock songs. Lyrics: invented lines for the song details.",
   "songs": [
     {
       "t": "Harbour Lights",
@@ -193,5 +193,73 @@
       "bpm": 102,
       "genre": "Dream Pop"
     }
+  ],
+  "albums": {
+    "Harbour Lights": {
+      "year": 2024,
+      "label": "Quayside Tapes"
+    },
+    "First Light Sessions": {
+      "year": 2022,
+      "label": "Alder House"
+    },
+    "Late Shift (Demos)": {
+      "year": 2021,
+      "label": "Granary Sound"
+    },
+    "Live at the Granary": {
+      "year": 2023,
+      "label": "Granary Sound"
+    },
+    "Coastal Static": {
+      "year": 2020,
+      "label": "Low Tide Records"
+    },
+    "Small Hours": {
+      "year": 2025,
+      "label": "Orchard Lane"
+    },
+    "First Light": {
+      "year": 2019,
+      "label": "Alder House"
+    },
+    "Funfair Season": {
+      "year": 2018,
+      "label": "Marigold"
+    },
+    "Overtime": {
+      "year": 2024,
+      "label": "Avenue Works"
+    },
+    "Brass & Bramble": {
+      "year": 2017,
+      "label": "Hedgerow"
+    },
+    "Paper Maps": {
+      "year": 2023,
+      "label": "Atlas Field"
+    }
+  },
+  "playlist": {
+    "url": "https://open.spotify.com/playlist/mockupHarbourNights",
+    "title": "Harbour Nights",
+    "owner": "Stock Listener",
+    "songs": [
+      "Night Harbour",
+      "Harbour Lights",
+      "Midnight Tram",
+      "Neon Pier",
+      "Harbour Fog",
+      "Lantern Street",
+      "Morning Ferry",
+      "Static Bloom",
+      "Blue Hour"
+    ]
+  },
+  "lyrics": [
+    "Lights along the harbour wall",
+    "Ferries counting down the hours",
+    "Every lamp a borrowed star",
+    "Home before the tide turns ours"
   ]
 }

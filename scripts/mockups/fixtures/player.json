@@ -3,8 +3,18 @@
   "now": "2026-10-04T19:42:00.000Z",
   "hubBase": "http://192.168.1.20:4546",
   "hub": {
-    "/healthz": { "status": "ok", "version": "0.1.0" },
-    "/readyz": { "status": "ok", "checks": { "database": "ok", "library": "ok", "storage": "ok" } },
+    "/healthz": {
+      "status": "ok",
+      "version": "0.1.0"
+    },
+    "/readyz": {
+      "status": "ok",
+      "checks": {
+        "database": "ok",
+        "library": "ok",
+        "storage": "ok"
+      }
+    },
     "/api/v1/hub": {
       "hubId": "01a1040a-7a8d-7095-9b6f-0b1ce4d534e3",
       "name": "Airwave Hub",
@@ -20,77 +30,7 @@
       "codeOnlyPairingAvailable": false
     }
   },
-  "playlistLink": "https://www.youtube.com/playlist?list=PLmockupHarbourLights",
-  "resolve": {
-    "source": "youtube",
-    "kind": "collection",
-    "url": "https://www.youtube.com/playlist?list=PLmockupHarbourLights",
-    "track": null,
-    "collection": {
-      "title": "Harbour Lights — live sessions",
-      "artist": "Cassette Bloom",
-      "artworkUrl": null,
-      "date": "2026-03-14",
-      "entries": [
-        {
-          "url": "https://www.youtube.com/watch?v=mockup00001",
-          "title": "Signal Fade (live)",
-          "artist": "Cassette Bloom",
-          "featured": [],
-          "album": "Harbour Lights",
-          "genre": "Indie",
-          "durationSec": 244,
-          "date": "2026-03-14",
-          "year": 2026,
-          "artworkUrl": null,
-          "trackNumber": 1
-        },
-        {
-          "url": "https://www.youtube.com/watch?v=mockup00002",
-          "title": "Low Tide Radio",
-          "artist": "Cassette Bloom",
-          "featured": ["Alder Quartet"],
-          "album": "Harbour Lights",
-          "genre": "Indie",
-          "durationSec": 198,
-          "date": "2026-03-14",
-          "year": 2026,
-          "artworkUrl": null,
-          "trackNumber": 2
-        },
-        {
-          "url": "https://www.youtube.com/watch?v=mockup00003",
-          "title": "Lantern Street",
-          "artist": "Cassette Bloom",
-          "featured": [],
-          "album": "Harbour Lights",
-          "genre": "Indie",
-          "durationSec": 271,
-          "date": "2026-03-14",
-          "year": 2026,
-          "artworkUrl": null,
-          "trackNumber": 3
-        },
-        {
-          "url": "https://www.youtube.com/watch?v=mockup00004",
-          "title": "Paper Boats",
-          "artist": "Cassette Bloom",
-          "featured": [],
-          "album": "Harbour Lights",
-          "genre": "Indie",
-          "durationSec": 225,
-          "date": "2026-03-14",
-          "year": 2026,
-          "artworkUrl": null,
-          "trackNumber": 4
-        }
-      ],
-      "total": 4,
-      "cap": 200,
-      "capped": false
-    },
-    "resolvedAt": "2026-10-04T19:41:00.000Z"
-  },
+  "playlistLink": "https://open.spotify.com/playlist/mockupHarbourNights",
   "search": {
     "results": [
       {
@@ -128,9 +68,21 @@
   "helper": {
     "/helper/v1/backup/estimate": {
       "parts": {
-        "music": { "bytes": 41205678080, "files": 3812, "measuredAt": "2026-10-04T19:20:00.000Z" },
-        "tv": { "bytes": 18253611008, "files": 64, "measuredAt": "2026-10-04T19:20:00.000Z" },
-        "movies": { "bytes": 52613349376, "files": 22, "measuredAt": "2026-10-04T19:20:00.000Z" }
+        "music": {
+          "bytes": 41205678080,
+          "files": 3812,
+          "measuredAt": "2026-10-04T19:20:00.000Z"
+        },
+        "tv": {
+          "bytes": 18253611008,
+          "files": 64,
+          "measuredAt": "2026-10-04T19:20:00.000Z"
+        },
+        "movies": {
+          "bytes": 52613349376,
+          "files": 22,
+          "measuredAt": "2026-10-04T19:20:00.000Z"
+        }
       },
       "destination": null
     },

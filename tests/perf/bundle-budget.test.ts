@@ -66,8 +66,12 @@ const BUNDLES: Bundle[] = [
      * And to 248 for the music catalog's contracts (DEC-039, 2026-10-06): nine hub routes in the route
      * table the hub client reads at start-up, with their schemas — tracks, artists, albums, the NDJSON
      * chunks, collections, resolve, lyrics, enrichment and settings — measured, 7 KB minified.
+     *
+     * And to 249 for the catalog search's loader (NP-FIND-003, 2026-10-06): the bridge's dynamic import
+     * of src/shell/search and the few lines that keep an Enter pressed before it lands — measured, under
+     * 1 KB (248.6 KB, which rounds up). The search itself is a lazy chunk, fetched after the shell runs.
      */
-    entryBudgetKb: 248,
+    entryBudgetKb: 249,
     /*
      * The total rose from 1600 to 1900 when the hero gained the reference's jewel case.
      *
@@ -162,8 +166,14 @@ const BUNDLES: Bundle[] = [
      * measured, 6 KB of inline markup and script, counted in both builds; the entry's 1 KB is above.
      *
      * And to 2430 for the music catalog's contracts (DEC-039) — the entry's 7 KB above, nothing else.
+     *
+     * And to 2505 for the catalog search (NP-FIND-001..008, 2026-10-06): the lazy search chunk is
+     * 102 KB — the popover's views, the hub/helper client and, for a player with neither, the catalog
+     * engine itself (iTunes, Deezer, MusicBrainz, LRCLIB parsers, the merger, the NDJSON reader) — while
+     * the shell's HTML lost the old inline search (29 KB less, after the new styles and markup it
+     * gained). Measured: 2505 KB. None of it is in the first load.
      */
-    totalBudgetKb: 2430,
+    totalBudgetKb: 2505,
     // Three.js belongs to the constellation and the jewel case; the tag reader only to a scan.
     mustBeSplit: ['three', 'music-metadata'],
   },

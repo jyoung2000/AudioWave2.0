@@ -142,7 +142,7 @@ export function trackRowHTML(t: CatalogTrack, i: number, added: boolean): string
 }
 
 export function artistRowHTML(a: CatalogArtist, i: number): string {
-  const facts = [a.genre, a.albumCount ? `${a.albumCount} albums` : null, a.fans ? `${a.fans.toLocaleString('en-US')} fans` : null].filter(Boolean).join(' · ');
+  const facts = [a.genre, a.albumCount ? `${a.albumCount} ${a.albumCount === 1 ? 'album' : 'albums'}` : null, a.fans ? `${a.fans.toLocaleString('en-US')} fans` : null].filter(Boolean).join(' · ');
   return opt(
     i,
     ' srch__row--artist',

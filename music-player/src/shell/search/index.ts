@@ -434,7 +434,7 @@ export function installSearch(): SearchApi {
       return;
     }
     const { artist, topTracks, albums } = v.detail;
-    const facts = [artist.genre, artist.fans ? `${artist.fans.toLocaleString('en-US')} fans` : null, artist.albumCount ? `${artist.albumCount} albums` : null].filter(Boolean).map((x) => V.esc(x)).join(' · ');
+    const facts = [artist.genre, artist.fans ? `${artist.fans.toLocaleString('en-US')} fans` : null, artist.albumCount ? `${artist.albumCount} ${artist.albumCount === 1 ? 'album' : 'albums'}` : null].filter(Boolean).map((x) => V.esc(x)).join(' · ');
     // Apple has no artist pictures: the first album's cover stands in.
     const picture = artist.pictureUrl ?? albums[0]?.artworkUrl ?? null;
     const head = V.detailHead({ cover: V.coverHTML(picture, true), title: artist.name, sub: '', facts, badges: V.badgesHTML(artist.sources), actions: '' });

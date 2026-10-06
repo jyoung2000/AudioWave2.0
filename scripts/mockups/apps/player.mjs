@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { ROOT, viteBuild } from '../lib/browser.mjs';
 import manifest from '../../../design/manifest.json' with { type: 'json' };
 import fixtures from '../fixtures/player.json' with { type: 'json' };
-import { CATALOGUE, deezerAnswer, itunesAnswer } from '../lib/stock-search.mjs';
+import { behaviourData, catalogAlbum, catalogArtist, catalogEnrich, catalogLyrics, catalogResolve, catalogSearch, deezerAnswer, itunesAnswer } from '../lib/stock-search.mjs';
 
 const ORIGIN = 'http://127.0.0.1:47910';
 const HELPER = 'http://127.0.0.1:17342';
@@ -103,6 +103,20 @@ const LINKS = [
   ...SETTINGS.map((id) => ({ selector: `#pt-${id.slice('settings-'.length)}`, to: id, in: [...SETTINGS, 'settings-src-hub'] })),
   { selector: '#prefsBack', to: 'now-playing', in: [...SETTINGS, 'settings-src-hub'] },
   { selector: '#hubTest', to: 'settings-src-hub', in: ['settings-src'] },
+  // The search: its views lead where they led in the app (NP-FIND-003..008).
+  { selector: '.srch__more', to: 'search-see-all', in: ['search', 'search-keys'] },
+  { selector: '.srch__row--artist', to: 'search-artist', in: ['search', 'search-keys'] },
+  { selector: '.srch__row--album', to: 'search-album', in: ['search', 'search-keys', 'search-artist'] },
+  { selector: '#srchList .srch__row:not(.srch__more):not(.srch__row--artist):not(.srch__row--album) .srch__title', to: 'search-song', in: ['search', 'search-keys', 'search-album'] },
+  { selector: '#srchBack', to: 'search', in: ['search-see-all', 'search-artist', 'search-album', 'search-song'] },
+  { selector: '#srchFilterBtn', to: 'search-filter', in: ['search', 'search-keys', 'search-see-all'] },
+  { selector: '#srchFilterCancel, #srchFilter button[type="submit"]', to: 'search', in: ['search-filter'] },
+  { selector: '#qMore', to: 'search-advanced', in: ['search', 'search-keys'] },
+  { selector: '#qMore', to: 'search', in: ['search-advanced'] },
+  { selector: '.srch__row--coll', to: 'playlist-in-list', in: ['pasted-link'] },
+  { selector: '.srch__btn[data-act="list"]', to: 'playlist-in-list', in: ['search-album'] },
+  { selector: '#libColStar', to: 'playlist-kept', in: ['playlist-in-list'] },
+  { selector: '#libColStar', to: 'playlist-in-list', in: ['playlist-kept'] },
 ];
 
 export default {
@@ -134,7 +148,8 @@ export default {
   },
   timezoneId: 'UTC',
   // Outside services the shell asks and copes without: the station directory and station logos,
-  // stations' now-playing feeds, oEmbed for a pasted link, tempo and artwork lookups.
+  // stations' now-playing feeds, oEmbed for a pasted link, tempo and artwork lookups. (The search
+  // itself is answered: the companion's catalog, from lib/stock-search.mjs.)
   unanswered: [/^GET https:\/\/(?:[a-z0-9-]+\.)*(radio-browser\.info|tritondigital\.com|iheart\.com|radio\.co|youtube\.com\/oembed|noembed\.com|deezer\.com|itunes\.apple\.com|musicbrainz\.org|coverartarchive\.org)[/?]/i, /^GET https:\/\/[^ ]+\.(png|jpe?g|ico|svg|webp)(\?|$)/i],
   expectedErrors: [],
   links: LINKS,
@@ -143,7 +158,7 @@ export default {
     {
       name: 'search',
       file: 'player-search.js',
-      data: { template: 'search', page: 5, clip: 30, songs: CATALOGUE.map(({ t, a, al, d, bpm, art }) => ({ t, a, al, d, bpm, art })) },
+      data: { template: 'search', clip: 30, ...behaviourData() },
     },
   ],
 
@@ -163,13 +178,23 @@ export default {
           await route.fulfill({ status: 200, headers: { 'content-type': 'text/javascript' }, body: deezerAnswer(url) });
           return true;
         }
+        // The music catalog, through the companion on this PC (DEC-039): the search streams NDJSON.
+        if (url.origin === HELPER && url.pathname === '/helper/v1/catalog/search') {
+          await route.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'application/x-ndjson' }, body: catalogSearch(url) });
+          return true;
+        }
+        const catalog = { album: catalogAlbum, artist: catalogArtist, lyrics: catalogLyrics, enrich: catalogEnrich, resolve: catalogResolve };
+        const route2 = url.origin === HELPER && /^\/helper\/v1\/catalog\/(\w+)$/.exec(url.pathname);
+        if (route2 && catalog[route2[1]]) {
+          const body = catalog[route2[1]](url);
+          await route.fulfill(body ? json(body) : { status: 404, headers: { ...CORS, 'content-type': 'application/json' }, body: '{"error":"not_found","message":"Not in the stock catalogue"}' });
+          return true;
+        }
         const answer =
           url.origin === HELPER
             ? url.pathname === '/search'
               ? fixtures.search
-              : url.pathname === '/helper/v1/resolve'
-                ? fixtures.resolve
-                : fixtures.helper[url.pathname]
+              : fixtures.helper[url.pathname]
             : url.origin === fixtures.hubBase
               ? fixtures.hub[url.pathname]
               : undefined;
@@ -240,32 +265,63 @@ export default {
     await snap({ id: 'new-playlist-sheet', title: 'New playlist sheet', group: 'Music', note: 'Add to Playlist ▸ New Playlist…, answered in the sheet.', dismiss: 'now-playing', dismissOutside: '#sheet' });
     await click('#sheetCancel', { ms: 500 });
 
+    // ---- Search: the music catalog, through the companion on this PC (NP-FIND-001..008)
+    const pop = { dismiss: 'now-playing', dismissOutside: '#searchBox' };
+    // Reading a state can take focus from the field, which shuts the popover; it opens again on focus.
+    const inPop = async (selector, ms) => {
+      if (await page.evaluate(() => document.getElementById('srch').hidden)) {
+        await page.evaluate(() => document.getElementById('q').blur());
+        await page.focus('#q');
+        await settle(300);
+      }
+      await click(selector, { ms });
+    };
     await page.click('#q', { force: true });
     await page.fill('#q', 'harbour');
     await page.press('#q', 'Enter');
     await settle(2500);
-    await snap({ id: 'search', title: 'Search', group: 'Music', note: 'Search runs on Enter: five stock songs a page, each with its cover, a 30-second preview, time and tempo, and + to add it. In this mockup the field searches the stock songs as you type and press Enter; arrows, Page Up/Down and the page buttons move through them.', dismiss: 'now-playing', dismissOutside: '#searchBox' });
-    await page.press('#q', 'PageDown');
-    await settle(1500);
-    await snap({ id: 'search-page-2', title: 'Search ▸ page 2', group: 'Music', note: 'The second page of results, and the dots that count them.', dismiss: 'now-playing', dismissOutside: '#searchBox' });
+    await snap({ id: 'search', title: 'Search', group: 'Search', note: 'Search runs on Enter and streams in: songs, artists and albums in sections, each row with the platforms it is on, and a quiet line saying how every service did (one is cooling down). Songs have a 30-second preview, time and tempo, and + to add them. In this mockup the field searches the stock songs as you type and press Enter; the arrows and Page Up/Down move through every section.', ...pop });
     await page.press('#q', 'ArrowDown');
     await page.press('#q', 'ArrowDown');
     await settle(300);
-    await snap({ id: 'search-keys', title: 'Search ▸ a row chosen with the keys', group: 'Music', note: 'Arrow keys move the highlight; Enter previews it, Ctrl+Enter adds it.', dismiss: 'now-playing', dismissOutside: '#searchBox' });
+    await snap({ id: 'search-keys', title: 'Search ▸ a row chosen with the keys', group: 'Search', note: 'Arrow keys move the highlight through every section; Enter previews a song (or opens an artist or album), Ctrl+Enter adds the song, Escape goes back and then closes.', ...pop });
+    await inPop('.srch__more', 1500);
+    await snap({ id: 'search-see-all', title: 'Search ▸ See all songs', group: 'Search', note: 'One section alone, under Back: the rest of its pages arrive as it scrolls, until it says that is all.', ...pop });
+    await inPop('#srchBack', 600);
+    await inPop('.srch__row--artist', 1500);
+    await snap({ id: 'search-artist', title: 'Search ▸ an artist', group: 'Search', note: 'An artist: picture, genre and fans, their top songs and albums. An album here drills into it; Back walks back.', ...pop });
+    await inPop('#srchList .srch__row--album', 1500);
+    await snap({ id: 'search-album', title: 'Search ▸ an album', group: 'Search', note: 'An album: cover, year, label, genre and its songs, and Open in Music, which shows it in the music list.', ...pop });
+    await inPop('#srchList .srch__row[data-i="0"] .srch__title', 2000);
+    await snap({ id: 'search-song', title: 'Search ▸ a song', group: 'Search', note: 'A song: its platforms, genre, label and year (enrichment), its ISRC, Add to Library and Download…, and its lyrics, synced.', ...pop });
+    await inPop('#srchBack', 400);
+    await inPop('#srchBack', 400);
+    await inPop('#srchBack', 600);
+    await inPop('#srchFilterBtn', 600);
+    await snap({ id: 'search-filter', title: 'Search ▸ Filter', group: 'Search', note: 'Which sections a search shows and which services it asks, kept in the player’s settings.', dismiss: 'search', dismissOutside: '#srchFilter' });
+    await click('#srchFilterCancel', { ms: 400 });
+    await inPop('#qMore', 600);
+    await page.fill('#srchAdv input[name="artist"]', 'Cassette Bloom');
+    await settle(300);
+    await snap({ id: 'search-advanced', title: 'Search ▸ Track, Artist, Album, ISRC', group: 'Search', note: 'The pill’s switch folds out Track, Artist, Album and ISRC fields; the pill shows them merged, and folding them away keeps them merged.', ...pop });
+    await click('#qMore', { ms: 400 });
     await page.fill('#q', 'harbour lights');
     await settle(300);
-    await snap({ id: 'search-stale', title: 'Search ▸ typed, not yet searched', group: 'Music', note: 'Between a keystroke and Enter the rows are the last search’s, dimmed, and the count says what to do.', dismiss: 'now-playing', dismissOutside: '#searchBox' });
+    await snap({ id: 'search-stale', title: 'Search ▸ typed, not yet searched', group: 'Search', note: 'Between a keystroke and Enter the rows are the last search’s, dimmed, and the count says what to do.', ...pop });
     await page.fill('#q', 'theremin');
     await page.press('#q', 'Enter');
     await settle(1500);
-    await snap({ id: 'search-empty', title: 'Search ▸ no matches', group: 'Music', note: 'A search that finds nothing says so, with the words searched for.', dismiss: 'now-playing', dismissOutside: '#searchBox' });
+    await snap({ id: 'search-empty', title: 'Search ▸ no matches', group: 'Search', note: 'A search that finds nothing says so, with the words searched for.', ...pop });
     await page.fill('#q', fixtures.playlistLink);
     await page.press('#q', 'Enter');
     await settle(2500);
-    await snap({ id: 'pasted-link', title: 'Pasted playlist link', group: 'Music', note: 'A pasted playlist link, read by the companion: each song its own row, under a count that names the list.', dismiss: 'now-playing', dismissOutside: '#searchBox' });
+    await snap({ id: 'pasted-link', title: 'Pasted playlist link', group: 'Search', note: 'A pasted Spotify playlist, read by the companion: one listing that names its platform, its cover a 2×2 mosaic of its first four songs’ covers. Opening it shows it in the music list.', ...pop });
+    await inPop('.srch__row--coll', 1500);
+    await snap({ id: 'playlist-in-list', title: 'A playlist in the music list', group: 'Search', note: 'Opened, the playlist shows the way an album does: the silver bar names it, its songs are the rows, and the star beside its name keeps it in the library.' });
+    await click('#libColStar', { ms: 600 });
+    await snap({ id: 'playlist-kept', title: 'A playlist kept in the library', group: 'Search', note: 'Starred: it is in the library menu under Playlists, and opens again from there.' });
+    await click('#libScopeClear', { ms: 400 });
     await page.fill('#q', '');
-    await page.press('#q', 'Escape');
-    await settle(500);
     await page.mouse.click(5, 300);
     await settle(400);
 

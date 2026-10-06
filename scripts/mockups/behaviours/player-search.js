@@ -1,28 +1,31 @@
 /*
  * The mockup's search, on stock songs: not the app's code, a small stand-in for it.
  *
- * The header field searches as the shell does (music-player/index.html, "search"): typing dims the
- * last results and says "Press ⏎ to search"; Enter searches; five rows a page with dots, ‹ › and
- * Page Up/Down; arrow keys move the highlight; Enter or a click previews the highlighted row (the
- * ring fills over 30 seconds, without sound); + adds it (✓); Clear or Escape closes. Every row is a
- * copy of the row the app drew in the captured "search" state, so it wears the app's own CSS.
+ * The header field searches as the shell does (music-player/src/shell/search, NP-FIND-003): typing
+ * dims the last results and says "Press ⏎ to search"; Enter searches and draws Songs (five, then "See
+ * all"), Artists and Albums, every row with the platforms it is on; the arrows move through every
+ * section and Page Up/Down by five; Enter or a click on a cover previews a song (the ring fills over
+ * 30 seconds, without sound); + adds it (✓); Clear or Escape closes. Every row is a copy of a row the
+ * app drew in the captured "search" state, so it wears the app's own CSS. "See all", an artist, an
+ * album, a song's title, Filter and the fields switch lead to the captured states for them (the
+ * navigator follows those clicks), which show the stock search for "harbour".
  *
  * The list's own Search field (#libFind) filters the rows on show as you type, as it does in the app.
  *
- * The songs are the stock list in the <script data-mock-data="search"> above
+ * The songs, artists and albums are the stock list in the <script data-mock-data="search"> above
  * (scripts/mockups/fixtures/search-catalogue.json, invented artists and albums).
  */
 (function () {
   'use strict';
   var DATA = JSON.parse(document.querySelector('script[data-mock-data="search"]').textContent);
-  var PAGE = DATA.page;
   var CLIP = DATA.clip;
+  var PREVIEW = { songs: 5, artists: 3, albums: 3 };
   var self = document.currentScript;
   if (self) self.remove();
   var dataEl = document.querySelector('script[data-mock-data="search"]');
   if (dataEl) dataEl.remove();
 
-  var S = { results: [], page: 0, hot: -1, state: 'idle', lastQ: '', added: {} };
+  var S = { found: null, hot: -1, state: 'idle', lastQ: '', added: {} };
   var previewing = null;
 
   function $(id) { return document.getElementById(id); }
@@ -36,8 +39,15 @@
     var hay = (song.t + ' ' + song.a + ' ' + song.al).toLowerCase();
     return q.toLowerCase().split(/\s+/).filter(Boolean).every(function (w) { return hay.indexOf(w) >= 0; });
   }
-  function pages() { return Math.ceil(S.results.length / PAGE); }
-  function visible() { return S.results.slice(S.page * PAGE, S.page * PAGE + PAGE); }
+  function search(q) {
+    var songs = DATA.songs.filter(function (s) { return matches(s, q); });
+    return {
+      songs: songs,
+      artists: DATA.artists.filter(function (a) { return songs.some(function (s) { return s.a === a.name; }); }),
+      albums: DATA.albums.filter(function (al) { return songs.some(function (s) { return s.al === al.title; }); }),
+    };
+  }
+  function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
 
   /* ---- the popover, as the app drew it in the "search" state ---- */
 
@@ -45,9 +55,9 @@
     var t = window.mockup.template(DATA.template);
     return t ? t.content.querySelector('#srch') : null;
   }
-  function protoRow() {
-    var pop = captured();
-    return pop ? pop.querySelector('.srch__row') : null;
+  function proto(selector) {
+    var p = captured();
+    return p ? p.querySelector(selector) : null;
   }
   /* In other states the closed popover was written out empty: put the app's markup back. */
   function pop() {
@@ -78,15 +88,31 @@
     for (var i = 0; i < 12; i++) s += '<i style="transform:rotate(' + i * 30 + 'deg);animation-delay:' + (i / 12 - 1).toFixed(3) + 's"></i>';
     return s + '</span>';
   }
-  function msg(html) { $('srchBody').innerHTML = '<div class="srch__msg">' + html + '</div>'; $('srchFoot').hidden = true; }
+  function msg(html) { $('srchBody').innerHTML = '<div class="srch__msg">' + html + '</div>'; }
 
-  function row(song, i) {
-    var r = protoRow().cloneNode(true);
-    var key = song.a + '|' + song.t;
+  function stamp(r, i) {
     r.id = 'srchOpt' + i;
     r.setAttribute('data-i', String(i));
     r.setAttribute('aria-selected', 'false');
     r.classList.remove('is-hot');
+    return r;
+  }
+  function picture(r, src) {
+    var img = r.querySelector('.srch__art img');
+    if (img && src) img.src = src;
+  }
+  function badges(r, names) {
+    var box = r.querySelector('.srch__pfs');
+    var one = proto('.srch__pfs .srch__badge');
+    if (!box || !one) return;
+    box.replaceChildren();
+    names.forEach(function (n) { var b = one.cloneNode(true); b.textContent = n; box.appendChild(b); });
+    box.title = 'On ' + names.join(', ');
+  }
+
+  function songRow(song, i) {
+    var r = stamp(proto('.srch__sec[aria-label="Songs"] .srch__row:not(.srch__more)').cloneNode(true), i);
+    var key = song.a + '|' + song.t;
     var art = r.querySelector('.srch__art');
     if (art) {
       art.setAttribute('data-preview', String(i));
@@ -94,13 +120,15 @@
       art.setAttribute('aria-label', 'Preview ' + song.t + ', ' + CLIP + ' seconds');
       art.classList.remove('is-preview');
       art.style.removeProperty('--p');
-      var img = art.querySelector('img');
-      if (img) img.src = song.art;
     }
+    picture(r, song.art);
     r.querySelector('.srch__title').textContent = song.t;
-    r.querySelector('.srch__sub').textContent = song.a + ' — ' + song.al;
+    badges(r, song.pfs);
+    r.querySelector('.srch__sub').textContent = song.a + ' — ' + song.al + ' · ' + song.year;
     r.querySelector('.srch__time').textContent = fmt(song.d);
     r.querySelector('.srch__bpm').textContent = song.bpm ? song.bpm + ' bpm' : '';
+    var genre = r.querySelector('.srch__genre');
+    if (genre) genre.remove();
     var add = r.querySelector('.srch__add');
     if (add) {
       var done = !!S.added[key];
@@ -109,18 +137,44 @@
       if (done) { add.setAttribute('aria-disabled', 'true'); add.removeAttribute('data-add'); }
       else { add.removeAttribute('aria-disabled'); add.setAttribute('data-add', String(i)); }
     }
-    var q = encodeURIComponent(song.a + ' ' + song.t);
-    r.querySelectorAll('.srch__pf').forEach(function (a) {
-      a.href = a.href.replace(/([?&](?:search_query|q)=).*$/, '$1' + q);
-      a.setAttribute('aria-label', 'Find ' + song.t + ' on ' + (a.getAttribute('aria-label') || '').replace(/^.* on /, ''));
-    });
     return r;
+  }
+  function artistRow(a, i) {
+    var r = stamp(proto('.srch__row--artist').cloneNode(true), i);
+    picture(r, a.art);
+    r.querySelector('.srch__title').textContent = a.name;
+    r.querySelector('.srch__sub').textContent = a.sub;
+    return r;
+  }
+  function albumRow(al, i) {
+    var r = stamp(proto('.srch__row--album').cloneNode(true), i);
+    picture(r, al.art);
+    r.querySelector('.srch__title').textContent = al.title;
+    r.querySelector('.srch__sub').textContent = al.sub;
+    return r;
+  }
+  function moreRow(n, i) {
+    var r = stamp(proto('.srch__more').cloneNode(true), i);
+    r.querySelector('.srch__morelabel').textContent = 'See all songs (' + n + ')';
+    return r;
+  }
+  function section(label, rows) {
+    var sec = proto('.srch__sec').cloneNode(true);
+    sec.setAttribute('aria-label', label);
+    sec.replaceChildren();
+    var cap = proto('.srch__sec .srch__cap').cloneNode(true);
+    cap.textContent = label;
+    sec.appendChild(cap);
+    rows.forEach(function (r) { sec.appendChild(r); });
+    return sec;
   }
 
   function render() {
     var count = $('srchCount');
     var live = $('srchLive');
     $('srch').classList.remove('is-stale');
+    var back = $('srchBack');
+    if (back) back.hidden = true;
     if (S.state === 'loading') {
       count.textContent = 'Searching…';
       msg(spinner() + '<span>Searching…</span>');
@@ -130,52 +184,50 @@
       msg('No matches for “' + esc(S.lastQ) + '”.');
       live.textContent = 'No results';
     } else if (S.state === 'list') {
-      var n = S.results.length;
-      count.innerHTML = '<b>Results:</b> ' + n + (n === 1 ? ' song' : ' songs');
+      var f = S.found;
+      var words = plural(f.songs.length, 'song', 'songs') + ' · ' + plural(f.artists.length, 'artist', 'artists') + ' · ' + plural(f.albums.length, 'album', 'albums');
+      count.innerHTML = '<b>Results:</b> ' + words;
       var list = document.createElement('div');
       list.setAttribute('role', 'listbox');
       list.id = 'srchList';
       list.setAttribute('aria-label', 'Search results');
-      visible().forEach(function (s, i) { list.appendChild(row(s, i)); });
+      var i = 0;
+      var songs = f.songs.slice(0, PREVIEW.songs).map(function (s) { return songRow(s, i++); });
+      if (f.songs.length > PREVIEW.songs) songs.push(moreRow(f.songs.length, i++));
+      var artists = f.artists.slice(0, PREVIEW.artists).map(function (a) { return artistRow(a, i++); });
+      var albums = f.albums.slice(0, PREVIEW.albums).map(function (a) { return albumRow(a, i++); });
+      if (songs.length) list.appendChild(section('Songs', songs));
+      if (artists.length) list.appendChild(section('Artists', artists));
+      if (albums.length) list.appendChild(section('Albums', albums));
       $('srchBody').replaceChildren(list);
-      var pg = pages();
-      $('srchFoot').hidden = pg < 2;
-      if (pg > 1) {
-        var d = '';
-        for (var i = 0; i < pg; i++) d += '<i' + (i === S.page ? ' class="is-on"' : '') + '></i>';
-        $('srchDots').innerHTML = d;
-        $('srchPrev').disabled = S.page === 0;
-        $('srchNext').disabled = S.page === pg - 1;
-      }
       applyHot();
-      live.textContent = n + ' results' + (pg > 1 ? ', page ' + (S.page + 1) + ' of ' + pg : '');
+      live.textContent = words;
     }
   }
 
+  function rows() { return $('srchBody').querySelectorAll('.srch__row[data-i]'); }
   function applyHot() {
-    var rows = $('srchBody').querySelectorAll('.srch__row');
-    for (var i = 0; i < rows.length; i++) {
-      rows[i].classList.toggle('is-hot', i === S.hot);
-      rows[i].setAttribute('aria-selected', String(i === S.hot));
+    var all = rows();
+    for (var i = 0; i < all.length; i++) {
+      all[i].classList.toggle('is-hot', i === S.hot);
+      all[i].setAttribute('aria-selected', String(i === S.hot));
     }
     if (S.hot >= 0) $('q').setAttribute('aria-activedescendant', 'srchOpt' + S.hot);
     else $('q').removeAttribute('aria-activedescendant');
   }
-
-  function turn(by, hotAt) {
-    var p = Math.min(pages() - 1, Math.max(0, S.page + by));
-    if (p === S.page) return;
-    stopPreview();
-    S.page = p;
-    S.hot = hotAt === undefined ? -1 : hotAt;
-    render();
+  function move(by) {
+    var n = rows().length;
+    if (!n) return;
+    S.hot = S.hot < 0 ? (by > 0 ? 0 : n - 1) : Math.max(0, Math.min(n - 1, S.hot + by));
+    applyHot();
+    var on = rows()[S.hot];
+    if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest' });
   }
 
   var searchTimer = 0;
   function go(q) {
     stopPreview();
     S.lastQ = q;
-    S.page = 0;
     S.hot = -1;
     S.state = 'loading';
     open();
@@ -183,8 +235,8 @@
     clearTimeout(searchTimer);
     // A moment of "Searching…", as a real lookup takes.
     searchTimer = setTimeout(function () {
-      S.results = DATA.songs.filter(function (s) { return matches(s, q); });
-      S.state = S.results.length ? 'list' : 'empty';
+      S.found = search(q);
+      S.state = S.found.songs.length ? 'list' : 'empty';
       render();
     }, 450);
   }
@@ -194,7 +246,6 @@
     var stale = !!q && q !== S.lastQ && S.state === 'list';
     $('srch').classList.toggle('is-stale', stale);
     if (stale) $('srchCount').textContent = 'Press ⏎ to search';
-    else if (S.state === 'list') render();
   }
 
   /* ---- preview: the ring fills over the clip, without sound ---- */
@@ -224,35 +275,35 @@
   }
 
   function addRow(i) {
-    var s = visible()[i];
-    if (!s) return;
-    S.added[s.a + '|' + s.t] = true;
+    var r = $('srchBody').querySelector('.srch__row[data-i="' + i + '"]');
+    var t = r && r.querySelector('.srch__title');
+    var song = t && S.found && S.found.songs.filter(function (s) { return s.t === t.textContent; })[0];
+    if (!song) return;
+    S.added[song.a + '|' + song.t] = true;
     render();
   }
 
   /* ---- picking up a state the navigator just drew ---- */
 
-  function adopt() {
+  function adopt(e) {
     stopPreview();
     var q = $('q');
     if (!q) return;
     var p = $('srch');
-    if (p && !p.hidden && p.querySelector('.srch__row[data-i]') && q.value.trim()) {
-      // The captured "search" states: carry on from what they show.
-      S.lastQ = q.value.trim();
-      S.results = DATA.songs.filter(function (s) { return matches(s, S.lastQ); });
-      S.state = S.results.length ? 'list' : 'empty';
-      var dots = p.querySelectorAll('#srchDots i');
-      S.page = 0;
-      for (var i = 0; i < dots.length; i++) if (dots[i].classList.contains('is-on')) S.page = i;
+    var id = e && e.detail ? e.detail.id : window.mockup.current();
+    if (p && !p.hidden && q.value.trim() && (id === 'search' || id === 'search-keys' || id === 'search-stale')) {
+      // The captured overview states: carry on from what they show.
+      S.lastQ = id === 'search-stale' ? 'harbour' : q.value.trim();
+      S.found = search(S.lastQ);
+      S.state = S.found.songs.length ? 'list' : 'empty';
       var hot = p.querySelector('.srch__row.is-hot');
       S.hot = hot ? Number(hot.getAttribute('data-i')) : -1;
     } else if (p && !p.hidden && q.value.trim()) {
       S.lastQ = q.value.trim();
-      S.results = [];
-      S.state = 'empty';
+      S.found = search(S.lastQ);
+      S.state = 'view';
     } else {
-      S = { results: [], page: 0, hot: -1, state: 'idle', lastQ: '', added: S.added };
+      S = { found: null, hot: -1, state: 'idle', lastQ: '', added: S.added };
     }
   }
   document.addEventListener('mockup:show', adopt);
@@ -271,23 +322,23 @@
     }
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       if (!showing) { if (S.state !== 'idle') { e.preventDefault(); open(); render(); } return; }
-      if (S.state !== 'list') return;
       e.preventDefault();
-      var n = visible().length;
-      if (e.key === 'ArrowDown') { if (S.hot < n - 1) { S.hot++; applyHot(); } else if (S.page < pages() - 1) turn(1, 0); }
-      else { if (S.hot > 0) { S.hot--; applyHot(); } else if (S.page > 0) turn(-1, PAGE - 1); }
+      move(e.key === 'ArrowDown' ? 1 : -1);
       return;
     }
-    if ((e.key === 'PageDown' || e.key === 'PageUp') && showing && S.state === 'list') {
+    if ((e.key === 'PageDown' || e.key === 'PageUp') && showing) {
       e.preventDefault();
-      turn(e.key === 'PageDown' ? 1 : -1);
+      move(e.key === 'PageDown' ? 5 : -5);
       return;
     }
     if (e.key === 'Enter') {
       e.preventDefault();
-      if (showing && S.state === 'list' && S.hot >= 0) {
+      var hot = showing && S.hot >= 0 ? $('srchBody').querySelector('.srch__row[data-i="' + S.hot + '"]') : null;
+      if (hot && !$('srch').classList.contains('is-stale')) {
+        var art = hot.querySelector('.srch__art[data-preview]');
         if (e.metaKey || e.ctrlKey) addRow(S.hot);
-        else preview($('srchBody').querySelector('.srch__row[data-i="' + S.hot + '"] .srch__art'));
+        else if (art) preview(art);
+        else hot.click(); // an artist, an album or "See all": the navigator follows it
         return;
       }
       var q = t.value.trim();
@@ -310,7 +361,8 @@
     if (p && p.hidden && S.state !== 'idle' && e.target.value.trim()) { open(); render(); markStale(); }
   });
 
-  // Clicks inside the popover: handled here before the navigator reads them as "away".
+  // Clicks inside the popover: handled here before the navigator reads them as "away". (The
+  // navigator has already followed any click it wired to another state.)
   document.addEventListener('click', function (e) {
     var t = e.target instanceof Element ? e.target : null;
     if (!t) return;
@@ -321,20 +373,20 @@
       if (t.closest('#libFindClear')) { var f = $('libFind'); f.value = ''; filterList(''); f.focus(); }
       return;
     }
+    if (t.closest('input, label')) return;
     e.preventDefault();
     e.stopPropagation();
     if (t.closest('#srchClear')) { $('q').value = ''; S.state = 'idle'; S.lastQ = ''; close(); $('q').focus(); return; }
-    if (t.closest('#srchPrev')) { turn(-1); return; }
-    if (t.closest('#srchNext')) { turn(1); return; }
     var add = t.closest('[data-add]');
     if (add) { addRow(Number(add.getAttribute('data-add'))); return; }
     var art = t.closest('.srch__art[data-preview]');
     if (art) { preview(art); return; }
     var r = t.closest('.srch__row[data-i]');
-    if (r && !t.closest('a')) {
+    if (r) {
       S.hot = Number(r.getAttribute('data-i'));
       applyHot();
-      preview(r.querySelector('.srch__art'));
+      var a = r.querySelector('.srch__art[data-preview]');
+      if (a) preview(a);
     }
   }, true);
 
