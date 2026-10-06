@@ -172,8 +172,12 @@ const BUNDLES: Bundle[] = [
      * engine itself (iTunes, Deezer, MusicBrainz, LRCLIB parsers, the merger, the NDJSON reader) — while
      * the shell's HTML lost the old inline search (29 KB less, after the new styles and markup it
      * gained). Measured: 2505 KB. None of it is in the first load.
+     *
+     * And to 2508 for that search's second and third rounds (owner, 2026-10-06): the results pager that
+     * fetches later pages, whole-list loading with its progress in the music list, and the engine's
+     * merger applied across chunks and pages — measured, 3 KB, in the lazy chunk and the shell's HTML.
      */
-    totalBudgetKb: 2505,
+    totalBudgetKb: 2508,
     // Three.js belongs to the constellation and the jewel case; the tag reader only to a scan.
     mustBeSplit: ['three', 'music-metadata'],
   },
