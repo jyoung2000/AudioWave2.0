@@ -12733,8 +12733,17 @@ window.AW.startStats = function () {
        should go — but selecting the row repaints the list first, and that
        repaint can scroll on its own. Anything in the first moment belongs to
        the opening, not to the user. */
+    var userScrollAt = 0;
+    function userScrolls() { userScrollAt = Date.now(); }
+    addEventListener('wheel', userScrolls, { capture: true, passive: true });
+    addEventListener('touchmove', userScrolls, { capture: true, passive: true });
+    addEventListener('keydown', function (e) {
+      if (/^(PageUp|PageDown|Home|End|ArrowUp|ArrowDown| )$/.test(e.key) && !ctx.contains(e.target)) userScrolls();
+    }, true);
     document.addEventListener('scroll', function () {
       if (Date.now() - menuOpenedAt < 250) return;
+      /* A list repainting or bringing its playing row into view is not the user moving away. */
+      if (Date.now() - userScrollAt > 600) return;
       closeMenu();
     }, true);
     addEventListener('resize', closeMenu);

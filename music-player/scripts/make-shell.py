@@ -1918,6 +1918,31 @@ replace("</style>\n",
         "  @media (min-width: 720px) { .conn__card > #pcMsg { margin-left: 158px; } }\n"
         "</style>\n")
 
+# ---- menus: only the user's own scroll closes a contextual menu (NP-MENU-001) -----------------------------
+# The menu shut on any scroll 250 ms after it opened. Lists scroll themselves too: the station list
+# brings its playing row into view each time a now-playing feed lands, and on a slow phone (or a CI
+# runner) that landed while the menu was being read, so the menu vanished under the pointer. A scroll
+# now closes it only when a wheel, touch drag or scrolling key started it.
+replace("""    document.addEventListener('scroll', function () {
+      if (Date.now() - menuOpenedAt < 250) return;
+      closeMenu();
+    }, true);
+""",
+        """    var userScrollAt = 0;
+    function userScrolls() { userScrollAt = Date.now(); }
+    addEventListener('wheel', userScrolls, { capture: true, passive: true });
+    addEventListener('touchmove', userScrolls, { capture: true, passive: true });
+    addEventListener('keydown', function (e) {
+      if (/^(PageUp|PageDown|Home|End|ArrowUp|ArrowDown| )$/.test(e.key) && !ctx.contains(e.target)) userScrolls();
+    }, true);
+    document.addEventListener('scroll', function () {
+      if (Date.now() - menuOpenedAt < 250) return;
+      /* A list repainting or bringing its playing row into view is not the user moving away. */
+      if (Date.now() - userScrollAt > 600) return;
+      closeMenu();
+    }, true);
+""")
+
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):
     assert bad not in text, f'left behind: {bad}'

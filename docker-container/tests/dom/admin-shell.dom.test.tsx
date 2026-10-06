@@ -224,7 +224,8 @@ describe('signed in', () => {
     render(<App />);
     const attention = await screen.findByRole('list', { name: 'Needs attention' });
     await waitFor(() => expect(within(attention).getAllByRole('listitem')).toHaveLength(1));
-    expect(screen.getByRole('tab', { name: /^Overview/ }).textContent).toContain('1');
+    // The badge is drawn from the same reading one render after the list (a slow CI runner showed the gap).
+    await waitFor(() => expect(screen.getByRole('tab', { name: /^Overview/ }).textContent).toContain('1'));
     // One request for the overview, not one for the badge and another for the list.
     expect(fetchMock.mock.calls.filter((call) => String(call[0]).includes('/metrics/overview'))).toHaveLength(1);
   });

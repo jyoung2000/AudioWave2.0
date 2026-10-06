@@ -1454,7 +1454,7 @@
       "id": "NP-MENU-001",
       "group": "np-menus",
       "title": "Right-click opens the item's commands; keys work inside",
-      "contract": "Right-clicking a song, station, channel, series or film opens an OS X contextual menu at the pointer with the commands for that kind of item. Arrow keys move, Return chooses, Escape closes and returns focus. Scrolling the page after opening does not close it instantly.",
+      "contract": "Right-clicking a song, station, channel, series or film opens an OS X contextual menu at the pointer with the commands for that kind of item. Arrow keys move, Return chooses, Escape closes and returns focus. Scrolling the page after opening does not close it instantly, and only the user's own scroll (wheel, touch drag or a scrolling key) closes it: a list repainting or bringing its playing row into view as a feed lands leaves it open.",
       "example": "",
       "authority": "adopted",
       "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
@@ -1473,6 +1473,11 @@
           "type": "test",
           "path": "music-player/tests/e2e/np/lists.spec.ts",
           "name": "Radio: a station is played, kept or filed; a new playlist holds it and can be emptied"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/menuverify.spec.ts",
+          "name": "a list scrolling itself leaves the menu open; the user scrolling closes it"
         }
       ]
     },

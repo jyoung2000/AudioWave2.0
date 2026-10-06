@@ -34,6 +34,23 @@ test.describe('desktop: OS X menu', () => {
     await page.click('.ctx__sub .ctx__item[data-act="toggle"]'); await page.waitForTimeout(300);
     expect(await page.textContent('#toast'), 'menu action still fires').toContain('Removed from');
   });
+
+  test('a list scrolling itself leaves the menu open; the user scrolling closes it', async ({ page }) => {
+    await page.click('#libraryRows tr:nth-child(3)', { button: 'right', position: { x: 200, y: 8 } });
+    await page.waitForTimeout(400); // past the opening moment
+    expect(await page.getAttribute('#ctx', 'hidden'), 'menu opens on right-click').toBeNull();
+    // What a feed landing does: the list repaints and brings a row into view, with no hand on the wheel.
+    await page.evaluate(() => {
+      document.querySelector('#libraryRows tr:last-child')!.scrollIntoView({ block: 'nearest' });
+      document.dispatchEvent(new Event('scroll'));
+    });
+    await page.waitForTimeout(200);
+    expect(await page.getAttribute('#ctx', 'hidden'), 'the app scrolling stays out of the way').toBeNull();
+    await page.mouse.move(40, 400);
+    await page.mouse.wheel(0, 120);
+    await page.evaluate(() => document.dispatchEvent(new Event('scroll'))); // a short list may not move
+    await expect(page.locator('#ctx'), 'the user scrolling away closes it').toBeHidden();
+  });
 });
 
 test.describe('touch: iOS action sheet', () => {
