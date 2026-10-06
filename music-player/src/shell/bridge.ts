@@ -31,6 +31,7 @@ import { normalizeCrossfade, crossfadeMsBetween } from '../lib/crossfade.js';
 import { toTrackRef } from '../state/store.js';
 import { registerServiceWorker } from '../lib/pwa.js';
 import type { RemoteSong, ShellAwsp } from './awsp.js';
+import type { SearchApi } from './search/index.js';
 import { detectBackend } from '../lib/tool-backend.js';
 import { runFetch, ToolError } from '../lib/tools-core.js';
 import type { SavedHelper } from '../lib/fetch-helper.js';
@@ -43,6 +44,12 @@ export type ShellSurface =
   | 'library'
   | 'now-playing'
   | 'search-popover'
+  | 'search-see-all'
+  | 'search-album'
+  | 'search-artist'
+  | 'search-song'
+  | 'search-filter'
+  | 'search-collection-list'
   | 'row-menu'
   | 'new-playlist-sheet'
   | 'fetch-sheet'
@@ -115,6 +122,8 @@ declare global {
     NP_AWSP_READY?: Promise<ShellAwsp | null>;
     NP_READY?: Promise<void>;
     NP_BRIDGE?: { version: number; log: string[] };
+    /** Resolves with the header search once its lazy chunk has installed itself (NP-FIND-*), or null. */
+    NP_SEARCH_READY?: Promise<SearchApi | null>;
     __npStart?: () => void;
     outputVolume?: number;
   }
@@ -477,6 +486,35 @@ async function boot(): Promise<void> {
   note(`bridge ready: ${window.LIBRARY.length} tracks, hub ${hub.getStatus().connected ? 'paired' : 'not paired'}`);
   // Now the shell may run: everything it reads at boot is in place.
   window.__npStart?.();
+  loadSearch();
+}
+
+/**
+ * The header search is a lazy chunk (src/shell/search, NP-FIND-*): the catalog's songs, artists and
+ * albums, details and pasted links. It is fetched once the shell runs, never before the first paint;
+ * an Enter pressed in the field before it lands is kept and replayed rather than lost.
+ */
+function loadSearch(): void {
+  const q = document.getElementById('q') as HTMLInputElement | null;
+  let pending = false;
+  const early = (e: KeyboardEvent): void => {
+    if (e.key === 'Enter' && q?.value.trim()) {
+      pending = true;
+      e.preventDefault();
+    }
+  };
+  q?.addEventListener('keydown', early);
+  window.NP_SEARCH_READY = import('./search/index.js')
+    .then((m) => {
+      q?.removeEventListener('keydown', early);
+      const api = m.installSearch();
+      if (pending && q) q.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+      return api;
+    })
+    .catch((err: unknown) => {
+      note(`search is unavailable: ${err instanceof Error ? err.message : String(err)}`);
+      return null;
+    });
 }
 
 // No top-level await: the single-file build is an IIFE, which cannot carry one. Everything that

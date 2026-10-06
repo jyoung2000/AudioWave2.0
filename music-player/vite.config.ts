@@ -27,6 +27,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@now-playing/contracts': workspace('contracts'),
+      // The catalog's own entry precedes the bare alias: string aliases match by prefix.
+      '@now-playing/domain/catalog': fileURLToPath(new URL('../packages/domain/src/catalog/index.ts', import.meta.url)),
       '@now-playing/domain': workspace('domain'),
       // The stylesheet entries must precede the bare package alias: string aliases match by
       // prefix, so otherwise "…/aqua-ui/now-playing.css" is rewritten to "…/src/index.ts/now-playing.css".

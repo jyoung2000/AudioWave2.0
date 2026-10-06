@@ -596,8 +596,7 @@
   .srch__art:not(.is-preview) .srch__stop { display: none; }
   .srch__art.is-preview .srch__play { display: none; }
 
-  /* one badge per platform, matching the library's monochrome initials —
-     no logos, those are trademarks */
+  /* the row's right rail: + (add to the library) */
   .srch__links { flex: none; display: flex; gap: 3px; }
 
   /* The genre chip: the platform badge's own materials, worn as a word. */
@@ -613,26 +612,202 @@
   }
   @media (max-width: 480px) { .srch__genre { display: none; } }
 
-  .srch__pf {
+  /* ---------- the catalog search (NP-FIND-003..008) ----------
+     Same card, same rows; wider, so a section's badges and numbers fit beside a title. Anchored to
+     the pill's right edge and never wider than the window. */
+  .srch { left: auto; width: max(100%, min(480px, calc(100vw - 20px))); }
+  .srch__body { max-height: min(62vh, 470px); overflow-y: auto; overscroll-behavior: contain; }
+  .srch__head { gap: 6px; }
+  .srch__head .srch__count { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .srch__back, .srch__filter {
+    flex: none;
+    padding: 2px 4px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    font: inherit;
+    color: var(--srch-soft);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .srch__back { color: var(--lib-accent); font-weight: 700; }
+  .srch__back[hidden] { display: none; }
+  .srch__back:hover, .srch__filter:hover { color: var(--srch-ink); }
+  .srch__filter.is-on { color: var(--lib-accent); font-weight: 700; }
+  .srch__back:focus, .srch__filter:focus { outline: none; }
+  .srch__back:focus-visible, .srch__filter:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
+
+  /* the pill's own switch for the Track / Artist / Album / ISRC fields */
+  .search__input { padding-right: 28px; }
+  .search__more {
+    position: absolute;
+    top: 50%;
+    right: 5px;
     display: flex;
     align-items: center;
     justify-content: center;
     width: 20px;
-    height: 16px;
+    height: 18px;
+    padding: 0;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--field-hint);
+    transform: translateY(-50%);
+    cursor: default;
+  }
+  .search__more svg { width: 13px; height: 13px; fill: currentColor; }
+  .search__more:hover { color: var(--ink); }
+  .search__more[aria-expanded="true"] { background: rgba(0, 0, 0, 0.12); color: var(--ink); }
+  .search__more:focus { outline: none; }
+  .search__more:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
+  @media (pointer: coarse) { .search__more { width: 32px; height: 32px; right: 2px; border-radius: 16px; } .search__input { padding-right: 36px; } }
+
+  .srch__adv {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 8px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--srch-rule);
+    background: var(--srch-head-bot);
+  }
+  .srch__adv[hidden] { display: none; }
+  .srch__field { display: flex; flex-direction: column; gap: 2px; color: var(--srch-soft); font-size: 10px; }
+  .srch__field input {
+    height: 22px;
+    padding: 0 7px;
+    border: 1px solid var(--srch-rule);
+    border-radius: 4px;
+    background: #fff;
+    font: inherit;
+    font-size: 12px;
+    color: var(--srch-ink);
+  }
+  .srch__field input:focus { outline: 2px solid rgba(24, 160, 235, 0.6); outline-offset: 0; }
+  .srch__advgo { grid-column: 1 / -1; justify-self: end; }
+
+  /* the quiet line: each service and how it did (UX-CAT-001) */
+  .srch__status {
+    margin: 0;
+    padding: 3px 10px;
+    border-bottom: 1px solid var(--srch-rule);
+    color: var(--srch-soft);
+    font-size: 10px;
+    line-height: 14px;
+  }
+  .srch__status[hidden] { display: none; }
+  .srch__st { white-space: nowrap; }
+  .srch__st[data-state="failed"], .srch__st[data-state="timeout"] { color: var(--srch-ink); font-weight: 700; }
+  .srch__st[data-state="cooling-down"], .srch__st[data-state="skipped"] { font-style: italic; }
+
+  .srch__cap { margin: 0; padding: 6px 10px 2px; color: var(--srch-soft); font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+  .srch__cap span { font-weight: 400; letter-spacing: 0; text-transform: none; }
+  .srch__sec + .srch__sec { border-top: 1px solid var(--srch-rule); }
+
+  /* title, then the platforms it is on (UX-CAT-003) */
+  .srch__line { display: flex; align-items: center; gap: 5px; min-width: 0; }
+  .srch__line .srch__title { flex: 0 1 auto; min-width: 0; }
+  .srch__pfs { flex: none; display: inline-flex; align-items: center; gap: 3px; }
+  .srch__badge {
+    padding: 0 4px;
     border-radius: 3px;
     background: var(--srch-pf);
     color: var(--srch-pf-ink);
-    font-size: 8px;
+    font-size: 9px;
     font-weight: 700;
     letter-spacing: 0.02em;
-    text-decoration: none;
-    -webkit-tap-highlight-color: transparent;
+    line-height: 13px;
+    white-space: nowrap;
   }
+  .srch__via { color: var(--srch-soft); font-size: 9.5px; white-space: nowrap; }
+  @media (max-width: 480px) { .srch__line .srch__badge:nth-child(n+3) { display: none; } }
 
-  .srch__pf[data-len="1"] { font-size: 9px; }
-  .srch__pf:hover { background: var(--lib-accent); color: #fff; }
-  .srch__pf:focus { outline: none; }
-  .srch__pf:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
+  .srch__art--round { border-radius: 50%; }
+  .srch__mosaic { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+  .srch__mosaic img { position: static; width: 100%; height: 100%; object-fit: cover; }
+  .srch__row--coll { height: 54px; }
+  .srch__row--coll .srch__art { width: 42px; height: 42px; }
+  .srch__open { flex: none; color: var(--srch-soft); font-size: 10px; }
+  .srch__more .srch__morelabel { flex: 1; padding-left: 38px; color: var(--lib-accent); font-weight: 700; }
+  .srch__end { padding: 8px 12px; color: var(--srch-soft); font-size: 10px; text-align: center; }
+
+  /* album, artist and song details: a cover, its facts, then its rows */
+  .srch__detail { display: flex; gap: 12px; padding: 10px; border-bottom: 1px solid var(--srch-rule); }
+  .srch__cover {
+    position: relative;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 84px;
+    height: 84px;
+    overflow: hidden;
+    border-radius: 3px;
+    background-image: linear-gradient(to bottom, var(--srch-art-top), var(--srch-art-bot));
+    box-shadow: inset 0 0 0 1px var(--srch-art-ring), 0 1px 3px rgba(0, 0, 0, 0.2);
+    color: var(--srch-art-ink);
+  }
+  .srch__cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .srch__cover > svg { width: 28px; height: 28px; fill: currentColor; }
+  .srch__cover--round { border-radius: 50%; }
+  .srch__dmeta { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .srch__dtitle { margin: 0; color: var(--srch-ink); font-size: 13px; font-weight: 700; }
+  .srch__dsub, .srch__dfacts, .srch__dpfs, .srch__dacts { margin: 0; color: var(--srch-soft); }
+  .srch__dfacts { display: flex; flex-wrap: wrap; gap: 2px 10px; }
+  .srch__fact b { margin-right: 3px; color: var(--srch-ink); font-weight: 700; }
+  .srch__fact--wait { font-style: italic; }
+  .srch__dacts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .srch__btn {
+    height: 20px;
+    padding: 0 10px;
+    border: 1px solid var(--srch-rule);
+    border-radius: 10px;
+    background-image: linear-gradient(to bottom, #fff, var(--srch-head-bot));
+    font: inherit;
+    color: var(--srch-ink);
+    cursor: default;
+  }
+  .srch__btn:hover { border-color: var(--srch-chev); }
+  .srch__btn:focus { outline: none; }
+  .srch__btn:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
+  .srch__btn:disabled, .srch__btn[aria-disabled="true"] { opacity: 0.5; }
+  @media (pointer: coarse) { .srch__btn { height: 32px; padding: 0 14px; border-radius: 16px; } }
+  .srch__lyrics { max-height: 220px; overflow-y: auto; padding: 2px 12px 10px; color: var(--srch-ink); font-size: 11.5px; line-height: 1.5; }
+  .srch__lyr { margin: 0; }
+  .srch__lyr time { display: inline-block; min-width: 34px; color: var(--srch-soft); font-size: 10px; font-variant-numeric: tabular-nums; }
+
+  /* the filter sheet's two groups */
+  .srch-filter__set { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin: 10px 0 0; padding: 0; border: 0; font-size: 12px; }
+  .srch-filter__set legend { padding: 0; margin-bottom: 4px; }
+  .srch-filter__note { margin-top: 10px; font-size: 11px; }
+
+  /* a catalog list's caption ("Playlist · Spotify · 200 of 230 songs") gives way to its name on a phone */
+  .lib-scope .lib-scope__scope { flex: 0 1 auto; }
+  .lib-scope .lib-scope__kind { flex: 0 1000 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lib-scope .lib-scope__label { flex: 0 1 auto; }
+
+  /* the silver bar's star: keep the album or playlist on show in the library (NP-FIND-008) */
+  .lib-scope__star {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--scope-ink);
+    opacity: 0.6;
+    cursor: default;
+  }
+  .lib-scope__star[hidden] { display: none; }
+  .lib-scope__star svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; }
+  .lib-scope__star[aria-pressed="true"] { color: var(--lib-accent); opacity: 1; }
+  .lib-scope__star[aria-pressed="true"] svg { fill: currentColor; }
+  .lib-scope__star:focus { outline: none; }
+  .lib-scope__star:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
+  @media (pointer: coarse) { .lib-scope__star { width: 32px; height: 32px; } .lib-scope__star svg { width: 18px; height: 18px; } }
 
   /* "add to library" — same 20x16 badge as the platform links so the row's
      right rail keeps one rhythm; the glyph carries the difference, not the box */
@@ -6738,19 +6913,34 @@ window.AW.startStats = function () {
         <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2"/>
         <path d="M10.1 10.1 L14 14" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
       </svg>
-      <input class="search__input" type="search" id="q" placeholder="Search or paste a link"
-             aria-label="Search YouTube, SoundCloud and Bandcamp, or paste a link"
+      <input class="search__input" type="search" id="q" placeholder="Search music or paste a link"
+             aria-label="Search for songs, artists and albums, or paste a music link"
              role="combobox" aria-expanded="false" aria-controls="srchBody"
              autocomplete="off" spellcheck="false">
+      <!-- Track, artist, album and ISRC fields fold out of the pill and back into it (NP-FIND-005). -->
+      <button class="search__more" type="button" id="qMore" aria-expanded="false" aria-controls="srchAdv"
+              aria-label="Search by track, artist, album or ISRC">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h7.2a2 2 0 0 1 3.6 0H14v1.6h-1.2a2 2 0 0 1-3.6 0H2zm9 .8a.6.6 0 1 0 0 .01zM2 10.4h1.2a2 2 0 0 1 3.6 0H14V12H6.8a2 2 0 0 1-3.6 0H2zm3 .8a.6.6 0 1 0 0 .01z"/></svg>
+      </button>
 
       <!-- Search results: the iTunes 11 Up Next popover — count + Clear in a
            gradient header, 40px rows of art / title / "Artist — Platform",
            a circled chevron on the hot row, pager in the footer. -->
       <div class="srch" id="srch" hidden>
         <div class="srch__head">
+          <button class="srch__back" type="button" id="srchBack" hidden aria-label="Back">&#8249; Back</button>
           <p class="srch__count" id="srchCount"></p>
+          <button class="srch__filter" type="button" id="srchFilterBtn" aria-haspopup="dialog" aria-controls="srchFilter">Filter</button>
           <button class="srch__clear" type="button" id="srchClear">Clear</button>
         </div>
+        <form class="srch__adv" id="srchAdv" hidden aria-label="Search by track, artist, album or ISRC">
+          <label class="srch__field">Track<input name="track" type="text" autocomplete="off" spellcheck="false"></label>
+          <label class="srch__field">Artist<input name="artist" type="text" autocomplete="off" spellcheck="false"></label>
+          <label class="srch__field">Album<input name="album" type="text" autocomplete="off" spellcheck="false"></label>
+          <label class="srch__field">ISRC<input name="isrc" type="text" autocomplete="off" spellcheck="false" maxlength="15" placeholder="USQX91300108"></label>
+          <button class="srch__btn srch__advgo" type="submit">Search</button>
+        </form>
+        <p class="srch__status" id="srchStatus" hidden></p>
         <div class="srch__people" id="srchPeople" hidden></div>
         <div class="srch__body" id="srchBody"></div>
         <div class="srch__foot" id="srchFoot" hidden>
@@ -7109,6 +7299,9 @@ window.AW.startStats = function () {
       <span class="lib-scope__scope" id="libScope">
         <span class="lib-scope__kind" id="libScopeKind" hidden>Album</span>
         <span class="lib-scope__label" id="libScopeLabel">Library</span>
+        <button class="lib-scope__star" type="button" id="libColStar" hidden aria-pressed="false" aria-label="Save to your library">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.5 6.1 20.6l1.2-6.5L2.5 9.5l6.6-.9z"/></svg>
+        </button>
         <button class="lib-scope__clear" type="button" id="libScopeClear" hidden
                 aria-label="Show all songs">&#10005;</button>
       </span>
@@ -7213,6 +7406,34 @@ window.AW.startStats = function () {
     <div class="sheet__actions">
       <button class="sheet__btn" type="button" id="sheetCancel">Cancel</button>
       <button class="sheet__btn sheet__btn--default" type="submit" id="sheetCreate" value="create">Create</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- The search filter (NP-FIND-005): which sections a search shows and which services it asks.
+     Kept in the player's settings store (kv "player:search"). -->
+<dialog class="sheet" id="srchFilter" aria-labelledby="srchFilterTitle">
+  <form method="dialog" class="sheet__form">
+    <div class="sheet__body">
+      <p class="sheet__title" id="srchFilterTitle">Search Filter</p>
+      <fieldset class="srch-filter__set"><legend class="sheet__msg">Show</legend>
+        <label><input type="checkbox" name="sec" value="tracks"> Songs</label>
+        <label><input type="checkbox" name="sec" value="artists"> Artists</label>
+        <label><input type="checkbox" name="sec" value="albums"> Albums</label>
+      </fieldset>
+      <fieldset class="srch-filter__set"><legend class="sheet__msg">Ask</legend>
+        <label><input type="checkbox" name="pf" value="itunes"> Apple Music</label>
+        <label><input type="checkbox" name="pf" value="deezer"> Deezer</label>
+        <label><input type="checkbox" name="pf" value="musicbrainz"> MusicBrainz</label>
+        <label><input type="checkbox" name="pf" value="youtube"> YouTube</label>
+        <label><input type="checkbox" name="pf" value="soundcloud"> SoundCloud</label>
+      </fieldset>
+      <p class="sheet__msg srch-filter__note">YouTube and SoundCloud are searched by the hub or the companion (yt-dlp); with neither, this browser asks the others.</p>
+      <p class="sheet__msg" id="srchFilterMsg" role="status"></p>
+    </div>
+    <div class="sheet__actions">
+      <button class="sheet__btn" type="button" id="srchFilterCancel">Cancel</button>
+      <button class="sheet__btn sheet__btn--default" type="submit" value="save">Save</button>
     </div>
   </form>
 </dialog>
@@ -8138,1016 +8359,12 @@ window.AW.startStats = function () {
     window.addEventListener('focus', sync);
   })();
 
-  // Search hook — replace with your own handler.
   /* ---- search ----
-     One page ends up opened from very different places — the Claude artifact
-     viewer (strict CSP), a downloaded
-     file on a phone (no CSP, but cross-origin fetch dies on CORS), or a
-     normal web host. No single source works everywhere, so search walks a
-     provider chain and takes the first one that answers with rows:
-
-       1. yt-dlp companion  http://127.0.0.1:8642 — optional local helper
-          (search-server.py, next to this file). Real YouTube + SoundCloud
-          search with exact titles, uploaders, thumbnails and durations.
-          Note: this is a plain-http origin, so a page served over https will
-          have the request blocked as mixed content before it is sent. This
-          provider is reachable from file:// and http:// hosts only.
-       2. iTunes Search API — keyless; fetch first, JSONP when CORS refuses.
-          Art, 30s preview audio (the 15s clip source), duration.
-       3. Anthropic API + web search — only resolves inside the artifact
-          sandbox, where 1 and 2 are blocked by CSP.
-       4. Offline: one launcher row per platform, carrying the query.
-
-     Pasted links resolve through their own chain (companion /resolve →
-     site oEmbed → noembed.com, a CORS-open oEmbed relay → Anthropic), and
-     keep the slug reading if everything misses. BPM isn't in any of those
-     answers, so visible rows are enriched lazily from Deezer's JSONP API,
-     the only keyless source that carries tempo. */
-  (function () {
-    var input = document.getElementById('q');
-    var pop = document.getElementById('srch');
-    if (!input || !pop) return;
-
-    var count = document.getElementById('srchCount');
-    var body = document.getElementById('srchBody');
-    var foot = document.getElementById('srchFoot');
-    var dots = document.getElementById('srchDots');
-    var prevBtn = document.getElementById('srchPrev');
-    var nextBtn = document.getElementById('srchNext');
-    var live = document.getElementById('srchLive');
-
-    var PAGE = 5;
-    var CLIP = 30;                 // seconds of preview \u2014 the whole clip a platform serves
-    window.NP_SRCH_CLIP = CLIP;    /* read by tests; one constant drives label, ring and cutoff */
-    var TAIL = 0.7;                // seconds of volume ramp before the cut
-    var COMPANION = null;   // no hard-coded local companion: see docs/DEVIATIONS.md
-    var results = [], page = 0, hot = -1, state = 'idle', lastQ = '', seq = 0;
-    var listInfo = null;   // the pasted playlist the rows came from, for the count line
-
-    var HOSTS = /^(www\.)?(youtube\.com|music\.youtube\.com|youtu\.be|soundcloud\.com|on\.soundcloud\.com|bandcamp\.com|[a-z0-9-]+\.bandcamp\.com|open\.spotify\.com)$/i;
-    var NOTE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.6 3 9.8 5.2a1 1 0 0 0-.8 1v9.7a3.1 3.1 0 1 0 1.6 2.7V9.6l7.6-1.7v5.6a3.1 3.1 0 1 0 1.6 2.7V3.8a.8.8 0 0 0-1-.8z"/></svg>';
-    var PLATFORMS = [
-      { name: 'YouTube',    ini: 'YT', find: 'https://www.youtube.com/results?search_query=' },
-      { name: 'SoundCloud', ini: 'SC', find: 'https://soundcloud.com/search?q=' },
-      { name: 'Bandcamp',   ini: 'B',  find: 'https://bandcamp.com/search?q=' },
-    ];
-
-    function esc(t) {
-      return String(t).replace(/[&<>"']/g, function (c) {
-        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-      });
-    }
-
-    function fmtTime(sec) {
-      sec = Math.round(sec);
-      return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
-    }
-
-    /* ---- transport ---- */
-
-    var cbN = 0;
-
-    function jsonp(url, ms) {
-      return new Promise(function (res, rej) {
-        var cb = '__srchCB' + (++cbN);
-        var el = document.createElement('script');
-        var done = false;
-        var t = setTimeout(function () { fail(); }, ms || 12000);
-        function cleanup() {
-          clearTimeout(t);
-          try { delete window[cb]; } catch (e) { window[cb] = undefined; }
-          if (el.parentNode) el.parentNode.removeChild(el);
-        }
-        function fail() { if (done) return; done = true; cleanup(); rej(new Error('jsonp')); }
-        window[cb] = function (d) { if (done) return; done = true; cleanup(); res(d); };
-        el.onerror = fail;
-        el.src = url + (url.indexOf('?') < 0 ? '?' : '&') + 'callback=' + cb;
-        document.head.appendChild(el);
-      });
-    }
-
-    function getJSON(url, allowJsonp, ms, headers) {
-      var ctl = window.AbortController ? new AbortController() : null;
-      var t = ctl ? setTimeout(function () { ctl.abort(); }, ms || 12000) : 0;
-      return fetch(url, { signal: ctl ? ctl.signal : undefined, headers: headers || undefined })
-        .then(function (r) { clearTimeout(t); if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
-        .catch(function (e) {
-          clearTimeout(t);
-          if (allowJsonp) return jsonp(url, ms);
-          throw e;
-        });
-    }
-
-    /* ---- result shape ---- */
-
-    function findLinks(t, a) {
-      var q = encodeURIComponent(((a ? a + ' ' : '') + t).trim());
-      return PLATFORMS.map(function (pf) {
-        return { name: pf.name, ini: pf.ini, url: pf.find + q };
-      });
-    }
-
-    function track(t, a, al, art, prev, canonical, platform, d, bpm) {
-      return {
-        t: t, a: a || '', al: al || '', art: art || null, prev: prev || null,
-        u: canonical || null, p: platform || null,
-        d: d > 0 ? Math.round(d) : null,
-        bpm: bpm > 0 ? Math.round(bpm) : null,
-        bpmTried: false,
-        feat: [], genre: null, conf: null,
-        links: findLinks(t, a),
-      };
-    }
-
-    /* ---- providers ---- */
-
-    function fromITunes(d) {
-      var rows = (d && d.results) || [], out = [], seen = {};
-      for (var i = 0; i < rows.length && out.length < 25; i++) {
-        var r = rows[i];
-        if (!r || !r.trackName) continue;
-        var key = (r.trackName + '|' + (r.artistName || '')).toLowerCase();
-        if (seen[key]) continue;
-        seen[key] = 1;
-        var art = r.artworkUrl100 ? r.artworkUrl100.replace('100x100', '200x200') : null;
-        out.push(track(r.trackName, r.artistName, r.collectionName, art, r.previewUrl,
-                       null, null, r.trackTimeMillis ? r.trackTimeMillis / 1000 : 0));
-      }
-      return out;
-    }
-
-    function itunesSearch(q) {
-      var u = 'https://itunes.apple.com/search?media=music&entity=song&limit=25&term=' + encodeURIComponent(q);
-      return getJSON(u, true).then(fromITunes);
-    }
-
-    /* the local helper answers this shape directly; anything else listening
-       on the port fails the guards and the chain moves on */
-    function fromCompanion(d) {
-      var rows = (d && d.results) || [], out = [];
-      for (var i = 0; i < rows.length && out.length < 25; i++) {
-        var r = rows[i] || {};
-        if (typeof r.t !== 'string' || !r.t) continue;
-        /* `p` is rendered as markup by rowHTML, so it is constrained to the
-           known platform names here rather than trusted from the wire —
-           the same guard anthropicSearch already applies. */
-        var p = (r.p === 'YouTube' || r.p === 'SoundCloud' || r.p === 'Bandcamp') ? r.p : null;
-        out.push(track(r.t, r.a, r.al, r.art, null, r.u, p, r.d, r.bpm));
-      }
-      return out;
-    }
-
-    /* 2s, not 20: the helper is on loopback, so it either answers at once or
-       is not running. A long probe here is pure dead time in front of the
-       user, because every later provider is queued behind it. */
-    function companionSearch(q) {
-      if (!COMPANION) return Promise.reject(new Error('no local companion search'));
-      return getJSON(COMPANION + '/search?q=' + encodeURIComponent(q), false, 2000)
-        .then(fromCompanion);
-    }
-
-    /* No web-search leg: it needed a third-party account, and this player keeps none. */
-    function anthropic() { return Promise.reject(new Error('no web-search provider')); }
-
-    function pluck(text, openCh, closeCh) {
-      var i = text.indexOf(openCh), j = text.lastIndexOf(closeCh);
-      if (i < 0 || j <= i) throw new Error('no json');
-      return JSON.parse(text.slice(i, j + 1));
-    }
-
-    function anthropicSearch(q) {
-      var prompt = 'Find real songs or music videos matching this search: "' + q.replace(/"/g, "'") + '".\n' +
-        'Use web search on youtube.com (songs or videos), soundcloud.com (tracks) and bandcamp.com (tracks or albums). Include results from more than one platform when possible.\n' +
-        'Respond with ONLY minified JSON, no markdown fences, no prose: an array of at most 10 objects {"t":"title","a":"artist","p":"YouTube","u":"https url on that platform","d":duration_seconds,"bpm":tempo} where p is exactly one of "YouTube", "SoundCloud", "Bandcamp"; omit d or bpm when unknown.\n' +
-        'Only include entries whose URL you actually found via search. If nothing matches, respond [].';
-      return anthropic(prompt).then(function (text) {
-        var arr = pluck(text, '[', ']'), out = [], seen = {};
-        if (!Array.isArray(arr)) return out;
-        for (var i = 0; i < arr.length && out.length < 10; i++) {
-          var r = arr[i] || {};
-          if (typeof r.t !== 'string' || !r.t || typeof r.u !== 'string') continue;
-          if (r.p !== 'YouTube' && r.p !== 'SoundCloud' && r.p !== 'Bandcamp') continue;
-          var u; try { u = new URL(r.u); } catch (e) { continue; }
-          if ((u.protocol !== 'https:' && u.protocol !== 'http:') || !HOSTS.test(u.hostname)) continue;
-          if (seen[u.href]) continue;
-          seen[u.href] = 1;
-          out.push(track(r.t.slice(0, 140), typeof r.a === 'string' ? r.a.slice(0, 80) : '',
-                         '', null, null, u.href, r.p, +r.d, +r.bpm));
-        }
-        return out;
-      });
-    }
-
-    /* first provider to answer with rows wins; an honest empty answer only
-       counts once nothing later finds more. The whole walk races an overall
-       deadline: three sequential per-request timeouts can otherwise stack into
-       most of a minute of spinner, and the offline launchers are a better
-       answer than a long wait. */
-    /* ---- the hub leg: enriched results when paired (NP-FIND-001) ----
-       The paired credential lives in kv; this module reads it directly because the shell's
-       hub closure is elsewhere. Same Bearer scheme as hubRaw. Without a credential nothing
-       here runs and the keyless chain below is untouched. */
-    function hubAcctFor() {
-      if (!window.kv || !window.kv.get) return Promise.resolve(null);
-      return window.kv.get('player:hub').then(function (v) {
-        return v && v.base && v.credentialId && v.secret ? v : null;
-      }, function () { return null; });
-    }
-    var HUB_PLATFORM_NAMES ={ youtube: 'YouTube', soundcloud: 'SoundCloud', spotify: 'Spotify', bandcamp: 'Bandcamp' };
-    /* Hub metadata comes from provider adapters; only the web's own schemes may travel
-       from it into an href, an audio src or window.open. */
-    function webUrl(u) {
-      if (typeof u !== 'string' || !u) return null;
-      try { var p = new URL(u).protocol; return p === 'https:' || p === 'http:' ? u : null; } catch (e) { return null; }
-    }
-    function fromHub(d) {
-      var rows = (d && d.results) || [], out = [];
-      for (var i = 0; i < rows.length && out.length < 25; i++) {
-        var x = rows[i] || {};
-        if (x.kind !== 'track' || typeof x.title !== 'string') continue;
-        var conf = x.identity && typeof x.identity.matchConfidence === 'number' ? x.identity.matchConfidence : null;
-        /* Below 0.5 the hub itself refused to guess; this listing shows the platform's own words. */
-        var sure = conf === null || conf >= 0.5;
-        var r = track(x.title, x.artistName || '', sure ? (x.albumName || '') : '', webUrl(x.artworkUrl),
-                      webUrl(x.previewUrl), webUrl(x.canonicalUrl), HUB_PLATFORM_NAMES[x.provider] || null,
-                      x.durationMs > 0 ? x.durationMs / 1000 : 0, x.bpm);
-        r.feat = sure && x.featuredArtists && x.featuredArtists.length ? x.featuredArtists.slice(0, 3) : [];
-        r.genre = sure && x.genres && x.genres[0] ? String(x.genres[0]) : null;
-        r.conf = conf;
-        out.push(r);
-      }
-      return out;
-    }
-    function hubAuth(acct) { return { Authorization: 'Bearer ' + acct.credentialId + '.' + acct.secret }; }
-    function hubSearch(q) {
-      return hubAcctFor().then(function (acct) {
-        if (!acct) throw new Error('not paired');
-        return getJSON(acct.base + '/api/v1/search?scope=songs&q=' + encodeURIComponent(q), false, 5000, hubAuth(acct)).then(fromHub);
-      });
-    }
-    /* iTunes lends its 30-second clips to hub rows that arrived without one: matched by name
-       and by length to three seconds, never by hope. */
-    function fillPreviewsFromITunes(q, rows) {
-      var wanting = rows.filter(function (r) { return !r.prev; });
-      if (!wanting.length) return;
-      itunesSearch(q).then(function (list) {
-        var changed = false;
-        wanting.forEach(function (r) {
-          for (var i = 0; i < list.length; i++) {
-            var m = list[i];
-            if (!m.prev) continue;
-            if ((m.t || '').toLowerCase() !== (r.t || '').toLowerCase()) continue;
-            if ((m.a || '').toLowerCase() !== (r.a || '').toLowerCase()) continue;
-            if (r.d && m.d && Math.abs(r.d - m.d) > 3) continue;
-            r.prev = m.prev; changed = true; break;
-          }
-        });
-        if (changed && state === 'list') render();
-      }, function () { /* no clips to lend is not an error */ });
-    }
-    var DEADLINE = 8000;
-
-    function search(q) {
-      /* hubSearch leads unconditionally: it reads the credential itself and rejects at once
-         when unpaired, so the decision is never one search out of date. */
-      var chain = [hubSearch, itunesSearch];
-      var sawEmpty = false;
-      var walk = (function step(i) {
-        if (i >= chain.length) return sawEmpty ? Promise.resolve([]) : Promise.reject(new Error('all failed'));
-        return chain[i](q).then(function (rows) {
-          if (rows && rows.length) {
-            if (chain[i] === hubSearch) fillPreviewsFromITunes(q, rows);
-            return rows;
-          }
-          sawEmpty = true;
-          return step(i + 1);
-        }, function () { return step(i + 1); });
-      })(0);
-
-      return Promise.race([
-        walk,
-        new Promise(function (_, rej) {
-          setTimeout(function () { rej(new Error('deadline')); }, DEADLINE);
-        }),
-      ]);
-    }
-
-    window.NP_FIND = function (q) { return search(q); };
-
-    /* ---- pasted links ---- */
-
-    function platformOf(host) {
-      if (/youtu/i.test(host)) return 'YouTube';
-      if (/soundcloud/i.test(host)) return 'SoundCloud';
-      if (/bandcamp/i.test(host)) return 'Bandcamp';
-      if (/spotify/i.test(host)) return 'Spotify';
-      return null;
-    }
-
-    function humanize(s) {
-      try { s = decodeURIComponent(s); } catch (e) { /* keep raw */ }
-      return s.replace(/[-_+]+/g, ' ').trim()
-              .replace(/(^|\s)[a-z]/g, function (c) { return c.toUpperCase(); });
-    }
-
-    function urlish(text) {
-      return /^(https?:\/\/|www\.)\S+$/i.test(text) ||
-             /^[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?$/i.test(text);
-    }
-
-    function parseLink(text) {
-      if (/\s/.test(text)) return null;
-      var u;
-      try { u = new URL(/^https?:\/\//i.test(text) ? text : 'https://' + text); } catch (e) { return null; }
-      if (!HOSTS.test(u.hostname)) return null;
-      var p = platformOf(u.hostname);
-      var segs = u.pathname.split('/').filter(Boolean);
-      var t = '', a = '';
-      if (p === 'YouTube') {
-        t = 'YouTube video';
-      } else if (p === 'SoundCloud') {
-        a = segs[0] ? humanize(segs[0]) : '';
-        t = segs[1] ? humanize(segs[1]) : 'SoundCloud track';
-      } else if (p === 'Spotify') {
-        t = segs[0] === 'album' ? 'Spotify album' : segs[0] === 'playlist' ? 'Spotify playlist' : 'Spotify track';
-      } else {
-        var sub = u.hostname.split('.')[0].toLowerCase();
-        a = (sub !== 'bandcamp' && sub !== 'www') ? humanize(sub) : '';
-        t = segs[1] ? humanize(segs[1]) : (segs[0] ? humanize(segs[0]) : 'Bandcamp page');
-      }
-      return track(t, a, '', null, null, u.href, p);
-    }
-
-    function applyMeta(r, t, a, art, d) {
-      if (typeof t === 'string' && t) r.t = t.slice(0, 140);
-      if (typeof a === 'string' && a) r.a = a.slice(0, 80);
-      if (typeof art === 'string' && art) r.art = art;
-      if (d > 0) r.d = Math.round(d);
-      r.links = findLinks(r.t, r.a);
-      if (state === 'list' && results.indexOf(r) >= 0) render();
-    }
-
-    /* the site's own oEmbed goes first because it's authoritative, but
-       neither YouTube's nor SoundCloud's sends CORS headers, so in practice
-       noembed.com (which relays them with ACAO *) does the real work in a
-       browser; a paired container, when there is one, beats both, and the
-       companion on this PC, when there is one, reads the link with its own
-       tools beside them (NP-FIND-002) */
-    function resolveLink(r) {
-      var enc = encodeURIComponent(r.u);
-      var mine = seq;
-      r.rank = 0;
-      /* rank: hub 3, companion 2, oEmbed and the rest 1. A lower answer that arrives late
-         only fills what the better one left empty. */
-      function put(rank, m) {
-        if (mine !== seq || !m) return;
-        if (rank < r.rank) {
-          if (!r.d && m.d > 0) r.d = Math.round(m.d);
-          if (!r.art && typeof m.art === 'string' && m.art) r.art = m.art;
-          if (state === 'list' && results.indexOf(r) >= 0) render();
-          return;
-        }
-        r.rank = rank;
-        applyMeta(r, m.t, m.a, m.art, m.d);
-      }
-      fromCompanion(r, enc, mine, put);
-      var tries = [
-        /* Paired first: the hub's resolve carries the enrichment cache — album, features,
-           genre, tempo — which no oEmbed can. Unpaired, this try fails at once. */
-        function () {
-          return hubAcctFor().then(function (acct) {
-            if (!acct) throw new Error('not paired');
-            /* The hub reads Spotify through spotDL, which takes 20-50 s; everything else answers in seconds. */
-            return getJSON(acct.base + '/api/v1/providers/resolve?url=' + enc, false, r.u.indexOf('open.spotify.com/') >= 0 ? 90000 : 20000, hubAuth(acct)).then(function (d) {
-              var rr = fromHub({ results: [d] })[0];
-              if (!rr) throw new Error('empty');
-              if (!r.bpm && rr.bpm) r.bpm = rr.bpm;
-              r.feat = rr.feat; r.genre = rr.genre; r.conf = rr.conf;
-              if (rr.prev) r.prev = rr.prev;
-              if (rr.al) r.al = rr.al;
-              return { t: rr.t, a: rr.a, art: rr.art, d: rr.d };
-            });
-          });
-        },
-        function () {
-          var end = r.p === 'YouTube' ? 'https://www.youtube.com/oembed?format=json&url='
-                  : r.p === 'SoundCloud' ? 'https://soundcloud.com/oembed?format=json&url=' : null;
-          if (!end) return Promise.reject(new Error('no oembed'));
-          return getJSON(end + enc, false, 6000).then(function (d) {
-            if (!d || !d.title) throw new Error('empty');
-            return { t: d.title, a: d.author_name, art: d.thumbnail_url };
-          });
-        },
-        function () {
-          return getJSON('https://noembed.com/embed?url=' + enc, false, 8000).then(function (d) {
-            if (!d || d.error || !d.title) throw new Error(d && d.error || 'empty');
-            return { t: d.title, a: d.author_name, art: d.thumbnail_url };
-          });
-        },
-        function () {
-          return anthropic('Use web search to identify the song or video at this exact URL: ' + r.u + '\n' +
-            'Respond with ONLY minified JSON of the shape {"t":"title","a":"artist or channel","d":duration_seconds} — no prose, no markdown.'
-          ).then(function (text) {
-            var d = pluck(text, '{', '}');
-            if (typeof d.t !== 'string' || !d.t) throw new Error('empty');
-            return { t: d.t, a: d.a, d: +d.d };
-          });
-        },
-      ];
-      /* The hub is asked alongside the rest, not before it: a slow answer (a Spotify link) must not
-         hold back what oEmbed can say at once, and when it lands it outranks it. */
-      tries[0]().then(function (m) { put(3, m); }, function () { /* not paired, or it could not read the link */ });
-      (function step(i) {
-        if (i >= tries.length || mine !== seq) return;
-        tries[i]().then(function (m) { put(i === 0 ? 3 : 1, m); }, function () { step(i + 1); });
-      })(1);
-    }
-
-    /* The companion's answer (HelperResolved). A song fills the row; a playlist, set or album
-       replaces it with its songs. Nothing here throws: no companion is the ordinary case. */
-    function companionBase() { return window.COMPANION ? String(window.COMPANION).replace(/\/$/, '') : null; }
-    function fromCompanion(r, enc, mine, put) {
-      var base = companionBase();
-      if (!base) return;
-      getJSON(base + '/helper/v1/resolve?url=' + enc, false, 160000).then(function (d) {
-        if (mine !== seq || !d) return;
-        var c = d.kind === 'collection' ? d.collection : null;
-        if (c && Array.isArray(c.entries) && c.entries.length) { listCollection(r, c); return; }
-        var x = d.track;
-        if (!x || typeof x.title !== 'string' || !x.title) return;
-        fillFrom(r, x, r.rank <= 2);
-        put(2, { t: x.title, a: x.artist, art: webUrl(x.artworkUrl), d: x.durationSec });
-      }).catch(function () { /* no companion, or it could not read the link: the chain stands */ });
-    }
-    /* What only the companion knows. `lead` is false when the hub already answered: then it
-       only fills what the hub left empty. */
-    function fillFrom(r, x, lead) {
-      if (typeof x.date === 'string' && x.date) r.date = x.date.slice(0, 10);
-      if (typeof x.album === 'string' && x.album && (lead || !r.al)) r.al = x.album.slice(0, 80);
-      if (Array.isArray(x.featured) && x.featured.length && (lead || !r.feat.length)) r.feat = x.featured.slice(0, 3).map(String);
-      if (typeof x.genre === 'string' && x.genre && (lead || !r.genre)) r.genre = x.genre;
-    }
-    function rowFromResolved(x, platform) {
-      /* a set's entry may arrive as an address alone: its path stands in until it is looked up */
-      var guess = !x.title && x.url ? parseLink(x.url) : null;
-      var row = track(x.title || (guess && guess.t) || 'Untitled', x.artist || (guess && guess.a) || '', '',
-                      webUrl(x.artworkUrl), null, webUrl(x.url), platform, x.durationSec || 0);
-      fillFrom(row, x, true);
-      row.pending = !x.title;
-      return row;
-    }
-    function listCollection(r, c) {
-      results = c.entries.map(function (x) { return rowFromResolved(x || {}, r.p); });
-      listInfo = { title: String(c.title || 'Playlist'), total: c.total, cap: c.cap, capped: !!c.capped };
-      page = 0; hot = -1; state = 'list';
-      render();
-    }
-    /* An entry listed by address alone, looked up once when its page is on screen. */
-    function resolveEntry(r) {
-      var base = companionBase(), mine = seq;
-      if (!base || !r.u) return;
-      getJSON(base + '/helper/v1/resolve?url=' + encodeURIComponent(r.u), false, 60000).then(function (d) {
-        var x = d && d.track;
-        if (mine !== seq || !x || typeof x.title !== 'string' || !x.title) return;
-        r.pending = false;
-        fillFrom(r, x, true);
-        applyMeta(r, x.title, x.artist, webUrl(x.artworkUrl), x.durationSec);
-      }).catch(function () { r.pending = false; });
-    }
-
-    /* ---- BPM, lazily, for whatever page is showing ----
-       Deezer is the one keyless source that publishes tempo, over JSONP:
-       one search to pin the track id, one track call for the bpm (and the
-       duration, which fills rows that arrived without one). Cached by
-       artist|title; a miss renders as an em dash rather than retrying. */
-    var bpmCache = {};
-
-    function enrich() {
-      if (state !== 'list') return;
-      visible().forEach(function (r) {
-        /* named by its address alone so far: no tempo to look up for a guessed name */
-        if (r.pending) { if (!r.pendingAsked) { r.pendingAsked = true; resolveEntry(r); } return; }
-        if (r.bpm || r.bpmTried) return;
-        var key = (r.a + '|' + r.t).toLowerCase();
-        if (!bpmCache[key]) {
-          var q = encodeURIComponent((r.a ? r.a + ' ' : '') + r.t);
-          bpmCache[key] = jsonp('https://api.deezer.com/search?limit=1&output=jsonp&q=' + q, 7000)
-            .then(function (d) {
-              var hit = d && d.data && d.data[0];
-              if (!hit || !hit.id) throw new Error('no match');
-              return jsonp('https://api.deezer.com/track/' + hit.id + '?output=jsonp', 7000)
-                .then(function (tr) {
-                  return { bpm: tr && tr.bpm > 0 ? Math.round(tr.bpm) : null,
-                           d: hit.duration > 0 ? Math.round(hit.duration) : null };
-                });
-            })
-            .catch(function () { return { bpm: null, d: null }; });
-        }
-        bpmCache[key].then(function (m) {
-          r.bpmTried = true;
-          if (m.bpm) r.bpm = m.bpm;
-          if (m.d && !r.d) r.d = m.d;
-          if (m.bpm && r.added) {
-            /* The row already moved into the library; hand the late answer over the same wall. */
-            document.dispatchEvent(new CustomEvent('library:bpm', { detail: { title: r.t, artist: r.a, bpm: m.bpm } }));
-          }
-          if (state === 'list' && visible().indexOf(r) >= 0) {
-            var el = body.querySelector('.srch__row[data-i="' + visible().indexOf(r) + '"]');
-            if (el) {
-              var tEl = el.querySelector('.srch__time'), bEl = el.querySelector('.srch__bpm');
-              if (tEl) tEl.textContent = r.d ? fmtTime(r.d) : '';
-              /* a miss leaves the slot empty rather than stamping an em dash:
-                 Deezer is blocked often enough (CORS, blockers, offline) that
-                 a column of dashes reads as a column of errors */
-              if (bEl) bEl.textContent = r.bpm ? r.bpm + ' bpm' : '';
-            }
-          }
-        });
-      });
-    }
-
-    /* ---- hold-to-hear: five seconds of rest arms a row with a clip (NP-FIND-001) ---- */
-    var ARM_DEFAULT_MS = 5000;
-    window.NP_SRCH_ARM_MS = ARM_DEFAULT_MS;
-    var armTimer = 0, armedEl = null;
-    function canArm() {
-      try {
-        return matchMedia('(hover: hover) and (pointer: fine)').matches &&
-               !matchMedia('(prefers-reduced-motion: reduce)').matches;
-      } catch (e) { return false; }
-    }
-    function disarm() {
-      if (armTimer) { clearTimeout(armTimer); armTimer = 0; }
-      if (armedEl) { armedEl.classList.remove('is-arming'); armedEl.style.removeProperty('--p'); armedEl.style.removeProperty('--arm-ms'); armedEl = null; }
-    }
-    body.addEventListener('pointerenter', function (e) {
-      if (!canArm()) return;
-      var rowEl = e.target && e.target.closest ? e.target.closest('.srch__row') : null;
-      if (!rowEl) return;
-      var i = +rowEl.dataset.i, r = visible()[i];
-      var el = rowEl.querySelector('button.srch__art');
-      if (!r || !r.prev || !el || playing === r) return;
-      /* pointerenter fires again at every child boundary inside the row; an armed row
-         keeps its hold instead of starting the five seconds over */
-      if (armedEl === el) return;
-      disarm();
-      armedEl = el;
-      el.style.setProperty('--arm-ms', (window.NP_SRCH_ARM_MS || ARM_DEFAULT_MS) + 'ms');
-      el.classList.add('is-arming');
-      /* two frames: the class lands with the ring empty, then the transition carries it full */
-      requestAnimationFrame(function () { requestAnimationFrame(function () { if (armedEl === el) el.style.setProperty('--p', '1'); }); });
-      armTimer = setTimeout(function () {
-        var target = armedEl;
-        disarm();
-        if (target) {
-          var live = body.querySelector('.srch__row[data-i="' + i + '"] button.srch__art');
-          if (live) preview(i, live);
-        }
-      }, window.NP_SRCH_ARM_MS || ARM_DEFAULT_MS);
-    }, true);
-    body.addEventListener('pointerleave', function (e) {
-      if (!armedEl || !e.target || !e.target.closest) return;
-      var rowEl = e.target.closest('.srch__row');
-      if (!rowEl || !rowEl.contains(armedEl)) return;
-      /* still inside the armed row (a child boundary): the hold goes on */
-      if (e.relatedTarget && rowEl.contains(e.relatedTarget)) return;
-      disarm();
-    }, true);
-    body.addEventListener('scroll', disarm, true);
-    document.addEventListener('keydown', disarm, true);
-
-    /* ---- preview ---- */
-
-    var audio = null, playing = null, raf = 0, resumeMain = false;
-
-    function stopPreview() {
-      disarm();
-      if (raf) { cancelAnimationFrame(raf); raf = 0; }
-      if (audio) { audio.pause(); audio.removeAttribute('src'); try { audio.load(); } catch (e) {} }
-      if (playing) {
-        var el = body.querySelector('.srch__art.is-preview');
-        if (el) { el.classList.remove('is-preview'); el.style.removeProperty('--p'); el.setAttribute('aria-pressed', 'false'); }
-      }
-      playing = null;
-      if (resumeMain) {
-        resumeMain = false;
-        try { window.NP_PLAYER.resume(); } catch (e) { /* the engine may have been torn down */ }
-      }
-    }
-
-    function tick() {
-      raf = 0;
-      if (!audio || !playing) return;
-      var el = body.querySelector('.srch__art.is-preview');
-      var p = Math.min(1, audio.currentTime / CLIP);
-      if (el) el.style.setProperty('--p', p.toFixed(4));
-      var left = CLIP - audio.currentTime;
-      /* The tail ramp is a fraction of the output level, not a level of its
-         own: a preview that faded out to full volume would be louder at the
-         end than the station it interrupted. */
-      var out = typeof window.outputVolume === 'number' ? window.outputVolume : 1;
-      audio.volume = out * (left < TAIL ? Math.max(0, left / TAIL) : 1);
-      if (audio.currentTime >= CLIP) { stopPreview(); return; }
-      raf = requestAnimationFrame(tick);
-    }
-
-    function preview(i, el) {
-      var r = visible()[i];
-      if (!r || !r.prev) return;
-      var same = playing === r;
-      /* Switching clips: the main track is already stepped aside — keep it aside rather than
-         let stopPreview resume it under the new audition. (Its engine reports 'playing' only
-         once the element truly starts, so re-checking right after a resume would miss it.)
-         A same-row click is a stop, and that one does resume. */
-      var keepAside = !same && resumeMain;
-      if (keepAside) resumeMain = false;
-      stopPreview();
-      if (same) return;
-      /* One sound at a time: the main track steps aside for the audition and returns after. */
-      if (keepAside) {
-        resumeMain = true;
-      } else if (window.NP_PLAYER && window.NP_PLAYER.playing && window.NP_PLAYER.playing()) {
-        try { window.NP_PLAYER.pause(); resumeMain = true; } catch (e) { resumeMain = false; }
-      }
-      if (!audio) {
-        audio = new Audio();
-        audio.preload = 'none';
-        audio.addEventListener('ended', stopPreview);
-        audio.addEventListener('error', stopPreview);
-      }
-      playing = r;
-      audio.src = r.prev;
-      audio.volume = typeof window.outputVolume === 'number' ? window.outputVolume : 1;
-      el.classList.add('is-preview');
-      el.style.setProperty('--p', '0');
-      el.setAttribute('aria-pressed', 'true');
-      var mine = playing;
-      audio.play().then(function () {
-        if (playing !== mine) return;
-        if (!raf) raf = requestAnimationFrame(tick);
-      }).catch(function () { if (playing === mine) stopPreview(); });
-    }
-
-    /* ---- popover ---- */
-
-    function open() { pop.hidden = false; input.setAttribute('aria-expanded', 'true'); }
-
-    function close() {
-      stopPreview();
-      pop.hidden = true;
-      pop.classList.remove('is-stale');
-      hot = -1;
-      input.setAttribute('aria-expanded', 'false');
-      input.removeAttribute('aria-activedescendant');
-    }
-
-    /* The header field belongs to the music library, so the toolbar hides it on
-       the other tabs. If its popover happens to be open at that moment it would
-       be left hanging over a panel it knows nothing about, so the toolbar needs
-       a way to shut it. */
-    window.srchClose = close;
-
-    function pages() { return Math.ceil(results.length / PAGE); }
-    function visible() { return results.slice(page * PAGE, page * PAGE + PAGE); }
-
-    function spinner() {
-      var s = '<span class="srch__spin" aria-hidden="true">';
-      for (var i = 0; i < 12; i++) {
-        s += '<i style="transform:rotate(' + (i * 30) + 'deg);animation-delay:' + (i / 12 - 1).toFixed(3) + 's"></i>';
-      }
-      return s + '</span>';
-    }
-
-    function msg(html) { body.innerHTML = '<div class="srch__msg">' + html + '</div>'; foot.hidden = true; }
-
-    function artHTML(r, i) {
-      var inner = r.art
-        ? '<img src="' + esc(r.art) + '" alt="" loading="lazy" onerror="this.remove()">' + NOTE
-        : NOTE;
-      if (!r.prev) {
-        /* Unavailable is shown and explained (NP-PRIN-002): the tile stays, and says why. */
-        var whyNot = 'No preview \u2014 ' + (r.p ? 'opens on ' + r.p : 'nothing to play here');
-        return '<span class="srch__art" title="' + esc(whyNot) + '" aria-label="' + esc(whyNot) + '">' + inner + '</span>';
-      }
-      return '<button class="srch__art" type="button" data-preview="' + i + '" aria-pressed="false"' +
-        ' aria-label="Preview ' + esc(r.t) + ', ' + CLIP + ' seconds">' + inner +
-        '<span class="srch__scrim">' +
-          '<svg viewBox="0 0 30 30" aria-hidden="true">' +
-            '<circle class="srch__ring" cx="15" cy="15" r="13.5"/>' +
-            '<circle class="srch__ring srch__ring--on" cx="15" cy="15" r="13.5"/>' +
-            '<path class="srch__glyph srch__play" d="M12 10.5 19 15l-7 4.5z"/>' +
-            '<rect class="srch__glyph srch__stop" x="11.5" y="11.5" width="7" height="7" rx="1"/>' +
-          '</svg>' +
-        '</span></button>';
-    }
-
-    function rowHTML(r, i) {
-      /* Features and album lead when enrichment knows them; the platform stays as the tail
-         when there is no album to name. */
-      var who = r.a ? esc(r.a) + (r.feat && r.feat.length ? ' feat. ' + esc(r.feat.join(', ')) : '') : '';
-      var tail = (r.al ? esc(r.al) : (r.p || '')) + (r.date ? (r.al || r.p ? ' \u00b7 ' : '') + esc(r.date) : '');
-      var sub = who ? (tail ? who + ' \u2014 ' + tail : who) : tail;
-      var links = r.links.map(function (l) {
-        return '<a class="srch__pf" data-len="' + l.ini.length + '" href="' + esc(l.url) + '"' +
-          ' target="_blank" rel="noopener noreferrer" tabindex="-1"' +
-          ' aria-label="Find ' + esc(r.t) + ' on ' + l.name + '">' + l.ini + '</a>';
-      }).join('');
-      var added = r.added
-        ? '<button class="srch__add" type="button" aria-disabled="true" tabindex="-1"' +
-            ' aria-label="' + esc(r.t) + ' is already in your library">✓</button>'
-        : '<button class="srch__add" type="button" data-add="' + i + '" tabindex="-1"' +
-            ' aria-label="Add ' + esc(r.t) + ' to your library">+</button>';
-      return '<div class="srch__row" role="option" id="srchOpt' + i + '" data-i="' + i + '" aria-selected="false">' +
-        artHTML(r, i) +
-        '<span class="srch__meta">' +
-          '<span class="srch__title">' + esc(r.t) + '</span>' +
-          '<span class="srch__sub">' + sub + '</span>' +
-        '</span>' +
-        '<span class="srch__nums">' +
-          '<span class="srch__time">' + (r.d ? fmtTime(r.d) : '') + '</span>' +
-          '<span class="srch__bpm">' + (r.bpm ? r.bpm + ' bpm' : '') + '</span>' +
-          (r.genre ? '<span class="srch__genre">' + esc(r.genre) + '</span>' : '') +
-        '</span>' +
-        '<span class="srch__links">' + added + links + '</span>' +
-      '</div>';
-    }
-
-    /* The one bridge between search and the library. The library owns the
-       merge (dedupe, platform badge, duration/BPM carry-over) and listens for
-       this event; all the row has to do is hand over what it knows. */
-    function addToLibrary(i) {
-      var r = visible()[i];
-      if (!r || r.added) return;
-      r.added = true;
-      document.dispatchEvent(new CustomEvent('library:add', {
-        detail: {
-          title: r.t, artist: r.a, album: r.al,
-          duration: r.d, bpm: r.bpm, date: r.date || null,
-          platform: r.p || (r.links[0] && r.links[0].name) || 'YouTube',
-          url: r.u || (r.links[0] && r.links[0].url) || '',
-        },
-      }));
-      render();
-    }
-
-    function applyHot() {
-      var rows = body.querySelectorAll('.srch__row');
-      for (var i = 0; i < rows.length; i++) {
-        rows[i].classList.toggle('is-hot', i === hot);
-        rows[i].setAttribute('aria-selected', String(i === hot));
-      }
-      if (hot >= 0) input.setAttribute('aria-activedescendant', 'srchOpt' + hot);
-      else input.removeAttribute('aria-activedescendant');
-    }
-
-    function render() {
-      if (state === 'loading') {
-        count.innerHTML = 'Searching\u2026';
-        msg(spinner() + '<span>Searching\u2026</span>');
-        live.textContent = 'Searching';
-      } else if (state === 'error') {
-        count.innerHTML = 'Search';
-        body.innerHTML = '<div class="srch__msg">Couldn\u2019t reach search \u2014 open it on a platform instead:</div>' +
-          '<div role="listbox" id="srchList" aria-label="Search results">' +
-          PLATFORMS.map(function (pf, i) {
-            var u = pf.find + encodeURIComponent(lastQ);
-            return '<a class="srch__row" role="option" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer"' +
-              ' style="text-decoration:none;color:inherit" id="srchOpt' + i + '" aria-selected="false">' +
-              '<span class="srch__art" aria-hidden="true">' + NOTE + '</span>' +
-              '<span class="srch__meta"><span class="srch__title">Search ' + pf.name + '</span>' +
-              '<span class="srch__sub">' + esc(lastQ) + '</span></span>' +
-              '<span class="srch__go" aria-hidden="true">\u203a</span></a>';
-          }).join('') + '</div>';
-        foot.hidden = true;
-        live.textContent = 'Search unavailable';
-      } else if (state === 'badlink') {
-        count.innerHTML = 'Search';
-        msg('Only YouTube, SoundCloud, Bandcamp and Spotify links work here.');
-        live.textContent = 'Unsupported link';
-      } else if (state === 'empty') {
-        count.innerHTML = '<b>Results:</b> 0 songs';
-        msg('No matches for \u201c' + esc(lastQ) + '\u201d.');
-        live.textContent = 'No results';
-      } else if (state === 'list') {
-        var n = results.length;
-        var songs = n + (n === 1 ? ' song' : ' songs');
-        count.innerHTML = listInfo
-          ? '<b>' + esc(listInfo.title.length > 48 ? listInfo.title.slice(0, 47) + '\u2026' : listInfo.title) + ':</b> ' + songs +
-            (listInfo.capped ? ' (the first ' + listInfo.cap + (listInfo.total ? ' of ' + listInfo.total : '') + ')' : '')
-          : '<b>Results:</b> ' + songs;
-        body.innerHTML = '<div role="listbox" id="srchList" aria-label="Search results">' +
-          visible().map(rowHTML).join('') + '</div>';
-        var pg = pages();
-        foot.hidden = pg < 2;
-        if (pg > 1) {
-          var d = '';
-          for (var i = 0; i < pg; i++) d += '<i' + (i === page ? ' class="is-on"' : '') + '></i>';
-          dots.innerHTML = d;
-          prevBtn.disabled = page === 0;
-          nextBtn.disabled = page === pg - 1;
-        }
-        applyHot();
-        enrich();
-        live.textContent = n + ' results' + (pg > 1 ? ', page ' + (page + 1) + ' of ' + pg : '');
-      }
-    }
-
-    function turn(delta, hotAt) {
-      var pg = pages(), p = Math.min(pg - 1, Math.max(0, page + delta));
-      if (p === page) return;
-      stopPreview();
-      page = p;
-      hot = hotAt === undefined ? -1 : hotAt;
-      render();
-    }
-
-    /* ---- flows ---- */
-
-    /* People on the paired container, above the songs (NPD-025) */
-    var peopleBox = document.getElementById('srchPeople'), pseq = 0;
-    function people(q) {
-      var my = ++pseq;
-      peopleBox.hidden = true; peopleBox.innerHTML = '';
-      if (!window.hubPeople || !window.hubPeople.ready() || urlish(q) || q.length < 2) return;
-      window.hubPeople.search(q).then(function (list) {
-        if (my !== pseq || !list.length) return;
-        peopleBox.innerHTML = '<p class="srch__cap">People on ' + esc(window.hubPeople.hubName()) + '</p>' + list.slice(0, 4).map(function (u) {
-          return '<button class="srch__row srch__person" type="button" data-person="' + esc(u.id) + '">' +
-            '<span class="srch__art" aria-hidden="true">' + (u.img ? '<img src="' + esc(u.img) + '" alt="">' : esc((u.name || '?').charAt(0).toUpperCase())) + '</span>' +
-            '<span class="srch__meta"><span class="srch__title">' + esc(u.name) + '</span><span class="srch__sub">' + u.playlists + (u.playlists === 1 ? ' shared playlist' : ' shared playlists') + '</span></span>' +
-            '<span class="srch__go" aria-hidden="true">\u203a</span></button>';
-        }).join('');
-        peopleBox.hidden = false;
-        open();
-      });
-    }
-    peopleBox.addEventListener('click', function (e) {
-      var b = e.target.closest('[data-person]');
-      if (!b) return;
-      close();
-      window.hubPeople.open(b.dataset.person);
-    });
-
-    function go(q) {
-      people(q);
-      stopPreview();
-      pop.classList.remove('is-stale');
-      lastQ = q;
-      listInfo = null;
-      page = 0;
-      hot = -1;
-      var link = urlish(q) ? parseLink(q) : null;
-      if (urlish(q) && !link) { state = 'badlink'; results = []; open(); render(); return; }
-      var mine = ++seq;
-      if (link) {
-        results = [link];
-        state = 'list';
-        open(); render();
-        resolveLink(link);
-        return;
-      }
-      state = 'loading';
-      open(); render();
-      search(q).then(function (rows) {
-        if (mine !== seq) return;
-        results = rows;
-        state = rows.length ? 'list' : 'empty';
-        render();
-      }).catch(function () {
-        if (mine !== seq) return;
-        results = [];
-        state = 'error';
-        render();
-      });
-    }
-
-    function reset() {
-      pseq++; peopleBox.hidden = true;
-      stopPreview();
-      results = [];
-      state = 'idle';
-      lastQ = '';
-      seq++;
-      close();
-    }
-
-    /* ---- wiring ---- */
-
-    input.addEventListener('keydown', function (e) {
-      var showing = !pop.hidden;
-      if (e.key === 'Escape') {
-        if (showing) { e.preventDefault(); close(); }
-        return;
-      }
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-        if (!showing) {
-          if (state !== 'idle') { e.preventDefault(); open(); render(); }
-          return;
-        }
-        if (state !== 'list') return;
-        e.preventDefault();
-        var n = visible().length;
-        if (e.key === 'ArrowDown') {
-          if (hot < n - 1) { hot++; applyHot(); }
-          else if (page < pages() - 1) turn(1, 0);
-        } else {
-          if (hot > 0) { hot--; applyHot(); }
-          else if (page > 0) turn(-1, PAGE - 1);
-        }
-        return;
-      }
-      if (e.key === 'PageDown' && showing && state === 'list') { e.preventDefault(); turn(1); return; }
-      if (e.key === 'PageUp' && showing && state === 'list') { e.preventDefault(); turn(-1); return; }
-      if (e.key === 'Enter') {
-        /* Cmd/Ctrl+Enter files the hot row in the library instead of opening
-           it — the keyboard twin of the row's + badge */
-        if (showing && state === 'list' && hot >= 0 && (e.metaKey || e.ctrlKey)) {
-          e.preventDefault();
-          addToLibrary(hot);
-          return;
-        }
-        if (showing && state === 'list' && hot >= 0) {
-          e.preventDefault();
-          var r = visible()[hot];
-          if (!r) return;
-          if (r.u) window.open(r.u, '_blank', 'noopener');
-          else {
-            var el = body.querySelector('.srch__row[data-i="' + hot + '"] .srch__art[data-preview]');
-            if (el) preview(hot, el);
-          }
-          return;
-        }
-        var q = input.value.trim();
-        if (!q) return;
-        e.preventDefault();
-        go(q);
-      }
-    });
-
-    /* Search runs on Enter, so between a keystroke and that Enter the rows on
-       screen answer the previous query. Rather than clear them — which throws
-       away a result the user may still want — they are marked stale: dimmed,
-       inert, and the count replaced by the instruction that resolves it. */
-    function markStale() {
-      var q = input.value.trim();
-      var stale = !!q && q !== lastQ && state === 'list';
-      pop.classList.toggle('is-stale', stale);
-      if (stale) count.textContent = 'Press ⏎ to search';
-    }
-
-    input.addEventListener('input', function () {
-      if (!input.value.trim()) { reset(); return; }
-      markStale();
-    });
-
-    function reopen() {
-      if (pop.hidden && state !== 'idle' && input.value.trim()) { open(); render(); markStale(); }
-    }
-    input.addEventListener('focus', reopen);
-    input.addEventListener('click', reopen);
-
-    pop.addEventListener('mousedown', function (e) { if (!e.target.closest('a')) e.preventDefault(); });
-
-    /* The mousedown closer below catches clicks on the page, but tabbing out
-       left the popover floating over the content. relatedTarget is the element
-       about to receive focus: null (window blur) or anything outside .search
-       closes. The mousedown handler above keeps focus inside the pill while a
-       row is being clicked, so this does not race the row handlers. */
-    document.querySelector('.search').addEventListener('focusout', function (e) {
-      var to = e.relatedTarget;
-      if (!to || !to.closest || !to.closest('.search')) close();
-    });
-
-    body.addEventListener('click', function (e) {
-      var add = e.target.closest('.srch__add[data-add]');
-      if (add) { e.preventDefault(); addToLibrary(+add.dataset.add); return; }
-      var art = e.target.closest('.srch__art[data-preview]');
-      if (art) { e.preventDefault(); preview(+art.dataset.preview, art); return; }
-      if (e.target.closest('a') || e.target.closest('.srch__add')) return;
-      var row = e.target.closest('.srch__row');
-      if (!row || row.tagName === 'A') return;
-      var r = visible()[+row.dataset.i];
-      if (!r) return;
-      if (r.u) window.open(r.u, '_blank', 'noopener');
-      else {
-        var el = row.querySelector('.srch__art[data-preview]');
-        if (el) preview(+row.dataset.i, el);
-      }
-    });
-
-    prevBtn.addEventListener('click', function () { turn(-1); });
-    nextBtn.addEventListener('click', function () { turn(1); });
-
-    document.getElementById('srchClear').addEventListener('click', function () {
-      input.value = '';
-      reset();
-      input.focus();
-    });
-
-    document.addEventListener('mousedown', function (e) {
-      if (!pop.hidden && !e.target.closest('.search')) close();
-    });
-  })();
+     The header search is src/shell/search, a lazy chunk the bridge loads once this script has run
+     (NP-FIND-001..008): songs, artists and albums from the catalog — the paired hub, the companion on
+     this PC, or this browser — live, in sections, with details, previews and pasted links. It draws
+     into #srch above and sets window.srchClose and window.NP_FIND, which the toolbar and the radio's
+     "keep this song" use. Nothing in it sends anyone to search on another site. */
 
   // Keeps the transport row's right edge under the progress track's right
   // edge. The label beside the track ("-02:35" vs the LIVE marker) changes
@@ -9256,7 +8473,7 @@ window.AW.startStats = function () {
     var section = document.querySelector('.player');
     var desktop = matchMedia('(hover: hover) and (pointer: fine)').matches;
     var state = { starred: {}, saved: {}, playlists: [], queue: [], edits: {}, history: [],
-                  stations: {}, videos: {}, lists: {}, plays: [], sessions: [], recShown: [], acts: [], kept: [] };
+                  stations: {}, videos: {}, lists: {}, plays: [], sessions: [], recShown: [], acts: [], kept: [], collections: [] };
     var selectedId = null;
     var sortKey = 'title', sortDir = 1;
 
@@ -9279,7 +8496,13 @@ window.AW.startStats = function () {
       });
     }
     function fmt(sec) { return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); }
-    function song(id) { for (var i = 0; i < LIB.length; i++) if (LIB[i].id === id) return LIB[i]; return null; }
+    function song(id) {
+      for (var i = 0; i < LIB.length; i++) if (LIB[i].id === id) return LIB[i];
+      /* a song of the catalog list on show (NP-FIND-007) */
+      var vis = focus && focus.rows;
+      if (vis) for (var j = 0; j < vis.length; j++) if (vis[j].id === id) return vis[j];
+      return null;
+    }
     function nowPlayingTitle() { return window.ALBUMS[section.dataset.mode || 'group'].nowPlaying; }
     function playingSong() {
       var t = nowPlayingTitle();
@@ -9370,6 +8593,7 @@ window.AW.startStats = function () {
        the toolbar above says WHICH library, this says where in it. */
     function paintScope() {
       if (!scope) return;
+      paintStar();
       if (!focus) {
         scopeLabel.textContent = 'Library';
         scopeKind.hidden = true;
@@ -9380,7 +8604,7 @@ window.AW.startStats = function () {
          "Live from Pier 9". Discover and the queue have no thing inside a
          category; they ARE the category, so naming it twice just stutters.
          Drop the caption whenever it would repeat the label. */
-      var kind = KIND_LABEL[focus.kind] || '';
+      var kind = focus.kindLabel || KIND_LABEL[focus.kind] || '';
       scopeLabel.textContent = focus.label;
       scopeKind.textContent = kind;
       scopeKind.hidden = !kind || kind === focus.label;
@@ -9416,7 +8640,7 @@ window.AW.startStats = function () {
     }
 
     function sorted() {
-      var rows = LIB.filter(function (sg) { return inView(sg) && inFocus(sg) && inQuery(sg); });
+      var rows = (focus && focus.rows ? focus.rows : LIB).filter(function (sg) { return inView(sg) && inFocus(sg) && inQuery(sg); });
       if (focus && focus.ordered && !sortExplicit) {
         var ids = focus.ids;
         rows.sort(function (a, b) { return ids.indexOf(a.id) - ids.indexOf(b.id); });
@@ -9485,6 +8709,96 @@ window.AW.startStats = function () {
     }
     var say = window.say;
 
+    /* ---- albums and playlists from the catalog (NP-FIND-007/008) ----
+       The search opens one here the way an album opens: the bar names it, its songs are the rows, page
+       after page as the catalog gives them, up to its cap. The star beside the name keeps it in the
+       library — a SavedCollection (packages/contracts, the one shape the hub and the companion share) in
+       library:state — and the library menu lists what is kept under Playlists and Albums. Its songs are
+       visitors: they are not added to the library unless + or the Download key says so. */
+    var colSeq = 0;
+    function cols() { if (!Array.isArray(state.collections)) state.collections = []; return state.collections; }
+    function savedIndex(ref) {
+      var l = cols();
+      for (var i = 0; i < l.length; i++) if (l[i].ref.platform === ref.platform && l[i].ref.kind === ref.kind && l[i].ref.id === ref.id) return i;
+      return -1;
+    }
+    function colKind(c, n) {
+      var total = c.trackCount != null ? c.trackCount : null;
+      var words = (c.ref.kind === 'album' ? 'Album' : 'Playlist') + ' \u00b7 ' + c.platformLabel;
+      if (n || total) words += ' \u00b7 ' + n + (total && total > n ? ' of ' + total : '') + (n === 1 && !total ? ' song' : ' songs');
+      if (c.capped) words += ' (the first ' + n + ')';
+      return words;
+    }
+    function paintStar() {
+      var b = document.getElementById('libColStar');
+      if (!b) return;
+      var c = focus && focus.col;
+      b.hidden = !c;
+      if (!c) return;
+      var on = savedIndex(c.ref) >= 0;
+      b.setAttribute('aria-pressed', String(on));
+      b.setAttribute('aria-label', on ? 'Remove \u201c' + c.ref.title + '\u201d from your library' : 'Save \u201c' + c.ref.title + '\u201d to your library');
+      b.title = on ? 'In your library' : 'Save to your library';
+    }
+    document.getElementById('libColStar').addEventListener('click', function () {
+      var c = focus && focus.col;
+      if (!c) return;
+      var at = savedIndex(c.ref);
+      if (at >= 0) { cols().splice(at, 1); say('Removed \u201c' + c.ref.title + '\u201d from your library'); }
+      else {
+        cols().push({ ref: c.ref, savedAt: new Date().toISOString(), artworkUrl: c.artworkUrl || null, covers: (c.covers || []).slice(0, 4),
+                      trackCount: c.trackCount != null ? c.trackCount : (focus.rows ? focus.rows.length : null) });
+        say('Saved \u201c' + c.ref.title + '\u201d to your library');
+      }
+      save();
+      paintStar();
+    });
+    function showCollection(info) {
+      var my = ++colSeq;
+      var rows = info.rows.slice();
+      var f = { kind: 'collection', label: info.ref.title, ordered: true, rows: rows, ids: rows.map(function (r) { return r.id; }), col: info };
+      f.kindLabel = colKind(info, rows.length);
+      query = ''; findEl.value = ''; findClear.hidden = true;
+      if (ipodShowing()) ipodClose(false);
+      selectedId = null;
+      setFocus(f);
+      say('Showing \u201c' + info.ref.title + '\u201d');
+      if (info.loading || info.hasMore) pull(f, my);
+    }
+    function pull(f, my) {
+      f.col.loading = !f.rows.length;
+      f.col.more().then(function (pg) {
+        if (my !== colSeq || focus !== f) return;
+        pg.rows.forEach(function (r) { if (f.ids.indexOf(r.id) < 0) { f.rows.push(r); f.ids.push(r.id); } });
+        f.col.loading = false;
+        f.col.hasMore = pg.hasMore;
+        if (pg.total != null) f.col.trackCount = pg.total;
+        f.col.capped = pg.capped;
+        f.kindLabel = colKind(f.col, f.rows.length);
+        paintScope();
+        render();
+        if (pg.hasMore) pull(f, my);
+      }, function (err) {
+        if (my !== colSeq || focus !== f) return;
+        f.col.loading = false;
+        f.col.error = (err && err.message) || 'The list could not be read just now.';
+        paintScope();
+        render();
+        if (!f.rows.length) say(f.col.error);
+      });
+    }
+    function savedItems(kind) {
+      return cols().filter(function (s) { return s.ref.kind === kind; }).map(function (s) {
+        return { label: s.ref.title, count: s.trackCount, saved: s };
+      });
+    }
+    window.NP_LIST = {
+      showCollection: showCollection,
+      /* a song of the list on show, for the Download key */
+      find: function (id) { var vis = focus && focus.rows; if (vis) for (var i = 0; i < vis.length; i++) if (vis[i].id === id) return vis[i]; return null; },
+      saved: function () { return cols().slice(); },
+    };
+
     /* ---- rows ---- */
 
     var DL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.8 3h2.4v7.7h4.1L12 17.1 6.7 10.7h4.1z"/><path d="M4.6 19h14.8v2.1H4.6z"/></svg>';
@@ -9506,7 +8820,10 @@ window.AW.startStats = function () {
       if (!rows.length) {
         /* colspan covers every column including the ones hidden at this
            breakpoint — a hidden <col> still counts in the span */
-        var why = query ? 'No songs match \u201c' + esc(query) + '\u201d.'
+        var col = focus && focus.col;
+        var why = col && col.error ? esc(col.error)
+                : col && col.loading ? 'Loading \u201c' + esc(focus.label) + '\u201d\u2026'
+                : query ? 'No songs match \u201c' + esc(query) + '\u201d.'
                 : (focus && focus.kind === 'nowplaying') ? 'Nothing played yet.'
                 : focus ? 'Nothing in \u201c' + esc(focus.label) + '\u201d.'
                 : 'No ' + esc(VIEW_LABEL[view] || 'items') + ' yet.';
@@ -10491,12 +9808,12 @@ window.AW.startStats = function () {
       if (id === 'playlists') {
         return {
           title: 'Playlists',
-          items: state.playlists.length
+          items: (state.playlists.length
             ? state.playlists.map(function (pl) {
                 return { label: pl.name, count: pl.songs.length,
                          focus: { kind: 'playlist', label: pl.name, ids: pl.songs.slice() } };
               })
-            : [],
+            : []).concat(savedItems('playlist')),
           empty: 'No playlists yet',
         };
       }
@@ -10507,7 +9824,7 @@ window.AW.startStats = function () {
           items: uniqueBy(key).map(function (v) {
             return { label: v, count: countBy(key, v),
                      focus: { kind: key, key: key, value: v, label: v } };
-          }),
+          }).concat(id === 'albums' ? savedItems('album') : []),
           empty: 'Nothing here yet',
         };
       }
@@ -10517,9 +9834,9 @@ window.AW.startStats = function () {
           { label: 'Now Playing', focus: nowPlayingFocus() },
           { label: 'Discover', count: discoverIds().length,
             focus: { kind: 'discover', label: 'Discover', ids: discoverIds() } },
-          { label: 'Playlists', count: state.playlists.length, into: 'playlists' },
+          { label: 'Playlists', count: state.playlists.length + savedItems('playlist').length, into: 'playlists' },
           { label: 'Artists', count: uniqueBy('artist').length, into: 'artists' },
-          { label: 'Albums', count: uniqueBy('album').length, into: 'albums' },
+          { label: 'Albums', count: uniqueBy('album').length + savedItems('album').length, into: 'albums' },
         ],
       };
     }
@@ -10604,6 +9921,15 @@ window.AW.startStats = function () {
       var it = lvl.items[i];
       if (!it || it.disabled) return;
       if (it.into) { ipodStack.push(it.into); ipodSel = 0; ipodRender(); return; }
+      if (it.saved) {
+        /* kept from the catalog: its songs are read again, through the search's own servers */
+        var kept = it.saved;
+        ipodClose();
+        (window.NP_SEARCH_READY || Promise.resolve(null)).then(function (api) {
+          if (api) api.openSaved(kept); else say('Search is not available, so \u201c' + kept.ref.title + '\u201d cannot be read');
+        });
+        return;
+      }
       setFocus(it.focus);
       if (findEl.value) { findEl.value = ''; query = ''; findClear.hidden = true; render(); }
       ipodClose();
@@ -12852,6 +12178,10 @@ window.AW.startStats = function () {
         /* Songs kept from the radio are library entries of this player's own. */
         state.kept = (Array.isArray(saved.kept) ? saved.kept : []).filter(function (s) { return s && s.id && s.title; });
         state.kept.forEach(function (s) { if (!song(s.id)) LIB.push(s); });
+        /* Albums and playlists kept from the catalog (SavedCollection), rebuilt rather than trusted. */
+        state.collections = (Array.isArray(saved.collections) ? saved.collections : []).filter(function (c) {
+          return c && c.ref && typeof c.ref.title === 'string' && c.ref.platform && c.ref.id && (c.ref.kind === 'album' || c.ref.kind === 'playlist');
+        });
         /* A renamed artist has to survive a reload, or the command is a lie. */
         applyEdits();
       }
@@ -17665,7 +16995,7 @@ window.AW.startStats = function () {
       if (!c) { window.say('Choose a song first'); return; }
       if (c.local) { window.say('This song is already on this device'); return; }
       if (c.remote) { window.say('This song streams from your PC'); return; }
-      var sg = (window.LIBRARY || []).filter(function (s) { return s.id === c.id; })[0];
+      var sg = (window.LIBRARY || []).filter(function (s) { return s.id === c.id; })[0] || (window.NP_LIST && window.NP_LIST.find(c.id));
       if (!sg || !sg.url || !/^https?:/.test(sg.url)) { window.say('This row has no link to fetch from'); return; }
       openFetch(sg);
     });
@@ -17678,6 +17008,8 @@ window.AW.startStats = function () {
       ['licensed', 'Licensed to me', 'A Creative Commons licence that permits it, or a licence you hold.'],
       ['purchased-export', 'I bought it', 'You paid for this and are fetching your own copy.']];
     var fetchSheet = null;
+    /* the search's song details fetch through the same sheet (NP-FIND-006) */
+    window.NP_FETCH = function (sg) { openFetch(sg); };
     function openFetch(sg) {
       if (!fetchSheet) {
         fetchSheet = document.createElement('dialog');

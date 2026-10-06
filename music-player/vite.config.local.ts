@@ -148,6 +148,8 @@ export default defineConfig(async (): Promise<UserConfig> => {
       // The registration module imports workbox-window lazily; this build must not carry it at all.
       'workbox-window': here('./src/lib/workbox-window.stub.ts'),
         '@now-playing/contracts': workspace('contracts'),
+        // The catalog's own entry precedes the bare alias: string aliases match by prefix.
+        '@now-playing/domain/catalog': fileURLToPath(new URL('../packages/domain/src/catalog/index.ts', import.meta.url)),
         '@now-playing/domain': workspace('domain'),
         // Prefix matching again: the specific entry has to come first.
       '@now-playing/aqua-ui/now-playing.css': fileURLToPath(new URL('../packages/aqua-ui/src/styles/now-playing.css', import.meta.url)),

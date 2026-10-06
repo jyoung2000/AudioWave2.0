@@ -1943,6 +1943,496 @@ replace("""    document.addEventListener('scroll', function () {
     }, true);
 """)
 
+# ---- the catalog search: music, live, in sections, with details (NP-FIND-001..008, DEC-039) ----------------------
+# The header search becomes the catalog's: songs, artists and albums from the paired hub, the companion on this
+# PC or (with neither) this browser, streamed in and merged by id, every row naming the platforms it is on. Its
+# code moves out of this page into a lazy chunk (music-player/src/shell/search, loaded by the bridge once the
+# shell runs); what stays here is the markup it draws into, its styles, and the music list's side: an album or
+# playlist from the catalog opens in the list like an album, and the silver bar's star keeps it in the library.
+# The per-row "find it on YouTube / SoundCloud / Bandcamp" links and the "open it on a platform instead"
+# fallback go: search is about music, never an offer to search somewhere else (owner, 2026-10-06).
+
+replace('''      <input class="search__input" type="search" id="q" placeholder="Search or paste a link"
+             aria-label="Search YouTube, SoundCloud and Bandcamp, or paste a link"
+             role="combobox" aria-expanded="false" aria-controls="srchBody"
+             autocomplete="off" spellcheck="false">
+''', '''      <input class="search__input" type="search" id="q" placeholder="Search music or paste a link"
+             aria-label="Search for songs, artists and albums, or paste a music link"
+             role="combobox" aria-expanded="false" aria-controls="srchBody"
+             autocomplete="off" spellcheck="false">
+      <!-- Track, artist, album and ISRC fields fold out of the pill and back into it (NP-FIND-005). -->
+      <button class="search__more" type="button" id="qMore" aria-expanded="false" aria-controls="srchAdv"
+              aria-label="Search by track, artist, album or ISRC">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h7.2a2 2 0 0 1 3.6 0H14v1.6h-1.2a2 2 0 0 1-3.6 0H2zm9 .8a.6.6 0 1 0 0 .01zM2 10.4h1.2a2 2 0 0 1 3.6 0H14V12H6.8a2 2 0 0 1-3.6 0H2zm3 .8a.6.6 0 1 0 0 .01z"/></svg>
+      </button>
+''')
+
+replace('''        <div class="srch__head">
+          <p class="srch__count" id="srchCount"></p>
+          <button class="srch__clear" type="button" id="srchClear">Clear</button>
+        </div>
+''', '''        <div class="srch__head">
+          <button class="srch__back" type="button" id="srchBack" hidden aria-label="Back">&#8249; Back</button>
+          <p class="srch__count" id="srchCount"></p>
+          <button class="srch__filter" type="button" id="srchFilterBtn" aria-haspopup="dialog" aria-controls="srchFilter">Filter</button>
+          <button class="srch__clear" type="button" id="srchClear">Clear</button>
+        </div>
+        <form class="srch__adv" id="srchAdv" hidden aria-label="Search by track, artist, album or ISRC">
+          <label class="srch__field">Track<input name="track" type="text" autocomplete="off" spellcheck="false"></label>
+          <label class="srch__field">Artist<input name="artist" type="text" autocomplete="off" spellcheck="false"></label>
+          <label class="srch__field">Album<input name="album" type="text" autocomplete="off" spellcheck="false"></label>
+          <label class="srch__field">ISRC<input name="isrc" type="text" autocomplete="off" spellcheck="false" maxlength="15" placeholder="USQX91300108"></label>
+          <button class="srch__btn srch__advgo" type="submit">Search</button>
+        </form>
+        <p class="srch__status" id="srchStatus" hidden></p>
+''')
+
+replace('''<div class="toast" id="toast" role="status" aria-live="polite"></div>
+''', '''<!-- The search filter (NP-FIND-005): which sections a search shows and which services it asks.
+     Kept in the player's settings store (kv "player:search"). -->
+<dialog class="sheet" id="srchFilter" aria-labelledby="srchFilterTitle">
+  <form method="dialog" class="sheet__form">
+    <div class="sheet__body">
+      <p class="sheet__title" id="srchFilterTitle">Search Filter</p>
+      <fieldset class="srch-filter__set"><legend class="sheet__msg">Show</legend>
+        <label><input type="checkbox" name="sec" value="tracks"> Songs</label>
+        <label><input type="checkbox" name="sec" value="artists"> Artists</label>
+        <label><input type="checkbox" name="sec" value="albums"> Albums</label>
+      </fieldset>
+      <fieldset class="srch-filter__set"><legend class="sheet__msg">Ask</legend>
+        <label><input type="checkbox" name="pf" value="itunes"> Apple Music</label>
+        <label><input type="checkbox" name="pf" value="deezer"> Deezer</label>
+        <label><input type="checkbox" name="pf" value="musicbrainz"> MusicBrainz</label>
+        <label><input type="checkbox" name="pf" value="youtube"> YouTube</label>
+        <label><input type="checkbox" name="pf" value="soundcloud"> SoundCloud</label>
+      </fieldset>
+      <p class="sheet__msg srch-filter__note">YouTube and SoundCloud are searched by the hub or the companion (yt-dlp); with neither, this browser asks the others.</p>
+      <p class="sheet__msg" id="srchFilterMsg" role="status"></p>
+    </div>
+    <div class="sheet__actions">
+      <button class="sheet__btn" type="button" id="srchFilterCancel">Cancel</button>
+      <button class="sheet__btn sheet__btn--default" type="submit" value="save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+''')
+
+# The silver bar's star: shown while the list holds an album or playlist from the catalog (NP-FIND-008).
+replace('''        <span class="lib-scope__label" id="libScopeLabel">Library</span>
+''', '''        <span class="lib-scope__label" id="libScopeLabel">Library</span>
+        <button class="lib-scope__star" type="button" id="libColStar" hidden aria-pressed="false" aria-label="Save to your library">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.5 6.1 20.6l1.2-6.5L2.5 9.5l6.6-.9z"/></svg>
+        </button>
+''')
+
+# The code: out to the lazy chunk. Everything from the old hook comment to the next module goes.
+_search_start = "  // Search hook — replace with your own handler.\n"
+_search_end = "  // Keeps the transport row's right edge under the progress track's right\n"
+assert text.count(_search_start) == 1 and text.count(_search_end) == 1
+_i, _j = text.index(_search_start), text.index(_search_end)
+assert _i < _j and 'function rowHTML(r, i)' in text[_i:_j] and 'function findLinks(t, a)' in text[_i:_j]
+text = (text[:_i] +
+        "  /* ---- search ----\n"
+        "     The header search is src/shell/search, a lazy chunk the bridge loads once this script has run\n"
+        "     (NP-FIND-001..008): songs, artists and albums from the catalog — the paired hub, the companion on\n"
+        "     this PC, or this browser — live, in sections, with details, previews and pasted links. It draws\n"
+        "     into #srch above and sets window.srchClose and window.NP_FIND, which the toolbar and the radio's\n"
+        "     \"keep this song\" use. Nothing in it sends anyone to search on another site. */\n\n" +
+        text[_j:])
+edits += 1
+
+# Styles: the platform-search badges go; the catalog's sections, badges, status line, details and mosaic come.
+replace('''  /* one badge per platform, matching the library's monochrome initials —
+     no logos, those are trademarks */
+  .srch__links { flex: none; display: flex; gap: 3px; }
+''', '''  /* the row's right rail: + (add to the library) */
+  .srch__links { flex: none; display: flex; gap: 3px; }
+''')
+
+replace('''  .srch__pf {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 16px;
+    border-radius: 3px;
+    background: var(--srch-pf);
+    color: var(--srch-pf-ink);
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .srch__pf[data-len="1"] { font-size: 9px; }
+  .srch__pf:hover { background: var(--lib-accent); color: #fff; }
+  .srch__pf:focus { outline: none; }
+  .srch__pf:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
+''', '''  /* ---------- the catalog search (NP-FIND-003..008) ----------
+     Same card, same rows; wider, so a section's badges and numbers fit beside a title. Anchored to
+     the pill's right edge and never wider than the window. */
+  .srch { left: auto; width: max(100%, min(480px, calc(100vw - 20px))); }
+  .srch__body { max-height: min(62vh, 470px); overflow-y: auto; overscroll-behavior: contain; }
+  .srch__head { gap: 6px; }
+  .srch__head .srch__count { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .srch__back, .srch__filter {
+    flex: none;
+    padding: 2px 4px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    font: inherit;
+    color: var(--srch-soft);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .srch__back { color: var(--lib-accent); font-weight: 700; }
+  .srch__back[hidden] { display: none; }
+  .srch__back:hover, .srch__filter:hover { color: var(--srch-ink); }
+  .srch__filter.is-on { color: var(--lib-accent); font-weight: 700; }
+  .srch__back:focus, .srch__filter:focus { outline: none; }
+  .srch__back:focus-visible, .srch__filter:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
+
+  /* the pill's own switch for the Track / Artist / Album / ISRC fields */
+  .search__input { padding-right: 28px; }
+  .search__more {
+    position: absolute;
+    top: 50%;
+    right: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 18px;
+    padding: 0;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--field-hint);
+    transform: translateY(-50%);
+    cursor: default;
+  }
+  .search__more svg { width: 13px; height: 13px; fill: currentColor; }
+  .search__more:hover { color: var(--ink); }
+  .search__more[aria-expanded="true"] { background: rgba(0, 0, 0, 0.12); color: var(--ink); }
+  .search__more:focus { outline: none; }
+  .search__more:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
+  @media (pointer: coarse) { .search__more { width: 32px; height: 32px; right: 2px; border-radius: 16px; } .search__input { padding-right: 36px; } }
+
+  .srch__adv {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 8px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--srch-rule);
+    background: var(--srch-head-bot);
+  }
+  .srch__adv[hidden] { display: none; }
+  .srch__field { display: flex; flex-direction: column; gap: 2px; color: var(--srch-soft); font-size: 10px; }
+  .srch__field input {
+    height: 22px;
+    padding: 0 7px;
+    border: 1px solid var(--srch-rule);
+    border-radius: 4px;
+    background: #fff;
+    font: inherit;
+    font-size: 12px;
+    color: var(--srch-ink);
+  }
+  .srch__field input:focus { outline: 2px solid rgba(24, 160, 235, 0.6); outline-offset: 0; }
+  .srch__advgo { grid-column: 1 / -1; justify-self: end; }
+
+  /* the quiet line: each service and how it did (UX-CAT-001) */
+  .srch__status {
+    margin: 0;
+    padding: 3px 10px;
+    border-bottom: 1px solid var(--srch-rule);
+    color: var(--srch-soft);
+    font-size: 10px;
+    line-height: 14px;
+  }
+  .srch__status[hidden] { display: none; }
+  .srch__st { white-space: nowrap; }
+  .srch__st[data-state="failed"], .srch__st[data-state="timeout"] { color: var(--srch-ink); font-weight: 700; }
+  .srch__st[data-state="cooling-down"], .srch__st[data-state="skipped"] { font-style: italic; }
+
+  .srch__cap { margin: 0; padding: 6px 10px 2px; color: var(--srch-soft); font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+  .srch__cap span { font-weight: 400; letter-spacing: 0; text-transform: none; }
+  .srch__sec + .srch__sec { border-top: 1px solid var(--srch-rule); }
+
+  /* title, then the platforms it is on (UX-CAT-003) */
+  .srch__line { display: flex; align-items: center; gap: 5px; min-width: 0; }
+  .srch__line .srch__title { flex: 0 1 auto; min-width: 0; }
+  .srch__pfs { flex: none; display: inline-flex; align-items: center; gap: 3px; }
+  .srch__badge {
+    padding: 0 4px;
+    border-radius: 3px;
+    background: var(--srch-pf);
+    color: var(--srch-pf-ink);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 13px;
+    white-space: nowrap;
+  }
+  .srch__via { color: var(--srch-soft); font-size: 9.5px; white-space: nowrap; }
+  @media (max-width: 480px) { .srch__line .srch__badge:nth-child(n+3) { display: none; } }
+
+  .srch__art--round { border-radius: 50%; }
+  .srch__mosaic { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+  .srch__mosaic img { position: static; width: 100%; height: 100%; object-fit: cover; }
+  .srch__row--coll { height: 54px; }
+  .srch__row--coll .srch__art { width: 42px; height: 42px; }
+  .srch__open { flex: none; color: var(--srch-soft); font-size: 10px; }
+  .srch__more .srch__morelabel { flex: 1; padding-left: 38px; color: var(--lib-accent); font-weight: 700; }
+  .srch__end { padding: 8px 12px; color: var(--srch-soft); font-size: 10px; text-align: center; }
+
+  /* album, artist and song details: a cover, its facts, then its rows */
+  .srch__detail { display: flex; gap: 12px; padding: 10px; border-bottom: 1px solid var(--srch-rule); }
+  .srch__cover {
+    position: relative;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 84px;
+    height: 84px;
+    overflow: hidden;
+    border-radius: 3px;
+    background-image: linear-gradient(to bottom, var(--srch-art-top), var(--srch-art-bot));
+    box-shadow: inset 0 0 0 1px var(--srch-art-ring), 0 1px 3px rgba(0, 0, 0, 0.2);
+    color: var(--srch-art-ink);
+  }
+  .srch__cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .srch__cover > svg { width: 28px; height: 28px; fill: currentColor; }
+  .srch__cover--round { border-radius: 50%; }
+  .srch__dmeta { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .srch__dtitle { margin: 0; color: var(--srch-ink); font-size: 13px; font-weight: 700; }
+  .srch__dsub, .srch__dfacts, .srch__dpfs, .srch__dacts { margin: 0; color: var(--srch-soft); }
+  .srch__dfacts { display: flex; flex-wrap: wrap; gap: 2px 10px; }
+  .srch__fact b { margin-right: 3px; color: var(--srch-ink); font-weight: 700; }
+  .srch__fact--wait { font-style: italic; }
+  .srch__dacts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .srch__btn {
+    height: 20px;
+    padding: 0 10px;
+    border: 1px solid var(--srch-rule);
+    border-radius: 10px;
+    background-image: linear-gradient(to bottom, #fff, var(--srch-head-bot));
+    font: inherit;
+    color: var(--srch-ink);
+    cursor: default;
+  }
+  .srch__btn:hover { border-color: var(--srch-chev); }
+  .srch__btn:focus { outline: none; }
+  .srch__btn:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
+  .srch__btn:disabled, .srch__btn[aria-disabled="true"] { opacity: 0.5; }
+  @media (pointer: coarse) { .srch__btn { height: 32px; padding: 0 14px; border-radius: 16px; } }
+  .srch__lyrics { max-height: 220px; overflow-y: auto; padding: 2px 12px 10px; color: var(--srch-ink); font-size: 11.5px; line-height: 1.5; }
+  .srch__lyr { margin: 0; }
+  .srch__lyr time { display: inline-block; min-width: 34px; color: var(--srch-soft); font-size: 10px; font-variant-numeric: tabular-nums; }
+
+  /* the filter sheet's two groups */
+  .srch-filter__set { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin: 10px 0 0; padding: 0; border: 0; font-size: 12px; }
+  .srch-filter__set legend { padding: 0; margin-bottom: 4px; }
+  .srch-filter__note { margin-top: 10px; font-size: 11px; }
+
+  /* a catalog list's caption ("Playlist · Spotify · 200 of 230 songs") gives way to its name on a phone */
+  .lib-scope .lib-scope__scope { flex: 0 1 auto; }
+  .lib-scope .lib-scope__kind { flex: 0 1000 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lib-scope .lib-scope__label { flex: 0 1 auto; }
+
+  /* the silver bar's star: keep the album or playlist on show in the library (NP-FIND-008) */
+  .lib-scope__star {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--scope-ink);
+    opacity: 0.6;
+    cursor: default;
+  }
+  .lib-scope__star[hidden] { display: none; }
+  .lib-scope__star svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; }
+  .lib-scope__star[aria-pressed="true"] { color: var(--lib-accent); opacity: 1; }
+  .lib-scope__star[aria-pressed="true"] svg { fill: currentColor; }
+  .lib-scope__star:focus { outline: none; }
+  .lib-scope__star:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
+  @media (pointer: coarse) { .lib-scope__star { width: 32px; height: 32px; } .lib-scope__star svg { width: 18px; height: 18px; } }
+''')
+
+# The music list: an album or playlist from the catalog is shown the way an album is — its name in the bar, its
+# songs as the rows — though its songs are not in the library. They are the focus's own rows (`focus.rows`),
+# found by song() like any other, loaded page by page as the catalog gives them (NP-FIND-007).
+replace("    function song(id) { for (var i = 0; i < LIB.length; i++) if (LIB[i].id === id) return LIB[i]; return null; }",
+        "    function song(id) {\n"
+        "      for (var i = 0; i < LIB.length; i++) if (LIB[i].id === id) return LIB[i];\n"
+        "      /* a song of the catalog list on show (NP-FIND-007) */\n"
+        "      var vis = focus && focus.rows;\n"
+        "      if (vis) for (var j = 0; j < vis.length; j++) if (vis[j].id === id) return vis[j];\n"
+        "      return null;\n"
+        "    }")
+replace("      var rows = LIB.filter(function (sg) { return inView(sg) && inFocus(sg) && inQuery(sg); });",
+        "      var rows = (focus && focus.rows ? focus.rows : LIB).filter(function (sg) { return inView(sg) && inFocus(sg) && inQuery(sg); });")
+replace("      var kind = KIND_LABEL[focus.kind] || '';\n",
+        "      var kind = focus.kindLabel || KIND_LABEL[focus.kind] || '';\n")
+replace("    function paintScope() {\n      if (!scope) return;\n",
+        "    function paintScope() {\n      if (!scope) return;\n      paintStar();\n")
+replace("        var why = query ? 'No songs match \\u201c' + esc(query) + '\\u201d.'\n",
+        "        var col = focus && focus.col;\n"
+        "        var why = col && col.error ? esc(col.error)\n"
+        "                : col && col.loading ? 'Loading \\u201c' + esc(focus.label) + '\\u201d\\u2026'\n"
+        "                : query ? 'No songs match \\u201c' + esc(query) + '\\u201d.'\n")
+replace("    var say = window.say;\n\n    /* ---- rows ---- */\n",
+        r"""    var say = window.say;
+
+    /* ---- albums and playlists from the catalog (NP-FIND-007/008) ----
+       The search opens one here the way an album opens: the bar names it, its songs are the rows, page
+       after page as the catalog gives them, up to its cap. The star beside the name keeps it in the
+       library — a SavedCollection (packages/contracts, the one shape the hub and the companion share) in
+       library:state — and the library menu lists what is kept under Playlists and Albums. Its songs are
+       visitors: they are not added to the library unless + or the Download key says so. */
+    var colSeq = 0;
+    function cols() { if (!Array.isArray(state.collections)) state.collections = []; return state.collections; }
+    function savedIndex(ref) {
+      var l = cols();
+      for (var i = 0; i < l.length; i++) if (l[i].ref.platform === ref.platform && l[i].ref.kind === ref.kind && l[i].ref.id === ref.id) return i;
+      return -1;
+    }
+    function colKind(c, n) {
+      var total = c.trackCount != null ? c.trackCount : null;
+      var words = (c.ref.kind === 'album' ? 'Album' : 'Playlist') + ' \u00b7 ' + c.platformLabel;
+      if (n || total) words += ' \u00b7 ' + n + (total && total > n ? ' of ' + total : '') + (n === 1 && !total ? ' song' : ' songs');
+      if (c.capped) words += ' (the first ' + n + ')';
+      return words;
+    }
+    function paintStar() {
+      var b = document.getElementById('libColStar');
+      if (!b) return;
+      var c = focus && focus.col;
+      b.hidden = !c;
+      if (!c) return;
+      var on = savedIndex(c.ref) >= 0;
+      b.setAttribute('aria-pressed', String(on));
+      b.setAttribute('aria-label', on ? 'Remove \u201c' + c.ref.title + '\u201d from your library' : 'Save \u201c' + c.ref.title + '\u201d to your library');
+      b.title = on ? 'In your library' : 'Save to your library';
+    }
+    document.getElementById('libColStar').addEventListener('click', function () {
+      var c = focus && focus.col;
+      if (!c) return;
+      var at = savedIndex(c.ref);
+      if (at >= 0) { cols().splice(at, 1); say('Removed \u201c' + c.ref.title + '\u201d from your library'); }
+      else {
+        cols().push({ ref: c.ref, savedAt: new Date().toISOString(), artworkUrl: c.artworkUrl || null, covers: (c.covers || []).slice(0, 4),
+                      trackCount: c.trackCount != null ? c.trackCount : (focus.rows ? focus.rows.length : null) });
+        say('Saved \u201c' + c.ref.title + '\u201d to your library');
+      }
+      save();
+      paintStar();
+    });
+    function showCollection(info) {
+      var my = ++colSeq;
+      var rows = info.rows.slice();
+      var f = { kind: 'collection', label: info.ref.title, ordered: true, rows: rows, ids: rows.map(function (r) { return r.id; }), col: info };
+      f.kindLabel = colKind(info, rows.length);
+      query = ''; findEl.value = ''; findClear.hidden = true;
+      if (ipodShowing()) ipodClose(false);
+      selectedId = null;
+      setFocus(f);
+      say('Showing \u201c' + info.ref.title + '\u201d');
+      if (info.loading || info.hasMore) pull(f, my);
+    }
+    function pull(f, my) {
+      f.col.loading = !f.rows.length;
+      f.col.more().then(function (pg) {
+        if (my !== colSeq || focus !== f) return;
+        pg.rows.forEach(function (r) { if (f.ids.indexOf(r.id) < 0) { f.rows.push(r); f.ids.push(r.id); } });
+        f.col.loading = false;
+        f.col.hasMore = pg.hasMore;
+        if (pg.total != null) f.col.trackCount = pg.total;
+        f.col.capped = pg.capped;
+        f.kindLabel = colKind(f.col, f.rows.length);
+        paintScope();
+        render();
+        if (pg.hasMore) pull(f, my);
+      }, function (err) {
+        if (my !== colSeq || focus !== f) return;
+        f.col.loading = false;
+        f.col.error = (err && err.message) || 'The list could not be read just now.';
+        paintScope();
+        render();
+        if (!f.rows.length) say(f.col.error);
+      });
+    }
+    function savedItems(kind) {
+      return cols().filter(function (s) { return s.ref.kind === kind; }).map(function (s) {
+        return { label: s.ref.title, count: s.trackCount, saved: s };
+      });
+    }
+    window.NP_LIST = {
+      showCollection: showCollection,
+      /* a song of the list on show, for the Download key */
+      find: function (id) { var vis = focus && focus.rows; if (vis) for (var i = 0; i < vis.length; i++) if (vis[i].id === id) return vis[i]; return null; },
+      saved: function () { return cols().slice(); },
+    };
+
+    /* ---- rows ---- */
+""")
+replace("        state.kept.forEach(function (s) { if (!song(s.id)) LIB.push(s); });\n",
+        "        state.kept.forEach(function (s) { if (!song(s.id)) LIB.push(s); });\n"
+        "        /* Albums and playlists kept from the catalog (SavedCollection), rebuilt rather than trusted. */\n"
+        "        state.collections = (Array.isArray(saved.collections) ? saved.collections : []).filter(function (c) {\n"
+        "          return c && c.ref && typeof c.ref.title === 'string' && c.ref.platform && c.ref.id && (c.ref.kind === 'album' || c.ref.kind === 'playlist');\n"
+        "        });\n")
+replace("    var state = { starred: {}, saved: {}, playlists: [], queue: [], edits: {}, history: [],\n"
+        "                  stations: {}, videos: {}, lists: {}, plays: [], sessions: [], recShown: [], acts: [], kept: [] };",
+        "    var state = { starred: {}, saved: {}, playlists: [], queue: [], edits: {}, history: [],\n"
+        "                  stations: {}, videos: {}, lists: {}, plays: [], sessions: [], recShown: [], acts: [], kept: [], collections: [] };")
+# The library menu: kept playlists after your own, kept albums after the library's.
+replace("          items: state.playlists.length\n"
+        "            ? state.playlists.map(function (pl) {",
+        "          items: (state.playlists.length\n"
+        "            ? state.playlists.map(function (pl) {")
+replace("            : [],\n          empty: 'No playlists yet',",
+        "            : []).concat(savedItems('playlist')),\n          empty: 'No playlists yet',")
+replace("                     focus: { kind: key, key: key, value: v, label: v } };\n          }),\n",
+        "                     focus: { kind: key, key: key, value: v, label: v } };\n          }).concat(id === 'albums' ? savedItems('album') : []),\n")
+replace("          { label: 'Playlists', count: state.playlists.length, into: 'playlists' },",
+        "          { label: 'Playlists', count: state.playlists.length + savedItems('playlist').length, into: 'playlists' },")
+replace("          { label: 'Albums', count: uniqueBy('album').length, into: 'albums' },",
+        "          { label: 'Albums', count: uniqueBy('album').length + savedItems('album').length, into: 'albums' },")
+replace("      if (it.into) { ipodStack.push(it.into); ipodSel = 0; ipodRender(); return; }\n",
+        "      if (it.into) { ipodStack.push(it.into); ipodSel = 0; ipodRender(); return; }\n"
+        "      if (it.saved) {\n"
+        "        /* kept from the catalog: its songs are read again, through the search's own servers */\n"
+        "        var kept = it.saved;\n"
+        "        ipodClose();\n"
+        "        (window.NP_SEARCH_READY || Promise.resolve(null)).then(function (api) {\n"
+        "          if (api) api.openSaved(kept); else say('Search is not available, so \\u201c' + kept.ref.title + '\\u201d cannot be read');\n"
+        "        });\n"
+        "        return;\n"
+        "      }\n")
+# The Download key fetches a catalog song on show the way it fetches a link row (the helper, a stated basis).
+replace("      var sg = (window.LIBRARY || []).filter(function (s) { return s.id === c.id; })[0];\n"
+        "      if (!sg || !sg.url || !/^https?:/.test(sg.url)) { window.say('This row has no link to fetch from'); return; }\n"
+        "      openFetch(sg);\n",
+        "      var sg = (window.LIBRARY || []).filter(function (s) { return s.id === c.id; })[0] || (window.NP_LIST && window.NP_LIST.find(c.id));\n"
+        "      if (!sg || !sg.url || !/^https?:/.test(sg.url)) { window.say('This row has no link to fetch from'); return; }\n"
+        "      openFetch(sg);\n")
+replace("    var fetchSheet = null;\n    function openFetch(sg) {\n",
+        "    var fetchSheet = null;\n"
+        "    /* the search's song details fetch through the same sheet (NP-FIND-006) */\n"
+        "    window.NP_FETCH = function (sg) { openFetch(sg); };\n"
+        "    function openFetch(sg) {\n")
+
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):
     assert bad not in text, f'left behind: {bad}'
