@@ -2,17 +2,17 @@
  * The Airwave Hub window.
  *
  * One window, always: the centred Snow Leopard window `design/frontends/origin/airwave-hub.html` draws — a
- * title bar and six icon tabs on one chrome sheet, the pane scrolling under it, a status strip at
+ * title bar and seven icon tabs (the design's six, and Search) on one chrome sheet, the pane scrolling under it, a status strip at
  * the foot. What changes with the session is what the window lets through:
  *
  * 1. **Not signed in** — the same window with its tabs locked and the sign-in form in the pane.
  * 2. **Signed in, bootstrap password still in place** — the Overview pane with the design's amber
- *    gate asking for a real password. The other five tabs are visible but locked, with the reason:
+ *    gate asking for a real password. The other six tabs are visible but locked, with the reason:
  *    the server refuses every gated route until the password is changed, so there is nothing true
  *    to show behind them. Overview itself reads only routes the server allows before setup.
  * 3. **Signed in and set up** — everything.
  *
- * The thirteen sections the hub has always had live inside the six tabs (design/decisions.md
+ * The thirteen sections the hub has always had live inside the tabs (design/decisions.md
  * DEC-017); each keeps its own data flow, its own `#section-id` anchor and its own ledger entry. The
  * tab strip is a roving-tabindex group (UX-KEY-001): one tab stop, arrows and Home/End move the
  * selection, locked tabs are skipped.
@@ -39,13 +39,15 @@ import { NetworkView } from './views/Network.js';
 import { DiagnosticsView } from './views/Diagnostics.js';
 import { BackupView } from './views/Backup.js';
 import { RecommendationsView } from './views/Recommendations.js';
+import { MusicSearchSettingsView } from './views/CatalogSettings.js';
+import { SearchView } from './views/Search.js';
 
 const PRODUCT = BRANDING.products.hub;
 
 /** The sections. Each is a screen in design/coverage.json; the tab it lives in is below. */
-export type ViewId = 'overview' | 'devices' | 'groups' | 'profiles' | 'providers' | 'library' | 'downloads' | 'shares' | 'recommendations' | 'discord' | 'network' | 'diagnostics' | 'backup';
+export type ViewId = 'overview' | 'devices' | 'groups' | 'profiles' | 'providers' | 'catalog' | 'library' | 'downloads' | 'search' | 'shares' | 'recommendations' | 'discord' | 'network' | 'diagnostics' | 'backup';
 
-export type TabId = 'overview' | 'devices' | 'music' | 'groups' | 'sharing' | 'system';
+export type TabId = 'overview' | 'devices' | 'music' | 'search' | 'groups' | 'sharing' | 'system';
 
 interface TabSpec {
   id: TabId;
@@ -57,7 +59,7 @@ interface TabSpec {
   sections: ViewId[];
 }
 
-/* The six toolbar icons, as drawn in the design file, are in ./icons.tsx. */
+/* The toolbar icons, as drawn in the design file (and Search's, drawn to match), are in ./icons.tsx. */
 const ICONS: Record<TabId, ReactNode> = TAB_ICONS;
 
 /**
@@ -79,7 +81,16 @@ const TABS: readonly TabSpec[] = [
     label: 'Music',
     icon: ICONS.music,
     lead: 'What the hub plays from, where it looks things up, and what it may save. Everything here is shared by every paired device.',
-    sections: ['library', 'providers', 'downloads', 'recommendations'],
+    sections: ['library', 'providers', 'catalog', 'downloads', 'recommendations'],
+  },
+  {
+    // The music catalog (DEC-039): find songs, artists and albums, read a pasted link, star a list,
+    // download a song to the hub. Its services are set in Music ▸ Music search.
+    id: 'search',
+    label: 'Search',
+    icon: ICONS.search,
+    lead: 'Look music up anywhere it is, without an account: what you find can be previewed, opened, starred into your library or downloaded to this hub.',
+    sections: ['search'],
   },
   {
     id: 'groups',
@@ -103,6 +114,8 @@ const SECTION_TITLES: Record<ViewId, string> = {
   profiles: 'Profiles',
   library: 'Library',
   providers: 'Providers',
+  catalog: 'Music search',
+  search: 'Search',
   downloads: 'Downloads',
   recommendations: 'Recommendations',
   groups: 'Groups',
@@ -409,6 +422,10 @@ function sectionBody(id: ViewId): ReactNode {
       return <GroupsView />;
     case 'providers':
       return <ProvidersView />;
+    case 'catalog':
+      return <MusicSearchSettingsView />;
+    case 'search':
+      return <SearchView />;
     case 'library':
       return <LibraryView />;
     case 'downloads':

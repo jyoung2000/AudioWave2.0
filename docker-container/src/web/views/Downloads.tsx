@@ -11,7 +11,7 @@ import { api } from '../lib/api.js';
 import { useAction, useResource } from '../lib/hooks.js';
 import { ActionError, EmptyCells, errorSentence, formatBytes, Group, listState, Note, Push, useHubUi } from '../ui.js';
 
-const BASIS_LABELS: Record<string, string> = {
+export const BASIS_LABELS: Record<string, string> = {
   'user-owned': 'The requester owns it',
   'creator-download': 'The artist allows downloads',
   'purchased-export': 'Exported from a purchase',

@@ -265,9 +265,11 @@ interface HubUi {
   confirm: (request: ConfirmRequest) => Promise<boolean>;
   /** True while the bootstrap password stands and the server refuses every gated route. */
   gated: boolean;
+  /** Drop a sheet of the view's own (a `Sheet`) over the pane; null puts it away. */
+  present: (sheet: ReactNode | null) => void;
 }
 
-const HubUiContext = createContext<HubUi>({ say: () => undefined, confirm: async () => false, gated: false });
+const HubUiContext = createContext<HubUi>({ say: () => undefined, confirm: async () => false, gated: false, present: () => undefined });
 
 export function useHubUi(): HubUi {
   return useContext(HubUiContext);
@@ -302,9 +304,66 @@ export function HubUiProvider({ gated, children }: { gated: boolean; children: (
     [pending],
   );
 
-  const sheet = pending ? <ConfirmSheet request={pending.request} onAnswer={answer} /> : null;
-  const value = useMemo<HubUi>(() => ({ say, confirm, gated }), [say, confirm, gated]);
-  return <HubUiContext.Provider value={value}>{children({ message, sheet, sheetOpen: pending !== null })}</HubUiContext.Provider>;
+  const [panel, setPanel] = useState<ReactNode | null>(null);
+  const present = useCallback((next: ReactNode | null) => setPanel(next), []);
+
+  const sheet = pending ? <ConfirmSheet request={pending.request} onAnswer={answer} /> : panel;
+  const value = useMemo<HubUi>(() => ({ say, confirm, gated, present }), [say, confirm, gated, present]);
+  return <HubUiContext.Provider value={value}>{children({ message, sheet, sheetOpen: pending !== null || panel !== null })}</HubUiContext.Provider>;
+}
+
+/**
+ * A sheet of a view's own — a form that asks more than yes or no (Search ▸ Filter…). It drops from
+ * under the toolbar like the confirmation sheet and holds the keyboard the same way: the first
+ * control has the focus, Tab and Shift+Tab stay inside, Escape cancels, and the focus goes back to
+ * the button that opened it (DEC-037's sheet spacing).
+ */
+export function Sheet({ title, children, onCancel }: { title: string; children: ReactNode; onCancel: () => void }) {
+  const titleId = useId();
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const asker = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    box.current?.querySelector<HTMLElement>('input, select, button, [tabindex="0"]')?.focus();
+    return () => {
+      if (asker?.isConnected) asker.focus();
+    };
+  }, []);
+  return (
+    <div className="sheet-layer">
+      {/* The dialog owns Escape and the Tab cycle for the controls inside it. */}
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
+      <div
+        ref={box}
+        className="sheet sheet--form"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.stopPropagation();
+            onCancel();
+          } else if (event.key === 'Tab') {
+            const stops = Array.from(box.current?.querySelectorAll<HTMLElement>('input:not([disabled]), select:not([disabled]), button:not([disabled])') ?? []);
+            if (!stops.length) return;
+            const first = stops[0]!;
+            const last = stops[stops.length - 1]!;
+            if (event.shiftKey && document.activeElement === first) {
+              event.preventDefault();
+              last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+              event.preventDefault();
+              first.focus();
+            }
+          }
+        }}
+      >
+        <div className="sheet__body">
+          <b id={titleId}>{title}</b>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /**

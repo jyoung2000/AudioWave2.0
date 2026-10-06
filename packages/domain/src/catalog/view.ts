@@ -187,16 +187,21 @@ export function platformLabel(platform: CatalogPlatform): string {
   return CATALOG_PLATFORM_LABELS[platform];
 }
 
+/** What a Spotify song's row says beside its Spotify chip. */
+export const PLAYS_FROM_SPOTDL = 'plays from YouTube Music via spotDL';
+
 /**
- * For a Spotify song, where it really plays from (UX-CAT-003): spotDL fetches YouTube Music's
- * recording of it, so a song whose only playable home is Spotify says so. Null for anything else.
+ * Whether a song plays only through Spotify (UX-CAT-003): spotDL fetches YouTube Music's recording
+ * of it, so the row says so. False when it is also somewhere it plays from directly.
  */
+export function playsThroughSpotdl(sources: readonly CatalogSource[]): boolean {
+  if (!sources.some((s) => s.platform === 'spotify')) return false;
+  return !sources.some((s) => s.platform !== 'spotify' && !(s.platform === 'youtube-music' && s.matchedBy === 'spotdl') && ['youtube', 'youtube-music', 'soundcloud', 'bandcamp'].includes(s.platform));
+}
+
+/** The same in one line where no chip is drawn: "Spotify · plays from YouTube Music via spotDL", or null. */
 export function playsFromText(sources: readonly CatalogSource[]): string | null {
-  const platforms = platformsOf(sources);
-  if (!platforms.includes('spotify')) return null;
-  const elsewhere = sources.some((s) => s.platform !== 'spotify' && !(s.platform === 'youtube-music' && s.matchedBy === 'spotdl') && ['youtube', 'youtube-music', 'soundcloud', 'bandcamp'].includes(s.platform));
-  if (elsewhere) return null;
-  return 'Spotify · plays from YouTube Music via spotDL';
+  return playsThroughSpotdl(sources) ? `Spotify · ${PLAYS_FROM_SPOTDL}` : null;
 }
 
 /** The 30-second clip a row can play: Apple Music's, else Deezer's (DRM-free, keyless). */

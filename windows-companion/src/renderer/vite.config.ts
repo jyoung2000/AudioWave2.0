@@ -26,6 +26,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@now-playing/contracts': workspace('contracts'),
+      // Before the bare package alias: string aliases match by prefix.
+      '@now-playing/domain/catalog': fileURLToPath(new URL('../../../packages/domain/src/catalog/index.ts', import.meta.url)),
       '@now-playing/domain': workspace('domain'),
       // The stylesheet and drawing entries must precede the bare package alias: string aliases match by prefix.
       '@now-playing/aqua-ui/airwave-window.css': fileURLToPath(new URL('../../../packages/aqua-ui/src/styles/airwave-window.css', import.meta.url)),

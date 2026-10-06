@@ -478,6 +478,270 @@ a.push:active {
   }
 }
 
+/* A sheet that asks more than yes or no (Search ▸ Filter…): the same sheet, its controls in columns. */
+.sheet--form {
+  width: min(480px, 100%);
+}
+.sheet--form fieldset {
+  margin: 0;
+}
+.sheet--form legend {
+  margin-bottom: 4px;
+}
+.sheet--form .chk {
+  margin: 3px 0;
+}
+
+/* ---------------------------------------------------------------- search (DEC-039, UX-SEARCH-001…006) */
+/* Built from the window's own parts — a .barrow form, a .pref grid, .well lists of .rows, .cap chips —
+   on the design's spacing (DEC-037): 2, 4, 6, 8, 12 and 16px, and its 24px row with a 36px cover. */
+.srch__bar .srch__q {
+  flex: 1 1 260px;
+}
+.srch__fields {
+  margin-top: 10px;
+}
+.srch__filter {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 8px 0 12px;
+}
+.srcs {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 8px 0 0;
+  padding: 0;
+  font-size: 11px;
+}
+.srcs li {
+  white-space: nowrap;
+}
+.srcs__state {
+  color: var(--ink-quiet);
+}
+.srch__count {
+  margin-left: 4px;
+}
+.srch__nav {
+  flex-wrap: nowrap;
+}
+.srch__h {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.srch__h:focus {
+  outline: none;
+}
+.srch__h:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+.srch__page > div > fieldset + fieldset,
+.srch__page .mhead + * {
+  margin-top: 12px;
+}
+
+/* a list of music: cover, what it is and where, its tempo and time, and the preview */
+.mrows:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+.mrows li {
+  gap: 8px;
+  min-height: 44px;
+  padding: 4px 8px;
+  cursor: default;
+}
+.mrows li[aria-selected='true'] {
+  background: #d9dde3;
+}
+.mrows:focus li[aria-selected='true'] {
+  background: linear-gradient(var(--sel-top), var(--sel-mid) 45%, var(--sel-bot));
+  color: var(--sel-ink);
+}
+.mrows:focus li[aria-selected='true'] .mrow__sub,
+.mrows:focus li[aria-selected='true'] .mrow__meta,
+.mrows:focus li[aria-selected='true'] .mrow__plays,
+.mrows:focus li[aria-selected='true'] .mrow__n {
+  color: var(--sel-ink);
+}
+.mrow__n {
+  flex: none;
+  width: 20px;
+  text-align: right;
+  color: var(--ink-quiet);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.mrow__main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.mrow__title {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mrow__sub {
+  color: var(--ink-2);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mrow__plat {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+}
+.mrow__plays {
+  font-size: 11px;
+  color: var(--ink-2);
+}
+.mrow__meta {
+  flex: none;
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  font-size: 11px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.mrow__play {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: linear-gradient(var(--btn-top), var(--btn-bot));
+  box-shadow: inset 0 0 0 1px var(--btn-edge);
+  color: #3a3d41;
+  font-size: 9px;
+}
+.mrow__play.is-playing {
+  color: var(--link);
+}
+.cap--x {
+  margin-left: 6px;
+  padding: 0 4px;
+  font-weight: 700;
+  background: #8a8f98;
+  color: #fff;
+  vertical-align: 1px;
+}
+
+/* covers: a 36px tile in a row, 96px at the head of a page; a list's 2×2 mosaic in the same square */
+.art {
+  flex: none;
+  display: block;
+  width: 36px;
+  height: 36px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: linear-gradient(#e4e8ee, #cfd6de);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+.art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.art--round {
+  border-radius: 50%;
+}
+.art--big {
+  width: 96px;
+  height: 96px;
+}
+.art--mosaic {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+.art--mosaic img {
+  min-width: 0;
+  min-height: 0;
+}
+
+/* the head of an album, a playlist, an artist or a song */
+.mhead {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.mhead__text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.mhead__title {
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+.mhead__line {
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.mhead .barrow {
+  margin-top: 6px;
+}
+.star[aria-pressed='true'] span[aria-hidden] {
+  color: #b0781c;
+}
+
+/* lyrics: timed lines in a scrolling well */
+.lyrics {
+  padding: 6px 8px;
+}
+.lyrics__lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.lyrics__lines li {
+  margin: 2px 0;
+}
+.lyrics__at {
+  display: inline-block;
+  width: 40px;
+  color: var(--ink-quiet);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.lyrics__plain {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.lyrics__src {
+  margin: 6px 0 0;
+}
+
+@media (max-width: 560px) {
+  .srch__filter {
+    grid-template-columns: 1fr;
+  }
+  .art--big {
+    width: 64px;
+    height: 64px;
+  }
+  .mrow__meta .mrow__bpm {
+    display: none;
+  }
+}
+
 /* A label beside a control with a line of help under it sits level with the control, not the help. */
 .pref > .k {
   align-self: start;
