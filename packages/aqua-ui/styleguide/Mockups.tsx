@@ -115,7 +115,7 @@ export function overridesCss(edits: Readonly<Record<string, string>>, airwave: R
   const names = all.filter((name) => !airwave.has(name));
   // The Airwave windows never load overrides.css: their stylesheets are generated from the designs.
   const windowBlock = windowNames.length
-    ? `/*\n * Airwave window properties (hub, companion). These do not go in overrides.css: the window\n * stylesheets are generated. Change the same properties in the :root block of\n * design/frontends/airwave-companion.html and airwave-hub.html, then run pnpm build:window-css.\n * (--ink-quiet, --success-ink, --danger-ink and --link are the hub's, in docker-container/src/web/styles.css.)\n */\n:root {\n${windowNames.map(line).join('\n')}\n}\n`
+    ? `/*\n * Airwave window properties (hub, companion). These do not go in overrides.css: the window\n * stylesheets are generated. Change the same properties in the :root block of\n * design/frontends/origin/airwave-companion.html and airwave-hub.html, then run pnpm build:window-css.\n * (--ink-quiet, --success-ink, --danger-ink and --link are the hub's, in docker-container/src/web/styles.css.)\n */\n:root {\n${windowNames.map(line).join('\n')}\n}\n`
     : '';
   if (!names.length) return windowBlock;
   const body = names.map(line).join('\n');

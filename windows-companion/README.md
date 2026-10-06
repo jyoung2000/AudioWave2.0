@@ -4,7 +4,7 @@ A desktop app that reads the music already on your computer, keeps a searchable 
 if you want — connects to an [Airwave Hub](../docker-container/README.md) so the rest of your
 devices can see what you have.
 
-Its window is the one drawn in [`design/frontends/airwave-companion.html`](../design/frontends/airwave-companion.html):
+Its window is the one drawn in [`design/frontends/origin/airwave-companion.html`](../design/frontends/origin/airwave-companion.html):
 four tools — Library, Live TV, Remote, Settings — on one sheet of chrome that is also the title bar.
 
 It is optional. The [player](../music-player/README.md) works on its own, and so does the hub. This

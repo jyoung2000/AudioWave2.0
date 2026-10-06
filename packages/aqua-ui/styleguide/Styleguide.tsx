@@ -215,7 +215,7 @@ export function Styleguide() {
               <p className="sg__lede">
                 One guide for the three apps of {BRANDING.suiteName} — {BRANDING.products.player}, the player (a page, also inside the Android app); {BRANDING.products.hub}, the
                 admin window the container serves; and {BRANDING.products.companion}, the Windows app — and for the words the Discord bot uses. All three are a reconstruction of
-                Apple's 2009–2010 interface, and each is built from a design file in <code>design/frontends/</code>. Every value here is read from <code>tokens.json</code> as this
+                Apple's 2009–2010 interface, and each is built from a design file in <code>design/frontends/origin/</code>. Every value here is read from <code>tokens.json</code> as this
                 page is built, the windows are drawn with the stylesheets and kits the products ship, and every rule, screen and journey is read from <code>design/</code> — so the
                 page cannot describe one thing and show another.
               </p>
@@ -232,7 +232,7 @@ export function Styleguide() {
 
             <Section id="skins" title="Three apps, one system">
               <p>
-                One period, one set of rules, three apps — and each app's interface comes from its own design file in <code>design/frontends/</code>. The design file is the
+                One period, one set of rules, three apps — and each app's interface comes from its own design file in <code>design/frontends/origin/</code>. The design file is the
                 authority for how its app looks; this guide is the authority for what the three share: the rules, the words, the ledger of screens, and the checks that keep them
                 in step.
               </p>
@@ -887,7 +887,7 @@ box-shadow:
                   <strong>Both schemes.</strong> Light on bare <code>:root</code>; redefine only what changes inside the dark guard.
                 </li>
                 <li>
-                  <strong>The Airwave window changes in its design file.</strong> Edit <code>design/frontends/airwave-companion.html</code> or <code>airwave-hub.html</code>, run{' '}
+                  <strong>The Airwave window changes in its design file.</strong> Edit <code>design/frontends/origin/airwave-companion.html</code> or <code>airwave-hub.html</code>, run{' '}
                   <code>pnpm build:window-css</code>, and carry any change to the design's <code>AquaArt</code> script into <code>src/airwave/aqua-art.ts</code>. The player's
                   shell changes in <code>airwave-now-playing.html</code> and is rebuilt by <code>make-shell.py</code>.
                 </li>

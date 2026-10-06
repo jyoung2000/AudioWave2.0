@@ -208,7 +208,7 @@ function iconOption(): { icon?: string } {
 }
 
 /**
- * The window is the one `design/frontends/airwave-companion.html` drew: a title and four tools on
+ * The window is the one `design/frontends/origin/airwave-companion.html` drew: a title and four tools on
  * one sheet of chrome, with nothing above it. So the operating system's title bar is hidden and the
  * page draws the title itself — but the window keeps its frame: `titleBarOverlay` has Windows draw
  * its own minimise, maximise and close over the top-right of that chrome, with Snap Layouts, the

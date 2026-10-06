@@ -1,7 +1,7 @@
 /**
  * The companion's window.
  *
- * It is the window `design/frontends/airwave-companion.html` drew, on this PC's own data: a title
+ * It is the window `design/frontends/origin/airwave-companion.html` drew, on this PC's own data: a title
  * and four tools on one sheet of chrome — Library, Live TV, Remote, Settings — the pane scrolling
  * beneath, a status line at the foot. The markup and class names are the design's, styled by the
  * design's stylesheet; what this file adds is where the mockup had sample data: every figure on

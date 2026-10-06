@@ -110,7 +110,7 @@ for line in (NP / 'design' / 'decisions.md').read_text(encoding='utf-8').splitli
     if not m or m.group(1) in present:
         continue
     ident, status, text = m.group(1), m.group(2), m.group(3).strip()
-    text = text.replace('`now-playing.html`', '`design/frontends/airwave-now-playing.html` (served here as `music-player/index.html`)')
+    text = text.replace('`now-playing.html`', '`design/frontends/origin/airwave-now-playing.html` (served here as `music-player/index.html`)')
     if ident in NOTES:
         text += ' ' + NOTES[ident]
     rows.append(f'| {ident} | {status:<10} | {text} |')

@@ -1,5 +1,5 @@
 /**
- * The design's own icons, as it drew them (design/frontends/airwave-companion.html): the four
+ * The design's own icons, as it drew them (design/frontends/origin/airwave-companion.html): the four
  * toolbar tools at 26px and the three row glyphs at 15px. Decorative, so hidden from assistive
  * technology — the control or row beside each one carries the words.
  */

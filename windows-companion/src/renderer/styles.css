@@ -3,7 +3,7 @@
  *
  * Everything that makes this window look the way it does is the design's own stylesheet,
  * `@now-playing/aqua-ui/airwave-window.css`, copied verbatim from
- * `design/frontends/airwave-companion.html`. This file adds only what a mockup in a browser tab
+ * `design/frontends/origin/airwave-companion.html`. This file adds only what a mockup in a browser tab
  * did not need and a program does:
  *
  *   1. the window fills the frame Windows gives it, instead of floating on a desktop backdrop;

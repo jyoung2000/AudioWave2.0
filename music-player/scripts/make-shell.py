@@ -1,5 +1,5 @@
 """
-Build music-player/index.html (the shell) from design/frontends/airwave-now-playing.html.
+Build music-player/index.html (the shell) from design/frontends/origin/airwave-now-playing.html.
 
 The frontend file is read-only reference material; this script is the record of every edit the
 player makes to it, each asserted against the exact text it replaces so a drift in the source is a
@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-SRC = ROOT / 'design' / 'frontends' / 'airwave-now-playing.html'
+SRC = ROOT / 'design' / 'frontends' / 'origin' / 'airwave-now-playing.html'
 DST = ROOT / 'music-player' / 'index.html'
 
 text = SRC.read_text(encoding='utf-8')

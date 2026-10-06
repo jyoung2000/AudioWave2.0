@@ -6,9 +6,9 @@
   "sources": {
     "designs": {
       "paths": [
-        "design/frontends/airwave-now-playing.html",
-        "design/frontends/airwave-hub.html",
-        "design/frontends/airwave-companion.html"
+        "design/frontends/origin/airwave-now-playing.html",
+        "design/frontends/origin/airwave-hub.html",
+        "design/frontends/origin/airwave-companion.html"
       ],
       "owns": "How each app looks. The player is the first file served as a shell (music-player/scripts/make-shell.py writes music-player/index.html from it); the hub and the companion are drawn with stylesheets generated from the other two."
     },
@@ -146,7 +146,7 @@
       "product": "player",
       "path": "music-player",
       "imports": [
-        "design/frontends/airwave-now-playing.html, served as music-player/index.html: imports nothing from aqua-ui",
+        "design/frontends/origin/airwave-now-playing.html, served as music-player/index.html: imports nothing from aqua-ui",
         "@now-playing/aqua-ui and @now-playing/aqua-ui/now-playing.css: the React source in music-player/src, kept but not served (DEC-019)"
       ],
       "skin": "the Airwave player shell (a page)"
@@ -187,7 +187,7 @@
     }
   ],
   "commands": {
-    "build:window-css": "pnpm build:window-css — regenerates airwave-window.css and airwave-hub.css from design/frontends/airwave-companion.html and airwave-hub.html.",
+    "build:window-css": "pnpm build:window-css — regenerates airwave-window.css and airwave-hub.css from design/frontends/origin/airwave-companion.html and airwave-hub.html.",
     "styleguide:build": "pnpm styleguide:build — rebuilds docs/design/styleguide.html from the sources above (same as pnpm build:styleguide).",
     "styleguide:check": "pnpm styleguide:check — sources and evidence exist, rule IDs are unique, every discovered screen is in the ledger, tokens.json matches the stylesheets (the library’s and the Airwave window’s), and the committed HTML was built from the current sources.",
     "styleguide:shell": "pnpm styleguide:shell — after pnpm build:player, retakes the served player's screenshots for The served shell (packages/aqua-ui/styleguide/shell) and records which shell they show.",

@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-// The window is the design's: its stylesheet, copied verbatim from design/frontends/airwave-companion.html.
+// The window is the design's: its stylesheet, copied verbatim from design/frontends/origin/airwave-companion.html.
 import '@now-playing/aqua-ui/airwave-window.css';
 import './styles.css';
 import { installAquaArt } from '@now-playing/aqua-ui/airwave-art';

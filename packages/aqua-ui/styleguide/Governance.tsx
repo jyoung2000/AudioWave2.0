@@ -86,10 +86,10 @@ const PRODUCTS: Array<{ id: string; label: string; note: string }> = [
   {
     id: 'player',
     label: `${BRANDING.products.player} — the player`,
-    note: 'The shell generated from design/frontends/airwave-now-playing.html: the PWA, the single-file build, the Android app and the local helper all show it. Its surfaces are the player-shell rows (adopted). The rows marked proposed are the React interface in music-player/src, which is kept and tested but no longer served (DEC-019).',
+    note: 'The shell generated from design/frontends/origin/airwave-now-playing.html: the PWA, the single-file build, the Android app and the local helper all show it. Its surfaces are the player-shell rows (adopted). The rows marked proposed are the React interface in music-player/src, which is kept and tested but no longer served (DEC-019).',
   },
-  { id: 'hub', label: `${BRANDING.products.hub} — admin window and public pages`, note: 'The Airwave window of design/frontends/airwave-hub.html, served by the container on port 4546. Sign-in and the first-run gate are drawn in the same window.' },
-  { id: 'companion', label: `${BRANDING.products.companion} — Windows`, note: 'The Airwave window of design/frontends/airwave-companion.html in an Electron window whose chrome is its title bar.' },
+  { id: 'hub', label: `${BRANDING.products.hub} — admin window and public pages`, note: 'The Airwave window of design/frontends/origin/airwave-hub.html, served by the container on port 4546. Sign-in and the first-run gate are drawn in the same window.' },
+  { id: 'companion', label: `${BRANDING.products.companion} — Windows`, note: 'The Airwave window of design/frontends/origin/airwave-companion.html in an Electron window whose chrome is its title bar.' },
   { id: 'discord', label: 'Discord bot', note: 'Messages rendered from templates the operator can edit.' },
   { id: 'android', label: 'Android shell', note: 'A WebView around the player, plus system UI.' },
   { id: 'local-helper', label: 'Local helper', note: 'A console program that serves the player and runs download tools.' },

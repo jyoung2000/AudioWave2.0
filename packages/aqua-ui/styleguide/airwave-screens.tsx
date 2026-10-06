@@ -1,7 +1,7 @@
 /**
  * The Airwave windows: the hub's admin GUI and the Windows companion, as they are drawn today.
  *
- * Both products are the windows `design/frontends/airwave-hub.html` and `airwave-companion.html`
+ * Both products are the windows `design/frontends/origin/airwave-hub.html` and `airwave-companion.html`
  * draw. Their look is three things, and all three are the real ones here:
  *
  *   - the stylesheets generated from those design files (`airwave-window.css`, `airwave-hub.css`),

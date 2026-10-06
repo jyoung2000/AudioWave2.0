@@ -164,7 +164,7 @@ describe('the window has no default application menu', () => {
 /**
  * The title bar is the design's, and the window is still Windows'.
  *
- * `design/frontends/airwave-companion.html` draws the title and the four tools on one sheet of
+ * `design/frontends/origin/airwave-companion.html` draws the title and the four tools on one sheet of
  * chrome with nothing above it. A second, operating-system title bar over that — the same name
  * twice — was the most visible way the app differed from its design. So the OS title bar is hidden
  * and the page draws the title. What must not be lost in doing that is everything Windows users
