@@ -27,6 +27,13 @@ built. The UI phase on the player, hub and companion must meet every item here.
 - Clicking the playlist opens it in the music list the way an album opens: the list header names
   it, and its songs are the rows.
 
+## Pagination and whole playlists (added 2026-10-06)
+- Search lists paginate (page controls with a count, Page Up/Down); "see all" keeps infinite
+  scroll. Later pages are fetched from the engine, not sliced from the first answer.
+- Opening a playlist or album loads every song, from any platform (Spotify, YouTube/YouTube Music,
+  SoundCloud, Bandcamp, Deezer, Apple Music albums and playlists): no 200 cap; pages are fetched
+  until `hasMore` is false, with progress shown and an upper bound that is reported, never silent.
+
 ## The music list's silver search/filter bar
 - When the list shows an album or a playlist (from search, a pasted link or the library), the bar
   offers a star to save that album or playlist to the user's music library (and un-star it). Saved
