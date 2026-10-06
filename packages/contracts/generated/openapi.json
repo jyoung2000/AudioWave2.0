@@ -13824,6 +13824,789 @@
         }
       }
     },
+    "/api/v1/catalog/saved": {
+      "get": {
+        "operationId": "listSavedCollections",
+        "summary": "The albums and playlists the admin starred, newest first",
+        "tags": [
+          "catalog"
+        ],
+        "x-route-name": "catalogSavedList",
+        "x-auth": "admin",
+        "x-scopes": [],
+        "x-setup-required": true,
+        "x-rate-limit": "default",
+        "parameters": [],
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "ref": {
+                            "type": "object",
+                            "properties": {
+                              "platform": {
+                                "type": "string",
+                                "enum": [
+                                  "apple-music",
+                                  "deezer",
+                                  "musicbrainz",
+                                  "youtube",
+                                  "youtube-music",
+                                  "soundcloud",
+                                  "spotify",
+                                  "bandcamp",
+                                  "tidal",
+                                  "qobuz",
+                                  "amazon-music"
+                                ]
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "album",
+                                  "playlist"
+                                ]
+                              },
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 260
+                              },
+                              "url": {
+                                "type": "string",
+                                "maxLength": 2048
+                              },
+                              "title": {
+                                "type": "string",
+                                "maxLength": 300
+                              },
+                              "owner": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "platform",
+                              "kind",
+                              "id",
+                              "url",
+                              "title",
+                              "owner"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "savedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                            "description": "UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z"
+                          },
+                          "artworkUrl": {
+                            "default": null,
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 2048
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "covers": {
+                            "default": [],
+                            "maxItems": 4,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "maxLength": 2048
+                            }
+                          },
+                          "trackCount": {
+                            "default": null,
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "ref",
+                          "savedAt",
+                          "artworkUrl",
+                          "covers",
+                          "trackCount"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "default": "about:blank",
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "description": "Machine-readable error code",
+                      "type": "string"
+                    },
+                    "correlationId": {
+                      "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated"
+          },
+          "403": {
+            "description": "Forbidden (scope, CSRF, or setup incomplete)"
+          },
+          "429": {
+            "description": "Rate limited; honours Retry-After"
+          }
+        }
+      },
+      "put": {
+        "operationId": "saveCollection",
+        "summary": "Star an album or playlist (by its ref; saving it again refreshes it)",
+        "tags": [
+          "catalog"
+        ],
+        "x-route-name": "catalogSavedPut",
+        "x-auth": "admin",
+        "x-scopes": [],
+        "x-setup-required": true,
+        "x-rate-limit": "write",
+        "parameters": [],
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "ref": {
+                            "type": "object",
+                            "properties": {
+                              "platform": {
+                                "type": "string",
+                                "enum": [
+                                  "apple-music",
+                                  "deezer",
+                                  "musicbrainz",
+                                  "youtube",
+                                  "youtube-music",
+                                  "soundcloud",
+                                  "spotify",
+                                  "bandcamp",
+                                  "tidal",
+                                  "qobuz",
+                                  "amazon-music"
+                                ]
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "album",
+                                  "playlist"
+                                ]
+                              },
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 260
+                              },
+                              "url": {
+                                "type": "string",
+                                "maxLength": 2048
+                              },
+                              "title": {
+                                "type": "string",
+                                "maxLength": 300
+                              },
+                              "owner": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "platform",
+                              "kind",
+                              "id",
+                              "url",
+                              "title",
+                              "owner"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "savedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                            "description": "UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z"
+                          },
+                          "artworkUrl": {
+                            "default": null,
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 2048
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "covers": {
+                            "default": [],
+                            "maxItems": 4,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "maxLength": 2048
+                            }
+                          },
+                          "trackCount": {
+                            "default": null,
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "ref",
+                          "savedAt",
+                          "artworkUrl",
+                          "covers",
+                          "trackCount"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "default": "about:blank",
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "description": "Machine-readable error code",
+                      "type": "string"
+                    },
+                    "correlationId": {
+                      "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated"
+          },
+          "403": {
+            "description": "Forbidden (scope, CSRF, or setup incomplete)"
+          },
+          "429": {
+            "description": "Rate limited; honours Retry-After"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "type": "object",
+                    "properties": {
+                      "platform": {
+                        "type": "string",
+                        "enum": [
+                          "apple-music",
+                          "deezer",
+                          "musicbrainz",
+                          "youtube",
+                          "youtube-music",
+                          "soundcloud",
+                          "spotify",
+                          "bandcamp",
+                          "tidal",
+                          "qobuz",
+                          "amazon-music"
+                        ]
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "album",
+                          "playlist"
+                        ]
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 260
+                      },
+                      "url": {
+                        "type": "string",
+                        "maxLength": 2048
+                      },
+                      "title": {
+                        "type": "string",
+                        "maxLength": 300
+                      },
+                      "owner": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "maxLength": 300
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "platform",
+                      "kind",
+                      "id",
+                      "url",
+                      "title",
+                      "owner"
+                    ]
+                  },
+                  "savedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                    "description": "UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z"
+                  },
+                  "artworkUrl": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 2048
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "covers": {
+                    "default": [],
+                    "maxItems": 4,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 2048
+                    }
+                  },
+                  "trackCount": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "ref",
+                  "savedAt"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "unsaveCollection",
+        "summary": "Un-star an album or playlist",
+        "tags": [
+          "catalog"
+        ],
+        "x-route-name": "catalogSavedDelete",
+        "x-auth": "admin",
+        "x-scopes": [],
+        "x-setup-required": true,
+        "x-rate-limit": "write",
+        "parameters": [
+          {
+            "name": "platform",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "apple-music",
+                "deezer",
+                "musicbrainz",
+                "youtube",
+                "youtube-music",
+                "soundcloud",
+                "spotify",
+                "bandcamp",
+                "tidal",
+                "qobuz",
+                "amazon-music"
+              ]
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "album",
+                "playlist"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 260
+            }
+          }
+        ],
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "ref": {
+                            "type": "object",
+                            "properties": {
+                              "platform": {
+                                "type": "string",
+                                "enum": [
+                                  "apple-music",
+                                  "deezer",
+                                  "musicbrainz",
+                                  "youtube",
+                                  "youtube-music",
+                                  "soundcloud",
+                                  "spotify",
+                                  "bandcamp",
+                                  "tidal",
+                                  "qobuz",
+                                  "amazon-music"
+                                ]
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "album",
+                                  "playlist"
+                                ]
+                              },
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 260
+                              },
+                              "url": {
+                                "type": "string",
+                                "maxLength": 2048
+                              },
+                              "title": {
+                                "type": "string",
+                                "maxLength": 300
+                              },
+                              "owner": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 300
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "platform",
+                              "kind",
+                              "id",
+                              "url",
+                              "title",
+                              "owner"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "savedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+                            "description": "UTC ISO-8601 timestamp with offset, e.g. 2026-09-03T12:00:00.000Z"
+                          },
+                          "artworkUrl": {
+                            "default": null,
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 2048
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "covers": {
+                            "default": [],
+                            "maxItems": 4,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "maxLength": 2048
+                            }
+                          },
+                          "trackCount": {
+                            "default": null,
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "ref",
+                          "savedAt",
+                          "artworkUrl",
+                          "covers",
+                          "trackCount"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "default": "about:blank",
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "description": "Machine-readable error code",
+                      "type": "string"
+                    },
+                    "correlationId": {
+                      "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not authenticated"
+          },
+          "403": {
+            "description": "Forbidden (scope, CSRF, or setup incomplete)"
+          },
+          "429": {
+            "description": "Rate limited; honours Retry-After"
+          }
+        }
+      }
+    },
     "/api/v1/artists/releases": {
       "get": {
         "operationId": "latestReleases",

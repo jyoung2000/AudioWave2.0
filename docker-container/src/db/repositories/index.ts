@@ -9,6 +9,7 @@ import { LibraryRepository } from './library.js';
 import { MetricsRepository } from './metrics.js';
 import { PairingRepository } from './pairing.js';
 import { ProvidersRepository } from './providers.js';
+import { SavedCollectionsRepository } from './saved-collections.js';
 import { SettingsRepository } from './settings.js';
 import { SharesRepository } from './shares.js';
 import { SyncRepository } from './sync.js';
@@ -27,6 +28,7 @@ export interface Repositories {
   shares: SharesRepository;
   canonical: CanonicalRepository;
   metrics: MetricsRepository;
+  savedCollections: SavedCollectionsRepository;
 }
 
 export function createRepositories(db: Db): Repositories {
@@ -44,6 +46,7 @@ export function createRepositories(db: Db): Repositories {
     shares: new SharesRepository(db),
     canonical: new CanonicalRepository(db),
     metrics: new MetricsRepository(db),
+    savedCollections: new SavedCollectionsRepository(db),
   };
 }
 
@@ -57,6 +60,7 @@ export * from './library.js';
 export * from './metrics.js';
 export * from './pairing.js';
 export * from './providers.js';
+export * from './saved-collections.js';
 export * from './settings.js';
 export * from './shares.js';
 export * from './sync.js';

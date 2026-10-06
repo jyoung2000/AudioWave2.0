@@ -10,7 +10,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { CatalogAlbumDetail, CatalogResolveResult, CatalogSearchAggregate, CatalogSearchChunk, CatalogSettingsView, type CatalogTrack, type DownloadJob } from '@now-playing/contracts';
+import { CatalogAlbumDetail, CatalogResolveResult, CatalogSearchAggregate, CatalogSearchChunk, CatalogSettingsView, SavedCollection, type CatalogTrack, type DownloadJob } from '@now-playing/contracts';
 import { hubCatalogFetch } from '../../src/catalog/service.js';
 import { toolEnvironment, toolScratchDir } from '../../src/media/tool-env.js';
 import { ExternalToolAdapter } from '../../src/providers/adapters/external-tool.js';
@@ -250,4 +250,33 @@ describe('catalog settings and downloads', () => {
     expect(response.statusCode).toBe(404);
     expect(response.json().detail).toMatch(/is in a store, but nowhere this hub can download from/);
   }, 30_000);
+});
+
+describe('starred albums and playlists (UX-SEARCH-005)', () => {
+  const ref = { platform: 'deezer' as const, kind: 'playlist' as const, id: '908622995', url: 'https://www.deezer.com/playlist/908622995', title: 'Harbour Mix', owner: 'Airwave' };
+  const saved = { ref, savedAt: '2026-10-06T12:00:00.000Z', artworkUrl: null, covers: ['https://cdn-images.dzcdn.net/images/cover/a/250x250.jpg'], trackCount: 42 };
+
+  it('keeps a starred list in the admin’s library, in the shared SavedCollection shape, and un-stars it', async () => {
+    const headers = { cookie: admin.cookie, 'x-csrf-token': admin.csrfToken };
+    expect((await hub.app.inject({ method: 'GET', url: '/api/v1/catalog/saved', headers })).json()).toEqual({ items: [] });
+    const put = await hub.app.inject({ method: 'PUT', url: '/api/v1/catalog/saved', headers, payload: saved });
+    expect(put.statusCode, put.body).toBe(200);
+    expect(put.json()).toEqual({ items: [saved] });
+    // Starring it again refreshes it rather than adding a second.
+    const again = await hub.app.inject({ method: 'PUT', url: '/api/v1/catalog/saved', headers, payload: { ...saved, trackCount: 43 } });
+    expect((again.json() as { items: Array<{ trackCount: number }> }).items.map((i) => i.trackCount)).toEqual([43]);
+    const list = await hub.app.inject({ method: 'GET', url: '/api/v1/catalog/saved', headers });
+    expect(SavedCollection.array().parse((list.json() as { items: unknown[] }).items)).toHaveLength(1);
+    const removed = await hub.app.inject({ method: 'DELETE', url: '/api/v1/catalog/saved?platform=deezer&kind=playlist&id=908622995', headers });
+    expect(removed.statusCode).toBe(200);
+    expect(removed.json()).toEqual({ items: [] });
+  });
+
+  it('is the admin’s alone: no device, no anonymous caller, and a change needs the CSRF token', async () => {
+    expect((await get('/api/v1/catalog/saved')).statusCode).toBe(401);
+    expect((await hub.app.inject({ method: 'GET', url: '/api/v1/catalog/saved', headers: { authorization: device.authorization } })).statusCode).toBe(401);
+    expect((await hub.app.inject({ method: 'PUT', url: '/api/v1/catalog/saved', headers: { cookie: admin.cookie }, payload: saved })).statusCode).toBe(403);
+    const bad = await hub.app.inject({ method: 'PUT', url: '/api/v1/catalog/saved', headers: { cookie: admin.cookie, 'x-csrf-token': admin.csrfToken }, payload: { ...saved, ref: { ...ref, kind: 'radio' } } });
+    expect(bad.statusCode).toBe(400);
+  });
 });
