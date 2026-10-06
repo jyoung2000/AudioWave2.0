@@ -10,6 +10,7 @@
  * No real person's data: the user folder is `you`, the names are the e2e suites' invented ones.
  */
 import recorded from '../../../packages/aqua-ui/styleguide/fixtures/companion-ipc.json' with { type: 'json' };
+import { CATALOG_STOCK } from '../lib/stock-catalog.mjs';
 
 export const now = '2026-10-04T19:42:00.000Z';
 const at = (minutesAgo) => new Date(Date.parse(now) - minutesAgo * 60_000).toISOString();
@@ -69,6 +70,14 @@ export const answers = {
     ],
   },
   'helper:token': { token: null },
+  // The Search tool (DEC-039): the stock catalog; a search and a resolve are answered live by apps/companion.mjs.
+  'catalog:saved': CATALOG_STOCK.saved,
+  'catalog:filter': { sections: ['tracks', 'artists', 'albums'], providers: ['itunes', 'deezer', 'musicbrainz', 'youtube', 'soundcloud'] },
+  'catalog:cancel': { ok: true },
+  'catalog:album': { result: CATALOG_STOCK.album, reason: null },
+  'catalog:artist': { result: CATALOG_STOCK.artist, reason: null },
+  'catalog:lyrics': { result: CATALOG_STOCK.lyrics, reason: null },
+  'catalog:enrich': { result: CATALOG_STOCK.enrich, reason: null },
   'library:folders': {
     items: [
       { id: MUSIC, path: 'C:\\Users\\you\\Music', displayName: 'Music', watch: true, kind: 'music', trackCount: 3812, sizeBytes: 41_205_678_080, lastScanAt: at(42), lastScanError: null, available: true },
