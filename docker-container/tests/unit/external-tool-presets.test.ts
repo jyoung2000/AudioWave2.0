@@ -83,8 +83,15 @@ describe('the spotDL preset', () => {
     expect(preset.allowedHosts).toEqual(['open.spotify.com']);
   });
 
-  it('downloads the one link it is given, last and behind a separator', () => {
-    expect(args.slice(-3)).toEqual(['download', '--', url]);
+  it('downloads the one link it is given, straight after the operation and never behind `--` (spotDL 4.5.2 refuses it)', () => {
+    expect(args.slice(0, 2)).toEqual(['download', url]);
+    expect(args).not.toContain('--');
+    expect(args.filter((a) => a === url)).toHaveLength(1);
+  });
+
+  it('hands spotDL only an http(s) address, so a link can never be read as a flag', () => {
+    expect(() => preset.download(ctx('--exec=calc'))).toThrow(/http\(s\)/);
+    expect(() => preset.metadata({ url: '-o/etc/passwd', ffmpeg: '/usr/bin/ffmpeg', node: null, saveFile: '/tmp/x/save.spotdl', listLimit: 201 })).toThrow(/http\(s\)/);
   });
 
   it('names its file inside the job’s directory and writes what it knew beside it', () => {
@@ -101,7 +108,9 @@ describe('the spotDL preset', () => {
   });
 
   it('reads a link with `save`, and refuses to try without FFmpeg (spotDL will not start without it)', () => {
-    expect(preset.metadata({ url, ffmpeg: '/usr/bin/ffmpeg', node: null, saveFile: '/tmp/x/save.spotdl', listLimit: 201 })!.slice(-3)).toEqual(['save', '--', url]);
+    const save = preset.metadata({ url, ffmpeg: '/usr/bin/ffmpeg', node: null, saveFile: '/tmp/x/save.spotdl', listLimit: 201 })!;
+    expect(save.slice(0, 2)).toEqual(['save', url]);
+    expect(save).not.toContain('--');
     expect(preset.metadata({ url, ffmpeg: null, node: null, saveFile: '/tmp/x/save.spotdl', listLimit: 201 })).toBeNull();
   });
 });

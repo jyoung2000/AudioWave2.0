@@ -79,7 +79,9 @@ function writeFakeSpotdl(dir: string): string {
 import { dirname, join } from 'node:path';
 const args = process.argv.slice(2);
 appendFileSync(${JSON.stringify(join(dir, 'spotdl.calls'))}, JSON.stringify({ args, home: process.env.HOME }) + '\\n');
-const url = args.at(-1);
+// As spotDL 4.5.2 parses: the operation first, the URL straight after it, and no \`--\` anywhere.
+if (args.includes('--') || !['save', 'download'].includes(args[0])) { process.stderr.write('spotdl: error: unrecognized arguments: ' + args.join(' ') + '\\n'); process.exit(2); }
+const url = args[1];
 const album = ${JSON.stringify(fixture('spotdl-album.json'))};
 const track = ${JSON.stringify(fixture('spotdl-track.json'))};
 if (args.includes('save')) {
@@ -283,7 +285,7 @@ describe('running a job through the tool', () => {
     const downloads = calls<{ args: string[]; home: string }>('spotdl.calls').filter((c) => c.args.includes('download'));
     expect(downloads).toHaveLength(10);
     expect(new Set(downloads.map((c) => c.home)).size, 'a new home every run').toBe(10);
-    for (const call of downloads) expect(call.args.slice(-2)[0]).toBe('--');
+    for (const call of downloads) expect(call.args[1]).toMatch(/^https:\/\/open\.spotify\.com\/track\//);
     const [first] = calls<{ args: string[]; meta: string }>('ffmpeg.calls');
     expect(first!.meta).toMatch(/album=Whenever You Need Somebody/);
   });

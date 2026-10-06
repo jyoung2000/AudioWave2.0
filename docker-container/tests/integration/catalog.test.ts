@@ -50,7 +50,9 @@ function writeFakeSpotdl(dir: string): string {
     `import { appendFileSync, writeFileSync } from 'node:fs';
 const args = process.argv.slice(2);
 appendFileSync(${JSON.stringify(join(dir, 'spotdl.calls'))}, JSON.stringify(args) + '\\n');
-const url = args.at(-1);
+// As spotDL 4.5.2 parses: the operation first, the URL straight after it, and no \`--\` anywhere.
+if (args.includes('--') || args[0] !== 'save') { process.stderr.write('spotdl: error: unrecognized arguments: ' + args.join(' ') + '\\n'); process.exit(2); }
+const url = args[1];
 if (url.includes('/playlist/')) { process.stderr.write('HTTP Error for GET to https://api.spotify.com/v1/playlists/x returned 404 due to Resource not found.\\n'); process.exit(1); }
 const song = { ...${JSON.stringify(track[0])}, isrc: 'GBARL9300135', publisher: 'RCA Records Label', download_url: args.includes('--preload') ? 'https://music.youtube.com/watch?v=lYBUbBu4W08' : null };
 writeFileSync(args[args.indexOf('--save-file') + 1], JSON.stringify([song]));

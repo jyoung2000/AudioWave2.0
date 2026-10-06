@@ -40,7 +40,7 @@ export interface ToolPreset {
   binary: string;
   allowedHosts: readonly string[];
   note: string;
-  /** The download command line. The URL is always the last argument, behind `--`. */
+  /** The download command line. yt-dlp takes the URL last, behind `--`; spotDL straight after its operation. */
   download(ctx: DownloadArgsContext): string[];
   /** The metadata command line, or null where the tool cannot run without FFmpeg and there is none. */
   metadata(ctx: MetadataArgsContext): string[] | null;
@@ -51,13 +51,23 @@ export interface ToolPreset {
 }
 
 /**
+ * A URL for spotDL's command line, which has no `--` to put it behind: only an http(s) address
+ * passes, so it can never be read as a flag.
+ */
+export function spotdlUrl(url: string): string {
+  if (!/^https?:\/\//i.test(url)) throw new DomainError('validation', 'Only http(s) addresses can be handed to spotDL.');
+  return url;
+}
+
+/**
  * The command lines, written here rather than typed into an admin form.
  *
  * `--ignore-config` comes first for yt-dlp and is not decoration: a configuration file left in the
  * container's home directory would otherwise be read and obeyed, and one of the flags it could add
  * is `--exec`. spotDL has no such flag; instead it is run with a fresh, empty home directory every
- * time, so there is no configuration file for it to find. Both take the URL last, behind `--`, so
- * nothing in a link can be read as a flag.
+ * time, so there is no configuration file for it to find. yt-dlp takes the URL last, behind `--`;
+ * spotDL refuses `--` and takes it straight after its operation, as an http(s) address only
+ * (`spotdlUrl`). Either way nothing in a link can be read as a flag.
  *
  * Each download gets a directory of its own and the hub takes the one audio file that appears in
  * it. That is what lets yt-dlp extract the audio (`--extract-audio` renames the file it downloaded:
@@ -106,7 +116,13 @@ export const TOOL_PRESETS: Record<PresetTool, ToolPreset> = {
     binary: '/usr/local/bin/spotdl',
     allowedHosts: ['open.spotify.com'],
     note: 'Shipped in the image for open.spotify.com links. It reads Spotify for the track list and fetches a matching recording from YouTube Music; it never touches Spotify’s own audio.',
+    // The operation, then the URL straight after it, then the options. spotDL 4.5.2 (measured
+    // 2026-10-04 by the local helper, local-helper/src/jobs.ts `spotdlArgs`) refuses `--`
+    // ("unrecognized arguments: -- https://…") and the query anywhere but there; the image runs the
+    // same release's build (scripts/fetch-spotdl.ts), so `… download -- <url>` never ran here.
     download: ({ url, outputDir, ffmpeg }) => [
+      'download',
+      spotdlUrl(url),
       '--no-cache',
       '--log-level',
       'ERROR',
@@ -122,12 +138,9 @@ export const TOOL_PRESETS: Record<PresetTool, ToolPreset> = {
       join(outputDir, '{track-id}.{output-ext}'),
       '--save-file',
       join(outputDir, 'song.spotdl'),
-      'download',
-      '--',
-      url,
     ],
     // spotDL refuses to start at all without FFmpeg, even to read metadata.
-    metadata: ({ url, ffmpeg, saveFile, match }) => (ffmpeg ? ['--no-cache', '--log-level', 'ERROR', '--ffmpeg', ffmpeg, ...(match ? ['--preload'] : []), '--save-file', saveFile, 'save', '--', url] : null),
+    metadata: ({ url, ffmpeg, saveFile, match }) => (ffmpeg ? ['save', spotdlUrl(url), '--no-cache', '--log-level', 'ERROR', '--ffmpeg', ffmpeg, ...(match ? ['--preload'] : []), '--save-file', saveFile] : null),
     infoFile: 'song.spotdl',
     needsHome: true,
   },
