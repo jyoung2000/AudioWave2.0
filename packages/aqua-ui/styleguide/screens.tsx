@@ -50,6 +50,7 @@ import {
 import {
   CompanionAboutScreen,
   CompanionBackupScreen,
+  CompanionSearchScreen,
   CompanionSettingsView,
   HubBackupScreen,
   HubDiagnosticsScreen,
@@ -57,9 +58,11 @@ import {
   HubGroupsScreen,
   HubLibraryScreen,
   HubLiveTvScreen,
+  HubMusicSearchScreen,
   HubNetworkScreen,
   HubProfilesScreen,
   HubRecommendationsScreen,
+  HubSearchScreen,
   HubSharesScreen,
 } from './view-specimens.js';
 /*
@@ -279,6 +282,20 @@ export const SCREENS: readonly Screen[] = [
     render: () => <HubGroupsScreen />,
   },
   {
+    id: 'hub-search',
+    product: 'hub',
+    label: 'Search',
+    note: 'The hub’s own Search view, answering “harbour” from the stock catalog: every service’s state (one resting), the platforms that only gave links, and Songs, Artists and Albums in pages, each row with its platforms, BPM, time, the explicit mark and a preview. Open a row for a song, an album or an artist; paste a link for a playlist with its mosaic and star.',
+    render: () => <HubSearchScreen />,
+  },
+  {
+    id: 'hub-catalog',
+    product: 'hub',
+    label: 'Music ▸ Music search',
+    note: 'The services the catalog asks, lyrics in downloads, and the optional SongLink key — write-only, never shown again.',
+    render: () => <HubMusicSearchScreen />,
+  },
+  {
     id: 'hub-library',
     product: 'hub',
     label: 'Music ▸ Library',
@@ -368,6 +385,13 @@ export const SCREENS: readonly Screen[] = [
     label: 'Remote',
     note: 'Pairing a device, the hub connection and what is shared, and transfers. Untick sharing and Sync Now is disabled with its reason.',
     render: () => <CompanionRemoteScreen />,
+  },
+  {
+    id: 'companion-search',
+    product: 'companion',
+    label: 'Search',
+    note: 'The companion’s own Search view, the hub’s search through this PC’s helper, answering “harbour” from the stock catalog through the stand-in bridge.',
+    render: () => <CompanionSearchScreen />,
   },
   {
     id: 'companion-settings',

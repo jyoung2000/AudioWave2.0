@@ -96,16 +96,17 @@ function albumPage(album: CatalogAlbum): Page {
 /* ------------------------------------------------------------------ the tab */
 
 /** The Search tool: its pane, with the tool's own status line and sheet. */
-export function SearchView({ client = companionCatalog }: { client?: CatalogClient }) {
+/** `initialQuery`: a search to run as the tool opens (the style guide's specimen). */
+export function SearchView({ client = companionCatalog, initialQuery }: { client?: CatalogClient; initialQuery?: string }) {
   return (
     <SearchUiProvider>
-      <SearchPane client={client} />
+      <SearchPane client={client} {...(initialQuery ? { initialQuery } : {})} />
     </SearchUiProvider>
   );
 }
 
-function SearchPane({ client }: { client: CatalogClient }) {
-  const [fields, setFields] = useState<CatalogFields>(EMPTY_FIELDS);
+function SearchPane({ client, initialQuery }: { client: CatalogClient; initialQuery?: string }) {
+  const [fields, setFields] = useState<CatalogFields>(() => ({ ...EMPTY_FIELDS, q: initialQuery ?? '' }));
   const [advanced, setAdvanced] = useState(false);
   const [filter, setFilter] = useCatalogFilter();
   const live = useLiveSearch(client);
@@ -134,6 +135,18 @@ function SearchPane({ client }: { client: CatalogClient }) {
     setPagers(FRESH_PAGERS);
     live.run({ ...params, sections: using.sections, providers: using.providers });
   };
+
+  // Started from a microtask: the first render has drawn the field, and the search sets state as it goes.
+  const started = useRef(false);
+  const latestSearch = useRef(search);
+  useEffect(() => {
+    latestSearch.current = search;
+  });
+  useEffect(() => {
+    if (started.current || !initialQuery?.trim()) return;
+    started.current = true;
+    queueMicrotask(() => latestSearch.current({ fields: { ...EMPTY_FIELDS, q: initialQuery } }));
+  }, [initialQuery]);
 
   const submit = (event: FormEvent): void => {
     event.preventDefault();

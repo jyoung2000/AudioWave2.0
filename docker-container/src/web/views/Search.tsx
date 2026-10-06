@@ -93,8 +93,9 @@ function albumPage(album: CatalogAlbum): Page {
 
 /* ------------------------------------------------------------------ the tab */
 
-export function SearchView({ client = hubCatalog }: { client?: CatalogClient }) {
-  const [fields, setFields] = useState<CatalogFields>(EMPTY_FIELDS);
+/** `initialQuery`: a search to run as the tab opens (the style guide's specimen; a link with words). */
+export function SearchView({ client = hubCatalog, initialQuery }: { client?: CatalogClient; initialQuery?: string }) {
+  const [fields, setFields] = useState<CatalogFields>(() => ({ ...EMPTY_FIELDS, q: initialQuery ?? '' }));
   const [advanced, setAdvanced] = useState(false);
   const [filter, setFilter] = useCatalogFilter();
   const live = useLiveSearch(client);
@@ -123,6 +124,18 @@ export function SearchView({ client = hubCatalog }: { client?: CatalogClient }) 
     setPagers(FRESH_PAGERS);
     live.run({ ...params, sections: using.sections, providers: using.providers });
   };
+
+  // Started from a microtask: the first render has drawn the field, and the search sets state as it goes.
+  const started = useRef(false);
+  const latestSearch = useRef(search);
+  useEffect(() => {
+    latestSearch.current = search;
+  });
+  useEffect(() => {
+    if (started.current || !initialQuery?.trim()) return;
+    started.current = true;
+    queueMicrotask(() => latestSearch.current({ fields: { ...EMPTY_FIELDS, q: initialQuery } }));
+  }, [initialQuery]);
 
   const submit = (event: FormEvent): void => {
     event.preventDefault();

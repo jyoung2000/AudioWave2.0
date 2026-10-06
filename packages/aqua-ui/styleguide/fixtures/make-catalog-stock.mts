@@ -27,7 +27,9 @@ import {
   type CatalogSourceStatus,
   type CatalogTrack,
 } from '../../../contracts/src/index.js';
-import { coverFor } from '../../../../scripts/mockups/lib/stock-search.mjs';
+// The player mockup's drawn covers (plain JavaScript, so typed here).
+const STOCK_SEARCH: string = '../../../../scripts/mockups/lib/stock-search.mjs';
+const { coverFor } = (await import(STOCK_SEARCH)) as { coverFor: (album: string) => string };
 
 const RECORDED_AT = '2026-10-06T12:00:00.000Z';
 const QUERY = {

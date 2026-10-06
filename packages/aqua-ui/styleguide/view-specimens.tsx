@@ -28,6 +28,9 @@ import { NetworkView } from '../../../docker-container/src/web/views/Network.js'
 import { ProfilesView } from '../../../docker-container/src/web/views/Profiles.js';
 import { RecommendationsView } from '../../../docker-container/src/web/views/Recommendations.js';
 import { SharesView } from '../../../docker-container/src/web/views/Shares.js';
+import { MusicSearchSettingsView } from '../../../docker-container/src/web/views/CatalogSettings.js';
+import { SearchView as HubSearchView } from '../../../docker-container/src/web/views/Search.js';
+import { SearchView as CompanionSearchView } from '../../../windows-companion/src/renderer/views/Search.js';
 import { AboutView } from '../../../windows-companion/src/renderer/views/About.js';
 import { BackupView as CompanionBackupView } from '../../../windows-companion/src/renderer/views/Backup.js';
 import { SettingsView } from '../../../windows-companion/src/renderer/views/Settings.js';
@@ -67,6 +70,9 @@ export const HubSharesScreen = () => <HubSections tab="sharing" sections={[{ id:
 export const HubDiscordScreen = () => <HubSections tab="sharing" sections={[{ id: 'discord', title: 'Discord', view: <DiscordView /> }]} />;
 export const HubNetworkScreen = () => <HubSections tab="system" sections={[{ id: 'network', title: 'Network', view: <NetworkView /> }]} />;
 export const HubBackupScreen = () => <HubSections tab="system" sections={[{ id: 'backup', title: 'Backup', view: <HubBackupView /> }]} />;
+/** Search, as a hub answers "harbour" from the stock catalog (the music services are not recorded). */
+export const HubSearchScreen = () => <HubSections tab="search" sections={[{ id: 'search', title: 'Search', view: <HubSearchView initialQuery="harbour" /> }]} />;
+export const HubMusicSearchScreen = () => <HubSections tab="music" sections={[{ id: 'catalog', title: 'Music search', view: <MusicSearchSettingsView /> }]} />;
 export const HubDiagnosticsScreen = () => <HubSections tab="system" sections={[{ id: 'diagnostics', title: 'Diagnostics', view: <DiagnosticsView /> }]} />;
 
 /* ================================================================ companion */
@@ -127,6 +133,15 @@ export const CompanionBackupScreen = () => (
       </Sect>
     )}
   </CompanionSettingsTab>
+);
+
+/** The Search tool, answering "harbour" from the stock catalog through the stand-in bridge. */
+export const CompanionSearchScreen = () => (
+  <CompanionWindow tab="search" hubLine="No hub paired" dot="off" counts="0 folders · 0 playlists · 0 guides · 0 devices">
+    <Sect id="search" title="Search">
+      <CompanionSearchView initialQuery="harbour" />
+    </Sect>
+  </CompanionWindow>
 );
 
 export const CompanionAboutScreen = () => (

@@ -2050,7 +2050,7 @@
         "UX-KEY-001"
       ],
       "guideAnchor": "screens",
-      "mockup": "search-results",
+      "mockup": "hub-search",
       "authority": "adopted",
       "decision": "DEC-039"
     },
@@ -2075,7 +2075,7 @@
       ],
       "rules": ["UX-SEARCH-006", "UX-FORM-001"],
       "guideAnchor": "screens",
-      "mockup": "music",
+      "mockup": "hub-catalog",
       "authority": "adopted",
       "decision": "DEC-039"
     },
@@ -2141,7 +2141,7 @@
         "UX-KEY-001"
       ],
       "guideAnchor": "screens",
-      "mockup": "search-results",
+      "mockup": "companion-search",
       "authority": "adopted",
       "decision": "DEC-039"
     }
