@@ -1509,9 +1509,10 @@
         "link rows from search",
         "sorted",
         "narrowed by scope chip",
-        "filtered by the bar"
+        "filtered by the bar",
+        "an album or playlist from the catalog (search-collection-list)"
       ],
-      "rules": ["NP-LIST-001", "UX-KEY-001", "UX-STATE-001"],
+      "rules": ["NP-LIST-001", "UX-KEY-001", "UX-STATE-001", "NP-FIND-007", "NP-FIND-008"],
       "guideAnchor": "shell",
       "authority": "adopted"
     },
@@ -1550,19 +1551,39 @@
       "sourcePaths": [
         "music-player/index.html",
         "music-player/scripts/make-shell.py",
-        "music-player/src/shell/bridge.ts"
+        "music-player/src/shell/bridge.ts",
+        "music-player/src/shell/search/index.ts",
+        "music-player/src/shell/search/view.ts",
+        "music-player/src/shell/search/client.ts"
       ],
       "components": ["shell markup (design/frontends/origin/airwave-now-playing.html)"],
       "states": [
         "empty",
-        "results from companion / iTunes",
-        "pasted link resolved",
-        "people on the hub",
-        "pasted link filled in by the companion (duration, date, album, art)",
-        "pasted playlist, set or album: its songs, “Title: N songs”, and “(the first 200 of M)” when capped",
-        "set entry named by its address until its page is on screen"
+        "searching (rows arriving, upserted by id)",
+        "songs, artists and albums in sections, each row with its platform badges",
+        "a Spotify song: “plays from YouTube Music”",
+        "the per-service line: counts, searching, failed, timed out, cooling down until, needs yt-dlp; who answered",
+        "no matches for the words searched",
+        "failed (said plainly, per service)",
+        "Track / Artist / Album / ISRC fields folded out",
+        "a stale query (dimmed, “Press ⏎ to search”)",
+        "an older hub’s enriched songs (features, album, genre, bpm)",
+        "auditioning (click, or a five-second hold that fills the ring)",
+        "no clip (says why)",
+        "pasted link being read (Spotify: spotDL takes up to a minute)",
+        "pasted song: one row with its platform and date",
+        "pasted album or playlist: one listing with its platform and a 2×2 mosaic",
+        "pasted link nobody can read: the reason",
+        "people on the hub"
       ],
-      "rules": ["NP-PRIN-002", "NP-FIND-002"],
+      "rules": [
+        "NP-PRIN-002",
+        "NP-FIND-001",
+        "NP-FIND-002",
+        "NP-FIND-003",
+        "NP-FIND-005",
+        "NP-FIND-007"
+      ],
       "guideAnchor": "screens",
       "authority": "adopted"
     },
@@ -1989,6 +2010,160 @@
       "rules": ["UX-SAFE-001", "UX-FEED-001", "UX-PRIN-002", "UX-STREAM-001"],
       "mockup": "companion-transfers",
       "decision": "DEC-018"
+    },
+    {
+      "id": "player-shell-search-see-all",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Search ▸ See all",
+      "entry": "a section’s “See all” in the search popover",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts",
+        "music-player/src/shell/search/index.ts",
+        "music-player/src/shell/search/view.ts",
+        "music-player/src/shell/search/client.ts"
+      ],
+      "components": ["shell markup (design/frontends/origin/airwave-now-playing.html)"],
+      "states": [
+        "the overview’s rows, then the next page at once",
+        "loading more as it scrolls",
+        "that’s all N",
+        "a page that failed (said, and no more asked)"
+      ],
+      "rules": ["NP-FIND-004", "NP-FIND-003"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-shell-search-album",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Search ▸ Album",
+      "entry": "an album row in the search popover",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts",
+        "music-player/src/shell/search/index.ts",
+        "music-player/src/shell/search/view.ts",
+        "music-player/src/shell/search/client.ts"
+      ],
+      "components": ["shell markup (design/frontends/origin/airwave-now-playing.html)"],
+      "states": [
+        "opening",
+        "cover, facts, platforms and songs",
+        "could not be opened (the reason)"
+      ],
+      "rules": ["NP-FIND-006", "NP-FIND-007"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-shell-search-artist",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Search ▸ Artist",
+      "entry": "an artist row in the search popover",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts",
+        "music-player/src/shell/search/index.ts",
+        "music-player/src/shell/search/view.ts",
+        "music-player/src/shell/search/client.ts"
+      ],
+      "components": ["shell markup (design/frontends/origin/airwave-now-playing.html)"],
+      "states": [
+        "opening",
+        "picture, facts, top songs and albums",
+        "an album drilled into (Back returns)"
+      ],
+      "rules": ["NP-FIND-006"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-shell-search-song",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Search ▸ Song",
+      "entry": "a song row in the search popover",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts",
+        "music-player/src/shell/search/index.ts",
+        "music-player/src/shell/search/view.ts",
+        "music-player/src/shell/search/client.ts"
+      ],
+      "components": ["shell markup (design/frontends/origin/airwave-now-playing.html)"],
+      "states": [
+        "genre, label and year being looked up",
+        "enriched",
+        "lyrics synced / plain / none / instrumental",
+        "Download… (the helper) / only in stores (says so)"
+      ],
+      "rules": ["NP-FIND-006", "NP-FIND-001"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-shell-search-filter",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Search filter sheet",
+      "entry": "Filter in the search popover’s header",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts",
+        "music-player/src/shell/search/index.ts",
+        "music-player/src/shell/search/view.ts",
+        "music-player/src/shell/search/client.ts"
+      ],
+      "components": ["shell markup (design/frontends/origin/airwave-now-playing.html)"],
+      "states": [
+        "every section and service on",
+        "some switched off (the button says so)",
+        "nothing left on (refused, in words)"
+      ],
+      "rules": ["NP-FIND-005"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-shell-search-collection-list",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Music list ▸ an album or playlist from the catalog",
+      "entry": "a pasted playlist or album, an album’s “Open in Music”, or the library menu’s kept lists",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts",
+        "music-player/src/shell/search/index.ts",
+        "music-player/src/shell/search/view.ts",
+        "music-player/src/shell/search/client.ts"
+      ],
+      "components": ["shell markup (design/frontends/origin/airwave-now-playing.html)"],
+      "states": [
+        "loading",
+        "rows page by page",
+        "capped (the first 200)",
+        "could not be read (the reason)",
+        "star off / on"
+      ],
+      "rules": ["NP-FIND-007", "NP-FIND-008"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
     }
   ],
   "flows": [
@@ -2294,6 +2469,54 @@
         "local-helper/tests/unit/download-tags.test.ts",
         "local-helper/tests/integration/helper-resolve.test.ts",
         "music-player/tests/e2e/np/links.spec.ts"
+      ]
+    },
+    {
+      "id": "flow-find-music",
+      "title": "Find music, open a playlist, keep it",
+      "preconditions": "The player on Music. A paired hub, the companion on this PC, or neither (this browser asks the keyless services itself).",
+      "steps": [
+        "Type a few words in the header search and press Enter: songs, artists and albums arrive in sections as each service answers, every row naming its platforms, the quiet line saying how each service did",
+        "Narrow with Filter (sections, services) or the Track / Artist / Album / ISRC fields",
+        "See all songs: the section scrolls on, page after page",
+        "Open an artist, then one of their albums; open a song for its genre, label, year and lyrics; Back walks it back",
+        "Paste a playlist link: one listing with its platform and a 2×2 mosaic",
+        "Open it: the music list names it and lists its songs page by page",
+        "Star it in the silver bar: it is in the library menu under Playlists, and opens again from there"
+      ],
+      "failures": [
+        "A service fails, times out or is resting: the line says so; the rest still answer",
+        "Nothing reachable: the search says what happened, in words",
+        "A link nobody can read (a private or Spotify-made playlist, an Apple Music playlist, a Tidal link without a SongLink key): the reason",
+        "A list longer than 200 songs: the bar says “(the first 200)”"
+      ],
+      "surfaces": [
+        "player-shell-search-popover",
+        "player-shell-search-see-all",
+        "player-shell-search-artist",
+        "player-shell-search-album",
+        "player-shell-search-song",
+        "player-shell-search-filter",
+        "player-shell-search-collection-list",
+        "player-shell-library"
+      ],
+      "rules": [
+        "NP-FIND-001",
+        "NP-FIND-002",
+        "NP-FIND-003",
+        "NP-FIND-004",
+        "NP-FIND-005",
+        "NP-FIND-006",
+        "NP-FIND-007",
+        "NP-FIND-008",
+        "UX-CAT-001",
+        "UX-CAT-003"
+      ],
+      "evidence": [
+        "music-player/tests/e2e/np/catalog-search.spec.ts",
+        "music-player/tests/e2e/np/collections.spec.ts",
+        "music-player/tests/e2e/np/links.spec.ts",
+        "music-player/tests/e2e/np/preview.spec.ts"
       ]
     }
   ],

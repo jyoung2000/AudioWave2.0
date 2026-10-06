@@ -15,6 +15,7 @@ c = json.loads(p.read_text(encoding='utf-8'))
 
 SHELL = ['music-player/index.html', 'music-player/scripts/make-shell.py', 'music-player/src/shell/bridge.ts']
 NP = 'music-player/tests/e2e/np/'
+SEARCH = ['music-player/src/shell/search/index.ts', 'music-player/src/shell/search/view.ts', 'music-player/src/shell/search/client.ts']
 
 if not any(d.get('file') == 'music-player/src/shell/bridge.ts' for d in c['discovery']):
     c['discovery'].append({'product': 'player', 'kind': 'view-union', 'file': 'music-player/src/shell/bridge.ts', 'type': 'ShellSurface', 'prefix': 'player-shell-'})
@@ -34,6 +35,13 @@ NEW = [
     surface('library', 'Library', 'the list under the player; Music view', ['empty (nothing indexed)', 'rows from this device', 'link rows from search', 'sorted', 'narrowed by scope chip', 'filtered by the bar'], ['NP-LIST-001', 'UX-KEY-001', 'UX-STATE-001']),
     surface('now-playing', 'Now Playing', 'the jewel case and transport at the top of the page', ['nothing playing', 'a track from this device playing (the bar follows the element)', 'paused', 'a link row chosen (does not pretend to play)', 'a station (LIVE)', 'a channel (video bar, LIVE)'], ['NP-TRANS-001', 'UX-KEY-002']),
     surface('search-popover', 'Search popover', 'the header search field', ['empty', 'results from companion / iTunes', 'enriched rows from the paired hub (features, album, genre, bpm)', 'pasted link resolved', 'auditioning (click, or a five-second hold that fills the ring)', 'no clip (says why)', 'people on the hub'], ['NP-PRIN-002', 'NP-FIND-001']),
+    # The catalog search (DEC-039, 2026-10-06): its views beyond the overview, and the music list's side.
+    surface('search-see-all', 'Search ▸ See all', 'a section’s “See all” in the search popover', ['the overview’s rows, then the next page at once', 'loading more as it scrolls', 'that’s all N', 'a page that failed (said, and no more asked)'], ['NP-FIND-004', 'NP-FIND-003'], SEARCH),
+    surface('search-album', 'Search ▸ Album', 'an album row in the search popover', ['opening', 'cover, facts, platforms and songs', 'could not be opened (the reason)'], ['NP-FIND-006', 'NP-FIND-007'], SEARCH),
+    surface('search-artist', 'Search ▸ Artist', 'an artist row in the search popover', ['opening', 'picture, facts, top songs and albums', 'an album drilled into (Back returns)'], ['NP-FIND-006'], SEARCH),
+    surface('search-song', 'Search ▸ Song', 'a song row in the search popover', ['genre, label and year being looked up', 'enriched', 'lyrics synced / plain / none / instrumental', 'Download… (the helper) / only in stores (says so)'], ['NP-FIND-006', 'NP-FIND-001'], SEARCH),
+    surface('search-filter', 'Search filter sheet', 'Filter in the search popover’s header', ['every section and service on', 'some switched off (the button says so)', 'nothing left on (refused, in words)'], ['NP-FIND-005'], SEARCH),
+    surface('search-collection-list', 'Music list ▸ an album or playlist from the catalog', 'a pasted playlist or album, an album’s “Open in Music”, or the library menu’s kept lists', ['loading', 'rows page by page', 'capped (the first 200)', 'could not be read (the reason)', 'star off / on'], ['NP-FIND-007', 'NP-FIND-008'], SEARCH),
     surface('row-menu', 'Row menu', 'right-click or long-press a row', ['one row', 'several rows (marquee)'], ['NP-MENU-001']),
     surface('new-playlist-sheet', 'New playlist sheet', 'row menu ▸ Add to Playlist ▸ New Playlist…', ['empty name refused', 'created'], ['NP-MENU-002']),
     surface('fetch-sheet', 'Fetch sheet', 'transport ▸ Download, on a link row', ['no basis chosen (refused, said why)', 'helper found / not found', 'fetching', 'refused by the helper (its reason)', 'fetched and playing'], ['UX-SAFE-001', 'UX-FEED-001'], ['music-player/src/lib/tools-core.ts']),

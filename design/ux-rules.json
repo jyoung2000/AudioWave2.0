@@ -2079,10 +2079,16 @@
       "id": "NP-FIND-001",
       "group": "np-find",
       "title": "A listing can be heard before it is added",
-      "contract": "In the header search popover, a result with a clip plays it on a click of its artwork tile — the whole clip, up to 30 seconds, with a countdown ring and a fade at the tail — and resting a fine pointer on the row for five seconds arms the same play with a visible fill in the selection blue. Leaving the row, a key, a scroll or another row cancels the hold; touch and reduced motion never arm; the click always works. The main track pauses for the audition and resumes after it. A row with no clip keeps its tile and says why on hover instead of dressing as a button. When the player is paired, rows lead with the hub's enriched answers (features, album, genre, tempo) and a match below confidence 0.5 shows the platform's own words; unpaired, the keyless chain is the whole story.",
+      "contract": "In the header search popover, a song with a clip plays it on a click of its artwork tile — the whole clip, up to 30 seconds, with a countdown ring and a fade at the tail — and resting a fine pointer on the row for five seconds arms the same play with a visible fill in the selection blue. Leaving the row, a key, a scroll or another row cancels the hold; touch and reduced motion never arm; the click always works. The main track pauses for the audition and resumes after it. Clips are the catalog's: Apple Music's, then Deezer's (a Deezer clip that has expired is asked for again, once). A row with no clip keeps its tile and says why on hover instead of dressing as a button. Rows are music, never offers: the per-row \"find it on YouTube / SoundCloud / Bandcamp\" links and the \"open it on a platform instead\" fallback are gone (owner, 2026-10-06; UX-CAT-003). A hub that predates the catalog still answers with its enriched songs (features, album, genre, tempo), and a match below confidence 0.5 shows the platform's own words.",
       "example": "",
       "authority": "adopted",
-      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "owners": [
+        "music-player/src/shell/search/index.ts",
+        "music-player/src/shell/search/view.ts",
+        "music-player/src/shell/search/client.ts",
+        "music-player/scripts/make-shell.py",
+        "music-player/index.html"
+      ],
       "evidence": [
         {
           "type": "test",
@@ -2108,30 +2114,37 @@
           "type": "test",
           "path": "music-player/tests/e2e/np/preview.spec.ts",
           "name": "a row with no clip says so instead of pretending"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
+          "name": "a search streams songs, artists and albums in sections; rows upsert by id and name their platforms"
         }
       ]
     },
     {
       "id": "NP-FIND-002",
       "group": "np-find",
-      "title": "A pasted link says what it is, keylessly, and a playlist becomes its songs",
-      "contract": "A YouTube, SoundCloud, Bandcamp or Spotify link pasted into the header search becomes a row at once and fills in from the best source that answers: the paired hub first, then the companion on this PC — its yt-dlp or spotDL reading the link with no account or key (GET /helper/v1/resolve) — then the site’s oEmbed. A later, lesser answer only fills what a better one left empty. The details line under the title gains the release date (or, failing that, the upload date) as YYYY-MM-DD; the companion also supplies duration, album, features and art. A pasted playlist, set or album is replaced by its songs, each a row with its own address that can be added and fetched on its own, under a count that names the list — “Title: N songs” — and says “(the first 200 of M)” when the cap of 200 left some out. An entry the site lists by address alone shows its address as a name until its page of rows is on screen, when it is looked up. The companion answers a page it has vetted, or the token; it never answers another device on the network, because reading a link runs a tool.",
-      "example": "Pasting https://www.youtube.com/watch?v=dQw4w9WgXcQ: “Never Gonna Give You Up” — “Rick Astley — YouTube · 2009-10-25”, 3:33. Pasting a YouTube playlist: “Team Fortress 2 [2010 Version]: 29 songs”.",
+      "title": "A pasted link of any platform says what it is, keylessly",
+      "contract": "A music link pasted into the header search — YouTube, YouTube Music, SoundCloud, Bandcamp, Spotify, Deezer, Apple Music, or a store SongLink can read — is not searched but resolved (GET catalog/resolve): by the paired hub, else the companion on this PC (its yt-dlp or spotDL reading the link with no account or key), else this browser (Deezer and Apple links through their public APIs; a YouTube or SoundCloud link named by its oEmbed). The count says \"Reading the link…\" at once, and that a Spotify link takes spotDL up to a minute. A song becomes one row naming its platform, its details line gaining the whole release date when it has no album; a Spotify song says it plays from YouTube Music, and + files it with that address. An album or playlist becomes one listing (NP-FIND-007). A link nobody can read says why, in the server's words. The companion answers a page it has vetted, or the token; it never answers another device on the network, because reading a link runs a tool.",
+      "example": "Pasting https://www.youtube.com/watch?v=dQw4w9WgXcQ: “Never Gonna Give You Up” — “Rick Astley — 2009-10-25”, 3:33, YouTube.",
       "authority": "adopted",
       "owners": [
+        "music-player/src/shell/search/index.ts",
+        "music-player/src/shell/search/view.ts",
+        "music-player/src/shell/search/client.ts",
         "music-player/scripts/make-shell.py",
         "music-player/index.html",
-        "local-helper/src/resolve.ts",
+        "local-helper/src/catalog.ts",
         "local-helper/src/server.ts",
-        "packages/contracts/src/api/local-helper.ts",
-        "packages/domain/src/media-tags.ts",
-        "packages/domain/src/titles.ts"
+        "packages/domain/src/catalog/engine.ts",
+        "packages/contracts/src/api/catalog.ts"
       ],
       "evidence": [
         {
           "type": "test",
           "path": "music-player/tests/e2e/np/links.spec.ts",
-          "name": "a pasted YouTube link: the companion’s answer lands over oEmbed’s, with the date on the details line"
+          "name": "a pasted YouTube link: the companion reads it, and the date is on the details line"
         },
         {
           "type": "test",
@@ -2141,12 +2154,12 @@
         {
           "type": "test",
           "path": "music-player/tests/e2e/np/links.spec.ts",
-          "name": "a pasted playlist becomes its songs, each its own row, under a count that names the list and the cap"
+          "name": "a link nobody can read says why, in words"
         },
         {
           "type": "test",
           "path": "music-player/tests/e2e/np/links.spec.ts",
-          "name": "a set listed by address alone shows each entry’s own words once its page is on screen"
+          "name": "a paired hub that reads a Spotify link slowly still lands its answer: Spotify, playing from YouTube Music"
         },
         {
           "type": "test",
@@ -2177,6 +2190,208 @@
           "type": "test",
           "path": "local-helper/tests/security/helper-lan.test.ts",
           "name": "refuses every other route from the network, even with the token"
+        }
+      ]
+    },
+    {
+      "id": "NP-FIND-003",
+      "group": "np-find",
+      "title": "Search is music, live: songs, artists and albums in sections, each naming its platforms",
+      "contract": "A search in the header (Enter) asks the catalog — the paired hub's /api/v1/catalog/search with the device credential, else the companion's /helper/v1/catalog/search, else the engine run in this browser against the keyless services that answer a page (iTunes, MusicBrainz and LRCLIB over CORS; Deezer over JSONP) — and reads its NDJSON as it arrives. Rows appear as each service answers and upsert by id (a later chunk's merged copy replaces its row in place); they are sorted by rank, ties by arrival. The popover shows Songs (five), Artists (three) and Albums (three), each section with \"See all\" when there are more. Every row shows each platform it is on as a small badge (Apple Music, Deezer, YouTube, YouTube Music, SoundCloud, Bandcamp, Spotify, MusicBrainz…); a Spotify song says \"plays from YouTube Music\". A quiet line under the count names every service in the engine's states — a count, searching…, nothing, failed, timed out, cooling down until a time, needs yt-dlp — with the reason on hover, and who answered. A failure says plainly what happened. Arrows move through every row of every section, Page Up/Down by five, Enter auditions a song with a clip or opens what it is on, Ctrl/Cmd+Enter adds the song, Escape goes back a level and then closes; the rows are a listbox of groups with options, and a live region says the counts.",
+      "example": "“harbour”: Results: 12 songs · 2 artists · 2 albums — Apple Music 6 · Deezer 9 · MusicBrainz cooling down until 12:05 · YouTube 4 · SoundCloud failed — through the companion on this PC.",
+      "authority": "adopted",
+      "owners": [
+        "music-player/src/shell/search/index.ts",
+        "music-player/src/shell/search/view.ts",
+        "music-player/src/shell/search/client.ts",
+        "music-player/scripts/make-shell.py",
+        "music-player/index.html"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
+          "name": "a search streams songs, artists and albums in sections; rows upsert by id and name their platforms"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
+          "name": "keys move through every section; Enter opens what it is on, Escape goes back, Ctrl+Enter adds"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
+          "name": "a failure says plainly what happened"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
+          "name": "paired, the hub’s catalog answers first, with the device credential"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
+          "name": "with no hub and no companion, this browser searches the keyless services itself and says what it cannot"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/func.spec.ts",
+          "name": "search: add to library, escaping, a stale query, and focus loss closes the popover"
+        }
+      ]
+    },
+    {
+      "id": "NP-FIND-004",
+      "group": "np-find",
+      "title": "“See all” is one section that scrolls on until it is all there",
+      "contract": "A section's \"See all\" opens that section alone, under a Back button, with what the overview already had; the next page (offset +25, the same query, that section only) is asked at once and again whenever the list is scrolled near its end or the keys reach its last row, while the server says more may exist (to its offset limit of 1000). A song that a later page brings again — by id or as the same recording — is not shown twice. \"Loading more…\" shows while a page is coming; the end says \"That’s all N songs.\"",
+      "example": "",
+      "authority": "adopted",
+      "owners": [
+        "music-player/src/shell/search/index.ts",
+        "music-player/src/shell/search/view.ts",
+        "music-player/src/shell/search/client.ts",
+        "music-player/scripts/make-shell.py",
+        "music-player/index.html"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
+          "name": "see all opens one section that scrolls on, page after page, until it is all there"
+        }
+      ]
+    },
+    {
+      "id": "NP-FIND-005",
+      "group": "np-find",
+      "title": "A filter for sections and services, kept; Track / Artist / Album fields and ISRC",
+      "contract": "Filter in the popover's header opens a sheet with the sections to show (Songs, Artists, Albums) and the services to ask (Apple Music, Deezer, MusicBrainz, YouTube, SoundCloud). Saved, it lives in the player's settings store (kv \"player:search\"), survives a reload, marks the button, and asks a search on screen again; at least one section and one service stay on, said in the sheet. The pill's own switch folds out Track, Artist, Album and ISRC fields, starting from what was typed; while they are out the pill shows them merged, read-only, and folded away they stay merged in it. A search from the fields asks track, artist and album rather than q. An ISRC — typed in the pill or its field — is searched as an ISRC; a malformed one is explained before anything is asked.",
+      "example": "Track “harbour lamps” + Artist “Lantern Choir” → GET …/catalog/search?track=harbour+lamps&artist=Lantern+Choir; the pill reads “harbour lamps Lantern Choir”.",
+      "authority": "adopted",
+      "owners": [
+        "music-player/src/shell/search/index.ts",
+        "music-player/src/shell/search/view.ts",
+        "music-player/src/shell/search/client.ts",
+        "music-player/scripts/make-shell.py",
+        "music-player/index.html"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
+          "name": "the filter keeps its sections and services in the settings store, and the search asks only those"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
+          "name": "track, artist and album fields fold out of the pill and back into it; an ISRC is searched as one"
+        }
+      ]
+    },
+    {
+      "id": "NP-FIND-006",
+      "group": "np-find",
+      "title": "Album, artist and song details stack, and go back",
+      "contract": "An album row opens its details (catalog/album): cover, title, artist, year · label · genre · song count, its platforms, \"Open in Music\" (NP-FIND-007) and its songs, each auditionable and addable. An artist row opens theirs (catalog/artist): picture (an album cover when the platform has none), genre, fans, top songs and albums; an album there drills into that album. A song row opens the song: its cover, platforms (with any other homes enrichment found), genre, label and year from catalog/enrich (\"Looking up…\" while MusicBrainz is asked, a sentence if it cannot be), its ISRC, Add to Library, Download… (the helper's fetch sheet with a stated basis, as the Download key; a store-only song says there is nothing to fetch), and its lyrics from catalog/lyrics — synced lines with their times, or plain, or \"No lyrics found\", or an instrumental said as one. Details stack; Back and Escape walk them back, and the keys come back to the row they left.",
+      "example": "",
+      "authority": "adopted",
+      "owners": [
+        "music-player/src/shell/search/index.ts",
+        "music-player/src/shell/search/view.ts",
+        "music-player/src/shell/search/client.ts",
+        "music-player/scripts/make-shell.py",
+        "music-player/index.html"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
+          "name": "an artist drills into an album; details stack, and Back walks them back"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
+          "name": "a song’s details: genre, label and year from enrichment, and its lyrics, synced"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
+          "name": "keys move through every section; Enter opens what it is on, Escape goes back, Ctrl+Enter adds"
+        }
+      ]
+    },
+    {
+      "id": "NP-FIND-007",
+      "group": "np-find",
+      "title": "A pasted album or playlist is one listing that opens in the music list like an album",
+      "contract": "A pasted album or playlist (catalog/resolve, kind album or playlist) is one listing, not a page of rows: its title, its platform as a badge and in words with its owner and song count, and a cover that is a 2×2 mosaic of the first four songs' covers — or the list's own cover when fewer than four songs have one. Choosing it (or an album's \"Open in Music\") opens it in the music list the way an album opens: the silver bar names it, with \"Playlist · Spotify · N of M songs\", its songs are the rows in the list's order, read page after page (offset/limit) up to the cap of 200, which the bar says as \"(the first 200)\" when it left songs out. The songs are on show, not added: + or the Download key (through the helper) makes one the person's. Clearing the bar returns to the library.",
+      "example": "“Lantern Mix”, Playlist on Spotify · Ada · 230 songs → the bar: Playlist · Spotify · 200 of 230 songs (the first 200) — Lantern Mix ☆ ⓧ.",
+      "authority": "adopted",
+      "owners": [
+        "music-player/src/shell/search/index.ts",
+        "music-player/src/shell/search/view.ts",
+        "music-player/src/shell/search/client.ts",
+        "music-player/scripts/make-shell.py",
+        "music-player/index.html"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/collections.spec.ts",
+          "name": "a pasted playlist: its platform, a 2×2 mosaic, and opened, the music list names it and lists its songs page by page"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/collections.spec.ts",
+          "name": "the mosaic gives way to the list’s own cover when fewer than four songs have artwork"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/collections.spec.ts",
+          "name": "an album from search opens in the list too, and starred, it is kept under Albums"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/collections.spec.ts",
+          "name": "a song on show plays its row and the Download key offers to fetch it through the helper"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/links.spec.ts",
+          "name": "a pasted playlist becomes one listing that names its platform, not a page of rows"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/links.spec.ts",
+          "name": "a set whose entries the server looked up shows their covers as a mosaic"
+        }
+      ]
+    },
+    {
+      "id": "NP-FIND-008",
+      "group": "np-find",
+      "title": "The silver bar’s star keeps an album or playlist in the library",
+      "contract": "While the music list shows an album or playlist from the catalog — from search, a pasted link, or reopened from the library — the silver bar has a star beside its name: pressing it saves the list to the library as a SavedCollection (the contract the hub's sync and the companion share: ref, savedAt, artworkUrl, covers, trackCount) in library:state, and pressing it again removes it; the star says which it would do. The library menu lists what is kept under Playlists (after the person's own) and Albums (after the library's), and choosing one reads it again through whichever server answers. Saved lists are this player's until the hub syncs library state (not yet: .agents/plans/2026-10-06-player-search-ui.md, follow-ups).",
+      "example": "",
+      "authority": "adopted",
+      "owners": [
+        "music-player/src/shell/search/index.ts",
+        "music-player/src/shell/search/view.ts",
+        "music-player/src/shell/search/client.ts",
+        "music-player/scripts/make-shell.py",
+        "music-player/index.html"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/collections.spec.ts",
+          "name": "the star in the silver bar saves the list to the library, the menu lists it, and it opens again from there"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/collections.spec.ts",
+          "name": "an album from search opens in the list too, and starred, it is kept under Albums"
         }
       ]
     },
