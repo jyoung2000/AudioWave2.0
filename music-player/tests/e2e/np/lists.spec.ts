@@ -14,15 +14,32 @@ let errors: string[];
 const go = async (p: Page, v: string) => { await p.click('.tb__btn[data-view="' + v + '"]'); await p.waitForTimeout(500); };
 const label = (p: Page) => p.textContent('#libScopeLabel');
 const menuText = (p: Page) => p.$$eval('#ctx > .ctx__item', (n) => n.map((x) => { const sub = x.querySelector('.ctx__sub'); const t = sub ? x.textContent!.replace(sub.textContent!, '') : x.textContent!; return t.trim(); }));
-const openSub = async (p: Page) => { await p.click('#ctx [data-act="parent"]'); await p.waitForTimeout(200); };
 /* Right-click until the menu stays open, at most three times. The menu shuts on purpose when the page
    moves under it, and on a slow runner the station list can still be redrawing as its feeds land. */
+let lastRow = '';
 const rightClick = async (p: Page, sel: string) => {
+  lastRow = sel;
   for (let i = 0; i < 3; i += 1) {
     await p.click(sel, { button: 'right', position: { x: 120, y: 8 } });
     await p.waitForTimeout(300);
     if ((await p.getAttribute('#ctx', 'hidden')) === null) return;
   }
+};
+/* Open the submenu. On a CI runner the menu could shut (a feed redrew the list) between being read and
+   being clicked, and the click then waited out the test's minute on a hidden item: open it again instead. */
+const openSub = async (p: Page) => {
+  for (let i = 0; i < 3; i += 1) {
+    if ((await p.getAttribute('#ctx', 'hidden')) !== null && lastRow) await rightClick(p, lastRow);
+    try {
+      await p.click('#ctx [data-act="parent"]', { timeout: 5_000 });
+      await p.waitForTimeout(200);
+      return;
+    } catch {
+      /* the menu shut under the click; open it again */
+    }
+  }
+  await p.click('#ctx [data-act="parent"]');
+  await p.waitForTimeout(200);
 };
 const name = async (p: Page, n: string) => { await p.waitForSelector('#sheet[open]', { timeout: 3000 }); await p.fill('#sheetInput', n); await p.click('#sheetCreate'); await p.waitForTimeout(400); };
 const radioReady = async (p: Page) => { await expect(p.locator('#libScopeLabel')).toHaveText('Chicago', { timeout: 15_000 }); await expect(p.locator('#radioMenu .rlist tbody tr').first()).toBeVisible({ timeout: 15_000 }); };
