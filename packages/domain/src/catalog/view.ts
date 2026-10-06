@@ -96,6 +96,43 @@ export function appendTracks(shown: readonly CatalogTrack[], page: readonly Cata
   return appendPage(shown, page, sameRecording);
 }
 
+/* ------------------------------------------------------------------ pages of a section */
+
+export interface SectionPages {
+  /** 0-based page shown. */
+  page: number;
+  /** Pages that can be drawn from the rows already loaded. */
+  known: number;
+  /** True while the services say there is more past what is loaded (`hasMore`). */
+  more: boolean;
+  canPrev: boolean;
+  canNext: boolean;
+  /** The next page needs rows the window has not loaded yet: ask the server for its next `offset`. */
+  fetchForNext: boolean;
+  /** "Page 2 of 3", "Page 2 of 3 or more". */
+  label: string;
+}
+
+/**
+ * Where a section's pager stands (UX-SEARCH-007): pages of `size` over the rows loaded so far, with
+ * the services' `hasMore` saying whether there are pages past them. The rows of a page are
+ * `rows.slice(page * size, page * size + size)`.
+ */
+export function sectionPages(loaded: number, size: number, page: number, more: boolean): SectionPages {
+  const known = Math.max(1, Math.ceil(loaded / size));
+  const at = Math.max(0, Math.min(page, known - 1));
+  const lastKnown = at >= known - 1;
+  return {
+    page: at,
+    known,
+    more,
+    canPrev: at > 0,
+    canNext: !lastKnown || more,
+    fetchForNext: lastKnown && more,
+    label: `Page ${at + 1} of ${known}${more ? ' or more' : ''}`,
+  };
+}
+
 /* ------------------------------------------------------------------ the services */
 
 export const CATALOG_PROVIDER_LABELS: Record<CatalogProviderId, string> = {

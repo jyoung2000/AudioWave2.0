@@ -547,6 +547,34 @@ a.push:active {
   margin-top: 12px;
 }
 
+/* a section's pages (UX-SEARCH-007): Previous, the numbers, Next, the count; See All at the end */
+.srch__pagerow {
+  justify-content: space-between;
+}
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.pager .push {
+  min-width: 0;
+  padding: 0 10px;
+}
+.pager .pager__n {
+  min-width: 26px;
+  padding: 0 6px;
+}
+.pager .push[aria-current='page'] {
+  border-image-source: var(--aq-def-22);
+  font-weight: 700;
+}
+.pager__count {
+  margin-left: 4px;
+  font-size: 11px;
+  color: var(--ink-quiet);
+}
+
 /* a list of music: cover, what it is and where, its tempo and time, and the preview */
 .mrows:focus-visible {
   outline: 2px solid var(--focus);

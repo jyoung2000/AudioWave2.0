@@ -177,6 +177,39 @@ describe('what a row says (UX-SEARCH-003)', () => {
   });
 });
 
+describe('pages of a section (UX-SEARCH-007)', () => {
+  it('pages Songs with numbers, Previous and Next and a count, by pointer or arrow keys, asking the services for the next offset at the end', async () => {
+    fakeHub(SAVED_EMPTY);
+    const { client, searches } = stockClient();
+    renderSearch(client);
+    await searchFor('harbour');
+    const songs = await screen.findByRole('listbox', { name: 'Songs' });
+    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/^Done/));
+    const pager = screen.getByRole('navigation', { name: 'Songs pages' });
+    expect(within(pager).getByText('Page 1 of 2 or more')).toBeTruthy();
+    expect(within(pager).getByRole('button', { name: 'Songs, page 1' }).getAttribute('aria-current')).toBe('page');
+    expect((within(pager).getByRole('button', { name: 'Previous page of songs' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(within(songs).getAllByRole('option')).toHaveLength(8);
+
+    await userEvent.click(within(pager).getByRole('button', { name: 'Songs, page 2' }));
+    expect(within(screen.getByRole('listbox', { name: 'Songs' })).getAllByRole('option')).toHaveLength(1);
+    // Past what is loaded: the next offset of Songs alone, then its rows join the pages.
+    within(pager).getByRole('button', { name: 'Next page of songs' }).focus();
+    await userEvent.keyboard('{ArrowRight}');
+    await waitFor(() => expect(searches.at(-1)).toMatchObject({ sections: ['tracks'], offset: 25 }));
+    await waitFor(() => expect(within(pager).getByText('Page 2 of 2')).toBeTruthy());
+    expect(within(screen.getByRole('listbox', { name: 'Songs' })).getAllByRole('option')).toHaveLength(3);
+    within(pager).getByRole('button', { name: 'Songs, page 2' }).focus();
+    await userEvent.keyboard('{Home}');
+    expect(within(pager).getByText('Page 1 of 2')).toBeTruthy();
+    // A page survives opening a song and coming Back.
+    await userEvent.keyboard('{End}');
+    await userEvent.click(within(screen.getByRole('listbox', { name: 'Songs' })).getAllByRole('option')[0]!);
+    await userEvent.click(await screen.findByRole('button', { name: 'Back to Results' }));
+    expect(within(await screen.findByRole('navigation', { name: 'Songs pages' })).getByText('Page 2 of 2')).toBeTruthy();
+  });
+});
+
 describe('the filter and See All (UX-SEARCH-001, UX-SEARCH-002)', () => {
   it('is a sheet: it takes the focus, Escape puts it away, and Done keeps the choice and searches again', async () => {
     fakeHub(SAVED_EMPTY);

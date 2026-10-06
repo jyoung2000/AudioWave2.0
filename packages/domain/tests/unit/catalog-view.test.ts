@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CatalogSearchChunk, CatalogSourceStatus, CatalogTrack } from '@now-playing/contracts';
-import { appendTracks, byRank, collapseFields, collectionLine, coverArt, EMPTY_RESULTS, embeddedText, foldCatalogChunk, formatDuration, parseLrc, playsFromText, previewOf, queryKind, retryText, savedCollectionOf, sourceDot, sourceStateText, statusSummary } from '@now-playing/domain/catalog';
+import { appendTracks, byRank, collapseFields, sectionPages, collectionLine, coverArt, EMPTY_RESULTS, embeddedText, foldCatalogChunk, formatDuration, parseLrc, playsFromText, previewOf, queryKind, retryText, savedCollectionOf, sourceDot, sourceStateText, statusSummary } from '@now-playing/domain/catalog';
 
 const track = (patch: Partial<CatalogTrack> & Pick<CatalogTrack, 'id' | 'title' | 'artist'>): CatalogTrack => ({
   artists: [],
@@ -44,6 +44,15 @@ describe('the live feed (UX-SEARCH-002)', () => {
     const shown = [track({ id: 'deezer:1', title: 'Get Lucky', artist: 'Daft Punk', durationMs: 248_000 })];
     const page = [track({ id: 'youtube:x', title: 'Get Lucky (Official Audio)', artist: 'Daft Punk', durationMs: 249_000 }), track({ id: 'deezer:1', title: 'Get Lucky', artist: 'Daft Punk' }), track({ id: 'deezer:2', title: 'Instant Crush', artist: 'Daft Punk' })];
     expect(appendTracks(shown, page).map((t) => t.id)).toEqual(['deezer:1', 'deezer:2']);
+  });
+});
+
+describe('pages of a section (UX-SEARCH-007)', () => {
+  it('counts the pages loaded, says when there are more, and asks for the next offset only at the end', () => {
+    expect(sectionPages(25, 10, 0, true)).toMatchObject({ page: 0, known: 3, canPrev: false, canNext: true, fetchForNext: false, label: 'Page 1 of 3 or more' });
+    expect(sectionPages(25, 10, 2, true)).toMatchObject({ page: 2, canPrev: true, canNext: true, fetchForNext: true });
+    expect(sectionPages(25, 10, 2, false)).toMatchObject({ canNext: false, fetchForNext: false, label: 'Page 3 of 3' });
+    expect(sectionPages(0, 10, 4, false)).toMatchObject({ page: 0, known: 1, label: 'Page 1 of 1' });
   });
 });
 

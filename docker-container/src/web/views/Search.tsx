@@ -42,8 +42,10 @@ import {
   previewOf,
   savedCollectionOf,
   sourceDot,
+  sectionPages,
   sourceStateText,
   statusSummary,
+  type SectionPages,
   type CatalogFields,
   type CatalogResults,
 } from '@now-playing/domain/catalog';
@@ -52,8 +54,8 @@ import { catalogError, hubCatalog, useCatalogFilter, useLiveSearch, usePreview, 
 import { ActionError, Check, errorSentence, Field, Group, Note, Pop, Push, Sdot, Sheet, useHubUi, useNow } from '../ui.js';
 import { BASIS_LABELS } from './Downloads.js';
 
-/** Rows a section shows before See All. */
-const PREVIEW_ROWS = 8;
+/** Rows a page of a section shows on the results (UX-SEARCH-007); See All scrolls through them all. */
+const SECTION_PAGE = 8;
 /** Rows a See All page or a list asks for at a time. */
 const PAGE = 25;
 const LIST_PAGE = 50;
@@ -112,9 +114,13 @@ export function SearchView({ client = hubCatalog }: { client?: CatalogClient }) 
     if (depth > 1) heading.current?.focus();
   }, [depth, page]);
 
+  // Each section's pager, kept here so a page survives opening a row and coming Back (UX-SEARCH-007).
+  const [pagers, setPagers] = useState<Pagers>(FRESH_PAGERS);
+
   const search = (params: Omit<CatalogSearchParams, 'sections' | 'providers'>, using: CatalogFilter = filter): void => {
     preview.stop();
     setStack([{ kind: 'results' }]);
+    setPagers(FRESH_PAGERS);
     live.run({ ...params, sections: using.sections, providers: using.providers });
   };
 
@@ -201,7 +207,7 @@ export function SearchView({ client = hubCatalog }: { client?: CatalogClient }) 
       </Group>
 
       {page.kind === 'results' ? (
-        <ResultsPage results={results} running={live.running} asked={live.asked !== null} filter={filter} client={client} preview={preview} open={open} />
+        <ResultsPage results={results} running={live.running} asked={live.asked} filter={filter} client={client} preview={preview} open={open} pagers={pagers} setPagers={setPagers} />
       ) : (
         // Escape goes back a page, as Back does, from anywhere in it but a field being typed in.
         // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
@@ -305,33 +311,116 @@ function FilterSheet({ filter, onDone, onCancel }: { filter: CatalogFilter; onDo
 
 /* ------------------------------------------------------------------ the results */
 
-function ResultsPage({ results, running, asked, filter, client, preview, open }: { results: CatalogResults; running: boolean; asked: boolean; filter: CatalogFilter; client: CatalogClient; preview: Preview; open: (page: Page) => void }) {
+/** One section's pager: the page shown, rows loaded past the first answer, and where the next ask starts. */
+interface PagerState {
+  page: number;
+  extra: { tracks: CatalogTrack[]; artists: CatalogArtist[]; albums: CatalogAlbum[] };
+  /** The offset of the last page the server was asked for. */
+  offset: number;
+  /** The services' `hasMore` for that page; null until a further page was asked for. */
+  more: boolean | null;
+  busy: boolean;
+  error: ApiError | null;
+}
+type Pagers = Record<CatalogSection, PagerState>;
+const FRESH_PAGER: PagerState = { page: 0, extra: { tracks: [], artists: [], albums: [] }, offset: 0, more: null, busy: false, error: null };
+const FRESH_PAGERS: Pagers = { tracks: FRESH_PAGER, artists: FRESH_PAGER, albums: FRESH_PAGER };
+
+function sectionRows(section: CatalogSection, results: CatalogResults, extra: PagerState['extra']): Array<CatalogTrack | CatalogArtist | CatalogAlbum> {
+  if (section === 'tracks') return appendTracks(byRank(results.tracks), extra.tracks);
+  if (section === 'artists') return appendPage(byRank(results.artists), extra.artists);
+  return appendPage(byRank(results.albums), extra.albums);
+}
+
+function ResultsPage({ results, running, asked, filter, client, preview, open, pagers, setPagers }: { results: CatalogResults; running: boolean; asked: CatalogSearchParams | null; filter: CatalogFilter; client: CatalogClient; preview: Preview; open: (page: Page) => void; pagers: Pagers; setPagers: (update: (current: Pagers) => Pagers) => void }) {
   const link = results.done?.resolve ?? null;
   if (!asked) return null;
   if (link) return <LinkResult key={link} url={link} client={client} preview={preview} open={open} />;
-  const totals = results.done?.totals;
   const shown = filter.sections.filter((s) => results.done === null || results.done.page[s] !== null || results[s].length > 0);
+  const patch = (section: CatalogSection, next: Partial<PagerState>): void => setPagers((current) => ({ ...current, [section]: { ...current[section], ...next } }));
+
+  /** A page: drawn from what is loaded, or — past it, while the services have more — asked for first. */
+  const goTo = async (section: CatalogSection, target: number, state: SectionPages, pager: PagerState): Promise<void> => {
+    if (target <= state.known - 1 || !state.more) return patch(section, { page: Math.max(0, Math.min(target, state.known - 1)) });
+    const size = asked.limit ?? PAGE;
+    const offset = (pager.more === null ? (asked.offset ?? 0) : pager.offset) + size;
+    patch(section, { busy: true, error: null });
+    let page: CatalogResults = EMPTY_RESULTS;
+    try {
+      await client.search({ ...asked, sections: [section], offset, limit: size }, (chunk) => (page = foldCatalogChunk(page, chunk)), new AbortController().signal);
+      setPagers((current) => {
+        const before = current[section];
+        const extra = { ...before.extra, [section]: section === 'tracks' ? appendTracks(before.extra.tracks, byRank(page.tracks)) : appendPage(before.extra[section] as Array<{ id: string; rank: number }>, byRank(page[section] as Array<{ id: string; rank: number }>)) } as PagerState['extra'];
+        const loaded = sectionRows(section, results, extra).length;
+        return { ...current, [section]: { ...before, extra, offset, more: Boolean(page.done?.page[section]?.hasMore) && offset + size <= 1000, busy: false, page: Math.min(target, Math.max(0, Math.ceil(loaded / SECTION_PAGE) - 1)) } };
+      });
+    } catch (err) {
+      patch(section, { busy: false, error: catalogError(err) });
+    }
+  };
+
   return (
     <>
       {shown.map((section) => {
-        const rows = section === 'tracks' ? byRank(results.tracks) : section === 'artists' ? byRank(results.artists) : byRank(results.albums);
-        const more = rows.length > PREVIEW_ROWS || Boolean(results.done?.page[section]?.hasMore);
+        const pager = pagers[section];
+        const rows = sectionRows(section, results, pager.extra);
+        const more = pager.more ?? Boolean(results.done?.page[section]?.hasMore);
+        const state = sectionPages(rows.length, SECTION_PAGE, pager.page, more);
+        const slice = rows.slice(state.page * SECTION_PAGE, state.page * SECTION_PAGE + SECTION_PAGE);
         const waiting = running && !rows.length;
-        const total = totals ? totals[section] : rows.length;
+        const label = CATALOG_SECTION_LABELS[section];
         return (
-          <Group key={section} title={CATALOG_SECTION_LABELS[section]} tag={rows.length ? <span className="sub srch__count">{` ${total}${results.done?.page[section]?.hasMore ? '+' : ''}`}</span> : null}>
-            {section === 'tracks' ? <TrackList label="Songs" tracks={rows.slice(0, PREVIEW_ROWS) as CatalogTrack[]} preview={preview} onOpen={(t) => open({ kind: 'song', track: t })} empty={waiting ? 'Asking…' : 'No songs.'} /> : null}
-            {section === 'artists' ? <ArtistList label="Artists" artists={rows.slice(0, PREVIEW_ROWS) as CatalogArtist[]} onOpen={(a) => open({ kind: 'artist', artist: a })} empty={waiting ? 'Asking…' : 'No artists.'} /> : null}
-            {section === 'albums' ? <AlbumList label="Albums" albums={rows.slice(0, PREVIEW_ROWS) as CatalogAlbum[]} onOpen={(a) => open(albumPage(a))} empty={waiting ? 'Asking…' : 'No albums.'} /> : null}
-            {more ? (
-              <div className="barrow">
-                <Push onClick={() => open({ kind: 'all', section })}>See All {CATALOG_SECTION_LABELS[section]}</Push>
-              </div>
-            ) : null}
+          <Group key={section} title={label} tag={rows.length ? <span className="sub srch__count">{` ${rows.length}${more ? '+' : ''}`}</span> : null}>
+            {section === 'tracks' ? <TrackList label="Songs" tracks={slice as CatalogTrack[]} preview={preview} onOpen={(t) => open({ kind: 'song', track: t })} empty={waiting ? 'Asking…' : 'No songs.'} /> : null}
+            {section === 'artists' ? <ArtistList label="Artists" artists={slice as CatalogArtist[]} onOpen={(a) => open({ kind: 'artist', artist: a })} empty={waiting ? 'Asking…' : 'No artists.'} /> : null}
+            {section === 'albums' ? <AlbumList label="Albums" albums={slice as CatalogAlbum[]} onOpen={(a) => open(albumPage(a))} empty={waiting ? 'Asking…' : 'No albums.'} /> : null}
+            <div className="barrow srch__pagerow">
+              {state.known > 1 || state.more ? <Pager label={label} state={state} busy={pager.busy} onPage={(n) => void goTo(section, n, state, pager)} /> : null}
+              {rows.length > SECTION_PAGE || more ? <Push onClick={() => open({ kind: 'all', section })}>See All {label}</Push> : null}
+            </div>
+            <ActionError error={pager.error} />
           </Group>
         );
       })}
     </>
+  );
+}
+
+/**
+ * A section's pages (UX-SEARCH-007): Previous, the page numbers, Next, and the count in words. The
+ * arrow keys move a page from anywhere in it, Home and End go to the first and the last loaded.
+ */
+function Pager({ label, state, busy, onPage }: { label: string; state: SectionPages; busy: boolean; onPage: (page: number) => void }) {
+  const first = Math.max(0, Math.min(state.page - 3, state.known - 7));
+  const numbers = Array.from({ length: Math.min(7, state.known) }, (_, i) => first + i);
+  return (
+    // The arrow keys belong to the pager as a whole, as they do to a tab strip.
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
+    <nav
+      className="pager"
+      aria-label={`${label} pages`}
+      onKeyDown={(event) => {
+        const to = { ArrowLeft: state.canPrev ? state.page - 1 : null, ArrowRight: state.canNext ? state.page + 1 : null, Home: 0, End: state.known - 1 }[event.key];
+        if (to === undefined) return;
+        event.preventDefault();
+        if (to !== null && !busy) onPage(to);
+      }}
+    >
+      <Push className="pager__step" disabled={!state.canPrev} onClick={() => onPage(state.page - 1)} aria-label={`Previous page of ${label.toLowerCase()}`}>
+        ‹ Previous
+      </Push>
+      {numbers.map((n) => (
+        <Push key={n} className="pager__n" aria-current={n === state.page ? 'page' : undefined} aria-label={`${label}, page ${n + 1}`} onClick={() => onPage(n)}>
+          {n + 1}
+        </Push>
+      ))}
+      <Push className="pager__step" disabled={!state.canNext} busy={busy} onClick={() => onPage(state.page + 1)} aria-label={`Next page of ${label.toLowerCase()}`}>
+        Next ›
+      </Push>
+      <span className="pager__count" aria-live="polite">
+        {state.label}
+      </span>
+    </nav>
   );
 }
 
