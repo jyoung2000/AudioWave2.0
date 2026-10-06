@@ -50,6 +50,35 @@ This document is the threat model and the list of concrete mitigations for the A
 | Supply chain / license | Pinned versions in lockfile, `pnpm audit` in CI (fails on high/critical), only allowlisted build scripts (`onlyBuiltDependencies`), `LICENSES.md` generated from installed packages, no CDN at runtime | root `pnpm-workspace.yaml`, `.github/workflows/ci.yml`, `scripts/licenses.mjs` | CI |
 | Data integrity during migrations | Backup before migrating an existing database; migrations run in a transaction; restore takes a safety backup first | hub `db/`, `backup/` | hub tests |
 
+## Outbound hosts of the music catalog (DEC-039)
+
+The catalog engine (`packages/domain/src/catalog`) reaches only these hosts (`CATALOG_API_HOSTS` in
+`packages/contracts/src/api/catalog.ts`), over https, all keyless:
+
+| Host | What for | Limit kept |
+| --- | --- | --- |
+| `itunes.apple.com` | iTunes Search and Lookup: songs, albums, artists, 30-second previews | ~20 calls a minute (own budget; rests instead of being refused) |
+| `api.deezer.com` | Deezer public API: search, ISRC lookup, albums, artists, playlists | Deezer's quota (code 4) read as a rate limit |
+| `musicbrainz.org` | Recording search, ISRC lookup, genre, label, year, recording links | 1 request per 1.1 s, named User-Agent |
+| `coverartarchive.org` | Cover art (reserved; redirects to `archive.org`) | — |
+| `lrclib.net` | Synced and plain lyrics | cached 24 h |
+| `api.song.link` | Cross-platform links, **only with an administrator's key** (keyless access was closed in 2026) | 10 a minute, cached |
+
+The hub sends these through `SafeHttpClient` with that list (`docker-container/src/catalog/service.ts`);
+the helper through `guardedCatalogFetch` (`local-helper/src/catalog.ts`): https only, the host checked on
+every redirect hop, every resolved address refused if private, loopback or link-local, 4 MB cap. Pages
+load artwork and previews directly from `*.mzstatic.com`, `audio-ssl.itunes.apple.com`, `*.dzcdn.net`,
+`i.ytimg.com`, `*.sndcdn.com` and `i.scdn.co` (`CATALOG_MEDIA_HOSTS`); the engine never fetches them.
+`HELPER_DEFAULT_HOSTS` lists the API hosts and the artwork/preview CDNs so the helper's (and Android's)
+list still says what it touches. YouTube and SoundCloud are searched by yt-dlp
+(`toolSearchArgs`: `--ignore-config` first, the search string last behind `--`, control characters
+removed, 200 characters at most, 100 results deep at most), in the existing tool slots. The SongLink key
+is sealed with the installation key, write-only, and never logged or audited.
+
+Tests: `packages/domain/tests/unit/catalog-*.test.ts`, `docker-container/tests/integration/catalog.test.ts`
+("reaches only the catalog’s own hosts"), `local-helper/tests/integration/helper-catalog.test.ts`
+("reaches only the catalog’s hosts, never this network, and re-checks every redirect").
+
 ## Cryptography
 - Password hashing: Argon2id via `@node-rs/argon2` (memory 65536 KiB, iterations 3, parallelism 1, 16-byte random salt).
 - Session ids, pairing claim secrets, credential secrets: 32 random bytes from `crypto.getRandomValues`/`randomBytes`, stored as SHA-256 hashes, compared in constant time.
@@ -77,4 +106,6 @@ One advisory is accepted, in `pnpm.auditConfig.ignoreGhsas`, because no fixed ve
 ## What is deliberately not done
 - No UPnP, no automatic port opening, no third-party tunnel provisioning.
 - No browser-cookie extraction, no DRM circumvention, no scraping of services that prohibit it.
+- No lossless downloads through third-party proxy pools or scraped private tokens (Spotify web-player
+  tokens, Amazon pages), and no Spotify Web API calls with spotDL's bundled client credentials (DEC-039).
 - No telemetry to the developer.

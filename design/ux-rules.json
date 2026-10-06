@@ -86,6 +86,10 @@
     {
       "id": "np-voice",
       "title": "Player shell — Voice and copy"
+    },
+    {
+      "id": "catalog",
+      "title": "Music catalog — what the search API promises"
     }
   ],
   "rules": [
@@ -2358,6 +2362,150 @@
           "type": "test",
           "path": "music-player/tests/e2e/np/disc.spec.ts",
           "name": "the preview in Settings draws the disc, and says what it is showing"
+        }
+      ]
+    },
+    {
+      "id": "UX-CAT-001",
+      "group": "catalog",
+      "title": "Every service a search asks says how it did",
+      "contract": "A catalog search (hub /api/v1/catalog/search, helper /helper/v1/catalog/search) names every keyless service on every chunk with its state: pending, ok, empty, failed, timeout, cooling-down or skipped, with a sentence for anything but ok and, when resting, the time it may be asked again. The first chunk lists them all as pending (or skipped, or cooling down) before any answers; the last (done) has every final state. A failed service never hides the others’ results and never fails the search. Two failures in a row rest a service for 30 s, doubling to at most ten minutes; a Retry-After is honoured at once; iTunes rests within Apple’s own budget (about 20 calls a minute) instead of being refused. A hub or PC without yt-dlp says so for YouTube and SoundCloud, and a service switched off in the catalog settings is skipped, saying so.",
+      "example": "{\"provider\":\"deezer\",\"state\":\"cooling-down\",\"error\":\"api.deezer.com answered 500\",\"retryAt\":\"2026-01-01T00:00:30.000Z\"}",
+      "authority": "adopted",
+      "owners": [
+        "packages/domain/src/catalog/engine.ts",
+        "packages/domain/src/catalog/limits.ts",
+        "packages/contracts/src/api/catalog.ts",
+        "docker-container/src/api/routes/catalog.ts",
+        "local-helper/src/server.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-engine.test.ts",
+          "name": "opens with every service’s state, sends a chunk per service, merges, and ends with done"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-engine.test.ts",
+          "name": "reports a failing service as failed, and rests it after a second failure (UX-CAT-001)"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-engine.test.ts",
+          "name": "says a slow service timed out, and still answers with the rest"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-engine.test.ts",
+          "name": "reports a server without yt-dlp honestly, and a switched-off service as skipped"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-engine.test.ts",
+          "name": "rests iTunes within Apple’s budget instead of being refused"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-engine.test.ts",
+          "name": "honours Retry-After at once, and backs off by doubling after repeated failures"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/integration/catalog.test.ts",
+          "name": "streams NDJSON: a chunk per service as it answers, then done"
+        }
+      ]
+    },
+    {
+      "id": "UX-CAT-002",
+      "group": "catalog",
+      "title": "One song is one row, however many services have it",
+      "contract": "Rows from different services are one song when they share an ISRC, or — when either lacks one — when the main artist and the title agree once “feat. …”, “Remastered 2011”, “(Official Video)” and the like are set aside and the durations are within three seconds. A row with no duration is never merged on names alone. The merged row keeps every source (platform, id, link, preview) and takes each field from the best service that has it: the stores’ titles and credits before MusicBrainz, a YouTube upload’s last; the largest store artwork; the fullest date. A merged row keeps the id it first arrived with, so a later chunk replaces it in place. The best rows also gain their other homes (Spotify, YouTube Music, Tidal…) from MusicBrainz’s links, keylessly, before the search is done.",
+      "example": "Deezer’s “Get Lucky (feat. Pharrell Williams and Nile Rodgers)” (USQX91300108, 367 s) and YouTube’s “Daft Punk - Get Lucky (Official Audio)” (369 s) are one row with both sources, Deezer’s title and ISRC.",
+      "authority": "adopted",
+      "owners": ["packages/domain/src/catalog/merge.ts", "packages/domain/src/catalog/engine.ts"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-query-merge.test.ts",
+          "name": "is one recording by ISRC, whatever the titles say"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-query-merge.test.ts",
+          "name": "is one recording by names when the durations are within three seconds, and not otherwise"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-query-merge.test.ts",
+          "name": "keeps every source and takes each field from the best one"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-query-merge.test.ts",
+          "name": "upserts by the first id in a merger, so a chunk can replace a row it sent before"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-engine.test.ts",
+          "name": "folds into one aggregate where Deezer, Apple and YouTube’s copies of one song are one row"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-engine.test.ts",
+          "name": "adds the best rows’ other homes (Spotify, Tidal…) from MusicBrainz before done"
+        }
+      ]
+    },
+    {
+      "id": "UX-CAT-003",
+      "group": "catalog",
+      "title": "Search finds music, never a “search on YouTube” offer, and every result says where it is",
+      "contract": "The catalog answers with songs, artists and albums only. It never returns an entry whose only purpose is to send the person to search another site; YouTube and SoundCloud are searched by the server (yt-dlp) and their results are songs like any other. Every track, artist and album carries at least one source naming its platform, and a song from Spotify that plays from YouTube Music carries both, the second marked as spotDL’s match. A pasted link is not searched: the search says to resolve it, and resolve says what it is or, for a link it cannot read (a private or Spotify-made playlist, an Apple Music playlist, a Tidal link without a SongLink key), why — in words.",
+      "example": "{\"sources\":[{\"platform\":\"spotify\",\"matchedBy\":\"link\"},{\"platform\":\"youtube-music\",\"matchedBy\":\"spotdl\"}]} — shown as “Spotify · plays from YouTube Music”.",
+      "authority": "adopted",
+      "owners": [
+        "packages/contracts/src/api/catalog.ts",
+        "packages/domain/src/catalog/engine.ts",
+        "packages/domain/src/catalog/links.ts",
+        "packages/domain/src/catalog/providers/ytdlp.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-engine.test.ts",
+          "name": "folds into one aggregate where Deezer, Apple and YouTube’s copies of one song are one row"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-engine.test.ts",
+          "name": "yt-dlp: a cleaned YouTube title, a Topic channel as YouTube Music, no channels or sets"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-engine.test.ts",
+          "name": "does not search a pasted link: done names it for resolve"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-engine.test.ts",
+          "name": "a Spotify song through spotDL, with spotDL’s YouTube Music match as a second source"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-engine.test.ts",
+          "name": "a Spotify playlist Spotify will not list says so, with the reason"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-engine.test.ts",
+          "name": "an Apple Music playlist and a Tidal link without a SongLink key say why they cannot be read"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/integration/catalog.test.ts",
+          "name": "a Spotify song through spotDL, with its YouTube Music match"
         }
       ]
     }

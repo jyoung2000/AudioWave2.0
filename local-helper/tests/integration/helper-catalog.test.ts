@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { CatalogResolveResult, CatalogSearchAggregate, CatalogSearchChunk, HELPER_CATALOG_ROUTES } from '@now-playing/contracts';
+import { CatalogResolveResult, CatalogSearchAggregate, HELPER_CATALOG_ROUTES, type CatalogSearchChunk } from '@now-playing/contracts';
 import { readCatalogStream } from '@now-playing/domain/catalog';
 import { guardedCatalogFetch } from '../../src/catalog.js';
 import { startHelper, type Helper } from '../../src/server.js';

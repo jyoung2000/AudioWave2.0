@@ -382,7 +382,7 @@ export class CatalogEngine {
       const link: MusicLink = { platform: 'deezer', kind: 'album', id: native, url: `https://www.deezer.com/album/${native}` };
       return {
         album: found.album,
-        page: { tracks: found.tracks, offset, limit, total, hasMore: offset + found.tracks.length < Math.min(total ?? 0, CATALOG_COLLECTION_CAP), capped: (total ?? 0) > CATALOG_COLLECTION_CAP },
+        page: { tracks: found.tracks.slice(0, limit), offset, limit, total, hasMore: offset + Math.min(found.tracks.length, limit) < Math.min(total ?? 0, CATALOG_COLLECTION_CAP), capped: (total ?? 0) > CATALOG_COLLECTION_CAP },
         collection: collectionRef(link, 'album', found.album.title, found.album.artist),
       };
     }
@@ -461,7 +461,8 @@ export class CatalogEngine {
     if (link.kind === 'playlist') {
       const found = await this.upstream(() => this.deezer.playlist(link.id!, offset, Math.min(limit, CATALOG_COLLECTION_CAP - offset), signal), 'Deezer');
       if (!found) return answer({ kind: 'unavailable', reason: 'Deezer would not list that playlist: it is private or gone.' });
-      const { playlist, tracks } = found;
+      const { playlist } = found;
+      const tracks = found.tracks.slice(0, limit);
       const head = offset === 0 ? tracks : ((await this.upstream(() => this.deezer.playlist(link.id!, 0, 8, signal), 'Deezer'))?.tracks ?? []);
       const total = playlist.total;
       const collection: CatalogCollection = {

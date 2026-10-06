@@ -90,7 +90,8 @@ export function mergeTrack(into: CatalogTrack, other: CatalogTrack): CatalogTrac
     id: into.id,
     title: best.title,
     artist: best.artist,
-    artists: best.artists.length ? best.artists : rest.artists,
+    // A store that credits "A, B & C" as one name says less than one that lists A, B and C.
+    artists: best.artists.length > 1 || rest.artists.length <= best.artists.length ? best.artists : rest.artists,
     album: pick('album'),
     albumArtist: pick('albumArtist'),
     durationMs: pick('durationMs'),
