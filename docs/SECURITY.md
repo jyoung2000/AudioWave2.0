@@ -61,6 +61,19 @@ This document is the threat model and the list of concrete mitigations for the A
 - Loopback HTTP is acceptable only for first setup on the same machine. LAN and remote modes require TLS termination (reverse proxy) and set `Secure` cookies; see `docs/REMOTE_ACCESS.md`.
 - Direct player↔companion pairing on the same network uses the same authenticated TLS transport; nothing is exposed on a raw public port.
 
+## Dependency audit
+
+CI runs `pnpm audit --audit-level=high` and fails on any high or critical advisory. Vulnerable versions
+pulled in by other packages are pinned to their patched releases in `pnpm.overrides` (root
+`package.json`): `undici` (via Discord.js and Electron's downloader), `brace-expansion` (via ESLint and
+Workbox) and `source-map-js` (via Vite). `fastify` is a direct dependency and is kept at a patched release.
+
+One advisory is accepted, in `pnpm.auditConfig.ignoreGhsas`, because no fixed version exists:
+
+| Advisory | Package and path | Why it is accepted |
+| --- | --- | --- |
+| [GHSA-ch52-4w7c-c8xp](https://github.com/advisories/GHSA-ch52-4w7c-c8xp) (2026-10-06) | `http-cache-semantics` ≤ 4.2.0, via `electron-builder › @electron/get › got › cacheable-request` | Build-time only: it caches Electron's own download while the companion is packaged. Nothing shipped contains it, and the flaw (`max-stale` disclosing another user's cached response) needs a cache shared between users, which a build has not. Remove the entry when a patched release appears. |
+
 ## What is deliberately not done
 - No UPnP, no automatic port opening, no third-party tunnel provisioning.
 - No browser-cookie extraction, no DRM circumvention, no scraping of services that prohibit it.
