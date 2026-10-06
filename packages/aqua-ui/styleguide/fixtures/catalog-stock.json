@@ -1072,7 +1072,8 @@
         "artists": 3,
         "albums": 2
       },
-      "resolve": null
+      "resolve": null,
+      "linkedOnly": []
     }
   ],
   "searchPage2": [
@@ -1416,7 +1417,8 @@
         "artists": 0,
         "albums": 0
       },
-      "resolve": null
+      "resolve": null,
+      "linkedOnly": []
     }
   ],
   "searchLink": [
@@ -1443,7 +1445,8 @@
         "artists": 0,
         "albums": 0
       },
-      "resolve": "https://open.spotify.com/playlist/0MockHarbourMix0000001"
+      "resolve": "https://open.spotify.com/playlist/0MockHarbourMix0000001",
+      "linkedOnly": []
     }
   ],
   "resolvePlaylist": {

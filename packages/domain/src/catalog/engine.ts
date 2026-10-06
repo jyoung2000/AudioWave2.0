@@ -33,7 +33,7 @@ import { CATALOG_COLLECTION_CAP, CATALOG_PAGE_MAX, CATALOG_PLATFORM_LABELS } fro
 import { DomainError } from '../errors.js';
 import { CatalogHttpError, type CatalogFetch } from './http.js';
 import { ProviderHealth, TtlCache, describeError, statusFor, type Now, type Sleep } from './limits.js';
-import { CatalogMerger, mergeSources, sameRecording } from './merge.js';
+import { CatalogMerger, mergeSources, mergeTrack, sameRecording } from './merge.js';
 import { ProviderResting, type CatalogProvider, type ProviderResult } from './provider.js';
 import { ApplePageChanged, fetchApplePlaylistPage, type ApplePlaylistPage } from './providers/applemusic-page.js';
 import { DeezerClient, DeezerProvider } from './providers/deezer.js';
@@ -46,6 +46,11 @@ import { LrclibClient, OdesliClient } from './services.js';
 
 export const ALL_SECTIONS: readonly CatalogSection[] = ['tracks', 'artists', 'albums'];
 const ALL_PROVIDERS: readonly CatalogProviderId[] = ['itunes', 'deezer', 'musicbrainz', 'youtube', 'soundcloud'];
+/** The platforms a service's search finds songs on; any other platform on a row only came as a link. */
+const PROVIDER_PLATFORMS: Record<CatalogProviderId, CatalogPlatform[]> = { itunes: ['apple-music'], deezer: ['deezer'], musicbrainz: ['musicbrainz'], youtube: ['youtube', 'youtube-music'], soundcloud: ['soundcloud'] };
+/** How long a query's rows are kept so its later pages never repeat them. */
+const SESSION_TTL_MS = 15 * 60_000;
+const SESSION_MAX = 200;
 
 export interface CatalogEngineOptions {
   fetch: CatalogFetch;
@@ -103,6 +108,7 @@ export class CatalogEngine {
   private readonly searchCache: TtlCache<ProviderResult>;
   private readonly linksCache: TtlCache<CatalogSource[]>;
   private readonly applePageCache: TtlCache<ApplePlaylistPage | null>;
+  private readonly sessions = new Map<string, { at: number; rows: Array<{ track: CatalogTrack; offset: number }> }>();
 
   constructor(private readonly options: CatalogEngineOptions) {
     this.now = options.now ?? Date.now;
@@ -162,7 +168,7 @@ export class CatalogEngine {
     const list = (): CatalogSourceStatus[] => ALL_PROVIDERS.filter((id) => statuses.has(id)).map((id) => statuses.get(id)!);
 
     if (query.kind === 'url') {
-      yield { type: 'done', seq, query, status: [], page: { tracks: null, artists: null, albums: null }, totals: { tracks: 0, artists: 0, albums: 0 }, resolve: query.url };
+      yield { type: 'done', seq, query, status: [], page: { tracks: null, artists: null, albums: null }, totals: { tracks: 0, artists: 0, albums: 0 }, resolve: query.url, linkedOnly: [] };
       return;
     }
 
@@ -201,6 +207,21 @@ export class CatalogEngine {
 
     const merger = new CatalogMerger(query);
     const full: Partial<Record<CatalogSection, boolean>> = {};
+    // One song is one row across pages too: a later page's copy of a song an earlier page sent comes
+    // back with that row's id (an upsert), never as a new row.
+    const sessionKey = JSON.stringify([query.kind, query.text, query.track, query.artist, query.album, query.isrc, [...wanted].sort()]);
+    const session = this.sessionFor(sessionKey, offset);
+    const alias = new Map<string, string>();
+    const canonical = (rows: CatalogTrack[]): CatalogTrack[] =>
+      rows.map((row) => {
+        if (!session || offset === 0) return row;
+        const known = alias.get(row.id);
+        const earlier = known ? session.rows.find((s) => s.track.id === known) : session.rows.find((s) => s.offset < offset && sameRecording(s.track, row));
+        if (!earlier) return row;
+        alias.set(row.id, earlier.track.id);
+        earlier.track = mergeTrack(earlier.track, row);
+        return earlier.track;
+      });
     const pending = new Map(running.map((p, i) => [i, p.then((o) => ({ o, i }))]));
     while (pending.size) {
       const { o, i } = await Promise.race(pending.values());
@@ -208,7 +229,7 @@ export class CatalogEngine {
       statuses.set(o.provider.id, o.status);
       const changed = o.result ? merger.add(o.result) : { tracks: [], artists: [], albums: [] };
       for (const [section, more] of Object.entries(o.result?.full ?? {})) if (more) full[section as CatalogSection] = true;
-      yield { type: 'results', seq: seq++, provider: o.provider.id, query, ...changed, status: list() };
+      yield { type: 'results', seq: seq++, provider: o.provider.id, query, ...changed, tracks: canonical(changed.tracks), status: list() };
     }
 
     // The best rows' other homes, within a small budget: MusicBrainz is paced at one call a second.
@@ -224,11 +245,22 @@ export class CatalogEngine {
         const found = await this.withDeadline(this.crossLinks(track, signal), deadline - this.now()).catch(() => [] as CatalogSource[]);
         if (!found.length) continue;
         const patched = merger.patchTrack(track.id, (t) => ({ ...t, sources: mergeSources(t.sources, found) }));
-        if (patched) yield { type: 'results', seq: seq++, provider: null, query, tracks: [patched], artists: [], albums: [], status: list() };
+        if (patched) yield { type: 'results', seq: seq++, provider: null, query, tracks: canonical([patched]), artists: [], albums: [], status: list() };
       }
     }
 
     const snapshot = merger.snapshot();
+    if (session) {
+      for (const row of snapshot.tracks) {
+        if (alias.has(row.id)) continue;
+        const again = session.rows.findIndex((s) => s.offset === offset && (s.track.id === row.id || sameRecording(s.track, row)));
+        if (again === -1) session.rows.push({ track: row, offset });
+        else session.rows[again] = { track: row, offset };
+      }
+    }
+    const searched = new Set<CatalogPlatform>(ALL_PROVIDERS.filter((id) => statuses.get(id) && statuses.get(id)!.state !== 'skipped').flatMap((id) => PROVIDER_PLATFORMS[id]));
+    const linkedOnly: CatalogPlatform[] = [];
+    for (const row of [...snapshot.tracks, ...snapshot.artists, ...snapshot.albums]) for (const s of row.sources) if (!searched.has(s.platform) && !linkedOnly.includes(s.platform)) linkedOnly.push(s.platform);
     const page = (section: CatalogSection) => (sections.includes(section) && askedSections.has(section) ? { offset, limit, hasMore: Boolean(full[section]) } : null);
     const done: CatalogSearchDoneChunk = {
       type: 'done',
@@ -238,8 +270,28 @@ export class CatalogEngine {
       page: { tracks: page('tracks'), artists: page('artists'), albums: page('albums') },
       totals: { tracks: snapshot.tracks.length, artists: snapshot.artists.length, albums: snapshot.albums.length },
       resolve: null,
+      linkedOnly,
     };
     yield done;
+  }
+
+  /**
+   * The rows a query has sent so far, by page, for 15 minutes: page 0 starts afresh; a later page
+   * finds the session its first page made (or none, after a restart — then only ids dedupe).
+   */
+  private sessionFor(key: string, offset: number): { rows: Array<{ track: CatalogTrack; offset: number }> } | null {
+    const now = this.now();
+    for (const [k, s] of this.sessions) if (now - s.at > SESSION_TTL_MS) this.sessions.delete(k);
+    if (offset === 0) {
+      const fresh = { at: now, rows: [] as Array<{ track: CatalogTrack; offset: number }> };
+      this.sessions.delete(key);
+      while (this.sessions.size >= SESSION_MAX) this.sessions.delete(this.sessions.keys().next().value!);
+      this.sessions.set(key, fresh);
+      return fresh;
+    }
+    const found = this.sessions.get(key) ?? null;
+    if (found) found.at = now;
+    return found;
   }
 
   /** The whole search as one answer (`?stream=0`): the feed, folded. */

@@ -35,7 +35,7 @@ describe('the live feed (UX-SEARCH-002)', () => {
     expect(state.tracks.map((t) => t.title)).toEqual(['Harbour (merged)', 'Wall', 'Fog']);
     // By rank, then in the order they arrived.
     expect(byRank(state.tracks).map((t) => t.id)).toEqual(['b', 'a', 'c']);
-    state = foldCatalogChunk(state, { type: 'done', seq: 3, query, status: [status('itunes', 'ok'), status('deezer', 'ok')], page: { tracks: { offset: 0, limit: 25, hasMore: true }, artists: null, albums: null }, totals: { tracks: 3, artists: 0, albums: 0 }, resolve: null });
+    state = foldCatalogChunk(state, { type: 'done', seq: 3, query, status: [status('itunes', 'ok'), status('deezer', 'ok')], page: { tracks: { offset: 0, limit: 25, hasMore: true }, artists: null, albums: null }, totals: { tracks: 3, artists: 0, albums: 0 }, resolve: null, linkedOnly: [] });
     expect(state.done?.page.tracks?.hasMore).toBe(true);
     expect(state.tracks).toHaveLength(3);
   });

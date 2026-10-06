@@ -12,6 +12,15 @@
  * `results` chunk upserts tracks, artists and albums by `id` (a later chunk can carry a row seen
  * before, now merged with another service's copy of the same song); a `done` chunk closes the
  * stream with every service's final status. `?stream=0` answers with one `CatalogSearchAggregate`.
+ *
+ * One song is one row (UX-CAT-002): the same recording from iTunes, Deezer, a YouTube official
+ * video or Topic upload and SoundCloud is merged into one track carrying every platform; a live
+ * version, a remix, an acoustic or instrumental take, a demo, a radio edit, an extended mix, a sped
+ * up or slowed edit, karaoke and covers stay rows of their own. **Across pages:** the server keeps
+ * each query's rows (same words and services, any sections) for 15 minutes; a later page's song that
+ * is the same recording as one already sent comes back **with that row's id** — an upsert of the
+ * earlier row, never a new row — so page 2 never repeats page 1. A client that pages after the
+ * session has lapsed should still drop rows by id and `sameRecording` (`appendTracks`).
  */
 import { z } from 'zod';
 import { CalendarDate, IsoDateTime } from '../common.js';
@@ -219,6 +228,12 @@ export const CatalogSearchDoneChunk = z.object({
   totals: z.object({ tracks: z.number().int().nonnegative(), artists: z.number().int().nonnegative(), albums: z.number().int().nonnegative() }),
   /** A pasted link is not searched: the client should call `resolve` with it. */
   resolve: z.string().max(2048).nullable().default(null),
+  /**
+   * Platforms on the rows that were not searched but only linked to (Spotify, Tidal, Qobuz, Amazon
+   * Music… from MusicBrainz's links, Deezer's ISRC lookup or SongLink with a key): the status line says
+   * which platforms were searched (`status`) and which only contributed links (this).
+   */
+  linkedOnly: z.array(CatalogPlatform).default([]),
 });
 export const CatalogSearchChunk = z.discriminatedUnion('type', [CatalogSearchResultsChunk, CatalogSearchDoneChunk]);
 export type CatalogSearchChunk = z.infer<typeof CatalogSearchChunk>;

@@ -112,6 +112,31 @@ An album/playlist comes as `collection: CatalogCollection`:
   Open it in the music list the way an album opens.
 - A Spotify **artist** link answers `kind: 'artist'` with `artist` and a `collection` of their songs.
 
+### One song, one row — on every page (owner requirement, 2026-10-06)
+
+- **Merge identity** (`recordingKey`, `sameRecording` in `merge.ts`): ISRC when both rows have one;
+  otherwise the main artist and the title with the noise gone ("feat.", "(Official Music Video)",
+  "[Lyrics]", "HD", "Remastered", an uploader's "Artist - Title", "- Topic" and VEVO channels) **and the
+  same version** (`versionOf`: live, remix, acoustic, instrumental, demo, radio edit, extended, sped up,
+  slowed, karaoke, cover, reprise — each stays its own row), and durations within ±3 s. When one side has
+  no duration, names and version must match exactly and that side must be an **official upload**
+  (YouTube Music Topic, the artist's own or a VEVO channel, or a title saying "Official"); a stranger's
+  re-upload never joins on names. So iTunes + Deezer + a YouTube official video + a Topic upload +
+  SoundCloud is **one row with five badges**.
+- **No repeats across pages.** The server keeps each query's rows (same words and services, any
+  sections) for 15 minutes. On a later `offset`, a song that is the same recording as one an earlier page
+  sent comes back **with that earlier row's id** (an upsert: more badges on the row already shown), never
+  as a new row. Fold later pages by id and you never show a song twice. If the session lapsed (15 min,
+  a server restart), keep dropping rows by id and `sameRecording` client-side (`appendTracks` does).
+- **`done.linkedOnly`**: platforms on the rows that were not searched but only linked (Spotify, Tidal,
+  Qobuz, Amazon Music from MusicBrainz, Deezer's ISRC lookup or SongLink with a key). The status line
+  says which were searched (`status`) and which only contributed links (this).
+- **Bandcamp search is not workable keylessly**: its public search page answers a bot "Client
+  Challenge" that needs JavaScript (checked 2026-10-06), and yt-dlp has no Bandcamp search. Bandcamp
+  stays link-only (pasted album and track links resolve through yt-dlp). Spotify, Tidal, Qobuz and
+  Amazon stay link-only too, by decision: badges come from MusicBrainz, Deezer's ISRC lookup and the
+  optional SongLink key; no scraped tokens.
+
 ### Paging a list: every song, no 200 cap (owner requirement, 2026-10-06, later the same day)
 
 The 200-song cap is gone. **`CATALOG_COLLECTION_CAP` is now 10,000** (the bound a runaway list stops at)

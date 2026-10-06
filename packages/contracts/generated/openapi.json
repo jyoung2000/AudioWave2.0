@@ -8850,6 +8850,26 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "linkedOnly": {
+                          "default": [],
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "apple-music",
+                              "deezer",
+                              "musicbrainz",
+                              "youtube",
+                              "youtube-music",
+                              "soundcloud",
+                              "spotify",
+                              "bandcamp",
+                              "tidal",
+                              "qobuz",
+                              "amazon-music"
+                            ]
+                          }
                         }
                       },
                       "required": [
@@ -8859,7 +8879,8 @@
                         "status",
                         "page",
                         "totals",
-                        "resolve"
+                        "resolve",
+                        "linkedOnly"
                       ],
                       "additionalProperties": false
                     }
