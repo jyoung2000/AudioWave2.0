@@ -1,5 +1,5 @@
 /**
- * Search: the music catalog in the companion's window (DEC-039; rules UX-SEARCH-001…007, UX-CAT-001…003).
+ * Search: the music catalog in the companion's window (DEC-039; rules UX-SEARCH-001…008, UX-CAT-001…004).
  *
  * The same search the hub's Search tab is, with the same rules, on this PC: one field finds songs,
  * artists and albums across iTunes, Deezer, MusicBrainz, YouTube and SoundCloud, or reads a pasted
@@ -904,7 +904,7 @@ function Platforms({ sources }: { sources: readonly CatalogSource[] }) {
   const plays = playsThroughSpotdl(sources);
   return (
     <span className="mrow__plat">
-      <span className="caps" aria-label={`On ${platformsOf(sources).map(platformLabel).join(', ')}`}>
+      <span className="caps" role="img" aria-label={`On ${platformsOf(sources).map(platformLabel).join(', ')}`}>
         {platformsOf(sources).map((p) => (
           <span key={p} className={`cap cap--${p}`} aria-hidden="true">
             {platformLabel(p)}
@@ -917,7 +917,7 @@ function Platforms({ sources }: { sources: readonly CatalogSource[] }) {
 }
 
 /**
- * A list box of music (UX-KEY-001, UX-SEARCH-006): one tab stop, the arrows, Home and End move the
+ * A list box of music (UX-KEY-001, UX-SEARCH-008): one tab stop, the arrows, Home and End move the
  * highlight, Enter opens, Space plays a song's preview; a click opens (a click on ▶ plays).
  */
 function Listbox<T>({ label, items, render, onOpen, onSpace, empty, hint }: { label: string; items: readonly T[]; render: (item: T, index: number) => ReactNode; onOpen: (item: T) => void; onSpace?: (item: T) => void; empty: string; hint?: string }) {

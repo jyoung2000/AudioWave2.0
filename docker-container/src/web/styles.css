@@ -524,7 +524,8 @@ a.push:active {
   font-size: 11px;
 }
 .srcs__state {
-  color: var(--ink-quiet);
+  /* On the window grey, --ink-quiet is 4.3:1; --ink-2 is 5.9:1. */
+  color: var(--ink-2);
 }
 .srch__count {
   margin-left: 4px;
@@ -576,7 +577,7 @@ a.push:active {
 .pager__count {
   margin-left: 4px;
   font-size: 11px;
-  color: var(--ink-quiet);
+  color: var(--ink-2);
 }
 
 /* a list of music: cover, what it is and where, its tempo and time, and the preview */

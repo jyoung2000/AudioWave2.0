@@ -19,8 +19,8 @@ import { AUTH_STATE, STRONG_PASSWORD } from './shared.js';
 setup('first run', async ({ page, request }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Airwave Hub' })).toBeVisible();
-  // Signed out, it is already the hub's window: the six tabs are there, and none of them opens.
-  for (const name of ['Overview', 'Devices', 'Music', 'Groups', 'Sharing', 'System']) await expect(page.getByRole('tab', { name })).toHaveAttribute('aria-disabled', 'true');
+  // Signed out, it is already the hub's window: the seven tabs are there, and none of them opens.
+  for (const name of ['Overview', 'Devices', 'Music', 'Search', 'Groups', 'Sharing', 'System']) await expect(page.getByRole('tab', { name })).toHaveAttribute('aria-disabled', 'true');
   // The credentials are stated rather than left for someone to guess or search for.
   await expect(page.getByText(/First run/)).toBeVisible();
 
@@ -49,9 +49,9 @@ setup('first run', async ({ page, request }) => {
 
   await expect(page.getByRole('heading', { name: 'Choose a real password' })).toBeVisible();
   await expect(page.getByText(/no pairing, no providers, no group listening, no Discord bot and no remote access/i)).toBeVisible();
-  // Overview is open; the other five tabs are shown, locked, and say why.
+  // Overview is open; the other six tabs are shown, locked, and say why.
   await expect(page.getByRole('tab', { name: /^Overview/ })).toHaveAttribute('aria-selected', 'true');
-  for (const name of ['Devices', 'Music', 'Groups', 'Sharing', 'System']) {
+  for (const name of ['Devices', 'Music', 'Search', 'Groups', 'Sharing', 'System']) {
     const tab = page.getByRole('tab', { name });
     await expect(tab).toHaveAttribute('aria-disabled', 'true');
     await expect(tab).toHaveClass(/locked/);
