@@ -261,19 +261,28 @@ export const CatalogTrackPage = z.object({
   /** How many the platform says there are, when it says. */
   total: z.number().int().nonnegative().nullable(),
   hasMore: z.boolean(),
-  /** True when the server's cap (`CATALOG_COLLECTION_CAP`) left some out for good. */
+  /**
+   * True only when a list is longer than `CATALOG_COLLECTION_CAP` (10,000) and the songs past it
+   * cannot be opened: said, never a silent cut. Below that every song is reachable page by page.
+   */
   capped: z.boolean(),
 });
 export type CatalogTrackPage = z.infer<typeof CatalogTrackPage>;
 
-/** The most songs one album or playlist lists. The same cap a batch download has. */
-export const CATALOG_COLLECTION_CAP = 200;
+/**
+ * The most songs one album or playlist opens: every song of any real list, page by page, with a
+ * bound so a runaway list cannot hold a server forever. A list past it says so (`capped`).
+ */
+export const CATALOG_COLLECTION_CAP = 10_000;
+
+/** The most songs one page of a list carries (`limit`). Ask for the next `offset` for more. */
+export const CATALOG_PAGE_MAX = 200;
 
 export const CatalogAlbumRequest = z.object({
   /** `platform:id` from a result's source (`deezer:6575789`, `apple-music:617154241`). */
   id: z.string().min(3).max(260),
   offset: z.coerce.number().int().min(0).max(CATALOG_COLLECTION_CAP).default(0),
-  limit: z.coerce.number().int().min(1).max(CATALOG_COLLECTION_CAP).default(100),
+  limit: z.coerce.number().int().min(1).max(CATALOG_PAGE_MAX).default(100),
 });
 export const CatalogAlbumDetail = z.object({ album: CatalogAlbum, page: CatalogTrackPage, collection: CatalogCollectionRef });
 export type CatalogAlbumDetail = z.infer<typeof CatalogAlbumDetail>;
@@ -322,7 +331,7 @@ export type CatalogCollection = z.infer<typeof CatalogCollection>;
 export const CatalogResolveRequest = z.object({
   url: z.string().trim().min(1).max(2048),
   offset: z.coerce.number().int().min(0).max(CATALOG_COLLECTION_CAP).default(0),
-  limit: z.coerce.number().int().min(1).max(CATALOG_COLLECTION_CAP).default(100),
+  limit: z.coerce.number().int().min(1).max(CATALOG_PAGE_MAX).default(100),
 });
 
 /**
@@ -411,7 +420,8 @@ export const CatalogSettingsInput = z.object({
 export type CatalogSettingsInput = z.infer<typeof CatalogSettingsInput>;
 
 /** The hosts the catalog engine itself calls. Nothing else is reachable from it. */
-export const CATALOG_API_HOSTS: readonly string[] = ['itunes.apple.com', 'api.deezer.com', 'musicbrainz.org', 'coverartarchive.org', 'api.song.link', 'lrclib.net'];
+/** `music.apple.com`: an Apple Music playlist's public page, read for its songs (one GET, no token). */
+export const CATALOG_API_HOSTS: readonly string[] = ['itunes.apple.com', 'api.deezer.com', 'musicbrainz.org', 'coverartarchive.org', 'api.song.link', 'lrclib.net', 'music.apple.com'];
 
 /** Where the services keep artwork and clips: what a page loads directly, never fetched by the engine. */
 export const CATALOG_MEDIA_HOSTS: readonly string[] = ['*.mzstatic.com', 'audio-ssl.itunes.apple.com', 'cdn-images.dzcdn.net', '*.dzcdn.net', 'i.ytimg.com', '*.sndcdn.com', 'archive.org', '*.archive.org', 'i.scdn.co'];

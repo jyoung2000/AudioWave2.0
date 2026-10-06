@@ -62,6 +62,7 @@ The catalog engine (`packages/domain/src/catalog`) reaches only these hosts (`CA
 | `musicbrainz.org` | Recording search, ISRC lookup, genre, label, year, recording links | 1 request per 1.1 s, named User-Agent |
 | `coverartarchive.org` | Cover art (reserved; redirects to `archive.org`) | — |
 | `lrclib.net` | Synced and plain lyrics | cached 24 h |
+| `music.apple.com` | An Apple Music playlist's public page, read for the songs it embeds (one GET of the page a browser opens; no token, no account) | cached 10 min |
 | `api.song.link` | Cross-platform links, **only with an administrator's key** (keyless access was closed in 2026) | 10 a minute, cached |
 
 The hub sends these through `SafeHttpClient` with that list (`docker-container/src/catalog/service.ts`);

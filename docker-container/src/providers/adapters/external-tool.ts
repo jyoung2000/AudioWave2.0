@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DOWNLOAD_BATCH_CAP, type ProviderCapabilities, type ProviderDescriptor, type ProviderHealth, type SearchResult } from '@now-playing/contracts';
+import { CATALOG_COLLECTION_CAP, DOWNLOAD_BATCH_CAP, type ProviderCapabilities, type ProviderDescriptor, type ProviderHealth, type SearchResult } from '@now-playing/contracts';
 import { DomainError, hostMatches, validateOutboundUrl } from '@now-playing/domain';
 import { versionOf } from '@now-playing/domain/tool-install';
 import { fromSpotdl, fromYtDlp, type MediaProbe } from '../../media/media-metadata.js';
@@ -32,6 +32,11 @@ export interface MetadataArgsContext {
   listLimit: number;
   /** spotDL: also find the YouTube Music recording it would download (`--preload`), for the catalog. */
   match?: boolean;
+  /**
+   * yt-dlp: describe these positions of a list in full (`--playlist-items`) instead of listing it
+   * flat — a page of a SoundCloud set's bare ids, looked up in one run (the catalog's paging).
+   */
+  items?: readonly number[];
 }
 
 export interface ToolPreset {
@@ -106,7 +111,10 @@ export const TOOL_PRESETS: Record<PresetTool, ToolPreset> = {
       '--',
       url,
     ],
-    metadata: ({ url, node, listLimit }) => ['--ignore-config', '--no-colors', '--no-cache-dir', '--no-warnings', '--dump-single-json', '--no-download', '--no-playlist', '--flat-playlist', '--playlist-end', String(listLimit), ...(node ? ['--js-runtimes', `node:${node}`] : []), '--', url],
+    metadata: ({ url, node, listLimit, items }) =>
+      items?.length
+        ? ['--ignore-config', '--no-colors', '--no-cache-dir', '--no-warnings', '--dump-single-json', '--no-download', '--playlist-items', items.map((n) => String(Math.trunc(n))).join(','), ...(node ? ['--js-runtimes', `node:${node}`] : []), '--', url]
+        : ['--ignore-config', '--no-colors', '--no-cache-dir', '--no-warnings', '--dump-single-json', '--no-download', '--no-playlist', '--flat-playlist', '--playlist-end', String(listLimit), ...(node ? ['--js-runtimes', `node:${node}`] : []), '--', url],
     infoFile: 'media.info.json',
     needsHome: false,
   },
@@ -162,6 +170,8 @@ const METADATA_CACHE_MAX = 100;
 const METADATA_CONCURRENCY = 2;
 /** yt-dlp answers in seconds; spotDL unpacks a large runtime first and Spotify's lookups are slow. */
 const METADATA_TIMEOUT_MS: Record<PresetTool, number> = { 'yt-dlp': 60_000, spotdl: 150_000 };
+/** A whole list for the catalog: thousands of entries take yt-dlp and spotDL minutes, not seconds. */
+const METADATA_ALL_TIMEOUT_MS = 600_000;
 
 /**
  * Bridge to a command-line media tool. Ready without setup (owner decision 2026-10-03): with nothing configured it is
@@ -402,18 +412,21 @@ export class ExternalToolAdapter extends BaseAdapter {
    * usually resolved and then downloaded), at most two at a time (each run unpacks a runtime), and a
    * failure is not cached, so the next attempt asks again.
    */
-  probe(input: string, signal?: AbortSignal, options: { match?: boolean } = {}): Promise<MediaProbe> {
+  probe(input: string, signal?: AbortSignal, options: { match?: boolean; all?: boolean; items?: readonly number[] } = {}): Promise<MediaProbe> {
     const url = this.allowed(input);
     if (!url) return Promise.reject(new DomainError('forbidden', 'That link is not on a host the external tool may reach'));
     const preset = this.presetFor(url);
     if (!preset || (this.config.extra['command'] ?? '').trim()) return Promise.reject(new DomainError('unsupported', 'Reading a link needs the yt-dlp or spotDL preset; a hand-written command cannot be asked'));
     const match = options.match === true && preset.tool === 'spotdl';
-    const key = `${url.toString()}${match ? '#match' : ''}`;
+    // `all`: the catalog reads a whole list (up to CATALOG_COLLECTION_CAP); a download batch reads one past its own cap.
+    const all = options.all === true;
+    const items = preset.tool === 'yt-dlp' && options.items?.length ? options.items.filter((n) => Number.isInteger(n) && n > 0).slice(0, 200) : undefined;
+    const key = `${url.toString()}${match ? '#match' : ''}${all ? '#all' : ''}${items ? `#items:${items.join(',')}` : ''}`;
     const now = Date.now();
     for (const [k, entry] of this.metadataCache) if (now - entry.at > METADATA_CACHE_TTL_MS) this.metadataCache.delete(k);
     const hit = this.metadataCache.get(key);
     if (hit) return hit.value;
-    const value = this.withSlot(() => this.readMetadata(preset, url.toString(), signal, match));
+    const value = this.withSlot(() => this.readMetadata(preset, url.toString(), signal, match, all, items));
     this.metadataCache.set(key, { at: now, value });
     while (this.metadataCache.size > METADATA_CACHE_MAX) this.metadataCache.delete(this.metadataCache.keys().next().value!);
     value.catch(() => {
@@ -461,18 +474,18 @@ export class ExternalToolAdapter extends BaseAdapter {
     }
   }
 
-  private async readMetadata(preset: ToolPreset, url: string, signal?: AbortSignal, match = false): Promise<MediaProbe> {
+  private async readMetadata(preset: ToolPreset, url: string, signal?: AbortSignal, match = false, all = false, items?: readonly number[]): Promise<MediaProbe> {
     const binary = this.binaryFor(preset);
     if (!existsSync(binary)) throw new DomainError('setup-required', `${preset.displayName} is not on this hub yet`);
     const ffmpeg = resolveExecutable(await this.ffmpeg());
     const runDir = preset.needsHome ? this.makeRunDir(preset.tool) : null;
     try {
       const saveFile = join(runDir ?? '', 'save.spotdl');
-      const args = preset.metadata({ url, ffmpeg, node: process.execPath, saveFile, listLimit: DOWNLOAD_BATCH_CAP + 1, match });
+      const args = preset.metadata({ url, ffmpeg, node: process.execPath, saveFile, listLimit: all ? CATALOG_COLLECTION_CAP + 1 : DOWNLOAD_BATCH_CAP + 1, match, ...(items ? { items } : {}) });
       if (!args) throw new DomainError('unsupported', `${preset.displayName} needs FFmpeg, and this hub has none`);
       let stdout: string;
       try {
-        ({ stdout } = await runTool(binary, args, { env: this.toolEnvironment(runDir), timeoutMs: METADATA_TIMEOUT_MS[preset.tool], ...(signal ? { signal } : {}), ...(runDir ? { cwd: runDir } : {}) }));
+        ({ stdout } = await runTool(binary, args, { env: this.toolEnvironment(runDir), timeoutMs: all ? METADATA_ALL_TIMEOUT_MS : METADATA_TIMEOUT_MS[preset.tool], ...(signal ? { signal } : {}), ...(runDir ? { cwd: runDir } : {}) }));
       } catch (error) {
         if (error instanceof ToolRunError) throw new DomainError('unavailable', `${preset.displayName} could not read that link: ${lastError(error.stderr) || error.message}`);
         throw error;

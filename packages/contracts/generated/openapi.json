@@ -8958,7 +8958,7 @@
               "default": 0,
               "type": "integer",
               "minimum": 0,
-              "maximum": 200
+              "maximum": 10000
             }
           },
           {
@@ -10512,7 +10512,7 @@
               "default": 0,
               "type": "integer",
               "minimum": 0,
-              "maximum": 200
+              "maximum": 10000
             }
           },
           {

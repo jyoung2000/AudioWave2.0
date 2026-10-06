@@ -74,6 +74,19 @@ describe('the yt-dlp preset', () => {
   });
 });
 
+describe('reading a whole list for the catalog (no 200-song cap)', () => {
+  const preset = TOOL_PRESETS['yt-dlp'];
+  const url = 'https://soundcloud.com/band/sets/long';
+  it('lists flat up to the limit it is given, and describes a page of positions in full', () => {
+    const flat = preset.metadata({ url, ffmpeg: null, node: null, saveFile: '', listLimit: 10_001 })!;
+    expect(flat[flat.indexOf('--playlist-end') + 1]).toBe('10001');
+    const page = preset.metadata({ url, ffmpeg: null, node: null, saveFile: '', listLimit: 10_001, items: [201, 202, 203] })!;
+    expect(page[page.indexOf('--playlist-items') + 1]).toBe('201,202,203');
+    expect(page).not.toContain('--flat-playlist');
+    expect(page.slice(-2)).toEqual(['--', url]);
+  });
+});
+
 describe('the spotDL preset', () => {
   const preset = TOOL_PRESETS.spotdl;
   const url = 'https://open.spotify.com/track/4PTG3Z6ehGkBFwjybzWkR8';

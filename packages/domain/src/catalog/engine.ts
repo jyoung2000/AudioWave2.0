@@ -29,18 +29,19 @@ import type {
   CatalogSourceStatus,
   CatalogTrack,
 } from '@now-playing/contracts';
-import { CATALOG_COLLECTION_CAP, CATALOG_PLATFORM_LABELS } from '@now-playing/contracts';
+import { CATALOG_COLLECTION_CAP, CATALOG_PAGE_MAX, CATALOG_PLATFORM_LABELS } from '@now-playing/contracts';
 import { DomainError } from '../errors.js';
 import { CatalogHttpError, type CatalogFetch } from './http.js';
 import { ProviderHealth, TtlCache, describeError, statusFor, type Now, type Sleep } from './limits.js';
 import { CatalogMerger, mergeSources, sameRecording } from './merge.js';
 import { ProviderResting, type CatalogProvider, type ProviderResult } from './provider.js';
+import { ApplePageChanged, fetchApplePlaylistPage, type ApplePlaylistPage } from './providers/applemusic-page.js';
 import { DeezerClient, DeezerProvider } from './providers/deezer.js';
 import { ItunesClient, ItunesProvider } from './providers/itunes.js';
 import { MusicBrainzClient, MusicBrainzProvider } from './providers/musicbrainz.js';
 import { ToolSearchProvider, type ToolSearchRunner } from './providers/ytdlp.js';
 import { parseCatalogQuery, parseMusicLink, type MusicLink } from './query.js';
-import { LinkReadError, TOOL_PLATFORMS, collectionRef, coversOf, pageOf, pickDownloadSource, trackFromLink, type LinkRead, type LinkReader } from './links.js';
+import { LinkReadError, TOOL_PLATFORMS, collectAllPages, collectionRef, coversOf, pageOf, pickDownloadSource, trackFromLink, type CollectedList, type LinkRead, type LinkReader, type LinkTrack } from './links.js';
 import { LrclibClient, OdesliClient } from './services.js';
 
 export const ALL_SECTIONS: readonly CatalogSection[] = ['tracks', 'artists', 'albums'];
@@ -101,6 +102,7 @@ export class CatalogEngine {
   private readonly resolveCache: TtlCache<LinkRead>;
   private readonly searchCache: TtlCache<ProviderResult>;
   private readonly linksCache: TtlCache<CatalogSource[]>;
+  private readonly applePageCache: TtlCache<ApplePlaylistPage | null>;
 
   constructor(private readonly options: CatalogEngineOptions) {
     this.now = options.now ?? Date.now;
@@ -116,6 +118,7 @@ export class CatalogEngine {
     this.resolveCache = new TtlCache(10 * 60_000, 100, this.now);
     this.searchCache = new TtlCache(5 * 60_000, 300, this.now);
     this.linksCache = new TtlCache(24 * 3600_000, 1000, this.now);
+    this.applePageCache = new TtlCache(10 * 60_000, 50, this.now);
     this.register(new ItunesProvider(this.itunes));
     this.register(new DeezerProvider(this.deezer));
     this.register(new MusicBrainzProvider(this.musicbrainz));
@@ -495,7 +498,7 @@ export class CatalogEngine {
       const detail = await this.artist(`apple-music:${link.id}`, {}, signal);
       return answer({ kind: 'artist', artist: detail.artist });
     }
-    if (link.kind === 'playlist') return answer({ kind: 'unsupported', reason: 'Apple Music playlists are not in Apple’s public API, so they cannot be listed without an Apple developer account. Albums and songs can.' });
+    if (link.kind === 'playlist' && link.id) return this.resolveApplePlaylist(link, offset, limit, answer, signal);
     return answer({ kind: 'unsupported', reason: 'That Apple Music address is not a song, album or artist.' });
   }
 
@@ -515,18 +518,23 @@ export class CatalogEngine {
       const track = trackFromLink(read.track, { platform });
       return track ? answer({ kind: 'track', track }) : answer({ kind: 'unavailable', reason: `${label} described nothing playable at that address.` });
     }
-    const all = read.entries
-      .slice(0, CATALOG_COLLECTION_CAP)
-      .map((e) => trackFromLink(e, { platform, owner: link.kind === 'album' ? read.owner : null, album: link.kind === 'album' ? read.title : null }))
-      .filter((t): t is CatalogTrack => t !== null);
+    // Every entry, in order, up to the bound (CATALOG_COLLECTION_CAP); past it the list says so.
+    const rows: Array<{ track: CatalogTrack; bare: boolean; position: number }> = [];
+    read.entries.slice(0, CATALOG_COLLECTION_CAP).forEach((e, i) => {
+      const track = trackFromLink(e, { platform, owner: link.kind === 'album' ? read.owner : null, album: link.kind === 'album' ? read.title : null });
+      if (track) rows.push({ track, bare: !e.title, position: i + 1 });
+    });
+    const all = rows.map((r) => r.track);
     await this.fillCovers(all, reader, signal);
+    const page = pageOf(all, offset, limit, read.total ?? read.entries.length, read.capped || read.entries.length > CATALOG_COLLECTION_CAP || (read.total ?? 0) > CATALOG_COLLECTION_CAP);
+    page.tracks = await this.hydratePage(link, rows.slice(offset, offset + page.tracks.length), page.tracks, reader, signal);
     const kind: 'album' | 'playlist' = link.kind === 'album' ? 'album' : 'playlist';
     const collection: CatalogCollection = {
       ref: collectionRef(link, kind, read.title, read.owner),
       artworkUrl: read.artworkUrl,
       covers: coversOf(all),
       releaseDate: read.date && /^\d{4}(-\d{2}(-\d{2})?)?$/.test(read.date) ? read.date : null,
-      page: pageOf(all, offset, limit, read.total, read.capped || (read.total ?? 0) > CATALOG_COLLECTION_CAP),
+      page,
     };
     if (link.kind === 'artist') {
       const artist: CatalogArtist = { id: `${platform}:${link.id ?? link.url}`, name: read.owner ?? read.title, pictureUrl: read.artworkUrl, albumCount: null, fans: null, genre: null, sources: [{ platform, id: link.id, url: link.url, previewUrl: null, matchedBy: 'link' }], rank: 0 };
@@ -555,6 +563,58 @@ export class CatalogEngine {
     for (let k = 0; k < missing.length; k += 2) await Promise.all(missing.slice(k, k + 2).map(one));
   }
 
+  /**
+   * A SoundCloud set lists most of its songs as bare ids (yt-dlp's flat listing). The page asked for
+   * is described in one batch — the reader runs the tool once for exactly those positions
+   * (`items`), and the tool looks the ids up in batches — and each bare row takes its title, artist,
+   * artwork and length. Positions keep the order; if the answer does not line up, the bare rows stay.
+   */
+  private async hydratePage(link: MusicLink, rows: Array<{ track: CatalogTrack; bare: boolean; position: number }>, tracks: CatalogTrack[], reader: LinkReader, signal?: AbortSignal): Promise<CatalogTrack[]> {
+    const bare = rows.filter((r) => r.bare);
+    if (!bare.length) return tracks;
+    const positions = bare.map((r) => r.position);
+    const key = `${link.url}|items:${positions.join(',')}`;
+    const read = await this.resolveCache.get(key, () => reader(link.url, { signal, items: positions })).catch(() => null);
+    if (read?.kind !== 'collection' || read.entries.length !== bare.length) return tracks;
+    const filled = new Map<string, LinkTrack>(bare.map((r, i) => [r.track.id, read.entries[i]!]));
+    return tracks.map((t) => {
+      const entry = filled.get(t.id);
+      if (!entry?.title) return t;
+      const full = trackFromLink(entry, { platform: t.sources[0]!.platform, album: t.album });
+      return full ? { ...full, id: t.id, trackNumber: t.trackNumber, album: t.album ?? full.album, sources: mergeSources(t.sources, full.sources) } : t;
+    });
+  }
+
+  /** An Apple Music playlist from its public page (DEC-039, owner decision 2026-10-06). */
+  private async resolveApplePlaylist(link: MusicLink, offset: number, limit: number, answer: (p: Partial<CatalogResolveResult> & Pick<CatalogResolveResult, 'kind'>) => CatalogResolveResult, signal?: AbortSignal): Promise<CatalogResolveResult> {
+    let found: ApplePlaylistPage | null;
+    try {
+      found = await this.applePageCache.get(link.url, () => fetchApplePlaylistPage(this.options.fetch, link.url, link.id!, { timeoutMs: this.options.timeouts?.itunes ?? 15_000, signal }));
+    } catch (error) {
+      if (error instanceof ApplePageChanged) return answer({ kind: 'unavailable', reason: error.message });
+      throw error;
+    }
+    if (!found) return answer({ kind: 'unavailable', reason: 'Apple Music has no playlist at that address, or it is private.' });
+    const all = found.tracks.slice(0, CATALOG_COLLECTION_CAP);
+    const total = found.total ?? all.length;
+    const page = pageOf(all, offset, limit, total, total > CATALOG_COLLECTION_CAP);
+    // The page carries the songs it shows; when Apple says there are more, the list says so.
+    const short = total > all.length && all.length < CATALOG_COLLECTION_CAP;
+    return answer({
+      kind: 'playlist',
+      collection: { ref: collectionRef(link, 'playlist', found.title, found.owner), artworkUrl: found.artworkUrl, covers: coversOf(all), releaseDate: null, page: { ...page, total } },
+      reason: short ? `Apple’s public page for this playlist lists its first ${all.length} of ${total} songs; the rest can’t be read without an Apple account.` : null,
+    });
+  }
+
+  /**
+   * Every song of an album or playlist link, in order, page after page (`CATALOG_PAGE_MAX` at a
+   * time), up to `CATALOG_COLLECTION_CAP`. Stopping at the bound is reported (`capped`), never silent.
+   */
+  resolveAll(input: string, options: { signal?: AbortSignal; max?: number; onPage?: (result: CatalogResolveResult) => void } = {}): Promise<CollectedList> {
+    return collectAllPages((offset, limit) => this.resolve(input, offset, limit, options.signal), { max: options.max ?? CATALOG_COLLECTION_CAP, pageSize: CATALOG_PAGE_MAX, ...(options.signal ? { signal: options.signal } : {}), ...(options.onPage ? { onPage: options.onPage } : {}) });
+  }
+
   private unreadable(link: MusicLink, error: unknown): string {
     const said = describeError(error);
     if (link.platform === 'spotify' && (link.kind === 'playlist' || link.kind === 'unknown')) {
@@ -577,7 +637,7 @@ export class CatalogEngine {
       // The album's songs come from the same album on Deezer when SongLink names it there.
       const dz = sources.find((s) => s.platform === 'deezer' && s.id);
       if (dz?.id) {
-        const detail = await this.album(`deezer:${dz.id}`, 0, CATALOG_COLLECTION_CAP, signal).catch(() => null);
+        const detail = await this.album(`deezer:${dz.id}`, 0, CATALOG_PAGE_MAX, signal).catch(() => null);
         if (detail) return answer({ kind: 'album', collection: { ref: collectionRef(link, 'album', found.title, found.artist), artworkUrl: found.artworkUrl ?? detail.album.artworkUrl, covers: coversOf(detail.page.tracks), releaseDate: detail.album.releaseDate, page: detail.page } });
       }
       return answer({ kind: 'album', collection: { ref: collectionRef(link, 'album', found.title, found.artist), artworkUrl: found.artworkUrl, covers: found.artworkUrl ? [found.artworkUrl] : [], releaseDate: null, page: { tracks: [], offset: 0, limit: 1, total: null, hasMore: false, capped: false } }, reason: `${label} albums list their songs only when the same album is on Deezer.` });

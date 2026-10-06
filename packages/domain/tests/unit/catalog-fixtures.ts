@@ -38,7 +38,8 @@ export function fixtureFetch(routes: Route[]): FixtureFetch {
       status,
       headers: { get: (name: string) => (headers as Record<string, string>)[name.toLowerCase()] ?? null },
       json: async () => body,
-      text: async () => JSON.stringify(body),
+      // A page (an HTML body given as a string) is its own text.
+      text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
     };
     return response;
   };

@@ -3,7 +3,7 @@
  * catalog rows. The servers already run these tools to resolve a pasted link — the hub's external
  * tool adapter, the helper's resolver — so they pass that reader in, and nothing here runs a process.
  */
-import type { CatalogCollection, CatalogCollectionRef, CatalogPlatform, CatalogSource, CatalogTrack } from '@now-playing/contracts';
+import type { CatalogCollection, CatalogCollectionRef, CatalogPlatform, CatalogResolveResult, CatalogSource, CatalogTrack } from '@now-playing/contracts';
 import { calendarDate, webUrl, yearOf } from './http.js';
 import { normaliseIsrc, parseMusicLink, type MusicLink } from './query.js';
 import { youtubeThumbnail } from './providers/ytdlp.js';
@@ -48,6 +48,11 @@ export interface LinkReadOptions {
   signal?: AbortSignal | undefined;
   /** Ask spotDL for its YouTube Music match too (slower: it searches). Track links only. */
   match?: boolean | undefined;
+  /**
+   * Describe these positions of a list in full (1-based, in this order) rather than listing the whole
+   * list flat: how a page of a SoundCloud set's bare ids gets its titles, in one run of the tool.
+   */
+  items?: readonly number[] | undefined;
 }
 
 /** Reads a link with the server's tools. Throws `LinkReadError` (or anything) when it cannot. */
@@ -134,7 +139,42 @@ export function coversOf(tracks: readonly Pick<CatalogTrack, 'artworkUrl'>[], n 
   return out;
 }
 
-/** An ordered list as one page of it. `capped` is the server's cap, not the page. */
+/** Every song of a list, fetched page after page (`collectAllPages`). */
+export interface CollectedList {
+  /** The first page's answer: what the list is (kind, ref, covers, reason). */
+  first: CatalogResolveResult;
+  tracks: CatalogTrack[];
+  /** What the platform says the list holds, when it says. */
+  total: number | null;
+  /** True when the bound stopped the reading before the end: said, never a silent cut. */
+  capped: boolean;
+}
+
+/**
+ * Read a whole list in order through any `resolve`-shaped call (the engine's own, the hub's
+ * `GET catalog/resolve`, the helper's): `offset` advances by what each page held until `hasMore`
+ * is false, a page comes back empty, or `max` songs are in. Usable by every app, so the player,
+ * the hub and the companion page through a long playlist the same way.
+ */
+export async function collectAllPages(page: (offset: number, limit: number) => Promise<CatalogResolveResult>, options: { max: number; pageSize: number; signal?: AbortSignal; onPage?: (result: CatalogResolveResult) => void }): Promise<CollectedList> {
+  const first = await page(0, Math.min(options.pageSize, options.max));
+  options.onPage?.(first);
+  const tracks = [...(first.collection?.page.tracks ?? [])];
+  let last = first.collection?.page ?? null;
+  while (last && last.hasMore && tracks.length < options.max && !options.signal?.aborted) {
+    const next = await page(tracks.length, Math.min(options.pageSize, options.max - tracks.length));
+    options.onPage?.(next);
+    const rows = next.collection?.page.tracks ?? [];
+    if (!rows.length) break;
+    tracks.push(...rows);
+    last = next.collection?.page ?? null;
+  }
+  const total = first.collection?.page.total ?? null;
+  const stopped = Boolean(last?.hasMore) && tracks.length >= options.max;
+  return { first, tracks: tracks.slice(0, options.max), total, capped: stopped || Boolean(last?.capped) };
+}
+
+/** An ordered list as one page of it. `capped`: the bound (CATALOG_COLLECTION_CAP) left songs out for good. */
 export function pageOf(tracks: readonly CatalogTrack[], offset: number, limit: number, total: number | null, capped: boolean): CatalogCollection['page'] {
   const slice = tracks.slice(offset, offset + limit);
   const known = total ?? tracks.length;
