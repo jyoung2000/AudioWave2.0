@@ -32,7 +32,7 @@ import type {
   SavedCollection,
 } from '@now-playing/contracts';
 import { CATALOG_PLATFORM_LABELS, CATALOG_PROVIDERS } from '@now-playing/contracts';
-import { pickDownloadSource, sameRecording } from '@now-playing/domain/catalog';
+import { mergeTrack, pickDownloadSource, sameRecording } from '@now-playing/domain/catalog';
 import { ask, clients, jsonp, legacyHubSearch, Refused, Unreachable, type CatalogClient, type SearchParams } from './client.js';
 import * as V from './view.js';
 
@@ -61,21 +61,42 @@ interface Filter {
 class Bag<T extends { id: string; rank: number }> {
   private rows: Array<{ row: T; at: number }> = [];
   private n = 0;
-  constructor(private readonly same?: (a: T, b: T) => boolean) {}
+  /**
+   * `same` is the engine's identity (one recording on several platforms); `merge` is its merger, so
+   * the one row keeps every platform's badge. Without them, rows are one only by id.
+   */
+  constructor(
+    private readonly same?: (a: T, b: T) => boolean,
+    private readonly merge?: (into: T, other: T) => T,
+  ) {}
+  /** The row already shown that is this one: by id, else by recording. */
+  private find(row: T): { row: T; at: number } | undefined {
+    return this.rows.find((r) => r.row.id === row.id) ?? (this.same ? this.rows.find((r) => this.same!(r.row, row)) : undefined);
+  }
+  private fold(have: { row: T }, row: T): void {
+    // A later chunk's copy replaces its row in place; what this page already folded in stays.
+    have.row = this.merge ? (have.row.id === row.id ? this.merge(row, have.row) : this.merge(have.row, row)) : have.row.id === row.id ? row : have.row;
+  }
   upsert(list: readonly T[]): void {
     for (const row of list) {
-      // By id first (a later chunk replaces its row in place), then by recording (a duplicate is dropped).
-      const byId = this.rows.find((r) => r.row.id === row.id);
-      if (byId) byId.row = row;
-      else if (!this.same || !this.rows.some((r) => this.same!(r.row, row))) this.rows.push({ row, at: this.n++ });
+      const have = this.find(row);
+      if (have) this.fold(have, row);
+      else this.rows.push({ row, at: this.n++ });
     }
     this.rows.sort((a, b) => b.row.rank - a.row.rank || a.at - b.at);
   }
-  /** Appends a later page beneath what is there: a song seen already (by id or recording) is skipped. */
+  /**
+   * Appends a later page beneath what is there. A song already shown — by id or as the same recording
+   * — is never a second row: its badges join the row it is. Returns how many new rows came.
+   */
   append(list: readonly T[]): number {
     let added = 0;
     for (const row of list) {
-      if (this.rows.some((r) => r.row.id === row.id || (this.same ? this.same(r.row, row) : false))) continue;
+      const have = this.find(row);
+      if (have) {
+        this.fold(have, row);
+        continue;
+      }
       this.rows.push({ row, at: this.n++ });
       added += 1;
     }
@@ -107,7 +128,7 @@ interface Results {
   error: string | null;
 }
 
-const freshResults = (): Results => ({ tracks: new Bag<CatalogTrack>(sameSong), artists: new Bag(), albums: new Bag(), status: [], done: false, more: { tracks: false, artists: false, albums: false }, next: { tracks: 0, artists: 0, albums: 0 }, pending: new Set(), page: 0, via: '', error: null });
+const freshResults = (): Results => ({ tracks: new Bag<CatalogTrack>(sameSong, mergeTrack), artists: new Bag(), albums: new Bag(), status: [], done: false, more: { tracks: false, artists: false, albums: false }, next: { tracks: 0, artists: 0, albums: 0 }, pending: new Set(), page: 0, via: '', error: null });
 
 type View =
   | { kind: 'results' }

@@ -96,6 +96,49 @@ test('a search streams songs, artists and albums in sections; rows upsert by id 
   expect(asked[0]).toContain('sections=tracks%2Cartists%2Calbums');
 });
 
+test('one song from three sources in separate chunks is one row with three badges; a live version stays its own row', async ({ page }) => {
+  // Three services' copies under their own ids, each in its own chunk: the player applies the engine's
+  // identity (same artist, same title once the noise is set aside, within three seconds) and folds them.
+  const dz = track('deezer:1', 'Harbour Lamps', { durationMs: 214_000, sources: [src('deezer', '1', { previewUrl: 'https://cdnt-preview.dzcdn.net/1.mp3' })], rank: 120 });
+  const am = track('apple-music:7', 'Harbour Lamps', { durationMs: 215_000, sources: [src('apple-music', '7')], rank: 110 });
+  const yt = track('youtube:abc', 'Harbour Lamps (Official Video)', { album: null, durationMs: 216_000, sources: [src('youtube', 'abc')], rank: 50 });
+  const live = track('deezer:2', 'Harbour Lamps (Live)', { durationMs: 214_000, sources: [src('deezer', '2')], rank: 100 });
+  await companion(page, (path, route) =>
+    fulfillStream(route, [
+      results(0, null, 'harbour lamps', {}, PENDING),
+      results(1, 'deezer', 'harbour lamps', { tracks: [dz, live] }, PENDING),
+      results(2, 'itunes', 'harbour lamps', { tracks: [am] }, PENDING),
+      results(3, 'youtube', 'harbour lamps', { tracks: [yt] }, FINAL),
+      done(4, 'harbour lamps', FINAL, { tracks: false }),
+    ]),
+  );
+  await searchFor(page, 'harbour lamps');
+  const songs = page.locator('#srchList .srch__sec[aria-label="Songs"] .srch__row');
+  await expect(songs).toHaveCount(2);
+  await expect(songs.locator('.srch__title')).toHaveText(['Harbour Lamps', 'Harbour Lamps (Live)']);
+  await expect(songs.first().locator('.srch__badge')).toHaveText(['Deezer', 'Apple Music', 'YouTube']);
+  await expect(songs.nth(1).locator('.srch__badge')).toHaveText(['Deezer']);
+  await expect(page.locator('#srchCount')).toHaveText('Results: 2 songs · 0 artists · 0 albums');
+});
+
+test('a later page never repeats a song already shown: its platforms join the row it is', async ({ page }) => {
+  const songs = (from: number, n: number) => Array.from({ length: n }, (_, i) => track(`deezer:${from + i}`, `Song ${String(from + i).padStart(2, '0')}`, { durationMs: (200 + from + i) * 1000, rank: 1000 - from - i }));
+  await companion(page, (path, route) => {
+    const offset = Number(params(route).get('offset') ?? 0);
+    if (offset === 0) return fulfillStream(route, [results(0, 'deezer', 'song', { tracks: songs(1, 10) }, FINAL), done(1, 'song', FINAL, { tracks: true, artists: false, albums: false }, 0)]);
+    // Page two from another service: Song 01 again (its own id there), Song 03 under Deezer's id again, and one new song.
+    const again = track('apple-music:901', 'Song 01', { durationMs: 201_000, sources: [src('apple-music', '901')], rank: 5 });
+    return fulfillStream(route, [results(0, 'itunes', 'song', { tracks: [again, songs(3, 1)[0]!, ...songs(11, 1)] }, FINAL), done(1, 'song', FINAL, { tracks: false }, offset)]);
+  });
+  await searchFor(page, 'song');
+  await page.locator('.srch__row.srch__more').click();
+  await expect(page.locator('.srch__end')).toHaveText('That’s all 11 songs.');
+  const titles = await page.locator('#srchList .srch__title').allTextContents();
+  expect(titles).toHaveLength(11);
+  expect(new Set(titles).size).toBe(11);
+  await expect(page.locator('#srchList .srch__row').first().locator('.srch__badge')).toHaveText(['Deezer', 'Apple Music']);
+});
+
 test('keys move through every section; Enter opens what it is on, Escape goes back, Ctrl+Enter adds', async ({ page }) => {
   await companion(page, (path, route) => {
     if (path === 'search') {
@@ -367,5 +410,6 @@ test('with no hub and no companion, this browser searches the keyless services i
   const line = page.locator('#srchStatus');
   await expect(line).toContainText('through this browser');
   await expect(line).toContainText('YouTube needs yt-dlp');
+  await expect(line.locator('.srch__note')).toHaveText('YouTube and SoundCloud results need the hub or the companion.');
   expect(deezer.length).toBeGreaterThan(0);
 });

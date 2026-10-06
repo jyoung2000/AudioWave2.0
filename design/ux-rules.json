@@ -2197,7 +2197,7 @@
       "id": "NP-FIND-003",
       "group": "np-find",
       "title": "Search is music, live: songs, artists and albums in sections, each naming its platforms",
-      "contract": "A search in the header (Enter) asks the catalog — the paired hub's /api/v1/catalog/search with the device credential, else the companion's /helper/v1/catalog/search, else the engine run in this browser against the keyless services that answer a page (iTunes, MusicBrainz and LRCLIB over CORS; Deezer over JSONP) — and reads its NDJSON as it arrives. Rows appear as each service answers and upsert by id (a later chunk's merged copy replaces its row in place); they are sorted by rank, ties by arrival. The popover shows Songs (five), Artists (three) and Albums (three), each section with \"See all\" when there are more. Every row shows each platform it is on as a small badge (Apple Music, Deezer, YouTube, YouTube Music, SoundCloud, Bandcamp, Spotify, MusicBrainz…); a Spotify song says \"plays from YouTube Music\". A quiet line under the count names every service in the engine's states — a count, searching…, nothing, failed, timed out, cooling down until a time, needs yt-dlp — with the reason on hover, and who answered. A failure says plainly what happened. Arrows move through every row of every section (Page Up/Down turn the results page, NP-FIND-004; in a long list they move five rows), Enter auditions a song with a clip or opens what it is on, Ctrl/Cmd+Enter adds the song, Escape goes back a level and then closes; the rows are a listbox of groups with options, and a live region says the counts.",
+      "contract": "A search in the header (Enter) asks the catalog — the paired hub's /api/v1/catalog/search with the device credential, else the companion's /helper/v1/catalog/search, else the engine run in this browser against the keyless services that answer a page (iTunes, MusicBrainz and LRCLIB over CORS; Deezer over JSONP) — and reads its NDJSON as it arrives. Rows appear as each service answers and upsert by id (a later chunk's merged copy replaces its row in place); they are sorted by rank, ties by arrival. One song is one row: the engine merges its services' copies, and the player applies the engine's own identity (sameRecording) and merger (mergeTrack) to whatever still arrives apart — another chunk, another page — so a copy already shown joins that row with its badge instead of making a second; a live, remix or other version stays its own row. The popover shows Songs (five), Artists (three) and Albums (three), each section with \"See all\" when there are more. Every row shows each platform it is on as a small badge (Apple Music, Deezer, YouTube, YouTube Music, SoundCloud, Bandcamp, Spotify, MusicBrainz…); a Spotify song says \"plays from YouTube Music\". A quiet line under the count names every service in the engine's states — a count, searching…, nothing, failed, timed out, cooling down until a time, needs yt-dlp — with the reason on hover, and who answered; with only this browser it says plainly that YouTube and SoundCloud results need the hub or the companion. A failure says plainly what happened. Arrows move through every row of every section (Page Up/Down turn the results page, NP-FIND-004; in a long list they move five rows), Enter auditions a song with a clip or opens what it is on, Ctrl/Cmd+Enter adds the song, Escape goes back a level and then closes; the rows are a listbox of groups with options, and a live region says the counts.",
       "example": "“harbour”: Results: 12 songs · 2 artists · 2 albums — Apple Music 6 · Deezer 9 · MusicBrainz cooling down until 12:05 · YouTube 4 · SoundCloud failed — through the companion on this PC.",
       "authority": "adopted",
       "owners": [
@@ -2237,6 +2237,16 @@
           "type": "test",
           "path": "music-player/tests/e2e/np/func.spec.ts",
           "name": "search: add to library, escaping, a stale query, and focus loss closes the popover"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
+          "name": "one song from three sources in separate chunks is one row with three badges; a live version stays its own row"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
+          "name": "a later page never repeats a song already shown: its platforms join the row it is"
         }
       ]
     },

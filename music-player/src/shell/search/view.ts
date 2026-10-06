@@ -230,7 +230,9 @@ export function statusHTML(list: readonly CatalogSourceStatus[], via: string): s
     const why = s.error ? ` title="${esc(s.error)}"` : '';
     return `<span class="srch__st" data-state="${s.state}"${why}>${esc(PROVIDER_LABEL[s.provider])} ${esc(word)}</span>`;
   });
-  return parts.join('<span class="srch__dot" aria-hidden="true"> · </span>') + (via ? `<span class="srch__via2"> — through ${esc(via)}</span>` : '');
+  // With no hub and no companion, this browser asks what answers a page; yt-dlp is the servers'.
+  const browserOnly = via === 'this browser' ? '<span class="srch__note"> YouTube and SoundCloud results need the hub or the companion.</span>' : '';
+  return parts.join('<span class="srch__dot" aria-hidden="true"> · </span>') + (via ? `<span class="srch__via2"> — through ${esc(via)}.</span>` : '') + browserOnly;
 }
 
 /** The same, said plainly for a screen reader and for the failure message. */
