@@ -20,6 +20,8 @@ export interface ProbedTrack {
   /** The page the tool says the track lives at. */
   url: string;
   tags: DownloadTags;
+  /** spotDL's YouTube Music match for a Spotify song (`save --preload`), when it made one. */
+  matchUrl?: string | null;
 }
 
 export interface ProbedEntry {
@@ -219,6 +221,8 @@ export function tagsFromSpotdl(song: Json): DownloadTags | null {
     discNumber: int(song['disc_number'], 999),
     durationMs: durationMs(song['duration']),
     artworkUrl: https(song['cover_url']),
+    isrc: typeof song['isrc'] === 'string' && /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/.test(song['isrc']) ? song['isrc'] : null,
+    label: text(song['publisher'], 300),
   };
 }
 
@@ -236,7 +240,7 @@ export function fromSpotdl(json: unknown, requested: string): MediaProbe | null 
   if (/^\/(?:intl-[a-z-]+\/)?track\//i.test(path)) {
     const first = songs[0];
     const tags = first ? tagsFromSpotdl(first) : null;
-    return tags ? { kind: 'track', url: https(first!['url']) ?? requested, tags } : null;
+    return tags ? { kind: 'track', url: https(first!['url']) ?? requested, tags, matchUrl: https(first!['download_url']) } : null;
   }
   const ordered = [...songs].sort((a, b) => order(a) - order(b));
   const first = ordered[0];

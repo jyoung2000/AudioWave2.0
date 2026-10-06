@@ -40,7 +40,7 @@ import { ItunesClient, ItunesProvider } from './providers/itunes.js';
 import { MusicBrainzClient, MusicBrainzProvider } from './providers/musicbrainz.js';
 import { ToolSearchProvider, type ToolSearchRunner } from './providers/ytdlp.js';
 import { parseCatalogQuery, parseMusicLink, type MusicLink } from './query.js';
-import { LinkReadError, TOOL_PLATFORMS, collectionRef, coversOf, pageOf, trackFromLink, type LinkRead, type LinkReader } from './links.js';
+import { LinkReadError, TOOL_PLATFORMS, collectionRef, coversOf, pageOf, pickDownloadSource, trackFromLink, type LinkRead, type LinkReader } from './links.js';
 import { LrclibClient, OdesliClient } from './services.js';
 
 export const ALL_SECTIONS: readonly CatalogSection[] = ['tracks', 'artists', 'albums'];
@@ -334,6 +334,35 @@ export class CatalogEngine {
       }
     }
     return mergeSources([], found);
+  }
+
+  /**
+   * Where to fetch a song's audio: a downloadable source it already has; else one of its other homes
+   * (MusicBrainz's links, SongLink with a key); else YouTube's own search for "artist - title",
+   * taking only a result that is the same recording (same artist and title, within three seconds).
+   * Null when none is found: the song is in a store, and nowhere it can be fetched from.
+   */
+  async findDownloadSource(track: CatalogTrack, signal?: AbortSignal): Promise<CatalogSource | null> {
+    const own = pickDownloadSource(track.sources);
+    if (own) return own;
+    const linked = pickDownloadSource(await this.crossLinks(track, signal).catch(() => [] as CatalogSource[]));
+    if (linked) return linked;
+    const youtube = this.providers.get('youtube');
+    if (!youtube || this.health.coolingUntil('youtube')) return null;
+    const query = parseCatalogQuery({ q: `${track.artists[0] ?? track.artist} - ${track.title}` });
+    const controller = new AbortController();
+    const onAbort = (): void => controller.abort();
+    signal?.addEventListener('abort', onAbort, { once: true });
+    try {
+      const found = await this.withDeadline(youtube.search(query, { offset: 0, limit: 5, sections: ['tracks'], signal: controller.signal }), youtube.timeoutMs);
+      const same = found.tracks.find((t) => sameRecording(track, t));
+      return same?.sources[0] ? { ...same.sources[0], matchedBy: 'metadata' } : null;
+    } catch {
+      controller.abort();
+      return null;
+    } finally {
+      signal?.removeEventListener('abort', onAbort);
+    }
   }
 
   /* --------------------------------------------------------------- details */

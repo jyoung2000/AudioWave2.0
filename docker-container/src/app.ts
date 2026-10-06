@@ -71,6 +71,7 @@ import { TransferService } from './sync/transfers.js';
 import { detectFfmpeg } from './media/ffmpeg.js';
 import { HubTools } from './media/tools.js';
 import { toolEnvironment, toolScratchDir } from './media/tool-env.js';
+import { HubCatalogService } from './catalog/service.js';
 
 const HUB_IDENTITY_KEY = 'hub.identity';
 
@@ -207,6 +208,8 @@ export async function buildApp(deps: HubDeps): Promise<HubApp> {
 
   const downloads = new DownloadService(repos.downloads, repos.library, providers, rateLimiter, http, config, ffmpeg, audit, metrics, clock, random, log, identity.hubId);
   const files = new FileStore(config, repos.library, repos.downloads, metrics, clock);
+  // The music catalog (DEC-039): keyless search, through the same client, tools and queue.
+  const catalog = new HubCatalogService({ http, settings: repos.settings, sealer, providers, downloads, clock, log, userAgent: BRANDING.userAgent(version, repos.settings.get<string>('providers.contactEmail') ?? 'https://github.com/jyoung2000/AudioWave2.0') });
   const transfers = new TransferService(repos.downloads, repos.devices, files, audit, metrics, clock);
 
   /* ------------------------------------------------------------------ sync */
@@ -292,6 +295,7 @@ export async function buildApp(deps: HubDeps): Promise<HubApp> {
     recommendations,
     platformSync,
     downloads,
+    catalog,
     library,
     sync,
     files,

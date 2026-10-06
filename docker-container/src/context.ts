@@ -24,6 +24,7 @@ import type { ProviderRegistry } from './providers/registry.js';
 import type { SearchService } from './providers/search-service.js';
 import type { RateLimitManager } from './providers/rate-limit-manager.js';
 import type { DownloadService } from './downloads/service.js';
+import type { HubCatalogService } from './catalog/service.js';
 import type { LibraryService } from './library/service.js';
 import type { SyncService } from './sync/service.js';
 import type { FileStore } from './sync/files.js';
@@ -91,6 +92,8 @@ export interface HubContext {
   recommendations: RecommendationService;
   platformSync: PlatformSyncService;
   downloads: DownloadService;
+  /** The music catalog: keyless search across services, details, resolve, lyrics, enrichment (DEC-039). */
+  catalog: HubCatalogService;
   library: LibraryService;
   sync: SyncService;
   files: FileStore;

@@ -28,6 +28,13 @@ describe('the tags written', () => {
     expect(map).toMatchObject({ title: 'Big Buck Bunny', artist: 'Blender', date: '2014-11-10', genre: 'Film & Animation', copyright: 'Creative Commons Attribution license (reuse allowed)', comment: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ' });
   });
 
+  it('a catalog download’s ISRC, label and lyrics, under FFmpeg’s generic names, lyrics lines intact (DEC-039)', () => {
+    const map = tagMap(tags({ isrc: 'USQX91300108', label: 'Columbia', lyrics: '[00:01.00] One\n[00:02.00] Two' }), null, null);
+    expect(map).toMatchObject({ isrc: 'USQX91300108', publisher: 'Columbia', lyrics: '[00:01.00] One\n[00:02.00] Two' });
+    expect(ffmetadata({ lyrics: map['lyrics']! })).toBe(';FFMETADATA1\nlyrics=[00:01.00] One\\\n[00:02.00] Two\n');
+    expect(tagMap(tags(), null, null)).not.toHaveProperty('lyrics');
+  });
+
   it('featured artists in the title, as players show them', () => {
     expect(titleWithFeatured(tags({ title: 'Song', featured: ['A'] }))).toBe('Song (feat. A)');
     expect(titleWithFeatured(tags({ title: 'Song', featured: ['A', 'B', 'C'] }))).toBe('Song (feat. A, B & C)');

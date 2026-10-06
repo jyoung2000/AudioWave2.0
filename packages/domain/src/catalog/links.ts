@@ -108,6 +108,22 @@ export function trackFromLink(entry: LinkTrack, fallback: { platform: CatalogPla
   };
 }
 
+/**
+ * Where a song's audio can be fetched from, best first: YouTube Music's recording of the song (the
+ * one spotDL itself would pick), a YouTube upload, SoundCloud, Bandcamp, then a Spotify link — which
+ * spotDL turns into that same YouTube Music recording. The stores (Apple Music, Deezer) and
+ * MusicBrainz are never a download source: they sell or describe music, they do not hand it out.
+ */
+export const DOWNLOAD_SOURCE_ORDER: readonly CatalogPlatform[] = ['youtube-music', 'youtube', 'soundcloud', 'bandcamp', 'spotify'];
+
+export function pickDownloadSource(sources: readonly CatalogSource[]): CatalogSource | null {
+  for (const platform of DOWNLOAD_SOURCE_ORDER) {
+    const found = sources.find((s) => s.platform === platform && webUrl(s.url));
+    if (found) return found;
+  }
+  return null;
+}
+
 /** The first `n` pieces of artwork, in list order, for a mosaic. */
 export function coversOf(tracks: readonly Pick<CatalogTrack, 'artworkUrl'>[], n = 4): string[] {
   const out: string[] = [];

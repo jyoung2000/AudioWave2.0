@@ -94,6 +94,12 @@ export function tagMap(tags: DownloadTags | null | undefined, existing: Existing
     set('track', tags.trackNumber);
     set('disc', tags.discNumber);
     set('copyright', tags.license);
+    // Catalog downloads (DEC-039). FFmpeg's generic names: `publisher` is ID3 TPUB and the Vorbis
+    // PUBLISHER comment; `lyrics` is M4A ©lyr and the Vorbis LYRICS comment (MP3 gets it as a
+    // TXXX frame); `isrc` is the Vorbis ISRC comment and ID3 TSRC where FFmpeg maps it.
+    set('isrc', tags.isrc);
+    set('publisher', tags.label);
+    set('lyrics', tags.lyrics);
   }
   set('comment', sourceUrl);
   return out;

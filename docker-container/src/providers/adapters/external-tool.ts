@@ -30,6 +30,8 @@ export interface MetadataArgsContext {
   saveFile: string;
   /** Entries to list, one more than the batch cap so the hub can tell when a list was longer. */
   listLimit: number;
+  /** spotDL: also find the YouTube Music recording it would download (`--preload`), for the catalog. */
+  match?: boolean;
 }
 
 export interface ToolPreset {
@@ -125,7 +127,7 @@ export const TOOL_PRESETS: Record<PresetTool, ToolPreset> = {
       url,
     ],
     // spotDL refuses to start at all without FFmpeg, even to read metadata.
-    metadata: ({ url, ffmpeg, saveFile }) => (ffmpeg ? ['--no-cache', '--log-level', 'ERROR', '--ffmpeg', ffmpeg, '--save-file', saveFile, 'save', '--', url] : null),
+    metadata: ({ url, ffmpeg, saveFile, match }) => (ffmpeg ? ['--no-cache', '--log-level', 'ERROR', '--ffmpeg', ffmpeg, ...(match ? ['--preload'] : []), '--save-file', saveFile, 'save', '--', url] : null),
     infoFile: 'song.spotdl',
     needsHome: true,
   },
@@ -387,23 +389,52 @@ export class ExternalToolAdapter extends BaseAdapter {
    * usually resolved and then downloaded), at most two at a time (each run unpacks a runtime), and a
    * failure is not cached, so the next attempt asks again.
    */
-  probe(input: string, signal?: AbortSignal): Promise<MediaProbe> {
+  probe(input: string, signal?: AbortSignal, options: { match?: boolean } = {}): Promise<MediaProbe> {
     const url = this.allowed(input);
     if (!url) return Promise.reject(new DomainError('forbidden', 'That link is not on a host the external tool may reach'));
     const preset = this.presetFor(url);
     if (!preset || (this.config.extra['command'] ?? '').trim()) return Promise.reject(new DomainError('unsupported', 'Reading a link needs the yt-dlp or spotDL preset; a hand-written command cannot be asked'));
-    const key = url.toString();
+    const match = options.match === true && preset.tool === 'spotdl';
+    const key = `${url.toString()}${match ? '#match' : ''}`;
     const now = Date.now();
     for (const [k, entry] of this.metadataCache) if (now - entry.at > METADATA_CACHE_TTL_MS) this.metadataCache.delete(k);
     const hit = this.metadataCache.get(key);
     if (hit) return hit.value;
-    const value = this.withSlot(() => this.readMetadata(preset, key, signal));
+    const value = this.withSlot(() => this.readMetadata(preset, url.toString(), signal, match));
     this.metadataCache.set(key, { at: now, value });
     while (this.metadataCache.size > METADATA_CACHE_MAX) this.metadataCache.delete(this.metadataCache.keys().next().value!);
     value.catch(() => {
       if (this.metadataCache.get(key)?.value === value) this.metadataCache.delete(key);
     });
     return value;
+  }
+
+  /**
+   * One page of a catalog search through yt-dlp (`ytsearchN:` / `scsearchN:`, DEC-039). The arguments
+   * are `toolSearchArgs` from the domain and are checked for that shape again here: `--ignore-config`
+   * first, the search last behind `--`. Shares the two metadata slots, so searches cannot pile up
+   * processes.
+   */
+  async catalogSearch(args: readonly string[], signal?: AbortSignal): Promise<unknown> {
+    const preset = TOOL_PRESETS['yt-dlp'];
+    if (!this.presets().includes(preset)) throw new DomainError('unsupported', 'The external tool is not set to yt-dlp here, so YouTube and SoundCloud cannot be searched');
+    const binary = this.binaryFor(preset);
+    if (!existsSync(binary)) throw new DomainError('setup-required', 'yt-dlp is not on this hub yet. The hub sets it up by itself when it can reach github.com.');
+    if (args[0] !== '--ignore-config' || args.at(-2) !== '--' || !/^(yt|sc)search\d{1,3}:./.test(args.at(-1) ?? '')) throw new DomainError('validation', 'That is not a catalog search');
+    return this.withSlot(async () => {
+      let stdout: string;
+      try {
+        ({ stdout } = await runTool(binary, args, { env: this.toolEnvironment(null), timeoutMs: 30_000, maxStdoutBytes: 8 * 1024 * 1024, ...(signal ? { signal } : {}) }));
+      } catch (error) {
+        if (error instanceof ToolRunError) throw new DomainError('unavailable', `yt-dlp could not search: ${lastError(error.stderr) || error.message}`);
+        throw error;
+      }
+      try {
+        return JSON.parse(stdout) as unknown;
+      } catch {
+        throw new DomainError('unavailable', 'yt-dlp gave an answer the hub could not read');
+      }
+    });
   }
 
   private async withSlot<T>(run: () => Promise<T>): Promise<T> {
@@ -417,14 +448,14 @@ export class ExternalToolAdapter extends BaseAdapter {
     }
   }
 
-  private async readMetadata(preset: ToolPreset, url: string, signal?: AbortSignal): Promise<MediaProbe> {
+  private async readMetadata(preset: ToolPreset, url: string, signal?: AbortSignal, match = false): Promise<MediaProbe> {
     const binary = this.binaryFor(preset);
     if (!existsSync(binary)) throw new DomainError('setup-required', `${preset.displayName} is not on this hub yet`);
     const ffmpeg = resolveExecutable(await this.ffmpeg());
     const runDir = preset.needsHome ? this.makeRunDir(preset.tool) : null;
     try {
       const saveFile = join(runDir ?? '', 'save.spotdl');
-      const args = preset.metadata({ url, ffmpeg, node: process.execPath, saveFile, listLimit: DOWNLOAD_BATCH_CAP + 1 });
+      const args = preset.metadata({ url, ffmpeg, node: process.execPath, saveFile, listLimit: DOWNLOAD_BATCH_CAP + 1, match });
       if (!args) throw new DomainError('unsupported', `${preset.displayName} needs FFmpeg, and this hub has none`);
       let stdout: string;
       try {
