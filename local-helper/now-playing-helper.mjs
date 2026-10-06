@@ -697,10 +697,10 @@ function cached(getter) {
 function nullish(input2) {
   return input2 === null || input2 === void 0;
 }
-function cleanRegex(source) {
-  const start = source.startsWith("^") ? 1 : 0;
-  const end = source.endsWith("$") ? source.length - 1 : source.length;
-  return source.slice(start, end);
+function cleanRegex(source2) {
+  const start = source2.startsWith("^") ? 1 : 0;
+  const end = source2.endsWith("$") ? source2.length - 1 : source2.length;
+  return source2.slice(start, end);
 }
 function floatSafeRemainder(val, step) {
   const ratio = val / step;
@@ -773,14 +773,14 @@ function promiseAllObject(promisesObj) {
 }
 function randomString(length = 10) {
   const chars = "abcdefghijklmnopqrstuvwxyz";
-  let str2 = "";
+  let str3 = "";
   for (let i = 0; i < length; i++) {
-    str2 += chars[Math.floor(Math.random() * chars.length)];
+    str3 += chars[Math.floor(Math.random() * chars.length)];
   }
-  return str2;
+  return str3;
 }
-function esc(str2) {
-  return JSON.stringify(str2);
+function esc(str3) {
+  return JSON.stringify(str3);
 }
 function slugify(input2) {
   return input2.toLowerCase().trim().replace(/[^\w\s-]/g, "").replace(/[\s_-]+/g, "-").replace(/^-+|-+$/g, "");
@@ -894,8 +894,8 @@ var primitiveTypes = /* @__PURE__ */ new Set([
   "symbol",
   "undefined"
 ]);
-function escapeRegex(str2) {
-  return str2.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function escapeRegex(str3) {
+  return str3.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 function clone(inst, def, params) {
   const cl = new inst._zod.constr(def ?? inst._zod.def);
@@ -1216,13 +1216,13 @@ function getSizableOrigin(input2) {
   return "unknown";
 }
 var highSurrogate = /[\uD800-\uDBFF]/;
-function codePointLength(str2) {
-  const units = str2.length;
-  if (!highSurrogate.test(str2))
+function codePointLength(str3) {
+  const units = str3.length;
+  if (!highSurrogate.test(str3))
     return units;
   let count = units;
   for (let i = 0; i < units - 1; i++) {
-    if ((str2.charCodeAt(i) & 64512) === 55296 && (str2.charCodeAt(i + 1) & 64512) === 56320) {
+    if ((str3.charCodeAt(i) & 64512) === 55296 && (str3.charCodeAt(i + 1) & 64512) === 56320) {
       count--;
       i++;
     }
@@ -1721,14 +1721,14 @@ function toDotPath(_path) {
   return segs.join("");
 }
 function prettifyError(error61) {
-  const lines = [];
+  const lines2 = [];
   const issues = [...error61.issues].sort((a, b) => (a.path ?? []).length - (b.path ?? []).length);
   for (const issue2 of issues) {
-    lines.push(`\u2716 ${issue2.message}`);
+    lines2.push(`\u2716 ${issue2.message}`);
     if (issue2.path?.length)
-      lines.push(`  \u2192 at ${toDotPath(issue2.path)}`);
+      lines2.push(`  \u2192 at ${toDotPath(issue2.path)}`);
   }
-  return lines.join("\n");
+  return lines2.join("\n");
 }
 
 // ../node_modules/zod/v4/core/parse.js
@@ -1985,8 +1985,8 @@ var httpProtocol = /^https?$/;
 var e164 = /^\+[1-9]\d{6,14}$/;
 var creditCard = /^\d(?:[ -]?\d){11,18}$/;
 var dateSource = `(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))`;
-function anchor(source) {
-  return new RegExp(`^${source}$`);
+function anchor(source2) {
+  return new RegExp(`^${source2}$`);
 }
 var date = /* @__PURE__ */ anchor(dateSource);
 function timeSource(args) {
@@ -2604,9 +2604,9 @@ var Doc = class {
       return;
     }
     const content = arg;
-    const lines = content.split("\n").filter((x) => x);
-    const minIndent = Math.min(...lines.map((x) => x.length - x.trimStart().length));
-    const dedented = lines.map((x) => x.slice(minIndent)).map((x) => " ".repeat(this.indent * 2) + x);
+    const lines2 = content.split("\n").filter((x) => x);
+    const minIndent = Math.min(...lines2.map((x) => x.length - x.trimStart().length));
+    const dedented = lines2.map((x) => x.slice(minIndent)).map((x) => " ".repeat(this.indent * 2) + x);
     for (const line of dedented) {
       this.content.push(line);
     }
@@ -3489,20 +3489,20 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
     const shape = zod.def.shape;
     const propValues = {};
     for (const key in shape) {
-      const field = shape[key]._zod;
-      if (field.values) {
+      const field2 = shape[key]._zod;
+      if (field2.values) {
         if (!Object.prototype.hasOwnProperty.call(propValues, key)) {
           assignProp(propValues, key, /* @__PURE__ */ new Set());
         }
-        for (const v of field.values)
+        for (const v of field2.values)
           propValues[key].add(v);
-        if (field.optin !== void 0)
+        if (field2.optin !== void 0)
           propValues[key].add(void 0);
       }
     }
     return propValues;
   });
-  const isObject2 = isObject;
+  const isObject3 = isObject;
   const catchall = def.catchall;
   let value;
   const memo2 = globalConfig.memoizer;
@@ -3510,7 +3510,7 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
   inst._zod.parse = (payload, ctx) => {
     value ?? (value = _normalized.value);
     const input2 = payload.value;
-    if (!isObject2(input2)) {
+    if (!isObject3(input2)) {
       payload.issues.push({
         expected: "object",
         code: "invalid_type",
@@ -3629,7 +3629,7 @@ var $ZodObjectJIT = /* @__PURE__ */ $constructor("$ZodObjectJIT", (inst, def) =>
     return doc.compile();
   };
   let fastpass;
-  const isObject2 = isObject;
+  const isObject3 = isObject;
   const jit = !globalConfig.jitless;
   const allowsEval2 = allowsEval;
   const fastEnabled = jit && allowsEval2.value;
@@ -3638,7 +3638,7 @@ var $ZodObjectJIT = /* @__PURE__ */ $constructor("$ZodObjectJIT", (inst, def) =>
   inst._zod.parse = (payload, ctx) => {
     value ?? (value = _normalized.value);
     const input2 = payload.value;
-    if (!isObject2(input2)) {
+    if (!isObject3(input2)) {
       payload.issues.push({
         expected: "object",
         code: "invalid_type",
@@ -4721,12 +4721,12 @@ var $ZodTemplateLiteral = /* @__PURE__ */ $constructor("$ZodTemplateLiteral", (i
       if (!part._zod.pattern) {
         throw new Error(`Invalid template literal part, no pattern found: ${[...part._zod.traits].shift()}`);
       }
-      const source = part._zod.pattern instanceof RegExp ? part._zod.pattern.source : part._zod.pattern;
-      if (!source)
+      const source2 = part._zod.pattern instanceof RegExp ? part._zod.pattern.source : part._zod.pattern;
+      if (!source2)
         throw new Error(`Invalid template literal part: ${part._zod.traits}`);
-      const start = source.startsWith("^") ? 1 : 0;
-      const end = source.endsWith("$") ? source.length - 1 : source.length;
-      regexParts.push(source.slice(start, end));
+      const start = source2.startsWith("^") ? 1 : 0;
+      const end = source2.endsWith("$") ? source2.length - 1 : source2.length;
+      regexParts.push(source2.slice(start, end));
     } else if (part === null || primitiveTypes.has(typeof part)) {
       regexParts.push(escapeRegex(`${part}`));
     } else {
@@ -12570,9 +12570,9 @@ function compile(schema, options) {
     return schema;
   }
 }
-function installCompiledUserMethods(target, source, parser) {
+function installCompiledUserMethods(target, source2, parser) {
   const targetAny = target;
-  const sourceAny = source;
+  const sourceAny = source2;
   if (typeof sourceAny.safeParse === "function") {
     const originalSafeParse = sourceAny.safeParse;
     targetAny.safeParse = (data, params) => {
@@ -15113,10 +15113,10 @@ function _stringFormat(Class2, format, fnOrRegex, _params = {}) {
 
 // ../node_modules/zod/v4/core/to-json-schema.js
 function assignProps(target, ...sources) {
-  for (const source of sources) {
-    for (const key of Reflect.ownKeys(source)) {
-      if (Object.prototype.propertyIsEnumerable.call(source, key)) {
-        assignProp(target, key, source[key]);
+  for (const source2 of sources) {
+    for (const key of Reflect.ownKeys(source2)) {
+      if (Object.prototype.propertyIsEnumerable.call(source2, key)) {
+        assignProp(target, key, source2[key]);
       }
     }
   }
@@ -15902,11 +15902,11 @@ var objectProcessor = (schema, ctx, _json, params) => {
   }
   const allKeys = new Set(Object.keys(shape));
   const requiredKeys = new Set([...allKeys].filter((key) => {
-    const field = def.shape[key];
+    const field2 = def.shape[key];
     if (ctx.io === "input") {
-      return inputOptin(field) === void 0;
+      return inputOptin(field2) === void 0;
     } else {
-      return field._zod.optout === void 0;
+      return field2._zod.optout === void 0;
     }
   }));
   if (requiredKeys.size > 0) {
@@ -19628,7 +19628,12 @@ var DownloadTags = external_exports.object({
   discNumber: external_exports.number().int().positive().max(999).nullable().default(null),
   durationMs: external_exports.number().int().nonnegative().nullable().default(null),
   artworkUrl: external_exports.string().url().max(2048).nullable().default(null),
-  license: external_exports.string().max(200).nullable().default(null)
+  license: external_exports.string().max(200).nullable().default(null),
+  /** Catalog downloads (DEC-039) also carry these; FFmpeg writes them as the ISRC, publisher (label) and lyrics tags. */
+  isrc: external_exports.string().regex(/^[A-Z]{2}[A-Z0-9]{3}\d{7}$/).nullable().optional(),
+  label: external_exports.string().max(300).nullable().optional(),
+  /** LRC or plain text from LRCLIB, when the hub's catalog setting embeds lyrics. */
+  lyrics: external_exports.string().max(2e4).nullable().optional()
 });
 var DOWNLOAD_BATCH_CAP = 200;
 var DownloadBatchRef = external_exports.object({
@@ -20376,7 +20381,11 @@ var HelperResolvedTrack = external_exports.object({
   date: CalendarDate.nullable(),
   year: external_exports.number().int().min(1e3).max(3e3).nullable(),
   artworkUrl: external_exports.string().max(2048).nullable(),
-  trackNumber: external_exports.number().int().positive().nullable()
+  trackNumber: external_exports.number().int().positive().nullable(),
+  /** spotDL reports these for a Spotify song (catalog resolve, DEC-039); absent from yt-dlp answers. */
+  isrc: external_exports.string().max(12).nullable().optional(),
+  /** spotDL's own YouTube Music match for a Spotify song, when it made one (`save --preload`). */
+  matchUrl: external_exports.string().max(2048).nullable().optional()
 });
 var HelperResolved = external_exports.object({
   source: HelperResolveSource,
@@ -20427,7 +20436,18 @@ var HELPER_DEFAULT_HOSTS = [
   "bandcamp.com",
   // Bandcamp keeps its music on each artist subdomain (artist.bandcamp.com/track/...).
   "*.bandcamp.com",
-  "archive.org"
+  "archive.org",
+  // The music catalog (DEC-039): the keyless services its routes call (CATALOG_API_HOSTS), and the
+  // hosts their artwork and 30-second previews come from, so the list still says what this touches.
+  "itunes.apple.com",
+  "api.deezer.com",
+  "musicbrainz.org",
+  "coverartarchive.org",
+  "api.song.link",
+  "lrclib.net",
+  "*.mzstatic.com",
+  "audio-ssl.itunes.apple.com",
+  "*.dzcdn.net"
 ];
 
 // ../packages/contracts/src/api/live-tv.ts
@@ -20461,6 +20481,298 @@ var HubLiveTvSummary = external_exports.object({
   updatedAt: IsoDateTime.nullable(),
   sourceDevice: HubLiveTvSource.nullable()
 });
+
+// ../packages/contracts/src/api/catalog.ts
+var CatalogPlatform = external_exports.enum(["apple-music", "deezer", "musicbrainz", "youtube", "youtube-music", "soundcloud", "spotify", "bandcamp", "tidal", "qobuz", "amazon-music"]);
+var CATALOG_PLATFORM_LABELS = {
+  "apple-music": "Apple Music",
+  deezer: "Deezer",
+  musicbrainz: "MusicBrainz",
+  youtube: "YouTube",
+  "youtube-music": "YouTube Music",
+  soundcloud: "SoundCloud",
+  spotify: "Spotify",
+  bandcamp: "Bandcamp",
+  tidal: "Tidal",
+  qobuz: "Qobuz",
+  "amazon-music": "Amazon Music"
+};
+var CatalogProviderId = external_exports.enum(["itunes", "deezer", "musicbrainz", "youtube", "soundcloud"]);
+var CATALOG_PROVIDERS = CatalogProviderId.options;
+var CatalogSection = external_exports.enum(["tracks", "artists", "albums"]);
+var CatalogMatch = external_exports.enum(["search", "isrc", "metadata", "musicbrainz", "spotdl", "odesli", "link"]);
+var CatalogSource = external_exports.object({
+  platform: CatalogPlatform,
+  /** The platform's own id for the item, when it has one. */
+  id: external_exports.string().max(200).nullable(),
+  url: external_exports.string().max(2048),
+  /** A DRM-free clip (iTunes, Deezer: 30 s), when the platform offers one. */
+  previewUrl: external_exports.string().max(2048).nullable().default(null),
+  matchedBy: CatalogMatch.default("search")
+});
+var CatalogTrack = external_exports.object({
+  /** Stable for the life of a search: the first source's `platform:id`. Chunks upsert by it. */
+  id: external_exports.string().max(260),
+  title: external_exports.string().max(300),
+  /** The credited artist line, as the richest source wrote it. */
+  artist: external_exports.string().max(300),
+  artists: external_exports.array(external_exports.string().max(300)).max(20).default([]),
+  album: external_exports.string().max(300).nullable().default(null),
+  albumArtist: external_exports.string().max(300).nullable().default(null),
+  durationMs: external_exports.number().int().nonnegative().nullable().default(null),
+  isrc: external_exports.string().regex(/^[A-Z]{2}[A-Z0-9]{3}\d{7}$/).nullable().default(null),
+  artworkUrl: external_exports.string().max(2048).nullable().default(null),
+  /** `YYYY`, `YYYY-MM` or `YYYY-MM-DD`. */
+  releaseDate: external_exports.string().regex(/^\d{4}(-\d{2}(-\d{2})?)?$/).nullable().default(null),
+  year: external_exports.number().int().min(1e3).max(3e3).nullable().default(null),
+  trackNumber: external_exports.number().int().positive().nullable().default(null),
+  discNumber: external_exports.number().int().positive().nullable().default(null),
+  bpm: external_exports.number().positive().nullable().default(null),
+  explicit: external_exports.boolean().nullable().default(null),
+  genre: external_exports.string().max(100).nullable().default(null),
+  label: external_exports.string().max(300).nullable().default(null),
+  sources: external_exports.array(CatalogSource).min(1).max(20),
+  /** Higher is a better answer to the query. Ties keep arrival order. */
+  rank: external_exports.number().default(0)
+});
+var CatalogArtist = external_exports.object({
+  id: external_exports.string().max(260),
+  name: external_exports.string().max(300),
+  pictureUrl: external_exports.string().max(2048).nullable().default(null),
+  albumCount: external_exports.number().int().nonnegative().nullable().default(null),
+  fans: external_exports.number().int().nonnegative().nullable().default(null),
+  genre: external_exports.string().max(100).nullable().default(null),
+  sources: external_exports.array(CatalogSource).min(1).max(20),
+  rank: external_exports.number().default(0)
+});
+var CatalogAlbum = external_exports.object({
+  id: external_exports.string().max(260),
+  title: external_exports.string().max(300),
+  artist: external_exports.string().max(300).nullable().default(null),
+  artworkUrl: external_exports.string().max(2048).nullable().default(null),
+  releaseDate: external_exports.string().regex(/^\d{4}(-\d{2}(-\d{2})?)?$/).nullable().default(null),
+  year: external_exports.number().int().min(1e3).max(3e3).nullable().default(null),
+  trackCount: external_exports.number().int().nonnegative().nullable().default(null),
+  label: external_exports.string().max(300).nullable().default(null),
+  genre: external_exports.string().max(100).nullable().default(null),
+  explicit: external_exports.boolean().nullable().default(null),
+  upc: external_exports.string().max(40).nullable().default(null),
+  sources: external_exports.array(CatalogSource).min(1).max(20),
+  rank: external_exports.number().default(0)
+});
+var CatalogQuery = external_exports.object({
+  kind: external_exports.enum(["text", "advanced", "isrc", "url"]),
+  text: external_exports.string().max(400),
+  track: external_exports.string().max(200).nullable().default(null),
+  artist: external_exports.string().max(200).nullable().default(null),
+  album: external_exports.string().max(200).nullable().default(null),
+  isrc: external_exports.string().max(12).nullable().default(null),
+  url: external_exports.string().max(2048).nullable().default(null)
+});
+var CatalogSourceState = external_exports.enum(["pending", "ok", "empty", "failed", "timeout", "cooling-down", "skipped"]);
+var CatalogSourceStatus = external_exports.object({
+  provider: CatalogProviderId,
+  state: CatalogSourceState,
+  /** Rows this service returned for this page, before merging. */
+  count: external_exports.number().int().nonnegative().default(0),
+  latencyMs: external_exports.number().int().nonnegative().nullable().default(null),
+  /** Said in words, for a person. Never a stack trace. */
+  error: external_exports.string().max(400).nullable().default(null),
+  retryAt: IsoDateTime.nullable().default(null)
+});
+var CatalogPage = external_exports.object({
+  offset: external_exports.number().int().nonnegative(),
+  limit: external_exports.number().int().positive(),
+  /** True when any service returned a full page: asking for the next offset may find more. */
+  hasMore: external_exports.boolean()
+});
+var CATALOG_MAX_LIMIT = 50;
+var csv = (item) => external_exports.string().max(200).transform((value, ctx) => {
+  const parts = value.split(",").map((p) => p.trim()).filter(Boolean);
+  const out = [];
+  for (const part of parts) {
+    const parsed = item.safeParse(part);
+    if (!parsed.success) {
+      ctx.addIssue({ code: "custom", message: `Unknown value \u201C${part}\u201D` });
+      return external_exports.NEVER;
+    }
+    out.push(parsed.data);
+  }
+  return out;
+});
+var CatalogSearchRequest = external_exports.object({
+  q: external_exports.string().trim().max(400).default(""),
+  track: external_exports.string().trim().max(200).optional(),
+  artist: external_exports.string().trim().max(200).optional(),
+  album: external_exports.string().trim().max(200).optional(),
+  sections: csv(CatalogSection).optional(),
+  providers: csv(CatalogProviderId).optional(),
+  offset: external_exports.coerce.number().int().min(0).max(1e3).default(0),
+  limit: external_exports.coerce.number().int().min(1).max(CATALOG_MAX_LIMIT).default(25),
+  /** `0` answers with one aggregate instead of NDJSON. */
+  stream: external_exports.enum(["0", "1"]).default("1")
+}).refine((r) => Boolean(r.q || r.track || r.artist || r.album), { message: "Say what to look for: q, or track, artist or album" });
+var CatalogSearchResultsChunk = external_exports.object({
+  type: external_exports.literal("results"),
+  seq: external_exports.number().int().nonnegative(),
+  /** The service whose answer this chunk carries; null for a merge-only update (cross-links). */
+  provider: CatalogProviderId.nullable(),
+  query: CatalogQuery,
+  tracks: external_exports.array(CatalogTrack),
+  artists: external_exports.array(CatalogArtist),
+  albums: external_exports.array(CatalogAlbum),
+  status: external_exports.array(CatalogSourceStatus)
+});
+var CatalogSearchDoneChunk = external_exports.object({
+  type: external_exports.literal("done"),
+  seq: external_exports.number().int().nonnegative(),
+  query: CatalogQuery,
+  status: external_exports.array(CatalogSourceStatus),
+  page: external_exports.object({ tracks: CatalogPage.nullable(), artists: CatalogPage.nullable(), albums: CatalogPage.nullable() }),
+  /** Rows after merging, per section. */
+  totals: external_exports.object({ tracks: external_exports.number().int().nonnegative(), artists: external_exports.number().int().nonnegative(), albums: external_exports.number().int().nonnegative() }),
+  /** A pasted link is not searched: the client should call `resolve` with it. */
+  resolve: external_exports.string().max(2048).nullable().default(null)
+});
+var CatalogSearchChunk = external_exports.discriminatedUnion("type", [CatalogSearchResultsChunk, CatalogSearchDoneChunk]);
+var CatalogSearchAggregate = external_exports.object({
+  query: CatalogQuery,
+  tracks: external_exports.array(CatalogTrack),
+  artists: external_exports.array(CatalogArtist),
+  albums: external_exports.array(CatalogAlbum),
+  status: external_exports.array(CatalogSourceStatus),
+  page: CatalogSearchDoneChunk.shape.page,
+  resolve: external_exports.string().max(2048).nullable().default(null)
+});
+var CatalogCollectionRef = external_exports.object({
+  platform: CatalogPlatform,
+  kind: external_exports.enum(["album", "playlist"]),
+  id: external_exports.string().min(1).max(260),
+  url: external_exports.string().max(2048),
+  title: external_exports.string().max(300),
+  owner: external_exports.string().max(300).nullable()
+});
+var CatalogTrackPage = external_exports.object({
+  tracks: external_exports.array(CatalogTrack),
+  offset: external_exports.number().int().nonnegative(),
+  limit: external_exports.number().int().positive(),
+  /** How many the platform says there are, when it says. */
+  total: external_exports.number().int().nonnegative().nullable(),
+  hasMore: external_exports.boolean(),
+  /** True when the server's cap (`CATALOG_COLLECTION_CAP`) left some out for good. */
+  capped: external_exports.boolean()
+});
+var CATALOG_COLLECTION_CAP = 200;
+var CatalogAlbumRequest = external_exports.object({
+  /** `platform:id` from a result's source (`deezer:6575789`, `apple-music:617154241`). */
+  id: external_exports.string().min(3).max(260),
+  offset: external_exports.coerce.number().int().min(0).max(CATALOG_COLLECTION_CAP).default(0),
+  limit: external_exports.coerce.number().int().min(1).max(CATALOG_COLLECTION_CAP).default(100)
+});
+var CatalogAlbumDetail = external_exports.object({ album: CatalogAlbum, page: CatalogTrackPage, collection: CatalogCollectionRef });
+var CatalogArtistRequest = external_exports.object({
+  id: external_exports.string().min(3).max(260),
+  albumsOffset: external_exports.coerce.number().int().min(0).max(500).default(0),
+  albumsLimit: external_exports.coerce.number().int().min(1).max(CATALOG_MAX_LIMIT).default(25),
+  topLimit: external_exports.coerce.number().int().min(1).max(CATALOG_MAX_LIMIT).default(10)
+});
+var CatalogArtistDetail = external_exports.object({
+  artist: CatalogArtist,
+  topTracks: external_exports.array(CatalogTrack),
+  albums: external_exports.array(CatalogAlbum),
+  albumsPage: CatalogPage
+});
+var SavedCollection = external_exports.object({
+  ref: CatalogCollectionRef,
+  savedAt: IsoDateTime,
+  artworkUrl: external_exports.string().max(2048).nullable().default(null),
+  /** The first four songs' artwork, in order: the 2×2 mosaic when the list has no cover of its own. */
+  covers: external_exports.array(external_exports.string().max(2048)).max(4).default([]),
+  trackCount: external_exports.number().int().nonnegative().nullable().default(null)
+});
+var CatalogCollection = external_exports.object({
+  ref: CatalogCollectionRef,
+  /** The list's own cover, when the platform gives it one. */
+  artworkUrl: external_exports.string().max(2048).nullable(),
+  /** Artwork of the first four songs that have one, in list order, for a 2×2 mosaic. */
+  covers: external_exports.array(external_exports.string().max(2048)).max(4),
+  releaseDate: CalendarDate.nullable().default(null),
+  page: CatalogTrackPage
+});
+var CatalogResolveRequest = external_exports.object({
+  url: external_exports.string().trim().min(1).max(2048),
+  offset: external_exports.coerce.number().int().min(0).max(CATALOG_COLLECTION_CAP).default(0),
+  limit: external_exports.coerce.number().int().min(1).max(CATALOG_COLLECTION_CAP).default(100)
+});
+var CatalogResolveResult = external_exports.object({
+  url: external_exports.string().max(2048),
+  platform: CatalogPlatform.nullable(),
+  kind: external_exports.enum(["track", "album", "playlist", "artist", "unavailable", "unsupported"]),
+  track: CatalogTrack.nullable().default(null),
+  collection: CatalogCollection.nullable().default(null),
+  artist: CatalogArtist.nullable().default(null),
+  reason: external_exports.string().max(600).nullable().default(null),
+  resolvedAt: IsoDateTime
+});
+var CatalogLyricsRequest = external_exports.object({
+  title: external_exports.string().trim().min(1).max(300),
+  artist: external_exports.string().trim().min(1).max(300),
+  album: external_exports.string().trim().max(300).optional(),
+  durationSec: external_exports.coerce.number().int().min(1).max(7200).optional()
+});
+var CatalogLyrics = external_exports.object({
+  found: external_exports.boolean(),
+  source: external_exports.literal("lrclib"),
+  id: external_exports.number().int().nullable().default(null),
+  instrumental: external_exports.boolean().default(false),
+  /** LRC: `[mm:ss.xx] line`, one per line. */
+  synced: external_exports.string().max(1e5).nullable().default(null),
+  plain: external_exports.string().max(1e5).nullable().default(null),
+  trackName: external_exports.string().max(300).nullable().default(null),
+  artistName: external_exports.string().max(300).nullable().default(null),
+  durationSec: external_exports.number().nonnegative().nullable().default(null)
+});
+var CatalogEnrichRequest = external_exports.object({
+  isrc: external_exports.string().trim().transform((s) => s.toUpperCase().replace(/[-\s]/g, "")).pipe(external_exports.string().regex(/^[A-Z]{2}[A-Z0-9]{3}\d{7}$/)).optional(),
+  title: external_exports.string().trim().max(300).optional(),
+  artist: external_exports.string().trim().max(300).optional(),
+  durationSec: external_exports.coerce.number().int().min(1).max(7200).optional(),
+  /** Also look for the song on other platforms (MusicBrainz links, Deezer by ISRC, SongLink with a key). */
+  links: external_exports.enum(["0", "1"]).default("1")
+}).refine((r) => Boolean(r.isrc || r.title && r.artist), { message: "Give an isrc, or a title and an artist" });
+var CatalogEnrichment = external_exports.object({
+  isrc: external_exports.string().max(12).nullable(),
+  musicbrainzRecordingId: external_exports.string().max(40).nullable(),
+  genre: external_exports.string().max(100).nullable(),
+  genres: external_exports.array(external_exports.string().max(100)).max(10),
+  label: external_exports.string().max(300).nullable(),
+  releaseDate: external_exports.string().max(10).nullable(),
+  year: external_exports.number().int().nullable(),
+  sources: external_exports.array(CatalogSource)
+});
+var CatalogSettingsView = external_exports.object({
+  /** Write synced or plain lyrics (LRCLIB) into a catalog download's tags. Default on. */
+  embedLyrics: external_exports.boolean(),
+  providers: external_exports.record(CatalogProviderId, external_exports.boolean()),
+  /** SongLink closed keyless access in 2026; with a key it adds Tidal, Qobuz and Amazon links. */
+  odesliKeyConfigured: external_exports.boolean()
+});
+var CatalogSettingsInput = external_exports.object({
+  embedLyrics: external_exports.boolean().optional(),
+  providers: external_exports.partialRecord(CatalogProviderId, external_exports.boolean()).optional(),
+  /** Write-only. Empty string clears it. */
+  odesliKey: external_exports.string().max(200).optional()
+});
+var CATALOG_API_HOSTS = ["itunes.apple.com", "api.deezer.com", "musicbrainz.org", "coverartarchive.org", "api.song.link", "lrclib.net"];
+var HELPER_CATALOG_ROUTES = {
+  search: "/helper/v1/catalog/search",
+  album: "/helper/v1/catalog/album",
+  artist: "/helper/v1/catalog/artist",
+  resolve: "/helper/v1/catalog/resolve",
+  lyrics: "/helper/v1/catalog/lyrics",
+  enrich: "/helper/v1/catalog/enrich"
+};
+var NDJSON_CONTENT_TYPE = "application/x-ndjson";
 
 // ../packages/contracts/src/api/routes.ts
 function defineRoute(route) {
@@ -20779,6 +21091,16 @@ var routes = {
   radioNowPlaying: defineRoute({ method: "GET", path: "/radio/now-playing", operationId: "radioNowPlaying", summary: "The song an internet radio station says it is playing, read from its ICY metadata", tags: ["search"], auth: "admin-or-device", scopes: ["search:use"], rateLimit: "search", query: external_exports.object({ url: external_exports.string().min(1).max(2048) }), response: StationNowPlaying }),
   providersResolve: defineRoute({ method: "GET", path: "/providers/resolve", operationId: "resolveUrl", summary: "Resolve a pasted URL or id to a capability-annotated result", tags: ["providers"], auth: "admin-or-device", scopes: ["search:use"], rateLimit: "search", query: external_exports.object({ url: external_exports.string().min(1).max(2048) }), response: SearchResult }),
   providersUsage: defineRoute({ method: "GET", path: "/providers/usage", operationId: "providerUsage", summary: "Quota budgets, circuit state and request classes", tags: ["providers"], auth: "admin", response: external_exports.object({ items: external_exports.array(external_exports.object({ provider: ProviderId, health: ProviderHealth, budget: external_exports.object({ perMinute: external_exports.number(), perDay: external_exports.number().nullable(), usedMinute: external_exports.number(), usedDay: external_exports.number(), shedding: external_exports.array(external_exports.string()) }), queueDepth: external_exports.record(external_exports.string(), external_exports.number()), concurrency: external_exports.object({ limit: external_exports.number(), inFlight: external_exports.number() }) })) }) }),
+  /* the music catalog (DEC-039): keyless search across services, merged; see packages/contracts/src/api/catalog.ts */
+  catalogSearch: defineRoute({ method: "GET", path: "/catalog/search", operationId: "catalogSearch", summary: "Songs, artists and albums across the keyless music services, merged, streamed as NDJSON (one CatalogSearchChunk per line, a done chunk last). ?stream=0 answers with one CatalogSearchAggregate instead.", tags: ["catalog"], auth: "admin-or-device", scopes: ["search:use"], rateLimit: "search", query: CatalogSearchRequest, response: CatalogSearchChunk, responseContentType: NDJSON_CONTENT_TYPE }),
+  catalogAlbum: defineRoute({ method: "GET", path: "/catalog/album", operationId: "catalogAlbum", summary: "An album by platform:id: cover, label, date and its tracks (paged)", tags: ["catalog"], auth: "admin-or-device", scopes: ["search:use"], rateLimit: "search", query: CatalogAlbumRequest, response: CatalogAlbumDetail }),
+  catalogArtist: defineRoute({ method: "GET", path: "/catalog/artist", operationId: "catalogArtist", summary: "An artist by platform:id: picture, top tracks and albums (paged)", tags: ["catalog"], auth: "admin-or-device", scopes: ["search:use"], rateLimit: "search", query: CatalogArtistRequest, response: CatalogArtistDetail }),
+  catalogResolve: defineRoute({ method: "GET", path: "/catalog/resolve", operationId: "catalogResolve", summary: "What a pasted music link is: a track, or an album or playlist with every song (paged), read keylessly (public APIs, yt-dlp, spotDL)", tags: ["catalog"], auth: "admin-or-device", scopes: ["search:use"], rateLimit: "search", query: CatalogResolveRequest, response: CatalogResolveResult }),
+  catalogLyrics: defineRoute({ method: "GET", path: "/catalog/lyrics", operationId: "catalogLyrics", summary: "Synced and plain lyrics from LRCLIB", tags: ["catalog"], auth: "admin-or-device", scopes: ["search:use"], rateLimit: "search", query: CatalogLyricsRequest, response: CatalogLyrics }),
+  catalogEnrich: defineRoute({ method: "GET", path: "/catalog/enrich", operationId: "catalogEnrich", summary: "Genre, label and year from MusicBrainz by ISRC, and the song on other platforms", tags: ["catalog"], auth: "admin-or-device", scopes: ["search:use"], rateLimit: "search", query: CatalogEnrichRequest, response: CatalogEnrichment }),
+  catalogDownload: defineRoute({ method: "POST", path: "/catalog/download", operationId: "catalogDownload", summary: "Queue a catalog track through the download queue, from its best downloadable source, tagged with ISRC, genre, label, year and (setting) lyrics", tags: ["catalog", "downloads"], auth: "admin-or-device", scopes: ["downloads:request"], rateLimit: "write", body: external_exports.object({ track: CatalogTrack, authorization: DownloadAuthorizationInput, target: DownloadTargetInput }), response: external_exports.object({ job: DownloadJob, source: CatalogSource, embedded: external_exports.object({ isrc: external_exports.boolean(), genre: external_exports.boolean(), label: external_exports.boolean(), year: external_exports.boolean(), lyrics: external_exports.boolean() }) }), responseStatus: 201 }),
+  catalogSettingsGet: defineRoute({ method: "GET", path: "/catalog/settings", operationId: "getCatalogSettings", summary: "Which catalog services are asked, lyrics embedding, and whether a SongLink key is set", tags: ["catalog"], auth: "admin", response: CatalogSettingsView }),
+  catalogSettingsPut: defineRoute({ method: "PUT", path: "/catalog/settings", operationId: "putCatalogSettings", summary: "Change catalog services, lyrics embedding, or the (write-only) SongLink key", tags: ["catalog"], auth: "admin", rateLimit: "write", body: CatalogSettingsInput, response: CatalogSettingsView }),
   artistReleases: defineRoute({ method: "GET", path: "/artists/releases", operationId: "latestReleases", summary: "Latest releases from MusicBrainz plus enabled playback providers", tags: ["discovery"], auth: "admin-or-device", scopes: ["search:use"], rateLimit: "search", query: external_exports.object({ mbid: external_exports.string().optional(), name: external_exports.string().optional(), refresh: external_exports.coerce.boolean().default(false) }), response: LatestReleasesResponse }),
   /* per-user provider accounts */
   accountsList: defineRoute({ method: "GET", path: "/accounts", operationId: "listAccounts", summary: "The caller's connected provider accounts", tags: ["accounts"], auth: "device", response: external_exports.object({ items: external_exports.array(ProviderAccount), available: external_exports.array(external_exports.object({ provider: ProviderId, configured: external_exports.boolean(), reason: external_exports.string().nullable() })) }) }),
@@ -20959,13 +21281,13 @@ var TYPES = {
   ".txt": "text/plain; charset=utf-8"
 };
 var SEARCH_DEPTH = 4;
-function findApp(explicit, from) {
-  if (explicit) return sourceAt(explicit);
+function findApp(explicit2, from) {
+  if (explicit2) return sourceAt(explicit2);
   let directory = resolve(from);
   for (let level = 0; level <= SEARCH_DEPTH; level += 1) {
     for (const candidate of [join(directory, "app"), join(directory, "music-player", "dist"), join(directory, "now-playing.html")]) {
-      const source = sourceAt(candidate);
-      if (source) return source;
+      const source2 = sourceAt(candidate);
+      if (source2) return source2;
     }
     const parent = resolve(directory, "..");
     if (parent === directory) break;
@@ -20985,13 +21307,13 @@ function withToken(html, token) {
   if (head) return `${html.slice(0, head.index + head[0].length)}${meta3}${html.slice(head.index + head[0].length)}`;
   return `${meta3}${html}`;
 }
-function serveApp(source, urlPath, token, response) {
-  const path = urlPath === "/" || urlPath === "" ? source.index : withinRoot(source.root, urlPath);
+function serveApp(source2, urlPath, token, response) {
+  const path = urlPath === "/" || urlPath === "" ? source2.index : withinRoot(source2.root, urlPath);
   if (!path || !existsSync(path) || !statSync(path).isFile()) {
-    if (source.singleFile) return { served: false };
-    return sendDocument(source.index, token, response);
+    if (source2.singleFile) return { served: false };
+    return sendDocument(source2.index, token, response);
   }
-  if (path === source.index) return sendDocument(path, token, response);
+  if (path === source2.index) return sendDocument(path, token, response);
   const type = TYPES[extname(path).toLowerCase()] ?? "application/octet-stream";
   response.writeHead(200, {
     "content-type": type,
@@ -21220,6 +21542,12 @@ import { randomBytes as randomBytes2, timingSafeEqual as timingSafeEqual2 } from
 // ../packages/domain/src/ids.ts
 var cryptoImpl = globalThis.crypto;
 
+// ../packages/domain/src/identity.ts
+function normalizeText(input2) {
+  if (!input2) return "";
+  return input2.normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/&/g, " and ").replace(/[’'`]/g, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim().replace(/\s+/g, " ");
+}
+
 // ../packages/domain/src/eq.ts
 var FLAT_PRESET_ID = "00000000-0000-7000-8000-00000000f1a7";
 var BUILTIN_EPOCH = "2026-01-01T00:00:00.000Z";
@@ -21445,6 +21773,38 @@ var DEFAULT_DISCORD_TEMPLATES = {
 // ../packages/domain/src/permissions.ts
 var DISCORD_MINIMAL_PERMISSIONS = 1n << 10n | 1n << 11n | 1n << 14n | 1n << 16n | 1n << 20n | 1n << 21n | 1n << 31n;
 
+// ../packages/domain/src/errors.ts
+var DomainError = class extends Error {
+  code;
+  status;
+  details;
+  retryAfterSeconds;
+  constructor(code, message, options = {}) {
+    super(message, options.cause !== void 0 ? { cause: options.cause } : void 0);
+    this.name = "DomainError";
+    this.code = code;
+    this.status = STATUS[code];
+    this.details = options.details;
+    this.retryAfterSeconds = options.retryAfterSeconds;
+  }
+};
+var STATUS = {
+  validation: 400,
+  unauthenticated: 401,
+  forbidden: 403,
+  "not-found": 404,
+  conflict: 409,
+  // Only for a resource the caller demonstrably held a valid reference to and that has since
+  // lapsed. Anything a stranger could be probing for stays 404, so a guess learns nothing.
+  gone: 410,
+  "rate-limited": 429,
+  unavailable: 503,
+  unsupported: 422,
+  "setup-required": 403,
+  "upgrade-required": 426,
+  internal: 500
+};
+
 // ../packages/domain/src/titles.ts
 var NOISE = /\s*[[(]\s*(official\s*(music\s*)?(video|audio|lyric\s*video|visuali[sz]er)|lyrics?(\s*video)?|audio|visuali[sz]er|hd|hq|4k|\d{2,3}\s?fps|explicit|clean|(4k\s+)?remaster(ed)?(\s*\d{4})?|prod\.?\s+by[^\])]*|music\s*video|mv|m\/v)\s*[\])]/gi;
 var TRAILING_NOISE = /\s+(hd|hq|4k|\d{2,3}\s?fps|official\s+video|official\s+audio|lyrics)\s*$/i;
@@ -21480,8 +21840,8 @@ function cleanVideoTitle(input2) {
   if (topic) return { title: unquote(raw), artist: topic[1].trim(), featured, fromTopicChannel: true };
   const dash = raw.match(/^(.+?)\s+[-–—]\s+(.+)$/);
   if (dash) return { title: unquote(dash[2]), artist: dash[1].trim(), featured, fromTopicChannel: false };
-  const quoted = raw.match(/^(.+?)\s+["“](.+)["”]$/);
-  if (quoted) return { title: quoted[2].trim(), artist: quoted[1].trim(), featured, fromTopicChannel: false };
+  const quoted2 = raw.match(/^(.+?)\s+["“](.+)["”]$/);
+  if (quoted2) return { title: quoted2[2].trim(), artist: quoted2[1].trim(), featured, fromTopicChannel: false };
   const pipe2 = raw.match(/^(.+?)\s+\|\s+(.+)$/);
   if (pipe2) return { title: pipe2[1].trim(), artist: pipe2[2].trim(), featured, fromTopicChannel: false };
   return { title: raw, artist: null, featured, fromTopicChannel: false };
@@ -21939,7 +22299,7 @@ function withZipFile(path, use) {
   const fd = openSync(path, "r");
   try {
     const size = fstatSync(fd).size;
-    const source = {
+    const source2 = {
       size,
       read: (offset, length) => {
         if (offset < 0 || offset + length > size) throw new ZipError("The archive is truncated.");
@@ -21953,29 +22313,29 @@ function withZipFile(path, use) {
         return buffer;
       }
     };
-    return use(openZip(source));
+    return use(openZip(source2));
   } finally {
     closeSync(fd);
   }
 }
-function openZip(source) {
-  const end = findEnd(source);
+function openZip(source2) {
+  const end = findEnd(source2);
   let count = end.readUInt16LE(10);
   let directorySize = end.readUInt32LE(12);
   let directoryOffset = end.readUInt32LE(16);
   if (count === 65535 || directorySize === 4294967295 || directoryOffset === 4294967295) {
-    const eocdAt = locateEnd(source);
+    const eocdAt = locateEnd(source2);
     if (eocdAt < 20) throw new ZipError("The archive says it is ZIP64 but has no ZIP64 locator.");
-    const locator = source.read(eocdAt - 20, 20);
+    const locator = source2.read(eocdAt - 20, 20);
     if (locator.readUInt32LE(0) !== ZIP64_LOCATOR) throw new ZipError("The archive says it is ZIP64 but has no ZIP64 locator.");
     const recordAt = toNumber(locator.readBigUInt64LE(8));
-    const record2 = source.read(recordAt, 56);
+    const record2 = source2.read(recordAt, 56);
     if (record2.readUInt32LE(0) !== ZIP64_EOCD) throw new ZipError("The ZIP64 end record is missing.");
     count = toNumber(record2.readBigUInt64LE(32));
     directorySize = toNumber(record2.readBigUInt64LE(40));
     directoryOffset = toNumber(record2.readBigUInt64LE(48));
   }
-  const directory = source.read(directoryOffset, directorySize);
+  const directory = source2.read(directoryOffset, directorySize);
   const entries = [];
   let at = 0;
   for (let i = 0; i < count; i += 1) {
@@ -22012,15 +22372,15 @@ function openZip(source) {
     entries.push({ name, method, flags, crc32: crc, compressedSize, uncompressedSize, localHeaderOffset });
     at += 46 + nameLength + extraLength + commentLength;
   }
-  return { entries, read: (entry) => readEntry(source, entry) };
+  return { entries, read: (entry) => readEntry(source2, entry) };
 }
-function readEntry(source, entry) {
+function readEntry(source2, entry) {
   if (entry.flags & 1) throw new ZipError(`${entry.name} is encrypted.`);
   if (entry.uncompressedSize > MAX_ENTRY_BYTES) throw new ZipError(`${entry.name} is larger than anything this reader will unpack.`);
-  const header2 = source.read(entry.localHeaderOffset, 30);
+  const header2 = source2.read(entry.localHeaderOffset, 30);
   if (header2.readUInt32LE(0) !== LOCAL) throw new ZipError(`The local header for ${entry.name} is missing.`);
   const dataAt = entry.localHeaderOffset + 30 + header2.readUInt16LE(26) + header2.readUInt16LE(28);
-  const raw = source.read(dataAt, entry.compressedSize);
+  const raw = source2.read(dataAt, entry.compressedSize);
   let data;
   if (entry.method === 0) data = Buffer.from(raw);
   else if (entry.method === 8) {
@@ -22040,15 +22400,15 @@ function safeEntryName(name) {
   if (/^[a-zA-Z]:/.test(name)) return false;
   return !name.split(/[\\/]/).some((segment) => segment === "..");
 }
-function findEnd(source) {
-  return source.read(locateEnd(source), 22);
+function findEnd(source2) {
+  return source2.read(locateEnd(source2), 22);
 }
-function locateEnd(source) {
-  if (source.size < 22) throw new ZipError("This is not a zip archive.");
-  const span = Math.min(source.size, 22 + 65535);
-  const tail = source.read(source.size - span, span);
+function locateEnd(source2) {
+  if (source2.size < 22) throw new ZipError("This is not a zip archive.");
+  const span = Math.min(source2.size, 22 + 65535);
+  const tail = source2.read(source2.size - span, span);
   for (let i = tail.length - 22; i >= 0; i -= 1) {
-    if (tail.readUInt32LE(i) === EOCD) return source.size - span + i;
+    if (tail.readUInt32LE(i) === EOCD) return source2.size - span + i;
   }
   throw new ZipError("This is not a zip archive.");
 }
@@ -22112,8 +22472,8 @@ function unsupportedReason(id, platform, arch) {
 async function installTool(id, options) {
   const platform = options.platform ?? process.platform;
   const arch = options.arch ?? process.arch;
-  const source = toolSource(id, platform, arch);
-  if (!source) return { installed: false, version: null, reason: unsupportedReason(id, platform, arch), tag: null };
+  const source2 = toolSource(id, platform, arch);
+  if (!source2) return { installed: false, version: null, reason: unsupportedReason(id, platform, arch), tag: null };
   const fetchImpl = options.fetchImpl ?? fetch;
   const limitMs = options.timeoutMs ?? (id === "ffmpeg" ? 20 * 6e4 : 10 * 6e4);
   const timeout = AbortSignal.timeout(limitMs);
@@ -22123,15 +22483,15 @@ async function installTool(id, options) {
   let staging = null;
   try {
     if (signal.aborted) throw signal.reason;
-    const release = await latestRelease(source.repo, { fetchImpl, signal });
+    const release = await latestRelease(source2.repo, { fetchImpl, signal });
     tag = release.tag;
-    const assetName = source.asset(release.assets.map((a) => a.name));
+    const assetName = source2.asset(release.assets.map((a) => a.name));
     const asset = assetName ? release.assets.find((a) => a.name === assetName) : void 0;
-    if (!asset) throw new Refusal(`${source.repo} ${release.tag} publishes no ${id} build for ${platform}/${arch}.`);
+    if (!asset) throw new Refusal(`${source2.repo} ${release.tag} publishes no ${id} build for ${platform}/${arch}.`);
     assertGitHub(asset.url);
     let expected = asset.digest;
-    if (!expected && source.sums) {
-      const sumsAsset = release.assets.find((a) => a.name === source.sums);
+    if (!expected && source2.sums) {
+      const sumsAsset = release.assets.find((a) => a.name === source2.sums);
       if (sumsAsset) {
         assertGitHub(sumsAsset.url);
         const sumsResponse = await fetchImpl(sumsAsset.url, { redirect: "follow", signal, headers: { "user-agent": USER_AGENT } });
@@ -22139,7 +22499,7 @@ async function installTool(id, options) {
         expected = digestFor(await sumsResponse.text(), asset.name);
       }
     }
-    if (!expected) throw new Refusal(`${source.repo} ${release.tag} publishes no SHA-256 for ${asset.name}, so it was not installed.`);
+    if (!expected) throw new Refusal(`${source2.repo} ${release.tag} publishes no SHA-256 for ${asset.name}, so it was not installed.`);
     mkdirSync(options.toolsDir, { recursive: true });
     sweepStaging(options.toolsDir);
     staging = mkdtempSync(join5(options.toolsDir, ".staging-"));
@@ -22147,7 +22507,7 @@ async function installTool(id, options) {
     const actual = await downloadTo(fetchImpl, asset, download, signal, options.onProgress);
     if (actual !== expected) throw new Refusal(`The downloaded ${asset.name} did not match its published SHA-256, so it was discarded.`);
     const staged = [];
-    if (source.kind === "binary") {
+    if (source2.kind === "binary") {
       const name = binaryName(id, platform);
       renameSync(download, join5(staging, name));
       staged.push({ from: join5(staging, name), name });
@@ -22661,7 +23021,7 @@ var PLAYLIST_CAP = 200;
 function ytDlpInfoArgs(job) {
   return ["--ignore-config", "--no-colors", "--no-cache-dir", "--playlist-end", String(PLAYLIST_CAP), "--dump-single-json", "--", urlArgument(job.url)];
 }
-function ytDlpArgs(job, directory, ffmpeg, limits = {}, source = {}) {
+function ytDlpArgs(job, directory, ffmpeg, limits = {}, source2 = {}) {
   const url2 = urlArgument(job.url);
   const args = [
     "--ignore-config",
@@ -22685,7 +23045,7 @@ function ytDlpArgs(job, directory, ffmpeg, limits = {}, source = {}) {
   }
   const rate = rateLimitOf(limits.rateLimitKBps);
   if (rate !== null) args.push("--limit-rate", `${rate}K`);
-  if (source.infoFile) args.push("--no-clean-infojson", "--load-info-json", source.infoFile);
+  if (source2.infoFile) args.push("--no-clean-infojson", "--load-info-json", source2.infoFile);
   else args.push("--", url2);
   return args;
 }
@@ -22693,8 +23053,8 @@ var UNUSED_INFO_FIELDS = ["automatic_captions", "subtitles", "heatmap", "request
 var LOAD_TIME_FIELDS = /* @__PURE__ */ new Set(["requested_downloads", "requested_formats", "requested_entries", "filepath", "_filename", "filename", "_format_sort_fields"]);
 function withCleanTags(info, depth = 0) {
   const out = { ...info };
-  for (const field of UNUSED_INFO_FIELDS) delete out[field];
-  for (const field of Object.keys(out)) if (field.startsWith("__") || out[field] === null || LOAD_TIME_FIELDS.has(field)) delete out[field];
+  for (const field2 of UNUSED_INFO_FIELDS) delete out[field2];
+  for (const field2 of Object.keys(out)) if (field2.startsWith("__") || out[field2] === null || LOAD_TIME_FIELDS.has(field2)) delete out[field2];
   for (const [single, plural] of [["album_artist", "album_artists"], ["genre", "genres"], ["artist", "artists"], ["creator", "creators"], ["composer", "composers"]]) if (out[plural] !== void 0) delete out[single];
   if (Array.isArray(info["entries"])) {
     const entries = info["entries"].filter((entry) => Boolean(entry) && typeof entry === "object" && !Array.isArray(entry));
@@ -22714,13 +23074,13 @@ function spotdlArgs(job, directory, ffmpeg, limits = {}) {
   if (rate !== null) args.push("--yt-dlp-args", `--limit-rate ${rate}K`);
   return args;
 }
-function spotdlSaveArgs(url2, saveFile) {
-  return ["save", urlArgument(url2), "--save-file", saveFile];
+function spotdlSaveArgs(url2, saveFile, options = {}) {
+  return ["save", urlArgument(url2), "--save-file", saveFile, ...options.preload ? ["--preload"] : []];
 }
-function childEnv(source = process.env, overrides = {}) {
+function childEnv(source2 = process.env, overrides = {}) {
   const keep = ["PATH", "Path", "SYSTEMROOT", "SystemRoot", "COMSPEC", "TEMP", "TMP", "TMPDIR", "LANG", "LC_ALL", "HOME", "USERPROFILE"];
   const env = {};
-  for (const key of keep) if (source[key]) env[key] = source[key];
+  for (const key of keep) if (source2[key]) env[key] = source2[key];
   env["PYTHONDONTWRITEBYTECODE"] = "1";
   return { ...env, ...overrides };
 }
@@ -22764,8 +23124,8 @@ function walk(directory, prefix = "", depth = 0) {
   return out;
 }
 function lastMeaningfulLine(stderr) {
-  const lines = stderr.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).filter((l) => !/^WARNING:/i.test(l));
-  const last = lines.at(-1);
+  const lines2 = stderr.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).filter((l) => !/^WARNING:/i.test(l));
+  const last = lines2.at(-1);
   return last ? last.replace(/^ERROR:\s*/i, "").slice(0, 600) : null;
 }
 function parseObject(text2) {
@@ -22844,7 +23204,7 @@ function trackFromYtDlp(info, flat = false) {
   };
 }
 function fromYtDlp(info, url2, now = /* @__PURE__ */ new Date()) {
-  const source = sourceOf(url2);
+  const source2 = sourceOf(url2);
   const canonical = webUrl(info["webpage_url"]) ?? url2.toString();
   const entries = Array.isArray(info["entries"]) ? info["entries"] : null;
   if (info["_type"] === "playlist" || entries) {
@@ -22852,7 +23212,7 @@ function fromYtDlp(info, url2, now = /* @__PURE__ */ new Date()) {
     const kept = list.slice(0, HELPER_RESOLVE_CAP).map((e) => trackFromYtDlp(e, true));
     const total = num(info["playlist_count"]);
     return {
-      source,
+      source: source2,
       kind: "collection",
       url: canonical,
       track: null,
@@ -22869,7 +23229,7 @@ function fromYtDlp(info, url2, now = /* @__PURE__ */ new Date()) {
       resolvedAt: now.toISOString()
     };
   }
-  return { source, kind: "track", url: canonical, track: trackFromYtDlp(info), collection: null, resolvedAt: now.toISOString() };
+  return { source: source2, kind: "track", url: canonical, track: trackFromYtDlp(info), collection: null, resolvedAt: now.toISOString() };
 }
 function trackFromSpotdl(song) {
   const artists = Array.isArray(song["artists"]) ? song["artists"].map((a) => str(a)).filter((a) => Boolean(a)) : [];
@@ -22890,7 +23250,9 @@ function trackFromSpotdl(song) {
     date: date5,
     year,
     artworkUrl: webUrl(song["cover_url"]),
-    trackNumber: trackNumber !== null && Number.isInteger(trackNumber) && trackNumber > 0 ? trackNumber : null
+    trackNumber: trackNumber !== null && Number.isInteger(trackNumber) && trackNumber > 0 ? trackNumber : null,
+    isrc: typeof song["isrc"] === "string" && /^[A-Z]{2}[A-Z0-9]{3}[0-9]{7}$/.test(song["isrc"]) ? song["isrc"] : null,
+    matchUrl: webUrl(song["download_url"])
   };
 }
 function fromSpotdl(songs, url2, now = /* @__PURE__ */ new Date()) {
@@ -22928,7 +23290,7 @@ var ResolveError = class extends Error {
   code;
   output;
 };
-function run2(path, args, env, timeoutMs, spawnImpl = spawn2) {
+function run2(path, args, env, timeoutMs, signal, spawnImpl = spawn2) {
   const { command, prefix } = toolCommand(path);
   return new Promise((resolve3, reject) => {
     const child = spawnImpl(command, [...prefix, ...args], { env, shell: false, windowsHide: true, stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32" });
@@ -22941,6 +23303,10 @@ function run2(path, args, env, timeoutMs, spawnImpl = spawn2) {
       timedOut = true;
       killTree(child);
     }, timeoutMs);
+    const onAbort = () => killTree(child);
+    if (signal?.aborted) onAbort();
+    signal?.addEventListener("abort", onAbort, { once: true });
+    child.on("close", () => signal?.removeEventListener("abort", onAbort));
     child.stdout?.on("data", (chunk) => {
       size += chunk.length;
       if (size > MAX_OUTPUT_BYTES) {
@@ -22989,10 +23355,10 @@ function createResolver(options) {
       waiting.shift()?.();
     }
   }
-  async function fresh(url2) {
+  async function fresh(url2, match = false) {
     const tools = await options.tools();
-    const source = sourceOf(url2);
-    if (source === "spotify") {
+    const source2 = sourceOf(url2);
+    if (source2 === "spotify") {
       const spotdl = tools.spotdl;
       if (!spotdl.present || !spotdl.path) throw new ResolveError(spotdl.installHint ?? "spotDL is not set up on this PC yet.", "tool-missing");
       return slot(async () => {
@@ -23000,7 +23366,7 @@ function createResolver(options) {
         mkdirSync3(dir, { recursive: true });
         try {
           const file2 = join8(dir, "songs.spotdl");
-          await run2(spotdl.path, spotdlSaveArgs(url2.toString(), file2), childEnv(process.env, { HOME: dir, USERPROFILE: dir }), timeouts.spotdl);
+          await run2(spotdl.path, spotdlSaveArgs(url2.toString(), file2, { preload: match && /^\/(?:intl-[a-z-]+\/)?track\//i.test(url2.pathname) }), childEnv(process.env, { HOME: dir, USERPROFILE: dir }), timeouts.spotdl);
           let songs;
           try {
             songs = JSON.parse(readFileSync2(file2, "utf8"));
@@ -23031,12 +23397,25 @@ function createResolver(options) {
     });
   }
   return {
-    resolve(url2) {
-      const key = url2.toString();
+    async search(args, signal) {
+      if (args[0] !== "--ignore-config" || args.at(-2) !== "--" || !/^(yt|sc)search[0-9]{1,3}:./.test(args.at(-1) ?? "")) throw new ResolveError("That is not a catalog search.", "failed");
+      const tools = await options.tools();
+      const ytDlp = tools["yt-dlp"];
+      if (!ytDlp.present || !ytDlp.path) throw new ResolveError(ytDlp.installHint ?? "yt-dlp is not set up on this PC yet.", "tool-missing");
+      const stdout = await slot(() => run2(ytDlp.path, [...args], childEnv(), timeouts.ytDlp, signal));
+      try {
+        return JSON.parse(stdout);
+      } catch {
+        throw new ResolveError("yt-dlp gave an answer that is not JSON.", "failed");
+      }
+    },
+    resolve(url2, resolveOptions = {}) {
+      const match = resolveOptions.match === true && sourceOf(url2) === "spotify";
+      const key = `${url2.toString()}${match ? "#match" : ""}`;
       const at = now();
       const hit = cache.get(key);
       if (hit && at - hit.at < RESOLVE_TTL_MS) return hit.value;
-      const value = fresh(url2);
+      const value = fresh(url2, match);
       value.catch(() => {
         if (cache.get(key)?.value === value) cache.delete(key);
       });
@@ -23097,7 +23476,7 @@ function once(url2, options) {
       request.destroy();
       resolve3(value);
     };
-    const lookup = (hostname3, lookupOptions, callback) => {
+    const lookup2 = (hostname3, lookupOptions, callback) => {
       dnsLookup(hostname3, { ...lookupOptions, all: true }, (err, addresses) => {
         if (err) return callback(err, "", 0);
         const list = addresses;
@@ -23112,7 +23491,7 @@ function once(url2, options) {
       target,
       {
         headers: { "Icy-MetaData": "1", "User-Agent": options.userAgent ?? "NowPlaying/1.0", Accept: "*/*" },
-        lookup,
+        lookup: lookup2,
         // SHOUTcast v1 answers "ICY 200 OK" and headers that are not quite HTTP.
         insecureHTTPParser: true
       },
@@ -23132,7 +23511,7 @@ function once(url2, options) {
         settled = true;
         clearTimeout(timer);
         request.destroy();
-        void rawOnce(target, { ...options, timeoutMs: Math.max(1, options.timeoutMs - (Date.now() - startedAt)) }, lookup, maxBytes).then(resolve3);
+        void rawOnce(target, { ...options, timeoutMs: Math.max(1, options.timeoutMs - (Date.now() - startedAt)) }, lookup2, maxBytes).then(resolve3);
         return;
       }
       finish(none(/private/i.test(err.message) ? "Private or local addresses are blocked" : "The station could not be reached"));
@@ -23164,11 +23543,11 @@ function titleConsumer(headers, maxBytes, finish) {
     if (blocks >= 2 || seen > maxBytes) finish(none("The station sent no song title", stationName));
   };
 }
-function rawOnce(target, options, lookup, maxBytes) {
+function rawOnce(target, options, lookup2, maxBytes) {
   return new Promise((resolve3) => {
     const secure = target.protocol === "https:";
     const port = Number(target.port) || (secure ? 443 : 80);
-    const socket = secure ? tls.connect({ host: target.hostname, port, servername: target.hostname, lookup }) : net.connect({ host: target.hostname, port, lookup });
+    const socket = secure ? tls.connect({ host: target.hostname, port, servername: target.hostname, lookup: lookup2 }) : net.connect({ host: target.hostname, port, lookup: lookup2 });
     let settled = false;
     const finish = (value) => {
       if (settled) return;
@@ -23197,11 +23576,11 @@ Accept: */*\r
         if (head.length > 16 * 1024) finish(none("The station sent a reply this cannot read"));
         return;
       }
-      const lines = head.subarray(0, end).toString("latin1").split("\r\n");
-      const status = /^(?:ICY|HTTP\/1\.[01]) (\d{3})/.exec(lines[0] ?? "");
+      const lines2 = head.subarray(0, end).toString("latin1").split("\r\n");
+      const status = /^(?:ICY|HTTP\/1\.[01]) (\d{3})/.exec(lines2[0] ?? "");
       if (!status) return finish(none("The station sent a reply this cannot read"));
       const headers = {};
-      for (const line of lines.slice(1)) {
+      for (const line of lines2.slice(1)) {
         const at = line.indexOf(":");
         if (at > 0) headers[line.slice(0, at).trim().toLowerCase()] = line.slice(at + 1).trim();
       }
@@ -23219,6 +23598,1976 @@ Accept: */*\r
 function headerText(value) {
   const first = Array.isArray(value) ? value[0] : value;
   return first?.trim() || null;
+}
+
+// ../packages/domain/src/catalog/http.ts
+var CatalogHttpError = class extends Error {
+  constructor(message, kind, status = null, retryAfterMs2 = null) {
+    super(message);
+    this.kind = kind;
+    this.status = status;
+    this.retryAfterMs = retryAfterMs2;
+    this.name = "CatalogHttpError";
+  }
+  kind;
+  status;
+  retryAfterMs;
+};
+function retryAfterMs(value) {
+  if (!value) return null;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.min(seconds, 3600) * 1e3;
+  const at = Date.parse(value);
+  return Number.isFinite(at) ? Math.max(0, Math.min(at - Date.now(), 36e5)) : null;
+}
+async function getJson(fetchImpl, url2, options) {
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, options.timeoutMs);
+  const outer = options.signal;
+  const onAbort = () => controller.abort();
+  if (outer?.aborted) controller.abort();
+  outer?.addEventListener("abort", onAbort, { once: true });
+  const host = (() => {
+    try {
+      return new URL(url2).hostname;
+    } catch {
+      return "the service";
+    }
+  })();
+  try {
+    let response;
+    try {
+      response = await fetchImpl(url2, { signal: controller.signal, headers: { Accept: "application/json", ...options.headers ?? {} } });
+    } catch {
+      if (timedOut) throw new CatalogHttpError(`${host} did not answer in time`, "timeout");
+      if (outer?.aborted) throw new CatalogHttpError("The search was cancelled", "aborted");
+      throw new CatalogHttpError(`${host} could not be reached`, "network");
+    }
+    const ok = response.status >= 200 && response.status < 300 || (options.accept ?? []).includes(response.status);
+    if (response.status === 429 || response.status === 503) {
+      throw new CatalogHttpError(`${host} asked to slow down`, "rate-limited", response.status, retryAfterMs(response.headers?.get("retry-after")));
+    }
+    if (!ok) throw new CatalogHttpError(`${host} answered ${response.status}`, "http", response.status);
+    let body;
+    try {
+      body = await response.json();
+    } catch {
+      if (timedOut) throw new CatalogHttpError(`${host} did not answer in time`, "timeout");
+      throw new CatalogHttpError(`${host} sent something that was not JSON`, "parse", response.status);
+    }
+    return { status: response.status, body };
+  } finally {
+    clearTimeout(timer);
+    outer?.removeEventListener("abort", onAbort);
+  }
+}
+var isObject2 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+function arr(value) {
+  return Array.isArray(value) ? value.filter(isObject2) : [];
+}
+function str2(value, max = 300) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.replace(/\s+/g, " ").trim();
+  return trimmed ? trimmed.slice(0, max) : null;
+}
+function num2(value) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+function posInt(value) {
+  const n = typeof value === "string" && /^\d+$/.test(value) ? Number(value) : value;
+  return typeof n === "number" && Number.isInteger(n) && n > 0 ? n : null;
+}
+function webUrl2(value) {
+  if (typeof value !== "string" || value.length > 2048) return null;
+  try {
+    const url2 = new URL(value);
+    return url2.protocol === "https:" || url2.protocol === "http:" ? url2.toString() : null;
+  } catch {
+    return null;
+  }
+}
+function calendarDate(value) {
+  if (typeof value !== "string") return null;
+  const m = /^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?/.exec(value.trim());
+  if (!m || m[1] === "0000") return null;
+  if (m[3] && m[3] !== "00") return `${m[1]}-${m[2]}-${m[3]}`;
+  if (m[2] && m[2] !== "00") return `${m[1]}-${m[2]}`;
+  return m[1];
+}
+function yearOf(date5) {
+  if (!date5) return null;
+  const year = Number(date5.slice(0, 4));
+  return year >= 1e3 && year <= 3e3 ? year : null;
+}
+
+// ../packages/domain/src/catalog/limits.ts
+var TtlCache = class {
+  constructor(ttlMs, max = 200, now = Date.now) {
+    this.ttlMs = ttlMs;
+    this.max = max;
+    this.now = now;
+  }
+  ttlMs;
+  max;
+  now;
+  entries = /* @__PURE__ */ new Map();
+  get(key, load) {
+    const at = this.now();
+    const hit = this.entries.get(key);
+    if (hit && at - hit.at < this.ttlMs) return hit.value;
+    const value = load();
+    this.entries.delete(key);
+    while (this.entries.size >= this.max) this.entries.delete(this.entries.keys().next().value);
+    this.entries.set(key, { at, value });
+    value.catch(() => {
+      if (this.entries.get(key)?.value === value) this.entries.delete(key);
+    });
+    return value;
+  }
+  get size() {
+    return this.entries.size;
+  }
+  clear() {
+    this.entries.clear();
+  }
+};
+var realSleep = (ms, signal) => new Promise((resolve3, reject) => {
+  if (signal?.aborted) return reject(new CatalogHttpError("The search was cancelled", "aborted"));
+  const timer = setTimeout(() => {
+    signal?.removeEventListener("abort", onAbort);
+    resolve3();
+  }, ms);
+  const onAbort = () => {
+    clearTimeout(timer);
+    reject(new CatalogHttpError("The search was cancelled", "aborted"));
+  };
+  signal?.addEventListener("abort", onAbort, { once: true });
+});
+var Pacer = class {
+  constructor(intervalMs, now = Date.now, sleep = realSleep) {
+    this.intervalMs = intervalMs;
+    this.now = now;
+    this.sleep = sleep;
+  }
+  intervalMs;
+  now;
+  sleep;
+  chain = Promise.resolve();
+  last = -Infinity;
+  run(work, signal) {
+    const turn = this.chain.then(async () => {
+      const wait = this.last + this.intervalMs - this.now();
+      if (wait > 0) await this.sleep(wait, signal);
+      this.last = this.now();
+    });
+    this.chain = turn.catch(() => void 0);
+    return turn.then(work);
+  }
+};
+var Budget = class {
+  constructor(capacity, windowMs, now = Date.now) {
+    this.capacity = capacity;
+    this.windowMs = windowMs;
+    this.now = now;
+  }
+  capacity;
+  windowMs;
+  now;
+  stamps = [];
+  take() {
+    const at = this.now();
+    this.stamps = this.stamps.filter((t2) => at - t2 < this.windowMs);
+    if (this.stamps.length >= this.capacity) return { ok: false, retryAt: this.stamps[0] + this.windowMs };
+    this.stamps.push(at);
+    return { ok: true };
+  }
+};
+var COOLDOWN_AFTER_FAILURES = 2;
+var COOLDOWN_BASE_MS = 3e4;
+var COOLDOWN_MAX_MS = 10 * 6e4;
+var ProviderHealth2 = class {
+  constructor(now = Date.now) {
+    this.now = now;
+  }
+  now;
+  entries = /* @__PURE__ */ new Map();
+  entry(id) {
+    let e = this.entries.get(id);
+    if (!e) {
+      e = { failures: 0, coolingUntil: 0, lastError: null };
+      this.entries.set(id, e);
+    }
+    return e;
+  }
+  /** When the provider may be asked again, or null when it may be asked now. */
+  coolingUntil(id) {
+    const e = this.entries.get(id);
+    return e && e.coolingUntil > this.now() ? e.coolingUntil : null;
+  }
+  lastError(id) {
+    return this.entries.get(id)?.lastError ?? null;
+  }
+  success(id) {
+    const e = this.entry(id);
+    e.failures = 0;
+    e.coolingUntil = 0;
+    e.lastError = null;
+  }
+  failure(id, error61) {
+    const e = this.entry(id);
+    e.failures += 1;
+    e.lastError = describeError(error61);
+    const asked = error61 instanceof CatalogHttpError && error61.kind === "rate-limited" ? error61.retryAfterMs ?? COOLDOWN_BASE_MS : null;
+    if (asked !== null) {
+      e.coolingUntil = this.now() + Math.min(Math.max(asked, 1e3), COOLDOWN_MAX_MS);
+      return;
+    }
+    if (e.failures >= COOLDOWN_AFTER_FAILURES) {
+      e.coolingUntil = this.now() + Math.min(COOLDOWN_BASE_MS * 2 ** (e.failures - COOLDOWN_AFTER_FAILURES), COOLDOWN_MAX_MS);
+    }
+  }
+  /** Rest the provider until `at` without counting a failure (its own budget ran out). */
+  restUntil(id, at, reason) {
+    const e = this.entry(id);
+    e.coolingUntil = Math.max(e.coolingUntil, at);
+    e.lastError = reason;
+  }
+};
+function describeError(error61) {
+  if (error61 instanceof CatalogHttpError) return error61.message.slice(0, 400);
+  if (error61 instanceof Error && error61.message) return error61.message.replace(/[A-Za-z]:\\[^\s]+|\/(?:home|Users|tmp|var|data)\/[^\s]+/g, "\u2026").slice(0, 400);
+  return "It failed without saying why";
+}
+function statusFor(provider, patch) {
+  return { provider, state: "pending", count: 0, latencyMs: null, error: null, retryAt: null, ...patch };
+}
+
+// ../packages/domain/src/catalog/query.ts
+var ISRC_PATTERN = /^[A-Z]{2}[A-Z0-9]{3}\d{2}\d{5}$/i;
+function normaliseIsrc(input2) {
+  if (!input2) return null;
+  const compact = input2.trim().replace(/[-\s]/g, "").toUpperCase();
+  return ISRC_PATTERN.test(compact) ? compact : null;
+}
+function hostIs(host, ...names) {
+  return names.some((name) => host === name || host.endsWith(`.${name}`));
+}
+function parseMusicLink(input2) {
+  const text2 = input2.trim();
+  const uri = /^spotify:(track|album|playlist|artist):([A-Za-z0-9]{10,40})$/.exec(text2);
+  if (uri) return { platform: "spotify", kind: uri[1], id: uri[2], url: `https://open.spotify.com/${uri[1]}/${uri[2]}` };
+  if (!/^https?:\/\//i.test(text2) || text2.length > 2048) return null;
+  let url2;
+  try {
+    url2 = new URL(text2);
+  } catch {
+    return null;
+  }
+  if (url2.username || url2.password) return null;
+  url2.protocol = "https:";
+  const host = url2.hostname.toLowerCase();
+  const path = url2.pathname;
+  const segments = path.split("/").filter(Boolean);
+  const href = url2.toString();
+  if (hostIs(host, "open.spotify.com", "play.spotify.com")) {
+    const m = /^\/(?:intl-[a-z-]+\/)?(track|album|playlist|artist)\/([A-Za-z0-9]+)/.exec(path);
+    return m ? { platform: "spotify", kind: m[1], id: m[2], url: `https://open.spotify.com/${m[1]}/${m[2]}` } : { platform: "spotify", kind: "unknown", id: null, url: href };
+  }
+  if (hostIs(host, "music.apple.com", "itunes.apple.com")) {
+    const track = url2.searchParams.get("i");
+    const song = /\/song\/(?:[^/]+\/)?(\d+)/.exec(path);
+    const album = /\/album\/(?:[^/]+\/)?(?:id)?(\d+)/.exec(path);
+    const playlist = /\/playlist\/(?:[^/]+\/)?(pl\.[A-Za-z0-9.-]+)/.exec(path);
+    const artist = /\/artist\/(?:[^/]+\/)?(?:id)?(\d+)/.exec(path);
+    if (track && /^\d+$/.test(track)) return { platform: "apple-music", kind: "track", id: track, url: href };
+    if (song) return { platform: "apple-music", kind: "track", id: song[1], url: href };
+    if (album) return { platform: "apple-music", kind: "album", id: album[1], url: href };
+    if (playlist) return { platform: "apple-music", kind: "playlist", id: playlist[1], url: href };
+    if (artist) return { platform: "apple-music", kind: "artist", id: artist[1], url: href };
+    return { platform: "apple-music", kind: "unknown", id: null, url: href };
+  }
+  if (hostIs(host, "deezer.com", "deezer.page.link")) {
+    const m = /^\/(?:[a-z]{2}(?:-[a-z]{2})?\/)?(track|album|playlist|artist)\/(\d+)/.exec(path);
+    return m ? { platform: "deezer", kind: m[1], id: m[2], url: `https://www.deezer.com/${m[1]}/${m[2]}` } : { platform: "deezer", kind: "unknown", id: null, url: href };
+  }
+  if (hostIs(host, "music.youtube.com")) {
+    const v = url2.searchParams.get("v");
+    const list = url2.searchParams.get("list");
+    if (path === "/watch" && v) return { platform: "youtube-music", kind: "track", id: v, url: `https://music.youtube.com/watch?v=${encodeURIComponent(v)}` };
+    if (path === "/playlist" && list) return { platform: "youtube-music", kind: list.startsWith("OLAK5uy_") ? "album" : "playlist", id: list, url: href };
+    const browse = /^\/browse\/(MPREb_[A-Za-z0-9_-]+)/.exec(path);
+    if (browse) return { platform: "youtube-music", kind: "album", id: browse[1], url: href };
+    const channel = /^\/channel\/([A-Za-z0-9_-]+)/.exec(path);
+    if (channel) return { platform: "youtube-music", kind: "artist", id: channel[1], url: href };
+    return { platform: "youtube-music", kind: "unknown", id: null, url: href };
+  }
+  if (hostIs(host, "youtube.com", "youtu.be")) {
+    const v = host.endsWith("youtu.be") ? segments[0] ?? null : url2.searchParams.get("v") ?? (/^\/(?:shorts|embed|live)\/([A-Za-z0-9_-]{6,})/.exec(path)?.[1] ?? null);
+    const list = url2.searchParams.get("list");
+    if (v && /^[A-Za-z0-9_-]{6,20}$/.test(v)) return { platform: "youtube", kind: "track", id: v, url: `https://www.youtube.com/watch?v=${encodeURIComponent(v)}` };
+    if (list) return { platform: "youtube", kind: list.startsWith("OLAK5uy_") ? "album" : "playlist", id: list, url: `https://www.youtube.com/playlist?list=${encodeURIComponent(list)}` };
+    if (/^\/(@[^/]+|channel\/[^/]+|c\/[^/]+|user\/[^/]+)/.test(path)) return { platform: "youtube", kind: "artist", id: segments.join("/"), url: href };
+    return { platform: "youtube", kind: "unknown", id: null, url: href };
+  }
+  if (hostIs(host, "soundcloud.com")) {
+    if (host === "on.soundcloud.com") return { platform: "soundcloud", kind: "unknown", id: segments[0] ?? null, url: href };
+    url2.search = "";
+    const clean = url2.toString();
+    if (segments.length >= 3 && segments[1] === "sets") return { platform: "soundcloud", kind: "playlist", id: `${segments[0]}/sets/${segments[2]}`, url: clean };
+    if (segments.length >= 2 && !["tracks", "albums", "sets", "reposts", "likes", "followers", "following"].includes(segments[1])) return { platform: "soundcloud", kind: "track", id: `${segments[0]}/${segments[1]}`, url: clean };
+    if (segments.length >= 1) return { platform: "soundcloud", kind: "artist", id: segments[0], url: clean };
+    return { platform: "soundcloud", kind: "unknown", id: null, url: clean };
+  }
+  if (hostIs(host, "bandcamp.com")) {
+    const m = /^\/(track|album)\/([^/]+)/.exec(path);
+    if (m) return { platform: "bandcamp", kind: m[1], id: `${host}/${m[1]}/${m[2]}`, url: href };
+    return { platform: "bandcamp", kind: host === "bandcamp.com" ? "unknown" : "artist", id: host, url: href };
+  }
+  if (hostIs(host, "tidal.com")) {
+    const m = /\/(track|album|playlist|artist)\/([A-Za-z0-9-]+)/.exec(path);
+    return m ? { platform: "tidal", kind: m[1], id: m[2], url: `https://tidal.com/browse/${m[1]}/${m[2]}` } : { platform: "tidal", kind: "unknown", id: null, url: href };
+  }
+  if (hostIs(host, "qobuz.com")) {
+    const m = /\/(album|track|playlist|artist|interpreter)\/(?:[^/]+\/)?([A-Za-z0-9]+)\/?$/.exec(path);
+    if (m) return { platform: "qobuz", kind: m[1] === "interpreter" ? "artist" : m[1], id: m[2], url: href };
+    return { platform: "qobuz", kind: "unknown", id: null, url: href };
+  }
+  if (/^music\.amazon\.[a-z.]+$/.test(host) || /^(www\.)?amazon\.[a-z.]+$/.test(host) && /^\/music\//.test(path)) {
+    const trackAsin = url2.searchParams.get("trackAsin");
+    if (trackAsin) return { platform: "amazon-music", kind: "track", id: trackAsin, url: href };
+    const m = /\/(albums|tracks|playlists|user-playlists|artists)\/([A-Z0-9]{10}|[a-z0-9]{20,})/i.exec(path);
+    if (m) {
+      const kind = { albums: "album", tracks: "track", playlists: "playlist", "user-playlists": "playlist", artists: "artist" }[m[1].toLowerCase()];
+      return { platform: "amazon-music", kind, id: m[2], url: href };
+    }
+    return { platform: "amazon-music", kind: "unknown", id: null, url: href };
+  }
+  return null;
+}
+function field(value, max) {
+  const s = (value ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
+  return s ? s.slice(0, max) : null;
+}
+function parseCatalogQuery(input2) {
+  const q = field(input2.q, 400) ?? "";
+  const track = field(input2.track, 200);
+  const artist = field(input2.artist, 200);
+  const album = field(input2.album, 200);
+  const base = { track, artist, album, isrc: null, url: null };
+  const link = q ? parseMusicLink(q) : null;
+  if (link) return { kind: "url", text: q, ...base, url: link.url };
+  const isrc = !track && !artist && !album ? normaliseIsrc(q) : null;
+  if (isrc) return { kind: "isrc", text: isrc, track: null, artist: null, album: null, isrc, url: null };
+  if (track || artist || album) return { kind: "advanced", text: [q, track, artist, album].filter(Boolean).join(" "), ...base };
+  return { kind: "text", text: q, ...base };
+}
+
+// ../packages/domain/src/catalog/merge.ts
+var DURATION_TOLERANCE_MS = 3e3;
+var PLATFORM_QUALITY = {
+  deezer: 6,
+  "apple-music": 6,
+  spotify: 6,
+  tidal: 5,
+  qobuz: 5,
+  "amazon-music": 5,
+  musicbrainz: 4,
+  bandcamp: 3,
+  soundcloud: 2,
+  "youtube-music": 2,
+  youtube: 1
+};
+var NOISE2 = [
+  /\s*[[(]\s*(?:feat\.?|ft\.?|featuring|with)\s+[^\])]*[\])]/gi,
+  /\s+(?:feat\.?|ft\.?|featuring)\s+.*$/i,
+  /\s*[[(]\s*(?:official\s*(?:music\s*)?(?:video|audio|lyric\s*video|visuali[sz]er)|lyrics?(?:\s*video)?|audio|visuali[sz]er|hd|hq|4k|\d{2,3}\s?fps|explicit|clean|music\s*video|mv|m\/v)\s*[\])]/gi,
+  /\s*[[(]\s*(?:\d{4}\s+)?(?:digital(?:ly)?\s+)?remaster(?:ed)?(?:\s+(?:version|edition))?(?:\s*\d{4})?\s*[\])]/gi,
+  /\s+[-–—]\s+(?:\d{4}\s+)?(?:digital(?:ly)?\s+)?remaster(?:ed)?(?:\s+(?:version|edition))?(?:\s*\d{4})?\s*$/i,
+  /\s+[-–—]\s+official\b.*$/i
+];
+function matchTitle(title) {
+  let out = title;
+  for (let i = 0; i < 2; i += 1) for (const re of NOISE2) out = out.replace(re, " ");
+  return normalizeText(out) || normalizeText(title);
+}
+function matchArtist(artist) {
+  const first = artist.split(/\s*(?:,|&|\+|\/|\bx\b|\band\b|\bfeat\.?|\bft\.?|\bfeaturing\b|\bwith\b|\bvs\.?)\s*/i)[0] ?? artist;
+  return normalizeText(first.replace(/\s*-\s*topic$/i, "").replace(/vevo$/i, "")).replace(/^the /, "");
+}
+function sameRecording(a, b) {
+  if (a.isrc && b.isrc) return a.isrc === b.isrc;
+  if (a.durationMs === null || b.durationMs === null) return false;
+  if (Math.abs(a.durationMs - b.durationMs) > DURATION_TOLERANCE_MS) return false;
+  return matchArtist(a.artist) === matchArtist(b.artist) && matchTitle(a.title) === matchTitle(b.title);
+}
+function quality(sources) {
+  return Math.max(0, ...sources.map((s) => PLATFORM_QUALITY[s.platform] ?? 0));
+}
+function mergeSources(a, b) {
+  const out = [...a];
+  for (const source2 of b) {
+    const same = out.findIndex((s) => s.platform === source2.platform && (s.url === source2.url || s.id !== null && s.id === source2.id));
+    if (same === -1) out.push(source2);
+    else if (!out[same].previewUrl && source2.previewUrl) out[same] = { ...out[same], previewUrl: source2.previewUrl };
+  }
+  return out.slice(0, 20);
+}
+function artworkScore(url2, q) {
+  if (!url2) return -1;
+  const size = /(\d{3,4})x(\d{3,4})/.exec(url2);
+  return q * 1e4 + (size ? Number(size[1]) : 300);
+}
+function mergeTrack(into, other) {
+  const qa = quality(into.sources);
+  const qb = quality(other.sources);
+  const [best, rest] = qb > qa ? [other, into] : [into, other];
+  const pick2 = (key) => best[key] ?? rest[key];
+  return {
+    id: into.id,
+    title: best.title,
+    artist: best.artist,
+    // A store that credits "A, B & C" as one name says less than one that lists A, B and C.
+    artists: best.artists.length > 1 || rest.artists.length <= best.artists.length ? best.artists : rest.artists,
+    album: pick2("album"),
+    albumArtist: pick2("albumArtist"),
+    durationMs: pick2("durationMs"),
+    isrc: pick2("isrc"),
+    artworkUrl: artworkScore(other.artworkUrl, qb) > artworkScore(into.artworkUrl, qa) ? other.artworkUrl : into.artworkUrl,
+    // The fuller date wins: "2013-05-17" says more than "2013".
+    releaseDate: (best.releaseDate?.length ?? 0) >= (rest.releaseDate?.length ?? 0) ? best.releaseDate : rest.releaseDate,
+    year: pick2("year"),
+    trackNumber: pick2("trackNumber"),
+    discNumber: pick2("discNumber"),
+    bpm: pick2("bpm"),
+    explicit: pick2("explicit"),
+    genre: pick2("genre"),
+    label: pick2("label"),
+    sources: mergeSources(into.sources, other.sources),
+    rank: Math.max(into.rank, other.rank)
+  };
+}
+function mergeArtist(into, other) {
+  return {
+    ...into,
+    pictureUrl: into.pictureUrl ?? other.pictureUrl,
+    albumCount: into.albumCount ?? other.albumCount,
+    fans: into.fans ?? other.fans,
+    genre: into.genre ?? other.genre,
+    sources: mergeSources(into.sources, other.sources),
+    rank: Math.max(into.rank, other.rank)
+  };
+}
+function mergeAlbum(into, other) {
+  const qa = quality(into.sources);
+  const qb = quality(other.sources);
+  return {
+    ...into,
+    artworkUrl: artworkScore(other.artworkUrl, qb) > artworkScore(into.artworkUrl, qa) ? other.artworkUrl : into.artworkUrl,
+    releaseDate: (into.releaseDate?.length ?? 0) >= (other.releaseDate?.length ?? 0) ? into.releaseDate : other.releaseDate,
+    year: into.year ?? other.year,
+    trackCount: into.trackCount ?? other.trackCount,
+    label: into.label ?? other.label,
+    genre: into.genre ?? other.genre,
+    explicit: into.explicit ?? other.explicit,
+    upc: into.upc ?? other.upc,
+    sources: mergeSources(into.sources, other.sources),
+    rank: Math.max(into.rank, other.rank)
+  };
+}
+function tokens(text2) {
+  return normalizeText(text2).split(" ").filter(Boolean);
+}
+function relevance(query, title, artist, album = null) {
+  if (query.kind === "isrc") return 1;
+  const want = new Set(tokens(query.text));
+  if (!want.size) return 0;
+  const have = /* @__PURE__ */ new Set([...tokens(title), ...tokens(artist), ...tokens(album)]);
+  let hit = 0;
+  for (const w of want) if (have.has(w) || [...have].some((h) => h.startsWith(w) && w.length >= 3)) hit += 1;
+  let score = hit / want.size;
+  const target = query.kind === "advanced" ? query.track : null;
+  if (target && matchTitle(title) === matchTitle(target)) score += 0.5;
+  if (query.kind === "advanced" && query.artist && artist && matchArtist(artist) === matchArtist(query.artist)) score += 0.3;
+  if (query.kind === "text" && normalizeText(title) && normalizeText(query.text).includes(matchTitle(title))) score += 0.2;
+  return Math.min(score, 2);
+}
+function rankOf(query, row, position) {
+  return Math.round((relevance(query, row.title, row.artist, row.album ?? null) * 100 + Math.min(row.sources.length, 6) * 4 - Math.min(position, 100) * 0.5) * 100) / 100;
+}
+var CatalogMerger = class {
+  constructor(query) {
+    this.query = query;
+  }
+  query;
+  tracks = [];
+  artists = [];
+  albums = [];
+  add(rows) {
+    const changed = { tracks: [], artists: [], albums: [] };
+    (rows.tracks ?? []).forEach((row, position) => {
+      const ranked = { ...row, rank: rankOf(this.query, row, position) };
+      const index = this.tracks.findIndex((t2) => sameRecording(t2, ranked));
+      const next = index === -1 ? ranked : mergeTrack(this.tracks[index], ranked);
+      const rescored = { ...next, rank: Math.max(next.rank, rankOf(this.query, next, position)) };
+      if (index === -1) this.tracks.push(rescored);
+      else this.tracks[index] = rescored;
+      upsert(changed.tracks, rescored);
+    });
+    (rows.artists ?? []).forEach((row, position) => {
+      const ranked = { ...row, rank: rankOf(this.query, { title: row.name, artist: row.name, sources: row.sources }, position) };
+      const index = this.artists.findIndex((a) => matchArtist(a.name) === matchArtist(ranked.name) && normalizeText(a.name) === normalizeText(ranked.name));
+      const next = index === -1 ? ranked : mergeArtist(this.artists[index], ranked);
+      if (index === -1) this.artists.push(next);
+      else this.artists[index] = next;
+      upsert(changed.artists, next);
+    });
+    (rows.albums ?? []).forEach((row, position) => {
+      const ranked = { ...row, rank: rankOf(this.query, { title: row.title, artist: row.artist, sources: row.sources }, position) };
+      const index = this.albums.findIndex((a) => matchTitle(a.title) === matchTitle(ranked.title) && matchArtist(a.artist ?? "") === matchArtist(ranked.artist ?? "") && (a.trackCount === null || ranked.trackCount === null || a.trackCount === ranked.trackCount));
+      const next = index === -1 ? ranked : mergeAlbum(this.albums[index], ranked);
+      if (index === -1) this.albums.push(next);
+      else this.albums[index] = next;
+      upsert(changed.albums, next);
+    });
+    return changed;
+  }
+  /** Replace a merged track by id (cross-links found after the search). */
+  patchTrack(id, update) {
+    const index = this.tracks.findIndex((t2) => t2.id === id);
+    if (index === -1) return null;
+    this.tracks[index] = update(this.tracks[index]);
+    return this.tracks[index];
+  }
+  snapshot() {
+    const byRank = (rows) => rows.map((row, i) => ({ row, i })).sort((a, b) => b.row.rank - a.row.rank || a.i - b.i).map(({ row }) => row);
+    return { tracks: byRank(this.tracks), artists: byRank(this.artists), albums: byRank(this.albums) };
+  }
+};
+function upsert(list, row) {
+  const at = list.findIndex((r) => r.id === row.id);
+  if (at === -1) list.push(row);
+  else list[at] = row;
+}
+
+// ../packages/domain/src/catalog/provider.ts
+var emptyResult = () => ({ tracks: [], artists: [], albums: [], full: {} });
+var ProviderResting = class extends Error {
+  constructor(message, retryAt) {
+    super(message);
+    this.retryAt = retryAt;
+    this.name = "ProviderResting";
+  }
+  retryAt;
+};
+
+// ../packages/domain/src/catalog/providers/ytdlp.ts
+var PREFIX = { youtube: "ytsearch", soundcloud: "scsearch" };
+var TOOL_SEARCH_MAX = 100;
+function toolSearchTerm(text2) {
+  const printable = text2.replace(/[\u0000-\u001f\u007f]/g, " ");
+  return printable.replace(/\s+/g, " ").trim().slice(0, 200);
+}
+function toolSearchArgs(platform, text2, offset, limit) {
+  const term = toolSearchTerm(text2);
+  if (!term) throw new Error("Nothing to search for");
+  const end = Math.min(Math.max(offset, 0) + Math.max(limit, 1), TOOL_SEARCH_MAX);
+  const start = Math.min(Math.max(offset, 0) + 1, end);
+  return ["--ignore-config", "--no-colors", "--no-cache-dir", "--no-warnings", "--flat-playlist", "--dump-single-json", "--playlist-start", String(start), "--playlist-end", String(end), "--", `${PREFIX[platform]}${end}:${term}`];
+}
+function youtubeThumbnail(id) {
+  return `https://i.ytimg.com/vi/${encodeURIComponent(id)}/hqdefault.jpg`;
+}
+function bestThumbnail(row) {
+  const direct = webUrl2(row["thumbnail"]);
+  if (direct) return direct;
+  const list = arr(row["thumbnails"]).filter((t2) => webUrl2(t2["url"]));
+  const best = [...list].sort((a, b) => (num2(b["width"]) ?? 0) - (num2(a["width"]) ?? 0))[0];
+  return best ? webUrl2(best["url"]) : null;
+}
+function channelArtist(channel) {
+  if (!channel) return null;
+  return channel.replace(/\s+-\s+Topic$/i, "").replace(/VEVO$/i, "").trim() || null;
+}
+function fromSlug(slug) {
+  return decodeURIComponent(slug).replace(/[-_]+/g, " ").replace(new RegExp("\\b\\p{Ll}", "gu"), (c) => c.toUpperCase()).slice(0, 300);
+}
+function toolSearchTrack(platform, row) {
+  const url2 = webUrl2(row["webpage_url"]) ?? webUrl2(row["url"]);
+  if (!url2) return null;
+  const duration3 = num2(row["duration"]);
+  const durationMs = duration3 !== null && duration3 > 0 ? Math.round(duration3 * 1e3) : null;
+  if (platform === "youtube") {
+    const id2 = str2(row["id"], 40) ?? new URL(url2).searchParams.get("v");
+    const rawTitle = str2(row["title"]);
+    if (!id2 || !rawTitle) return null;
+    const channel = str2(row["channel"]) ?? str2(row["uploader"]);
+    const cleaned = cleanVideoTitle({ title: rawTitle, channel });
+    const artist2 = cleaned.artist ?? channelArtist(channel);
+    if (!artist2) return null;
+    return {
+      id: `youtube:${id2}`,
+      title: cleaned.title,
+      artist: cleaned.featured.length ? `${artist2} feat. ${cleaned.featured.join(" & ")}` : artist2,
+      artists: [artist2, ...cleaned.featured],
+      album: str2(row["album"]),
+      albumArtist: null,
+      durationMs,
+      isrc: null,
+      artworkUrl: bestThumbnail(row) ?? youtubeThumbnail(id2),
+      releaseDate: null,
+      year: null,
+      trackNumber: null,
+      discNumber: null,
+      bpm: null,
+      explicit: null,
+      genre: null,
+      label: null,
+      sources: [{ platform: cleaned.fromTopicChannel ? "youtube-music" : "youtube", id: id2, url: cleaned.fromTopicChannel ? `https://music.youtube.com/watch?v=${encodeURIComponent(id2)}` : `https://www.youtube.com/watch?v=${encodeURIComponent(id2)}`, previewUrl: null, matchedBy: "search" }],
+      rank: 0
+    };
+  }
+  let path;
+  try {
+    path = new URL(url2).pathname.split("/").filter(Boolean);
+  } catch {
+    return null;
+  }
+  if (path.length < 2 || path[1] === "sets") return null;
+  const title = str2(row["title"]) ?? fromSlug(path[1]);
+  const artist = str2(row["uploader"]) ?? str2(row["artist"]) ?? fromSlug(path[0]);
+  const id = str2(row["id"], 60) ?? `${path[0]}/${path[1]}`;
+  return {
+    id: `soundcloud:${id}`,
+    title,
+    artist,
+    artists: [artist],
+    album: str2(row["album"]),
+    albumArtist: null,
+    durationMs,
+    isrc: null,
+    artworkUrl: bestThumbnail(row),
+    releaseDate: null,
+    year: null,
+    trackNumber: null,
+    discNumber: null,
+    bpm: null,
+    explicit: null,
+    genre: str2(row["genre"], 100),
+    label: null,
+    sources: [{ platform: "soundcloud", id, url: url2.split("?")[0], previewUrl: null, matchedBy: "search" }],
+    rank: 0
+  };
+}
+function toolSearchTracks(platform, document) {
+  if (!isObject2(document)) return [];
+  return arr(document["entries"]).filter((e) => e["_type"] !== "playlist" && !(typeof e["ie_key"] === "string" && /Tab|Playlist|User/i.test(e["ie_key"]))).map((e) => toolSearchTrack(platform, e)).filter((t2) => t2 !== null);
+}
+var ToolSearchProvider = class {
+  constructor(id, run3, timeoutMs = 3e4) {
+    this.id = id;
+    this.run = run3;
+    this.timeoutMs = timeoutMs;
+  }
+  id;
+  run;
+  timeoutMs;
+  sections = ["tracks"];
+  supports(query) {
+    return query.kind === "text" || query.kind === "advanced";
+  }
+  async search(query, options) {
+    const out = emptyResult();
+    if (!options.sections.includes("tracks") || options.offset >= TOOL_SEARCH_MAX) return out;
+    const document = await this.run({ platform: this.id, args: toolSearchArgs(this.id, query.text, options.offset, options.limit), signal: options.signal });
+    out.tracks = toolSearchTracks(this.id, document);
+    out.full.tracks = out.tracks.length >= options.limit && options.offset + options.limit < TOOL_SEARCH_MAX;
+    return out;
+  }
+};
+
+// ../packages/domain/src/catalog/links.ts
+var LinkReadError = class extends Error {
+  constructor(message, code) {
+    super(message);
+    this.code = code;
+    this.name = "LinkReadError";
+  }
+  code;
+};
+var TOOL_PLATFORMS = ["youtube", "youtube-music", "soundcloud", "bandcamp", "spotify"];
+function slugTitle(url2) {
+  if (!url2) return null;
+  try {
+    const slug = decodeURIComponent(new URL(url2).pathname.split("/").filter(Boolean).pop() ?? "");
+    return slug ? slug.replace(/[-_]+/g, " ").replace(new RegExp("\\b\\p{Ll}", "gu"), (c) => c.toUpperCase()).slice(0, 300) : null;
+  } catch {
+    return null;
+  }
+}
+function trackFromLink(entry, fallback) {
+  const url2 = webUrl2(entry.url);
+  if (!url2) return null;
+  const link = parseMusicLink(url2);
+  const platform = link?.platform ?? fallback.platform;
+  const id = link?.id ?? url2;
+  const title = entry.title || slugTitle(url2) || "Untitled";
+  const soundcloudUser = link?.platform === "soundcloud" && link.id ? link.id.split("/")[0] : void 0;
+  const artist = entry.artist || fallback.owner || soundcloudUser || "";
+  const featured = entry.featured ?? [];
+  const releaseDate = calendarDate(entry.date);
+  const sources = [{ platform, id: link?.id ?? null, url: link?.url ?? url2, previewUrl: null, matchedBy: "link" }];
+  const match = webUrl2(entry.matchUrl);
+  if (match) {
+    const m = parseMusicLink(match);
+    sources.push({ platform: m?.platform === "youtube" ? "youtube-music" : m?.platform ?? "youtube-music", id: m?.id ?? null, url: m?.platform === "youtube" && m.id ? `https://music.youtube.com/watch?v=${encodeURIComponent(m.id)}` : m?.url ?? match, previewUrl: null, matchedBy: "spotdl" });
+  }
+  const isYoutube = platform === "youtube" || platform === "youtube-music";
+  return {
+    id: `${platform}:${id}`,
+    title,
+    artist: featured.length && artist ? `${artist} feat. ${featured.join(" & ")}` : artist,
+    artists: artist ? [artist, ...featured] : [...featured],
+    album: entry.album ?? fallback.album ?? null,
+    albumArtist: null,
+    durationMs: entry.durationSec !== null && entry.durationSec > 0 ? Math.round(entry.durationSec * 1e3) : null,
+    isrc: normaliseIsrc(entry.isrc ?? null),
+    artworkUrl: webUrl2(entry.artworkUrl) ?? (isYoutube && link?.id && link.kind === "track" ? youtubeThumbnail(link.id) : null),
+    releaseDate,
+    year: yearOf(releaseDate),
+    trackNumber: entry.trackNumber,
+    discNumber: entry.discNumber ?? null,
+    bpm: null,
+    explicit: entry.explicit ?? null,
+    genre: entry.genre ?? null,
+    label: entry.label ?? null,
+    sources,
+    rank: 0
+  };
+}
+var DOWNLOAD_SOURCE_ORDER = ["youtube-music", "youtube", "soundcloud", "bandcamp", "spotify"];
+function pickDownloadSource(sources) {
+  for (const platform of DOWNLOAD_SOURCE_ORDER) {
+    const found = sources.find((s) => s.platform === platform && webUrl2(s.url));
+    if (found) return found;
+  }
+  return null;
+}
+function coversOf(tracks, n = 4) {
+  const out = [];
+  for (const t2 of tracks) {
+    if (t2.artworkUrl && !out.includes(t2.artworkUrl)) out.push(t2.artworkUrl);
+    if (out.length >= n) break;
+  }
+  return out;
+}
+function pageOf(tracks, offset, limit, total, capped) {
+  const slice = tracks.slice(offset, offset + limit);
+  const known = total ?? tracks.length;
+  return { tracks: slice, offset, limit, total: total ?? tracks.length, hasMore: offset + slice.length < Math.min(known, tracks.length), capped };
+}
+function collectionRef(link, kind, title, owner, url2) {
+  return { platform: link.platform, kind, id: link.id ?? link.url, url: url2 ?? link.url, title: title.slice(0, 300), owner: owner?.slice(0, 300) ?? null };
+}
+
+// ../packages/domain/src/catalog/services.ts
+var LRCLIB_API = "https://lrclib.net/api";
+var ODESLI_API = "https://api.song.link/v1-alpha.1/links";
+var LYRICS_MAX = 2e4;
+function lines(value) {
+  return typeof value === "string" && value.trim() ? value.replace(/\r\n?/g, "\n").trim().slice(0, LYRICS_MAX) : null;
+}
+function lyricsFrom(row) {
+  const synced = lines(row["syncedLyrics"]);
+  const plain = lines(row["plainLyrics"]);
+  return {
+    found: Boolean(synced || plain || row["instrumental"] === true),
+    source: "lrclib",
+    id: num2(row["id"]) !== null ? Math.round(num2(row["id"])) : null,
+    instrumental: row["instrumental"] === true,
+    synced,
+    plain,
+    trackName: str2(row["trackName"]),
+    artistName: str2(row["artistName"]),
+    durationSec: num2(row["duration"])
+  };
+}
+var NO_LYRICS = { found: false, source: "lrclib", id: null, instrumental: false, synced: null, plain: null, trackName: null, artistName: null, durationSec: null };
+var LrclibClient = class {
+  constructor(fetchImpl, userAgent, timeoutMs = 1e4) {
+    this.fetchImpl = fetchImpl;
+    this.userAgent = userAgent;
+    this.timeoutMs = timeoutMs;
+  }
+  fetchImpl;
+  userAgent;
+  timeoutMs;
+  /**
+   * The exact match first (title, artist, album and duration, which is how LRCLIB keys a song);
+   * failing that, a search, taking the closest duration among rows for the same artist.
+   */
+  async lyrics(input2, signal) {
+    const headers = { "User-Agent": this.userAgent };
+    const params = new URLSearchParams({ track_name: input2.title, artist_name: input2.artist });
+    if (input2.album) params.set("album_name", input2.album);
+    if (input2.durationSec) params.set("duration", String(Math.round(input2.durationSec)));
+    if (input2.album && input2.durationSec) {
+      const exact = await getJson(this.fetchImpl, `${LRCLIB_API}/get?${params}`, { timeoutMs: this.timeoutMs, signal, headers, accept: [404] });
+      if (exact.status !== 404 && isObject2(exact.body)) {
+        const found = lyricsFrom(exact.body);
+        if (found.found) return found;
+      }
+    }
+    const search = new URLSearchParams({ track_name: input2.title, artist_name: input2.artist });
+    const { body } = await getJson(this.fetchImpl, `${LRCLIB_API}/search?${search}`, { timeoutMs: this.timeoutMs, signal, headers });
+    const rows = (Array.isArray(body) ? body : []).filter(isObject2).slice(0, 50).map(lyricsFrom).filter((l) => l.found);
+    if (!rows.length) return NO_LYRICS;
+    const target = input2.durationSec ?? null;
+    const scored = rows.map((row, i) => ({ row, i, off: target !== null && row.durationSec !== null ? Math.abs(row.durationSec - target) : 30, synced: row.synced ? 0 : 1 }));
+    scored.sort((a, b) => (Math.min(a.off, 5) === Math.min(b.off, 5) ? a.synced - b.synced : a.off - b.off) || a.i - b.i);
+    const best = scored[0];
+    return target !== null && best.off > 10 ? NO_LYRICS : best.row;
+  }
+};
+var ODESLI_PLATFORMS = {
+  spotify: "spotify",
+  appleMusic: "apple-music",
+  itunes: "apple-music",
+  youtube: "youtube",
+  youtubeMusic: "youtube-music",
+  deezer: "deezer",
+  tidal: "tidal",
+  amazonMusic: "amazon-music",
+  soundcloud: "soundcloud",
+  bandcamp: "bandcamp",
+  qobuz: "qobuz"
+};
+var OdesliClient = class {
+  constructor(fetchImpl, key, now = Date.now, timeoutMs = 1e4) {
+    this.fetchImpl = fetchImpl;
+    this.key = key;
+    this.timeoutMs = timeoutMs;
+    this.budget = new Budget(10, 6e4, now);
+  }
+  fetchImpl;
+  key;
+  timeoutMs;
+  budget;
+  get configured() {
+    return Boolean(this.key());
+  }
+  /** The song's (or album's) other homes, or null without a key. A refusal is a `CatalogHttpError`. */
+  async links(url2, signal) {
+    const key = this.key();
+    if (!key) return null;
+    const turn = this.budget.take();
+    if (!turn.ok) throw new CatalogHttpError("SongLink allows ten lookups a minute; it is resting", "rate-limited", 429, turn.retryAt - Date.now());
+    const params = new URLSearchParams({ url: url2, key });
+    const { body } = await getJson(this.fetchImpl, `${ODESLI_API}?${params}`, { timeoutMs: this.timeoutMs, signal });
+    return parseOdesli(body);
+  }
+};
+function parseOdesli(body) {
+  if (!isObject2(body) || !isObject2(body["linksByPlatform"])) return null;
+  const sources = [];
+  for (const [key, value] of Object.entries(body["linksByPlatform"])) {
+    const platform = ODESLI_PLATFORMS[key];
+    const url2 = isObject2(value) ? webUrl2(value["url"]) : null;
+    if (!platform || !url2 || sources.some((s) => s.platform === platform)) continue;
+    const link = parseMusicLink(url2);
+    sources.push({ platform, id: link?.id ?? null, url: url2, previewUrl: null, matchedBy: "odesli" });
+  }
+  const entities = isObject2(body["entitiesByUniqueId"]) ? body["entitiesByUniqueId"] : {};
+  const primary = str2(body["entityUniqueId"], 200);
+  const entity = primary && isObject2(entities[primary]) ? entities[primary] : arr(Object.values(entities))[0];
+  const type = str2(entity?.["type"]);
+  return { title: str2(entity?.["title"]), artist: str2(entity?.["artistName"]), artworkUrl: webUrl2(entity?.["thumbnailUrl"]), kind: type === "song" || type === "album" ? type : null, sources };
+}
+
+// ../packages/domain/src/catalog/providers/itunes.ts
+var ITUNES_SEARCH = "https://itunes.apple.com/search";
+var ITUNES_LOOKUP = "https://itunes.apple.com/lookup";
+var ITUNES_BUDGET = { calls: 20, windowMs: 6e4 };
+function itunesArtwork(value, size = 600) {
+  const url2 = webUrl2(value);
+  return url2 ? url2.replace(/\/\d+x\d+bb\.(jpg|png)$/, `/${size}x${size}bb.$1`) : null;
+}
+function explicit(value) {
+  return value === "explicit" ? true : value === "notExplicit" || value === "cleaned" ? false : null;
+}
+function itunesTrack(row) {
+  const id = num2(row["trackId"]);
+  const title = str2(row["trackName"]);
+  const artist = str2(row["artistName"]);
+  const url2 = webUrl2(row["trackViewUrl"]);
+  if (id === null || !title || !artist || !url2) return null;
+  const releaseDate = calendarDate(row["releaseDate"]);
+  return {
+    id: `apple-music:${id}`,
+    title,
+    artist,
+    artists: [artist],
+    album: str2(row["collectionName"]),
+    albumArtist: str2(row["collectionArtistName"]) ?? str2(row["artistName"]),
+    durationMs: posInt(row["trackTimeMillis"]),
+    isrc: null,
+    artworkUrl: itunesArtwork(row["artworkUrl100"]),
+    releaseDate,
+    year: yearOf(releaseDate),
+    trackNumber: posInt(row["trackNumber"]),
+    discNumber: posInt(row["discNumber"]),
+    bpm: null,
+    explicit: explicit(row["trackExplicitness"]),
+    genre: str2(row["primaryGenreName"], 100),
+    label: null,
+    sources: [{ platform: "apple-music", id: String(id), url: url2.replace(/[?&]uo=\d+$/, ""), previewUrl: webUrl2(row["previewUrl"]), matchedBy: "search" }],
+    rank: 0
+  };
+}
+function itunesAlbum(row) {
+  const id = num2(row["collectionId"]);
+  const title = str2(row["collectionName"]);
+  const url2 = webUrl2(row["collectionViewUrl"]);
+  if (id === null || !title || !url2) return null;
+  const releaseDate = calendarDate(row["releaseDate"]);
+  return {
+    id: `apple-music:${id}`,
+    title,
+    artist: str2(row["artistName"]),
+    artworkUrl: itunesArtwork(row["artworkUrl100"]),
+    releaseDate,
+    year: yearOf(releaseDate),
+    trackCount: posInt(row["trackCount"]),
+    label: null,
+    genre: str2(row["primaryGenreName"], 100),
+    explicit: explicit(row["collectionExplicitness"]),
+    upc: null,
+    sources: [{ platform: "apple-music", id: String(id), url: url2.replace(/[?&]uo=\d+$/, ""), previewUrl: null, matchedBy: "search" }],
+    rank: 0
+  };
+}
+function itunesArtist(row) {
+  const id = num2(row["artistId"]);
+  const name = str2(row["artistName"]);
+  const url2 = webUrl2(row["artistLinkUrl"]) ?? webUrl2(row["artistViewUrl"]);
+  if (id === null || !name || !url2) return null;
+  return { id: `apple-music:${id}`, name, pictureUrl: null, albumCount: null, fans: null, genre: str2(row["primaryGenreName"], 100), sources: [{ platform: "apple-music", id: String(id), url: url2.replace(/[?&]uo=\d+$/, ""), previewUrl: null, matchedBy: "search" }], rank: 0 };
+}
+var ItunesClient = class {
+  constructor(options) {
+    this.options = options;
+    this.budget = new Budget(ITUNES_BUDGET.calls, ITUNES_BUDGET.windowMs, options.now ?? Date.now);
+    this.country = (options.country ?? "US").toUpperCase();
+    this.timeoutMs = options.timeoutMs ?? 8e3;
+  }
+  options;
+  budget;
+  country;
+  timeoutMs;
+  /** One call, within Apple's budget. */
+  async get(base, params, signal) {
+    const turn = this.budget.take();
+    if (!turn.ok) throw new ProviderResting("Apple\u2019s search allows about 20 searches a minute; it is resting", turn.retryAt);
+    const query = new URLSearchParams({ country: this.country, ...Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])) });
+    const { body } = await getJson(this.options.fetch, `${base}?${query}`, { timeoutMs: this.timeoutMs, signal });
+    return arr(body?.["results"]);
+  }
+  /** An album and its songs, in order. */
+  async album(id, signal) {
+    const rows = await this.get(ITUNES_LOOKUP, { id, entity: "song", limit: 200 }, signal);
+    const head = rows.find((r) => r["wrapperType"] === "collection");
+    const album = head ? itunesAlbum(head) : null;
+    if (!album) return null;
+    const tracks = rows.filter((r) => r["wrapperType"] === "track").map(itunesTrack).filter((t2) => t2 !== null).sort((a, b) => (a.discNumber ?? 1) - (b.discNumber ?? 1) || (a.trackNumber ?? 0) - (b.trackNumber ?? 0));
+    return { album, tracks };
+  }
+  async track(id, signal) {
+    const rows = await this.get(ITUNES_LOOKUP, { id, entity: "song" }, signal);
+    const row = rows.find((r) => r["wrapperType"] === "track" && String(r["trackId"]) === id) ?? rows.find((r) => r["wrapperType"] === "track");
+    return row ? itunesTrack(row) : null;
+  }
+  async artist(id, albumLimit, topLimit, signal) {
+    const albums = await this.get(ITUNES_LOOKUP, { id, entity: "album", limit: Math.min(albumLimit, 200) }, signal);
+    const head = albums.find((r) => r["wrapperType"] === "artist");
+    const artist = head ? itunesArtist(head) : null;
+    if (!artist) return null;
+    const songs = await this.get(ITUNES_LOOKUP, { id, entity: "song", limit: Math.min(topLimit, 200) }, signal).catch(() => []);
+    const list = albums.filter((r) => r["wrapperType"] === "collection").map(itunesAlbum).filter((a) => a !== null);
+    const firstArt = list.find((a) => a.artworkUrl)?.artworkUrl ?? null;
+    return { artist: { ...artist, albumCount: list.length || null, pictureUrl: artist.pictureUrl ?? firstArt }, albums: list, topTracks: songs.filter((r) => r["wrapperType"] === "track").map(itunesTrack).filter((t2) => t2 !== null) };
+  }
+};
+var ENTITY = { tracks: "song", artists: "musicArtist", albums: "album" };
+var ItunesProvider = class {
+  constructor(client) {
+    this.client = client;
+    this.timeoutMs = client.timeoutMs + 500;
+  }
+  client;
+  id = "itunes";
+  sections = ["tracks", "artists", "albums"];
+  timeoutMs;
+  supports(query) {
+    return query.kind === "text" || query.kind === "advanced";
+  }
+  async search(query, options) {
+    const out = emptyResult();
+    const sections = options.sections.filter((s) => this.sections.includes(s));
+    const settled = await Promise.allSettled(
+      sections.map((section) => {
+        const params = { term: query.text, media: "music", entity: ENTITY[section], limit: options.limit, offset: options.offset };
+        if (query.kind === "advanced" && section === "tracks" && query.track && !query.artist && !query.album) params["attribute"] = "songTerm";
+        return this.client.get(ITUNES_SEARCH, params, options.signal);
+      })
+    );
+    settled.forEach((result, i) => {
+      if (result.status !== "fulfilled") return;
+      const section = sections[i];
+      const rows = result.value;
+      out.full[section] = rows.length >= options.limit;
+      if (section === "tracks") out.tracks = rows.map(itunesTrack).filter((t2) => t2 !== null);
+      if (section === "albums") out.albums = rows.map(itunesAlbum).filter((a) => a !== null);
+      if (section === "artists") out.artists = rows.map(itunesArtist).filter((a) => a !== null);
+    });
+    const failed = settled.find((r) => r.status === "rejected");
+    if (failed && settled.every((r) => r.status === "rejected")) throw failed.reason;
+    return out;
+  }
+};
+
+// ../packages/domain/src/catalog/providers/deezer.ts
+var DEEZER_API = "https://api.deezer.com";
+function dzCover(md5, kind = "cover") {
+  return typeof md5 === "string" && /^[0-9a-f]{32}$/.test(md5) ? `https://cdn-images.dzcdn.net/images/${kind}/${md5}/1000x1000-000000-80-0-0.jpg` : null;
+}
+var source = (kind, id, preview = null) => ({
+  platform: "deezer",
+  id: String(id),
+  url: `https://www.deezer.com/${kind}/${id}`,
+  previewUrl: preview,
+  matchedBy: "search"
+});
+function deezerTrack(row, album = null) {
+  const id = num2(row["id"]);
+  const title = str2(row["title"]);
+  const artistObj = isObject2(row["artist"]) ? row["artist"] : null;
+  const artist = str2(artistObj?.["name"]);
+  if (id === null || !title || !artist || row["readable"] === false) return null;
+  const albumObj = isObject2(row["album"]) ? row["album"] : null;
+  const contributors = arr(row["contributors"]).map((c) => str2(c["name"])).filter((n) => Boolean(n));
+  const releaseDate = calendarDate(row["release_date"]) ?? album?.releaseDate ?? null;
+  const isrc = str2(row["isrc"], 12);
+  const bpm = num2(row["bpm"]);
+  const explicit2 = typeof row["explicit_lyrics"] === "boolean" ? row["explicit_lyrics"] : null;
+  return {
+    id: `deezer:${id}`,
+    title,
+    artist,
+    artists: contributors.length ? contributors : [artist],
+    album: str2(albumObj?.["title"]) ?? album?.title ?? null,
+    albumArtist: album?.artist ?? null,
+    durationMs: posInt(row["duration"]) !== null ? posInt(row["duration"]) * 1e3 : null,
+    isrc: isrc && /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/.test(isrc) ? isrc : null,
+    artworkUrl: webUrl2(albumObj?.["cover_xl"]) ?? dzCover(row["md5_image"]) ?? album?.artworkUrl ?? null,
+    releaseDate,
+    year: yearOf(releaseDate),
+    trackNumber: posInt(row["track_position"]),
+    discNumber: posInt(row["disk_number"]),
+    bpm: bpm !== null && bpm > 0 ? bpm : null,
+    explicit: explicit2,
+    genre: album?.genre ?? null,
+    label: album?.label ?? null,
+    sources: [source("track", id, webUrl2(row["preview"]))],
+    rank: 0
+  };
+}
+function deezerAlbum(row) {
+  const id = num2(row["id"]);
+  const title = str2(row["title"]);
+  if (id === null || !title) return null;
+  const artistObj = isObject2(row["artist"]) ? row["artist"] : null;
+  const genres = arr(isObject2(row["genres"]) ? row["genres"]["data"] : null);
+  const releaseDate = calendarDate(row["release_date"]);
+  return {
+    id: `deezer:${id}`,
+    title,
+    artist: str2(artistObj?.["name"]),
+    artworkUrl: webUrl2(row["cover_xl"]) ?? dzCover(row["md5_image"]),
+    releaseDate,
+    year: yearOf(releaseDate),
+    trackCount: posInt(row["nb_tracks"]),
+    label: str2(row["label"]),
+    genre: str2(genres[0]?.["name"], 100),
+    explicit: typeof row["explicit_lyrics"] === "boolean" ? row["explicit_lyrics"] : null,
+    upc: str2(row["upc"], 40),
+    sources: [source("album", id)],
+    rank: 0
+  };
+}
+function deezerArtist(row) {
+  const id = num2(row["id"]);
+  const name = str2(row["name"]);
+  if (id === null || !name) return null;
+  return { id: `deezer:${id}`, name, pictureUrl: webUrl2(row["picture_xl"]) ?? webUrl2(row["picture_big"]), albumCount: posInt(row["nb_album"]), fans: num2(row["nb_fan"]) !== null ? Math.round(num2(row["nb_fan"])) : null, genre: null, sources: [source("artist", id)], rank: 0 };
+}
+function quoted(value) {
+  return `"${value.replace(/["\\]/g, " ").trim().slice(0, 120)}"`;
+}
+function deezerAdvanced(query) {
+  const parts = [];
+  if (query.track) parts.push(`track:${quoted(query.track)}`);
+  if (query.artist) parts.push(`artist:${quoted(query.artist)}`);
+  if (query.album) parts.push(`album:${quoted(query.album)}`);
+  return parts.join(" ");
+}
+var DeezerClient = class {
+  constructor(fetchImpl, timeoutMs = 8e3) {
+    this.fetchImpl = fetchImpl;
+    this.timeoutMs = timeoutMs;
+  }
+  fetchImpl;
+  timeoutMs;
+  /** One call. Deezer's in-body errors become what they are: quota, not found, or a failure. */
+  async get(path, signal) {
+    const { body } = await getJson(this.fetchImpl, `${DEEZER_API}${path}`, { timeoutMs: this.timeoutMs, signal, accept: [404] });
+    if (!isObject2(body)) throw new CatalogHttpError("Deezer sent something unexpected", "parse");
+    const error61 = isObject2(body["error"]) ? body["error"] : null;
+    if (error61) {
+      const code = num2(error61["code"]);
+      if (code === 4) throw new CatalogHttpError("Deezer asked to slow down", "rate-limited", 429, 5e3);
+      if (code === 800 || code === 801) return null;
+      throw new CatalogHttpError(`Deezer refused: ${str2(error61["message"], 120) ?? "unknown error"}`, "http", null);
+    }
+    return body;
+  }
+  async list(path, signal) {
+    const body = await this.get(path, signal);
+    return { rows: arr(body?.["data"]), total: num2(body?.["total"]) };
+  }
+  async byIsrc(isrc, signal) {
+    const body = await this.get(`/track/isrc:${encodeURIComponent(isrc)}`, signal);
+    return body ? deezerTrack(body) : null;
+  }
+  async track(id, signal) {
+    const body = await this.get(`/track/${encodeURIComponent(id)}`, signal);
+    return body ? deezerTrack(body) : null;
+  }
+  async album(id, offset, limit, signal) {
+    const body = await this.get(`/album/${encodeURIComponent(id)}`, signal);
+    const album = body ? deezerAlbum(body) : null;
+    if (!album) return null;
+    const page = await this.list(`/album/${encodeURIComponent(id)}/tracks?index=${offset}&limit=${limit}`, signal);
+    const tracks = page.rows.map((r) => deezerTrack(r, album)).filter((t2) => t2 !== null);
+    return { album, tracks, total: page.total ?? album.trackCount };
+  }
+  async artist(id, albumsOffset, albumsLimit, topLimit, signal) {
+    const body = await this.get(`/artist/${encodeURIComponent(id)}`, signal);
+    const artist = body ? deezerArtist(body) : null;
+    if (!artist) return null;
+    const [top, albums] = await Promise.all([this.list(`/artist/${encodeURIComponent(id)}/top?limit=${topLimit}`, signal), this.list(`/artist/${encodeURIComponent(id)}/albums?index=${albumsOffset}&limit=${albumsLimit}`, signal)]);
+    return {
+      artist,
+      topTracks: top.rows.map((r) => deezerTrack(r)).filter((t2) => t2 !== null),
+      albums: albums.rows.map((r) => deezerAlbum({ ...r, artist: r["artist"] ?? { name: artist.name } })).filter((a) => a !== null),
+      albumsTotal: albums.total
+    };
+  }
+  async playlist(id, offset, limit, signal) {
+    const body = await this.get(`/playlist/${encodeURIComponent(id)}`, signal);
+    if (!body || num2(body["id"]) === null) return null;
+    const page = await this.list(`/playlist/${encodeURIComponent(id)}/tracks?index=${offset}&limit=${limit}`, signal);
+    const creator = isObject2(body["creator"]) ? body["creator"] : null;
+    return {
+      playlist: { id, title: str2(body["title"]) ?? "Playlist", owner: str2(creator?.["name"]), artworkUrl: webUrl2(body["picture_xl"]) ?? dzCover(body["md5_image"], "playlist"), total: posInt(body["nb_tracks"]) ?? page.total, url: `https://www.deezer.com/playlist/${id}` },
+      tracks: page.rows.map((r) => deezerTrack(r)).filter((t2) => t2 !== null)
+    };
+  }
+};
+var ENDPOINT = { tracks: "/search/track", artists: "/search/artist", albums: "/search/album" };
+var DeezerProvider = class {
+  constructor(client) {
+    this.client = client;
+    this.timeoutMs = client.timeoutMs * 2 + 500;
+  }
+  client;
+  id = "deezer";
+  sections = ["tracks", "artists", "albums"];
+  timeoutMs;
+  supports(query) {
+    return query.kind !== "url";
+  }
+  async search(query, options) {
+    const out = emptyResult();
+    if (query.kind === "isrc" && query.isrc) {
+      if (!options.sections.includes("tracks")) return out;
+      const track = await this.client.byIsrc(query.isrc, options.signal);
+      out.tracks = track ? [track] : [];
+      return out;
+    }
+    const sections = options.sections.filter((s) => this.sections.includes(s));
+    const ask = async (section) => {
+      const page = `&index=${options.offset}&limit=${options.limit}`;
+      if (query.kind === "advanced") {
+        const strict = await this.client.list(`${ENDPOINT[section]}?q=${encodeURIComponent(deezerAdvanced(query))}${page}`, options.signal);
+        if (strict.rows.length) return strict.rows;
+      }
+      return (await this.client.list(`${ENDPOINT[section]}?q=${encodeURIComponent(query.text)}${page}`, options.signal)).rows;
+    };
+    const settled = await Promise.allSettled(sections.map(ask));
+    settled.forEach((result, i) => {
+      if (result.status !== "fulfilled") return;
+      const section = sections[i];
+      out.full[section] = result.value.length >= options.limit;
+      if (section === "tracks") out.tracks = result.value.map((r) => deezerTrack(r)).filter((t2) => t2 !== null);
+      if (section === "albums") out.albums = result.value.map(deezerAlbum).filter((a) => a !== null);
+      if (section === "artists") out.artists = result.value.map(deezerArtist).filter((a) => a !== null);
+    });
+    const failed = settled.find((r) => r.status === "rejected");
+    if (failed && settled.every((r) => r.status === "rejected")) throw failed.reason;
+    return out;
+  }
+};
+
+// ../packages/domain/src/catalog/providers/musicbrainz.ts
+var MUSICBRAINZ_API = "https://musicbrainz.org/ws/2";
+var MUSICBRAINZ_INTERVAL_MS = 1100;
+function luceneEscape(text2) {
+  return text2.replace(/([+\-&|!(){}[\]^"~*?:\\/])/g, "\\$1");
+}
+function credit(row) {
+  const parts = arr(row["artist-credit"]);
+  const names = parts.map((p) => str2(p["name"]) ?? str2(isObject2(p["artist"]) ? p["artist"]["name"] : null)).filter((n) => Boolean(n));
+  const line = parts.map((p) => `${str2(p["name"]) ?? ""}${typeof p["joinphrase"] === "string" ? p["joinphrase"] : ""}`).join("").trim();
+  return { line: line || names.join(", "), names };
+}
+function firstRelease(row) {
+  const releases = arr(row["releases"]);
+  const dated = releases.filter((r) => typeof r["date"] === "string" && r["date"]);
+  const official = dated.filter((r) => r["status"] === "Official");
+  const pool = official.length ? official : dated.length ? dated : releases;
+  return [...pool].sort((a, b) => String(a["date"] ?? "9999").localeCompare(String(b["date"] ?? "9999")))[0] ?? null;
+}
+function musicbrainzTrack(row) {
+  const id = str2(row["id"], 40);
+  const title = str2(row["title"]);
+  const { line, names } = credit(row);
+  if (!id || !title || !line) return null;
+  const release = firstRelease(row);
+  const releaseDate = calendarDate(row["first-release-date"]) ?? calendarDate(release?.["date"]);
+  const isrcs = Array.isArray(row["isrcs"]) ? row["isrcs"].filter((i) => typeof i === "string" && /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/.test(i)) : [];
+  const length = num2(row["length"]);
+  return {
+    id: `musicbrainz:${id}`,
+    title,
+    artist: line,
+    artists: names.length ? names : [line],
+    album: str2(release?.["title"]),
+    albumArtist: null,
+    durationMs: length !== null && length > 0 ? Math.round(length) : null,
+    isrc: isrcs[0] ?? null,
+    artworkUrl: null,
+    releaseDate,
+    year: yearOf(releaseDate),
+    trackNumber: null,
+    discNumber: null,
+    bpm: null,
+    explicit: null,
+    genre: topGenre(row),
+    label: null,
+    sources: [{ platform: "musicbrainz", id, url: `https://musicbrainz.org/recording/${id}`, previewUrl: null, matchedBy: "search" }],
+    rank: 0
+  };
+}
+function topGenre(row) {
+  const ranked = (list) => [...list].sort((a, b) => (num2(b["count"]) ?? 0) - (num2(a["count"]) ?? 0)).map((g) => str2(g["name"], 100)).filter((n) => Boolean(n));
+  return ranked(arr(row["genres"]))[0] ?? null;
+}
+function genresOf(row) {
+  const list = [...arr(row["genres"])].sort((a, b) => (num2(b["count"]) ?? 0) - (num2(a["count"]) ?? 0));
+  return list.map((g) => str2(g["name"], 100)).filter((n) => Boolean(n)).slice(0, 10);
+}
+function sourcesFromRelations(row) {
+  const out = [];
+  for (const rel of arr(row["relations"])) {
+    const resource = isObject2(rel["url"]) ? str2(rel["url"]["resource"], 2048) : null;
+    if (!resource || rel["ended"] === true) continue;
+    const link = parseMusicLink(resource);
+    if (!link || link.kind !== "track") continue;
+    if (out.some((s) => s.platform === link.platform && s.id === link.id)) continue;
+    out.push({ platform: link.platform, id: link.id, url: link.url, previewUrl: null, matchedBy: "musicbrainz" });
+  }
+  return out;
+}
+var MusicBrainzClient = class {
+  constructor(options) {
+    this.options = options;
+    this.pacer = new Pacer(options.intervalMs ?? MUSICBRAINZ_INTERVAL_MS, options.now ?? Date.now, options.sleep);
+    this.timeoutMs = options.timeoutMs ?? 1e4;
+  }
+  options;
+  pacer;
+  timeoutMs;
+  /** One paced call. `null` for "no such thing" (404). */
+  get(path, signal) {
+    return this.pacer.run(async () => {
+      const sep2 = path.includes("?") ? "&" : "?";
+      const { status, body } = await getJson(this.options.fetch, `${MUSICBRAINZ_API}${path}${sep2}fmt=json`, { timeoutMs: this.timeoutMs, signal, headers: { "User-Agent": this.options.userAgent }, accept: [404] });
+      return status === 404 || !isObject2(body) ? null : body;
+    }, signal);
+  }
+  async searchRecordings(lucene, offset, limit, signal) {
+    const body = await this.get(`/recording?query=${encodeURIComponent(lucene)}&limit=${limit}&offset=${offset}`, signal);
+    return arr(body?.["recordings"]);
+  }
+  async byIsrc(isrc, signal) {
+    const body = await this.get(`/isrc/${encodeURIComponent(isrc)}?inc=artist-credits+releases`, signal);
+    return arr(body?.["recordings"]);
+  }
+  recording(id, signal) {
+    return this.get(`/recording/${encodeURIComponent(id)}?inc=url-rels+isrcs+genres+tags+releases+artist-credits`, signal);
+  }
+  release(id, signal) {
+    return this.get(`/release/${encodeURIComponent(id)}?inc=labels`, signal);
+  }
+  /** A recording's links on other platforms, for an ISRC: two paced calls. */
+  async linksByIsrc(isrc, signal) {
+    const candidates = await this.byIsrc(isrc, signal);
+    const id = str2(candidates[0]?.["id"], 40);
+    if (!id) return [];
+    const full = await this.recording(id, signal);
+    return full ? [{ platform: "musicbrainz", id, url: `https://musicbrainz.org/recording/${id}`, previewUrl: null, matchedBy: "isrc" }, ...sourcesFromRelations(full)] : [];
+  }
+  /**
+   * Genre, label and year for a recording (by ISRC, or by title and artist), and its links.
+   * Three paced calls at most: the lookup, the recording, its first official release's labels.
+   */
+  async enrich(input2, signal) {
+    const empty = { isrc: input2.isrc ?? null, musicbrainzRecordingId: null, genre: null, genres: [], label: null, releaseDate: null, year: null, sources: [] };
+    let candidates = [];
+    if (input2.isrc) candidates = await this.byIsrc(input2.isrc, signal);
+    if (!candidates.length && input2.title && input2.artist) {
+      candidates = await this.searchRecordings(`recording:"${luceneEscape(input2.title)}" AND artist:"${luceneEscape(input2.artist)}"`, 0, 5, signal);
+      if (input2.durationMs) {
+        const near = candidates.filter((c) => {
+          const length = num2(c["length"]);
+          return length === null || Math.abs(length - input2.durationMs) <= 5e3;
+        });
+        if (near.length) candidates = near;
+      }
+    }
+    const pick2 = [...candidates].sort((a, b) => String(a["first-release-date"] || "9999").localeCompare(String(b["first-release-date"] || "9999")))[0];
+    const id = str2(pick2?.["id"], 40);
+    if (!id) return empty;
+    const full = await this.recording(id, signal) ?? pick2;
+    const release = firstRelease(full);
+    let label = null;
+    const releaseId = str2(release?.["id"], 40);
+    if (releaseId) {
+      const detail = await this.release(releaseId, signal).catch(() => null);
+      label = str2(arr(detail?.["label-info"]).map((l) => isObject2(l["label"]) ? l["label"]["name"] : null).find((n) => typeof n === "string" && n !== "[no label]"));
+    }
+    const genres = genresOf(full);
+    const artistGenres = arr(full["artist-credit"]).flatMap((c) => isObject2(c["artist"]) ? genresOf(c["artist"]) : []);
+    const releaseDate = calendarDate(full["first-release-date"]) ?? calendarDate(release?.["date"]);
+    const isrcs = Array.isArray(full["isrcs"]) ? full["isrcs"].filter((i) => typeof i === "string") : [];
+    return {
+      isrc: input2.isrc ?? isrcs[0] ?? null,
+      musicbrainzRecordingId: id,
+      genre: genres[0] ?? artistGenres[0] ?? null,
+      genres: genres.length ? genres : artistGenres.slice(0, 10),
+      label,
+      releaseDate,
+      year: yearOf(releaseDate),
+      sources: [{ platform: "musicbrainz", id, url: `https://musicbrainz.org/recording/${id}`, previewUrl: null, matchedBy: input2.isrc ? "isrc" : "metadata" }, ...sourcesFromRelations(full)]
+    };
+  }
+};
+function musicbrainzLucene(query) {
+  if (query.kind === "advanced") {
+    const parts = [];
+    if (query.track) parts.push(`recording:"${luceneEscape(query.track)}"`);
+    if (query.artist) parts.push(`artist:"${luceneEscape(query.artist)}"`);
+    if (query.album) parts.push(`release:"${luceneEscape(query.album)}"`);
+    if (parts.length) return parts.join(" AND ");
+  }
+  return luceneEscape(query.text);
+}
+var MusicBrainzProvider = class {
+  constructor(client) {
+    this.client = client;
+    this.timeoutMs = client.timeoutMs + 3e3;
+  }
+  client;
+  id = "musicbrainz";
+  sections = ["tracks"];
+  timeoutMs;
+  supports(query) {
+    return query.kind !== "url";
+  }
+  async search(query, options) {
+    const out = emptyResult();
+    if (!options.sections.includes("tracks")) return out;
+    const rows = query.kind === "isrc" && query.isrc ? await this.client.byIsrc(query.isrc, options.signal) : await this.client.searchRecordings(musicbrainzLucene(query), options.offset, options.limit, options.signal);
+    out.tracks = rows.filter((r) => r["video"] !== true).map((r) => musicbrainzTrack(query.kind === "isrc" && query.isrc ? { ...r, isrcs: [query.isrc] } : r)).filter((t2) => t2 !== null);
+    out.full.tracks = query.kind !== "isrc" && rows.length >= options.limit;
+    return out;
+  }
+};
+
+// ../packages/domain/src/catalog/engine.ts
+var ALL_SECTIONS = ["tracks", "artists", "albums"];
+var ALL_PROVIDERS = ["itunes", "deezer", "musicbrainz", "youtube", "soundcloud"];
+var CatalogEngine = class {
+  constructor(options) {
+    this.options = options;
+    this.now = options.now ?? Date.now;
+    const t2 = options.timeouts ?? {};
+    this.itunes = new ItunesClient({ fetch: options.fetch, country: options.country, now: this.now, timeoutMs: t2.itunes ?? 8e3 });
+    this.deezer = new DeezerClient(options.fetch, t2.deezer ?? 8e3);
+    this.musicbrainz = new MusicBrainzClient({ fetch: options.fetch, userAgent: options.userAgent, now: this.now, ...options.sleep ? { sleep: options.sleep } : {}, timeoutMs: t2.musicbrainz ?? 1e4 });
+    this.lrclib = new LrclibClient(options.fetch, options.userAgent, t2.lrclib ?? 1e4);
+    this.odesli = new OdesliClient(options.fetch, options.odesliKey ?? (() => null), this.now, t2.odesli ?? 1e4);
+    this.health = new ProviderHealth2(this.now);
+    this.lyricsCache = new TtlCache(24 * 36e5, 500, this.now);
+    this.enrichCache = new TtlCache(24 * 36e5, 1e3, this.now);
+    this.resolveCache = new TtlCache(10 * 6e4, 100, this.now);
+    this.searchCache = new TtlCache(5 * 6e4, 300, this.now);
+    this.linksCache = new TtlCache(24 * 36e5, 1e3, this.now);
+    this.register(new ItunesProvider(this.itunes));
+    this.register(new DeezerProvider(this.deezer));
+    this.register(new MusicBrainzProvider(this.musicbrainz));
+    if (options.toolSearch) {
+      this.register(new ToolSearchProvider("youtube", options.toolSearch, t2.tools ?? 3e4));
+      this.register(new ToolSearchProvider("soundcloud", options.toolSearch, t2.tools ?? 3e4));
+    }
+  }
+  options;
+  itunes;
+  deezer;
+  musicbrainz;
+  lrclib;
+  odesli;
+  health;
+  providers = /* @__PURE__ */ new Map();
+  now;
+  lyricsCache;
+  enrichCache;
+  resolveCache;
+  searchCache;
+  linksCache;
+  /** Add or replace a provider (tests, or a server with a provider of its own). */
+  register(provider) {
+    this.providers.set(provider.id, provider);
+  }
+  /** Every service's standing right now, for a settings page. */
+  standing() {
+    const enabled = this.options.enabled?.() ?? {};
+    return ALL_PROVIDERS.map((id) => {
+      if (!this.providers.has(id)) return statusFor(id, { state: "skipped", error: "yt-dlp is not available here" });
+      if (enabled[id] === false) return statusFor(id, { state: "skipped", error: "Switched off" });
+      const until = this.health.coolingUntil(id);
+      if (until) return statusFor(id, { state: "cooling-down", retryAt: new Date(until).toISOString(), error: this.health.lastError(id) });
+      return statusFor(id, { state: "ok", error: this.health.lastError(id) });
+    });
+  }
+  /* ------------------------------------------------------------------ search */
+  /**
+   * The live feed. First chunk: every service's starting state (pending, skipped, cooling down).
+   * Then one `results` chunk per service as it answers, carrying the rows it added or changed.
+   * Then, for the best rows, a merge-only chunk with their other homes. Last, `done`.
+   */
+  async *search(input2, signal) {
+    const query = parseCatalogQuery(input2);
+    const sections = input2.sections?.length ? [...new Set(input2.sections)] : [...ALL_SECTIONS];
+    const offset = Math.max(0, input2.offset ?? 0);
+    const limit = Math.min(Math.max(1, input2.limit ?? 25), 50);
+    let seq = 0;
+    const statuses = /* @__PURE__ */ new Map();
+    const list = () => ALL_PROVIDERS.filter((id) => statuses.has(id)).map((id) => statuses.get(id));
+    if (query.kind === "url") {
+      yield { type: "done", seq, query, status: [], page: { tracks: null, artists: null, albums: null }, totals: { tracks: 0, artists: 0, albums: 0 }, resolve: query.url };
+      return;
+    }
+    const wanted = new Set(input2.providers?.length ? input2.providers : ALL_PROVIDERS);
+    const enabled = this.options.enabled?.() ?? {};
+    const running = [];
+    const askedSections = /* @__PURE__ */ new Set();
+    for (const id of ALL_PROVIDERS) {
+      if (!wanted.has(id)) continue;
+      const provider = this.providers.get(id);
+      if (!provider) {
+        statuses.set(id, statusFor(id, { state: "skipped", error: "yt-dlp is not available here, so this service cannot be searched" }));
+        continue;
+      }
+      if (enabled[id] === false) {
+        statuses.set(id, statusFor(id, { state: "skipped", error: "Switched off in the catalog settings" }));
+        continue;
+      }
+      const canSections = sections.filter((s) => provider.sections.includes(s));
+      if (!canSections.length || !provider.supports(query)) {
+        statuses.set(id, statusFor(id, { state: "skipped", error: query.kind === "isrc" ? "It cannot look up an ISRC" : "It has nothing in the sections asked for" }));
+        continue;
+      }
+      const until = this.health.coolingUntil(id);
+      if (until) {
+        statuses.set(id, statusFor(id, { state: "cooling-down", retryAt: new Date(until).toISOString(), error: this.health.lastError(id) }));
+        continue;
+      }
+      statuses.set(id, statusFor(id, { state: "pending" }));
+      canSections.forEach((s) => askedSections.add(s));
+      const tagged = this.ask(provider, query, { offset, limit, sections: canSections }, signal);
+      running.push(tagged);
+    }
+    yield { type: "results", seq: seq++, provider: null, query, tracks: [], artists: [], albums: [], status: list() };
+    const merger = new CatalogMerger(query);
+    const full = {};
+    const pending = new Map(running.map((p, i) => [i, p.then((o) => ({ o, i }))]));
+    while (pending.size) {
+      const { o, i } = await Promise.race(pending.values());
+      pending.delete(i);
+      statuses.set(o.provider.id, o.status);
+      const changed = o.result ? merger.add(o.result) : { tracks: [], artists: [], albums: [] };
+      for (const [section, more] of Object.entries(o.result?.full ?? {})) if (more) full[section] = true;
+      yield { type: "results", seq: seq++, provider: o.provider.id, query, ...changed, status: list() };
+    }
+    const top = this.options.crossLinkTop ?? 2;
+    if (top > 0 && !signal?.aborted && sections.includes("tracks")) {
+      const deadline = this.now() + (this.options.crossLinkBudgetMs ?? 5e3);
+      const candidates = merger.snapshot().tracks.filter((t2) => t2.isrc && !t2.sources.some((s) => s.platform === "spotify")).slice(0, top);
+      for (const track of candidates) {
+        if (this.now() >= deadline || signal?.aborted) break;
+        const found = await this.withDeadline(this.crossLinks(track, signal), deadline - this.now()).catch(() => []);
+        if (!found.length) continue;
+        const patched = merger.patchTrack(track.id, (t2) => ({ ...t2, sources: mergeSources(t2.sources, found) }));
+        if (patched) yield { type: "results", seq: seq++, provider: null, query, tracks: [patched], artists: [], albums: [], status: list() };
+      }
+    }
+    const snapshot = merger.snapshot();
+    const page = (section) => sections.includes(section) && askedSections.has(section) ? { offset, limit, hasMore: Boolean(full[section]) } : null;
+    const done = {
+      type: "done",
+      seq,
+      query,
+      status: list(),
+      page: { tracks: page("tracks"), artists: page("artists"), albums: page("albums") },
+      totals: { tracks: snapshot.tracks.length, artists: snapshot.artists.length, albums: snapshot.albums.length },
+      resolve: null
+    };
+    yield done;
+  }
+  /** The whole search as one answer (`?stream=0`): the feed, folded. */
+  async searchAll(input2, signal) {
+    const tracks = /* @__PURE__ */ new Map();
+    const artists = /* @__PURE__ */ new Map();
+    const albums = /* @__PURE__ */ new Map();
+    let last = null;
+    for await (const chunk of this.search(input2, signal)) {
+      last = chunk;
+      if (chunk.type !== "results") continue;
+      for (const t2 of chunk.tracks) tracks.set(t2.id, t2);
+      for (const a of chunk.artists) artists.set(a.id, a);
+      for (const a of chunk.albums) albums.set(a.id, a);
+    }
+    const done = last?.type === "done" ? last : null;
+    const byRank = (rows) => rows.map((row, i) => ({ row, i })).sort((a, b) => b.row.rank - a.row.rank || a.i - b.i).map(({ row }) => row);
+    return {
+      query: done?.query ?? parseCatalogQuery(input2),
+      tracks: byRank([...tracks.values()]),
+      artists: byRank([...artists.values()]),
+      albums: byRank([...albums.values()]),
+      status: done?.status ?? [],
+      page: done?.page ?? { tracks: null, artists: null, albums: null },
+      resolve: done?.resolve ?? null
+    };
+  }
+  async ask(provider, query, page, outer) {
+    const started = this.now();
+    const controller = new AbortController();
+    const onAbort = () => controller.abort();
+    outer?.addEventListener("abort", onAbort, { once: true });
+    let timer;
+    const key = JSON.stringify([provider.id, query.kind, query.text, query.track, query.artist, query.album, query.isrc, page.offset, page.limit, [...page.sections].sort()]);
+    try {
+      const work = this.searchCache.get(key, () => provider.search(query, { ...page, signal: controller.signal }));
+      const deadline = new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          controller.abort();
+          reject(new CatalogHttpError(`${provider.id} did not answer within ${Math.round(provider.timeoutMs / 1e3)} s`, "timeout"));
+        }, provider.timeoutMs);
+      });
+      const result = await Promise.race([work, deadline]);
+      this.health.success(provider.id);
+      const count = result.tracks.length + result.artists.length + result.albums.length;
+      return { provider, result, status: statusFor(provider.id, { state: count ? "ok" : "empty", count, latencyMs: this.now() - started }) };
+    } catch (error61) {
+      const latencyMs = this.now() - started;
+      if (error61 instanceof ProviderResting) {
+        this.health.restUntil(provider.id, error61.retryAt, error61.message);
+        return { provider, result: null, status: statusFor(provider.id, { state: "cooling-down", latencyMs, error: error61.message, retryAt: new Date(error61.retryAt).toISOString() }) };
+      }
+      if (error61 instanceof CatalogHttpError && error61.kind === "aborted") {
+        return { provider, result: null, status: statusFor(provider.id, { state: "failed", latencyMs, error: "The search was cancelled" }) };
+      }
+      this.health.failure(provider.id, error61);
+      const until = this.health.coolingUntil(provider.id);
+      const timedOut = error61 instanceof CatalogHttpError && error61.kind === "timeout";
+      return { provider, result: null, status: statusFor(provider.id, { state: timedOut ? "timeout" : "failed", latencyMs, error: describeError(error61), retryAt: until ? new Date(until).toISOString() : null }) };
+    } finally {
+      if (timer) clearTimeout(timer);
+      outer?.removeEventListener("abort", onAbort);
+    }
+  }
+  withDeadline(work, ms) {
+    let timer;
+    return Promise.race([work, new Promise((_, reject) => timer = setTimeout(() => reject(new CatalogHttpError("Out of time", "timeout")), Math.max(ms, 0)))]).finally(() => clearTimeout(timer));
+  }
+  /* ----------------------------------------------------------- cross-links */
+  /**
+   * A song's other homes, keylessly: MusicBrainz's links for its ISRC (Spotify, YouTube Music,
+   * Apple Music, Deezer, Tidal, Qobuz… as editors recorded them), Deezer's own ISRC lookup, and —
+   * only with a key — SongLink.
+   */
+  async crossLinks(track, signal) {
+    const found = [];
+    if (track.isrc) {
+      const isrc = track.isrc;
+      found.push(...await this.linksCache.get(isrc, () => this.musicbrainz.linksByIsrc(isrc, signal)).catch(() => []));
+      if (!track.sources.some((s) => s.platform === "deezer") && !found.some((s) => s.platform === "deezer")) {
+        const dz = await this.deezer.byIsrc(track.isrc, signal).catch(() => null);
+        const source2 = dz?.sources[0];
+        if (source2) found.push({ ...source2, matchedBy: "isrc" });
+      }
+    }
+    if (this.odesli.configured) {
+      const from = track.sources.find((s) => s.platform !== "musicbrainz") ?? found.find((s) => s.platform !== "musicbrainz");
+      if (from) {
+        const answer = await this.odesli.links(from.url, signal).catch(() => null);
+        if (answer) found.push(...answer.sources);
+      }
+    }
+    return mergeSources([], found);
+  }
+  /**
+   * Where to fetch a song's audio: a downloadable source it already has; else one of its other homes
+   * (MusicBrainz's links, SongLink with a key); else YouTube's own search for "artist - title",
+   * taking only a result that is the same recording (same artist and title, within three seconds).
+   * Null when none is found: the song is in a store, and nowhere it can be fetched from.
+   */
+  async findDownloadSource(track, signal) {
+    const own2 = pickDownloadSource(track.sources);
+    if (own2) return own2;
+    const linked = pickDownloadSource(await this.crossLinks(track, signal).catch(() => []));
+    if (linked) return linked;
+    const youtube = this.providers.get("youtube");
+    if (!youtube || this.health.coolingUntil("youtube")) return null;
+    const query = parseCatalogQuery({ q: `${track.artists[0] ?? track.artist} - ${track.title}` });
+    const controller = new AbortController();
+    const onAbort = () => controller.abort();
+    signal?.addEventListener("abort", onAbort, { once: true });
+    try {
+      const found = await this.withDeadline(youtube.search(query, { offset: 0, limit: 5, sections: ["tracks"], signal: controller.signal }), youtube.timeoutMs);
+      const same = found.tracks.find((t2) => sameRecording(track, t2));
+      return same?.sources[0] ? { ...same.sources[0], matchedBy: "metadata" } : null;
+    } catch {
+      controller.abort();
+      return null;
+    } finally {
+      signal?.removeEventListener("abort", onAbort);
+    }
+  }
+  /* --------------------------------------------------------------- details */
+  split(id) {
+    const at = id.indexOf(":");
+    if (at <= 0) throw new DomainError("validation", "Say which platform: an id is \u201Cplatform:id\u201D, as a result\u2019s id is");
+    return { platform: id.slice(0, at), native: id.slice(at + 1) };
+  }
+  async album(id, offset = 0, limit = 100, signal) {
+    const { platform, native } = this.split(id);
+    if (platform === "deezer") {
+      const found = await this.upstream(() => this.deezer.album(native, offset, Math.min(limit, CATALOG_COLLECTION_CAP - offset), signal), "Deezer");
+      if (!found) throw new DomainError("not-found", "Deezer has no album with that id");
+      const total = found.total ?? found.album.trackCount;
+      const link = { platform: "deezer", kind: "album", id: native, url: `https://www.deezer.com/album/${native}` };
+      return {
+        album: found.album,
+        page: { tracks: found.tracks.slice(0, limit), offset, limit, total, hasMore: offset + Math.min(found.tracks.length, limit) < Math.min(total ?? 0, CATALOG_COLLECTION_CAP), capped: (total ?? 0) > CATALOG_COLLECTION_CAP },
+        collection: collectionRef(link, "album", found.album.title, found.album.artist)
+      };
+    }
+    if (platform === "apple-music") {
+      const found = await this.upstream(() => this.itunes.album(native, signal), "Apple Music");
+      if (!found) throw new DomainError("not-found", "Apple Music has no album with that id");
+      const url2 = found.album.sources[0]?.url ?? `https://music.apple.com/album/${native}`;
+      const link = { platform: "apple-music", kind: "album", id: native, url: url2 };
+      return { album: found.album, page: pageOf(found.tracks, offset, limit, found.album.trackCount ?? found.tracks.length, false), collection: collectionRef(link, "album", found.album.title, found.album.artist) };
+    }
+    throw new DomainError("unsupported", `Albums are opened from Deezer or Apple Music; ${platform} albums are opened by pasting their link`);
+  }
+  async artist(id, input2 = {}, signal) {
+    const { platform, native } = this.split(id);
+    const albumsOffset = input2.albumsOffset ?? 0;
+    const albumsLimit = input2.albumsLimit ?? 25;
+    const topLimit = input2.topLimit ?? 10;
+    if (platform === "deezer") {
+      const found = await this.upstream(() => this.deezer.artist(native, albumsOffset, albumsLimit, topLimit, signal), "Deezer");
+      if (!found) throw new DomainError("not-found", "Deezer has no artist with that id");
+      return { artist: found.artist, topTracks: found.topTracks, albums: found.albums, albumsPage: { offset: albumsOffset, limit: albumsLimit, hasMore: found.albumsTotal !== null ? albumsOffset + found.albums.length < found.albumsTotal : found.albums.length >= albumsLimit } };
+    }
+    if (platform === "apple-music") {
+      const found = await this.upstream(() => this.itunes.artist(native, albumsOffset + albumsLimit, topLimit, signal), "Apple Music");
+      if (!found) throw new DomainError("not-found", "Apple Music has no artist with that id");
+      const albums = found.albums.slice(albumsOffset, albumsOffset + albumsLimit);
+      return { artist: found.artist, topTracks: found.topTracks.slice(0, topLimit), albums, albumsPage: { offset: albumsOffset, limit: albumsLimit, hasMore: found.albums.length >= albumsOffset + albumsLimit } };
+    }
+    throw new DomainError("unsupported", `Artists are opened from Deezer or Apple Music, not ${platform}`);
+  }
+  async upstream(work, name) {
+    try {
+      return await work();
+    } catch (error61) {
+      if (error61 instanceof DomainError) throw error61;
+      if (error61 instanceof ProviderResting) throw new DomainError("rate-limited", error61.message, { retryAfterSeconds: Math.max(1, Math.ceil((error61.retryAt - this.now()) / 1e3)) });
+      if (error61 instanceof CatalogHttpError && error61.kind === "rate-limited") throw new DomainError("rate-limited", `${name} asked to slow down`, { retryAfterSeconds: Math.max(1, Math.ceil((error61.retryAfterMs ?? 5e3) / 1e3)) });
+      throw new DomainError("unavailable", `${name} could not be read: ${describeError(error61)}`);
+    }
+  }
+  /* --------------------------------------------------------------- resolve */
+  /** What a pasted link is. Never throws for a link it cannot read: it says why, in `reason`. */
+  async resolve(input2, offset = 0, limit = 100, signal) {
+    const resolvedAt = new Date(this.now()).toISOString();
+    const link = parseMusicLink(input2);
+    const base = { track: null, collection: null, artist: null, reason: null, resolvedAt };
+    if (!link) return { ...base, url: input2.slice(0, 2048), platform: null, kind: "unsupported", reason: "That is not a link to music on a platform the catalog reads." };
+    const answer = (patch) => ({ ...base, url: link.url, platform: link.platform, ...patch });
+    const label = CATALOG_PLATFORM_LABELS[link.platform];
+    try {
+      if (link.platform === "deezer") return await this.resolveDeezer(link, offset, limit, answer, signal);
+      if (link.platform === "apple-music") return await this.resolveApple(link, offset, limit, answer, signal);
+      if (TOOL_PLATFORMS.includes(link.platform)) return await this.resolveWithTool(link, offset, limit, answer, signal);
+      return await this.resolveWithOdesli(link, answer, signal);
+    } catch (error61) {
+      if (error61 instanceof DomainError && error61.code === "not-found") return answer({ kind: "unavailable", reason: `${label} has nothing at that address.` });
+      if (error61 instanceof DomainError) throw error61;
+      return answer({ kind: "unavailable", reason: `${label} could not be read just now: ${describeError(error61)}` });
+    }
+  }
+  async resolveDeezer(link, offset, limit, answer, signal) {
+    if (!link.id) return answer({ kind: "unsupported", reason: "A Deezer short link says nothing until it is opened. Open it, then paste the address it goes to." });
+    if (link.kind === "track") {
+      const track = await this.upstream(() => this.deezer.track(link.id, signal), "Deezer");
+      return track ? answer({ kind: "track", track }) : answer({ kind: "unavailable", reason: "Deezer has no song at that address." });
+    }
+    if (link.kind === "album") {
+      const detail = await this.album(`deezer:${link.id}`, offset, limit, signal);
+      return answer({ kind: "album", collection: { ref: detail.collection, artworkUrl: detail.album.artworkUrl, covers: coversOf(detail.page.tracks), releaseDate: detail.album.releaseDate, page: detail.page } });
+    }
+    if (link.kind === "playlist") {
+      const found = await this.upstream(() => this.deezer.playlist(link.id, offset, Math.min(limit, CATALOG_COLLECTION_CAP - offset), signal), "Deezer");
+      if (!found) return answer({ kind: "unavailable", reason: "Deezer would not list that playlist: it is private or gone." });
+      const { playlist } = found;
+      const tracks = found.tracks.slice(0, limit);
+      const head = offset === 0 ? tracks : (await this.upstream(() => this.deezer.playlist(link.id, 0, 8, signal), "Deezer"))?.tracks ?? [];
+      const total = playlist.total;
+      const collection = {
+        ref: collectionRef(link, "playlist", playlist.title, playlist.owner, playlist.url),
+        artworkUrl: playlist.artworkUrl,
+        covers: coversOf(head),
+        releaseDate: null,
+        page: { tracks, offset, limit, total, hasMore: offset + tracks.length < Math.min(total ?? 0, CATALOG_COLLECTION_CAP), capped: (total ?? 0) > CATALOG_COLLECTION_CAP }
+      };
+      return answer({ kind: "playlist", collection });
+    }
+    if (link.kind === "artist") {
+      const detail = await this.artist(`deezer:${link.id}`, {}, signal);
+      return answer({ kind: "artist", artist: detail.artist });
+    }
+    return answer({ kind: "unsupported", reason: "That Deezer address is not a song, album, playlist or artist." });
+  }
+  async resolveApple(link, offset, limit, answer, signal) {
+    if (link.kind === "track" && link.id) {
+      const track = await this.upstream(() => this.itunes.track(link.id, signal), "Apple Music");
+      return track ? answer({ kind: "track", track }) : answer({ kind: "unavailable", reason: "Apple Music has no song at that address in this storefront." });
+    }
+    if (link.kind === "album" && link.id) {
+      const detail = await this.album(`apple-music:${link.id}`, offset, limit, signal);
+      const full = await this.upstream(() => this.itunes.album(link.id, signal), "Apple Music");
+      return answer({ kind: "album", collection: { ref: detail.collection, artworkUrl: detail.album.artworkUrl, covers: coversOf(full?.tracks ?? detail.page.tracks), releaseDate: detail.album.releaseDate, page: detail.page } });
+    }
+    if (link.kind === "artist" && link.id) {
+      const detail = await this.artist(`apple-music:${link.id}`, {}, signal);
+      return answer({ kind: "artist", artist: detail.artist });
+    }
+    if (link.kind === "playlist") return answer({ kind: "unsupported", reason: "Apple Music playlists are not in Apple\u2019s public API, so they cannot be listed without an Apple developer account. Albums and songs can." });
+    return answer({ kind: "unsupported", reason: "That Apple Music address is not a song, album or artist." });
+  }
+  async resolveWithTool(link, offset, limit, answer, signal) {
+    const label = CATALOG_PLATFORM_LABELS[link.platform];
+    const reader = this.options.linkReader;
+    if (!reader) return answer({ kind: "unsupported", reason: `${label} links are read by yt-dlp or spotDL, which are not available here.` });
+    const match = link.platform === "spotify" && link.kind === "track";
+    let read;
+    try {
+      read = await this.resolveCache.get(`${link.url}|${match ? "match" : ""}`, () => reader(link.url, { signal, match }));
+    } catch (error61) {
+      return answer({ kind: "unavailable", reason: this.unreadable(link, error61) });
+    }
+    const platform = link.platform;
+    if (read.kind === "track") {
+      const track = trackFromLink(read.track, { platform });
+      return track ? answer({ kind: "track", track }) : answer({ kind: "unavailable", reason: `${label} described nothing playable at that address.` });
+    }
+    const all = read.entries.slice(0, CATALOG_COLLECTION_CAP).map((e) => trackFromLink(e, { platform, owner: link.kind === "album" ? read.owner : null, album: link.kind === "album" ? read.title : null })).filter((t2) => t2 !== null);
+    await this.fillCovers(all, reader, signal);
+    const kind = link.kind === "album" ? "album" : "playlist";
+    const collection = {
+      ref: collectionRef(link, kind, read.title, read.owner),
+      artworkUrl: read.artworkUrl,
+      covers: coversOf(all),
+      releaseDate: read.date && /^\d{4}(-\d{2}(-\d{2})?)?$/.test(read.date) ? read.date : null,
+      page: pageOf(all, offset, limit, read.total, read.capped || (read.total ?? 0) > CATALOG_COLLECTION_CAP)
+    };
+    if (link.kind === "artist") {
+      const artist = { id: `${platform}:${link.id ?? link.url}`, name: read.owner ?? read.title, pictureUrl: read.artworkUrl, albumCount: null, fans: null, genre: null, sources: [{ platform, id: link.id, url: link.url, previewUrl: null, matchedBy: "link" }], rank: 0 };
+      return answer({ kind: "artist", artist, collection });
+    }
+    return answer({ kind, collection });
+  }
+  /**
+   * A list whose entries came without artwork (a SoundCloud set lists addresses only) gets its first
+   * four looked up one by one, two at a time, so its mosaic is never blank. Each answer also fills
+   * that entry's title and artist.
+   */
+  async fillCovers(tracks, reader, signal) {
+    const need = 4 - coversOf(tracks).length;
+    if (need <= 0) return;
+    const missing = tracks.map((t2, i) => ({ t: t2, i })).filter(({ t: t2 }) => !t2.artworkUrl).slice(0, Math.min(need + 2, 6));
+    const one = async ({ t: t2, i }) => {
+      const url2 = t2.sources[0]?.url;
+      if (!url2 || coversOf(tracks).length >= 4) return;
+      const read = await this.resolveCache.get(`${url2}|`, () => reader(url2, { signal })).catch(() => null);
+      if (read?.kind !== "track") return;
+      const filled = trackFromLink(read.track, { platform: t2.sources[0].platform });
+      if (filled) tracks[i] = { ...filled, id: t2.id, album: t2.album ?? filled.album, sources: mergeSources(t2.sources, filled.sources) };
+    };
+    for (let k = 0; k < missing.length; k += 2) await Promise.all(missing.slice(k, k + 2).map(one));
+  }
+  unreadable(link, error61) {
+    const said = describeError(error61);
+    if (link.platform === "spotify" && (link.kind === "playlist" || link.kind === "unknown")) {
+      return `Spotify would not list this playlist. It is private, or one Spotify made itself (Spotify\u2019s API does not share those with other apps). spotDL said: ${said}`;
+    }
+    if (error61 instanceof LinkReadError && error61.code === "tool-missing") return said;
+    if (error61 instanceof LinkReadError && error61.code === "busy") return `Too many links are being read at once. Try again in a moment. (${said})`;
+    return `${CATALOG_PLATFORM_LABELS[link.platform]} could not be read: ${said}`;
+  }
+  /** Tidal, Qobuz and Amazon Music publish no keyless API; with a SongLink key their links still resolve. */
+  async resolveWithOdesli(link, answer, signal) {
+    const label = CATALOG_PLATFORM_LABELS[link.platform];
+    if (!this.odesli.configured) return answer({ kind: "unsupported", reason: `${label} has no public API to read a link with, and SongLink (which could) now needs a key. An administrator can add one in the catalog settings.` });
+    const found = await this.odesli.links(link.url, signal);
+    if (!found || !found.title) return answer({ kind: "unavailable", reason: `SongLink did not recognise that ${label} link.` });
+    const own2 = { platform: link.platform, id: link.id, url: link.url, previewUrl: null, matchedBy: "link" };
+    const sources = mergeSources([own2], found.sources);
+    if (found.kind === "album" || link.kind === "album") {
+      const dz = sources.find((s) => s.platform === "deezer" && s.id);
+      if (dz?.id) {
+        const detail = await this.album(`deezer:${dz.id}`, 0, CATALOG_COLLECTION_CAP, signal).catch(() => null);
+        if (detail) return answer({ kind: "album", collection: { ref: collectionRef(link, "album", found.title, found.artist), artworkUrl: found.artworkUrl ?? detail.album.artworkUrl, covers: coversOf(detail.page.tracks), releaseDate: detail.album.releaseDate, page: detail.page } });
+      }
+      return answer({ kind: "album", collection: { ref: collectionRef(link, "album", found.title, found.artist), artworkUrl: found.artworkUrl, covers: found.artworkUrl ? [found.artworkUrl] : [], releaseDate: null, page: { tracks: [], offset: 0, limit: 1, total: null, hasMore: false, capped: false } }, reason: `${label} albums list their songs only when the same album is on Deezer.` });
+    }
+    const track = { id: `${link.platform}:${link.id ?? link.url}`, title: found.title, artist: found.artist ?? "", artists: found.artist ? [found.artist] : [], album: null, albumArtist: null, durationMs: null, isrc: null, artworkUrl: found.artworkUrl, releaseDate: null, year: null, trackNumber: null, discNumber: null, bpm: null, explicit: null, genre: null, label: null, sources, rank: 0 };
+    return answer({ kind: "track", track });
+  }
+  /* ---------------------------------------------------- lyrics, enrichment */
+  lyrics(input2, signal) {
+    const key = JSON.stringify([input2.title.toLowerCase(), input2.artist.toLowerCase(), input2.album?.toLowerCase() ?? null, input2.durationSec ?? null]);
+    return this.lyricsCache.get(key, () => this.upstream(() => this.lrclib.lyrics(input2, signal), "LRCLIB"));
+  }
+  /** MusicBrainz's genre, label and year for a song, and its other homes. Cached for a day. */
+  enrich(input2, signal) {
+    const key = input2.isrc ? `isrc:${input2.isrc}` : JSON.stringify([input2.title?.toLowerCase(), input2.artist?.toLowerCase(), input2.durationMs ? Math.round(input2.durationMs / 5e3) : null]);
+    return this.enrichCache.get(key, () => this.upstream(() => this.musicbrainz.enrich(input2, signal), "MusicBrainz"));
+  }
+  /** Enrichment with the song's other homes added (Deezer by ISRC; SongLink with a key). */
+  async enrichWithLinks(input2, signal) {
+    const base = await this.enrich(input2, signal);
+    const isrc = input2.isrc ?? base.isrc;
+    const extra = await this.crossLinks({ isrc, title: input2.title ?? "", artist: input2.artist ?? "", durationMs: input2.durationMs ?? null, sources: base.sources }, signal).catch(() => []);
+    return { ...base, isrc, sources: mergeSources(base.sources, extra) };
+  }
+  /** Whether two rows are one recording (exported for the player's own merging). */
+  static sameRecording = sameRecording;
+};
+
+// ../packages/domain/src/catalog/ndjson.ts
+function ndjsonLine(value) {
+  return `${JSON.stringify(value)}
+`;
+}
+
+// src/catalog.ts
+import { lookup } from "node:dns/promises";
+var MAX_REDIRECTS2 = 3;
+var MAX_BODY_BYTES = 4 * 1024 * 1024;
+function guardedCatalogFetch(fetchImpl = fetch, resolveName = async (host) => (await lookup(host, { all: true })).map((a) => a.address)) {
+  return async (input2, init) => {
+    let url2 = input2;
+    for (let hop = 0; hop <= MAX_REDIRECTS2; hop += 1) {
+      const checked = validateOutboundUrl(url2, { allowedHosts: CATALOG_API_HOSTS, allowedSchemes: ["https:"], maxLength: 4096 });
+      if (!checked.ok || !checked.url) throw new Error(`Blocked outbound URL: ${checked.reason ?? "not allowed"}`);
+      const addresses = await resolveName(checked.url.hostname);
+      const allowed = isResolvedAddressAllowed(addresses);
+      if (!allowed.ok) throw new Error(`Blocked outbound URL: ${allowed.reason ?? "resolves to a private address"}`);
+      const response = await fetchImpl(checked.url, { headers: init.headers, signal: init.signal, redirect: "manual", credentials: "omit" });
+      const location = response.headers.get("location");
+      if (response.status >= 300 && response.status < 400 && location) {
+        await response.body?.cancel().catch(() => void 0);
+        url2 = new URL(location, checked.url).toString();
+        continue;
+      }
+      const length = Number(response.headers.get("content-length") ?? 0);
+      if (length > MAX_BODY_BYTES) {
+        await response.body?.cancel().catch(() => void 0);
+        throw new Error(`${checked.url.hostname} sent far more than any answer needs`);
+      }
+      let text2 = null;
+      const read = () => text2 ??= response.text().then((t2) => {
+        if (t2.length > MAX_BODY_BYTES) throw new Error(`${checked.url.hostname} sent far more than any answer needs`);
+        return t2;
+      });
+      return { status: response.status, headers: response.headers, text: read, json: async () => JSON.parse(await read()) };
+    }
+    throw new Error("Too many redirects");
+  };
+}
+function helperToLinkRead(resolved) {
+  const entry = (t2) => ({ ...t2, isrc: t2.isrc ?? null, matchUrl: t2.matchUrl ?? null });
+  if (resolved.kind === "track" && resolved.track) return { kind: "track", url: resolved.url, track: entry(resolved.track) };
+  const c = resolved.collection;
+  if (!c) throw new LinkReadError("The tool described nothing at that address.", "unavailable");
+  return { kind: "collection", url: resolved.url, title: c.title, owner: c.artist, artworkUrl: c.artworkUrl, date: c.date, entries: c.entries.map(entry), total: c.total, capped: c.capped };
+}
+function createHelperCatalog(options) {
+  return new CatalogEngine({
+    fetch: options.fetch ?? guardedCatalogFetch(),
+    userAgent: `AirwaveHelper/${options.version} ( https://github.com/jyoung2000/AudioWave2.0 )`,
+    toolSearch: ({ args, signal }) => options.links.search(args, signal),
+    linkReader: async (url2, { signal, match }) => {
+      void signal;
+      const checked = checkFetchUrl(url2, options.allowedHosts);
+      if (!checked.ok || !checked.url) throw new LinkReadError(checked.reason ?? "That address is not one this helper will read.", "unavailable");
+      try {
+        return helperToLinkRead(await options.links.resolve(checked.url, { match: match === true }));
+      } catch (error61) {
+        if (error61 instanceof ResolveError) throw new LinkReadError(error61.message, error61.code === "tool-missing" ? "tool-missing" : error61.code === "busy" ? "busy" : "failed");
+        throw error61;
+      }
+    }
+  });
 }
 
 // src/provision.ts
@@ -23269,11 +25618,11 @@ async function ensureTools(options) {
     if (options.signal?.aborted) break;
     const record2 = state.tools[id] ??= {};
     const tool = await resolve3(id);
-    const source = toolSource(id, platform, arch);
+    const source2 = toolSource(id, platform, arch);
     if (tool.present && !options.force) {
-      if (id === "yt-dlp" && tool.origin === "installed" && source && (options.autoUpdate?.() ?? true) && due(record2.lastUpdateCheckAt, UPDATE_CHECK_MS, now) && !options.busy?.()) {
+      if (id === "yt-dlp" && tool.origin === "installed" && source2 && (options.autoUpdate?.() ?? true) && due(record2.lastUpdateCheckAt, UPDATE_CHECK_MS, now) && !options.busy?.()) {
         try {
-          const latest = await release(source.repo);
+          const latest = await release(source2.repo);
           const behind = !!latest.tag && !!tool.version && latest.tag.trim() !== tool.version.trim();
           if (!behind) record2.lastUpdateCheckAt = new Date(now()).toISOString();
           else if (options.busy?.()) log("yt-dlp update deferred: downloads are running");
@@ -23297,7 +25646,7 @@ async function ensureTools(options) {
       report(id, { state: "ready" });
       continue;
     }
-    if (!source) {
+    if (!source2) {
       report(id, { state: "unsupported", reason: installHint(id, false) });
       continue;
     }
@@ -23421,13 +25770,13 @@ var ToolProvisioner = class {
   async check(id, tool) {
     const now = this.options.now ?? Date.now;
     const checkedAt = new Date(now()).toISOString();
-    const source = toolSource(id, this.options.platform ?? process.platform, this.options.arch ?? process.arch);
-    if (!source) return { latest: null, updateAvailable: null, reason: installHint(id, false), checkedAt };
+    const source2 = toolSource(id, this.options.platform ?? process.platform, this.options.arch ?? process.arch);
+    if (!source2) return { latest: null, updateAvailable: null, reason: installHint(id, false), checkedAt };
     const release = this.options.release ?? ((repo) => latestRelease(repo, { ...this.options.fetchImpl ? { fetchImpl: this.options.fetchImpl } : {}, signal: AbortSignal.any([this.stopped.signal, AbortSignal.timeout(2e4)]) }));
     try {
-      const latest = await release(source.repo);
+      const latest = await release(source2.repo);
       const record2 = readState(this.options.toolsDir).tools[id];
-      return { ...compareRelease(id, tool, latest, record2?.verified, source.asset(latest.assets.map((a) => a.name))), checkedAt };
+      return { ...compareRelease(id, tool, latest, record2?.verified, source2.asset(latest.assets.map((a) => a.name))), checkedAt };
     } catch (error61) {
       this.options.log?.(`could not check ${id}: ${error61 instanceof Error ? error61.message : String(error61)}`);
       return { latest: null, updateAvailable: null, reason: "GitHub didn\u2019t answer, so the latest version isn\u2019t known. Check again in a moment.", checkedAt };
@@ -23469,7 +25818,7 @@ var ToolProvisioner = class {
 };
 
 // src/server.ts
-var MAX_BODY_BYTES = 64 * 1024;
+var MAX_BODY_BYTES2 = 64 * 1024;
 var MAX_JOBS = 50;
 function ownAddresses() {
   return Object.values(networkInterfaces()).flat().filter((entry) => Boolean(entry && !entry.internal && entry.family === "IPv4")).map((entry) => entry.address);
@@ -23507,6 +25856,7 @@ async function startHelper(options) {
   });
   const estimate = createEstimator(options.backup ?? { folders: {}, backupDir: null });
   const links = createResolver({ workDir: options.workDir, tools: resolve_, log: options.log, ...options.resolveTimeoutMs ? { timeoutMs: options.resolveTimeoutMs } : {} });
+  const catalog = createHelperCatalog({ version: options.version, links, allowedHosts: options.allowedHosts, fetch: options.catalogFetch });
   const server = createServer((request, response) => {
     void handle(request, response).catch((error61) => {
       options.log(`unhandled: ${error61 instanceof Error ? error61.message : String(error61)}`);
@@ -23596,6 +25946,12 @@ async function startHelper(options) {
         if (error61 instanceof ResolveError && error61.code === "tool-missing") return fail(response, 409, "tool-missing", message);
         return fail(response, 502, "resolve", message || "The link could not be read.");
       }
+    }
+    if (Object.values(HELPER_CATALOG_ROUTES).includes(path) && request.method === "GET") {
+      if (origin_ === void 0 && !tokenMatches(options.token, header(request, "x-helper-token"))) {
+        return fail(response, 403, "origin", "This origin may not talk to the helper.");
+      }
+      return catalogRoute(path, url2, response);
     }
     if (path !== HELPER_ROUTES.health && !tokenMatches(options.token, header(request, "x-helper-token"))) {
       return fail(response, 401, "token", "This request needs the helper\u2019s token. It is printed when the helper starts.");
@@ -23699,6 +26055,61 @@ async function startHelper(options) {
     }
     return fail(response, 404, "not-found", "No such route.");
   }
+  async function catalogRoute(path, url2, response) {
+    const params = Object.fromEntries(url2.searchParams);
+    const invalid = (issues) => fail(response, 400, "validation", `That request is not one this helper understands: ${issues[0]?.message ?? "invalid"}.`);
+    try {
+      if (path === HELPER_CATALOG_ROUTES.search) {
+        const parsed2 = CatalogSearchRequest.safeParse(params);
+        if (!parsed2.success) return invalid(parsed2.error.issues);
+        const q = parsed2.data;
+        const controller = new AbortController();
+        response.once("close", () => controller.abort());
+        const input3 = { q: q.q, track: q.track, artist: q.artist, album: q.album, sections: q.sections, providers: q.providers, offset: q.offset, limit: q.limit };
+        if (q.stream === "0") return send(response, 200, await catalog.searchAll(input3, controller.signal));
+        response.writeHead(200, { "content-type": `${NDJSON_CONTENT_TYPE}; charset=utf-8`, "cache-control": "no-store", "x-content-type-options": "nosniff" });
+        for await (const chunk of catalog.search(input3, controller.signal)) {
+          if (response.destroyed) break;
+          response.write(ndjsonLine(chunk));
+        }
+        return void response.end();
+      }
+      if (path === HELPER_CATALOG_ROUTES.album) {
+        const parsed2 = CatalogAlbumRequest.safeParse(params);
+        if (!parsed2.success) return invalid(parsed2.error.issues);
+        return send(response, 200, await catalog.album(parsed2.data.id, parsed2.data.offset, parsed2.data.limit));
+      }
+      if (path === HELPER_CATALOG_ROUTES.artist) {
+        const parsed2 = CatalogArtistRequest.safeParse(params);
+        if (!parsed2.success) return invalid(parsed2.error.issues);
+        return send(response, 200, await catalog.artist(parsed2.data.id, parsed2.data));
+      }
+      if (path === HELPER_CATALOG_ROUTES.resolve) {
+        const parsed2 = CatalogResolveRequest.safeParse(params);
+        if (!parsed2.success) return invalid(parsed2.error.issues);
+        return send(response, 200, await catalog.resolve(parsed2.data.url, parsed2.data.offset, parsed2.data.limit));
+      }
+      if (path === HELPER_CATALOG_ROUTES.lyrics) {
+        const parsed2 = CatalogLyricsRequest.safeParse(params);
+        if (!parsed2.success) return invalid(parsed2.error.issues);
+        const l = parsed2.data;
+        return send(response, 200, await catalog.lyrics({ title: l.title, artist: l.artist, ...l.album ? { album: l.album } : {}, ...l.durationSec ? { durationSec: l.durationSec } : {} }));
+      }
+      const parsed = CatalogEnrichRequest.safeParse(params);
+      if (!parsed.success) return invalid(parsed.error.issues);
+      const e = parsed.data;
+      const input2 = { isrc: e.isrc ?? null, title: e.title ?? null, artist: e.artist ?? null, durationMs: e.durationSec ? e.durationSec * 1e3 : null };
+      return send(response, 200, e.links === "1" ? await catalog.enrichWithLinks(input2) : await catalog.enrich(input2));
+    } catch (error61) {
+      if (response.headersSent) return void response.end();
+      if (error61 instanceof DomainError) {
+        if (error61.retryAfterSeconds !== void 0) response.setHeader("retry-after", String(error61.retryAfterSeconds));
+        return fail(response, error61.status, error61.code, error61.message.slice(0, 600));
+      }
+      options.log(`catalog: ${error61 instanceof Error ? error61.message : String(error61)}`);
+      return fail(response, 502, "catalog", "The music services could not be read just now.");
+    }
+  }
   function applyCors(response, origin_) {
     if (!origin_) return;
     response.setHeader("access-control-allow-origin", origin_);
@@ -23714,7 +26125,7 @@ async function startHelper(options) {
     let size = 0;
     for await (const chunk of request) {
       size += chunk.length;
-      if (size > MAX_BODY_BYTES) {
+      if (size > MAX_BODY_BYTES2) {
         fail(response, 413, "too-large", "That request body is far larger than anything this helper accepts.");
         request.destroy();
         return void 0;

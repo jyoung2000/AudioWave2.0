@@ -62,8 +62,12 @@ const BUNDLES: Bundle[] = [
      * stage module is bundled into this entry, and the rates, the held angle and tilt, and the preview
      * that renders a copy of the disc while it is on screen are about 1KB of it, minified. three.js
      * itself stays behind the dynamic import.
+     *
+     * And to 248 for the music catalog's contracts (DEC-039, 2026-10-06): nine hub routes in the route
+     * table the hub client reads at start-up, with their schemas — tracks, artists, albums, the NDJSON
+     * chunks, collections, resolve, lyrics, enrichment and settings — measured, 7 KB minified.
      */
-    entryBudgetKb: 241,
+    entryBudgetKb: 248,
     /*
      * The total rose from 1600 to 1900 when the hero gained the reference's jewel case.
      *
@@ -156,8 +160,10 @@ const BUNDLES: Bundle[] = [
      *
      * And to 2423 for the disc's angle, tilt, Reset Position and live preview (NP-PREF-014) —
      * measured, 6 KB of inline markup and script, counted in both builds; the entry's 1 KB is above.
+     *
+     * And to 2430 for the music catalog's contracts (DEC-039) — the entry's 7 KB above, nothing else.
      */
-    totalBudgetKb: 2423,
+    totalBudgetKb: 2430,
     // Three.js belongs to the constellation and the jewel case; the tag reader only to a scan.
     mustBeSplit: ['three', 'music-metadata'],
   },
