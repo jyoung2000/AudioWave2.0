@@ -66,7 +66,7 @@ This document is the threat model and the list of concrete mitigations for the A
 CI runs `pnpm audit --audit-level=high` and fails on any high or critical advisory. Vulnerable versions
 pulled in by other packages are pinned to their patched releases in `pnpm.overrides` (root
 `package.json`): `undici` (via Discord.js and Electron's downloader), `brace-expansion` (via ESLint and
-Workbox) and `source-map-js` (via Vite). `fastify` is a direct dependency and is kept at a patched release.
+Workbox), `source-map-js` (via Vite) and `shell-quote` (via `concurrently`, a dev script runner; GHSA-pqg4-j6r4-53mv). `fastify` is a direct dependency and is kept at a patched release.
 
 One advisory is accepted, in `pnpm.auditConfig.ignoreGhsas`, because no fixed version exists:
 

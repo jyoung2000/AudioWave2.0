@@ -111,6 +111,8 @@ test('one thing at a time: a channel stops the station, and tuning back stops th
 });
 
 test('the Live TV tab is live before a channel is chosen, and a channel does not follow you on to TV', async ({ browser }) => {
+  // A fresh context, seeded channels and a playing video: more than a minute on a CI runner.
+  test.setTimeout(120_000);
   const q = await fresh(browser, { viewport: { width: 1280, height: 900 } });
   await seedChannels(q);
   const st = () => q.evaluate(() => ({ live: !(document.getElementById('vp_live') as HTMLElement).hidden, clock: !(document.getElementById('vp_clock') as HTMLElement).hidden, paused: (document.getElementById('vp_video') as HTMLVideoElement).paused }));

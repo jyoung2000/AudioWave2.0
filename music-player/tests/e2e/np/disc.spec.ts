@@ -83,6 +83,8 @@ test('the controls start at today’s behaviour, show only what applies, and are
 });
 
 test('the angle and the tilt are the listener’s, and Reset Position puts the disc back there', async ({ page }) => {
+  // Settings, the disc out of its case (up to 30 s of software-drawn frames on a runner), a drag and a reload.
+  test.setTimeout(150_000);
   await playingWithSettings(page);
   await setSpeed(page, 'cfgDiscYaw', 90);
   await expect(page.locator('#cfgDiscFacing'), 'an angle that is a preset names it').toHaveValue('edge');
