@@ -2460,6 +2460,370 @@ replace("    var fetchSheet = null;\n    function openFetch(sg) {\n",
         "    window.NP_FETCH = function (sg) { openFetch(sg); };\n"
         "    function openFetch(sg) {\n")
 
+# ---- the search redrawn (owner, 2026-10-07): a calm overview, one type per page, centred under the field ---------
+# The overview after Enter is short — five songs, three artists, albums and playlists, each with "See all" — and has
+# no pager (NP-FIND-003). "See all" opens a page for that type alone, with a field that searches that type, a
+# segmented control to switch type, and the one pager: ‹ › with "Page N of M" in a footer that stays put while the
+# list scrolls on by itself (NP-FIND-004). The card hangs centred under the pill at every width (NP-FIND-006), and
+# every song row has a "…" that opens the shell's contextual menu — Add to Up Next, Add to Playlist ▸, Add to
+# Library, Download…, Audition — the same menu a long-press or right-click opens (NP-FIND-010). Playlists are a type
+# of their own (NP-FIND-009, UX-CAT-005).
+
+replace('''             aria-label="Search for songs, artists and albums, or paste a music link"
+''', '''             aria-label="Search for songs, artists, albums and playlists, or paste a music link"
+''')
+
+replace('''        <div class="srch__people" id="srchPeople" hidden></div>
+        <div class="srch__body" id="srchBody"></div>
+        <div class="srch__foot" id="srchFoot" hidden>
+          <button class="srch__page" type="button" id="srchPrev" aria-label="Previous page">&#8249;</button>
+          <span class="srch__dots" id="srchDots" aria-hidden="true"></span>
+          <button class="srch__page" type="button" id="srchNext" aria-label="Next page">&#8250;</button>
+          <span class="srch__pageof" id="srchPageOf"></span>
+        </div>''', '''        <div class="srch__people" id="srchPeople" hidden></div>
+        <!-- One type per page (NP-FIND-004): which type to list, and a field that searches that type alone. -->
+        <div class="srch__type" id="srchType" hidden>
+          <div class="srch__seg" role="tablist" aria-label="What to list">
+            <button class="srch__segbtn" type="button" role="tab" data-type="tracks" aria-selected="false">Songs</button>
+            <button class="srch__segbtn" type="button" role="tab" data-type="artists" aria-selected="false">Artists</button>
+            <button class="srch__segbtn" type="button" role="tab" data-type="albums" aria-selected="false">Albums</button>
+            <button class="srch__segbtn" type="button" role="tab" data-type="playlists" aria-selected="false">Playlists</button>
+          </div>
+          <form class="srch__tf" id="srchTypeForm">
+            <input class="srch__tq" type="search" id="srchTypeQ" autocomplete="off" spellcheck="false"
+                   role="combobox" aria-expanded="true" aria-controls="srchBody" aria-label="Search songs">
+            <button class="srch__btn" type="submit">Search</button>
+          </form>
+        </div>
+        <div class="srch__body" id="srchBody"></div>
+        <!-- The pager, on a type page only: ‹ › and "Page N of M" (M+ while more may exist). -->
+        <div class="srch__foot" id="srchFoot" hidden>
+          <button class="srch__page" type="button" id="srchPrev" aria-label="Previous page">&#8249;</button>
+          <span class="srch__pageof" id="srchPageOf"></span>
+          <button class="srch__page" type="button" id="srchNext" aria-label="Next page">&#8250;</button>
+        </div>''')
+
+replace('''        <label><input type="checkbox" name="sec" value="albums"> Albums</label>
+      </fieldset>''', '''        <label><input type="checkbox" name="sec" value="albums"> Albums</label>
+        <label><input type="checkbox" name="sec" value="playlists"> Playlists</label>
+      </fieldset>''')
+
+# Centred under the pill, never off screen; a caret keeps the joint with the field.
+replace('''  .srch { left: auto; width: max(100%, min(480px, calc(100vw - 20px))); }
+''', '''  .srch {
+    left: calc(50% + var(--srch-shift, 0px));
+    right: auto;
+    width: min(560px, calc(100vw - 20px));
+    transform: translateX(-50%);
+    overflow: visible;             /* the caret sits above the card's edge */
+  }
+  /* the caret: at the field's centre, however far the card had to move to stay on screen */
+  .srch::before {
+    content: "";
+    position: absolute;
+    top: -6px;
+    left: calc(50% - var(--srch-shift, 0px) - 6px);
+    width: 10px;
+    height: 10px;
+    border: 1px solid var(--srch-border);
+    border-right: 0;
+    border-bottom: 0;
+    background: var(--srch-head-top);
+    transform: rotate(45deg);
+  }
+  .srch__head { border-radius: 4px 4px 0 0; }
+  .srch__body { border-radius: 0 0 4px 4px; }
+  .srch__foot { border-radius: 0 0 4px 4px; }
+''')
+
+replace('''  .srch-filter__note { margin-top: 10px; font-size: 11px; }
+''', '''  .srch-filter__note { margin-top: 10px; font-size: 11px; }
+
+  /* one type per page (NP-FIND-004): the segmented control and the type's own field */
+  .srch__type {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--srch-rule);
+    background: var(--srch-head-bot);
+  }
+  .srch__type[hidden] { display: none; }
+  .srch__seg { display: inline-flex; overflow: hidden; border: 1px solid var(--srch-rule); border-radius: 10px; background: #fff; }
+  .srch__segbtn {
+    height: 20px;
+    padding: 0 9px;
+    border: 0;
+    border-left: 1px solid var(--srch-rule);
+    background: transparent;
+    font: inherit;
+    font-size: 10.5px;
+    color: var(--srch-soft);
+    cursor: default;
+  }
+  .srch__segbtn:first-child { border-left: 0; }
+  .srch__segbtn:hover { color: var(--srch-ink); }
+  .srch__segbtn[aria-selected="true"] { background-image: linear-gradient(to bottom, var(--lib-sel-top), var(--lib-sel-bot)); color: #fff; font-weight: 700; }
+  .srch__segbtn:focus { outline: none; }
+  .srch__segbtn:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: -2px; }
+  .srch__tf { flex: 1 1 160px; display: flex; gap: 6px; min-width: 0; }
+  .srch__tq {
+    flex: 1;
+    min-width: 0;
+    height: 22px;
+    padding: 0 9px;
+    border: 1px solid var(--srch-rule);
+    border-radius: 11px;
+    background: #fff;
+    font: inherit;
+    font-size: 12px;
+    color: var(--srch-ink);
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .srch__tq::-webkit-search-cancel-button { -webkit-appearance: none; }
+  .srch__tq:focus { outline: 2px solid rgba(24, 160, 235, 0.6); outline-offset: 0; }
+  @media (pointer: coarse) { .srch__segbtn { height: 32px; padding: 0 12px; } .srch__tq { height: 32px; } }
+
+  /* the row's "…": the song's menu (NP-FIND-010) */
+  .srch__menu {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 16px;
+    padding: 0;
+    border: 0;
+    border-radius: 3px;
+    background: transparent;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 1px;
+    color: var(--srch-soft);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .srch__menu:hover { background: var(--srch-pf); color: var(--srch-pf-ink); }
+  .srch__menu:focus { outline: none; }
+  .srch__menu:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
+  /* 44 px targets on a touch screen: the row grows to hold them, and the menu's commands do too */
+  @media (pointer: coarse) {
+    .srch__row { height: 48px; }
+    .srch__add, .srch__menu { width: 44px; height: 44px; border-radius: 6px; font-size: 17px; }
+    .srch__links { gap: 0; }
+    .ctx.ctx--touch .ctx__item { height: 44px; line-height: 44px; font-size: 13px; }
+    .ctx.ctx--touch .ctx__sub { position: static; display: none; margin: 0 0 0 12px; border-radius: 0; box-shadow: none; }
+    .ctx.ctx--touch .ctx__item--parent.is-open > .ctx__sub { display: block; }
+    .ctx.ctx--touch .ctx__item--parent { height: auto; }
+  }
+  /* "In your library" above the catalog's playlists: the same caption as a section's */
+  .srch__row--saved .srch__sub { color: var(--lib-accent); }
+''')
+
+# The song menu for a search row (NP-FIND-010): the shell's contextual menu, over a song the library may not hold
+# yet. Up Next, a playlist and New Playlist… file the song in the library first (as the radio's on-air menu does,
+# kept in library:state like any other kept song) and then where it was asked; Add to Library is the row's +;
+# Download… and Audition are the search's own. Confirmation is the HUD (NP-MENU-003).
+replace('''    /* Shared by both menus: clamp into the viewport, flip the submenu if it
+       would run off the right edge, and put focus on the first command. */
+    var menuOpenedAt = 0;
+''', '''    /* ---- the search's song menu (NP-FIND-010) ----
+       A song from the catalog, right-clicked, long-pressed or opened from its row's "…": the same
+       menu, with the commands that make sense before the song is in the library. `c` says what the
+       song is (title, artist, album, duration, tempo, date, platform, link, art), whether the library
+       holds it, what the search can do with it (download, audition), and where focus goes back to. */
+    var ctxCat = null;
+
+    function catSame(a, b) {
+      return String(a.title || '').toLowerCase() === String(b.title || '').toLowerCase().slice(0, 120) &&
+        String(a.artist || '').toLowerCase() === String(b.artist || '').toLowerCase().slice(0, 80);
+    }
+    function catRow(song) {
+      for (var i = 0; i < LIB.length; i++) if (catSame(LIB[i], song)) return LIB[i];
+      return null;
+    }
+    /* The song as a library row: the one already there, or one made now — over the same wall the
+       row's + uses (library:add, quietly: nothing plays) — and kept, so a playlist that files it
+       still finds it after a reload. */
+    function catEnsure(song) {
+      var have = catRow(song);
+      if (have) return have;
+      var detail = { title: song.title, artist: song.artist, album: song.album, duration: song.duration, bpm: song.bpm,
+                     date: song.date, platform: song.platform, url: song.url, quiet: true };
+      document.dispatchEvent(new CustomEvent('library:add', { detail: detail }));
+      have = detail.row || catRow(song);
+      if (have && state.kept.indexOf(have) < 0 && !state.kept.some(function (s) { return s.id === have.id; })) state.kept.push(have);
+      return have;
+    }
+    function buildCatMenu(c) {
+      var row = catRow(c.song);
+      var lists = state.playlists.length
+        ? state.playlists.map(function (pl) {
+            var has = !!row && pl.songs.indexOf(row.id) >= 0;
+            return '<button class="ctx__item" type="button" role="menuitemcheckbox" aria-checked="' + has + '"' +
+              ' data-act="cat-toggle" data-pl="' + esc(pl.id) + '"><span class="ctx__check" aria-hidden="true">' +
+              (has ? '\\u2713' : '') + '</span>' + esc(pl.name) + '</button>';
+          }).join('')
+        : '<button class="ctx__item" type="button" role="menuitem" disabled>No playlists yet</button>';
+      var queued = !!row && state.queue.indexOf(row.id) >= 0;
+      ctx.innerHTML =
+        '<div class="ctx__head" role="presentation">' + esc(c.song.title) + '</div>' +
+        '<button class="ctx__item" type="button" role="menuitem" data-act="cat-next"' + (queued ? ' disabled' : '') + '>' +
+          (queued ? 'In Up Next' : 'Add to Up Next') + '</button>' +
+        '<div class="ctx__item ctx__item--parent" role="menuitem" tabindex="0" aria-haspopup="menu" aria-expanded="false" data-act="parent">' +
+          'Add to Playlist<span class="ctx__chev" aria-hidden="true"></span>' +
+          '<div class="ctx__sub" role="menu" aria-label="Playlists">' + lists +
+            '<div class="ctx__sep" role="separator"></div>' +
+            '<button class="ctx__item" type="button" role="menuitem" data-act="cat-new-add">New Playlist\\u2026</button>' +
+          '</div>' +
+        '</div>' +
+        '<button class="ctx__item" type="button" role="menuitem" data-act="cat-lib"' + (c.inLibrary || row ? ' disabled' : '') + '>' +
+          (c.inLibrary || row ? 'In your library' : 'Add to Library') + '</button>' +
+        '<div class="ctx__sep" role="separator"></div>' +
+        '<button class="ctx__item" type="button" role="menuitem" data-act="cat-download"' +
+          (c.canDownload ? '' : ' disabled title="Only in stores (Apple Music, Deezer): there is no copy the helper can fetch"') + '>Download\\u2026</button>' +
+        '<button class="ctx__item" type="button" role="menuitem" data-act="cat-audition"' + (c.canAudition ? '' : ' disabled title="No preview for this song"') + '>' +
+          (c.auditioning ? 'Stop Audition' : 'Audition') + '</button>';
+    }
+    function openCatMenu(c, x, y) {
+      if (!c || !c.song) return;
+      ctxCat = c;
+      ctxSong = null;
+      ctxItem = null;
+      ctxMulti = null;
+      buildCatMenu(c);
+      ctx.classList.toggle('ctx--touch', !!c.touch);
+      placeMenu(x, y);
+    }
+    function runCatAction(act, el, c) {
+      if (!c) return;
+      if (act === 'cat-lib') { if (c.onAdd) c.onAdd(); return; }
+      if (act === 'cat-download') { if (c.onDownload) c.onDownload(); return; }
+      if (act === 'cat-audition') { if (c.onAudition) c.onAudition(); return; }
+      var sg = catEnsure(c.song);
+      if (!sg) { say('The song could not be added to the library'); return; }
+      if (act === 'cat-next') {
+        if (state.queue.indexOf(sg.id) < 0) state.queue.push(sg.id);
+        save();
+        say('Up Next: \\u201c' + sg.title + '\\u201d');
+      } else if (act === 'cat-toggle') {
+        var pl = state.playlists.filter(function (p) { return p.id === el.dataset.pl; })[0];
+        if (!pl) return;
+        var at = pl.songs.indexOf(sg.id);
+        if (at >= 0) { pl.songs.splice(at, 1); logAct('playlistRemove', sg.id); say('Removed from \\u201c' + pl.name + '\\u201d'); }
+        else { pl.songs.push(sg.id); logAct('playlistAdd', sg.id); say('Added to \\u201c' + pl.name + '\\u201d'); }
+        save();
+      } else if (act === 'cat-new-add') {
+        askName().then(function (name) {
+          if (!name) { save(); return; }
+          state.playlists.push({ id: 'pl-' + Date.now().toString(36), name: name, songs: [sg.id] });
+          logAct('playlistAdd', sg.id);
+          save();
+          say('Added to \\u201c' + name + '\\u201d');
+          if (c.onFiled) c.onFiled(sg);
+        });
+        return;
+      }
+      if (c.onFiled) c.onFiled(sg);
+    }
+    /* run: a command without the menu (Shift+Enter in the search queues the song to Up Next) */
+    window.NP_SONG_MENU = { open: openCatMenu, close: closeMenu, run: function (act, c) { runCatAction(act, null, c); }, isOpen: function () { return !ctx.hidden && !!ctxCat; } };
+
+    /* Shared by both menus: clamp into the viewport, flip the submenu if it
+       would run off the right edge, and put focus on the first command. */
+    var menuOpenedAt = 0;
+''')
+replace('''      if (act.indexOf('ls-') === 0) {
+        var sub = ctxItem;
+        closeMenu();
+        runItemAction(act, item, sub);
+        return;
+      }
+''', '''      if (act.indexOf('ls-') === 0) {
+        var sub = ctxItem;
+        closeMenu();
+        runItemAction(act, item, sub);
+        return;
+      }
+      if (act.indexOf('cat-') === 0) {
+        var cat = ctxCat;
+        closeMenu();
+        runCatAction(act, item, cat);
+        return;
+      }
+''')
+replace('''      var mrow = ctxMulti && selectedId && tbody.querySelector('tr[data-id="' + selectedId + '"]');
+      ctxSong = null;
+      ctxItem = null;
+      ctxMulti = null;
+      if (row) row.focus();
+      else if (mrow) mrow.focus();
+      else if (back && document.contains(back)) back.focus();
+''', '''      var mrow = ctxMulti && selectedId && tbody.querySelector('tr[data-id="' + selectedId + '"]');
+      var catBack = ctxCat && ctxCat.back;
+      ctxSong = null;
+      ctxItem = null;
+      ctxMulti = null;
+      ctxCat = null;
+      ctx.classList.remove('ctx--touch');
+      if (row) row.focus();
+      else if (mrow) mrow.focus();
+      else if (back && document.contains(back)) back.focus();
+      else if (catBack && document.contains(catBack)) catBack.focus({ preventScroll: true });
+''')
+replace('''    function openMenu(sg, x, y) {
+      ctxMulti = null;
+      ctxSong = sg;
+      ctxItem = null;
+''', '''    function openMenu(sg, x, y) {
+      ctxMulti = null;
+      ctxSong = sg;
+      ctxItem = null;
+      ctxCat = null;
+''')
+replace('''      ctxItem = sub;
+      ctxSong = null;
+      buildItemMenu(sub);
+''', '''      ctxItem = sub;
+      ctxSong = null;
+      ctxCat = null;
+      buildItemMenu(sub);
+''')
+replace('''      ctxMulti = ids;
+      ctxSong = null;
+      ctxItem = null;
+      buildMultiMenu(ids);
+''', '''      ctxMulti = ids;
+      ctxSong = null;
+      ctxItem = null;
+      ctxCat = null;
+      buildMultiMenu(ids);
+''')
+# library:add, quietly: the menu files a song without playing it; the row it made (or found) is handed back.
+replace('''      sortKey = 'title'; sortDir = 1;
+      selectedId = have.id;
+      render();
+      play(have.id);
+''', '''      d.row = have;
+      /* quietly (the search's menu filing a song): nothing plays, nothing is selected */
+      if (d.quiet) { render(); return; }
+      sortKey = 'title'; sortDir = 1;
+      selectedId = have.id;
+      render();
+      play(have.id);
+''')
+
+# Focus lands on the first command that can be run: a disabled first command cannot take it, and then
+# the keys would stay in the field under the menu.
+replace('''      var first = ctx.querySelector('.ctx__item');
+      if (first) first.focus({ preventScroll: true });
+      menuOpenedAt = Date.now();''', '''      var first = ctx.querySelector('.ctx__item:not([disabled])') || ctx.querySelector('.ctx__item');
+      if (first) first.focus({ preventScroll: true });
+      menuOpenedAt = Date.now();''')
+
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):
     assert bad not in text, f'left behind: {bad}'

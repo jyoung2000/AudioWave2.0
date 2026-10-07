@@ -8,10 +8,25 @@ import type { Page, Route } from '@playwright/test';
 import { CORS, HUB } from './_shell';
 
 export const COMPANION = 'http://127.0.0.1:17999';
-export const ACCT = { base: HUB, credentialId: '00000000-0000-4000-8000-0000000000aa', secret: 'x'.repeat(40), scopes: ['search:use'], hubName: 'TOWER', deviceId: 'd1' };
+export const ACCT = {
+  base: HUB,
+  credentialId: '00000000-0000-4000-8000-0000000000aa',
+  secret: 'x'.repeat(40),
+  scopes: ['search:use'],
+  hubName: 'TOWER',
+  deviceId: 'd1',
+};
 const AT = '2026-10-06T12:00:00.000Z';
 
-type Platform = 'apple-music' | 'deezer' | 'musicbrainz' | 'youtube' | 'youtube-music' | 'soundcloud' | 'spotify' | 'bandcamp';
+type Platform =
+  | 'apple-music'
+  | 'deezer'
+  | 'musicbrainz'
+  | 'youtube'
+  | 'youtube-music'
+  | 'soundcloud'
+  | 'spotify'
+  | 'bandcamp';
 interface Source {
   platform: Platform;
   id: string | null;
@@ -20,13 +35,24 @@ interface Source {
   matchedBy: 'search' | 'isrc' | 'metadata' | 'musicbrainz' | 'spotdl' | 'odesli' | 'link';
 }
 
-export const src = (platform: Platform, id: string, over: Partial<Source> = {}): Source => ({ platform, id, url: `https://${platform}.example/${id}`, previewUrl: null, matchedBy: 'search', ...over });
+export const src = (platform: Platform, id: string, over: Partial<Source> = {}): Source => ({
+  platform,
+  id,
+  url: `https://${platform}.example/${id}`,
+  previewUrl: null,
+  matchedBy: 'search',
+  ...over,
+});
 
 /** A cover: an inline SVG, so nothing is fetched. */
 export const cover = (hue: number): string =>
   `data:image/svg+xml;base64,${Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10" fill="hsl(${hue},60%,50%)"/></svg>`).toString('base64')}`;
 
-export function track(id: string, title: string, over: Record<string, unknown> = {}): Record<string, unknown> {
+export function track(
+  id: string,
+  title: string,
+  over: Record<string, unknown> = {},
+): Record<string, unknown> {
   return {
     id,
     title,
@@ -51,54 +77,224 @@ export function track(id: string, title: string, over: Record<string, unknown> =
   };
 }
 
-export function artist(id: string, name: string, over: Record<string, unknown> = {}): Record<string, unknown> {
-  return { id, name, pictureUrl: null, albumCount: 4, fans: 1200, genre: 'Folk', sources: [src('deezer', id.split(':')[1] ?? id)], rank: 50, ...over };
-}
-
-export function album(id: string, title: string, over: Record<string, unknown> = {}): Record<string, unknown> {
-  return { id, title, artist: 'Lantern Choir', artworkUrl: null, releaseDate: '2019-05-03', year: 2019, trackCount: 11, label: 'Quay Records', genre: 'Folk', explicit: null, upc: null, sources: [src('deezer', id.split(':')[1] ?? id)], rank: 40, ...over };
-}
-
-export type Status = { provider: 'itunes' | 'deezer' | 'musicbrainz' | 'youtube' | 'soundcloud'; state: string; count?: number; error?: string | null; retryAt?: string | null };
-export const status = (list: Status[]): Array<Record<string, unknown>> => list.map((s) => ({ count: 0, latencyMs: null, error: null, retryAt: null, ...s }));
-
-const query = (text: string) => ({ kind: 'text', text, track: null, artist: null, album: null, isrc: null, url: null });
-
-export function results(seq: number, provider: string | null, q: string, rows: { tracks?: unknown[]; artists?: unknown[]; albums?: unknown[] }, st: Array<Record<string, unknown>>): Record<string, unknown> {
-  return { type: 'results', seq, provider, query: query(q), tracks: rows.tracks ?? [], artists: rows.artists ?? [], albums: rows.albums ?? [], status: st };
-}
-
-export function done(seq: number, q: string, st: Array<Record<string, unknown>>, more: { tracks?: boolean; artists?: boolean; albums?: boolean } = {}, offset = 0): Record<string, unknown> {
-  const page = (has: boolean | undefined) => (has === undefined ? null : { offset, limit: 25, hasMore: has });
-  return { type: 'done', seq, query: query(q), status: st, page: { tracks: page(more.tracks), artists: page(more.artists), albums: page(more.albums) }, totals: { tracks: 0, artists: 0, albums: 0 }, resolve: null };
-}
-
-export const ndjson = (chunks: unknown[]): string => chunks.map((c) => `${JSON.stringify(c)}\n`).join('');
-
-export const json = (body: unknown, statusCode = 200) => ({ status: statusCode, headers: { ...CORS, 'content-type': 'application/json' }, body: JSON.stringify(body) });
-
-/** Stream chunks one by one, `gap` ms apart, the way the hub writes them as services answer. */
-export async function fulfillStream(route: Route, chunks: unknown[]): Promise<void> {
-  await route.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'application/x-ndjson' }, body: ndjson(chunks) });
-}
-
-export function collection(platform: Platform, kind: 'album' | 'playlist', id: string, title: string, tracks: unknown[], over: { total?: number | null; hasMore?: boolean; capped?: boolean; covers?: string[]; artworkUrl?: string | null; offset?: number; owner?: string | null } = {}): Record<string, unknown> {
+export function artist(
+  id: string,
+  name: string,
+  over: Record<string, unknown> = {},
+): Record<string, unknown> {
   return {
-    ref: { platform, kind, id, url: `https://${platform}.example/${kind}/${id}`, title, owner: over.owner ?? null },
-    artworkUrl: over.artworkUrl ?? null,
-    covers: over.covers ?? [],
-    releaseDate: null,
-    page: { tracks, offset: over.offset ?? 0, limit: 100, total: over.total ?? tracks.length, hasMore: over.hasMore ?? false, capped: over.capped ?? false },
+    id,
+    name,
+    pictureUrl: null,
+    albumCount: 4,
+    fans: 1200,
+    genre: 'Folk',
+    sources: [src('deezer', id.split(':')[1] ?? id)],
+    rank: 50,
+    ...over,
   };
 }
 
-export function resolved(url: string, platform: Platform | null, kind: string, over: Record<string, unknown> = {}): Record<string, unknown> {
-  return { url, platform, kind, track: null, collection: null, artist: null, reason: null, resolvedAt: AT, ...over };
+export function album(
+  id: string,
+  title: string,
+  over: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    id,
+    title,
+    artist: 'Lantern Choir',
+    artworkUrl: null,
+    releaseDate: '2019-05-03',
+    year: 2019,
+    trackCount: 11,
+    label: 'Quay Records',
+    genre: 'Folk',
+    explicit: null,
+    upc: null,
+    sources: [src('deezer', id.split(':')[1] ?? id)],
+    rank: 40,
+    ...over,
+  };
+}
+
+/** A public playlist as Deezer lists one (UX-CAT-005): its own picture, no songs until it is opened. */
+export function playlist(
+  id: string,
+  title: string,
+  over: Record<string, unknown> = {},
+): Record<string, unknown> {
+  const native = id.split(':')[1] ?? id;
+  return {
+    id,
+    title,
+    owner: 'Playlist Editor',
+    trackCount: 40,
+    pictureUrl: null,
+    covers: [],
+    sources: [src('deezer', native, { url: `https://www.deezer.com/playlist/${native}` })],
+    rank: 30,
+    ...over,
+  };
+}
+
+export type Status = {
+  provider: 'itunes' | 'deezer' | 'musicbrainz' | 'youtube' | 'soundcloud';
+  state: string;
+  count?: number;
+  error?: string | null;
+  retryAt?: string | null;
+};
+export const status = (list: Status[]): Array<Record<string, unknown>> =>
+  list.map((s) => ({ count: 0, latencyMs: null, error: null, retryAt: null, ...s }));
+
+const query = (text: string) => ({
+  kind: 'text',
+  text,
+  track: null,
+  artist: null,
+  album: null,
+  isrc: null,
+  url: null,
+});
+
+export function results(
+  seq: number,
+  provider: string | null,
+  q: string,
+  rows: { tracks?: unknown[]; artists?: unknown[]; albums?: unknown[]; playlists?: unknown[] },
+  st: Array<Record<string, unknown>>,
+): Record<string, unknown> {
+  return {
+    type: 'results',
+    seq,
+    provider,
+    query: query(q),
+    tracks: rows.tracks ?? [],
+    artists: rows.artists ?? [],
+    albums: rows.albums ?? [],
+    playlists: rows.playlists ?? [],
+    status: st,
+  };
+}
+
+export function done(
+  seq: number,
+  q: string,
+  st: Array<Record<string, unknown>>,
+  more: { tracks?: boolean; artists?: boolean; albums?: boolean; playlists?: boolean } = {},
+  offset = 0,
+  limit = 25,
+): Record<string, unknown> {
+  const page = (has: boolean | undefined) =>
+    has === undefined ? null : { offset, limit, hasMore: has };
+  return {
+    type: 'done',
+    seq,
+    query: query(q),
+    status: st,
+    page: {
+      tracks: page(more.tracks),
+      artists: page(more.artists),
+      albums: page(more.albums),
+      playlists: page(more.playlists),
+    },
+    totals: { tracks: 0, artists: 0, albums: 0, playlists: 0 },
+    resolve: null,
+  };
+}
+
+/** The toast the shell confirms a command with (NP-MENU-003). */
+export const hud = (page: Page) => page.locator('#toast');
+
+export const ndjson = (chunks: unknown[]): string =>
+  chunks.map((c) => `${JSON.stringify(c)}\n`).join('');
+
+export const json = (body: unknown, statusCode = 200) => ({
+  status: statusCode,
+  headers: { ...CORS, 'content-type': 'application/json' },
+  body: JSON.stringify(body),
+});
+
+/** Stream chunks one by one, `gap` ms apart, the way the hub writes them as services answer. */
+export async function fulfillStream(route: Route, chunks: unknown[]): Promise<void> {
+  await route.fulfill({
+    status: 200,
+    headers: { ...CORS, 'content-type': 'application/x-ndjson' },
+    body: ndjson(chunks),
+  });
+}
+
+export function collection(
+  platform: Platform,
+  kind: 'album' | 'playlist',
+  id: string,
+  title: string,
+  tracks: unknown[],
+  over: {
+    total?: number | null;
+    hasMore?: boolean;
+    capped?: boolean;
+    covers?: string[];
+    artworkUrl?: string | null;
+    offset?: number;
+    owner?: string | null;
+  } = {},
+): Record<string, unknown> {
+  return {
+    ref: {
+      platform,
+      kind,
+      id,
+      url: `https://${platform}.example/${kind}/${id}`,
+      title,
+      owner: over.owner ?? null,
+    },
+    artworkUrl: over.artworkUrl ?? null,
+    covers: over.covers ?? [],
+    releaseDate: null,
+    page: {
+      tracks,
+      offset: over.offset ?? 0,
+      limit: 100,
+      total: over.total ?? tracks.length,
+      hasMore: over.hasMore ?? false,
+      capped: over.capped ?? false,
+    },
+  };
+}
+
+export function resolved(
+  url: string,
+  platform: Platform | null,
+  kind: string,
+  over: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    url,
+    platform,
+    kind,
+    track: null,
+    collection: null,
+    artist: null,
+    reason: null,
+    resolvedAt: AT,
+    ...over,
+  };
 }
 
 /** Nothing the browser engine asks may reach the internet. */
 export async function stubServices(page: Page): Promise<void> {
-  for (const u of ['**/itunes.apple.com/**', '**/api.deezer.com/**', '**/musicbrainz.org/**', '**/lrclib.net/**', '**/coverartarchive.org/**', '**/noembed.com/**', '**/www.youtube.com/oembed**', '**/soundcloud.com/oembed**']) {
+  for (const u of [
+    '**/itunes.apple.com/**',
+    '**/api.deezer.com/**',
+    '**/musicbrainz.org/**',
+    '**/lrclib.net/**',
+    '**/coverartarchive.org/**',
+    '**/noembed.com/**',
+    '**/www.youtube.com/oembed**',
+    '**/soundcloud.com/oembed**',
+  ]) {
     await page.route(u, (r) => r.abort());
   }
 }
@@ -111,7 +307,8 @@ export async function useCompanion(page: Page): Promise<void> {
 }
 
 /** The asked-for URL's search parameters. */
-export const params = (route: Route): URLSearchParams => new URL(route.request().url()).searchParams;
+export const params = (route: Route): URLSearchParams =>
+  new URL(route.request().url()).searchParams;
 
 export async function searchFor(page: Page, q: string): Promise<void> {
   await page.fill('#q', q);

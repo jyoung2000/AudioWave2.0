@@ -1,5 +1,5 @@
 /**
- * The search popover's markup (NP-FIND-001/003..008): rows, platform badges, the per-service status
+ * The search popover's markup (NP-FIND-001/003..010): rows, platform badges, the per-service status
  * line, detail headers and the 2×2 mosaic. Strings, built from untrusted answers: every value is
  * escaped, and only http(s) addresses reach an `src`.
  */
@@ -9,11 +9,13 @@ import {
   type CatalogArtist,
   type CatalogCollection,
   type CatalogPlatform,
+  type CatalogPlaylist,
   type CatalogProviderId,
-  type CatalogSection,
+  type CatalogSearchSection,
   type CatalogSource,
   type CatalogSourceStatus,
   type CatalogTrack,
+  type SavedCollection,
 } from '@now-playing/contracts';
 import { webUrl } from './client.js';
 
@@ -34,15 +36,17 @@ export const NOTE =
 const PERSON =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.2" r="4.2"/><path d="M3.8 21c.6-4.6 4-7.2 8.2-7.2s7.6 2.6 8.2 7.2z"/></svg>';
 
-export const SECTION_LABEL: Record<CatalogSection, string> = {
+export const SECTION_LABEL: Record<CatalogSearchSection, string> = {
   tracks: 'Songs',
   artists: 'Artists',
   albums: 'Albums',
+  playlists: 'Playlists',
 };
-export const SECTION_NOUN: Record<CatalogSection, [string, string]> = {
+export const SECTION_NOUN: Record<CatalogSearchSection, [string, string]> = {
   tracks: ['song', 'songs'],
   artists: ['artist', 'artists'],
   albums: ['album', 'albums'],
+  playlists: ['playlist', 'playlists'],
 };
 export const PROVIDER_LABEL: Record<CatalogProviderId, string> = {
   itunes: 'Apple Music',
@@ -52,7 +56,7 @@ export const PROVIDER_LABEL: Record<CatalogProviderId, string> = {
   soundcloud: 'SoundCloud',
 };
 
-export const count = (n: number, s: CatalogSection): string =>
+export const count = (n: number, s: CatalogSearchSection): string =>
   `${n} ${SECTION_NOUN[s][n === 1 ? 0 : 1]}`;
 
 /** The clip a row can play: Apple's, then Deezer's, then any other; http(s) only. */
@@ -174,6 +178,8 @@ export function trackRowHTML(t: CatalogTrack, i: number, added: boolean): string
   const add = added
     ? `<button class="srch__add" type="button" aria-disabled="true" tabindex="-1" aria-label="${esc(t.title)} is already in your library">✓</button>`
     : `<button class="srch__add" type="button" data-add="${i}" tabindex="-1" aria-label="Add ${esc(t.title)} to your library">+</button>`;
+  // The row's menu (NP-FIND-010): Up Next, a playlist, the library, Download…, Audition.
+  const menu = `<button class="srch__menu" type="button" data-menu="${i}" tabindex="-1" aria-haspopup="menu" aria-label="More for ${esc(t.title)}">…</button>`;
   return opt(
     i,
     '',
@@ -187,7 +193,7 @@ export function trackRowHTML(t: CatalogTrack, i: number, added: boolean): string
       `<span class="srch__time">${sec ? fmtTime(sec) : ''}</span>` +
       `<span class="srch__bpm">${t.bpm ? `${Math.round(t.bpm)} bpm` : ''}</span>` +
       '</span>' +
-      `<span class="srch__links">${add}</span>`,
+      `<span class="srch__links">${add}${menu}</span>`,
   );
 }
 
@@ -229,18 +235,63 @@ export function albumRowHTML(al: CatalogAlbum, i: number): string {
   );
 }
 
-export function moreRowHTML(
-  section: CatalogSection,
-  shown: number,
-  known: number,
-  more: boolean,
-  i: number,
-): string {
-  const label = `See all ${SECTION_LABEL[section].toLowerCase()}${known > shown ? ` (${known}${more ? '+' : ''})` : ''}`;
+/** "See all 12+ songs": the way to that type's own page (NP-FIND-004). */
+export function moreRowHTML(section: CatalogSearchSection, known: number, more: boolean, i: number): string {
+  const label = `See all ${known}${more ? '+' : ''} ${SECTION_NOUN[section][1]}`;
   return opt(
     i,
     ' srch__more',
     `<span class="srch__morelabel">${esc(label)}</span><span class="srch__go" aria-hidden="true">›</span>`,
+    `${label}: open a page of ${SECTION_NOUN[section][1]} alone`,
+  );
+}
+
+/** The words under a playlist: where it is, whose it is, how long it is. */
+export function playlistWords(p: Pick<CatalogPlaylist, 'owner' | 'trackCount' | 'sources'>): string {
+  const pf = p.sources[0]?.platform;
+  const n = p.trackCount;
+  return [
+    `Playlist${pf ? ` on ${CATALOG_PLATFORM_LABELS[pf]}` : ''}`,
+    p.owner,
+    n ? `${n.toLocaleString('en-US')} ${n === 1 ? 'song' : 'songs'}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+/** A public playlist the search found (NP-FIND-009): its picture (or its songs' covers), its words. */
+export function playlistRowHTML(p: CatalogPlaylist, i: number): string {
+  return opt(
+    i,
+    ' srch__row--coll srch__row--pl',
+    mosaicHTML({ artworkUrl: p.pictureUrl, covers: p.covers }) +
+      '<span class="srch__meta">' +
+      `<span class="srch__line"><span class="srch__title">${esc(p.title)}</span>${badgesHTML(p.sources)}</span>` +
+      `<span class="srch__sub">${esc(playlistWords(p))}</span>` +
+      '</span><span class="srch__open">Open in Music</span><span class="srch__go" aria-hidden="true">›</span>',
+    `${p.title}, ${playlistWords(p)}. Opens in the music list`,
+  );
+}
+
+/** A playlist (or album) the person starred, listed under “In your library” (NP-FIND-009). */
+export function savedRowHTML(s: SavedCollection, i: number): string {
+  const n = s.trackCount;
+  const words = [
+    `${s.ref.kind === 'album' ? 'Album' : 'Playlist'} on ${CATALOG_PLATFORM_LABELS[s.ref.platform]}`,
+    s.ref.owner,
+    n ? `${n.toLocaleString('en-US')} ${n === 1 ? 'song' : 'songs'}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  return opt(
+    i,
+    ' srch__row--coll srch__row--saved',
+    mosaicHTML({ artworkUrl: s.artworkUrl, covers: s.covers }) +
+      '<span class="srch__meta">' +
+      `<span class="srch__line"><span class="srch__title">${esc(s.ref.title)}</span><span class="srch__pfs"><span class="srch__badge" data-pf="${s.ref.platform}">${esc(CATALOG_PLATFORM_LABELS[s.ref.platform])}</span></span></span>` +
+      `<span class="srch__sub">${esc(words)}</span>` +
+      '</span><span class="srch__open">Open in Music</span><span class="srch__go" aria-hidden="true">›</span>',
+    `${s.ref.title}, in your library. ${words}. Opens in the music list`,
   );
 }
 

@@ -20,7 +20,7 @@ import {
   HELPER_CATALOG_ROUTES,
   type CatalogProviderId,
   type CatalogSearchChunk,
-  type CatalogSection,
+  type CatalogSearchSection,
   type CatalogTrack,
 } from '@now-playing/contracts';
 import { readCatalogStream } from '@now-playing/domain/catalog';
@@ -31,7 +31,7 @@ export interface SearchParams {
   track?: string;
   artist?: string;
   album?: string;
-  sections: readonly CatalogSection[];
+  sections: readonly CatalogSearchSection[];
   providers: readonly CatalogProviderId[];
   offset: number;
   limit: number;

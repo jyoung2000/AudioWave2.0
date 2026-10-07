@@ -1,6 +1,7 @@
 /**
- * The header search as the catalog's (DEC-039; NP-FIND-003..006, NP-FIND-009): music only, live, in
- * sections, with a filter, advanced fields, see-all and details.
+ * The header search as the catalog's (DEC-039; NP-FIND-003..006): music only, live, in sections, with
+ * a filter, advanced fields, type pages and details. The type pages' pager, the Playlists type, the
+ * row menu and the centred card are in search-pages.spec.ts (NP-FIND-004/006/009/010).
  *
  * The companion's helper (`/helper/v1/catalog/*`) and the hub (`/api/v1/catalog/*`) are answered from
  * fixtures with `page.route`, in the contract's own shapes (NDJSON chunks for a search); the browser
@@ -165,7 +166,12 @@ test('a search streams songs, artists and albums in sections; rows upsert by id 
   await expect(page.locator('#srchList .srch__sec[aria-label="Albums"] .srch__title')).toHaveText([
     'Night Ferries',
   ]);
-  await expect(page.locator('#srchCount')).toHaveText('Results: 3 songs · 1 artist · 1 album');
+  await expect(page.locator('#srchCount')).toHaveText(
+    'Results: 3 songs · 1 artist · 1 album · 0 playlists',
+  );
+  // A calm overview: no pager (NP-FIND-003); the pager belongs to a type page (NP-FIND-004).
+  await expect(page.locator('#srchFoot')).toBeHidden();
+  await expect(page.locator('#srchType')).toBeHidden();
   // The quiet line: every service in the engine's own states, resting included.
   const line = page.locator('#srchStatus');
   await expect(line).toContainText('Apple Music 1');
@@ -185,7 +191,7 @@ test('a search streams songs, artists and albums in sections; rows upsert by id 
   await expect(page.locator('#srch')).not.toContainText(
     /Search (YouTube|SoundCloud|Bandcamp)|on a platform instead/,
   );
-  expect(asked[0]).toContain('sections=tracks%2Cartists%2Calbums');
+  expect(asked[0]).toContain('sections=tracks%2Cartists%2Calbums%2Cplaylists');
 });
 
 test('a song on five platforms keeps its whole title: three badges on the row, the rest counted', async ({
@@ -279,7 +285,9 @@ test('one song from three sources in separate chunks is one row with three badge
     'YouTube',
   ]);
   await expect(songs.nth(1).locator('.srch__badge')).toHaveText(['Deezer']);
-  await expect(page.locator('#srchCount')).toHaveText('Results: 2 songs · 0 artists · 0 albums');
+  await expect(page.locator('#srchCount')).toHaveText(
+    'Results: 2 songs · 0 artists · 0 albums · 0 playlists',
+  );
 });
 
 test('a later page never repeats a song already shown: its platforms join the row it is', async ({
@@ -313,6 +321,8 @@ test('a later page never repeats a song already shown: its platforms join the ro
   await searchFor(page, 'song');
   await page.locator('.srch__row.srch__more').click();
   await expect(page.locator('.srch__end')).toHaveText('That’s all 11 songs.');
+  // The overview had ten; the page read on from the overview's next offset for the rest.
+  await expect(page.locator('#srchPageOf')).toHaveText('Page 1 of 1');
   const titles = await page.locator('#srchList .srch__title').allTextContents();
   expect(titles).toHaveLength(11);
   expect(new Set(titles).size).toBe(11);
@@ -364,7 +374,9 @@ test('keys move through every section; Enter opens what it is on, Escape goes ba
   await expect(page.locator('#srchCount')).toHaveText('Artist: Lantern Choir');
   await expect(page.locator('#srchBack')).toBeVisible();
   await page.press('#q', 'Escape');
-  await expect(page.locator('#srchCount')).toHaveText('Results: 2 songs · 1 artist · 0 albums');
+  await expect(page.locator('#srchCount')).toHaveText(
+    'Results: 2 songs · 1 artist · 0 albums · 0 playlists',
+  );
   // Back on the results, the keys are on the row they left (the artist); up twice is the first song.
   await page.press('#q', 'ArrowUp');
   await page.press('#q', 'ArrowUp');
@@ -384,7 +396,7 @@ test('keys move through every section; Enter opens what it is on, Escape goes ba
   await expect(page.locator('#srch')).toBeHidden();
 });
 
-test('see all opens one section that scrolls on, page after page, until it is all there', async ({
+test('see all opens one type’s page that scrolls on, page after page, until it is all there', async ({
   page,
 }) => {
   const many = (from: number, n: number) =>
@@ -412,26 +424,42 @@ test('see all opens one section that scrolls on, page after page, until it is al
   });
   await searchFor(page, 'song');
   const more = page.locator('.srch__row.srch__more');
-  await expect(more).toContainText('See all songs');
+  await expect(more.locator('.srch__morelabel')).toHaveText('See all 25+ songs');
+  // The overview shows five songs, and nothing turns a page there.
+  await expect(page.locator('#srchList .srch__row:not(.srch__more)')).toHaveCount(5);
+  await expect(page.locator('#srchFoot')).toBeHidden();
   await more.click();
   await expect(page.locator('#srchCount')).toContainText('Songs:');
+  await expect(page.locator('#srchType')).toBeVisible();
+  await expect(page.locator('.srch__segbtn[aria-selected="true"]')).toHaveText('Songs');
+  await expect(page.locator('#srchTypeQ')).toHaveValue('song');
   // The overview's first page, then the next one as soon as the view opens.
   await expect(page.locator('#srchList .srch__row')).toHaveCount(50);
+  await expect(page.locator('#srchFoot')).toBeVisible();
+  await expect(page.locator('#srchPageOf')).toHaveText('Page 1 of 2+');
   await page.locator('#srchBody').evaluate((el) => {
     el.scrollTop = el.scrollHeight;
   });
   await expect(page.locator('#srchList .srch__row')).toHaveCount(57);
   await expect(page.locator('.srch__end')).toHaveText('That’s all 57 songs.');
+  // Scrolled to the end, the pager says the last page is the one on show.
+  await page.locator('#srchBody').evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
+  });
+  await expect(page.locator('#srchPageOf')).toHaveText(/^Page 3 of 3$/);
   const pages = asked
     .filter((a) => a.startsWith('/helper/v1/catalog/search'))
     .map((a) => new URL(`http://x${a}`).searchParams);
   expect(pages.map((p) => p.get('offset'))).toEqual(['0', '25', '50']);
-  expect(pages.slice(1).every((p) => p.get('sections') === 'tracks')).toBe(true);
+  expect(
+    pages.slice(1).every((p) => p.get('sections') === 'tracks' && p.get('limit') === '25'),
+  ).toBe(true);
   await page.click('#srchBack');
   await expect(page.locator('#srchCount')).toContainText('Results: 25 songs');
+  await expect(page.locator('#srchFoot')).toBeHidden();
 });
 
-test('the results page: ‹ › and Page Up/Down turn it, with a page count, and later pages are fetched from the next offset', async ({
+test('the overview has no pager, and Page Up/Down do nothing there; a type page has ‹ › and “Page N of M”', async ({
   page,
 }) => {
   const songs = (from: number, n: number) =>
@@ -443,7 +471,7 @@ test('the results page: ‹ › and Page Up/Down turn it, with a page count, and
   const asked = await companion(page, (path, route) => {
     const p = params(route);
     const offset = Number(p.get('offset') ?? 0);
-    // The first answer has twelve songs (after merging) and says more exist; the next page is asked from offset 25.
+    // The first answer has twelve songs (after merging) and says more exist; the rest come from offset 25.
     if (offset === 0)
       return fulfillStream(route, [
         results(
@@ -456,7 +484,7 @@ test('the results page: ‹ › and Page Up/Down turn it, with a page count, and
         done(1, 'song', FINAL, { tracks: true, artists: false, albums: false }, 0),
       ]);
     return fulfillStream(route, [
-      results(0, 'deezer', 'song', { tracks: songs(13, 8) }, FINAL),
+      results(0, 'deezer', 'song', { tracks: songs(13, 30) }, FINAL),
       done(1, 'song', FINAL, { tracks: false }, offset),
     ]);
   });
@@ -466,37 +494,37 @@ test('the results page: ‹ › and Page Up/Down turn it, with a page count, and
       '#srchList .srch__sec[aria-label="Songs"] .srch__row:not(.srch__more) .srch__title',
     );
   await expect(titlesOnPage()).toHaveText(['Song 01', 'Song 02', 'Song 03', 'Song 04', 'Song 05']);
-  await expect(page.locator('#srchFoot')).toBeVisible();
-  await expect(page.locator('#srchPageOf')).toHaveText('Page 1 of 3+');
-  await expect(page.locator('#srchPrev')).toBeDisabled();
-  await page.press('#q', 'PageDown');
-  await expect(titlesOnPage()).toHaveText(['Song 06', 'Song 07', 'Song 08', 'Song 09', 'Song 10']);
-  // Turning on also asks for the page after it, so it is there when it is wanted.
-  await expect(page.locator('#srchPageOf')).toHaveText(/^Page 2 of (3\+|4)$/);
-  // The artist had one page: it is not repeated on the next.
-  await expect(page.locator('#srchList .srch__sec[aria-label="Artists"]')).toHaveCount(0);
-  await page.click('#srchNext');
-  // Page 3 holds songs past the first answer: fetched from offset 25, songs only.
-  await expect(titlesOnPage()).toHaveText(['Song 11', 'Song 12', 'Song 13', 'Song 14', 'Song 15']);
-  await expect(page.locator('#srchPageOf')).toHaveText('Page 3 of 4');
-  const later = asked
-    .map((a) => new URL(`http://x${a}`).searchParams)
-    .filter((p) => p.get('offset') !== '0');
-  expect(later.map((p) => [p.get('offset'), p.get('sections')])).toEqual([['25', 'tracks']]);
-  await page.click('#srchNext');
-  await expect(titlesOnPage()).toHaveText(['Song 16', 'Song 17', 'Song 18', 'Song 19', 'Song 20']);
-  await expect(page.locator('#srchNext')).toBeDisabled();
-  await expect(page.locator('#srchPageOf')).toHaveText('Page 4 of 4');
-  // The arrows run off the top of a page onto the one before.
-  await page.press('#q', 'ArrowDown');
-  await page.press('#q', 'ArrowUp');
-  await expect(page.locator('#srchPageOf')).toHaveText('Page 3 of 4');
-  await page.press('#q', 'PageUp');
-  await page.press('#q', 'PageUp');
-  await expect(page.locator('#srchPageOf')).toHaveText('Page 1 of 4');
+  await expect(page.locator('#srchFoot')).toBeHidden();
   await expect(page.locator('#srchList .srch__sec[aria-label="Artists"] .srch__title')).toHaveText([
     'Lantern Choir',
   ]);
+  // Page Down on the overview turns nothing: the same five songs stay.
+  await page.press('#q', 'PageDown');
+  await expect(titlesOnPage()).toHaveText(['Song 01', 'Song 02', 'Song 03', 'Song 04', 'Song 05']);
+  await expect(page.locator('#srchFoot')).toBeHidden();
+  expect(asked.length).toBe(1);
+  // See all: the type page with its pager; the overview's twelve, then the rest fetched from offset 25.
+  await page.locator('.srch__row.srch__more').click();
+  await expect(page.locator('#srchPageOf')).toHaveText('Page 1 of 2');
+  await expect(page.locator('#srchList .srch__row')).toHaveCount(42);
+  await expect(page.locator('#srchPrev')).toBeDisabled();
+  await expect(page.locator('#srchNext')).toBeEnabled();
+  const later = asked
+    .map((a) => new URL(`http://x${a}`).searchParams)
+    .filter((p) => p.get('offset') !== '0');
+  expect(later.map((p) => [p.get('offset'), p.get('sections'), p.get('limit')])).toEqual([
+    ['25', 'tracks', '25'],
+  ]);
+  // › moves to page two's first row (the 26th song) and makes it the row the keys are on.
+  await page.click('#srchNext');
+  await expect(page.locator('#srchPageOf')).toHaveText('Page 2 of 2');
+  await expect(page.locator('.srch__row.is-hot .srch__title')).toHaveText('Song 26');
+  await expect(page.locator('#srchNext')).toBeDisabled();
+  await page.press('#q', 'PageUp');
+  await expect(page.locator('#srchPageOf')).toHaveText('Page 1 of 2');
+  await expect(page.locator('.srch__row.is-hot .srch__title')).toHaveText('Song 01');
+  await expect(page.locator('#srchPrev')).toBeDisabled();
+  await expect(page.locator('.srch__end')).toHaveText('That’s all 42 songs.');
 });
 
 test('the filter keeps its sections and services in the settings store, and the search asks only those', async ({
@@ -520,18 +548,18 @@ test('the filter keeps its sections and services in the settings store, and the 
   // The search on screen was asked again with the new filter.
   await expect.poll(() => asked.length).toBe(2);
   const p = new URL(`http://x${asked[1]}`).searchParams;
-  expect(p.get('sections')).toBe('tracks,albums');
+  expect(p.get('sections')).toBe('tracks,albums,playlists');
   expect(p.get('providers')).toBe('itunes,deezer,musicbrainz,soundcloud');
   const saved = await page.evaluate(() =>
     (window as unknown as { kv: { get(k: string): Promise<unknown> } }).kv.get('player:search'),
   );
   expect(saved).toMatchObject({
-    sections: { tracks: true, artists: false, albums: true },
+    sections: { tracks: true, artists: false, albums: true, playlists: true },
     providers: { youtube: false },
   });
   // Nothing switched off entirely: at least one section and one service stay.
   await page.click('#srchFilterBtn');
-  for (const s of ['tracks', 'albums'])
+  for (const s of ['tracks', 'albums', 'playlists'])
     await page.uncheck(`#srchFilter input[name="sec"][value="${s}"]`);
   await page.click('#srchFilter button[type="submit"]');
   await expect(page.locator('#srchFilterMsg')).toHaveText('Keep at least one section.');
@@ -652,7 +680,9 @@ test('an artist drills into an album; details stack, and Back walks them back', 
   await page.click('#srchBack');
   await expect(page.locator('#srchCount')).toHaveText('Artist: Lantern Choir');
   await page.click('#srchBack');
-  await expect(page.locator('#srchCount')).toHaveText('Results: 0 songs · 1 artist · 0 albums');
+  await expect(page.locator('#srchCount')).toHaveText(
+    'Results: 0 songs · 1 artist · 0 albums · 0 playlists',
+  );
   await expect(page.locator('#srchBack')).toBeHidden();
 });
 
