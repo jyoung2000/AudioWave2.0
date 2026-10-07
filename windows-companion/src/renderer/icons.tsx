@@ -32,6 +32,17 @@ export function RemoteToolIcon() {
   );
 }
 
+/** Not in the design, which drew four tools: Search (DEC-039), a lens over a note, in the same blues as the hub's. */
+export function SearchToolIcon() {
+  return (
+    <svg viewBox="0 0 26 26" aria-hidden="true">
+      <circle cx="11" cy="11" r="7.2" fill="#e9eef3" stroke="#4c637c" strokeWidth="1.6" />
+      <path d="M12.6 6.6v6.1a1.9 1.9 0 1 1-1-1.7V8.2l2.6-.6" fill="#7d97b3" stroke="#4c637c" strokeWidth=".8" strokeLinejoin="round" />
+      <path d="M16.3 16.3 22.5 22.5" stroke="#4c637c" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function SettingsToolIcon() {
   return (
     <svg viewBox="0 0 26 26" aria-hidden="true">

@@ -106,6 +106,18 @@ describe('the content security policy', () => {
     expect(contentSecurityPolicy(null)).toContain("connect-src 'self';");
   });
 
+  it('lets the Search tool show covers and play previews from the music services’ media hosts only, over https', async () => {
+    const { CATALOG_MEDIA_HOSTS } = await import('@now-playing/contracts');
+    const { CATALOG_MEDIA_SOURCES } = await import('../../src/main/csp.js');
+    expect(CATALOG_MEDIA_SOURCES).toEqual(CATALOG_MEDIA_HOSTS.map((host) => `https://${host}`));
+    const csp = contentSecurityPolicy(null);
+    expect(csp).toContain(`img-src 'self' data: blob: ${CATALOG_MEDIA_SOURCES.join(' ')};`);
+    expect(csp).toContain(`media-src 'self' blob: ${CATALOG_MEDIA_SOURCES.join(' ')};`);
+    // Nothing else may be fetched: the window still talks only to its own app.
+    expect(csp).toContain("connect-src 'self';");
+    expect(csp).toContain("default-src 'self'");
+  });
+
   it('is written into index.html, because a file:// page never receives the header', async () => {
     const html = await readFile(fileURLToPath(new URL('../../src/renderer/index.html', import.meta.url)), 'utf8');
     const meta = /<meta http-equiv="Content-Security-Policy" content="([^"]*)"/.exec(html);

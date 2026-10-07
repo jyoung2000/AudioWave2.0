@@ -116,6 +116,9 @@ export interface DeezerPlaylist {
   url: string;
 }
 
+/** Rows per call when paging a long album or playlist. */
+export const DEEZER_PAGE = 100;
+
 export class DeezerClient {
   constructor(
     private readonly fetchImpl: CatalogFetch,
@@ -141,6 +144,25 @@ export class DeezerClient {
     return { rows: arr(body?.['data']), total: num(body?.['total']) };
   }
 
+  /**
+   * `limit` rows from `offset` of a Deezer list, asked for with its own `index`/`limit`, at most
+   * `DEEZER_PAGE` at a time, until the rows are in or the list ends (its `total`, or a short page).
+   */
+  async pages(path: string, offset: number, limit: number, signal?: AbortSignal): Promise<{ rows: Json[]; total: number | null }> {
+    const rows: Json[] = [];
+    let total: number | null = null;
+    let index = offset;
+    while (rows.length < limit) {
+      const want = Math.min(DEEZER_PAGE, limit - rows.length);
+      const page = await this.list(`${path}?index=${index}&limit=${want}`, signal);
+      total = page.total ?? total;
+      rows.push(...page.rows);
+      index += page.rows.length;
+      if (!page.rows.length || (total !== null ? index >= total : page.rows.length < want)) break;
+    }
+    return { rows, total };
+  }
+
   async byIsrc(isrc: string, signal?: AbortSignal): Promise<CatalogTrack | null> {
     const body = await this.get(`/track/isrc:${encodeURIComponent(isrc)}`, signal);
     return body ? deezerTrack(body) : null;
@@ -155,7 +177,7 @@ export class DeezerClient {
     const body = await this.get(`/album/${encodeURIComponent(id)}`, signal);
     const album = body ? deezerAlbum(body) : null;
     if (!album) return null;
-    const page = await this.list(`/album/${encodeURIComponent(id)}/tracks?index=${offset}&limit=${limit}`, signal);
+    const page = await this.pages(`/album/${encodeURIComponent(id)}/tracks`, offset, limit, signal);
     const tracks = page.rows.map((r) => deezerTrack(r, album)).filter((t): t is CatalogTrack => t !== null);
     return { album, tracks, total: page.total ?? album.trackCount };
   }
@@ -176,7 +198,7 @@ export class DeezerClient {
   async playlist(id: string, offset: number, limit: number, signal?: AbortSignal): Promise<{ playlist: DeezerPlaylist; tracks: CatalogTrack[] } | null> {
     const body = await this.get(`/playlist/${encodeURIComponent(id)}`, signal);
     if (!body || num(body['id']) === null) return null;
-    const page = await this.list(`/playlist/${encodeURIComponent(id)}/tracks?index=${offset}&limit=${limit}`, signal);
+    const page = await this.pages(`/playlist/${encodeURIComponent(id)}/tracks`, offset, limit, signal);
     const creator = isObject(body['creator']) ? body['creator'] : null;
     return {
       playlist: { id, title: str(body['title']) ?? 'Playlist', owner: str(creator?.['name']), artworkUrl: webUrl(body['picture_xl']) ?? dzCover(body['md5_image'], 'playlist'), total: posInt(body['nb_tracks']) ?? page.total, url: `https://www.deezer.com/playlist/${id}` },

@@ -10,6 +10,22 @@
  */
 import { routePath, routes, type RouteName, type Routes } from '@now-playing/contracts';
 import recording from './hub-api.json';
+import catalog from './catalog-stock.json';
+
+/**
+ * The music catalog (DEC-039) is not in the recording — a recorded hub would have asked the real
+ * music services — so its routes answer from the stock catalog the mockups and tests use
+ * (`catalog-stock.json`): one search, an album, an artist, a pasted playlist, lyrics, details.
+ */
+const CATALOG: Partial<Record<RouteName, (query: Query) => unknown>> = {
+  catalogAlbum: () => catalog.album,
+  catalogArtist: () => catalog.artist,
+  catalogResolve: (query) => (query['url'] === catalog.playlistUrl ? catalog.resolvePlaylist : catalog.resolveUnsupported),
+  catalogLyrics: () => catalog.lyrics,
+  catalogEnrich: () => catalog.enrich,
+  catalogSavedList: () => catalog.saved,
+  catalogSettingsGet: () => catalog.settings,
+};
 
 export class ApiError extends Error {
   constructor(
@@ -94,10 +110,26 @@ export async function api<N extends RouteName>(name: N, options: RequestOptions 
   if (route.method !== 'GET' && route.method !== 'HEAD') {
     throw new ApiError(503, 'This window is a specimen in the style guide, so there is no hub behind it to change.', 'specimen', null, null, null);
   }
+  const stock = CATALOG[name];
+  if (stock) return stock(options.query ?? {}) as never;
   const answers = RECORDED.routes.filter((item) => item.name === name);
   const answer = answers.find((item) => same(item.query, options.query as Record<string, unknown>)) ?? answers[0];
   if (!answer) throw new ApiError(404, 'The style guide has no recorded answer for this.', 'specimen', null, null, null);
   return revive(answer.body, Date.parse(RECORDED.recordedAt)) as never;
+}
+
+/** The catalog's NDJSON search, from the stock: the same chunks a hub streams, as a stream. */
+export async function apiStream<N extends RouteName>(name: N, options: RequestOptions = {}): Promise<ReadableStream<Uint8Array>> {
+  if (name !== 'catalogSearch') throw new ApiError(404, 'The style guide has no recorded answer for this.', 'specimen', null, null, null);
+  const q = String(options.query?.['q'] ?? '');
+  const chunks = /^https?:/.test(q) ? [{ ...catalog.searchLink[0], resolve: q }] : Number(options.query?.['offset'] ?? 0) > 0 ? catalog.searchPage2 : catalog.search;
+  const bytes = new TextEncoder().encode(`${chunks.map((chunk) => JSON.stringify(chunk)).join('\n')}\n`);
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(bytes);
+      controller.close();
+    },
+  });
 }
 
 /** A link a real hub would serve; on the guide's page it goes nowhere. */

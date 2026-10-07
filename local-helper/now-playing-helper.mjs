@@ -15341,7 +15341,7 @@ function undeclaredConstraint(member) {
   return Object.keys(extra).length ? extra : null;
 }
 function foldObjects(members2) {
-  const objects = [];
+  const objects2 = [];
   for (const member of members2) {
     if (typeof member !== "object" || member.type !== "object")
       return null;
@@ -15349,16 +15349,16 @@ function foldObjects(members2) {
       if (!FOLDABLE_KEYS.has(key))
         return null;
     }
-    objects.push(member);
+    objects2.push(member);
   }
   const properties = {};
   const required2 = /* @__PURE__ */ new Set();
-  for (const object2 of objects) {
+  for (const object2 of objects2) {
     for (const key in object2.properties) {
       if (Object.prototype.hasOwnProperty.call(properties, key))
         continue;
       const parts = [];
-      for (const other of objects) {
+      for (const other of objects2) {
         const part = other.properties?.[key] ?? undeclaredConstraint(other);
         if (part === null || part === void 0)
           continue;
@@ -15374,11 +15374,11 @@ function foldObjects(members2) {
   const folded = { type: "object", properties };
   if (required2.size)
     folded.required = [...required2];
-  if (objects.every((object2) => object2.additionalProperties === false)) {
+  if (objects2.every((object2) => object2.additionalProperties === false)) {
     folded.additionalProperties = false;
   } else {
     const constraints = [];
-    for (const object2 of objects) {
+    for (const object2 of objects2) {
       const constraint = undeclaredConstraint(object2);
       if (constraint && !constraints.some((seen) => JSON.stringify(seen) === JSON.stringify(constraint)))
         constraints.push(constraint);
@@ -20632,7 +20632,13 @@ var CatalogSearchDoneChunk = external_exports.object({
   /** Rows after merging, per section. */
   totals: external_exports.object({ tracks: external_exports.number().int().nonnegative(), artists: external_exports.number().int().nonnegative(), albums: external_exports.number().int().nonnegative() }),
   /** A pasted link is not searched: the client should call `resolve` with it. */
-  resolve: external_exports.string().max(2048).nullable().default(null)
+  resolve: external_exports.string().max(2048).nullable().default(null),
+  /**
+   * Platforms on the rows that were not searched but only linked to (Spotify, Tidal, Qobuz, Amazon
+   * Music… from MusicBrainz's links, Deezer's ISRC lookup or SongLink with a key): the status line says
+   * which platforms were searched (`status`) and which only contributed links (this).
+   */
+  linkedOnly: external_exports.array(CatalogPlatform).default([])
 });
 var CatalogSearchChunk = external_exports.discriminatedUnion("type", [CatalogSearchResultsChunk, CatalogSearchDoneChunk]);
 var CatalogSearchAggregate = external_exports.object({
@@ -20659,15 +20665,19 @@ var CatalogTrackPage = external_exports.object({
   /** How many the platform says there are, when it says. */
   total: external_exports.number().int().nonnegative().nullable(),
   hasMore: external_exports.boolean(),
-  /** True when the server's cap (`CATALOG_COLLECTION_CAP`) left some out for good. */
+  /**
+   * True only when a list is longer than `CATALOG_COLLECTION_CAP` (10,000) and the songs past it
+   * cannot be opened: said, never a silent cut. Below that every song is reachable page by page.
+   */
   capped: external_exports.boolean()
 });
-var CATALOG_COLLECTION_CAP = 200;
+var CATALOG_COLLECTION_CAP = 1e4;
+var CATALOG_PAGE_MAX = 200;
 var CatalogAlbumRequest = external_exports.object({
   /** `platform:id` from a result's source (`deezer:6575789`, `apple-music:617154241`). */
   id: external_exports.string().min(3).max(260),
   offset: external_exports.coerce.number().int().min(0).max(CATALOG_COLLECTION_CAP).default(0),
-  limit: external_exports.coerce.number().int().min(1).max(CATALOG_COLLECTION_CAP).default(100)
+  limit: external_exports.coerce.number().int().min(1).max(CATALOG_PAGE_MAX).default(100)
 });
 var CatalogAlbumDetail = external_exports.object({ album: CatalogAlbum, page: CatalogTrackPage, collection: CatalogCollectionRef });
 var CatalogArtistRequest = external_exports.object({
@@ -20702,7 +20712,7 @@ var CatalogCollection = external_exports.object({
 var CatalogResolveRequest = external_exports.object({
   url: external_exports.string().trim().min(1).max(2048),
   offset: external_exports.coerce.number().int().min(0).max(CATALOG_COLLECTION_CAP).default(0),
-  limit: external_exports.coerce.number().int().min(1).max(CATALOG_COLLECTION_CAP).default(100)
+  limit: external_exports.coerce.number().int().min(1).max(CATALOG_PAGE_MAX).default(100)
 });
 var CatalogResolveResult = external_exports.object({
   url: external_exports.string().max(2048),
@@ -20763,7 +20773,7 @@ var CatalogSettingsInput = external_exports.object({
   /** Write-only. Empty string clears it. */
   odesliKey: external_exports.string().max(200).optional()
 });
-var CATALOG_API_HOSTS = ["itunes.apple.com", "api.deezer.com", "musicbrainz.org", "coverartarchive.org", "api.song.link", "lrclib.net"];
+var CATALOG_API_HOSTS = ["itunes.apple.com", "api.deezer.com", "musicbrainz.org", "coverartarchive.org", "api.song.link", "lrclib.net", "music.apple.com"];
 var HELPER_CATALOG_ROUTES = {
   search: "/helper/v1/catalog/search",
   album: "/helper/v1/catalog/album",
@@ -21101,6 +21111,10 @@ var routes = {
   catalogDownload: defineRoute({ method: "POST", path: "/catalog/download", operationId: "catalogDownload", summary: "Queue a catalog track through the download queue, from its best downloadable source, tagged with ISRC, genre, label, year and (setting) lyrics", tags: ["catalog", "downloads"], auth: "admin-or-device", scopes: ["downloads:request"], rateLimit: "write", body: external_exports.object({ track: CatalogTrack, authorization: DownloadAuthorizationInput, target: DownloadTargetInput }), response: external_exports.object({ job: DownloadJob, source: CatalogSource, embedded: external_exports.object({ isrc: external_exports.boolean(), genre: external_exports.boolean(), label: external_exports.boolean(), year: external_exports.boolean(), lyrics: external_exports.boolean() }) }), responseStatus: 201 }),
   catalogSettingsGet: defineRoute({ method: "GET", path: "/catalog/settings", operationId: "getCatalogSettings", summary: "Which catalog services are asked, lyrics embedding, and whether a SongLink key is set", tags: ["catalog"], auth: "admin", response: CatalogSettingsView }),
   catalogSettingsPut: defineRoute({ method: "PUT", path: "/catalog/settings", operationId: "putCatalogSettings", summary: "Change catalog services, lyrics embedding, or the (write-only) SongLink key", tags: ["catalog"], auth: "admin", rateLimit: "write", body: CatalogSettingsInput, response: CatalogSettingsView }),
+  /* starred albums and playlists in the admin's library (UX-SEARCH-005); the player syncs them later */
+  catalogSavedList: defineRoute({ method: "GET", path: "/catalog/saved", operationId: "listSavedCollections", summary: "The albums and playlists the admin starred, newest first", tags: ["catalog"], auth: "admin", response: external_exports.object({ items: external_exports.array(SavedCollection) }) }),
+  catalogSavedPut: defineRoute({ method: "PUT", path: "/catalog/saved", operationId: "saveCollection", summary: "Star an album or playlist (by its ref; saving it again refreshes it)", tags: ["catalog"], auth: "admin", rateLimit: "write", body: SavedCollection, response: external_exports.object({ items: external_exports.array(SavedCollection) }) }),
+  catalogSavedDelete: defineRoute({ method: "DELETE", path: "/catalog/saved", operationId: "unsaveCollection", summary: "Un-star an album or playlist", tags: ["catalog"], auth: "admin", rateLimit: "write", query: CatalogCollectionRef.pick({ platform: true, kind: true, id: true }), response: external_exports.object({ items: external_exports.array(SavedCollection) }) }),
   artistReleases: defineRoute({ method: "GET", path: "/artists/releases", operationId: "latestReleases", summary: "Latest releases from MusicBrainz plus enabled playback providers", tags: ["discovery"], auth: "admin-or-device", scopes: ["search:use"], rateLimit: "search", query: external_exports.object({ mbid: external_exports.string().optional(), name: external_exports.string().optional(), refresh: external_exports.coerce.boolean().default(false) }), response: LatestReleasesResponse }),
   /* per-user provider accounts */
   accountsList: defineRoute({ method: "GET", path: "/accounts", operationId: "listAccounts", summary: "The caller's connected provider accounts", tags: ["accounts"], auth: "device", response: external_exports.object({ items: external_exports.array(ProviderAccount), available: external_exports.array(external_exports.object({ provider: ProviderId, configured: external_exports.boolean(), reason: external_exports.string().nullable() })) }) }),
@@ -23155,9 +23169,10 @@ function sourceOf(url2) {
   if (/(^|\.)spotify\.com$/.test(host)) return "spotify";
   return "other";
 }
-function ytDlpResolveArgs(url2) {
+function ytDlpResolveArgs(url2, options = {}) {
   if (!/^https?:\/\//i.test(url2)) throw new Error("Only http(s) addresses can be handed to a tool.");
-  return ["--ignore-config", "--no-colors", "--no-cache-dir", "--no-warnings", "--skip-download", "--flat-playlist", "--playlist-end", String(HELPER_RESOLVE_CAP), "--dump-single-json", "--", url2];
+  if (options.items?.length) return ["--ignore-config", "--no-colors", "--no-cache-dir", "--no-warnings", "--skip-download", "--playlist-items", options.items.map((n) => String(Math.trunc(n))).join(","), "--dump-single-json", "--", url2];
+  return ["--ignore-config", "--no-colors", "--no-cache-dir", "--no-warnings", "--skip-download", "--flat-playlist", "--playlist-end", String(options.cap ?? HELPER_RESOLVE_CAP), "--dump-single-json", "--", url2];
 }
 function str(value, max = 300) {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : null;
@@ -23203,13 +23218,13 @@ function trackFromYtDlp(info, flat = false) {
     trackNumber: tags.trackNumber
   };
 }
-function fromYtDlp(info, url2, now = /* @__PURE__ */ new Date()) {
+function fromYtDlp(info, url2, now = /* @__PURE__ */ new Date(), cap = HELPER_RESOLVE_CAP) {
   const source2 = sourceOf(url2);
   const canonical = webUrl(info["webpage_url"]) ?? url2.toString();
   const entries = Array.isArray(info["entries"]) ? info["entries"] : null;
   if (info["_type"] === "playlist" || entries) {
     const list = (entries ?? []).filter((e) => Boolean(e) && typeof e === "object" && !Array.isArray(e));
-    const kept = list.slice(0, HELPER_RESOLVE_CAP).map((e) => trackFromYtDlp(e, true));
+    const kept = list.slice(0, cap).map((e) => trackFromYtDlp(e, true));
     const total = num(info["playlist_count"]);
     return {
       source: source2,
@@ -23223,8 +23238,8 @@ function fromYtDlp(info, url2, now = /* @__PURE__ */ new Date()) {
         date: isoDate(info["release_date"]) ?? isoDate(info["upload_date"]),
         entries: kept,
         total: total !== null ? Math.round(total) : null,
-        cap: HELPER_RESOLVE_CAP,
-        capped: total !== null && total > kept.length || list.length > HELPER_RESOLVE_CAP
+        cap,
+        capped: total !== null && total > kept.length || list.length > cap
       },
       resolvedAt: now.toISOString()
     };
@@ -23255,14 +23270,14 @@ function trackFromSpotdl(song) {
     matchUrl: webUrl(song["download_url"])
   };
 }
-function fromSpotdl(songs, url2, now = /* @__PURE__ */ new Date()) {
+function fromSpotdl(songs, url2, now = /* @__PURE__ */ new Date(), cap = HELPER_RESOLVE_CAP) {
   const list = (Array.isArray(songs) ? songs : []).filter((s) => Boolean(s) && typeof s === "object" && !Array.isArray(s));
   const isTrack = /^\/(?:intl-[a-z-]+\/)?track\//i.test(url2.pathname);
   if (isTrack && list[0]) return { source: "spotify", kind: "track", url: webUrl(list[0]["url"]) ?? url2.toString(), track: trackFromSpotdl(list[0]), collection: null, resolvedAt: now.toISOString() };
   const isAlbum = /^\/(?:intl-[a-z-]+\/)?album\//i.test(url2.pathname);
   const ordered = isAlbum ? [...list].sort((a, b) => (num(a["disc_number"]) ?? 1) - (num(b["disc_number"]) ?? 1) || (num(a["track_number"]) ?? 0) - (num(b["track_number"]) ?? 0)) : list;
   const first = ordered[0];
-  const kept = ordered.slice(0, HELPER_RESOLVE_CAP).map(trackFromSpotdl);
+  const kept = ordered.slice(0, cap).map(trackFromSpotdl);
   return {
     source: "spotify",
     kind: "collection",
@@ -23275,8 +23290,8 @@ function fromSpotdl(songs, url2, now = /* @__PURE__ */ new Date()) {
       date: first && isAlbum ? isoDate(first["date"]) : null,
       entries: kept,
       total: first && num(first["list_length"]) !== null ? Math.round(num(first["list_length"])) : isAlbum && first && num(first["tracks_count"]) !== null ? Math.round(num(first["tracks_count"])) : ordered.length,
-      cap: HELPER_RESOLVE_CAP,
-      capped: ordered.length > HELPER_RESOLVE_CAP
+      cap,
+      capped: ordered.length > cap
     },
     resolvedAt: now.toISOString()
   };
@@ -23355,7 +23370,9 @@ function createResolver(options) {
       waiting.shift()?.();
     }
   }
-  async function fresh(url2, match = false) {
+  async function fresh(url2, match = false, all = false, items) {
+    const cap = all ? CATALOG_COLLECTION_CAP : HELPER_RESOLVE_CAP;
+    const longer = all ? 10 * 6e4 : 0;
     const tools = await options.tools();
     const source2 = sourceOf(url2);
     if (source2 === "spotify") {
@@ -23366,14 +23383,14 @@ function createResolver(options) {
         mkdirSync3(dir, { recursive: true });
         try {
           const file2 = join8(dir, "songs.spotdl");
-          await run2(spotdl.path, spotdlSaveArgs(url2.toString(), file2, { preload: match && /^\/(?:intl-[a-z-]+\/)?track\//i.test(url2.pathname) }), childEnv(process.env, { HOME: dir, USERPROFILE: dir }), timeouts.spotdl);
+          await run2(spotdl.path, spotdlSaveArgs(url2.toString(), file2, { preload: match && /^\/(?:intl-[a-z-]+\/)?track\//i.test(url2.pathname) }), childEnv(process.env, { HOME: dir, USERPROFILE: dir }), Math.max(timeouts.spotdl, longer));
           let songs;
           try {
             songs = JSON.parse(readFileSync2(file2, "utf8"));
           } catch {
             throw new ResolveError("spotDL found nothing at that address.", "failed");
           }
-          return fromSpotdl(songs, url2);
+          return fromSpotdl(songs, url2, /* @__PURE__ */ new Date(), cap);
         } finally {
           rmSync3(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
         }
@@ -23382,7 +23399,7 @@ function createResolver(options) {
     const ytDlp = tools["yt-dlp"];
     if (!ytDlp.present || !ytDlp.path) throw new ResolveError(ytDlp.installHint ?? "yt-dlp is not set up on this PC yet.", "tool-missing");
     return slot(async () => {
-      const stdout = await run2(ytDlp.path, ytDlpResolveArgs(url2.toString()), childEnv(), timeouts.ytDlp).catch((error61) => {
+      const stdout = await run2(ytDlp.path, ytDlpResolveArgs(url2.toString(), items?.length ? { items } : { cap: all ? cap + 1 : cap }), childEnv(), Math.max(timeouts.ytDlp, longer)).catch((error61) => {
         if (error61 instanceof ResolveError && /"entries"\s*:\s*\[\s*\{/.test(error61.output)) return error61.output;
         throw error61;
       });
@@ -23393,7 +23410,7 @@ function createResolver(options) {
         throw new ResolveError("yt-dlp did not describe that address.", "failed");
       }
       if (!info || typeof info !== "object" || Array.isArray(info)) throw new ResolveError("yt-dlp did not describe that address.", "failed");
-      return fromYtDlp(info, url2);
+      return fromYtDlp(info, url2, /* @__PURE__ */ new Date(), items?.length ? items.length : cap);
     });
   }
   return {
@@ -23411,11 +23428,13 @@ function createResolver(options) {
     },
     resolve(url2, resolveOptions = {}) {
       const match = resolveOptions.match === true && sourceOf(url2) === "spotify";
-      const key = `${url2.toString()}${match ? "#match" : ""}`;
+      const all = resolveOptions.all === true;
+      const items = sourceOf(url2) !== "spotify" && resolveOptions.items?.length ? resolveOptions.items.filter((n) => Number.isInteger(n) && n > 0).slice(0, 200) : void 0;
+      const key = `${url2.toString()}${match ? "#match" : ""}${all ? "#all" : ""}${items ? `#items:${items.join(",")}` : ""}`;
       const at = now();
       const hit = cache.get(key);
       if (hit && at - hit.at < RESOLVE_TTL_MS) return hit.value;
-      const value = fresh(url2, match);
+      const value = fresh(url2, match, all, items);
       value.catch(() => {
         if (cache.get(key)?.value === value) cache.delete(key);
       });
@@ -23620,7 +23639,14 @@ function retryAfterMs(value) {
   const at = Date.parse(value);
   return Number.isFinite(at) ? Math.max(0, Math.min(at - Date.now(), 36e5)) : null;
 }
-async function getJson(fetchImpl, url2, options) {
+function getJson(fetchImpl, url2, options) {
+  return getBody(fetchImpl, url2, options, "json");
+}
+async function getText(fetchImpl, url2, options) {
+  const answer = await getBody(fetchImpl, url2, options, "text");
+  return { status: answer.status, body: answer.body };
+}
+async function getBody(fetchImpl, url2, options, as) {
   const controller = new AbortController();
   let timedOut = false;
   const timer = setTimeout(() => {
@@ -23641,7 +23667,7 @@ async function getJson(fetchImpl, url2, options) {
   try {
     let response;
     try {
-      response = await fetchImpl(url2, { signal: controller.signal, headers: { Accept: "application/json", ...options.headers ?? {} } });
+      response = await fetchImpl(url2, { signal: controller.signal, headers: { Accept: as === "json" ? "application/json" : "text/html", ...options.headers ?? {} } });
     } catch {
       if (timedOut) throw new CatalogHttpError(`${host} did not answer in time`, "timeout");
       if (outer?.aborted) throw new CatalogHttpError("The search was cancelled", "aborted");
@@ -23654,10 +23680,10 @@ async function getJson(fetchImpl, url2, options) {
     if (!ok) throw new CatalogHttpError(`${host} answered ${response.status}`, "http", response.status);
     let body;
     try {
-      body = await response.json();
+      body = as === "json" ? await response.json() : await response.text();
     } catch {
       if (timedOut) throw new CatalogHttpError(`${host} did not answer in time`, "timeout");
-      throw new CatalogHttpError(`${host} sent something that was not JSON`, "parse", response.status);
+      throw new CatalogHttpError(as === "json" ? `${host} sent something that was not JSON` : `${host}\u2019s page could not be read`, "parse", response.status);
     }
     return { status: response.status, body };
   } finally {
@@ -23998,11 +24024,49 @@ function matchArtist(artist) {
   const first = artist.split(/\s*(?:,|&|\+|\/|\bx\b|\band\b|\bfeat\.?|\bft\.?|\bfeaturing\b|\bwith\b|\bvs\.?)\s*/i)[0] ?? artist;
   return normalizeText(first.replace(/\s*-\s*topic$/i, "").replace(/vevo$/i, "")).replace(/^the /, "");
 }
+var VERSIONS = [
+  ["live", /\blive\b/],
+  ["remix", /\bremix(?:ed)?\b|\brmx\b|\brework\b|\bbootleg\b/],
+  ["acoustic", /\bacoustic\b|\bunplugged\b/],
+  ["instrumental", /\binstrumental\b/],
+  ["demo", /\bdemo\b/],
+  ["radio-edit", /\bradio (?:edit|version|mix)\b/],
+  ["extended", /\bextended\b/],
+  ["sped-up", /\bsped up\b|\bspeed up\b|\bnightcore\b/],
+  ["slowed", /\bslowed\b/],
+  ["karaoke", /\bkaraoke\b/],
+  ["cover", /\bcover\b/],
+  ["reprise", /\breprise\b/]
+];
+function versionOf2(title) {
+  const text2 = normalizeText(title.replace(/[-–—_]+/g, " "));
+  return VERSIONS.filter(([, re]) => re.test(text2)).map(([name]) => name).join("+");
+}
+var VERSION_WORDS = /\b(?:live|remix(?:ed)?|rmx|rework|bootleg|acoustic|unplugged|instrumental|demo|radio (?:edit|version|mix)|extended|sped[\s-]?up|speed up|nightcore|slowed|karaoke|cover|reprise)\b/i;
+function baseTitle(title) {
+  return title.replace(/\s*[[(][^\])]*[\])]/g, (part) => VERSION_WORDS.test(part) ? " " : part).replace(/\s+[-–—]\s+([^-–—]+)$/, (part, tail) => VERSION_WORDS.test(tail) ? " " : part);
+}
+function withoutArtistPrefix(title, artist) {
+  const at = title.search(/\s+[-–—]\s+/);
+  if (at <= 0) return title;
+  const prefix = title.slice(0, at);
+  return matchArtist(prefix) && matchArtist(prefix) === matchArtist(artist) ? title.slice(at).replace(/^\s+[-–—]\s+/, "") : title;
+}
+function recordingKey(track) {
+  const title = withoutArtistPrefix(track.title, track.artist);
+  return { artist: matchArtist(track.artist), title: matchTitle(baseTitle(title)), version: versionOf2(title) };
+}
+var OFFICIAL_SOURCES = /* @__PURE__ */ new WeakSet();
+function official(track) {
+  return (track.sources ?? []).some((s) => s.platform === "youtube-music" || OFFICIAL_SOURCES.has(s));
+}
 function sameRecording(a, b) {
   if (a.isrc && b.isrc) return a.isrc === b.isrc;
-  if (a.durationMs === null || b.durationMs === null) return false;
-  if (Math.abs(a.durationMs - b.durationMs) > DURATION_TOLERANCE_MS) return false;
-  return matchArtist(a.artist) === matchArtist(b.artist) && matchTitle(a.title) === matchTitle(b.title);
+  const ka = recordingKey(a);
+  const kb = recordingKey(b);
+  if (!ka.artist || !ka.title || ka.artist !== kb.artist || ka.title !== kb.title || ka.version !== kb.version) return false;
+  if (a.durationMs !== null && b.durationMs !== null) return Math.abs(a.durationMs - b.durationMs) <= DURATION_TOLERANCE_MS;
+  return a.durationMs === null && official(a) || b.durationMs === null && official(b);
 }
 function quality(sources) {
   return Math.max(0, ...sources.map((s) => PLATFORM_QUALITY[s.platform] ?? 0));
@@ -24208,6 +24272,9 @@ function toolSearchTrack(platform, row) {
     const cleaned = cleanVideoTitle({ title: rawTitle, channel });
     const artist2 = cleaned.artist ?? channelArtist(channel);
     if (!artist2) return null;
+    const source2 = { platform: cleaned.fromTopicChannel ? "youtube-music" : "youtube", id: id2, url: cleaned.fromTopicChannel ? `https://music.youtube.com/watch?v=${encodeURIComponent(id2)}` : `https://www.youtube.com/watch?v=${encodeURIComponent(id2)}`, previewUrl: null, matchedBy: "search" };
+    const own2 = channelArtist(channel);
+    if (cleaned.fromTopicChannel || /vevo$/i.test(channel ?? "") || own2 && matchArtist(own2) === matchArtist(artist2) || /\bofficial\b/i.test(rawTitle)) OFFICIAL_SOURCES.add(source2);
     return {
       id: `youtube:${id2}`,
       title: cleaned.title,
@@ -24226,7 +24293,7 @@ function toolSearchTrack(platform, row) {
       explicit: null,
       genre: null,
       label: null,
-      sources: [{ platform: cleaned.fromTopicChannel ? "youtube-music" : "youtube", id: id2, url: cleaned.fromTopicChannel ? `https://music.youtube.com/watch?v=${encodeURIComponent(id2)}` : `https://www.youtube.com/watch?v=${encodeURIComponent(id2)}`, previewUrl: null, matchedBy: "search" }],
+      sources: [source2],
       rank: 0
     };
   }
@@ -24363,6 +24430,23 @@ function coversOf(tracks, n = 4) {
     if (out.length >= n) break;
   }
   return out;
+}
+async function collectAllPages(page, options) {
+  const first = await page(0, Math.min(options.pageSize, options.max));
+  options.onPage?.(first);
+  const tracks = [...first.collection?.page.tracks ?? []];
+  let last = first.collection?.page ?? null;
+  while (last && last.hasMore && tracks.length < options.max && !options.signal?.aborted) {
+    const next = await page(tracks.length, Math.min(options.pageSize, options.max - tracks.length));
+    options.onPage?.(next);
+    const rows = next.collection?.page.tracks ?? [];
+    if (!rows.length) break;
+    tracks.push(...rows);
+    last = next.collection?.page ?? null;
+  }
+  const total = first.collection?.page.total ?? null;
+  const stopped = Boolean(last?.hasMore) && tracks.length >= options.max;
+  return { first, tracks: tracks.slice(0, options.max), total, capped: stopped || Boolean(last?.capped) };
 }
 function pageOf(tracks, offset, limit, total, capped) {
   const slice = tracks.slice(offset, offset + limit);
@@ -24723,6 +24807,7 @@ function deezerAdvanced(query) {
   if (query.album) parts.push(`album:${quoted(query.album)}`);
   return parts.join(" ");
 }
+var DEEZER_PAGE = 100;
 var DeezerClient = class {
   constructor(fetchImpl, timeoutMs = 8e3) {
     this.fetchImpl = fetchImpl;
@@ -24747,6 +24832,24 @@ var DeezerClient = class {
     const body = await this.get(path, signal);
     return { rows: arr(body?.["data"]), total: num2(body?.["total"]) };
   }
+  /**
+   * `limit` rows from `offset` of a Deezer list, asked for with its own `index`/`limit`, at most
+   * `DEEZER_PAGE` at a time, until the rows are in or the list ends (its `total`, or a short page).
+   */
+  async pages(path, offset, limit, signal) {
+    const rows = [];
+    let total = null;
+    let index = offset;
+    while (rows.length < limit) {
+      const want = Math.min(DEEZER_PAGE, limit - rows.length);
+      const page = await this.list(`${path}?index=${index}&limit=${want}`, signal);
+      total = page.total ?? total;
+      rows.push(...page.rows);
+      index += page.rows.length;
+      if (!page.rows.length || (total !== null ? index >= total : page.rows.length < want)) break;
+    }
+    return { rows, total };
+  }
   async byIsrc(isrc, signal) {
     const body = await this.get(`/track/isrc:${encodeURIComponent(isrc)}`, signal);
     return body ? deezerTrack(body) : null;
@@ -24759,7 +24862,7 @@ var DeezerClient = class {
     const body = await this.get(`/album/${encodeURIComponent(id)}`, signal);
     const album = body ? deezerAlbum(body) : null;
     if (!album) return null;
-    const page = await this.list(`/album/${encodeURIComponent(id)}/tracks?index=${offset}&limit=${limit}`, signal);
+    const page = await this.pages(`/album/${encodeURIComponent(id)}/tracks`, offset, limit, signal);
     const tracks = page.rows.map((r) => deezerTrack(r, album)).filter((t2) => t2 !== null);
     return { album, tracks, total: page.total ?? album.trackCount };
   }
@@ -24778,7 +24881,7 @@ var DeezerClient = class {
   async playlist(id, offset, limit, signal) {
     const body = await this.get(`/playlist/${encodeURIComponent(id)}`, signal);
     if (!body || num2(body["id"]) === null) return null;
-    const page = await this.list(`/playlist/${encodeURIComponent(id)}/tracks?index=${offset}&limit=${limit}`, signal);
+    const page = await this.pages(`/playlist/${encodeURIComponent(id)}/tracks`, offset, limit, signal);
     const creator = isObject2(body["creator"]) ? body["creator"] : null;
     return {
       playlist: { id, title: str2(body["title"]) ?? "Playlist", owner: str2(creator?.["name"]), artworkUrl: webUrl2(body["picture_xl"]) ?? dzCover(body["md5_image"], "playlist"), total: posInt(body["nb_tracks"]) ?? page.total, url: `https://www.deezer.com/playlist/${id}` },
@@ -24846,8 +24949,8 @@ function credit(row) {
 function firstRelease(row) {
   const releases = arr(row["releases"]);
   const dated = releases.filter((r) => typeof r["date"] === "string" && r["date"]);
-  const official = dated.filter((r) => r["status"] === "Official");
-  const pool = official.length ? official : dated.length ? dated : releases;
+  const official2 = dated.filter((r) => r["status"] === "Official");
+  const pool = official2.length ? official2 : dated.length ? dated : releases;
   return [...pool].sort((a, b) => String(a["date"] ?? "9999").localeCompare(String(b["date"] ?? "9999")))[0] ?? null;
 }
 function musicbrainzTrack(row) {
@@ -25017,9 +25120,120 @@ var MusicBrainzProvider = class {
   }
 };
 
+// ../packages/domain/src/catalog/providers/applemusic-page.ts
+var ApplePageChanged = class extends Error {
+  constructor() {
+    super("Apple Music\u2019s playlist page no longer looks the way Airwave reads it, so this playlist can\u2019t be listed until Airwave is updated. Albums and songs still open.");
+    this.name = "ApplePageChanged";
+  }
+};
+function appleArtwork(template) {
+  const raw = str2(template, 2048);
+  if (!raw) return null;
+  return webUrl2(raw.replace("{w}", "600").replace("{h}", "600").replace("{c}", "").replace("{f}", "jpg"));
+}
+function scriptJson(html, attribute) {
+  const re = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
+  for (let m = re.exec(html); m; m = re.exec(html)) {
+    if (!attribute.test(m[1] ?? "")) continue;
+    try {
+      return JSON.parse(m[2] ?? "");
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+function* objects(value, depth = 0) {
+  if (depth > 8) return;
+  if (Array.isArray(value)) for (const item of value) yield* objects(item, depth + 1);
+  else if (isObject2(value)) {
+    yield value;
+    for (const item of Object.values(value)) if (typeof item === "object" && item !== null) yield* objects(item, depth + 1);
+  }
+}
+function linkTitles(value) {
+  return (Array.isArray(value) ? value : []).map((l) => isObject2(l) ? str2(l["title"]) : null).filter((t2) => Boolean(t2));
+}
+function trackOf(item, playlistId, index) {
+  const title = str2(item["title"]);
+  const descriptor = isObject2(item["contentDescriptor"]) ? item["contentDescriptor"] : null;
+  const ids = descriptor && isObject2(descriptor["identifiers"]) ? descriptor["identifiers"] : null;
+  const id = str2(ids?.["storeAdamID"], 40);
+  const url2 = webUrl2(descriptor?.["url"]);
+  if (!title || !url2) return null;
+  const artists = linkTitles(item["subtitleLinks"]);
+  const album = linkTitles(item["tertiaryLinks"])[0] ?? null;
+  const artwork = isObject2(item["artwork"]) && isObject2(item["artwork"]["dictionary"]) ? item["artwork"]["dictionary"]["url"] : null;
+  const durationMs = num2(item["duration"]);
+  const source2 = { platform: "apple-music", id: id ?? null, url: url2, previewUrl: null, matchedBy: "link" };
+  return {
+    id: `apple-music:${id ?? `${playlistId}#${index}`}`,
+    title,
+    artist: artists.length > 1 ? `${artists[0]} feat. ${artists.slice(1).join(" & ")}` : artists[0] ?? "",
+    artists: artists.slice(0, 20),
+    album,
+    albumArtist: null,
+    durationMs: durationMs !== null && durationMs > 0 ? Math.round(durationMs) : null,
+    isrc: null,
+    artworkUrl: appleArtwork(artwork),
+    releaseDate: null,
+    year: null,
+    trackNumber: index + 1,
+    discNumber: null,
+    bpm: null,
+    explicit: null,
+    genre: null,
+    label: null,
+    sources: [source2],
+    rank: 0
+  };
+}
+function readApplePlaylistPage(html, playlistId) {
+  const data = scriptJson(html, /id=["']?serialized-server-data/);
+  const sections = [...objects(data)].filter((o) => typeof o["itemKind"] === "string" && Array.isArray(o["items"]));
+  const songs = sections.filter((s) => /^trackLockup$/i.test(String(s["itemKind"])));
+  if (!songs.length) throw new ApplePageChanged();
+  const tracks = [];
+  for (const section of songs) for (const item of section["items"]) if (isObject2(item)) {
+    const track = trackOf(item, playlistId, tracks.length);
+    if (track) tracks.push(track);
+  }
+  const header2 = sections.find((s) => /containerDetailHeader/i.test(String(s["itemKind"])));
+  const head = header2 && isObject2(header2["items"][0]) ? header2["items"][0] : null;
+  const schema = scriptJson(html, /schema:music-playlist|application\/ld\+json/);
+  const ld = isObject2(schema) ? schema : null;
+  const art = head && isObject2(head["artwork"]) && isObject2(head["artwork"]["dictionary"]) ? head["artwork"]["dictionary"]["url"] : null;
+  const author = ld && isObject2(ld["author"]) ? str2(ld["author"]["name"]) : null;
+  const total = num2(ld?.["numTracks"]);
+  return {
+    title: str2(head?.["title"]) ?? str2(ld?.["name"]) ?? "Playlist",
+    owner: linkTitles(head?.["subtitleLinks"])[0] ?? author,
+    artworkUrl: appleArtwork(art),
+    total: total !== null && Number.isInteger(total) ? total : null,
+    tracks
+  };
+}
+async function fetchApplePlaylistPage(fetchImpl, url2, playlistId, options) {
+  const page = new URL(url2);
+  page.search = "";
+  const { status, body } = await getText(fetchImpl, page.toString(), { timeoutMs: options.timeoutMs, signal: options.signal, accept: [404] });
+  if (status === 404) return null;
+  if (!body.includes("serialized-server-data")) throw new ApplePageChanged();
+  try {
+    return readApplePlaylistPage(body, playlistId);
+  } catch (error61) {
+    if (error61 instanceof ApplePageChanged) throw error61;
+    throw new CatalogHttpError("Apple Music\u2019s playlist page could not be read", "parse");
+  }
+}
+
 // ../packages/domain/src/catalog/engine.ts
 var ALL_SECTIONS = ["tracks", "artists", "albums"];
 var ALL_PROVIDERS = ["itunes", "deezer", "musicbrainz", "youtube", "soundcloud"];
+var PROVIDER_PLATFORMS = { itunes: ["apple-music"], deezer: ["deezer"], musicbrainz: ["musicbrainz"], youtube: ["youtube", "youtube-music"], soundcloud: ["soundcloud"] };
+var SESSION_TTL_MS = 15 * 6e4;
+var SESSION_MAX = 200;
 var CatalogEngine = class {
   constructor(options) {
     this.options = options;
@@ -25036,6 +25250,7 @@ var CatalogEngine = class {
     this.resolveCache = new TtlCache(10 * 6e4, 100, this.now);
     this.searchCache = new TtlCache(5 * 6e4, 300, this.now);
     this.linksCache = new TtlCache(24 * 36e5, 1e3, this.now);
+    this.applePageCache = new TtlCache(10 * 6e4, 50, this.now);
     this.register(new ItunesProvider(this.itunes));
     this.register(new DeezerProvider(this.deezer));
     this.register(new MusicBrainzProvider(this.musicbrainz));
@@ -25058,6 +25273,8 @@ var CatalogEngine = class {
   resolveCache;
   searchCache;
   linksCache;
+  applePageCache;
+  sessions = /* @__PURE__ */ new Map();
   /** Add or replace a provider (tests, or a server with a provider of its own). */
   register(provider) {
     this.providers.set(provider.id, provider);
@@ -25088,7 +25305,7 @@ var CatalogEngine = class {
     const statuses = /* @__PURE__ */ new Map();
     const list = () => ALL_PROVIDERS.filter((id) => statuses.has(id)).map((id) => statuses.get(id));
     if (query.kind === "url") {
-      yield { type: "done", seq, query, status: [], page: { tracks: null, artists: null, albums: null }, totals: { tracks: 0, artists: 0, albums: 0 }, resolve: query.url };
+      yield { type: "done", seq, query, status: [], page: { tracks: null, artists: null, albums: null }, totals: { tracks: 0, artists: 0, albums: 0 }, resolve: query.url, linkedOnly: [] };
       return;
     }
     const wanted = new Set(input2.providers?.length ? input2.providers : ALL_PROVIDERS);
@@ -25124,6 +25341,18 @@ var CatalogEngine = class {
     yield { type: "results", seq: seq++, provider: null, query, tracks: [], artists: [], albums: [], status: list() };
     const merger = new CatalogMerger(query);
     const full = {};
+    const sessionKey = JSON.stringify([query.kind, query.text, query.track, query.artist, query.album, query.isrc, [...wanted].sort()]);
+    const session = this.sessionFor(sessionKey, offset);
+    const alias = /* @__PURE__ */ new Map();
+    const canonical = (rows) => rows.map((row) => {
+      if (!session || offset === 0) return row;
+      const known = alias.get(row.id);
+      const earlier = known ? session.rows.find((s) => s.track.id === known) : session.rows.find((s) => s.offset < offset && sameRecording(s.track, row));
+      if (!earlier) return row;
+      alias.set(row.id, earlier.track.id);
+      earlier.track = mergeTrack(earlier.track, row);
+      return earlier.track;
+    });
     const pending = new Map(running.map((p, i) => [i, p.then((o) => ({ o, i }))]));
     while (pending.size) {
       const { o, i } = await Promise.race(pending.values());
@@ -25131,7 +25360,7 @@ var CatalogEngine = class {
       statuses.set(o.provider.id, o.status);
       const changed = o.result ? merger.add(o.result) : { tracks: [], artists: [], albums: [] };
       for (const [section, more] of Object.entries(o.result?.full ?? {})) if (more) full[section] = true;
-      yield { type: "results", seq: seq++, provider: o.provider.id, query, ...changed, status: list() };
+      yield { type: "results", seq: seq++, provider: o.provider.id, query, ...changed, tracks: canonical(changed.tracks), status: list() };
     }
     const top = this.options.crossLinkTop ?? 2;
     if (top > 0 && !signal?.aborted && sections.includes("tracks")) {
@@ -25142,10 +25371,21 @@ var CatalogEngine = class {
         const found = await this.withDeadline(this.crossLinks(track, signal), deadline - this.now()).catch(() => []);
         if (!found.length) continue;
         const patched = merger.patchTrack(track.id, (t2) => ({ ...t2, sources: mergeSources(t2.sources, found) }));
-        if (patched) yield { type: "results", seq: seq++, provider: null, query, tracks: [patched], artists: [], albums: [], status: list() };
+        if (patched) yield { type: "results", seq: seq++, provider: null, query, tracks: canonical([patched]), artists: [], albums: [], status: list() };
       }
     }
     const snapshot = merger.snapshot();
+    if (session) {
+      for (const row of snapshot.tracks) {
+        if (alias.has(row.id)) continue;
+        const again = session.rows.findIndex((s) => s.offset === offset && (s.track.id === row.id || sameRecording(s.track, row)));
+        if (again === -1) session.rows.push({ track: row, offset });
+        else session.rows[again] = { track: row, offset };
+      }
+    }
+    const searched = new Set(ALL_PROVIDERS.filter((id) => statuses.get(id) && statuses.get(id).state !== "skipped").flatMap((id) => PROVIDER_PLATFORMS[id]));
+    const linkedOnly = [];
+    for (const row of [...snapshot.tracks, ...snapshot.artists, ...snapshot.albums]) for (const s of row.sources) if (!searched.has(s.platform) && !linkedOnly.includes(s.platform)) linkedOnly.push(s.platform);
     const page = (section) => sections.includes(section) && askedSections.has(section) ? { offset, limit, hasMore: Boolean(full[section]) } : null;
     const done = {
       type: "done",
@@ -25154,9 +25394,28 @@ var CatalogEngine = class {
       status: list(),
       page: { tracks: page("tracks"), artists: page("artists"), albums: page("albums") },
       totals: { tracks: snapshot.tracks.length, artists: snapshot.artists.length, albums: snapshot.albums.length },
-      resolve: null
+      resolve: null,
+      linkedOnly
     };
     yield done;
+  }
+  /**
+   * The rows a query has sent so far, by page, for 15 minutes: page 0 starts afresh; a later page
+   * finds the session its first page made (or none, after a restart — then only ids dedupe).
+   */
+  sessionFor(key, offset) {
+    const now = this.now();
+    for (const [k, s] of this.sessions) if (now - s.at > SESSION_TTL_MS) this.sessions.delete(k);
+    if (offset === 0) {
+      const fresh = { at: now, rows: [] };
+      this.sessions.delete(key);
+      while (this.sessions.size >= SESSION_MAX) this.sessions.delete(this.sessions.keys().next().value);
+      this.sessions.set(key, fresh);
+      return fresh;
+    }
+    const found = this.sessions.get(key) ?? null;
+    if (found) found.at = now;
+    return found;
   }
   /** The whole search as one answer (`?stream=0`): the feed, folded. */
   async searchAll(input2, signal) {
@@ -25400,7 +25659,7 @@ var CatalogEngine = class {
       const detail = await this.artist(`apple-music:${link.id}`, {}, signal);
       return answer({ kind: "artist", artist: detail.artist });
     }
-    if (link.kind === "playlist") return answer({ kind: "unsupported", reason: "Apple Music playlists are not in Apple\u2019s public API, so they cannot be listed without an Apple developer account. Albums and songs can." });
+    if (link.kind === "playlist" && link.id) return this.resolveApplePlaylist(link, offset, limit, answer, signal);
     return answer({ kind: "unsupported", reason: "That Apple Music address is not a song, album or artist." });
   }
   async resolveWithTool(link, offset, limit, answer, signal) {
@@ -25419,15 +25678,22 @@ var CatalogEngine = class {
       const track = trackFromLink(read.track, { platform });
       return track ? answer({ kind: "track", track }) : answer({ kind: "unavailable", reason: `${label} described nothing playable at that address.` });
     }
-    const all = read.entries.slice(0, CATALOG_COLLECTION_CAP).map((e) => trackFromLink(e, { platform, owner: link.kind === "album" ? read.owner : null, album: link.kind === "album" ? read.title : null })).filter((t2) => t2 !== null);
+    const rows = [];
+    read.entries.slice(0, CATALOG_COLLECTION_CAP).forEach((e, i) => {
+      const track = trackFromLink(e, { platform, owner: link.kind === "album" ? read.owner : null, album: link.kind === "album" ? read.title : null });
+      if (track) rows.push({ track, bare: !e.title, position: i + 1 });
+    });
+    const all = rows.map((r) => r.track);
     await this.fillCovers(all, reader, signal);
+    const page = pageOf(all, offset, limit, read.total ?? read.entries.length, read.capped || read.entries.length > CATALOG_COLLECTION_CAP || (read.total ?? 0) > CATALOG_COLLECTION_CAP);
+    page.tracks = await this.hydratePage(link, rows.slice(offset, offset + page.tracks.length), page.tracks, reader, signal);
     const kind = link.kind === "album" ? "album" : "playlist";
     const collection = {
       ref: collectionRef(link, kind, read.title, read.owner),
       artworkUrl: read.artworkUrl,
       covers: coversOf(all),
       releaseDate: read.date && /^\d{4}(-\d{2}(-\d{2})?)?$/.test(read.date) ? read.date : null,
-      page: pageOf(all, offset, limit, read.total, read.capped || (read.total ?? 0) > CATALOG_COLLECTION_CAP)
+      page
     };
     if (link.kind === "artist") {
       const artist = { id: `${platform}:${link.id ?? link.url}`, name: read.owner ?? read.title, pictureUrl: read.artworkUrl, albumCount: null, fans: null, genre: null, sources: [{ platform, id: link.id, url: link.url, previewUrl: null, matchedBy: "link" }], rank: 0 };
@@ -25454,6 +25720,54 @@ var CatalogEngine = class {
     };
     for (let k = 0; k < missing.length; k += 2) await Promise.all(missing.slice(k, k + 2).map(one));
   }
+  /**
+   * A SoundCloud set lists most of its songs as bare ids (yt-dlp's flat listing). The page asked for
+   * is described in one batch — the reader runs the tool once for exactly those positions
+   * (`items`), and the tool looks the ids up in batches — and each bare row takes its title, artist,
+   * artwork and length. Positions keep the order; if the answer does not line up, the bare rows stay.
+   */
+  async hydratePage(link, rows, tracks, reader, signal) {
+    const bare = rows.filter((r) => r.bare);
+    if (!bare.length) return tracks;
+    const positions = bare.map((r) => r.position);
+    const key = `${link.url}|items:${positions.join(",")}`;
+    const read = await this.resolveCache.get(key, () => reader(link.url, { signal, items: positions })).catch(() => null);
+    if (read?.kind !== "collection" || read.entries.length !== bare.length) return tracks;
+    const filled = new Map(bare.map((r, i) => [r.track.id, read.entries[i]]));
+    return tracks.map((t2) => {
+      const entry = filled.get(t2.id);
+      if (!entry?.title) return t2;
+      const full = trackFromLink(entry, { platform: t2.sources[0].platform, album: t2.album });
+      return full ? { ...full, id: t2.id, trackNumber: t2.trackNumber, album: t2.album ?? full.album, sources: mergeSources(t2.sources, full.sources) } : t2;
+    });
+  }
+  /** An Apple Music playlist from its public page (DEC-039, owner decision 2026-10-06). */
+  async resolveApplePlaylist(link, offset, limit, answer, signal) {
+    let found;
+    try {
+      found = await this.applePageCache.get(link.url, () => fetchApplePlaylistPage(this.options.fetch, link.url, link.id, { timeoutMs: this.options.timeouts?.itunes ?? 15e3, signal }));
+    } catch (error61) {
+      if (error61 instanceof ApplePageChanged) return answer({ kind: "unavailable", reason: error61.message });
+      throw error61;
+    }
+    if (!found) return answer({ kind: "unavailable", reason: "Apple Music has no playlist at that address, or it is private." });
+    const all = found.tracks.slice(0, CATALOG_COLLECTION_CAP);
+    const total = found.total ?? all.length;
+    const page = pageOf(all, offset, limit, total, total > CATALOG_COLLECTION_CAP);
+    const short = total > all.length && all.length < CATALOG_COLLECTION_CAP;
+    return answer({
+      kind: "playlist",
+      collection: { ref: collectionRef(link, "playlist", found.title, found.owner), artworkUrl: found.artworkUrl, covers: coversOf(all), releaseDate: null, page: { ...page, total } },
+      reason: short ? `Apple\u2019s public page for this playlist lists its first ${all.length} of ${total} songs; the rest can\u2019t be read without an Apple account.` : null
+    });
+  }
+  /**
+   * Every song of an album or playlist link, in order, page after page (`CATALOG_PAGE_MAX` at a
+   * time), up to `CATALOG_COLLECTION_CAP`. Stopping at the bound is reported (`capped`), never silent.
+   */
+  resolveAll(input2, options = {}) {
+    return collectAllPages((offset, limit) => this.resolve(input2, offset, limit, options.signal), { max: options.max ?? CATALOG_COLLECTION_CAP, pageSize: CATALOG_PAGE_MAX, ...options.signal ? { signal: options.signal } : {}, ...options.onPage ? { onPage: options.onPage } : {} });
+  }
   unreadable(link, error61) {
     const said = describeError(error61);
     if (link.platform === "spotify" && (link.kind === "playlist" || link.kind === "unknown")) {
@@ -25474,7 +25788,7 @@ var CatalogEngine = class {
     if (found.kind === "album" || link.kind === "album") {
       const dz = sources.find((s) => s.platform === "deezer" && s.id);
       if (dz?.id) {
-        const detail = await this.album(`deezer:${dz.id}`, 0, CATALOG_COLLECTION_CAP, signal).catch(() => null);
+        const detail = await this.album(`deezer:${dz.id}`, 0, CATALOG_PAGE_MAX, signal).catch(() => null);
         if (detail) return answer({ kind: "album", collection: { ref: collectionRef(link, "album", found.title, found.artist), artworkUrl: found.artworkUrl ?? detail.album.artworkUrl, covers: coversOf(detail.page.tracks), releaseDate: detail.album.releaseDate, page: detail.page } });
       }
       return answer({ kind: "album", collection: { ref: collectionRef(link, "album", found.title, found.artist), artworkUrl: found.artworkUrl, covers: found.artworkUrl ? [found.artworkUrl] : [], releaseDate: null, page: { tracks: [], offset: 0, limit: 1, total: null, hasMore: false, capped: false } }, reason: `${label} albums list their songs only when the same album is on Deezer.` });
@@ -25556,12 +25870,12 @@ function createHelperCatalog(options) {
     fetch: options.fetch ?? guardedCatalogFetch(),
     userAgent: `AirwaveHelper/${options.version} ( https://github.com/jyoung2000/AudioWave2.0 )`,
     toolSearch: ({ args, signal }) => options.links.search(args, signal),
-    linkReader: async (url2, { signal, match }) => {
+    linkReader: async (url2, { signal, match, items }) => {
       void signal;
       const checked = checkFetchUrl(url2, options.allowedHosts);
       if (!checked.ok || !checked.url) throw new LinkReadError(checked.reason ?? "That address is not one this helper will read.", "unavailable");
       try {
-        return helperToLinkRead(await options.links.resolve(checked.url, { match: match === true }));
+        return helperToLinkRead(await options.links.resolve(checked.url, { match: match === true, all: true, ...items?.length ? { items } : {} }));
       } catch (error61) {
         if (error61 instanceof ResolveError) throw new LinkReadError(error61.message, error61.code === "tool-missing" ? "tool-missing" : error61.code === "busy" ? "busy" : "failed");
         throw error61;

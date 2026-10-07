@@ -90,6 +90,10 @@
     {
       "id": "catalog",
       "title": "Music catalog — what the search API promises"
+    },
+    {
+      "id": "search",
+      "title": "Music search in the hub and the companion"
     }
   ],
   "rules": [
@@ -959,7 +963,7 @@
       "group": "window",
       "title": "One sheet of chrome: the product’s name and its tools",
       "contract": "An Airwave window has one sheet of chrome carrying the product’s name, from BRANDING, and a row of tools — nothing else. The window is the same in every state: signed out and on first run the hub draws its form or its gate inside it, with the tools it cannot open locked and the reason said. In the companion the chrome is the title bar: the operating system’s own is hidden but the frame is kept, Windows draws minimise, maximise and close over the top-right corner, the chrome is the drag region and the tools are not, and the application menu is removed (DEC-020).",
-      "example": "“Airwave Companion” over Library · Live TV · Remote · Settings; “Airwave Hub” over six tools, five of them locked until a real password is set.",
+      "example": "“Airwave Companion” over Library · Search · Live TV · Remote · Settings; “Airwave Hub” over seven tools (the design’s six and Search), six of them locked until a real password is set.",
       "authority": "adopted",
       "owners": [
         "docker-container/src/web/App.tsx",
@@ -998,12 +1002,12 @@
         {
           "type": "test",
           "path": "windows-companion/tests/dom/companion-shell.dom.test.tsx",
-          "name": "has one title, four tools and nothing else in its chrome"
+          "name": "has one title, five tools and nothing else in its chrome"
         },
         {
           "type": "test",
           "path": "docker-container/tests/dom/admin-shell.dom.test.tsx",
-          "name": "renders the window with the six tabs, the status strip and Sign Out"
+          "name": "renders the window with the seven tabs, the status strip and Sign Out"
         },
         {
           "type": "test",
@@ -2651,8 +2655,8 @@
       "id": "UX-CAT-002",
       "group": "catalog",
       "title": "One song is one row, however many services have it",
-      "contract": "Rows from different services are one song when they share an ISRC, or — when either lacks one — when the main artist and the title agree once “feat. …”, “Remastered 2011”, “(Official Video)” and the like are set aside and the durations are within three seconds. A row with no duration is never merged on names alone. The merged row keeps every source (platform, id, link, preview) and takes each field from the best service that has it: the stores’ titles and credits before MusicBrainz, a YouTube upload’s last; the largest store artwork; the fullest date. A merged row keeps the id it first arrived with, so a later chunk replaces it in place. The best rows also gain their other homes (Spotify, YouTube Music, Tidal…) from MusicBrainz’s links, keylessly, before the search is done.",
-      "example": "Deezer’s “Get Lucky (feat. Pharrell Williams and Nile Rodgers)” (USQX91300108, 367 s) and YouTube’s “Daft Punk - Get Lucky (Official Audio)” (369 s) are one row with both sources, Deezer’s title and ISRC.",
+      "contract": "Rows from different services are one song when they share an ISRC, or — when either lacks one — when the main artist and the title agree once the noise is set aside (“feat. …”, “Remastered 2011”, “(Official Music Video)”, “[Lyrics]”, “HD”, an uploader’s “Artist - Title”, a “- Topic” or VEVO channel), their version agrees, and the durations are within three seconds. Versions stay apart: live, remix, acoustic, instrumental, demo, radio edit, extended, sped up, slowed, karaoke, cover and reprise are each a row of their own (`versionOf`). A row with no duration joins on names only when it is an official upload — a YouTube Music Topic recording, the artist’s own or a VEVO channel, or a title saying “Official”; a stranger’s re-upload never does. The merged row keeps every source (platform, id, link, preview) and takes each field from the best service that has it: the stores’ titles and credits before MusicBrainz, a YouTube upload’s last; the largest store artwork; the fullest date. A merged row keeps the id it first arrived with, so a later chunk replaces it in place, and a later page’s copy of a song an earlier page sent comes back with that row’s id (the server keeps a query’s rows for 15 minutes), so no page repeats another. The best rows gain their other homes (Spotify, YouTube Music, Tidal…) from MusicBrainz’s links, keylessly, and `done.linkedOnly` names the platforms that only contributed links.",
+      "example": "iTunes’s and Deezer’s “Harbour Lights” (214 s), the band’s official video “Cassette Bloom - Harbour Lights (Official Music Video) [HD]” (216 s), its YouTube Music Topic upload (no duration) and SoundCloud’s “Cassette Bloom - Harbour Lights” (215 s) are one row with five badges; “Harbour Lights (Live at the Granary)” and “(Night Shift Remix)” are rows of their own.",
       "authority": "adopted",
       "owners": ["packages/domain/src/catalog/merge.ts", "packages/domain/src/catalog/engine.ts"],
       "evidence": [
@@ -2685,6 +2689,31 @@
           "type": "test",
           "path": "packages/domain/tests/unit/catalog-engine.test.ts",
           "name": "adds the best rows’ other homes (Spotify, Tidal…) from MusicBrainz before done"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-one-row.test.ts",
+          "name": "iTunes, Deezer, a YouTube official video, a Topic upload and SoundCloud: one row, five badges"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-one-row.test.ts",
+          "name": "keeps versions apart: live, remix, acoustic, sped up and a cover are rows of their own"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-one-row.test.ts",
+          "name": "a stranger’s re-upload with no duration does not join on names alone"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-one-row.test.ts",
+          "name": "page 2’s copy of a page-1 song comes back with page 1’s id; only new songs are new rows"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-one-row.test.ts",
+          "name": "says which platforms only contributed links"
         }
       ]
     },
@@ -2692,7 +2721,7 @@
       "id": "UX-CAT-003",
       "group": "catalog",
       "title": "Search finds music, never a “search on YouTube” offer, and every result says where it is",
-      "contract": "The catalog answers with songs, artists and albums only. It never returns an entry whose only purpose is to send the person to search another site; YouTube and SoundCloud are searched by the server (yt-dlp) and their results are songs like any other. Every track, artist and album carries at least one source naming its platform, and a song from Spotify that plays from YouTube Music carries both, the second marked as spotDL’s match. A pasted link is not searched: the search says to resolve it, and resolve says what it is or, for a link it cannot read (a private or Spotify-made playlist, an Apple Music playlist, a Tidal link without a SongLink key), why — in words.",
+      "contract": "The catalog answers with songs, artists and albums only. It never returns an entry whose only purpose is to send the person to search another site; YouTube and SoundCloud are searched by the server (yt-dlp) and their results are songs like any other. Every track, artist and album carries at least one source naming its platform, and a song from Spotify that plays from YouTube Music carries both, the second marked as spotDL’s match. A pasted link is not searched: the search says to resolve it, and resolve says what it is or, for a link it cannot read (a private or Spotify-made playlist, a Tidal link without a SongLink key), why — in words.",
       "example": "{\"sources\":[{\"platform\":\"spotify\",\"matchedBy\":\"link\"},{\"platform\":\"youtube-music\",\"matchedBy\":\"spotdl\"}]} — shown as “Spotify · plays from YouTube Music”.",
       "authority": "adopted",
       "owners": [
@@ -2730,12 +2759,342 @@
         {
           "type": "test",
           "path": "packages/domain/tests/unit/catalog-engine.test.ts",
-          "name": "an Apple Music playlist and a Tidal link without a SongLink key say why they cannot be read"
+          "name": "an Apple Music playlist whose page changed and a Tidal link without a SongLink key say why they cannot be read"
         },
         {
           "type": "test",
           "path": "docker-container/tests/integration/catalog.test.ts",
           "name": "a Spotify song through spotDL, with its YouTube Music match"
+        }
+      ]
+    },
+    {
+      "id": "UX-CAT-004",
+      "group": "catalog",
+      "title": "A loaded list loads every song, from any platform",
+      "contract": "An album or playlist opened from a link or a result lists every song it has, in order, page by page: `resolve` and `album` serve any `offset` (to 10,000) with a `limit` of at most 200, `total` is the platform’s own count, and `hasMore` holds until the end; `collectAllPages` reads a whole list. Spotify (spotDL), YouTube and YouTube Music playlists and Bandcamp albums (yt-dlp) are read once, whole; a SoundCloud set’s bare ids are described a page at a time; Deezer pages with its own index; Apple Music playlists are read from their public page. A list past 10,000 songs says so (`capped`); a page that carries fewer songs than the list holds says so in words. Nothing is cut silently.",
+      "example": "A 1,200-song Spotify playlist opens with its first page, and page 12 is songs 1,101–1,200 with `hasMore: false`.",
+      "authority": "adopted",
+      "owners": [
+        "packages/domain/src/catalog/engine.ts",
+        "packages/domain/src/catalog/links.ts",
+        "packages/domain/src/catalog/providers/applemusic-page.ts",
+        "docker-container/src/catalog/service.ts",
+        "local-helper/src/resolve.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-paging.test.ts",
+          "name": "Deezer: any page of a 450-song playlist, the exact total, hasMore until the end, asked 100 at a time"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-paging.test.ts",
+          "name": "Spotify through spotDL: all 1,200 songs of a playlist, read once and served page by page"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-paging.test.ts",
+          "name": "stops at CATALOG_COLLECTION_CAP and says so, never silently"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-paging.test.ts",
+          "name": "SoundCloud: a set’s bare ids are described a page at a time, in one run for that page"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-paging.test.ts",
+          "name": "Apple Music: a playlist read from its public page, every song it carries, paged like any other"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-paging.test.ts",
+          "name": "collectAllPages pages any resolve-shaped call in order, page size bounded"
+        },
+        {
+          "type": "test",
+          "path": "local-helper/tests/unit/resolve-paging.test.ts",
+          "name": "keeps 1,500 entries of a playlist and 3,000 songs of a Spotify playlist when the cap allows"
+        }
+      ]
+    },
+    {
+      "id": "UX-SEARCH-001",
+      "group": "search",
+      "title": "One field finds music; the advanced fields fold back into it; the filter is kept",
+      "contract": "The Search tool takes free text, an ISRC or a pasted link from any platform. Track, Artist and Album are an expandable set of fields; put away, whatever they hold is folded back into the one line, so nothing typed is lost. Filter… is a sheet choosing the sections shown (Songs, Artists, Albums) and the services asked; it will not take a choice that shows nothing, and it is kept — per browser on the hub, in the companion’s settings store — and searching again applies it at once. Search is disabled, with the reason, until there is something to look for.",
+      "authority": "adopted",
+      "owners": [
+        "docker-container/src/web/views/Search.tsx",
+        "docker-container/src/web/lib/catalog.ts",
+        "windows-companion/src/renderer/views/Search.tsx",
+        "windows-companion/src/renderer/catalog.ts",
+        "packages/domain/src/catalog/view.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "puts the Track, Artist and Album fields back into the line when they are closed"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "is a sheet: it takes the focus, Escape puts it away, and Done keeps the choice and searches again"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "will not take a filter that shows nothing"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-search.dom.test.tsx",
+          "name": "keeps the filter in the companion’s store and searches again"
+        }
+      ]
+    },
+    {
+      "id": "UX-SEARCH-002",
+      "group": "search",
+      "title": "Results arrive live, and every service’s state is said",
+      "contract": "Results fold in as each service answers (the NDJSON feed), upserted by id and ordered by rank, ties by arrival. One line under the field names each service with its lamp and its state in words — asking…, N found, nothing found, failed, took too long, resting (with when it is back), not asked — and the platforms that only contributed links; a live region says, once, how far the search has got and what it found.",
+      "authority": "adopted",
+      "owners": [
+        "docker-container/src/web/views/Search.tsx",
+        "docker-container/src/web/lib/catalog.ts",
+        "windows-companion/src/renderer/views/Search.tsx",
+        "windows-companion/src/renderer/catalog.ts",
+        "packages/domain/src/catalog/view.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "folds the live feed by id and says every service’s state, the resting one with when it is back"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-view.test.ts",
+          "name": "upserts rows by id: a later chunk replaces a row in place, a new one is added after"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-view.test.ts",
+          "name": "says each state, with when a resting service is back"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-search.dom.test.tsx",
+          "name": "folds the chunks the main process passes on, says every service’s state, and shows rows that are music"
+        }
+      ]
+    },
+    {
+      "id": "UX-SEARCH-003",
+      "group": "search",
+      "title": "A row is music, and says where it is",
+      "contract": "Every song row shows its cover, title, artist, album, time, BPM when known, an explicit mark and a play control for its 30-second preview (Apple Music or Deezer), and one chip per platform it is on; a song that plays only through Spotify says it plays from YouTube Music via spotDL. No row offers to “search on” a site. A song opens to its genre, label and year (MusicBrainz), its lyrics (synced when LRCLIB has them), its preview, and Download: on the hub into the queue with the rights basis, saying which source was chosen and what was written into the tags; on the companion through the helper, as every download on that PC.",
+      "authority": "adopted",
+      "owners": [
+        "docker-container/src/web/views/Search.tsx",
+        "docker-container/src/web/lib/catalog.ts",
+        "windows-companion/src/renderer/views/Search.tsx",
+        "windows-companion/src/renderer/catalog.ts",
+        "packages/domain/src/catalog/view.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "shows cover, title, artist, album, its platforms, BPM, time, the explicit marker and a preview"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "downloads a song to the hub’s queue and says which source was chosen and what was embedded"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-view.test.ts",
+          "name": "a Spotify song says it plays from YouTube Music via spotDL; a song that is elsewhere too does not"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-search.dom.test.tsx",
+          "name": "opens a song with genre, label, year and lyrics, and downloads it through the helper’s path"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/contract/catalog-ipc.test.ts",
+          "name": "a download takes the helper’s own path from the song’s best source, with the rights basis"
+        }
+      ]
+    },
+    {
+      "id": "UX-SEARCH-004",
+      "group": "search",
+      "title": "A pasted list names its platform, wears a mosaic and opens like an album",
+      "contract": "A pasted album or playlist link is read, not searched. Its listing names its kind, platform and length, and its cover is a 2×2 mosaic of four songs’ artwork (or its own cover when four do not differ). Opened, it is a page like an album’s: the head, then its songs, every one of them, loaded as you scroll. A link that cannot be read says why, in words.",
+      "authority": "adopted",
+      "owners": [
+        "docker-container/src/web/views/Search.tsx",
+        "docker-container/src/web/lib/catalog.ts",
+        "windows-companion/src/renderer/views/Search.tsx",
+        "windows-companion/src/renderer/catalog.ts",
+        "packages/domain/src/catalog/view.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "lists a pasted Spotify playlist with its platform and a 2×2 mosaic, opens it like an album, and the star un-stars it"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "says why a link cannot be read, in words"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-view.test.ts",
+          "name": "draws four songs’ artwork as a 2×2 mosaic, else the list’s own cover"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-search.dom.test.tsx",
+          "name": "lists a pasted Spotify playlist with its mosaic and platform, opens it, and the star un-stars it"
+        }
+      ]
+    },
+    {
+      "id": "UX-SEARCH-005",
+      "group": "search",
+      "title": "A star keeps an album or playlist in the library",
+      "contract": "An opened album or playlist has a star (a toggle, pressed when kept). It keeps the list in the shared SavedCollection shape: on the hub in the admin’s library (`/api/v1/catalog/saved`, one store per admin, for the player to sync later); on the companion in its own store. The status line says what happened.",
+      "authority": "adopted",
+      "owners": [
+        "docker-container/src/web/views/Search.tsx",
+        "docker-container/src/web/lib/catalog.ts",
+        "windows-companion/src/renderer/views/Search.tsx",
+        "windows-companion/src/renderer/catalog.ts",
+        "packages/domain/src/catalog/view.ts",
+        "docker-container/src/api/routes/catalog.ts",
+        "docker-container/src/db/repositories/saved-collections.ts",
+        "windows-companion/src/main/catalog.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "docker-container/tests/integration/catalog.test.ts",
+          "name": "keeps a starred list in the admin’s library, in the shared SavedCollection shape, and un-stars it"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/integration/catalog.test.ts",
+          "name": "is the admin’s alone: no device, no anonymous caller, and a change needs the CSRF token"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "opens an album with its label, date and songs, and stars it into the library"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/contract/catalog-ipc.test.ts",
+          "name": "keeps starred albums and playlists and the filter in the companion’s store"
+        }
+      ]
+    },
+    {
+      "id": "UX-SEARCH-006",
+      "group": "search",
+      "title": "The hub’s music search settings: keyless, the key write-only",
+      "contract": "Music ▸ Music search sets which services the catalog asks, whether a song downloaded from Search carries its lyrics, and the optional SongLink key. Everything works with no key. The key is sealed like the hub’s other secrets and never shown again: the field says only whether one is set, and Clear Key removes it. Save sends what changed; Revert puts back what the hub has; at least one service stays on.",
+      "authority": "adopted",
+      "owners": [
+        "docker-container/src/web/views/CatalogSettings.tsx",
+        "docker-container/src/catalog/service.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "sends only what changed on Save, keeps the SongLink key write-only, and needs one service on"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/integration/catalog.test.ts",
+          "name": "settings: admin only, the SongLink key write-only, a switched-off service skipped"
+        }
+      ]
+    },
+    {
+      "id": "UX-SEARCH-007",
+      "group": "search",
+      "title": "Songs, Artists and Albums come in pages",
+      "contract": "Each section of the results shows a page of eight with a pager: Previous, the page numbers (the current one marked), Next, and the count in words (“Page 2 of 3 or more”). The arrow keys move a page from anywhere in the pager, Home and End go to the first and the last loaded. Past what is loaded, Next asks the services for that section’s next offset while they say there is more. A page survives opening a row and coming Back. See All keeps infinite scroll.",
+      "authority": "adopted",
+      "owners": [
+        "docker-container/src/web/views/Search.tsx",
+        "docker-container/src/web/lib/catalog.ts",
+        "windows-companion/src/renderer/views/Search.tsx",
+        "windows-companion/src/renderer/catalog.ts",
+        "packages/domain/src/catalog/view.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "pages Songs with numbers, Previous and Next and a count, by pointer or arrow keys, asking the services for the next offset at the end"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-view.test.ts",
+          "name": "counts the pages loaded, says when there are more, and asks for the next offset only at the end"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-search.dom.test.tsx",
+          "name": "pages Songs with numbers and Next, asking for the next offset at the end (UX-SEARCH-007)"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "See All opens every song and loads the next page without repeating one"
+        }
+      ]
+    },
+    {
+      "id": "UX-SEARCH-008",
+      "group": "search",
+      "title": "Search is keyboard-first and says where it is",
+      "contract": "Each list is a list box with one tab stop: the arrows, Page Up/Down, Home and End move the highlight, Enter opens, Space plays a song’s preview. Opening a row stacks a page with Back, and the focus moves to its heading; Escape goes back. The filter is a modal sheet: the focus starts in it, stays in it, and returns to Filter… when it closes. A live region carries the search’s progress.",
+      "authority": "adopted",
+      "owners": [
+        "docker-container/src/web/views/Search.tsx",
+        "docker-container/src/web/lib/catalog.ts",
+        "windows-companion/src/renderer/views/Search.tsx",
+        "windows-companion/src/renderer/catalog.ts",
+        "packages/domain/src/catalog/view.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "is a list box: one tab stop, arrows move, Enter opens the song with genre, label, year and synced lyrics"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "is a sheet: it takes the focus, Escape puts it away, and Done keeps the choice and searches again"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/e2e/search.spec.ts",
+          "name": "searches, opens a song and comes back with the keyboard alone, on stock answers"
         }
       ]
     }

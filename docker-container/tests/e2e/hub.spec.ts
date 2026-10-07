@@ -5,7 +5,7 @@
  * What they check is the part of the interface that makes a claim about the world: the remote
  * access table, the pairing screen, and whether the page is genuinely self-hosted.
  *
- * Navigation is by the six tabs of the hub window (Overview · Devices · Music · Groups · Sharing ·
+ * Navigation is by the seven tabs of the hub window (Overview · Devices · Music · Search · Groups · Sharing ·
  * System); a section such as Network or Profiles is a stacked part of its tab's pane.
  */
 import { expect, test } from '@playwright/test';
@@ -129,10 +129,10 @@ test('profiles are listed for moderation, and say who can see them', async ({ pa
   await expect(page.getByText(/Nobody has a profile yet|Every device paired with this hub can see these names/).first()).toBeVisible();
 });
 
-test('the window is the six-tab hub, its status line reads the real bind address and port, and old section ids still land on a tab', async ({ page }) => {
+test('the window is the seven-tab hub, its status line reads the real bind address and port, and old section ids still land on a tab', async ({ page }) => {
   await page.goto('/#overview');
   const tabs = page.getByRole('tablist', { name: 'Sections' });
-  await expect(tabs.getByRole('tab')).toHaveText([/^Overview/, 'Devices', 'Music', 'Groups', 'Sharing', 'System']);
+  await expect(tabs.getByRole('tab')).toHaveText([/^Overview/, 'Devices', 'Music', 'Search', 'Groups', 'Sharing', 'System']);
   await expect(page).toHaveTitle('Airwave Hub');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Airwave Hub');
 
@@ -175,7 +175,7 @@ test('no pane scrolls sideways, at the window width the design is drawn for or a
   ]) {
     await page.setViewportSize(viewport);
     await page.goto('/');
-    for (const name of ['Overview', 'Devices', 'Music', 'Groups', 'Sharing', 'System']) {
+    for (const name of ['Overview', 'Devices', 'Music', 'Search', 'Groups', 'Sharing', 'System']) {
       await page.getByRole('tab', { name }).click();
       await expect(page.getByRole('tabpanel')).toBeVisible();
       const overflow = await page.evaluate(() => {

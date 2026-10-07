@@ -2,9 +2,9 @@
  * The hub window's gating, rendered.
  *
  * The server enforces the same rules, but this asserts the *interface* does not offer a way past
- * them. It is one window in every state — "Airwave Hub", six tabs, a status strip — and what changes
+ * them. It is one window in every state — "Airwave Hub", seven tabs, a status strip — and what changes
  * is what the window lets through: signed out, every tab is locked; with the bootstrap password
- * still in place, Overview shows the amber gate and the other five tabs are locked with the reason;
+ * still in place, Overview shows the amber gate and the other six tabs are locked with the reason;
  * once a real password is set, everything opens.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -27,7 +27,7 @@ function mockFetch(routes: Routes) {
   });
 }
 
-const TABS = ['Overview', 'Devices', 'Music', 'Groups', 'Sharing', 'System'];
+const TABS = ['Overview', 'Devices', 'Music', 'Search', 'Groups', 'Sharing', 'System'];
 const HUB = { hubId: '1', name: 'Test Hub', version: '0.1.0', contractsVersion: '1.0.0', protocolVersion: 1, minSupportedProtocolVersion: 1, publicKey: 'k', fingerprint: 'ABCD-EF01', bindMode: 'localhost', publicEndpoint: null, setupComplete: true, codeOnlyPairingAvailable: false };
 const OVERVIEW = {
   hub: HUB,
@@ -191,7 +191,7 @@ describe('setup gate', () => {
 });
 
 describe('signed in', () => {
-  it('renders the window with the six tabs, the status strip and Sign Out', async () => {
+  it('renders the window with the seven tabs, the status strip and Sign Out', async () => {
     vi.stubGlobal('fetch', mockFetch(SIGNED_IN));
     render(<App />);
     expect(await screen.findByRole('tablist', { name: 'Sections' })).toBeTruthy();

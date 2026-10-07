@@ -1,12 +1,12 @@
 /**
- * The six toolbar icons of the Airwave Hub window, as `design/frontends/origin/airwave-hub.html` draws them.
+ * The toolbar icons of the Airwave Hub window: the six `design/frontends/origin/airwave-hub.html` draws, and Search's.
  *
  * They live in their own module, as the companion's do, so the window (`App.tsx`) and the styleguide
- * (`packages/aqua-ui/styleguide/screens.tsx`) draw the same six pictures.
+ * (`packages/aqua-ui/styleguide/screens.tsx`) draw the same pictures.
  */
 import type { ReactNode } from 'react';
 
-export type TabIconId = 'overview' | 'devices' | 'music' | 'groups' | 'sharing' | 'system';
+export type TabIconId = 'overview' | 'devices' | 'music' | 'search' | 'groups' | 'sharing' | 'system';
 
 export const TAB_ICONS: Record<TabIconId, ReactNode> = {
   overview: (
@@ -28,6 +28,15 @@ export const TAB_ICONS: Record<TabIconId, ReactNode> = {
   music: (
     <svg viewBox="0 0 26 26" aria-hidden="true">
       <path d="M20 3.5 10 5.8a1 1 0 0 0-.8 1v10.3a3.2 3.2 0 1 0 1.7 2.8V10.2l7.7-1.8v6.1a3.2 3.2 0 1 0 1.7 2.8V4.4a.8.8 0 0 0-1-.9z" fill="#7d97b3" stroke="#4c637c" strokeWidth=".9" />
+    </svg>
+  ),
+  // Not in the design, which drew six tools: the Search tool (DEC-039) in the same two blues and
+  // stroke weights — a lens over a note.
+  search: (
+    <svg viewBox="0 0 26 26" aria-hidden="true">
+      <circle cx="11" cy="11" r="7.2" fill="#e9eef3" stroke="#4c637c" strokeWidth="1.6" />
+      <path d="M12.6 6.6v6.1a1.9 1.9 0 1 1-1-1.7V8.2l2.6-.6" fill="#7d97b3" stroke="#4c637c" strokeWidth=".8" strokeLinejoin="round" />
+      <path d="M16.3 16.3 22.5 22.5" stroke="#4c637c" strokeWidth="3" strokeLinecap="round" />
     </svg>
   ),
   groups: (

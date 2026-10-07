@@ -78,12 +78,13 @@ export function createHelperCatalog(options: HelperCatalogOptions): CatalogEngin
     fetch: options.fetch ?? guardedCatalogFetch(),
     userAgent: `AirwaveHelper/${options.version} ( https://github.com/jyoung2000/AudioWave2.0 )`,
     toolSearch: ({ args, signal }) => options.links.search(args, signal),
-    linkReader: async (url, { signal, match }) => {
+    linkReader: async (url, { signal, match, items }) => {
       void signal;
       const checked = checkFetchUrl(url, options.allowedHosts);
       if (!checked.ok || !checked.url) throw new LinkReadError(checked.reason ?? 'That address is not one this helper will read.', 'unavailable');
       try {
-        return helperToLinkRead(await options.links.resolve(checked.url, { match: match === true }));
+        // The whole list for the catalog (up to CATALOG_COLLECTION_CAP), or a page of positions in full.
+        return helperToLinkRead(await options.links.resolve(checked.url, { match: match === true, all: true, ...(items?.length ? { items } : {}) }));
       } catch (error) {
         if (error instanceof ResolveError) throw new LinkReadError(error.message, error.code === 'tool-missing' ? 'tool-missing' : error.code === 'busy' ? 'busy' : 'failed');
         throw error;

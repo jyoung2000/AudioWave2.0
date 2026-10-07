@@ -32,9 +32,9 @@ loopback page for the companion) or `x-helper-token`; never reachable from the L
 | Route | Query / body | Answer |
 | --- | --- | --- |
 | `GET catalog/search` | `q` and/or `track`,`artist`,`album`; `sections=tracks,artists,albums`; `providers=itunes,deezer,musicbrainz,youtube,soundcloud`; `offset` (≤1000), `limit` (1–50, default 25); `stream=0` | NDJSON of `CatalogSearchChunk` (`application/x-ndjson`), or one `CatalogSearchAggregate` with `stream=0` |
-| `GET catalog/album` | `id=platform:id` (`deezer:…`, `apple-music:…`), `offset`, `limit` (≤200) | `CatalogAlbumDetail` `{ album, page, collection }` |
+| `GET catalog/album` | `id=platform:id` (`deezer:…`, `apple-music:…`), `offset` (≤10,000), `limit` (≤200 a page) | `CatalogAlbumDetail` `{ album, page, collection }` |
 | `GET catalog/artist` | `id`, `albumsOffset`, `albumsLimit`, `topLimit` | `CatalogArtistDetail` `{ artist, topTracks, albums, albumsPage }` |
-| `GET catalog/resolve` | `url`, `offset`, `limit` (≤200) | `CatalogResolveResult` |
+| `GET catalog/resolve` | `url`, `offset` (≤10,000), `limit` (≤200 a page; page on for every song) | `CatalogResolveResult` |
 | `GET catalog/lyrics` | `title`, `artist`, `album?`, `durationSec?` | `CatalogLyrics` |
 | `GET catalog/enrich` | `isrc` or `title`+`artist` (+`durationSec`), `links=0/1` | `CatalogEnrichment` |
 | `POST catalog/download` (hub) | `{ track: CatalogTrack, authorization, target }` | 201 `{ job: DownloadJob, source, embedded }` |
@@ -108,9 +108,61 @@ An album/playlist comes as `collection: CatalogCollection`:
   entries have no artwork (SoundCloud sets) get their first four looked up eagerly by the server (two at a
   time); YouTube entries use the video's own thumbnail.
 - `page: { tracks, offset, limit, total, hasMore, capped }` — the whole ordered list is loadable page by page
-  (`offset`/`limit` ≤ 200, the cap `CATALOG_COLLECTION_CAP`); `capped` says the cap left songs out for good.
+  (`offset` ≤ 10,000, `limit` ≤ `CATALOG_PAGE_MAX` 200; see "Paging a list" above); `capped` only past 10,000.
   Open it in the music list the way an album opens.
 - A Spotify **artist** link answers `kind: 'artist'` with `artist` and a `collection` of their songs.
+
+### One song, one row — on every page (owner requirement, 2026-10-06)
+
+- **Merge identity** (`recordingKey`, `sameRecording` in `merge.ts`): ISRC when both rows have one;
+  otherwise the main artist and the title with the noise gone ("feat.", "(Official Music Video)",
+  "[Lyrics]", "HD", "Remastered", an uploader's "Artist - Title", "- Topic" and VEVO channels) **and the
+  same version** (`versionOf`: live, remix, acoustic, instrumental, demo, radio edit, extended, sped up,
+  slowed, karaoke, cover, reprise — each stays its own row), and durations within ±3 s. When one side has
+  no duration, names and version must match exactly and that side must be an **official upload**
+  (YouTube Music Topic, the artist's own or a VEVO channel, or a title saying "Official"); a stranger's
+  re-upload never joins on names. So iTunes + Deezer + a YouTube official video + a Topic upload +
+  SoundCloud is **one row with five badges**.
+- **No repeats across pages.** The server keeps each query's rows (same words and services, any
+  sections) for 15 minutes. On a later `offset`, a song that is the same recording as one an earlier page
+  sent comes back **with that earlier row's id** (an upsert: more badges on the row already shown), never
+  as a new row. Fold later pages by id and you never show a song twice. If the session lapsed (15 min,
+  a server restart), keep dropping rows by id and `sameRecording` client-side (`appendTracks` does).
+- **`done.linkedOnly`**: platforms on the rows that were not searched but only linked (Spotify, Tidal,
+  Qobuz, Amazon Music from MusicBrainz, Deezer's ISRC lookup or SongLink with a key). The status line
+  says which were searched (`status`) and which only contributed links (this).
+- **Bandcamp search is not workable keylessly**: its public search page answers a bot "Client
+  Challenge" that needs JavaScript (checked 2026-10-06), and yt-dlp has no Bandcamp search. Bandcamp
+  stays link-only (pasted album and track links resolve through yt-dlp). Spotify, Tidal, Qobuz and
+  Amazon stay link-only too, by decision: badges come from MusicBrainz, Deezer's ISRC lookup and the
+  optional SongLink key; no scraped tokens.
+
+### Paging a list: every song, no 200 cap (owner requirement, 2026-10-06, later the same day)
+
+The 200-song cap is gone. **`CATALOG_COLLECTION_CAP` is now 10,000** (the bound a runaway list stops at)
+and **`CATALOG_PAGE_MAX` is 200** (the most one page carries). If you used `CATALOG_COLLECTION_CAP` as a
+`limit`, use `CATALOG_PAGE_MAX` — a `limit` above 200 is now a 400.
+
+- `GET catalog/resolve?url=&offset=&limit=` (and `catalog/album?id=&offset=&limit=`) answers **any page**:
+  `offset` 0…10,000, `limit` 1…200. `page.total` is the platform's own count when it gives one (Deezer,
+  Spotify through spotDL, YouTube/SoundCloud through yt-dlp, Apple's playlist page); `page.hasMore` is
+  true until `offset + tracks.length` reaches the end. `capped` is true **only** when the list is longer
+  than 10,000 and the rest can never be opened — say so; nothing is cut silently.
+- **To load a whole list in order**, page until `hasMore` is false: `collectAllPages(page, { max, pageSize })`
+  in `@now-playing/domain/catalog` does exactly that over any `resolve`-shaped call (pass a function that
+  fetches `catalog/resolve` with `offset`/`limit`); it returns `{ first, tracks, total, capped }`. The
+  engine's own `resolveAll(url)` is the same over itself. Use `pageSize: CATALOG_PAGE_MAX`.
+- The server reads a tool-read list (Spotify via `spotdl save`, YouTube/YouTube Music playlists and
+  Bandcamp albums via yt-dlp's flat listing, SoundCloud sets) **once**, whole, up to the bound, and serves
+  pages from that read for 10 minutes; the first page of a long playlist can take a minute or more.
+- Per platform: Deezer albums and playlists page with Deezer's own `index`/`limit` (100 a call); Apple
+  Music albums come whole from iTunes lookup; **Apple Music playlists** are read from their public page
+  (`music.apple.com`, the songs it embeds — no token). When that page carries fewer songs than the
+  playlist holds, `total` is the real count, `hasMore` ends at what was read, and `reason` says so in
+  words ("…lists its first 100 of 340 songs…"); a page whose shape changed answers `unavailable` with a
+  plain reason. **SoundCloud sets** list most songs as bare ids: each page you ask for is described in
+  one run of yt-dlp (`--playlist-items`), so its rows have titles, artists and artwork.
+- The mosaic's `covers` are the first four songs' artwork, as before.
 
 ### Details
 
@@ -145,7 +197,7 @@ album's cover stands in).
 ## Not done here (for later)
 
 - UI in the three apps; persisting `SavedCollection` (player store, hub sync, companion).
-- Apple Music playlists (no public API). Tidal/Qobuz/Amazon links without a SongLink key.
+- Apple Music playlists past what their public page embeds (reported in `reason`). Tidal/Qobuz/Amazon links without a SongLink key.
 - MP3 lyrics land where FFmpeg puts the generic `lyrics` key (a TXXX frame rather than USLT); FLAC/Opus
   get LYRICS, M4A ©lyr. Not checked against a real FFmpeg here.
 - The engine runs in a page, but a browser can only reach a service that sends CORS headers for it;

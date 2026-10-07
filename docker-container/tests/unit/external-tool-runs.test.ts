@@ -180,7 +180,8 @@ writeFileSync(args[args.indexOf('--save-file') + 1], readFileSync(${JSON.stringi
     const result = await instance.resolve('https://open.spotify.com/track/4PTG3Z6ehGkBFwjybzWkR8');
     expect(result).toMatchObject({ kind: 'track', title: 'Never Gonna Give You Up', artistName: 'Rick Astley', albumName: 'Whenever You Need Somebody', year: 1987 });
     const seen = spotdl.seen();
-    expect(seen.args.slice(-3)).toEqual(['save', '--', 'https://open.spotify.com/track/4PTG3Z6ehGkBFwjybzWkR8']);
+    expect(seen.args.slice(0, 2)).toEqual(['save', 'https://open.spotify.com/track/4PTG3Z6ehGkBFwjybzWkR8']);
+    expect(seen.args).not.toContain('--');
     expect(seen.args[seen.args.indexOf('--ffmpeg') + 1]).toBe('/opt/ffmpeg');
     expect(seen.homeExisted).toBe(true);
     expect(seen.userprofile).toBe(seen.home);

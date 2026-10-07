@@ -7,7 +7,8 @@
  * servers: `--ignore-config` first, the search behind `--`, and the words cleaned of control
  * characters and capped, so nothing typed into a search box can become a flag.
  */
-import type { CatalogQuery, CatalogSection, CatalogTrack } from '@now-playing/contracts';
+import type { CatalogQuery, CatalogSection, CatalogSource, CatalogTrack } from '@now-playing/contracts';
+import { OFFICIAL_SOURCES, matchArtist } from '../merge.js';
 import { cleanVideoTitle } from '../../titles.js';
 import { arr, isObject, num, str, webUrl, type Json } from '../http.js';
 import { emptyResult, type CatalogProvider, type ProviderResult, type ProviderSearchOptions } from '../provider.js';
@@ -83,6 +84,11 @@ export function toolSearchTrack(platform: ToolSearchPlatform, row: Json): Catalo
     const cleaned = cleanVideoTitle({ title: rawTitle, channel });
     const artist = cleaned.artist ?? channelArtist(channel);
     if (!artist) return null;
+    const source: CatalogSource = { platform: cleaned.fromTopicChannel ? 'youtube-music' : 'youtube', id, url: cleaned.fromTopicChannel ? `https://music.youtube.com/watch?v=${encodeURIComponent(id)}` : `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`, previewUrl: null, matchedBy: 'search' };
+    // An official upload: YouTube Music's Topic recording, a VEVO channel, the artist's own channel, or a
+    // title that says "Official". Only these join a store's row when yt-dlp gave no duration.
+    const own = channelArtist(channel);
+    if (cleaned.fromTopicChannel || /vevo$/i.test(channel ?? '') || (own && matchArtist(own) === matchArtist(artist)) || /\bofficial\b/i.test(rawTitle)) OFFICIAL_SOURCES.add(source);
     return {
       id: `youtube:${id}`,
       title: cleaned.title,
@@ -101,7 +107,7 @@ export function toolSearchTrack(platform: ToolSearchPlatform, row: Json): Catalo
       explicit: null,
       genre: null,
       label: null,
-      sources: [{ platform: cleaned.fromTopicChannel ? 'youtube-music' : 'youtube', id, url: cleaned.fromTopicChannel ? `https://music.youtube.com/watch?v=${encodeURIComponent(id)}` : `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`, previewUrl: null, matchedBy: 'search' }],
+      sources: [source],
       rank: 0,
     };
   }

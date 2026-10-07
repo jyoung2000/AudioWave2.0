@@ -13,11 +13,11 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
-/** The six tabs. Each stacks the sections the source list once listed (Profiles under Devices;
+/** The seven tabs. Each stacks the sections the source list once listed (Profiles under Devices;
  * Library, Providers, Downloads and Recommendations under Music; Shared links and Discord under
  * Sharing; Network, Backup and Diagnostics under System), so a pass over the tabs is a pass over
  * every section. */
-const TABS = ['Overview', 'Devices', 'Music', 'Groups', 'Sharing', 'System'] as const;
+const TABS = ['Overview', 'Devices', 'Music', 'Search', 'Groups', 'Sharing', 'System'] as const;
 
 /** axe needs a page from a real context, which is why the signed-out test builds one rather than
  * calling `browser.newPage()`. */
@@ -52,7 +52,10 @@ test.describe('signed in', () => {
 
     await page.keyboard.press('ArrowRight');
     const focused = await page.evaluate(() => document.activeElement?.textContent ?? '');
-    expect(focused, 'arrow-right should move focus to the next tab').toContain('Groups');
+    expect(focused, 'arrow-right should move focus to the next tab').toContain('Search');
+    await expect(page.getByRole('tab', { name: 'Search' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('searchbox', { name: 'Search for music' })).toBeVisible();
+    await page.keyboard.press('ArrowRight');
     await expect(page.getByRole('tab', { name: 'Groups' })).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByLabel('New group’s name')).toBeVisible();
 

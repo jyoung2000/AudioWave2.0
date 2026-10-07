@@ -3,8 +3,12 @@
  *
  * Two rows are the same recording when they share an ISRC, or — when either lacks one — when the
  * main artist and the title agree once the noise is gone ("feat. …", "Remastered 2011", "(Official
- * Video)") and the durations are within three seconds. A row with no duration is never merged on
- * names alone: "Intro" by the same artist is not one song.
+ * Video)", "[Lyrics]", "HD", an uploader's "Artist - Title", a "- Topic" or VEVO channel), their
+ * versions agree (`versionOf`: live, remix, acoustic, instrumental, demo, radio edit, extended,
+ * sped up, slowed, karaoke, cover and reprise each stay their own row), and the durations are within
+ * three seconds. When one side has no duration, the names and version must agree exactly and that
+ * side must be an official upload (a YouTube Music "Topic" recording, or the artist's own or VEVO
+ * channel — `OFFICIAL_SOURCES`): "Intro" re-uploaded by anyone is not one song.
  *
  * The merged row keeps every source and takes each field from the best service that has it: the
  * stores (Deezer, Apple Music, Spotify) write titles and credits the way a library wants them;
@@ -52,11 +56,75 @@ export function matchArtist(artist: string): string {
   return normalizeText(first.replace(/\s*-\s*topic$/i, '').replace(/vevo$/i, '')).replace(/^the /, '');
 }
 
-export function sameRecording(a: Pick<CatalogTrack, 'isrc' | 'title' | 'artist' | 'durationMs'>, b: Pick<CatalogTrack, 'isrc' | 'title' | 'artist' | 'durationMs'>): boolean {
+/**
+ * What makes a recording a different version of a song: each stays its own row, never merged into
+ * the studio recording (or into another version). Read from the title, words only.
+ */
+const VERSIONS: ReadonlyArray<readonly [string, RegExp]> = [
+  ['live', /\blive\b/],
+  ['remix', /\bremix(?:ed)?\b|\brmx\b|\brework\b|\bbootleg\b/],
+  ['acoustic', /\bacoustic\b|\bunplugged\b/],
+  ['instrumental', /\binstrumental\b/],
+  ['demo', /\bdemo\b/],
+  ['radio-edit', /\bradio (?:edit|version|mix)\b/],
+  ['extended', /\bextended\b/],
+  ['sped-up', /\bsped up\b|\bspeed up\b|\bnightcore\b/],
+  ['slowed', /\bslowed\b/],
+  ['karaoke', /\bkaraoke\b/],
+  ['cover', /\bcover\b/],
+  ['reprise', /\breprise\b/],
+];
+
+/** The version a title names ("live", "remix", "acoustic+live"…), or "" for the recording itself. */
+export function versionOf(title: string): string {
+  const text = normalizeText(title.replace(/[-–—_]+/g, ' '));
+  return VERSIONS.filter(([, re]) => re.test(text))
+    .map(([name]) => name)
+    .join('+');
+}
+
+const VERSION_WORDS = /\b(?:live|remix(?:ed)?|rmx|rework|bootleg|acoustic|unplugged|instrumental|demo|radio (?:edit|version|mix)|extended|sped[\s-]?up|speed up|nightcore|slowed|karaoke|cover|reprise)\b/i;
+
+/** The title without its version's parenthesis or dash part, so "Song (Live)" and "Song - Live" read alike. */
+function baseTitle(title: string): string {
+  return title
+    .replace(/\s*[[(][^\])]*[\])]/g, (part) => (VERSION_WORDS.test(part) ? ' ' : part))
+    .replace(/\s+[-–—]\s+([^-–—]+)$/, (part, tail: string) => (VERSION_WORDS.test(tail) ? ' ' : part));
+}
+
+/** "Artist - Title" as an uploader writes it, when the part before the dash is the artist. */
+function withoutArtistPrefix(title: string, artist: string): string {
+  const at = title.search(/\s+[-–—]\s+/);
+  if (at <= 0) return title;
+  const prefix = title.slice(0, at);
+  return matchArtist(prefix) && matchArtist(prefix) === matchArtist(artist) ? title.slice(at).replace(/^\s+[-–—]\s+/, '') : title;
+}
+
+/** One recording's identity for merging: the main artist, the bare title and its version. */
+export function recordingKey(track: Pick<CatalogTrack, 'title' | 'artist'>): { artist: string; title: string; version: string } {
+  const title = withoutArtistPrefix(track.title, track.artist);
+  return { artist: matchArtist(track.artist), title: matchTitle(baseTitle(title)), version: versionOf(title) };
+}
+
+/**
+ * Sources from an official upload: a YouTube Music "Topic" recording, or the artist's own or VEVO
+ * channel. Marked by the provider that read them (yt-dlp search), kept by reference through merging,
+ * never sent anywhere: it is what lets a row with no duration join the store's row.
+ */
+export const OFFICIAL_SOURCES = new WeakSet<CatalogSource>();
+
+function official(track: { sources?: readonly CatalogSource[] }): boolean {
+  return (track.sources ?? []).some((s) => s.platform === 'youtube-music' || OFFICIAL_SOURCES.has(s));
+}
+
+export function sameRecording(a: Pick<CatalogTrack, 'isrc' | 'title' | 'artist' | 'durationMs'> & { sources?: readonly CatalogSource[] }, b: Pick<CatalogTrack, 'isrc' | 'title' | 'artist' | 'durationMs'> & { sources?: readonly CatalogSource[] }): boolean {
   if (a.isrc && b.isrc) return a.isrc === b.isrc;
-  if (a.durationMs === null || b.durationMs === null) return false;
-  if (Math.abs(a.durationMs - b.durationMs) > DURATION_TOLERANCE_MS) return false;
-  return matchArtist(a.artist) === matchArtist(b.artist) && matchTitle(a.title) === matchTitle(b.title);
+  const ka = recordingKey(a);
+  const kb = recordingKey(b);
+  if (!ka.artist || !ka.title || ka.artist !== kb.artist || ka.title !== kb.title || ka.version !== kb.version) return false;
+  if (a.durationMs !== null && b.durationMs !== null) return Math.abs(a.durationMs - b.durationMs) <= DURATION_TOLERANCE_MS;
+  // One side has no duration: only an official upload joins on names alone.
+  return (a.durationMs === null && official(a)) || (b.durationMs === null && official(b));
 }
 
 function quality(sources: readonly CatalogSource[]): number {

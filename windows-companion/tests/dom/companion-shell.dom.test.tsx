@@ -2,7 +2,7 @@
  * The companion's window, rendered.
  *
  * What is asserted here is what no unit test can see: that the window is the design's — one title,
- * four tools, the folders in their wells, a status line — on this PC's data rather than a sample's;
+ * five tools (the design's four and Search), the folders in their wells, a status line — on this PC's data rather than a sample's;
  * that every command reaches the main process through the bridge and nothing else; that removing
  * and forgetting ask first; and the two sentences that matter most at the moment they matter:
  * what pairing shares, and why a downloader is not ready.
@@ -61,6 +61,8 @@ function fresh(): Record<string, Responder> {
     // No helper, so nothing is setting the downloaders up: they are found or they are missing.
     'helper:status': () => ({ running: false, port: null, origin: null, reason: 'Port 17342 is already in use on this PC. Choose another in Settings ▸ Network.', tools: TOOLS_MISSING, checkedAt: null }),
     'tv:links': () => ({ m3u: [], epg: [] }),
+    'catalog:saved': () => ({ items: [] }),
+    'catalog:filter': () => ({ sections: ['tracks', 'artists', 'albums'], providers: ['itunes', 'deezer', 'musicbrainz', 'youtube', 'soundcloud'] }),
     'awsp:status': () => awsp(),
     'transfers:list': () => ({ items: [] }),
     'backup:settings:get': () => ({ dir: null, include: { music: true, tv: false, movies: false, playlists: true, presets: true, settings: true }, schedule: 'manual', keep: 5, lastRunAt: null, lastRunError: null }),
@@ -121,17 +123,17 @@ describe('outside the app', () => {
 });
 
 describe('the window is the design’s', () => {
-  it('has one title, four tools and nothing else in its chrome', async () => {
+  it('has one title, five tools and nothing else in its chrome', async () => {
     installBridge(fresh());
     openApp();
     const tabs = await screen.findByRole('tablist', { name: 'Sections' });
-    expect(within(tabs).getAllByRole('tab').map((t) => t.textContent?.replace(/[\d,].*$/, ''))).toEqual(['Library', 'Live TV', 'Remote', 'Settings']);
+    expect(within(tabs).getAllByRole('tab').map((t) => t.textContent?.replace(/[\d,].*$/, ''))).toEqual(['Library', 'Search', 'Live TV', 'Remote', 'Settings']);
     // The name is drawn once: by the page, in the strip Windows' own buttons sit over.
     expect(screen.getAllByText('Airwave Companion')).toHaveLength(1);
     expect(screen.getByRole('heading', { level: 1, name: 'Airwave Companion' })).toBeTruthy();
     expect(document.body.textContent).not.toMatch(/Now Playing/);
     // Scan and Sync are commands of the Library and of the hub connection, not of the toolbar.
-    expect(within(tabs).getAllByRole('tab')).toHaveLength(4);
+    expect(within(tabs).getAllByRole('tab')).toHaveLength(5);
     expect(screen.queryByRole('button', { name: 'Scan' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Sync' })).toBeNull();
   });
@@ -164,7 +166,7 @@ describe('the window is the design’s', () => {
     openApp();
     const library = await tool('Library');
     library.focus();
-    await userEvent.keyboard('{ArrowRight}');
+    await userEvent.keyboard('{ArrowRight}{ArrowRight}');
     const liveTv = screen.getByRole('tab', { name: 'Live TV' });
     expect(liveTv.getAttribute('aria-selected')).toBe('true');
     expect(document.activeElement).toBe(liveTv);
@@ -185,7 +187,7 @@ describe('the window is the design’s', () => {
     installBridge(fresh());
     openApp();
     await tool('Library');
-    for (const [name, ids] of [['Library', ['folders', 'library']], ['Live TV', ['live-tv']], ['Remote', ['streaming', 'hub', 'transfers']], ['Settings', ['settings', 'backup', 'about']]] as const) {
+    for (const [name, ids] of [['Library', ['folders', 'library']], ['Search', ['search']], ['Live TV', ['live-tv']], ['Remote', ['streaming', 'hub', 'transfers']], ['Settings', ['settings', 'backup', 'about']]] as const) {
       await userEvent.click(screen.getByRole('tab', { name: new RegExp(`^${name}`) }));
       for (const id of ids) expect(document.getElementById(id), `section #${id}`).not.toBeNull();
     }

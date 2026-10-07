@@ -27,6 +27,21 @@ built. The UI phase on the player, hub and companion must meet every item here.
 - Clicking the playlist opens it in the music list the way an album opens: the list header names
   it, and its songs are the rows.
 
+## Pagination and whole playlists (added 2026-10-06)
+- Search lists paginate (page controls with a count, Page Up/Down); "see all" keeps infinite
+  scroll. Later pages are fetched from the engine, not sliced from the first answer.
+- Opening a playlist or album loads every song, from any platform (Spotify, YouTube/YouTube Music,
+  SoundCloud, Bandcamp, Deezer, Apple Music albums and playlists): no 200 cap; pages are fetched
+  until `hasMore` is false, with progress shown and an upper bound that is reported, never silent.
+
+## One row per unique track, every platform (added 2026-10-06)
+- The music tab's search covers every platform reachable keylessly (hub/companion: iTunes, Deezer,
+  MusicBrainz, YouTube/YouTube Music, SoundCloud, Bandcamp if workable; browser-only: iTunes,
+  Deezer via JSONP, MusicBrainz). Spotify, Tidal, Qobuz and Amazon appear as badges via ISRC links.
+- The same song on different platforms is one row with every platform's badge; versions (live,
+  remix, acoustic, instrumental, edits, sped up, covers) stay separate rows; no song repeats across
+  pages.
+
 ## The music list's silver search/filter bar
 - When the list shows an album or a playlist (from search, a pasted link or the library), the bar
   offers a star to save that album or playlist to the user's music library (and un-star it). Saved

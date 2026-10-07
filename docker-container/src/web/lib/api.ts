@@ -65,9 +65,27 @@ function buildUrl(name: RouteName, options: RequestOptions): string {
 
 /** Call a contract route by name. The response type comes from the contract, not from a cast here. */
 export async function api<N extends RouteName>(name: N, options: RequestOptions = {}): Promise<ReturnType<Routes[N]['response']['parse']>> {
+  const response = await send(name, options, 'application/json');
+  if (response.status === 204) return undefined as never;
+  const contentType = response.headers.get('content-type') ?? '';
+  if (!contentType.includes('application/json')) return (await response.text()) as never;
+  return (await response.json()) as never;
+}
+
+/**
+ * A route that answers as a stream (the catalog's NDJSON search): the body as it arrives, for
+ * `readCatalogStream`. Errors are the same `ApiError`s `api` throws; aborting `signal` ends it.
+ */
+export async function apiStream<N extends RouteName>(name: N, options: RequestOptions = {}): Promise<ReadableStream<Uint8Array>> {
+  const response = await send(name, options, 'application/x-ndjson, application/json');
+  if (!response.body) throw new ApiError(0, 'The hub sent nothing back.', null, response.headers.get('x-correlation-id'), null, null);
+  return response.body;
+}
+
+async function send<N extends RouteName>(name: N, options: RequestOptions, accept: string): Promise<Response> {
   const route = routes[name];
   const method = route.method;
-  const headers: Record<string, string> = { accept: 'application/json' };
+  const headers: Record<string, string> = { accept };
   const init: RequestInit = { method, headers, credentials: 'same-origin' };
   if (options.signal) init.signal = options.signal;
 
@@ -96,11 +114,7 @@ export async function api<N extends RouteName>(name: N, options: RequestOptions 
     }
     throw new ApiError(response.status, message, code, correlationId, details, retryAfterSeconds);
   }
-
-  if (response.status === 204) return undefined as never;
-  const contentType = response.headers.get('content-type') ?? '';
-  if (!contentType.includes('application/json')) return (await response.text()) as never;
-  return (await response.json()) as never;
+  return response;
 }
 
 /** Absolute URL for a route, for links and media the browser fetches itself. */
