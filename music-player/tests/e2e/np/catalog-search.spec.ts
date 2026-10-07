@@ -188,6 +188,52 @@ test('a search streams songs, artists and albums in sections; rows upsert by id 
   expect(asked[0]).toContain('sections=tracks%2Cartists%2Calbums');
 });
 
+test('a song on five platforms keeps its whole title: three badges on the row, the rest counted', async ({
+  page,
+}) => {
+  // Seen on the live player: "Billie Jean" on Deezer, Apple Music, MusicBrainz, Spotify and YouTube drew as "B…".
+  await companion(page, (path, route) => {
+    if (path !== 'search') return route.fulfill(json({ error: 'not_found', message: 'no' }, 404));
+    return fulfillStream(route, [
+      results(0, null, 'billie jean', {}, PENDING),
+      results(
+        1,
+        'deezer',
+        'billie jean',
+        {
+          tracks: [
+            track('deezer:4001', 'Billie Jean', {
+              sources: [
+                src('deezer', '4001'),
+                src('apple-music', '4002'),
+                src('musicbrainz', '4003', { matchedBy: 'isrc' }),
+                src('spotify', '4004', { matchedBy: 'musicbrainz' }),
+                src('youtube', '4005'),
+              ],
+            }),
+          ],
+        },
+        PENDING,
+      ),
+      done(2, 'billie jean', FINAL, { tracks: false, artists: false, albums: false }),
+    ]);
+  });
+  await searchFor(page, 'billie jean');
+  const row = page.locator('#srchList .srch__sec[aria-label="Songs"] .srch__row').first();
+  await expect(row.locator('.srch__title')).toHaveText('Billie Jean');
+  await expect(row.locator('.srch__badge')).toHaveCount(4);
+  await expect(row.locator('.srch__badge--more')).toHaveText('+2');
+  const clipped = await row
+    .locator('.srch__title')
+    .evaluate((el) => el.scrollWidth > el.clientWidth);
+  expect(clipped, 'the title is drawn whole, not cut short by its badges').toBe(false);
+  // Every platform is still named: in the tooltip on the row.
+  await expect(row.locator('.srch__pfs')).toHaveAttribute(
+    'title',
+    /Deezer.*Apple Music.*Spotify.*YouTube/,
+  );
+});
+
 test('one song from three sources in separate chunks is one row with three badges; a live version stays its own row', async ({
   page,
 }) => {

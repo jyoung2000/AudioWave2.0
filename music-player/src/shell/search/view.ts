@@ -94,6 +94,8 @@ export function platformsOf(sources: readonly CatalogSource[]): CatalogPlatform[
   return out;
 }
 
+const BADGES_ON_ROW = 3;
+
 export function badgesHTML(sources: readonly CatalogSource[]): string {
   const list = platformsOf(sources);
   if (!list.length) return '';
@@ -102,11 +104,17 @@ export function badgesHTML(sources: readonly CatalogSource[]): string {
   const said = `On ${words.join(', ')}${via ? '; Spotify plays from YouTube Music through spotDL' : ''}`;
   return (
     `<span class="srch__pfs" title="${esc(said)}">` +
+    // Three at most on the row, so the title keeps its room; the rest are counted, and every one is
+    // named in the tooltip and on the song's page.
     list
+      .slice(0, BADGES_ON_ROW)
       .map(
         (p) => `<span class="srch__badge" data-pf="${p}">${esc(CATALOG_PLATFORM_LABELS[p])}</span>`,
       )
       .join('') +
+    (list.length > BADGES_ON_ROW
+      ? `<span class="srch__badge srch__badge--more">+${list.length - BADGES_ON_ROW}</span>`
+      : '') +
     (via ? '<span class="srch__via">plays from YouTube Music</span>' : '') +
     '</span>'
   );

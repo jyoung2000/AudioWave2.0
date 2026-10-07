@@ -2164,8 +2164,10 @@ replace('''  .srch__pf {
 
   /* title, then the platforms it is on (UX-CAT-003) */
   .srch__line { display: flex; align-items: center; gap: 5px; min-width: 0; }
-  .srch__line .srch__title { flex: 0 1 auto; min-width: 0; }
-  .srch__pfs { flex: none; display: inline-flex; align-items: center; gap: 3px; }
+  /* the title keeps at least half the line; badges give way first (clipped, never the title) */
+  .srch__line .srch__title { flex: 0 1 auto; min-width: min(50%, max-content); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .srch__pfs { flex: 0 1 auto; min-width: 0; overflow: hidden; display: inline-flex; align-items: center; gap: 3px; }
+  .srch__badge--more { background: transparent; color: var(--srch-soft); padding: 0 2px; }
   .srch__badge {
     padding: 0 4px;
     border-radius: 3px;

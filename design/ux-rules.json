@@ -2721,7 +2721,7 @@
       "id": "UX-CAT-003",
       "group": "catalog",
       "title": "Search finds music, never a “search on YouTube” offer, and every result says where it is",
-      "contract": "The catalog answers with songs, artists and albums only. It never returns an entry whose only purpose is to send the person to search another site; YouTube and SoundCloud are searched by the server (yt-dlp) and their results are songs like any other. Every track, artist and album carries at least one source naming its platform, and a song from Spotify that plays from YouTube Music carries both, the second marked as spotDL’s match. A pasted link is not searched: the search says to resolve it, and resolve says what it is or, for a link it cannot read (a private or Spotify-made playlist, a Tidal link without a SongLink key), why — in words.",
+      "contract": "The catalog answers with songs, artists and albums only. It never returns an entry whose only purpose is to send the person to search another site; YouTube and SoundCloud are searched by the server (yt-dlp) and their results are songs like any other. Every track, artist and album carries at least one source naming its platform, and a song from Spotify that plays from YouTube Music carries both, the second marked as spotDL’s match. A pasted link is not searched: the search says to resolve it, and resolve says what it is or, for a link it cannot read (a private or Spotify-made playlist, a Tidal link without a SongLink key), why — in words. A row shows at most three platform badges and counts the rest (+N), so the title is never cut short by them; every platform is named in the row's tooltip and on the song's page.",
       "example": "{\"sources\":[{\"platform\":\"spotify\",\"matchedBy\":\"link\"},{\"platform\":\"youtube-music\",\"matchedBy\":\"spotdl\"}]} — shown as “Spotify · plays from YouTube Music”.",
       "authority": "adopted",
       "owners": [
@@ -2765,6 +2765,11 @@
           "type": "test",
           "path": "docker-container/tests/integration/catalog.test.ts",
           "name": "a Spotify song through spotDL, with its YouTube Music match"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
+          "name": "a song on five platforms keeps its whole title: three badges on the row, the rest counted"
         }
       ]
     },

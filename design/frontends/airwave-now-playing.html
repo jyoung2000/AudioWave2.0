@@ -54,7 +54,7 @@ Airwave — the living mockup.
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="mockup-of" content="player">
-<meta name="mockup-inputs" content="a0e34c0d080c059a">
+<meta name="mockup-inputs" content="50ef6b6a0e1cf01e">
 <title>Airwave — mockup</title>
 <style data-mock-source="music-player/index.html">
   :root {
@@ -749,8 +749,10 @@ Airwave — the living mockup.
 
   /* title, then the platforms it is on (UX-CAT-003) */
   .srch__line { display: flex; align-items: center; gap: 5px; min-width: 0; }
-  .srch__line .srch__title { flex: 0 1 auto; min-width: 0; }
-  .srch__pfs { flex: none; display: inline-flex; align-items: center; gap: 3px; }
+  /* the title keeps at least half the line; badges give way first (clipped, never the title) */
+  .srch__line .srch__title { flex: 0 1 auto; min-width: min(50%, max-content); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .srch__pfs { flex: 0 1 auto; min-width: 0; overflow: hidden; display: inline-flex; align-items: center; gap: 3px; }
+  .srch__badge--more { background: transparent; color: var(--srch-soft); padding: 0 2px; }
   .srch__badge {
     padding: 0 4px;
     border-radius: 3px;
@@ -23281,8 +23283,8 @@ button.seg:active .ico{transform:translateY(1px)}
                         <span class="srch__badge" data-pf="youtube-music">
                           YouTube Music
                         </span>
-                        <span class="srch__badge" data-pf="spotify">
-                          Spotify
+                        <span class="srch__badge srch__badge--more">
+                          +1
                         </span>
                       </span>
                     </span>
@@ -25886,8 +25888,8 @@ button.seg:active .ico{transform:translateY(1px)}
                       <span class="srch__badge" data-pf="youtube-music">
                         YouTube Music
                       </span>
-                      <span class="srch__badge" data-pf="spotify">
-                        Spotify
+                      <span class="srch__badge srch__badge--more">
+                        +1
                       </span>
                     </span>
                   </span>
@@ -32381,8 +32383,8 @@ button.seg:active .ico{transform:translateY(1px)}
                     <span class="srch__badge" data-pf="youtube-music">
                       YouTube Music
                     </span>
-                    <span class="srch__badge" data-pf="spotify">
-                      Spotify
+                    <span class="srch__badge srch__badge--more">
+                      +1
                     </span>
                   </span>
                 </p>
