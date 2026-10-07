@@ -16,7 +16,12 @@
       "creation_date": "2025-12-03 09:13:36",
       "md5_image": "ca698c69567ce9f8d4fc19dab12867d3",
       "picture_type": "playlist",
-      "user": { "id": 1, "name": "Playlist Editor", "tracklist": "https://api.deezer.com/user/1/flow", "type": "user" },
+      "user": {
+        "id": 1,
+        "name": "Playlist Editor",
+        "tracklist": "https://api.deezer.com/user/1/flow",
+        "type": "user"
+      },
       "type": "playlist"
     },
     {
@@ -32,7 +37,12 @@
       "creation_date": "2019-06-02 10:11:12",
       "md5_image": "fe9f2f1290275e57df54a32e18d31471",
       "picture_type": "cover",
-      "user": { "id": 2, "name": "Deezer Listener", "tracklist": "https://api.deezer.com/user/2/flow", "type": "user" },
+      "user": {
+        "id": 2,
+        "name": "Deezer Listener",
+        "tracklist": "https://api.deezer.com/user/2/flow",
+        "type": "user"
+      },
       "type": "playlist"
     },
     {
@@ -47,7 +57,12 @@
       "creation_date": "2025-09-14 21:08:51",
       "md5_image": "ad07a51e2ed70c0dac2934f7fe1c42b3-8f054d55fc294a6caeec7a15bc80c533-b6dcbe673c094aef93f834cfd1fa0665-ce32014b0939cd0747206b47aa9aa5cc",
       "picture_type": "cover",
-      "user": { "id": 3, "name": "anonymous", "tracklist": "https://api.deezer.com/user/3/flow", "type": "user" },
+      "user": {
+        "id": 3,
+        "name": "anonymous",
+        "tracklist": "https://api.deezer.com/user/3/flow",
+        "type": "user"
+      },
       "type": "playlist"
     }
   ],

@@ -686,7 +686,7 @@ export function installSearch(): SearchApi {
     typeQ.setAttribute('aria-label', `Search ${V.SECTION_LABEL[s].toLowerCase()}`);
     typeQ.placeholder = `Search ${V.SECTION_LABEL[s].toLowerCase()}`;
     if (document.activeElement !== typeQ) typeQ.value = v.label;
-    count.innerHTML = `<b>${V.SECTION_LABEL[s]}:</b> ${V.count(bag.size, s)}${r.more[s] ? '+' : ''} for “${V.esc(v.label)}”`;
+    count.innerHTML = `<b>${V.SECTION_LABEL[s]}:</b> ${bag.size}${r.more[s] ? '+' : ''} ${V.SECTION_NOUN[s][bag.size === 1 && !r.more[s] ? 0 : 1]} for “${V.esc(v.label)}”`;
     const groups: Array<{ label: string | null; opts: Opt[] }> = [];
     if (s === 'playlists') {
       const mine = savedOf('playlist');

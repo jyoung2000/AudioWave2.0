@@ -21,6 +21,7 @@
       "tracks": [],
       "artists": [],
       "albums": [],
+      "playlists": [],
       "status": [
         {
           "provider": "itunes",
@@ -211,6 +212,7 @@
           "rank": 100
         }
       ],
+      "playlists": [],
       "status": [
         {
           "provider": "itunes",
@@ -491,6 +493,7 @@
           "rank": 130
         }
       ],
+      "playlists": [],
       "status": [
         {
           "provider": "itunes",
@@ -724,6 +727,7 @@
       ],
       "artists": [],
       "albums": [],
+      "playlists": [],
       "status": [
         {
           "provider": "itunes",
@@ -820,6 +824,7 @@
       ],
       "artists": [],
       "albums": [],
+      "playlists": [],
       "status": [
         {
           "provider": "itunes",
@@ -923,6 +928,7 @@
       ],
       "artists": [],
       "albums": [],
+      "playlists": [],
       "status": [
         {
           "provider": "itunes",
@@ -1023,9 +1029,10 @@
       "page": {
         "tracks": { "offset": 0, "limit": 25, "hasMore": true },
         "artists": { "offset": 0, "limit": 25, "hasMore": false },
-        "albums": { "offset": 0, "limit": 25, "hasMore": false }
+        "albums": { "offset": 0, "limit": 25, "hasMore": false },
+        "playlists": null
       },
-      "totals": { "tracks": 9, "artists": 3, "albums": 2 },
+      "totals": { "tracks": 9, "artists": 3, "albums": 2, "playlists": 0 },
       "resolve": null,
       "linkedOnly": ["spotify"]
     }
@@ -1047,6 +1054,7 @@
       "tracks": [],
       "artists": [],
       "albums": [],
+      "playlists": [],
       "status": [
         {
           "provider": "itunes",
@@ -1165,6 +1173,7 @@
       ],
       "artists": [],
       "albums": [],
+      "playlists": [],
       "status": [
         {
           "provider": "itunes",
@@ -1254,6 +1263,7 @@
       ],
       "artists": [],
       "albums": [],
+      "playlists": [],
       "status": [
         {
           "provider": "itunes",
@@ -1354,9 +1364,10 @@
       "page": {
         "tracks": { "offset": 25, "limit": 25, "hasMore": false },
         "artists": null,
-        "albums": null
+        "albums": null,
+        "playlists": null
       },
-      "totals": { "tracks": 3, "artists": 0, "albums": 0 },
+      "totals": { "tracks": 3, "artists": 0, "albums": 0, "playlists": 0 },
       "resolve": null,
       "linkedOnly": []
     }
@@ -1375,8 +1386,8 @@
         "url": "https://open.spotify.com/playlist/0MockHarbourMix0000001"
       },
       "status": [],
-      "page": { "tracks": null, "artists": null, "albums": null },
-      "totals": { "tracks": 0, "artists": 0, "albums": 0 },
+      "page": { "tracks": null, "artists": null, "albums": null, "playlists": null },
+      "totals": { "tracks": 0, "artists": 0, "albums": 0, "playlists": 0 },
       "resolve": "https://open.spotify.com/playlist/0MockHarbourMix0000001",
       "linkedOnly": []
     }

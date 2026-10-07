@@ -2817,7 +2817,14 @@ replace('''      sortKey = 'title'; sortDir = 1;
 ''')
 
 # Focus lands on the first command that can be run: a disabled first command cannot take it, and then
-# the keys would stay in the field under the menu.
+# the keys would stay in the field under the menu. The submenu flips by where the menu was put, not
+# where it was measured before being put (a search row's "…" sits near the right edge).
+replace('''      Array.prototype.forEach.call(ctx.querySelectorAll('.ctx__sub'), function (sub) {
+        sub.classList.toggle('is-flip', r.right + 210 > innerWidth);
+      });''', '''      var placed = ctx.getBoundingClientRect();
+      Array.prototype.forEach.call(ctx.querySelectorAll('.ctx__sub'), function (sub) {
+        sub.classList.toggle('is-flip', placed.right + 210 > innerWidth);
+      });''')
 replace('''      var first = ctx.querySelector('.ctx__item');
       if (first) first.focus({ preventScroll: true });
       menuOpenedAt = Date.now();''', '''      var first = ctx.querySelector('.ctx__item:not([disabled])') || ctx.querySelector('.ctx__item');

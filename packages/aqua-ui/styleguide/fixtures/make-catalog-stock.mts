@@ -470,8 +470,13 @@ const page2 = [
     seq: 3,
     query: QUERY,
     status: statusAfter(4),
-    page: { tracks: { offset: 25, limit: 25, hasMore: false }, artists: null, albums: null },
-    totals: { tracks: 3, artists: 0, albums: 0 },
+    page: {
+      tracks: { offset: 25, limit: 25, hasMore: false },
+      artists: null,
+      albums: null,
+      playlists: null,
+    },
+    totals: { tracks: 3, artists: 0, albums: 0, playlists: 0 },
     resolve: null,
   },
 ];
@@ -493,8 +498,8 @@ const link = [
     seq: 0,
     query: linkQuery,
     status: [],
-    page: { tracks: null, artists: null, albums: null },
-    totals: { tracks: 0, artists: 0, albums: 0 },
+    page: { tracks: null, artists: null, albums: null, playlists: null },
+    totals: { tracks: 0, artists: 0, albums: 0, playlists: 0 },
     resolve: PLAYLIST_URL,
   },
 ];

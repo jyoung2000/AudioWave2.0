@@ -9885,8 +9885,9 @@ window.AW.startStats = function () {
       var r = ctx.getBoundingClientRect();
       ctx.style.left = Math.max(8, Math.min(x, innerWidth - r.width - 8)) + 'px';
       ctx.style.top = Math.max(8, Math.min(y, innerHeight - r.height - 8)) + 'px';
+      var placed = ctx.getBoundingClientRect();
       Array.prototype.forEach.call(ctx.querySelectorAll('.ctx__sub'), function (sub) {
-        sub.classList.toggle('is-flip', r.right + 210 > innerWidth);
+        sub.classList.toggle('is-flip', placed.right + 210 > innerWidth);
       });
       /* preventScroll, because the list these menus open over scrolls: without
          it the browser scrolls the focused command into view, the scroll guard
