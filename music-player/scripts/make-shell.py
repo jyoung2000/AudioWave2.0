@@ -2022,9 +2022,7 @@ replace('''<div class="toast" id="toast" role="status" aria-live="polite"></div>
 # The silver bar's star: shown while the list holds an album or playlist from the catalog (NP-FIND-008).
 replace('''        <span class="lib-scope__label" id="libScopeLabel">Library</span>
 ''', '''        <span class="lib-scope__label" id="libScopeLabel">Library</span>
-        <button class="lib-scope__star" type="button" id="libColStar" hidden aria-pressed="false" aria-label="Save to your library">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.5 6.1 20.6l1.2-6.5L2.5 9.5l6.6-.9z"/></svg>
-        </button>
+        <button class="lib-scope__star" type="button" id="libColStar" hidden aria-pressed="false" aria-label="Save to your library">&#9734;</button>
 ''')
 
 # The code: out to the lazy chunk. Everything from the old hook comment to the next module goes.
@@ -2120,7 +2118,7 @@ replace('''  .srch__pf {
   .search__more[aria-expanded="true"] { background: rgba(0, 0, 0, 0.12); color: var(--ink); }
   .search__more:focus { outline: none; }
   .search__more:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
-  @media (pointer: coarse) { .search__more { width: 32px; height: 32px; right: 2px; border-radius: 16px; } .search__input { padding-right: 36px; } }
+  @media (pointer: coarse) { .search__more { width: 44px; height: 44px; right: 0; border-radius: 22px; } .search__input { padding-right: 44px; } }
 
   .srch__adv {
     display: grid;
@@ -2262,12 +2260,12 @@ replace('''  .srch__pf {
     cursor: default;
   }
   .lib-scope__star[hidden] { display: none; }
-  .lib-scope__star svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; }
+  .lib-scope__star { font-size: 15px; line-height: 1; }
   .lib-scope__star[aria-pressed="true"] { color: var(--lib-accent); opacity: 1; }
-  .lib-scope__star[aria-pressed="true"] svg { fill: currentColor; }
   .lib-scope__star:focus { outline: none; }
   .lib-scope__star:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
-  @media (pointer: coarse) { .lib-scope__star { width: 32px; height: 32px; } .lib-scope__star svg { width: 18px; height: 18px; } }
+  /* a 44px target on a touch screen, overlapping the 26px bar rather than growing it */
+  @media (pointer: coarse) { .lib-scope__star { width: 44px; height: 44px; margin: -9px -8px; font-size: 19px; } }
 ''')
 
 # The music list: an album or playlist from the catalog is shown the way an album is — its name in the bar, its
@@ -2348,6 +2346,7 @@ replace("    var say = window.say;\n\n    /* ---- rows ---- */\n",
       b.setAttribute('aria-pressed', String(on));
       b.setAttribute('aria-label', on ? 'Remove \u201c' + c.ref.title + '\u201d from your library' : 'Save \u201c' + c.ref.title + '\u201d to your library');
       b.title = on ? 'In your library' : 'Save to your library';
+      b.textContent = on ? '★' : '☆';
     }
     document.getElementById('libColStar').addEventListener('click', function () {
       var c = focus && focus.col;

@@ -41,7 +41,10 @@ test.describe('desktop', () => {
     await page.click('label:has(#cfgMotion)');
     expect(await page.$eval('#cfgMotion', (e) => (e as HTMLInputElement).checked), 'and clicking the label still ticks it').toBe(true);
     await page.mouse.move(5, 5); await page.waitForTimeout(150);
-    expect(await src(page, '#cfgMotion'), 'which swaps in the blue drawing').toBe(on);
+    // The swap lands within a few hundred ms: measured 2026-10-06, the computed drawing stayed grey for
+    // 200-400 ms after the click on runs where the page was busy (the search chunk now loads after
+    // boot), then turned blue and stayed. Waited for rather than read at one instant.
+    await expect.poll(() => src(page, '#cfgMotion'), { message: 'which swaps in the blue drawing', timeout: 3000 }).toBe(on);
   });
 });
 
