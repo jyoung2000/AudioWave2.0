@@ -8,6 +8,7 @@ export * from './http.js';
 export * from './limits.js';
 export * from './query.js';
 export * from './merge.js';
+export * from './hydrate.js';
 export * from './provider.js';
 export * from './links.js';
 export * from './services.js';

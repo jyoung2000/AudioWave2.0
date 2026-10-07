@@ -263,6 +263,37 @@ export function formatDuration(ms: number | null | undefined): string {
   return h ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
 }
 
+/** How many featured names a credit line spells out before "& others". */
+export const CREDIT_FEATURES_MAX = 4;
+
+const FEATURE_WORDS = /\b(?:feat\.?|ft\.?|featuring|with)\b/i;
+
+/**
+ * Who made the song, in one line (UX-CAT-006): the main artist, then "feat. A & B" from the other
+ * credited names (`artists[1..]`) when the artist line does not already name them — a store writes
+ * "Daft Punk" and lists Pharrell Williams and Nile Rodgers as contributors; an upload's title may
+ * already say "feat.". Names already in the line, and repeats, are left out; order is kept; after
+ * `CREDIT_FEATURES_MAX` names the rest are "& others".
+ */
+export function creditLine(track: Pick<CatalogTrack, 'artist' | 'artists'>): string {
+  const main = track.artist.trim() || track.artists[0] || '';
+  const said = main.toLowerCase();
+  const seen = new Set<string>([said, (track.artists[0] ?? '').trim().toLowerCase()]);
+  const features: string[] = [];
+  for (const name of track.artists.slice(1)) {
+    const clean = name.trim();
+    const key = clean.toLowerCase();
+    if (!clean || seen.has(key) || said.includes(key)) continue;
+    seen.add(key);
+    features.push(clean);
+  }
+  if (!features.length || FEATURE_WORDS.test(main)) return main;
+  const named = features.slice(0, CREDIT_FEATURES_MAX);
+  const tail = features.length > CREDIT_FEATURES_MAX ? [...named, 'others'] : named;
+  const list = tail.length === 1 ? tail[0]! : `${tail.slice(0, -1).join(', ')} & ${tail.at(-1)!}`;
+  return `${main} feat. ${list}`;
+}
+
 /** The album line under a song: "Random Access Memories · 2013". */
 export function albumLine(track: Pick<CatalogTrack, 'album' | 'year'>): string {
   return [track.album, track.year].filter(Boolean).join(' · ');

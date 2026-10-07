@@ -18,6 +18,12 @@ export interface CatalogResponse {
 export interface CatalogRequestInit {
   signal: AbortSignal;
   headers: Record<string, string>;
+  /**
+   * `manual`: answer with the redirect itself (its status) instead of following it. The Cover Art
+   * Archive says "this release has a front cover" with a 307 to the archive, and the catalog needs
+   * only that answer, never the hop.
+   */
+  redirect?: 'manual' | undefined;
 }
 
 export type CatalogFetch = (url: string, init: CatalogRequestInit) => Promise<CatalogResponse>;
@@ -44,6 +50,17 @@ export interface GetJsonOptions {
   headers?: Record<string, string> | undefined;
   /** Statuses that are an answer rather than a failure (404 for "no such ISRC"). */
   accept?: readonly number[];
+  /** Passed to the fetch: `manual` answers with a redirect's own status. */
+  redirect?: 'manual' | undefined;
+}
+
+/**
+ * Does the archive have it? A GET with redirects left unfollowed: a 2xx or a redirect (the Cover Art
+ * Archive's 307 to the archive) says yes; a 404 says no. Anything else is the failure it is.
+ */
+export async function headLike(fetchImpl: CatalogFetch, url: string, options: GetJsonOptions): Promise<{ status: number; found: boolean }> {
+  const answer = await getBody(fetchImpl, url, { ...options, accept: [...(options.accept ?? []), 301, 302, 307, 308, 404], redirect: 'manual' }, 'text');
+  return { status: answer.status, found: answer.status < 400 };
 }
 
 function retryAfterMs(value: string | null | undefined): number | null {
@@ -89,7 +106,7 @@ async function getBody(fetchImpl: CatalogFetch, url: string, options: GetJsonOpt
   try {
     let response: CatalogResponse;
     try {
-      response = await fetchImpl(url, { signal: controller.signal, headers: { Accept: as === 'json' ? 'application/json' : 'text/html', ...(options.headers ?? {}) } });
+      response = await fetchImpl(url, { signal: controller.signal, headers: { Accept: as === 'json' ? 'application/json' : 'text/html', ...(options.headers ?? {}) }, ...(options.redirect ? { redirect: options.redirect } : {}) });
     } catch {
       if (timedOut) throw new CatalogHttpError(`${host} did not answer in time`, 'timeout');
       if (outer?.aborted) throw new CatalogHttpError('The search was cancelled', 'aborted');

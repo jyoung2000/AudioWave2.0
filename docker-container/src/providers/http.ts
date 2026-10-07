@@ -35,6 +35,11 @@ export interface SafeFetchOptions {
   maxRedirects?: number;
   /** Aborts the request, including a body that is still streaming. */
   signal?: AbortSignal;
+  /**
+   * False: a redirect is returned as the answer it is (its status and headers, no body read)
+   * instead of being followed. For a service that says "found" with a 307 (the Cover Art Archive).
+   */
+  followRedirects?: boolean;
 }
 
 /** A fetch that connects only to the given, already validated, addresses (no second DNS lookup). */
@@ -137,7 +142,7 @@ export class SafeHttpClient {
         // The timeout bounds the wait for headers only; a streaming body is governed by the caller.
         clearTimeout(timeout);
       }
-      if (res.status >= 300 && res.status < 400 && res.headers.get('location')) {
+      if (res.status >= 300 && res.status < 400 && res.headers.get('location') && options.followRedirects !== false) {
         options.signal?.removeEventListener('abort', onAbort);
         let next: URL;
         try {

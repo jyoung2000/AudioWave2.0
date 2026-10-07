@@ -33,7 +33,8 @@ export function guardedCatalogFetch(fetchImpl: typeof fetch = fetch, resolveName
       if (!allowed.ok) throw new Error(`Blocked outbound URL: ${allowed.reason ?? 'resolves to a private address'}`);
       const response = await fetchImpl(checked.url, { headers: init.headers, signal: init.signal, redirect: 'manual', credentials: 'omit' });
       const location = response.headers.get('location');
-      if (response.status >= 300 && response.status < 400 && location) {
+      // Asked not to follow: the redirect is the answer (the Cover Art Archive's 307 says "found").
+      if (response.status >= 300 && response.status < 400 && location && init.redirect !== 'manual') {
         await response.body?.cancel().catch(() => undefined);
         url = new URL(location, checked.url).toString();
         continue;
