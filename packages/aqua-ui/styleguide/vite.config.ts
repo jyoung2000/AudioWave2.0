@@ -193,6 +193,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@now-playing/contracts': workspace('contracts'),
+      // Before the bare package alias: string aliases match by prefix.
+      '@now-playing/domain/catalog': here('../../domain/src/catalog/index.ts'),
       '@now-playing/domain': workspace('domain'),
       '@now-playing/aqua-ui/now-playing.css': here('../src/styles/now-playing.css'),
       '@now-playing/aqua-ui': here('../src/index.ts'),

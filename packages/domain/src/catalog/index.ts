@@ -17,3 +17,5 @@ export * from './providers/musicbrainz.js';
 export * from './providers/ytdlp.js';
 export * from './engine.js';
 export * from './ndjson.js';
+export * from './view.js';
+export * from './providers/applemusic-page.js';

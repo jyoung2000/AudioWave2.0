@@ -263,9 +263,9 @@ describe('resolving a pasted link', () => {
     expect(r.collection!.ref).toMatchObject({ platform: 'soundcloud', kind: 'playlist', id: 'forss/sets/soulhack', owner: 'Forss' });
   });
 
-  it('an Apple Music playlist and a Tidal link without a SongLink key say why they cannot be read', async () => {
-    const { engine: e } = engine([]);
-    expect(await e.resolve('https://music.apple.com/us/playlist/x/pl.abc')).toMatchObject({ kind: 'unsupported', reason: expect.stringContaining('public API') });
+  it('an Apple Music playlist whose page changed and a Tidal link without a SongLink key say why they cannot be read', async () => {
+    const { engine: e } = engine([[/music\.apple\.com\/us\/playlist/, { status: 200, body: '<html><script id="serialized-server-data" type="application/json">{"data":[]}</script></html>' }]]);
+    expect(await e.resolve('https://music.apple.com/us/playlist/x/pl.abc')).toMatchObject({ kind: 'unavailable', reason: expect.stringContaining('no longer looks the way Airwave reads it') });
     expect(await e.resolve('https://tidal.com/browse/track/20115564')).toMatchObject({ kind: 'unsupported', reason: expect.stringContaining('SongLink') });
     expect(await e.resolve('https://example.com/song')).toMatchObject({ kind: 'unsupported', platform: null });
   });

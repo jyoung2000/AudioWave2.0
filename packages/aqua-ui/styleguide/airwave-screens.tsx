@@ -29,7 +29,7 @@ import companionCss from '../../../windows-companion/src/renderer/styles.css?inl
 import { TAB_ICONS, type TabIconId } from '../../../docker-container/src/web/icons.js';
 import * as Hub from '../../../docker-container/src/web/ui.js';
 import * as Companion from '../../../windows-companion/src/renderer/ui.js';
-import { DeviceIcon, FolderIcon, LibraryToolIcon, LinkIcon, LiveTvToolIcon, RemoteToolIcon, SettingsToolIcon } from '../../../windows-companion/src/renderer/icons.js';
+import { DeviceIcon, FolderIcon, LibraryToolIcon, LinkIcon, LiveTvToolIcon, RemoteToolIcon, SearchToolIcon, SettingsToolIcon } from '../../../windows-companion/src/renderer/icons.js';
 
 /** What each product's `main.tsx` imports, in the order it imports it. */
 export const HUB_CSS = `${airwaveWindowCss}\n${airwaveHubCss}\n${hubCss}`;
@@ -54,6 +54,7 @@ const HUB_TABS: ReadonlyArray<{ id: TabIconId; label: string; lead?: string }> =
   { id: 'overview', label: 'Overview' },
   { id: 'devices', label: 'Devices', lead: 'Players and companion apps that may use this hub. Each gets only the permissions you tick when you pair it.' },
   { id: 'music', label: 'Music', lead: 'What the hub plays from, where it looks things up, and what it may save. Everything here is shared by every paired device.' },
+  { id: 'search', label: 'Search', lead: 'Look music up anywhere it is, without an account: what you find can be previewed, opened, starred into your library or downloaded to this hub.' },
   { id: 'groups', label: 'Groups', lead: 'Listening together: one queue, one clock, every member kept in step. Drift is how far each device is from the group’s clock.' },
   { id: 'sharing', label: 'Sharing' },
   { id: 'system', label: 'System' },
@@ -598,10 +599,11 @@ export function HubConfirmScreen() {
 
 /* ================================================================ companion */
 
-type CompanionTab = 'library' | 'live-tv' | 'remote' | 'settings';
+export type CompanionTab = 'library' | 'search' | 'live-tv' | 'remote' | 'settings';
 
 const COMPANION_TABS: ReadonlyArray<{ id: CompanionTab; label: string; icon: () => ReactNode; lead: string }> = [
   { id: 'library', label: 'Library', icon: LibraryToolIcon, lead: 'The folders on this PC that Airwave plays from. The companion watches them and, once sharing is on, passes what it finds to your Airwave Hub so every device sees the same library.' },
+  { id: 'search', label: 'Search', icon: SearchToolIcon, lead: 'Look music up anywhere it is, without an account: what you find can be previewed, opened, starred into your library or downloaded to this PC.' },
   { id: 'live-tv', label: 'Live TV', icon: LiveTvToolIcon, lead: 'Channel playlists and programme guides for the Live TV tab. Paste a link and it is checked, kept here, and passed to the Airwave player on this PC.' },
   { id: 'remote', label: 'Remote', icon: RemoteToolIcon, lead: 'Reach this PC from the Airwave player wherever you are. Every connection is encrypted, and only devices you pair here can connect.' },
   { id: 'settings', label: 'Settings', icon: SettingsToolIcon, lead: 'The tools this PC downloads with, and how the companion behaves on this PC. Changes take effect as you make them.' },

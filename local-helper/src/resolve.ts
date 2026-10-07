@@ -21,7 +21,7 @@ import { spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { HELPER_RESOLVE_CAP, type HelperResolveSource, type HelperResolved, type HelperResolvedTrack } from '@now-playing/contracts';
+import { CATALOG_COLLECTION_CAP, HELPER_RESOLVE_CAP, type HelperResolveSource, type HelperResolved, type HelperResolvedTrack } from '@now-playing/contracts';
 import { cleanTags, isoDate, type MediaInfo } from '@now-playing/domain';
 import { childEnv, killTree, lastMeaningfulLine, spotdlSaveArgs } from './jobs.js';
 import { toolCommand, type ResolvedTool } from './tools.js';
@@ -42,10 +42,16 @@ export function sourceOf(url: URL): HelperResolveSource {
   return 'other';
 }
 
-/** yt-dlp, describing only. The URL is last and behind `--`, as in every command this program builds. */
-export function ytDlpResolveArgs(url: string): string[] {
+/**
+ * yt-dlp, describing only. The URL is last and behind `--`, as in every command this program builds.
+ * `cap`: how many entries a flat listing goes to (the catalog reads a whole list, one past
+ * `CATALOG_COLLECTION_CAP`, so it can tell a longer one). `items`: describe these positions in full
+ * instead (a page of a SoundCloud set's bare ids, looked up in one run).
+ */
+export function ytDlpResolveArgs(url: string, options: { cap?: number; items?: readonly number[] } = {}): string[] {
   if (!/^https?:\/\//i.test(url)) throw new Error('Only http(s) addresses can be handed to a tool.');
-  return ['--ignore-config', '--no-colors', '--no-cache-dir', '--no-warnings', '--skip-download', '--flat-playlist', '--playlist-end', String(HELPER_RESOLVE_CAP), '--dump-single-json', '--', url];
+  if (options.items?.length) return ['--ignore-config', '--no-colors', '--no-cache-dir', '--no-warnings', '--skip-download', '--playlist-items', options.items.map((n) => String(Math.trunc(n))).join(','), '--dump-single-json', '--', url];
+  return ['--ignore-config', '--no-colors', '--no-cache-dir', '--no-warnings', '--skip-download', '--flat-playlist', '--playlist-end', String(options.cap ?? HELPER_RESOLVE_CAP), '--dump-single-json', '--', url];
 }
 
 function str(value: unknown, max = 300): string | null {
@@ -101,13 +107,13 @@ export function trackFromYtDlp(info: Record<string, unknown>, flat = false): Hel
 }
 
 /** A yt-dlp `--dump-single-json --flat-playlist` answer, as the contract says it. */
-export function fromYtDlp(info: Record<string, unknown>, url: URL, now = new Date()): HelperResolved {
+export function fromYtDlp(info: Record<string, unknown>, url: URL, now = new Date(), cap: number = HELPER_RESOLVE_CAP): HelperResolved {
   const source = sourceOf(url);
   const canonical = webUrl(info['webpage_url']) ?? url.toString();
   const entries = Array.isArray(info['entries']) ? (info['entries'] as unknown[]) : null;
   if (info['_type'] === 'playlist' || entries) {
     const list = (entries ?? []).filter((e): e is Record<string, unknown> => Boolean(e) && typeof e === 'object' && !Array.isArray(e));
-    const kept = list.slice(0, HELPER_RESOLVE_CAP).map((e) => trackFromYtDlp(e, true));
+    const kept = list.slice(0, cap).map((e) => trackFromYtDlp(e, true));
     const total = num(info['playlist_count']);
     return {
       source,
@@ -121,8 +127,8 @@ export function fromYtDlp(info: Record<string, unknown>, url: URL, now = new Dat
         date: isoDate(info['release_date']) ?? isoDate(info['upload_date']),
         entries: kept,
         total: total !== null ? Math.round(total) : null,
-        cap: HELPER_RESOLVE_CAP,
-        capped: (total !== null && total > kept.length) || list.length > HELPER_RESOLVE_CAP,
+        cap,
+        capped: (total !== null && total > kept.length) || list.length > cap,
       },
       resolvedAt: now.toISOString(),
     };
@@ -157,7 +163,7 @@ export function trackFromSpotdl(song: Record<string, unknown>): HelperResolvedTr
 }
 
 /** spotDL's save file, as the contract says it. A track link is one song; anything else is a list. */
-export function fromSpotdl(songs: unknown, url: URL, now = new Date()): HelperResolved {
+export function fromSpotdl(songs: unknown, url: URL, now = new Date(), cap: number = HELPER_RESOLVE_CAP): HelperResolved {
   const list = (Array.isArray(songs) ? songs : []).filter((s): s is Record<string, unknown> => Boolean(s) && typeof s === 'object' && !Array.isArray(s));
   const isTrack = /^\/(?:intl-[a-z-]+\/)?track\//i.test(url.pathname);
   if (isTrack && list[0]) return { source: 'spotify', kind: 'track', url: webUrl(list[0]['url']) ?? url.toString(), track: trackFromSpotdl(list[0]), collection: null, resolvedAt: now.toISOString() };
@@ -165,7 +171,7 @@ export function fromSpotdl(songs: unknown, url: URL, now = new Date()): HelperRe
   // An album reads in its own order; spotDL saves them in whatever order they arrived.
   const ordered = isAlbum ? [...list].sort((a, b) => (num(a['disc_number']) ?? 1) - (num(b['disc_number']) ?? 1) || (num(a['track_number']) ?? 0) - (num(b['track_number']) ?? 0)) : list;
   const first = ordered[0];
-  const kept = ordered.slice(0, HELPER_RESOLVE_CAP).map(trackFromSpotdl);
+  const kept = ordered.slice(0, cap).map(trackFromSpotdl);
   return {
     source: 'spotify',
     kind: 'collection',
@@ -178,8 +184,8 @@ export function fromSpotdl(songs: unknown, url: URL, now = new Date()): HelperRe
       date: first && isAlbum ? isoDate(first['date']) : null,
       entries: kept,
       total: first && num(first['list_length']) !== null ? Math.round(num(first['list_length'])!) : isAlbum && first && num(first['tracks_count']) !== null ? Math.round(num(first['tracks_count'])!) : ordered.length,
-      cap: HELPER_RESOLVE_CAP,
-      capped: ordered.length > HELPER_RESOLVE_CAP,
+      cap,
+      capped: ordered.length > cap,
     },
     resolvedAt: now.toISOString(),
   };
@@ -257,8 +263,12 @@ function run(path: string, args: string[], env: NodeJS.ProcessEnv, timeoutMs: nu
 }
 
 export interface Resolver {
-  /** `match`: for a Spotify song, also spotDL's YouTube Music match (`save --preload`). */
-  resolve(url: URL, options?: { match?: boolean }): Promise<HelperResolved>;
+  /**
+   * `match`: for a Spotify song, also spotDL's YouTube Music match (`save --preload`). `all`: the
+   * whole list, up to `CATALOG_COLLECTION_CAP` (the catalog; the paste route keeps
+   * `HELPER_RESOLVE_CAP`). `items`: those positions of a list, described in full (yt-dlp).
+   */
+  resolve(url: URL, options?: { match?: boolean; all?: boolean; items?: readonly number[] }): Promise<HelperResolved>;
   /**
    * One page of a catalog search through yt-dlp (DEC-039). `args` are the domain's `toolSearchArgs`,
    * checked for that shape again; the run shares the two slots link lookups use.
@@ -287,7 +297,10 @@ export function createResolver(options: ResolverOptions): Resolver {
     }
   }
 
-  async function fresh(url: URL, match = false): Promise<HelperResolved> {
+  async function fresh(url: URL, match = false, all = false, items?: readonly number[]): Promise<HelperResolved> {
+    // A whole list for the catalog: thousands of entries take minutes, and the answer is held to the bound.
+    const cap = all ? CATALOG_COLLECTION_CAP : HELPER_RESOLVE_CAP;
+    const longer = all ? 10 * 60_000 : 0;
     const tools = await options.tools();
     const source = sourceOf(url);
     if (source === 'spotify') {
@@ -299,14 +312,14 @@ export function createResolver(options: ResolverOptions): Resolver {
         try {
           const file = join(dir, 'songs.spotdl');
           // An empty home of its own: spotDL reads a config file from the home directory otherwise.
-          await run(spotdl.path!, spotdlSaveArgs(url.toString(), file, { preload: match && /^\/(?:intl-[a-z-]+\/)?track\//i.test(url.pathname) }), childEnv(process.env, { HOME: dir, USERPROFILE: dir }), timeouts.spotdl);
+          await run(spotdl.path!, spotdlSaveArgs(url.toString(), file, { preload: match && /^\/(?:intl-[a-z-]+\/)?track\//i.test(url.pathname) }), childEnv(process.env, { HOME: dir, USERPROFILE: dir }), Math.max(timeouts.spotdl, longer));
           let songs: unknown;
           try {
             songs = JSON.parse(readFileSync(file, 'utf8'));
           } catch {
             throw new ResolveError('spotDL found nothing at that address.', 'failed');
           }
-          return fromSpotdl(songs, url);
+          return fromSpotdl(songs, url, new Date(), cap);
         } finally {
           rmSync(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
         }
@@ -315,7 +328,7 @@ export function createResolver(options: ResolverOptions): Resolver {
     const ytDlp = tools['yt-dlp'];
     if (!ytDlp.present || !ytDlp.path) throw new ResolveError(ytDlp.installHint ?? 'yt-dlp is not set up on this PC yet.', 'tool-missing');
     return slot(async () => {
-      const stdout = await run(ytDlp.path!, ytDlpResolveArgs(url.toString()), childEnv(), timeouts.ytDlp).catch((error: unknown) => {
+      const stdout = await run(ytDlp.path!, ytDlpResolveArgs(url.toString(), items?.length ? { items } : { cap: all ? cap + 1 : cap }), childEnv(), Math.max(timeouts.ytDlp, longer)).catch((error: unknown) => {
         // A playlist with a song the site will not give is still described, minus that song, and
         // yt-dlp exits 1 for it. What it did describe is the answer; nothing described is the failure.
         if (error instanceof ResolveError && /"entries"\s*:\s*\[\s*\{/.test(error.output)) return error.output;
@@ -328,7 +341,7 @@ export function createResolver(options: ResolverOptions): Resolver {
         throw new ResolveError('yt-dlp did not describe that address.', 'failed');
       }
       if (!info || typeof info !== 'object' || Array.isArray(info)) throw new ResolveError('yt-dlp did not describe that address.', 'failed');
-      return fromYtDlp(info as Record<string, unknown>, url);
+      return fromYtDlp(info as Record<string, unknown>, url, new Date(), items?.length ? items.length : cap);
     });
   }
 
@@ -345,13 +358,15 @@ export function createResolver(options: ResolverOptions): Resolver {
         throw new ResolveError('yt-dlp gave an answer that is not JSON.', 'failed');
       }
     },
-    resolve(url: URL, resolveOptions: { match?: boolean } = {}): Promise<HelperResolved> {
+    resolve(url: URL, resolveOptions: { match?: boolean; all?: boolean; items?: readonly number[] } = {}): Promise<HelperResolved> {
       const match = resolveOptions.match === true && sourceOf(url) === 'spotify';
-      const key = `${url.toString()}${match ? '#match' : ''}`;
+      const all = resolveOptions.all === true;
+      const items = sourceOf(url) !== 'spotify' && resolveOptions.items?.length ? resolveOptions.items.filter((n) => Number.isInteger(n) && n > 0).slice(0, 200) : undefined;
+      const key = `${url.toString()}${match ? '#match' : ''}${all ? '#all' : ''}${items ? `#items:${items.join(',')}` : ''}`;
       const at = now();
       const hit = cache.get(key);
       if (hit && at - hit.at < RESOLVE_TTL_MS) return hit.value;
-      const value = fresh(url, match);
+      const value = fresh(url, match, all, items);
       // A failure is not remembered: the next paste may find the tool set up, or the site back.
       value.catch(() => {
         if (cache.get(key)?.value === value) cache.delete(key);

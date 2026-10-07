@@ -6,7 +6,7 @@
  * Nothing new reaches the network except through `SafeHttpClient` with `CATALOG_API_HOSTS`, and
  * nothing new runs a process except through the external tool adapter's existing slots.
  */
-import { CATALOG_API_HOSTS, CATALOG_PROVIDERS, type CatalogProviderId, type CatalogSettingsInput, type CatalogSettingsView, type CatalogSource, type CatalogTrack, type DownloadJob, type DownloadTags } from '@now-playing/contracts';
+import { CATALOG_API_HOSTS, CATALOG_COLLECTION_CAP, CATALOG_PROVIDERS, type CatalogProviderId, type CatalogSettingsInput, type CatalogSettingsView, type CatalogSource, type CatalogTrack, type DownloadJob, type DownloadTags } from '@now-playing/contracts';
 import { DomainError } from '@now-playing/domain';
 import { CatalogEngine, LinkReadError, normaliseIsrc, type CatalogFetch, type LinkRead, type LinkTrack } from '@now-playing/domain/catalog';
 import type { Logger } from 'pino';
@@ -79,7 +79,7 @@ function entryToLink(entry: ProbedEntry): LinkTrack {
 export function probeToLinkRead(probe: MediaProbe, url: string): LinkRead {
   if (probe.kind === 'track') return { kind: 'track', url: probe.url, track: { ...entryToLink({ url: probe.url, tags: probe.tags, unavailable: null }), matchUrl: probe.matchUrl ?? null } };
   const entries = probe.entries.filter((e) => !e.unavailable).map(entryToLink);
-  return { kind: 'collection', url: probe.url || url, title: probe.title ?? 'Playlist', owner: probe.owner, artworkUrl: probe.artworkUrl, date: null, entries, total: probe.listed, capped: (probe.listed ?? 0) > entries.length };
+  return { kind: 'collection', url: probe.url || url, title: probe.title ?? 'Playlist', owner: probe.owner, artworkUrl: probe.artworkUrl, date: null, entries, total: probe.listed, capped: probe.entries.length > CATALOG_COLLECTION_CAP || (probe.listed ?? 0) > CATALOG_COLLECTION_CAP };
 }
 
 export class HubCatalogService {
@@ -96,10 +96,11 @@ export class HubCatalogService {
         const tool = this.tool();
         return tool.catalogSearch(args, signal);
       },
-      linkReader: async (url, { signal, match }) => {
+      linkReader: async (url, { signal, match, items }) => {
         const tool = this.tool();
         try {
-          return probeToLinkRead(await tool.probe(url, signal, { match: match === true }), url);
+          // The whole list (up to CATALOG_COLLECTION_CAP), read once; or a page of positions in full.
+          return probeToLinkRead(await tool.probe(url, signal, { match: match === true, all: true, ...(items?.length ? { items } : {}) }), url);
         } catch (error) {
           if (error instanceof DomainError) throw new LinkReadError(error.message, error.code === 'setup-required' ? 'tool-missing' : error.code === 'forbidden' ? 'unavailable' : 'failed');
           throw error;

@@ -2,7 +2,7 @@
  * The companion's window.
  *
  * It is the window `design/frontends/origin/airwave-companion.html` drew, on this PC's own data: a title
- * and four tools on one sheet of chrome — Library, Live TV, Remote, Settings — the pane scrolling
+ * and five tools on one sheet of chrome — Library, Search, Live TV, Remote, Settings — the pane scrolling
  * beneath, a status line at the foot. The markup and class names are the design's, styled by the
  * design's stylesheet; what this file adds is where the mockup had sample data: every figure on
  * screen comes through the preload bridge from the main process, which is the only part of the app
@@ -16,7 +16,7 @@ import { useCallback, useRef, useState, type KeyboardEvent, type ReactNode } fro
 import { bridgeAvailable, invoke } from './bridge.js';
 import { ago, plural } from './format.js';
 import { useChannel, useEvent, type Resource } from './hooks.js';
-import { LibraryToolIcon, LiveTvToolIcon, RemoteToolIcon, SettingsToolIcon } from './icons.js';
+import { LibraryToolIcon, LiveTvToolIcon, RemoteToolIcon, SearchToolIcon, SettingsToolIcon } from './icons.js';
 import { ConfirmProvider, Push, useConfirm } from './ui.js';
 import { AboutView } from './views/About.js';
 import { BackupView } from './views/Backup.js';
@@ -26,15 +26,16 @@ import { LibraryView } from './views/Library.js';
 import { LiveTvView } from './views/LiveTv.js';
 import { NoticeBar, useNotices } from './views/NoticeBar.js';
 import { needsAttention, SettingsView } from './views/Settings.js';
+import { SearchView } from './views/Search.js';
 import { StreamingView } from './views/Streaming.js';
 import { TransfersView } from './views/Transfers.js';
 import { PRODUCT_NAME } from '../shared/identity.js';
 import type { AwspStatus, HelperStatus, HubConnection, TvLinks } from '../shared/ipc.js';
 
 /** The sections. Each is a screen in design/coverage.json; the tab it lives in is below. */
-export type ViewId = 'folders' | 'library' | 'live-tv' | 'streaming' | 'hub' | 'transfers' | 'settings' | 'backup' | 'about';
+export type ViewId = 'folders' | 'library' | 'search' | 'live-tv' | 'streaming' | 'hub' | 'transfers' | 'settings' | 'backup' | 'about';
 
-export type TabId = 'library' | 'live-tv' | 'remote' | 'settings';
+export type TabId = 'library' | 'search' | 'live-tv' | 'remote' | 'settings';
 
 const PRODUCT = PRODUCT_NAME;
 
@@ -45,6 +46,14 @@ const TABS: ReadonlyArray<{ id: TabId; label: string; icon: () => ReactNode; sec
     icon: LibraryToolIcon,
     sections: ['folders', 'library'],
     lead: 'The folders on this PC that Airwave plays from. The companion watches them and, once sharing is on, passes what it finds to your Airwave Hub so every device sees the same library.',
+  },
+  {
+    // The music catalog (DEC-039): the hub's Search, with the same rules, through this PC's helper.
+    id: 'search',
+    label: 'Search',
+    icon: SearchToolIcon,
+    sections: ['search'],
+    lead: 'Look music up anywhere it is, without an account: what you find can be previewed, opened, starred into your library or downloaded to this PC.',
   },
   {
     id: 'live-tv',
@@ -72,6 +81,7 @@ const TABS: ReadonlyArray<{ id: TabId; label: string; icon: () => ReactNode; sec
 const SECTION_TITLES: Record<ViewId, string> = {
   folders: 'Folders',
   library: 'Music',
+  search: 'Search',
   'live-tv': 'Live TV',
   streaming: 'Stream to your devices',
   hub: 'Hub connection',
@@ -191,6 +201,8 @@ function Companion() {
         return <FoldersView folders={folders} />;
       case 'library':
         return <LibraryView helper={helper} hubConnected={hub?.connected ?? false} hasMusicFolder={items.some((f) => f.kind === 'music')} />;
+      case 'search':
+        return <SearchView />;
       case 'live-tv':
         return <LiveTvView links={tv} onChanged={setPushedTv} />;
       case 'streaming':

@@ -30,9 +30,10 @@
         "docker-container/src/web/styles.css",
         "windows-companion/src/renderer/ui.tsx",
         "windows-companion/src/renderer/icons.tsx",
-        "windows-companion/src/renderer/styles.css"
+        "windows-companion/src/renderer/styles.css",
+        "windows-companion/src/renderer/search-kit.tsx"
       ],
-      "owns": "Each window’s own kit, icons and remaining styles: the design’s markup as components, the states the designs never drew, and (hub) the contrast inks. Per product on purpose (DEC-026)."
+      "owns": "Each window’s own kit, icons and remaining styles: the design’s markup as components, the states the designs never drew, and (hub) the contrast inks. The companion’s search-kit.tsx adds the parts its Search tool needs (a titled group, notes, the <dialog> form sheet). Per product on purpose (DEC-026)."
     },
     "tokens": {
       "path": "packages/aqua-ui/src/styles/tokens.json",
@@ -187,7 +188,11 @@
       "docker-container/src/web/lib/words.ts",
       "windows-companion/src/renderer/views",
       "windows-companion/src/renderer/hooks.ts",
-      "windows-companion/src/renderer/format.ts"
+      "windows-companion/src/renderer/format.ts",
+      "docker-container/src/web/lib/catalog.ts",
+      "windows-companion/src/renderer/catalog.ts",
+      "windows-companion/src/renderer/search-kit.tsx",
+      "packages/domain/src/catalog/view.ts"
     ]
   },
   "consumers": [

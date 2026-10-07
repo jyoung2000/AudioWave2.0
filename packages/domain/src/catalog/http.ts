@@ -58,7 +58,17 @@ function retryAfterMs(value: string | null | undefined): number | null {
  * GET a JSON document with a deadline. Resolves to `{ status, body }`; a status outside 2xx and
  * `accept` is a `CatalogHttpError`, as is a timeout, a dropped connection or a body that is not JSON.
  */
-export async function getJson(fetchImpl: CatalogFetch, url: string, options: GetJsonOptions): Promise<{ status: number; body: unknown }> {
+export function getJson(fetchImpl: CatalogFetch, url: string, options: GetJsonOptions): Promise<{ status: number; body: unknown }> {
+  return getBody(fetchImpl, url, options, 'json');
+}
+
+/** GET a page (HTML) with the same deadline and refusals; the body is its text. */
+export async function getText(fetchImpl: CatalogFetch, url: string, options: GetJsonOptions): Promise<{ status: number; body: string }> {
+  const answer = await getBody(fetchImpl, url, options, 'text');
+  return { status: answer.status, body: answer.body as string };
+}
+
+async function getBody(fetchImpl: CatalogFetch, url: string, options: GetJsonOptions, as: 'json' | 'text'): Promise<{ status: number; body: unknown }> {
   const controller = new AbortController();
   let timedOut = false;
   const timer = setTimeout(() => {
@@ -79,7 +89,7 @@ export async function getJson(fetchImpl: CatalogFetch, url: string, options: Get
   try {
     let response: CatalogResponse;
     try {
-      response = await fetchImpl(url, { signal: controller.signal, headers: { Accept: 'application/json', ...(options.headers ?? {}) } });
+      response = await fetchImpl(url, { signal: controller.signal, headers: { Accept: as === 'json' ? 'application/json' : 'text/html', ...(options.headers ?? {}) } });
     } catch {
       if (timedOut) throw new CatalogHttpError(`${host} did not answer in time`, 'timeout');
       if (outer?.aborted) throw new CatalogHttpError('The search was cancelled', 'aborted');
@@ -92,10 +102,10 @@ export async function getJson(fetchImpl: CatalogFetch, url: string, options: Get
     if (!ok) throw new CatalogHttpError(`${host} answered ${response.status}`, 'http', response.status);
     let body: unknown;
     try {
-      body = await response.json();
+      body = as === 'json' ? await response.json() : await response.text();
     } catch {
       if (timedOut) throw new CatalogHttpError(`${host} did not answer in time`, 'timeout');
-      throw new CatalogHttpError(`${host} sent something that was not JSON`, 'parse', response.status);
+      throw new CatalogHttpError(as === 'json' ? `${host} sent something that was not JSON` : `${host}’s page could not be read`, 'parse', response.status);
     }
     return { status: response.status, body };
   } finally {

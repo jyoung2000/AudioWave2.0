@@ -12,6 +12,15 @@
  * `results` chunk upserts tracks, artists and albums by `id` (a later chunk can carry a row seen
  * before, now merged with another service's copy of the same song); a `done` chunk closes the
  * stream with every service's final status. `?stream=0` answers with one `CatalogSearchAggregate`.
+ *
+ * One song is one row (UX-CAT-002): the same recording from iTunes, Deezer, a YouTube official
+ * video or Topic upload and SoundCloud is merged into one track carrying every platform; a live
+ * version, a remix, an acoustic or instrumental take, a demo, a radio edit, an extended mix, a sped
+ * up or slowed edit, karaoke and covers stay rows of their own. **Across pages:** the server keeps
+ * each query's rows (same words and services, any sections) for 15 minutes; a later page's song that
+ * is the same recording as one already sent comes back **with that row's id** — an upsert of the
+ * earlier row, never a new row — so page 2 never repeats page 1. A client that pages after the
+ * session has lapsed should still drop rows by id and `sameRecording` (`appendTracks`).
  */
 import { z } from 'zod';
 import { CalendarDate, IsoDateTime } from '../common.js';
@@ -219,6 +228,12 @@ export const CatalogSearchDoneChunk = z.object({
   totals: z.object({ tracks: z.number().int().nonnegative(), artists: z.number().int().nonnegative(), albums: z.number().int().nonnegative() }),
   /** A pasted link is not searched: the client should call `resolve` with it. */
   resolve: z.string().max(2048).nullable().default(null),
+  /**
+   * Platforms on the rows that were not searched but only linked to (Spotify, Tidal, Qobuz, Amazon
+   * Music… from MusicBrainz's links, Deezer's ISRC lookup or SongLink with a key): the status line says
+   * which platforms were searched (`status`) and which only contributed links (this).
+   */
+  linkedOnly: z.array(CatalogPlatform).default([]),
 });
 export const CatalogSearchChunk = z.discriminatedUnion('type', [CatalogSearchResultsChunk, CatalogSearchDoneChunk]);
 export type CatalogSearchChunk = z.infer<typeof CatalogSearchChunk>;
@@ -261,19 +276,28 @@ export const CatalogTrackPage = z.object({
   /** How many the platform says there are, when it says. */
   total: z.number().int().nonnegative().nullable(),
   hasMore: z.boolean(),
-  /** True when the server's cap (`CATALOG_COLLECTION_CAP`) left some out for good. */
+  /**
+   * True only when a list is longer than `CATALOG_COLLECTION_CAP` (10,000) and the songs past it
+   * cannot be opened: said, never a silent cut. Below that every song is reachable page by page.
+   */
   capped: z.boolean(),
 });
 export type CatalogTrackPage = z.infer<typeof CatalogTrackPage>;
 
-/** The most songs one album or playlist lists. The same cap a batch download has. */
-export const CATALOG_COLLECTION_CAP = 200;
+/**
+ * The most songs one album or playlist opens: every song of any real list, page by page, with a
+ * bound so a runaway list cannot hold a server forever. A list past it says so (`capped`).
+ */
+export const CATALOG_COLLECTION_CAP = 10_000;
+
+/** The most songs one page of a list carries (`limit`). Ask for the next `offset` for more. */
+export const CATALOG_PAGE_MAX = 200;
 
 export const CatalogAlbumRequest = z.object({
   /** `platform:id` from a result's source (`deezer:6575789`, `apple-music:617154241`). */
   id: z.string().min(3).max(260),
   offset: z.coerce.number().int().min(0).max(CATALOG_COLLECTION_CAP).default(0),
-  limit: z.coerce.number().int().min(1).max(CATALOG_COLLECTION_CAP).default(100),
+  limit: z.coerce.number().int().min(1).max(CATALOG_PAGE_MAX).default(100),
 });
 export const CatalogAlbumDetail = z.object({ album: CatalogAlbum, page: CatalogTrackPage, collection: CatalogCollectionRef });
 export type CatalogAlbumDetail = z.infer<typeof CatalogAlbumDetail>;
@@ -322,7 +346,7 @@ export type CatalogCollection = z.infer<typeof CatalogCollection>;
 export const CatalogResolveRequest = z.object({
   url: z.string().trim().min(1).max(2048),
   offset: z.coerce.number().int().min(0).max(CATALOG_COLLECTION_CAP).default(0),
-  limit: z.coerce.number().int().min(1).max(CATALOG_COLLECTION_CAP).default(100),
+  limit: z.coerce.number().int().min(1).max(CATALOG_PAGE_MAX).default(100),
 });
 
 /**
@@ -411,7 +435,8 @@ export const CatalogSettingsInput = z.object({
 export type CatalogSettingsInput = z.infer<typeof CatalogSettingsInput>;
 
 /** The hosts the catalog engine itself calls. Nothing else is reachable from it. */
-export const CATALOG_API_HOSTS: readonly string[] = ['itunes.apple.com', 'api.deezer.com', 'musicbrainz.org', 'coverartarchive.org', 'api.song.link', 'lrclib.net'];
+/** `music.apple.com`: an Apple Music playlist's public page, read for its songs (one GET, no token). */
+export const CATALOG_API_HOSTS: readonly string[] = ['itunes.apple.com', 'api.deezer.com', 'musicbrainz.org', 'coverartarchive.org', 'api.song.link', 'lrclib.net', 'music.apple.com'];
 
 /** Where the services keep artwork and clips: what a page loads directly, never fetched by the engine. */
 export const CATALOG_MEDIA_HOSTS: readonly string[] = ['*.mzstatic.com', 'audio-ssl.itunes.apple.com', 'cdn-images.dzcdn.net', '*.dzcdn.net', 'i.ytimg.com', '*.sndcdn.com', 'archive.org', '*.archive.org', 'i.scdn.co'];

@@ -492,7 +492,7 @@
       "kind": "chrome",
       "product": "hub",
       "platform": "web",
-      "title": "The window: title, six tools, pane and status strip",
+      "title": "The window: title, seven tools, pane and status strip",
       "entry": "every admin URL, in every state",
       "sourcePaths": [
         "docker-container/src/web/App.tsx",
@@ -515,7 +515,7 @@
       "states": [
         "signed out (every tool locked)",
         "first run (only Overview open; the rest locked with the reason)",
-        "signed in (six tools; arrows, Home and End move between them)",
+        "signed in (seven tools: the design’s six and Search; arrows, Home and End move between them)",
         "a section opened by its #id in the address",
         "attention badge on Overview",
         "status strip: hub name, bind address and reach; what the window just did replaces it for a few seconds",
@@ -1319,7 +1319,7 @@
       "kind": "chrome",
       "product": "companion",
       "platform": "windows",
-      "title": "The window: title bar chrome, four tools, pane and status line",
+      "title": "The window: title bar chrome, five tools, pane and status line",
       "entry": "the app window",
       "sourcePaths": [
         "windows-companion/src/renderer/App.tsx",
@@ -1340,7 +1340,7 @@
         "AquaArt drawings"
       ],
       "states": [
-        "four tools (arrows, Home and End move between them, choosing as they go)",
+        "five tools — Library, Search, Live TV, Remote, Settings (arrows, Home and End move between them, choosing as they go)",
         "a pane is built the first time its tool is chosen, then kept",
         "attention badge on Settings (downloaders that need the person)",
         "status line: connected and last synced / can’t reach the hub / no hub paired; folders, playlists, guides and devices counted",
@@ -1989,6 +1989,161 @@
       "rules": ["UX-SAFE-001", "UX-FEED-001", "UX-PRIN-002", "UX-STREAM-001"],
       "mockup": "companion-transfers",
       "decision": "DEC-018"
+    },
+    {
+      "id": "hub-search",
+      "kind": "screen",
+      "product": "hub",
+      "platform": "web",
+      "title": "Search",
+      "entry": "Search tab",
+      "sourcePaths": [
+        "docker-container/src/web/views/Search.tsx",
+        "docker-container/src/web/lib/catalog.ts",
+        "docker-container/src/web/lib/api.ts",
+        "docker-container/src/web/styles.css",
+        "packages/domain/src/catalog/view.ts"
+      ],
+      "components": [
+        "Group",
+        "Field",
+        "Push",
+        "Check",
+        "Pop",
+        "Note",
+        "Sdot",
+        "Sheet",
+        ".well of .rows list boxes",
+        ".cap chips",
+        ".art covers and 2×2 mosaic",
+        ".pager",
+        ".kv",
+        ".lyrics"
+      ],
+      "states": [
+        "nothing asked yet: the field, Track/Artist/Album, Filter…",
+        "searching: every service “asking…”, rows folding in as each answers",
+        "done: each service’s state in words (one resting, with when it is back) and the platforms that only gave links",
+        "Songs, Artists and Albums, eight a page, with Previous, numbers, Next and “Page 1 of 2 or more”",
+        "a section with nothing (“No songs.”) and a filtered search (“Showing … from …”)",
+        "Filter… (sheet): sections and services; refuses a choice that shows nothing",
+        "See All: one section, loaded as you scroll, “That’s everything the services found.” at the end",
+        "a song: cover, platforms, preview, genre/label/year (looking it up…), synced or plain lyrics (or none, or instrumental), Download with the rights basis and what happened",
+        "an album: cover, label, date, songs, the star",
+        "an artist: picture, top songs, albums (more as you scroll)",
+        "a pasted playlist: its 2×2 mosaic, platform and length; opened like an album with every song; starred",
+        "a link that cannot be read: the reason in words",
+        "a failure: the reason in words under the field"
+      ],
+      "rules": [
+        "UX-SEARCH-001",
+        "UX-SEARCH-002",
+        "UX-SEARCH-003",
+        "UX-SEARCH-004",
+        "UX-SEARCH-005",
+        "UX-SEARCH-007",
+        "UX-SEARCH-008",
+        "UX-CAT-001",
+        "UX-CAT-002",
+        "UX-CAT-003",
+        "UX-CAT-004",
+        "UX-KEY-001"
+      ],
+      "guideAnchor": "screens",
+      "mockup": "hub-search",
+      "authority": "adopted",
+      "decision": "DEC-039"
+    },
+    {
+      "id": "hub-catalog",
+      "kind": "screen",
+      "product": "hub",
+      "platform": "web",
+      "title": "Music search settings",
+      "entry": "Music tab → Music search",
+      "sourcePaths": ["docker-container/src/web/views/CatalogSettings.tsx"],
+      "components": ["Group", "Check", "Field", "Push", "ActionError", ".pref rows"],
+      "states": [
+        "loading",
+        "every service on (the default)",
+        "a service switched off",
+        "none on (refused, in words)",
+        "no SongLink key (optional)",
+        "a key set (never shown; Clear Key)",
+        "changed (Save, Revert)",
+        "refused by the hub (its sentence)"
+      ],
+      "rules": ["UX-SEARCH-006", "UX-FORM-001"],
+      "guideAnchor": "screens",
+      "mockup": "hub-catalog",
+      "authority": "adopted",
+      "decision": "DEC-039"
+    },
+    {
+      "id": "companion-search",
+      "kind": "screen",
+      "product": "companion",
+      "platform": "windows",
+      "title": "Search",
+      "entry": "Search tool",
+      "sourcePaths": [
+        "windows-companion/src/renderer/views/Search.tsx",
+        "windows-companion/src/renderer/catalog.ts",
+        "windows-companion/src/renderer/search-kit.tsx",
+        "windows-companion/src/renderer/styles.css",
+        "windows-companion/src/main/catalog.ts",
+        "windows-companion/src/shared/ipc.ts"
+      ],
+      "components": [
+        "Group",
+        "Field",
+        "Push",
+        "Check",
+        "Pop",
+        "Note",
+        "Sdot",
+        "Sheet (<dialog>)",
+        ".well of .rows list boxes",
+        ".cap chips",
+        ".art covers and 2×2 mosaic",
+        ".pager",
+        ".kv",
+        ".lyrics"
+      ],
+      "states": [
+        "nothing asked yet: the field, Track/Artist/Album, Filter…",
+        "searching: every service “asking…”, rows folding in as each answers",
+        "done: each service’s state in words (one resting, with when it is back) and the platforms that only gave links",
+        "Songs, Artists and Albums, eight a page, with Previous, numbers, Next and “Page 1 of 2 or more”",
+        "a section with nothing (“No songs.”) and a filtered search (“Showing … from …”)",
+        "Filter… (sheet): sections and services; refuses a choice that shows nothing",
+        "See All: one section, loaded as you scroll, “That’s everything the services found.” at the end",
+        "a song: cover, platforms, preview, genre/label/year (looking it up…), synced or plain lyrics (or none, or instrumental), Download to this PC through the helper",
+        "an album: cover, label, date, songs, the star",
+        "an artist: picture, top songs, albums (more as you scroll)",
+        "a pasted playlist: its 2×2 mosaic, platform and length; opened like an album with every song; starred",
+        "a link that cannot be read: the reason in words",
+        "a failure: the reason in words under the field",
+        "the helper not running: the reason in words"
+      ],
+      "rules": [
+        "UX-SEARCH-001",
+        "UX-SEARCH-002",
+        "UX-SEARCH-003",
+        "UX-SEARCH-004",
+        "UX-SEARCH-005",
+        "UX-SEARCH-007",
+        "UX-SEARCH-008",
+        "UX-CAT-001",
+        "UX-CAT-002",
+        "UX-CAT-003",
+        "UX-CAT-004",
+        "UX-KEY-001"
+      ],
+      "guideAnchor": "screens",
+      "mockup": "companion-search",
+      "authority": "adopted",
+      "decision": "DEC-039"
     }
   ],
   "flows": [
@@ -2294,6 +2449,44 @@
         "local-helper/tests/unit/download-tags.test.ts",
         "local-helper/tests/integration/helper-resolve.test.ts",
         "music-player/tests/e2e/np/links.spec.ts"
+      ]
+    },
+    {
+      "id": "flow-find-music",
+      "title": "Find music, open it, keep it or download it (hub and companion)",
+      "preconditions": "The hub (signed in) or the companion with its helper running; no account or key anywhere.",
+      "steps": [
+        "Search ▸ type a song, an artist, an album, an ISRC or paste a link",
+        "Watch each service answer on the status line; page through Songs, Artists, Albums",
+        "Open a song: preview, genre, label, year, lyrics",
+        "Download it (hub: into the queue with the rights basis; companion: through the helper)",
+        "Or open an album or a pasted playlist and star it into the library"
+      ],
+      "failures": [
+        "A service resting or failing: said on the status line, the others still answer",
+        "A link that cannot be read: the reason in words",
+        "A song only in a store: Download says it cannot be fetched from anywhere",
+        "The companion’s helper not running: the reason, with where to fix it"
+      ],
+      "surfaces": ["hub-search", "hub-catalog", "companion-search"],
+      "rules": [
+        "UX-SEARCH-001",
+        "UX-SEARCH-002",
+        "UX-SEARCH-003",
+        "UX-SEARCH-004",
+        "UX-SEARCH-005",
+        "UX-SEARCH-007",
+        "UX-CAT-002",
+        "UX-CAT-004"
+      ],
+      "evidence": [
+        "docker-container/tests/dom/search.dom.test.tsx",
+        "windows-companion/tests/dom/companion-search.dom.test.tsx",
+        "windows-companion/tests/contract/catalog-ipc.test.ts",
+        "docker-container/tests/integration/catalog.test.ts",
+        "docker-container/tests/e2e/search.spec.ts",
+        "packages/domain/tests/unit/catalog-one-row.test.ts",
+        "packages/domain/tests/unit/catalog-paging.test.ts"
       ]
     }
   ],

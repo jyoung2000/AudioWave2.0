@@ -10,7 +10,9 @@ import type { FastifyInstance } from 'fastify';
 import { NDJSON_CONTENT_TYPE, routes } from '@now-playing/contracts';
 import { ndjsonLine } from '@now-playing/domain/catalog';
 import type { HubContext } from '../../context.js';
-import { actorDisplayName, actorId } from '../../auth/principal.js';
+import { DomainError } from '@now-playing/domain';
+import { actorDisplayName, actorId, type Principal } from '../../auth/principal.js';
+import { SAVED_COLLECTIONS_CAP } from '../../db/repositories/saved-collections.js';
 import { RAW, registerRoute, type RawResponse } from '../register.js';
 
 export function registerCatalogRoutes(app: FastifyInstance, ctx: HubContext): void {
@@ -69,6 +71,29 @@ export function registerCatalogRoutes(app: FastifyInstance, ctx: HubContext): vo
     );
     reply.status(201);
     return result;
+  });
+
+  /*
+   * Starred albums and playlists (UX-SEARCH-005), the admin's own: one owner per admin user, in the
+   * SavedCollection shape the player and the companion share, so the player's sync can carry them
+   * later without a second shape.
+   */
+  const savedOwner = (principal: Principal): string => (principal.kind === 'admin' ? `admin:${principal.userId}` : actorId(principal));
+
+  registerRoute(app, ctx, routes.catalogSavedList, ({ principal }) => ({ items: ctx.repos.savedCollections.list(savedOwner(principal)) }));
+
+  registerRoute(app, ctx, routes.catalogSavedPut, ({ body, principal }) => {
+    const owner = savedOwner(principal);
+    const repo = ctx.repos.savedCollections;
+    if (!repo.has(owner, body.ref) && repo.count(owner) >= SAVED_COLLECTIONS_CAP) throw new DomainError('conflict', `The library already holds ${SAVED_COLLECTIONS_CAP} starred albums and playlists. Un-star some first.`);
+    repo.put(owner, body);
+    return { items: repo.list(owner) };
+  });
+
+  registerRoute(app, ctx, routes.catalogSavedDelete, ({ query, principal }) => {
+    const owner = savedOwner(principal);
+    ctx.repos.savedCollections.remove(owner, query);
+    return { items: ctx.repos.savedCollections.list(owner) };
   });
 
   registerRoute(app, ctx, routes.catalogSettingsGet, () => ctx.catalog.settingsView());

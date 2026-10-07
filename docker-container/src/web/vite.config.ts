@@ -18,6 +18,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@now-playing/contracts': fileURLToPath(new URL('../../../packages/contracts/src/index.ts', import.meta.url)),
+      // Before the bare package alias, which would otherwise rewrite it to ".../index.ts/catalog".
+      '@now-playing/domain/catalog': fileURLToPath(new URL('../../../packages/domain/src/catalog/index.ts', import.meta.url)),
       '@now-playing/domain': fileURLToPath(new URL('../../../packages/domain/src/index.ts', import.meta.url)),
       // The stylesheet entries must precede the bare package alias: string aliases match by
       // prefix, so otherwise "…/aqua-ui/airwave-window.css" is rewritten to "…/src/index.ts/airwave-window.css".
