@@ -20500,6 +20500,8 @@ var CATALOG_PLATFORM_LABELS = {
 var CatalogProviderId = external_exports.enum(["itunes", "deezer", "musicbrainz", "youtube", "soundcloud"]);
 var CATALOG_PROVIDERS = CatalogProviderId.options;
 var CatalogSection = external_exports.enum(["tracks", "artists", "albums"]);
+var CatalogSearchSection = external_exports.enum(["tracks", "artists", "albums", "playlists"]);
+var CATALOG_SEARCH_SECTIONS = CatalogSearchSection.options;
 var CatalogMatch = external_exports.enum(["search", "isrc", "metadata", "musicbrainz", "spotdl", "odesli", "link"]);
 var CatalogSource = external_exports.object({
   platform: CatalogPlatform,
@@ -20560,6 +20562,16 @@ var CatalogAlbum = external_exports.object({
   sources: external_exports.array(CatalogSource).min(1).max(20),
   rank: external_exports.number().default(0)
 });
+var CatalogPlaylist = external_exports.object({
+  id: external_exports.string().max(260),
+  title: external_exports.string().max(300),
+  owner: external_exports.string().max(300).nullable().default(null),
+  trackCount: external_exports.number().int().nonnegative().nullable().default(null),
+  pictureUrl: external_exports.string().max(2048).nullable().default(null),
+  covers: external_exports.array(external_exports.string().max(2048)).max(4).default([]),
+  sources: external_exports.array(CatalogSource).min(1).max(20),
+  rank: external_exports.number().default(0)
+});
 var CatalogQuery = external_exports.object({
   kind: external_exports.enum(["text", "advanced", "isrc", "url"]),
   text: external_exports.string().max(400),
@@ -20605,7 +20617,7 @@ var CatalogSearchRequest = external_exports.object({
   track: external_exports.string().trim().max(200).optional(),
   artist: external_exports.string().trim().max(200).optional(),
   album: external_exports.string().trim().max(200).optional(),
-  sections: csv(CatalogSection).optional(),
+  sections: csv(CatalogSearchSection).optional(),
   providers: csv(CatalogProviderId).optional(),
   offset: external_exports.coerce.number().int().min(0).max(1e3).default(0),
   limit: external_exports.coerce.number().int().min(1).max(CATALOG_MAX_LIMIT).default(25),
@@ -20621,6 +20633,8 @@ var CatalogSearchResultsChunk = external_exports.object({
   tracks: external_exports.array(CatalogTrack),
   artists: external_exports.array(CatalogArtist),
   albums: external_exports.array(CatalogAlbum),
+  /** Public playlists (UX-CAT-005); empty from a server that predates them. */
+  playlists: external_exports.array(CatalogPlaylist).default([]),
   status: external_exports.array(CatalogSourceStatus)
 });
 var CatalogSearchDoneChunk = external_exports.object({
@@ -20628,9 +20642,9 @@ var CatalogSearchDoneChunk = external_exports.object({
   seq: external_exports.number().int().nonnegative(),
   query: CatalogQuery,
   status: external_exports.array(CatalogSourceStatus),
-  page: external_exports.object({ tracks: CatalogPage.nullable(), artists: CatalogPage.nullable(), albums: CatalogPage.nullable() }),
+  page: external_exports.object({ tracks: CatalogPage.nullable(), artists: CatalogPage.nullable(), albums: CatalogPage.nullable(), playlists: CatalogPage.nullable().default(null) }),
   /** Rows after merging, per section. */
-  totals: external_exports.object({ tracks: external_exports.number().int().nonnegative(), artists: external_exports.number().int().nonnegative(), albums: external_exports.number().int().nonnegative() }),
+  totals: external_exports.object({ tracks: external_exports.number().int().nonnegative(), artists: external_exports.number().int().nonnegative(), albums: external_exports.number().int().nonnegative(), playlists: external_exports.number().int().nonnegative().default(0) }),
   /** A pasted link is not searched: the client should call `resolve` with it. */
   resolve: external_exports.string().max(2048).nullable().default(null),
   /**
@@ -20646,6 +20660,7 @@ var CatalogSearchAggregate = external_exports.object({
   tracks: external_exports.array(CatalogTrack),
   artists: external_exports.array(CatalogArtist),
   albums: external_exports.array(CatalogAlbum),
+  playlists: external_exports.array(CatalogPlaylist).default([]),
   status: external_exports.array(CatalogSourceStatus),
   page: CatalogSearchDoneChunk.shape.page,
   resolve: external_exports.string().max(2048).nullable().default(null)
@@ -24170,8 +24185,9 @@ var CatalogMerger = class {
   tracks = [];
   artists = [];
   albums = [];
+  playlists = [];
   add(rows) {
-    const changed = { tracks: [], artists: [], albums: [] };
+    const changed = { tracks: [], artists: [], albums: [], playlists: [] };
     (rows.tracks ?? []).forEach((row, position) => {
       const ranked = { ...row, rank: rankOf(this.query, row, position) };
       const index = this.tracks.findIndex((t2) => sameRecording(t2, ranked));
@@ -24197,6 +24213,14 @@ var CatalogMerger = class {
       else this.albums[index] = next;
       upsert(changed.albums, next);
     });
+    (rows.playlists ?? []).forEach((row, position) => {
+      const ranked = { ...row, rank: rankOf(this.query, { title: row.title, artist: row.owner, sources: row.sources }, position) };
+      const index = this.playlists.findIndex((p) => p.id === ranked.id);
+      const next = index === -1 ? ranked : { ...this.playlists[index], ...ranked, rank: Math.max(this.playlists[index].rank, ranked.rank) };
+      if (index === -1) this.playlists.push(next);
+      else this.playlists[index] = next;
+      upsert(changed.playlists, next);
+    });
     return changed;
   }
   /** Replace a merged track by id (cross-links found after the search). */
@@ -24208,7 +24232,7 @@ var CatalogMerger = class {
   }
   snapshot() {
     const byRank = (rows) => rows.map((row, i) => ({ row, i })).sort((a, b) => b.row.rank - a.row.rank || a.i - b.i).map(({ row }) => row);
-    return { tracks: byRank(this.tracks), artists: byRank(this.artists), albums: byRank(this.albums) };
+    return { tracks: byRank(this.tracks), artists: byRank(this.artists), albums: byRank(this.albums), playlists: byRank(this.playlists) };
   }
 };
 function upsert(list, row) {
@@ -24218,7 +24242,7 @@ function upsert(list, row) {
 }
 
 // ../packages/domain/src/catalog/provider.ts
-var emptyResult = () => ({ tracks: [], artists: [], albums: [], full: {} });
+var emptyResult = () => ({ tracks: [], artists: [], albums: [], playlists: [], full: {} });
 var ProviderResting = class extends Error {
   constructor(message, retryAt) {
     super(message);
@@ -24699,7 +24723,7 @@ var ItunesProvider = class {
   }
   async search(query, options) {
     const out = emptyResult();
-    const sections = options.sections.filter((s) => this.sections.includes(s));
+    const sections = options.sections.filter((s) => s in ENTITY);
     const settled = await Promise.allSettled(
       sections.map((section) => {
         const params = { term: query.text, media: "music", entity: ENTITY[section], limit: options.limit, offset: options.offset };
@@ -24797,6 +24821,22 @@ function deezerArtist(row) {
   if (id === null || !name) return null;
   return { id: `deezer:${id}`, name, pictureUrl: webUrl2(row["picture_xl"]) ?? webUrl2(row["picture_big"]), albumCount: posInt(row["nb_album"]), fans: num2(row["nb_fan"]) !== null ? Math.round(num2(row["nb_fan"])) : null, genre: null, sources: [source("artist", id)], rank: 0 };
 }
+function deezerPlaylist(row) {
+  const id = num2(row["id"]);
+  const title = str2(row["title"]);
+  if (id === null || !title || row["public"] === false) return null;
+  const user = isObject2(row["user"]) ? row["user"] : isObject2(row["creator"]) ? row["creator"] : null;
+  return {
+    id: `deezer:${id}`,
+    title,
+    owner: str2(user?.["name"]),
+    trackCount: posInt(row["nb_tracks"]),
+    pictureUrl: webUrl2(row["picture_xl"]) ?? dzCover(row["md5_image"], "playlist"),
+    covers: [],
+    sources: [source("playlist", id)],
+    rank: 0
+  };
+}
 function quoted(value) {
   return `"${value.replace(/["\\]/g, " ").trim().slice(0, 120)}"`;
 }
@@ -24889,7 +24929,7 @@ var DeezerClient = class {
     };
   }
 };
-var ENDPOINT = { tracks: "/search/track", artists: "/search/artist", albums: "/search/album" };
+var ENDPOINT = { tracks: "/search/track", artists: "/search/artist", albums: "/search/album", playlists: "/search/playlist" };
 var DeezerProvider = class {
   constructor(client) {
     this.client = client;
@@ -24897,7 +24937,7 @@ var DeezerProvider = class {
   }
   client;
   id = "deezer";
-  sections = ["tracks", "artists", "albums"];
+  sections = ["tracks", "artists", "albums", "playlists"];
   timeoutMs;
   supports(query) {
     return query.kind !== "url";
@@ -24913,7 +24953,7 @@ var DeezerProvider = class {
     const sections = options.sections.filter((s) => this.sections.includes(s));
     const ask = async (section) => {
       const page = `&index=${options.offset}&limit=${options.limit}`;
-      if (query.kind === "advanced") {
+      if (query.kind === "advanced" && section !== "playlists") {
         const strict = await this.client.list(`${ENDPOINT[section]}?q=${encodeURIComponent(deezerAdvanced(query))}${page}`, options.signal);
         if (strict.rows.length) return strict.rows;
       }
@@ -24927,6 +24967,7 @@ var DeezerProvider = class {
       if (section === "tracks") out.tracks = result.value.map((r) => deezerTrack(r)).filter((t2) => t2 !== null);
       if (section === "albums") out.albums = result.value.map(deezerAlbum).filter((a) => a !== null);
       if (section === "artists") out.artists = result.value.map(deezerArtist).filter((a) => a !== null);
+      if (section === "playlists") out.playlists = result.value.map(deezerPlaylist).filter((p) => p !== null);
     });
     const failed = settled.find((r) => r.status === "rejected");
     if (failed && settled.every((r) => r.status === "rejected")) throw failed.reason;
@@ -25229,7 +25270,7 @@ async function fetchApplePlaylistPage(fetchImpl, url2, playlistId, options) {
 }
 
 // ../packages/domain/src/catalog/engine.ts
-var ALL_SECTIONS = ["tracks", "artists", "albums"];
+var ALL_SECTIONS = ["tracks", "artists", "albums", "playlists"];
 var ALL_PROVIDERS = ["itunes", "deezer", "musicbrainz", "youtube", "soundcloud"];
 var PROVIDER_PLATFORMS = { itunes: ["apple-music"], deezer: ["deezer"], musicbrainz: ["musicbrainz"], youtube: ["youtube", "youtube-music"], soundcloud: ["soundcloud"] };
 var SESSION_TTL_MS = 15 * 6e4;
@@ -25305,7 +25346,7 @@ var CatalogEngine = class {
     const statuses = /* @__PURE__ */ new Map();
     const list = () => ALL_PROVIDERS.filter((id) => statuses.has(id)).map((id) => statuses.get(id));
     if (query.kind === "url") {
-      yield { type: "done", seq, query, status: [], page: { tracks: null, artists: null, albums: null }, totals: { tracks: 0, artists: 0, albums: 0 }, resolve: query.url, linkedOnly: [] };
+      yield { type: "done", seq, query, status: [], page: { tracks: null, artists: null, albums: null, playlists: null }, totals: { tracks: 0, artists: 0, albums: 0, playlists: 0 }, resolve: query.url, linkedOnly: [] };
       return;
     }
     const wanted = new Set(input2.providers?.length ? input2.providers : ALL_PROVIDERS);
@@ -25338,7 +25379,7 @@ var CatalogEngine = class {
       const tagged = this.ask(provider, query, { offset, limit, sections: canSections }, signal);
       running.push(tagged);
     }
-    yield { type: "results", seq: seq++, provider: null, query, tracks: [], artists: [], albums: [], status: list() };
+    yield { type: "results", seq: seq++, provider: null, query, tracks: [], artists: [], albums: [], playlists: [], status: list() };
     const merger = new CatalogMerger(query);
     const full = {};
     const sessionKey = JSON.stringify([query.kind, query.text, query.track, query.artist, query.album, query.isrc, [...wanted].sort()]);
@@ -25358,7 +25399,7 @@ var CatalogEngine = class {
       const { o, i } = await Promise.race(pending.values());
       pending.delete(i);
       statuses.set(o.provider.id, o.status);
-      const changed = o.result ? merger.add(o.result) : { tracks: [], artists: [], albums: [] };
+      const changed = o.result ? merger.add(o.result) : { tracks: [], artists: [], albums: [], playlists: [] };
       for (const [section, more] of Object.entries(o.result?.full ?? {})) if (more) full[section] = true;
       yield { type: "results", seq: seq++, provider: o.provider.id, query, ...changed, tracks: canonical(changed.tracks), status: list() };
     }
@@ -25371,7 +25412,7 @@ var CatalogEngine = class {
         const found = await this.withDeadline(this.crossLinks(track, signal), deadline - this.now()).catch(() => []);
         if (!found.length) continue;
         const patched = merger.patchTrack(track.id, (t2) => ({ ...t2, sources: mergeSources(t2.sources, found) }));
-        if (patched) yield { type: "results", seq: seq++, provider: null, query, tracks: canonical([patched]), artists: [], albums: [], status: list() };
+        if (patched) yield { type: "results", seq: seq++, provider: null, query, tracks: canonical([patched]), artists: [], albums: [], playlists: [], status: list() };
       }
     }
     const snapshot = merger.snapshot();
@@ -25385,15 +25426,15 @@ var CatalogEngine = class {
     }
     const searched = new Set(ALL_PROVIDERS.filter((id) => statuses.get(id) && statuses.get(id).state !== "skipped").flatMap((id) => PROVIDER_PLATFORMS[id]));
     const linkedOnly = [];
-    for (const row of [...snapshot.tracks, ...snapshot.artists, ...snapshot.albums]) for (const s of row.sources) if (!searched.has(s.platform) && !linkedOnly.includes(s.platform)) linkedOnly.push(s.platform);
+    for (const row of [...snapshot.tracks, ...snapshot.artists, ...snapshot.albums, ...snapshot.playlists]) for (const s of row.sources) if (!searched.has(s.platform) && !linkedOnly.includes(s.platform)) linkedOnly.push(s.platform);
     const page = (section) => sections.includes(section) && askedSections.has(section) ? { offset, limit, hasMore: Boolean(full[section]) } : null;
     const done = {
       type: "done",
       seq,
       query,
       status: list(),
-      page: { tracks: page("tracks"), artists: page("artists"), albums: page("albums") },
-      totals: { tracks: snapshot.tracks.length, artists: snapshot.artists.length, albums: snapshot.albums.length },
+      page: { tracks: page("tracks"), artists: page("artists"), albums: page("albums"), playlists: page("playlists") },
+      totals: { tracks: snapshot.tracks.length, artists: snapshot.artists.length, albums: snapshot.albums.length, playlists: snapshot.playlists.length },
       resolve: null,
       linkedOnly
     };
@@ -25422,6 +25463,7 @@ var CatalogEngine = class {
     const tracks = /* @__PURE__ */ new Map();
     const artists = /* @__PURE__ */ new Map();
     const albums = /* @__PURE__ */ new Map();
+    const playlists = /* @__PURE__ */ new Map();
     let last = null;
     for await (const chunk of this.search(input2, signal)) {
       last = chunk;
@@ -25429,6 +25471,7 @@ var CatalogEngine = class {
       for (const t2 of chunk.tracks) tracks.set(t2.id, t2);
       for (const a of chunk.artists) artists.set(a.id, a);
       for (const a of chunk.albums) albums.set(a.id, a);
+      for (const p of chunk.playlists) playlists.set(p.id, p);
     }
     const done = last?.type === "done" ? last : null;
     const byRank = (rows) => rows.map((row, i) => ({ row, i })).sort((a, b) => b.row.rank - a.row.rank || a.i - b.i).map(({ row }) => row);
@@ -25437,8 +25480,9 @@ var CatalogEngine = class {
       tracks: byRank([...tracks.values()]),
       artists: byRank([...artists.values()]),
       albums: byRank([...albums.values()]),
+      playlists: byRank([...playlists.values()]),
       status: done?.status ?? [],
-      page: done?.page ?? { tracks: null, artists: null, albums: null },
+      page: done?.page ?? { tracks: null, artists: null, albums: null, playlists: null },
       resolve: done?.resolve ?? null
     };
   }
@@ -25459,7 +25503,7 @@ var CatalogEngine = class {
       });
       const result = await Promise.race([work, deadline]);
       this.health.success(provider.id);
-      const count = result.tracks.length + result.artists.length + result.albums.length;
+      const count = result.tracks.length + result.artists.length + result.albums.length + result.playlists.length;
       return { provider, result, status: statusFor(provider.id, { state: count ? "ok" : "empty", count, latencyMs: this.now() - started }) };
     } catch (error61) {
       const latencyMs = this.now() - started;
@@ -25822,6 +25866,10 @@ function ndjsonLine(value) {
   return `${JSON.stringify(value)}
 `;
 }
+
+// ../packages/domain/src/catalog/view.ts
+var CATALOG_SECTION_LABELS = { tracks: "Songs", artists: "Artists", albums: "Albums" };
+var CATALOG_SEARCH_SECTION_LABELS = { ...CATALOG_SECTION_LABELS, playlists: "Playlists" };
 
 // src/catalog.ts
 import { lookup } from "node:dns/promises";
