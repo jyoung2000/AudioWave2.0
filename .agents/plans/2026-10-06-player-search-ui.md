@@ -15,11 +15,54 @@ the companion get theirs from another agent). Requirements: `2026-10-06-search-u
   `SavedCollection`s in `library:state.collections`; the library menu's kept Playlists and Albums; the Download key
   for a song on show; `window.NP_FETCH`). The old inline search (and `findLinks` / `.srch__pf`) is gone.
 
-## Paging (owner, 2026-10-06, second round)
+## The shape (owner, 2026-10-07, third round) — NP-FIND-003/004/005/006/009/010
 
-- The results paginate (‹ › dots, "Page N of M+", Page Up/Down, arrows across page edges). A page beyond what arrived is
-  fetched per section from its next offset (`done.page[section].offset + limit`, then +25), a page ahead of the one
-  shown; "See all" uses the same fetch and keeps its infinite scroll.
+The owner's words: "The search list pagination should have arrows and let the user infinite scroll the search bar
+list, go to the next or previous page. Also don't show pagination for the search list until the user clicks See
+all for songs, albums, playlists or artists; these should have a separate search list page where the user can
+search for specifically that type of music media, instead of having songs, playlists, albums, artists and other
+stuff in the same search modal, it feels too hectic. Update the search modal UI and UX to be centered under the
+search bar. Also ensure the user can add songs from search to their Now Playing queue, playlist, or music library."
+
+- **Overview, no pager.** Enter draws Songs (five), Artists (three), Albums (three), Playlists (three), each with
+  "See all N" (N+ while more may exist), the per-service line, and no footer; Page Up/Down do nothing there. Rows
+  still upsert live, one row per song.
+- **One type per page.** "See all" pushes a `type` view: the heading with the count, a field of its own
+  (`#srchTypeQ`, prefilled; Enter searches `sections=<type>` from offset 0), a segmented control
+  (`.srch__segbtn[data-type]`) that re-searches the new type for the page's words, the status line and the list.
+  From "See all" the page is seeded with the overview's rows and reads on from `res.next[type]`; `PAGE_ROWS` is 25
+  for songs and 12 for the rest (bounded by `CATALOG_MAX_LIMIT`/`CATALOG_PAGE_MAX`).
+- **Pagination on the type pages only: arrows and infinite scroll together.** Scrolling near the end (or the keys
+  reaching the last rows) fetches the next page (`extend`); the end note "That’s all N …" stays. The footer
+  (`#srchFoot`) has ‹ › and "Page N of M" (M+ while more); each of the type's rows carries `data-page`, so ‹ ›
+  and Page Up/Down scroll to page N's first row and make it hot (`showPage`), fetching first when it is not there
+  (`turnPage` waits for a scroll's fetch rather than racing it); the count follows the scroll (`pageFromScroll`;
+  at the very end the last page is the one on show).
+- **Playlists as a type** (UX-CAT-005; `2026-10-06-catalog-engine.md`, "Playlists as a section"): `playlistRowHTML`
+  with the picture (or a mosaic when `covers` has four); choosing one is `showInList` on its source url (resolve
+  pages it). The Playlists page lists `window.NP_LIST.saved()`'s playlists first under "In your library"
+  (`savedRowHTML`, opened through `api.openSaved`). The filter sheet gains a Playlists box.
+- **Centred under the field.** `place()` sets `--srch-shift` on `#srch` from the field's centre, the window's
+  width and `min(560px, 100vw − 20px)`, re-run on resize; the stylesheet (make-shell.py, "the search redrawn")
+  centres the card and draws the caret at the field's centre. Details and type pages open inside the same card.
+- **The row menu.** `view.ts` gives every song row a `…` (`.srch__menu[data-menu]`); `index.ts` opens the shell's
+  menu on it, on `contextmenu` and on a 500 ms touch press (`openRowMenu` → `window.NP_SONG_MENU.open(subject)`),
+  where `subject` carries the song as a library row would be written (`songFor`), what the search can do
+  (download, audition) and callbacks. The shell (make-shell.py, "the search's song menu") builds the menu —
+  Add to Up Next, Add to Playlist ▸ (ticked, New Playlist…), Add to Library, Download…, Audition — and runs the
+  filing: `catEnsure` finds the library row by title and artist or adds one through `library:add` with
+  `quiet: true` (new: nothing plays, `detail.row` hands the row back) and keeps it in `state.kept`, then queues or
+  files it with the HUD. `window.NP_SONG_MENU.run('cat-next', subject)` is Shift+Enter's queue. The popover's
+  focus-out and outside-click guards treat `#ctx` and `#sheet` as its own.
+- Tests: `tests/e2e/np/catalog-search.spec.ts` (carried forward) and `tests/e2e/np/search-pages.spec.ts` (type
+  pages, pager, Playlists, the menu, centring at 390/820/1280). Mockup: `scripts/mockups` — states `search`,
+  `search-see-all` (a type page), `search-playlists`, `search-row-menu`; stock playlists in
+  `fixtures/search-catalogue.json`.
+
+## Paging (owner, 2026-10-06, second round) — superseded above for the overview; the fetch stays
+
+- A page beyond what arrived is fetched per section from its next offset (`done.page[section].offset + limit`);
+  "See all" uses the same fetch and keeps its infinite scroll. The overview's own pager is gone (third round).
 - An album or playlist opened in the music list loads every song: `catalog/resolve` (or `catalog/album` for Deezer and
   Apple albums) in pages of 200 from the next offset until `hasMore` is false — no 200 cap in the player. The bar says
   "Loading 400 of 1,250…" meanwhile and the rows on show stay usable. The engine's whole-playlist paging is the

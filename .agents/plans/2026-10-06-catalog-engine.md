@@ -31,7 +31,7 @@ loopback page for the companion) or `x-helper-token`; never reachable from the L
 
 | Route | Query / body | Answer |
 | --- | --- | --- |
-| `GET catalog/search` | `q` and/or `track`,`artist`,`album`; `sections=tracks,artists,albums`; `providers=itunes,deezer,musicbrainz,youtube,soundcloud`; `offset` (≤1000), `limit` (1–50, default 25); `stream=0` | NDJSON of `CatalogSearchChunk` (`application/x-ndjson`), or one `CatalogSearchAggregate` with `stream=0` |
+| `GET catalog/search` | `q` and/or `track`,`artist`,`album`; `sections=tracks,artists,albums,playlists`; `providers=itunes,deezer,musicbrainz,youtube,soundcloud`; `offset` (≤1000), `limit` (1–50, default 25); `stream=0` | NDJSON of `CatalogSearchChunk` (`application/x-ndjson`), or one `CatalogSearchAggregate` with `stream=0` |
 | `GET catalog/album` | `id=platform:id` (`deezer:…`, `apple-music:…`), `offset` (≤10,000), `limit` (≤200 a page) | `CatalogAlbumDetail` `{ album, page, collection }` |
 | `GET catalog/artist` | `id`, `albumsOffset`, `albumsLimit`, `topLimit` | `CatalogArtistDetail` `{ artist, topTracks, albums, albumsPage }` |
 | `GET catalog/resolve` | `url`, `offset` (≤10,000), `limit` (≤200 a page; page on for every song) | `CatalogResolveResult` |
@@ -75,6 +75,28 @@ Example (trimmed, from the fixtures):
            {"provider":"soundcloud","state":"failed","count":0,"latencyMs":30000,"error":"yt-dlp is not on this hub yet. …","retryAt":null}]}
 {"type":"done","seq":7,"query":{…},"status":[…],"page":{"tracks":{"offset":0,"limit":2,"hasMore":true},"artists":null,"albums":null},"totals":{"tracks":3,"artists":0,"albums":0},"resolve":null}
 ```
+
+### Playlists as a section (owner, 2026-10-07; UX-CAT-005)
+
+- `sections` takes a fourth value, `playlists`. The request type is `CatalogSearchSection`
+  (`tracks | artists | albums | playlists`); `CatalogSection` stays the three item sections the hub's
+  admin GUI and the companion draw today, so their `Record<CatalogSection, …>` tables keep typechecking
+  until a later pass aligns them.
+- Each `results` chunk carries `playlists: CatalogPlaylist[]` — `{ id, title, owner, trackCount,
+  pictureUrl, covers, sources, rank }` — and `done.page.playlists` / `done.totals.playlists` page them
+  like the rest. All of it defaults (empty array, null, 0), so a chunk from a server without the
+  section still parses, and an older client ignores what it does not draw.
+- **Deezer alone lists playlists**, keylessly: `/search/playlist?q=&index=&limit=` (checked by hand on
+  2026-10-07; JSONP works for a page too). `pictureUrl` is the playlist's `picture_xl`; `covers` stays
+  empty because a listing carries no songs and a mosaic would cost a call per row — the picture stands
+  for it (NP-FIND-009 draws the mosaic only when `covers` has four). A playlist with `public: false` is
+  never a row. iTunes, MusicBrainz and yt-dlp say `skipped` ("It has nothing in the sections asked
+  for") when only `playlists` is asked. The merger keeps playlists one row by id.
+- **Opening one** is `resolve` on its source's url (`https://www.deezer.com/playlist/<id>`): the
+  collection with every song, page by page (UX-CAT-004). The player shows it in the music list like
+  an album, with the star (NP-FIND-007/008).
+- Fixture: `tests/fixtures/catalog/deezer-search-playlist.json` (three rows, usernames replaced);
+  tests in `catalog-engine.test.ts` ("lists public playlists from Deezer…").
 
 ### What a row says (UX-CAT-003)
 

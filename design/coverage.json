@@ -1560,8 +1560,7 @@
       "states": [
         "empty",
         "searching (rows arriving, upserted by id)",
-        "songs, artists and albums in sections, each row with its platform badges",
-        "paged: ‹ › with “Page N of M”, a later page being fetched",
+        "the overview: songs (five), artists, albums and playlists (three each) in sections, each with “See all N”, no pager",
         "a Spotify song: “plays from YouTube Music”",
         "the per-service line: counts, searching, failed, timed out, cooling down until, needs yt-dlp; who answered",
         "no matches for the words searched",
@@ -1571,11 +1570,13 @@
         "an older hub’s enriched songs (features, album, genre, bpm)",
         "auditioning (click, or a five-second hold that fills the ring)",
         "no clip (says why)",
+        "a song row’s “…” (and right-click, long-press): the contextual menu",
         "pasted link being read (Spotify: spotDL takes up to a minute)",
         "pasted song: one row with its platform and date",
         "pasted album or playlist: one listing with its platform and a 2×2 mosaic",
         "pasted link nobody can read: the reason",
-        "people on the hub"
+        "people on the hub",
+        "centred under the field at 390, 820 and 1280 px (phone: spans the width)"
       ],
       "rules": [
         "NP-PRIN-002",
@@ -1583,11 +1584,14 @@
         "NP-FIND-002",
         "NP-FIND-003",
         "NP-FIND-005",
+        "NP-FIND-006",
         "NP-FIND-007",
-        "NP-FIND-004"
+        "NP-FIND-009",
+        "NP-FIND-010"
       ],
       "guideAnchor": "screens",
-      "authority": "adopted"
+      "authority": "adopted",
+      "mockup": "search"
     },
     {
       "id": "player-shell-row-menu",
@@ -2018,8 +2022,8 @@
       "kind": "screen",
       "product": "player",
       "platform": "web",
-      "title": "Search ▸ See all",
-      "entry": "a section’s “See all” in the search popover",
+      "title": "Search ▸ a type’s page (See all)",
+      "entry": "a type’s “See all” on the overview, or the segmented control on another type’s page",
       "sourcePaths": [
         "music-player/index.html",
         "music-player/scripts/make-shell.py",
@@ -2030,12 +2034,73 @@
       ],
       "components": ["shell markup (design/frontends/origin/airwave-now-playing.html)"],
       "states": [
-        "the overview’s rows, then the next page at once",
-        "loading more as it scrolls",
-        "that’s all N",
+        "the overview’s rows, then the next page at once; “Page 1 of M+”",
+        "loading more as it scrolls; the count following the scroll",
+        "‹ › (or Page Up/Down) landing on a page’s first row, fetched first when needed",
+        "the type’s own field: a fresh search of that type",
+        "another type chosen in the control",
+        "that’s all N; “Page M of M”",
+        "nothing for the words (said)",
         "a page that failed (said, and no more asked)"
       ],
-      "rules": ["NP-FIND-004", "NP-FIND-003"],
+      "rules": ["NP-FIND-004", "NP-FIND-005", "NP-FIND-003"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-shell-search-playlists",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Search ▸ Playlists",
+      "entry": "“See all playlists” on the overview, or Playlists in a type page’s control",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts",
+        "music-player/src/shell/search/index.ts",
+        "music-player/src/shell/search/view.ts",
+        "music-player/src/shell/search/client.ts"
+      ],
+      "components": ["shell markup (design/frontends/origin/airwave-now-playing.html)"],
+      "states": [
+        "In your library: the person’s starred playlists, first",
+        "From the catalog: Deezer’s public playlists, twelve a page, with their pictures, owners and counts",
+        "the pager: ‹ › and “Page N of M”",
+        "with only this browser: answered over JSONP",
+        "one chosen: opened in the music list, with the star",
+        "none for the words (said)"
+      ],
+      "rules": ["NP-FIND-009", "NP-FIND-007", "NP-FIND-008", "NP-FIND-004", "UX-CAT-005"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-shell-search-row-menu",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Search ▸ a song’s menu",
+      "entry": "a song row’s “…”, right-click, or a long press, in the search",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts",
+        "music-player/src/shell/search/index.ts",
+        "music-player/src/shell/search/view.ts",
+        "music-player/src/shell/search/client.ts"
+      ],
+      "components": ["the shell’s contextual menu (#ctx)"],
+      "states": [
+        "Add to Up Next / In Up Next",
+        "Add to Playlist ▸ the playlists (ticked where one holds the song), New Playlist…",
+        "Add to Library / In your library",
+        "Download… (disabled with the reason for a store-only song)",
+        "Audition / Stop Audition (disabled with no clip)",
+        "touch: 44 px commands, the submenu unfolding in place",
+        "the HUD confirming (NP-MENU-003)"
+      ],
+      "rules": ["NP-FIND-010", "NP-MENU-003"],
       "guideAnchor": "screens",
       "authority": "adopted"
     },
@@ -2630,16 +2695,18 @@
     },
     {
       "id": "flow-player-find-music",
-      "title": "Find music, open a playlist, keep it",
+      "title": "Find music, open a type’s page, file a song, keep a playlist",
       "preconditions": "The player on Music. A paired hub, the companion on this PC, or neither (this browser asks the keyless services itself).",
       "steps": [
-        "Type a few words in the header search and press Enter: songs, artists and albums arrive in sections as each service answers, every row naming its platforms, the quiet line saying how each service did",
+        "Type a few words in the header search and press Enter: a calm overview arrives as each service answers — five songs, three artists, albums and playlists, each with “See all N” — every row naming its platforms, the quiet line saying how each service did; the card hangs centred under the field",
         "Narrow with Filter (sections, services) or the Track / Artist / Album / ISRC fields",
-        "Page through the results with ‹ › or Page Up/Down; See all songs: the section scrolls on, page after page",
+        "See all songs: the Songs page, scrolling on by itself; ‹ › or Page Up/Down move a page at a time (fetched first when needed); the page’s own field searches songs alone; the control switches to Artists, Albums or Playlists",
+        "Playlists: the starred ones first, then Deezer’s public playlists; open one in the music list, as an album opens",
+        "A song’s “…” (or right-click, long-press): Add to Up Next, Add to Playlist ▸, Add to Library, Download…, Audition — the HUD confirms",
         "Open an artist, then one of their albums; open a song for its genre, label, year and lyrics; Back walks it back",
         "Paste a playlist link: one listing with its platform and a 2×2 mosaic",
         "Open it: the music list names it and loads every song, page by page, saying how far it has got",
-        "Star it in the silver bar: it is in the library menu under Playlists, and opens again from there"
+        "Star it in the silver bar: it is in the library menu under Playlists, under “In your library” on the Playlists page, and opens again from there"
       ],
       "failures": [
         "A service fails, times out or is resting: the line says so; the rest still answer",
@@ -2650,6 +2717,8 @@
       "surfaces": [
         "player-shell-search-popover",
         "player-shell-search-see-all",
+        "player-shell-search-playlists",
+        "player-shell-search-row-menu",
         "player-shell-search-artist",
         "player-shell-search-album",
         "player-shell-search-song",
@@ -2666,11 +2735,15 @@
         "NP-FIND-006",
         "NP-FIND-007",
         "NP-FIND-008",
+        "NP-FIND-009",
+        "NP-FIND-010",
         "UX-CAT-001",
-        "UX-CAT-003"
+        "UX-CAT-003",
+        "UX-CAT-005"
       ],
       "evidence": [
         "music-player/tests/e2e/np/catalog-search.spec.ts",
+        "music-player/tests/e2e/np/search-pages.spec.ts",
         "music-player/tests/e2e/np/collections.spec.ts",
         "music-player/tests/e2e/np/links.spec.ts",
         "music-player/tests/e2e/np/preview.spec.ts"

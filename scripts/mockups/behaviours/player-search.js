@@ -2,30 +2,37 @@
  * The mockup's search, on stock songs: not the app's code, a small stand-in for it.
  *
  * The header field searches as the shell does (music-player/src/shell/search, NP-FIND-003): typing
- * dims the last results and says "Press ⏎ to search"; Enter searches and draws Songs (five, then "See
- * all"), Artists and Albums, every row with the platforms it is on, a page at a time — ‹ › and Page
- * Up/Down turn the page, which says "Page N of M"; the arrows move through every section; Enter or a click on a cover previews a song (the ring fills over
- * 30 seconds, without sound); + adds it (✓); Clear or Escape closes. Every row is a copy of a row the
- * app drew in the captured "search" state, so it wears the app's own CSS. "See all", an artist, an
- * album, a song's title, Filter and the fields switch lead to the captured states for them (the
- * navigator follows those clicks), which show the stock search for "harbour".
+ * dims the last results and says "Press ⏎ to search"; Enter searches and draws a calm overview —
+ * Songs (five), Artists, Albums and Playlists (three each), each with "See all N" — every row with
+ * the platforms it is on, and no pager; the arrows move through every section; Enter or a click on a
+ * cover previews a song (the ring fills over 30 seconds, without sound); + adds it (✓); Clear or
+ * Escape closes. Every row is a copy of a row the app drew in the captured "search" state, so it
+ * wears the app's own CSS. "See all", an artist, an album, a song's title, a song's "…", Filter and
+ * the fields switch lead to the captured states for them (the navigator follows those clicks), which
+ * show the stock search for "harbour".
+ *
+ * On a type page (the captured "search-see-all" and "search-playlists" states) the type's own field
+ * searches that type on the stock list, and the footer's ‹ › move a page at a time — 25 songs or 12
+ * playlists — with "Page N of M" following the scroll (NP-FIND-004).
  *
  * The list's own Search field (#libFind) filters the rows on show as you type, as it does in the app.
  *
- * The songs, artists and albums are the stock list in the <script data-mock-data="search"> above
- * (scripts/mockups/fixtures/search-catalogue.json, invented artists and albums).
+ * The songs, artists, albums and playlists are the stock list in the <script data-mock-data="search">
+ * above (scripts/mockups/fixtures/search-catalogue.json, invented artists and albums).
  */
 (function () {
   'use strict';
   var DATA = JSON.parse(document.querySelector('script[data-mock-data="search"]').textContent);
   var CLIP = DATA.clip;
-  var PREVIEW = { songs: 5, artists: 3, albums: 3 };
+  var PREVIEW = { songs: 5, artists: 3, albums: 3, playlists: 3 };
+  var PAGE_ROWS = { songs: 25, playlists: 12 };
+  var TYPE_STATE = { 'search-see-all': 'songs', 'search-playlists': 'playlists' };
   var self = document.currentScript;
   if (self) self.remove();
   var dataEl = document.querySelector('script[data-mock-data="search"]');
   if (dataEl) dataEl.remove();
 
-  var S = { found: null, hot: -1, state: 'idle', lastQ: '', added: {}, page: 0 };
+  var S = { found: null, hot: -1, state: 'idle', lastQ: '', added: {}, type: null, typeQ: '', page: 0 };
   var previewing = null;
 
   function $(id) { return document.getElementById(id); }
@@ -35,9 +42,18 @@
     });
   }
   function fmt(sec) { return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); }
+  function words(q) { return String(q).toLowerCase().split(/\s+/).filter(Boolean); }
   function matches(song, q) {
     var hay = (song.t + ' ' + song.a + ' ' + song.al).toLowerCase();
-    return q.toLowerCase().split(/\s+/).filter(Boolean).every(function (w) { return hay.indexOf(w) >= 0; });
+    return words(q).every(function (w) { return hay.indexOf(w) >= 0; });
+  }
+  function playlistMatches(pl, q) {
+    var hay = pl.title.toLowerCase();
+    if (words(q).every(function (w) { return hay.indexOf(w) >= 0; })) return true;
+    return pl.songs.some(function (t) {
+      var s = DATA.songs.filter(function (x) { return x.t === t; })[0];
+      return s && matches(s, q);
+    });
   }
   function search(q) {
     var songs = DATA.songs.filter(function (s) { return matches(s, q); });
@@ -45,18 +61,19 @@
       songs: songs,
       artists: DATA.artists.filter(function (a) { return songs.some(function (s) { return s.a === a.name; }); }),
       albums: DATA.albums.filter(function (al) { return songs.some(function (s) { return s.al === al.title; }); }),
+      playlists: (DATA.playlists || []).filter(function (pl) { return playlistMatches(pl, q); }),
     };
   }
   function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
 
   /* ---- the popover, as the app drew it in the "search" state ---- */
 
-  function captured() {
-    var t = window.mockup.template(DATA.template);
+  function captured(id) {
+    var t = window.mockup.template(id || DATA.template);
     return t ? t.content.querySelector('#srch') : null;
   }
-  function proto(selector) {
-    var p = captured();
+  function proto(selector, id) {
+    var p = captured(id);
     return p ? p.querySelector(selector) : null;
   }
   /* In other states the closed popover was written out empty: put the app's markup back. */
@@ -95,6 +112,7 @@
     r.setAttribute('data-i', String(i));
     r.setAttribute('aria-selected', 'false');
     r.classList.remove('is-hot');
+    r.removeAttribute('data-page');
     return r;
   }
   function picture(r, src) {
@@ -137,6 +155,8 @@
       if (done) { add.setAttribute('aria-disabled', 'true'); add.removeAttribute('data-add'); }
       else { add.removeAttribute('aria-disabled'); add.setAttribute('data-add', String(i)); }
     }
+    var menu = r.querySelector('.srch__menu');
+    if (menu) { menu.setAttribute('data-menu', String(i)); menu.setAttribute('aria-label', 'More for ' + song.t); }
     return r;
   }
   function artistRow(a, i) {
@@ -153,9 +173,20 @@
     r.querySelector('.srch__sub').textContent = al.sub;
     return r;
   }
-  function moreRow(n, i) {
+  function playlistRow(pl, i) {
+    var p = proto('.srch__row--pl') || proto('.srch__row--pl', 'search-playlists');
+    if (!p) return null;
+    var r = stamp(p.cloneNode(true), i);
+    picture(r, pl.art);
+    r.querySelector('.srch__title').textContent = pl.title;
+    r.querySelector('.srch__sub').textContent = pl.sub;
+    r.setAttribute('aria-label', pl.title + ', ' + pl.sub + '. Opens in the music list');
+    return r;
+  }
+  function moreRow(section, n, i) {
     var r = stamp(proto('.srch__more').cloneNode(true), i);
-    r.querySelector('.srch__morelabel').textContent = 'See all songs (' + n + ')';
+    r.querySelector('.srch__morelabel').textContent = 'See all ' + n + ' ' + section;
+    r.setAttribute('aria-label', 'See all ' + n + ' ' + section + ': open a page of ' + section + ' alone');
     return r;
   }
   function section(label, rows) {
@@ -165,9 +196,18 @@
     var cap = proto('.srch__sec .srch__cap').cloneNode(true);
     cap.textContent = label;
     sec.appendChild(cap);
-    rows.forEach(function (r) { sec.appendChild(r); });
+    rows.forEach(function (r) { if (r) sec.appendChild(r); });
     return sec;
   }
+  function list(label) {
+    var el = document.createElement('div');
+    el.setAttribute('role', 'listbox');
+    el.id = 'srchList';
+    el.setAttribute('aria-label', label);
+    return el;
+  }
+
+  /* ---- the overview: no pager (NP-FIND-003) ---- */
 
   function render() {
     var count = $('srchCount');
@@ -175,6 +215,10 @@
     $('srch').classList.remove('is-stale');
     var back = $('srchBack');
     if (back) back.hidden = true;
+    var foot = $('srchFoot');
+    if (foot) foot.hidden = true;
+    var type = $('srchType');
+    if (type) type.hidden = true;
     if (S.state === 'loading') {
       count.textContent = 'Searching…';
       msg(spinner() + '<span>Searching…</span>');
@@ -185,53 +229,111 @@
       live.textContent = 'No results';
     } else if (S.state === 'list') {
       var f = S.found;
-      var words = plural(f.songs.length, 'song', 'songs') + ' · ' + plural(f.artists.length, 'artist', 'artists') + ' · ' + plural(f.albums.length, 'album', 'albums');
-      count.innerHTML = '<b>Results:</b> ' + words;
-      var list = document.createElement('div');
-      list.setAttribute('role', 'listbox');
-      list.id = 'srchList';
-      list.setAttribute('aria-label', 'Search results');
+      var said = [plural(f.songs.length, 'song', 'songs'), plural(f.artists.length, 'artist', 'artists'), plural(f.albums.length, 'album', 'albums'), plural(f.playlists.length, 'playlist', 'playlists')].join(' · ');
+      count.innerHTML = '<b>Results:</b> ' + said;
+      var out = list('Search results');
       var i = 0;
-      var pg = S.page;
-      var cut = function (list, n) { return list.slice(pg * n, pg * n + n); };
-      var songs = cut(f.songs, PREVIEW.songs).map(function (s) { return songRow(s, i++); });
-      if (songs.length && f.songs.length > PREVIEW.songs) songs.push(moreRow(f.songs.length, i++));
-      var artists = cut(f.artists, PREVIEW.artists).map(function (a) { return artistRow(a, i++); });
-      var albums = cut(f.albums, PREVIEW.albums).map(function (a) { return albumRow(a, i++); });
-      if (songs.length) list.appendChild(section('Songs', songs));
-      if (artists.length) list.appendChild(section('Artists', artists));
-      if (albums.length) list.appendChild(section('Albums', albums));
-      $('srchBody').replaceChildren(list);
+      var songs = f.songs.slice(0, PREVIEW.songs).map(function (s) { return songRow(s, i++); });
+      if (songs.length && f.songs.length > PREVIEW.songs) songs.push(moreRow('songs', f.songs.length, i++));
+      var artists = f.artists.slice(0, PREVIEW.artists).map(function (a) { return artistRow(a, i++); });
+      if (artists.length && f.artists.length > PREVIEW.artists) artists.push(moreRow('artists', f.artists.length, i++));
+      var albums = f.albums.slice(0, PREVIEW.albums).map(function (a) { return albumRow(a, i++); });
+      if (albums.length && f.albums.length > PREVIEW.albums) albums.push(moreRow('albums', f.albums.length, i++));
+      var playlists = f.playlists.slice(0, PREVIEW.playlists).map(function (p) { return playlistRow(p, i++); });
+      if (playlists.length && f.playlists.length > PREVIEW.playlists) playlists.push(moreRow('playlists', f.playlists.length, i++));
+      if (songs.length) out.appendChild(section('Songs', songs));
+      if (artists.length) out.appendChild(section('Artists', artists));
+      if (albums.length) out.appendChild(section('Albums', albums));
+      if (playlists.length) out.appendChild(section('Playlists', playlists));
+      $('srchBody').replaceChildren(out);
       applyHot();
-      var n = pages();
-      var foot = $('srchFoot');
-      if (foot) {
-        foot.hidden = n < 2;
-        var d = '';
-        for (var k = 0; k < n; k++) d += '<i' + (k === pg ? ' class="is-on"' : '') + '></i>';
-        $('srchDots').innerHTML = d;
-        $('srchPrev').disabled = pg === 0;
-        $('srchNext').disabled = pg >= n - 1;
-        if ($('srchPageOf')) $('srchPageOf').textContent = 'Page ' + (pg + 1) + ' of ' + n;
-      }
-      live.textContent = words + (n > 1 ? ', page ' + (pg + 1) + ' of ' + n : '');
+      live.textContent = said;
+    } else if (S.state === 'type') {
+      renderType();
     }
   }
 
-  function rows() { return $('srchBody').querySelectorAll('.srch__row[data-i]'); }
+  /* ---- a type page: the type's field, the list, and the pager (NP-FIND-004) ---- */
+
+  function typeRows() {
+    var f = search(S.typeQ || S.lastQ);
+    return S.type === 'playlists' ? f.playlists : f.songs;
+  }
+  function renderType() {
+    var rows = typeRows();
+    var n = PAGE_ROWS[S.type] || 25;
+    var noun = S.type === 'playlists' ? ['playlist', 'playlists'] : ['song', 'songs'];
+    var label = S.type === 'playlists' ? 'Playlists' : 'Songs';
+    var back = $('srchBack');
+    if (back) back.hidden = false;
+    var type = $('srchType');
+    if (type) {
+      type.hidden = false;
+      type.querySelectorAll('.srch__segbtn').forEach(function (b) { b.setAttribute('aria-selected', String(b.getAttribute('data-type') === (S.type === 'playlists' ? 'playlists' : 'tracks'))); });
+    }
+    var q = $('srchTypeQ');
+    if (q && document.activeElement !== q) q.value = S.typeQ || S.lastQ;
+    $('srchCount').innerHTML = '<b>' + label + ':</b> ' + plural(rows.length, noun[0], noun[1]) + ' for “' + esc(S.typeQ || S.lastQ) + '”';
+    var out = list('All ' + label.toLowerCase());
+    var i = 0;
+    rows.forEach(function (r, k) {
+      var el = S.type === 'playlists' ? playlistRow(r, i) : songRow(r, i);
+      if (!el) return;
+      el.setAttribute('data-page', String(Math.floor(k / n)));
+      out.appendChild(el);
+      i++;
+    });
+    var body = $('srchBody');
+    body.replaceChildren(out);
+    if (rows.length) {
+      var end = document.createElement('div');
+      end.className = 'srch__end';
+      end.textContent = 'That’s all ' + plural(rows.length, noun[0], noun[1]) + '.';
+      body.appendChild(end);
+    } else {
+      msg('No ' + noun[1] + ' for “' + esc(S.typeQ || S.lastQ) + '”.');
+    }
+    applyHot();
+    paintPager();
+    $('srchLive').textContent = plural(rows.length, noun[0], noun[1]) + ', page ' + (S.page + 1) + ' of ' + pages();
+  }
   function pages() {
-    var f = S.found;
-    if (!f) return 1;
-    return Math.max(1, Math.ceil(f.songs.length / PREVIEW.songs), Math.ceil(f.artists.length / PREVIEW.artists), Math.ceil(f.albums.length / PREVIEW.albums));
+    var n = PAGE_ROWS[S.type] || 25;
+    return Math.max(1, Math.ceil(typeRows().length / n));
+  }
+  function paintPager() {
+    var foot = $('srchFoot');
+    if (!foot) return;
+    foot.hidden = !typeRows().length;
+    var of = pages();
+    if ($('srchPrev')) $('srchPrev').disabled = S.page === 0;
+    if ($('srchNext')) $('srchNext').disabled = S.page >= of - 1;
+    if ($('srchPageOf')) $('srchPageOf').textContent = 'Page ' + (S.page + 1) + ' of ' + of;
   }
   function turn(by) {
-    var p = Math.max(0, Math.min(pages() - 1, S.page + by));
-    if (p === S.page) return;
-    stopPreview();
-    S.page = p;
-    S.hot = -1;
-    render();
+    var to = S.page + by;
+    if (to < 0 || to >= pages()) return;
+    var row = $('srchBody').querySelector('.srch__row[data-page="' + to + '"]');
+    if (!row) return;
+    var body = $('srchBody');
+    body.scrollTop = row.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop;
+    S.page = to;
+    S.hot = Number(row.getAttribute('data-i'));
+    applyHot();
+    paintPager();
   }
+  function pageFromScroll() {
+    var body = $('srchBody');
+    var rows = body.querySelectorAll('.srch__row[data-page]');
+    if (!rows.length) return;
+    var top = body.getBoundingClientRect().top;
+    var page = Number(rows[rows.length - 1].getAttribute('data-page'));
+    var atEnd = body.scrollTop + body.clientHeight >= body.scrollHeight - 2;
+    if (!atEnd) for (var i = 0; i < rows.length; i++) if (rows[i].getBoundingClientRect().bottom - top > 1) { page = Number(rows[i].getAttribute('data-page')); break; }
+    if (page !== S.page) { S.page = page; paintPager(); }
+  }
+
+  function rows() { return $('srchBody').querySelectorAll('.srch__row[data-i]'); }
   function applyHot() {
     var all = rows();
     for (var i = 0; i < all.length; i++) {
@@ -255,6 +357,8 @@
     stopPreview();
     S.lastQ = q;
     S.hot = -1;
+    S.type = null;
+    S.typeQ = '';
     S.page = 0;
     S.state = 'loading';
     open();
@@ -263,7 +367,7 @@
     // A moment of "Searching…", as a real lookup takes.
     searchTimer = setTimeout(function () {
       S.found = search(q);
-      S.state = S.found.songs.length ? 'list' : 'empty';
+      S.state = S.found.songs.length || S.found.playlists.length ? 'list' : 'empty';
       render();
     }, 450);
   }
@@ -304,7 +408,7 @@
   function addRow(i) {
     var r = $('srchBody').querySelector('.srch__row[data-i="' + i + '"]');
     var t = r && r.querySelector('.srch__title');
-    var song = t && S.found && S.found.songs.filter(function (s) { return s.t === t.textContent; })[0];
+    var song = t && DATA.songs.filter(function (s) { return s.t === t.textContent; })[0];
     if (!song) return;
     S.added[song.a + '|' + song.t] = true;
     render();
@@ -318,22 +422,31 @@
     if (!q) return;
     var p = $('srch');
     var id = e && e.detail ? e.detail.id : window.mockup.current();
-    if (p && !p.hidden && q.value.trim() && (id === 'search' || id === 'search-keys' || id === 'search-page-2' || id === 'search-stale')) {
+    if (p && !p.hidden && q.value.trim() && (id === 'search' || id === 'search-keys' || id === 'search-stale')) {
       // The captured overview states: carry on from what they show.
       S.lastQ = id === 'search-stale' ? 'harbour' : q.value.trim();
       S.found = search(S.lastQ);
       S.state = S.found.songs.length ? 'list' : 'empty';
+      S.type = null;
       var hot = p.querySelector('.srch__row.is-hot');
       S.hot = hot ? Number(hot.getAttribute('data-i')) : -1;
-      var on = p.querySelectorAll('#srchDots i');
+    } else if (p && !p.hidden && q.value.trim() && TYPE_STATE[id]) {
+      // A captured type page: the type's rows are the stock ones for its words; the pager works on them.
+      S.lastQ = q.value.trim();
+      S.type = TYPE_STATE[id];
+      var tq = $('srchTypeQ');
+      S.typeQ = tq && tq.value.trim() ? tq.value.trim() : S.lastQ;
+      S.found = search(S.lastQ);
+      S.state = 'type';
       S.page = 0;
-      for (var k = 0; k < on.length; k++) if (on[k].classList.contains('is-on')) S.page = k;
+      S.hot = -1;
     } else if (p && !p.hidden && q.value.trim()) {
       S.lastQ = q.value.trim();
       S.found = search(S.lastQ);
       S.state = 'view';
+      S.type = null;
     } else {
-      S = { found: null, hot: -1, state: 'idle', lastQ: '', added: S.added, page: 0 };
+      S = { found: null, hot: -1, state: 'idle', lastQ: '', added: S.added, type: null, typeQ: '', page: 0 };
     }
   }
   document.addEventListener('mockup:show', adopt);
@@ -344,6 +457,11 @@
     var t = e.target;
     if (!(t instanceof Element)) return;
     if (t.id === 'libFind') { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); t.value = ''; filterList(''); } return; }
+    if (t.id === 'srchTypeQ') {
+      if (e.key === 'Enter' && S.state === 'type') { e.preventDefault(); e.stopPropagation(); S.typeQ = t.value.trim(); S.page = 0; S.hot = -1; renderType(); }
+      else if (e.key === 'PageDown' || e.key === 'PageUp') { e.preventDefault(); turn(e.key === 'PageDown' ? 1 : -1); }
+      return;
+    }
     if (t.id !== 'q') return;
     var showing = $('srch') && !$('srch').hidden;
     if (e.key === 'Escape') {
@@ -358,8 +476,9 @@
     }
     if ((e.key === 'PageDown' || e.key === 'PageUp') && showing) {
       e.preventDefault();
-      if (S.state === 'list') turn(e.key === 'PageDown' ? 1 : -1);
-      else move(e.key === 'PageDown' ? 5 : -5);
+      // The overview has no pages (NP-FIND-003); a type page turns its pages; a long list moves five rows.
+      if (S.state === 'type') turn(e.key === 'PageDown' ? 1 : -1);
+      else if (S.state !== 'list') move(e.key === 'PageDown' ? 5 : -5);
       return;
     }
     if (e.key === 'Enter') {
@@ -369,7 +488,7 @@
         var art = hot.querySelector('.srch__art[data-preview]');
         if (e.metaKey || e.ctrlKey) addRow(S.hot);
         else if (art) preview(art);
-        else hot.click(); // an artist, an album or "See all": the navigator follows it
+        else hot.click(); // an artist, an album, a playlist or "See all": the navigator follows it
         return;
       }
       var q = t.value.trim();
@@ -392,6 +511,10 @@
     if (p && p.hidden && S.state !== 'idle' && e.target.value.trim()) { open(); render(); markStale(); }
   });
 
+  document.addEventListener('scroll', function (e) {
+    if (e.target instanceof Element && e.target.id === 'srchBody' && S.state === 'type') pageFromScroll();
+  }, true);
+
   // Clicks inside the popover: handled here before the navigator reads them as "away". (The
   // navigator has already followed any click it wired to another state.)
   document.addEventListener('click', function (e) {
@@ -400,11 +523,12 @@
     var inPop = t.closest('#srch');
     if (!inPop) {
       // A click away closes it, as in the app; in the captured search states the navigator does that.
-      if (!t.closest('#searchBox') && $('srch') && !$('srch').hidden && !window.mockup.template(window.mockup.current()).hasAttribute('data-mock-dismiss')) close();
+      if (!t.closest('#searchBox') && !t.closest('#ctx') && $('srch') && !$('srch').hidden && !window.mockup.template(window.mockup.current()).hasAttribute('data-mock-dismiss')) close();
       if (t.closest('#libFindClear')) { var f = $('libFind'); f.value = ''; filterList(''); f.focus(); }
       return;
     }
-    if (t.closest('input, label')) return;
+    if (t.closest('input, label, .srch__segbtn, .srch__menu')) return;
+    if (t.closest('#srchTypeForm button')) { e.preventDefault(); e.stopPropagation(); var tq = $('srchTypeQ'); if (tq && S.state === 'type') { S.typeQ = tq.value.trim(); S.page = 0; S.hot = -1; renderType(); } return; }
     e.preventDefault();
     e.stopPropagation();
     if (t.closest('#srchPrev')) { turn(-1); return; }

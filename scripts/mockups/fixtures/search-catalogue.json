@@ -1,5 +1,5 @@
 {
-  "about": "Stock songs for the player mockup's search: invented artists and albums, no real recordings. The capture answers the shell's catalog search, details, lyrics and pasted links (the companion's /helper/v1/catalog/*) from this list, and the mockup's search behaviour filters the same list as you type. Songs: t title, a artist, al album, d seconds, bpm, genre. Albums: year and label. Playlist: a pasted Spotify playlist made of stock songs. Lyrics: invented lines for the song details.",
+  "about": "Stock songs for the player mockup's search: invented artists and albums, no real recordings. The capture answers the shell's catalog search, details, lyrics and pasted links (the companion's /helper/v1/catalog/*) from this list, and the mockup's search behaviour filters the same list as you type. Songs: t title, a artist, al album, d seconds, bpm, genre. Albums: year and label. Playlist: a pasted Spotify playlist made of stock songs. Playlists: public playlists the catalog's Playlists section lists (Deezer-style), each made of stock songs. Lyrics: invented lines for the song details.",
   "songs": [
     {
       "t": "Harbour Lights",
@@ -261,5 +261,45 @@
     "Ferries counting down the hours",
     "Every lamp a borrowed star",
     "Home before the tide turns ours"
+  ],
+  "playlists": [
+    {
+      "title": "Harbour Mornings",
+      "owner": "Stock Listener",
+      "songs": [
+        "Harbour Morning (Acoustic)",
+        "Harbour Lights",
+        "Morning Ferry",
+        "First Light",
+        "Harbour Fog"
+      ]
+    },
+    {
+      "title": "Harbour Nights",
+      "owner": "Quayside Tapes",
+      "songs": [
+        "Night Harbour",
+        "Harbour Wall",
+        "Midnight Tram",
+        "Neon Pier",
+        "Lantern Street",
+        "Blue Hour"
+      ]
+    },
+    {
+      "title": "Harbourside Jazz",
+      "owner": "Playlist Editor",
+      "songs": ["Harbourside", "Paper Harbour (Live)", "Night Shift", "Slow Carousel (Strings)"]
+    },
+    {
+      "title": "Coastal Static Radio",
+      "owner": "Low Tide Signal",
+      "songs": ["Harbour Fog", "Blue Static", "Static Bloom", "Copper Moon", "Ember Season"]
+    },
+    {
+      "title": "Carousel Hours",
+      "owner": "Stock Listener",
+      "songs": ["Blue Carousel", "Slow Carousel (Strings)", "Bramble Waltz", "Paper Maps"]
+    }
   ]
 }

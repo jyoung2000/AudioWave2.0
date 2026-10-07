@@ -6,7 +6,9 @@
  * `/helper/v1/catalog/*` from `fixtures/search-catalogue.json` in the catalog's own shapes (NDJSON
  * chunks for a search, details, lyrics, enrichment, a pasted playlist), so the captured search states
  * are the shell's real popover; the mockup's search behaviour (`behaviours/player-search.js`) filters
- * the same songs as you type. Deezer's JSONP tempo lookup is answered too (`deezerAnswer`).
+ * the same songs as you type. Deezer's JSONP tempo lookup is answered too (`deezerAnswer`). Public
+ * playlists (the catalog's Playlists section, UX-CAT-005) are the fixture's stock playlists, each made
+ * of stock songs; one opens through its Deezer-style link (`catalogResolve`).
  *
  * Artwork is a small generated SVG per album (a gradient and the album's initials), written as a
  * data: URI so the mockup needs no network. Previews are addresses that are never fetched.
@@ -172,40 +174,64 @@ function catalogArtistRow(name) {
   };
 }
 
+const PLAYLISTS = catalogueFile.playlists ?? [];
+const playlistSongs = (pl) => pl.songs.map((t) => CATALOGUE.find((s) => s.t === t)).filter(Boolean);
+const playlistUrl = (i) => `https://www.deezer.com/playlist/${6000 + i}`;
+
+/** A public playlist as the catalog lists one (CatalogPlaylist): its own picture, no songs until opened. */
+function catalogPlaylistRow(pl) {
+  const i = PLAYLISTS.indexOf(pl);
+  return {
+    id: `deezer:${6000 + i}`,
+    title: pl.title,
+    owner: pl.owner,
+    trackCount: pl.songs.length,
+    pictureUrl: coverFor(pl.title),
+    covers: [],
+    sources: [{ platform: 'deezer', id: String(6000 + i), url: playlistUrl(i), previewUrl: null, matchedBy: 'search' }],
+    rank: 100 - i,
+  };
+}
+
+/** A playlist matches when its name does, or one of its songs does. */
+const playlistMatches = (pl, words) => matches({ t: pl.title, a: pl.owner, al: '' }, words) || playlistSongs(pl).some((s) => matches(s, words));
+
 const status = (provider, state, count, extra = {}) => ({ provider, state, count, latencyMs: state === 'pending' ? null : 300, error: null, retryAt: null, ...extra });
 
 /** A search as the helper streams it: every service pending, then Deezer, then iTunes (merged), then done. */
 export function catalogSearch(url) {
   const p = url.searchParams;
   const words = p.get('q') || [p.get('track'), p.get('artist'), p.get('album')].filter(Boolean).join(' ');
-  const sections = (p.get('sections') || 'tracks,artists,albums').split(',');
+  const sections = (p.get('sections') || 'tracks,artists,albums,playlists').split(',');
   const offset = Number(p.get('offset') || 0);
   const limit = Number(p.get('limit') || 25);
   const hit = CATALOGUE.filter((s) => matches(s, words) || (p.get('q') && catalogTrack(s).isrc === p.get('q').toUpperCase()));
   const tracks = sections.includes('tracks') ? hit.slice(offset, offset + limit).map(catalogTrack) : [];
   const artists = sections.includes('artists') ? [...new Set(hit.map((s) => s.a))].slice(offset, offset + limit).map(catalogArtistRow) : [];
   const albums = sections.includes('albums') ? [...new Set(hit.map((s) => s.al))].slice(offset, offset + limit).map(catalogAlbumRow) : [];
+  const lists = PLAYLISTS.filter((pl) => playlistMatches(pl, words));
+  const playlists = sections.includes('playlists') ? lists.slice(offset, offset + limit).map(catalogPlaylistRow) : [];
   const query = { kind: p.get('q') ? 'text' : 'advanced', text: words, track: p.get('track'), artist: p.get('artist'), album: p.get('album'), isrc: null, url: null };
   const resting = { error: 'soundcloud.com asked to slow down', retryAt: '2026-09-12T18:35:00.000Z' };
   const start = [status('itunes', 'pending', 0), status('deezer', 'pending', 0), status('musicbrainz', 'pending', 0), status('youtube', 'pending', 0), status('soundcloud', 'cooling-down', 0, resting)];
   const final = [
     status('itunes', tracks.length ? 'ok' : 'empty', tracks.length),
-    status('deezer', tracks.length + albums.length ? 'ok' : 'empty', tracks.length + artists.length + albums.length),
+    status('deezer', tracks.length + albums.length + playlists.length ? 'ok' : 'empty', tracks.length + artists.length + albums.length + playlists.length),
     status('musicbrainz', tracks.length ? 'ok' : 'empty', Math.min(tracks.length, 3)),
     status('youtube', 'ok', Math.ceil(tracks.length / 3)),
     status('soundcloud', 'cooling-down', 0, resting),
   ];
   const page = (s, n) => (sections.includes(s) ? { offset, limit, hasMore: offset + limit < n } : null);
   const chunks = [
-    { type: 'results', seq: 0, provider: null, query, tracks: [], artists: [], albums: [], status: start },
-    { type: 'results', seq: 1, provider: 'deezer', query, tracks, artists, albums, status: final },
+    { type: 'results', seq: 0, provider: null, query, tracks: [], artists: [], albums: [], playlists: [], status: start },
+    { type: 'results', seq: 1, provider: 'deezer', query, tracks, artists, albums, playlists, status: final },
     {
       type: 'done',
       seq: 2,
       query,
       status: final,
-      page: { tracks: page('tracks', hit.length), artists: page('artists', new Set(hit.map((s) => s.a)).size), albums: page('albums', new Set(hit.map((s) => s.al)).size) },
-      totals: { tracks: tracks.length, artists: artists.length, albums: albums.length },
+      page: { tracks: page('tracks', hit.length), artists: page('artists', new Set(hit.map((s) => s.a)).size), albums: page('albums', new Set(hit.map((s) => s.al)).size), playlists: page('playlists', lists.length) },
+      totals: { tracks: tracks.length, artists: artists.length, albums: albums.length, playlists: playlists.length },
       resolve: null,
     },
   ];
@@ -240,10 +266,35 @@ export function catalogEnrich(url) {
   return { isrc: t.isrc, musicbrainzRecordingId: '00000000-0000-4000-8000-00000000mock'.slice(0, 36), genre: s.genre, genres: [s.genre.toLowerCase()], label: t.label, releaseDate: t.releaseDate, year: t.year, sources: [source('spotify', `sp${s.id}`, { matchedBy: 'musicbrainz' })] };
 }
 
-/** The pasted Spotify playlist: its songs Spotify's only (spotDL finds each on YouTube Music when fetched). */
+/**
+ * The pasted Spotify playlist: its songs Spotify's only (spotDL finds each on YouTube Music when
+ * fetched). A stock playlist's own link (the Playlists section's rows) opens it the same way.
+ */
 export function catalogResolve(url) {
   const pl = catalogueFile.playlist;
   const link = url.searchParams.get('url');
+  const own = /deezer\.com\/playlist\/(\d+)$/.exec(link || '');
+  const stock = own ? PLAYLISTS[Number(own[1]) - 6000] : null;
+  if (stock) {
+    const i = PLAYLISTS.indexOf(stock);
+    const tracks = playlistSongs(stock).map(catalogTrack);
+    return {
+      url: link,
+      platform: 'deezer',
+      kind: 'playlist',
+      track: null,
+      artist: null,
+      reason: null,
+      resolvedAt: NOW,
+      collection: {
+        ref: { platform: 'deezer', kind: 'playlist', id: String(6000 + i), url: playlistUrl(i), title: stock.title, owner: stock.owner },
+        artworkUrl: coverFor(stock.title),
+        covers: tracks.slice(0, 4).map((t) => t.artworkUrl),
+        releaseDate: null,
+        page: { tracks, offset: 0, limit: 200, total: tracks.length, hasMore: false, capped: false },
+      },
+    };
+  }
   if (link !== pl.url) return { url: link, platform: null, kind: 'unsupported', track: null, collection: null, artist: null, reason: 'That is not a link to music on a platform the catalog reads.', resolvedAt: NOW };
   const songs = pl.songs.map((t) => CATALOGUE.find((s) => s.t === t));
   const tracks = songs.map((s) => ({ ...catalogTrack(s), id: `spotify:sp${s.id}`, sources: [source('spotify', `sp${s.id}`, { url: `https://open.spotify.com/track/sp${s.id}`, matchedBy: 'link' })] }));
@@ -277,6 +328,10 @@ export function behaviourData() {
     albums: ALBUM_NAMES.map((name) => {
       const a = catalogAlbumRow(name);
       return { title: name, a: a.artist, sub: [a.artist, a.year, `${a.trackCount} ${a.trackCount === 1 ? 'song' : 'songs'}`].join(' · '), art: a.artworkUrl };
+    }),
+    playlists: PLAYLISTS.map((pl) => {
+      const p = catalogPlaylistRow(pl);
+      return { title: pl.title, songs: pl.songs, sub: ['Playlist on Deezer', pl.owner, `${p.trackCount} ${p.trackCount === 1 ? 'song' : 'songs'}`].join(' · '), art: p.pictureUrl };
     }),
   };
 }

@@ -2200,9 +2200,9 @@
     {
       "id": "NP-FIND-003",
       "group": "np-find",
-      "title": "Search is music, live: songs, artists and albums in sections, each naming its platforms",
-      "contract": "A search in the header (Enter) asks the catalog — the paired hub's /api/v1/catalog/search with the device credential, else the companion's /helper/v1/catalog/search, else the engine run in this browser against the keyless services that answer a page (iTunes, MusicBrainz and LRCLIB over CORS; Deezer over JSONP) — and reads its NDJSON as it arrives. Rows appear as each service answers and upsert by id (a later chunk's merged copy replaces its row in place); they are sorted by rank, ties by arrival. One song is one row: the engine merges its services' copies, and the player applies the engine's own identity (sameRecording) and merger (mergeTrack) to whatever still arrives apart — another chunk, another page — so a copy already shown joins that row with its badge instead of making a second; a live, remix or other version stays its own row. The popover shows Songs (five), Artists (three) and Albums (three), each section with \"See all\" when there are more. Every row shows each platform it is on as a small badge (Apple Music, Deezer, YouTube, YouTube Music, SoundCloud, Bandcamp, Spotify, MusicBrainz…); a Spotify song says \"plays from YouTube Music\". A quiet line under the count names every service in the engine's states — a count, searching…, nothing, failed, timed out, cooling down until a time, needs yt-dlp — with the reason on hover, the platforms that only contributed links (done.linkedOnly: \"Spotify: links only\"), and who answered; with only this browser it says plainly that YouTube and SoundCloud results need the hub or the companion. A failure says plainly what happened. Arrows move through every row of every section (Page Up/Down turn the results page, NP-FIND-004; in a long list they move five rows), Enter auditions a song with a clip or opens what it is on, Ctrl/Cmd+Enter adds the song, Escape goes back a level and then closes; the rows are a listbox of groups with options, and a live region says the counts.",
-      "example": "“harbour”: Results: 12 songs · 2 artists · 2 albums — Apple Music 6 · Deezer 9 · MusicBrainz cooling down until 12:05 · YouTube 4 · SoundCloud failed — through the companion on this PC.",
+      "title": "Search is music, live: a calm overview of songs, artists, albums and playlists, each naming its platforms",
+      "contract": "A search in the header (Enter) asks the catalog — the paired hub's /api/v1/catalog/search with the device credential, else the companion's /helper/v1/catalog/search, else the engine run in this browser against the keyless services that answer a page (iTunes, MusicBrainz and LRCLIB over CORS; Deezer over JSONP) — and reads its NDJSON as it arrives. Rows appear as each service answers and upsert by id (a later chunk's merged copy replaces its row in place); they are sorted by rank, ties by arrival. One song is one row: the engine merges its services' copies, and the player applies the engine's own identity (sameRecording) and merger (mergeTrack) to whatever still arrives apart — another chunk, another page — so a copy already shown joins that row with its badge instead of making a second; a live, remix or other version stays its own row. The first view after Enter is a calm overview (owner, 2026-10-07): Songs (five), Artists (three), Albums (three) and Playlists (three), each group ending in “See all N” (N+ while more may exist) that opens that type's own page (NP-FIND-004). The overview has no pager — no dots, no ‹ ›, no page count — and Page Up/Down do nothing there. Every row shows each platform it is on as a small badge (Apple Music, Deezer, YouTube, YouTube Music, SoundCloud, Bandcamp, Spotify, MusicBrainz…); a Spotify song says \"plays from YouTube Music\". A quiet line under the count names every service in the engine's states — a count, searching…, nothing, failed, timed out, cooling down until a time, needs yt-dlp — with the reason on hover, the platforms that only contributed links (done.linkedOnly: \"Spotify: links only\"), and who answered; with only this browser it says plainly that YouTube and SoundCloud results need the hub or the companion. A failure says plainly what happened. Arrows move through every row of every section, Enter auditions a song with a clip or opens what it is on, Ctrl/Cmd+Enter adds the song, Shift+Enter queues it to Up Next (NP-FIND-010), Escape goes back a level and then closes; the rows are a listbox of groups with options, and a live region says the counts.",
+      "example": "“harbour”: Results: 12 songs · 2 artists · 2 albums · 4 playlists — Apple Music 6 · Deezer 9 · MusicBrainz cooling down until 12:05 · YouTube 4 · SoundCloud failed — through the companion on this PC; under Songs, “See all 12+ songs”.",
       "authority": "adopted",
       "owners": [
         "music-player/src/shell/search/index.ts",
@@ -2230,17 +2230,17 @@
         {
           "type": "test",
           "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
+          "name": "the overview has no pager, and Page Up/Down do nothing there; a type page has ‹ › and “Page N of M”"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
           "name": "paired, the hub’s catalog answers first, with the device credential"
         },
         {
           "type": "test",
           "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
           "name": "with no hub and no companion, this browser searches the keyless services itself and says what it cannot"
-        },
-        {
-          "type": "test",
-          "path": "music-player/tests/e2e/np/func.spec.ts",
-          "name": "search: add to library, escaping, a stale query, and focus loss closes the popover"
         },
         {
           "type": "test",
@@ -2257,9 +2257,9 @@
     {
       "id": "NP-FIND-004",
       "group": "np-find",
-      "title": "Results page with ‹ › and a page count; “See all” scrolls on until it is all there",
-      "contract": "The results paginate: each page shows the next five songs, three artists and three albums, and the footer's ‹ › and dots turn it with \"Page N of M\" (\"M+\" while a section says more exist). Page Up / Page Down turn it from the field, and the arrows run off a page's last row onto the next and off its first onto the one before. A page beyond what has arrived is fetched, not sliced from the first answer: the same query, that section only, from its next offset (offset / limit / hasMore, as the engine pages), asked a page ahead of the one shown; a page that turns out empty steps back. A section's \"See all\" opens that section alone, under a Back button, with what the results already had; its next page is asked at once and again whenever the list is scrolled near its end or the keys reach its last row, while the server says more may exist (to its offset limit of 1000). A song that a later page brings again — by id or as the same recording — is not shown twice. \"Loading more…\" shows while a page is coming; the end says \"That’s all N songs.\"",
-      "example": "",
+      "title": "One type per page: it scrolls on by itself, and ‹ › with “Page N of M” move it a page at a time",
+      "contract": "“See all” on the overview opens a page for that type alone — Songs, Artists, Albums or Playlists — under Back: a heading with the count (N+ while more may exist) and the words searched, the type's own search field (NP-FIND-005), a segmented control to switch type, the per-service line for it, and the list. The page starts with what the overview already had and reads on from that type's next offset (offset / limit / hasMore, as the engine pages; sections=<type> only), asked at once and again whenever the list is scrolled near its end or the keys reach its last rows, while the server says more may exist (to its offset limit of 1000): infinite scroll. “Loading more…” shows while a page is coming; the end says “That’s all N songs.” A song that a later page brings again — by id or as the same recording — is not shown twice. The one pager lives here, in a footer that stays put while the list scrolls: ‹ › and “Page N of M” (“M+” while more may exist). Pages are 25 rows for songs and 12 for artists, albums and playlists (never past the contract's page bounds). ‹ › scroll the list to the previous or next page's first row and make it the row the keys are on, fetching that page first when it has not arrived; Page Up/Down do the same from the field; the count follows the scroll (at the very end, the last page is the one on show). Nothing is sliced from the first answer: later pages are fetched from the engine.",
+      "example": "“See all 25+ songs” → Songs: 25+ for “harbour”, Page 1 of 2+; scrolled to the end: That’s all 57 songs, Page 3 of 3; ‹ lands on song 26, Page 2 of 3.",
       "authority": "adopted",
       "owners": [
         "music-player/src/shell/search/index.ts",
@@ -2272,21 +2272,31 @@
         {
           "type": "test",
           "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
-          "name": "the results page: ‹ › and Page Up/Down turn it, with a page count, and later pages are fetched from the next offset"
+          "name": "see all opens one type’s page that scrolls on, page after page, until it is all there"
         },
         {
           "type": "test",
           "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
-          "name": "see all opens one section that scrolls on, page after page, until it is all there"
+          "name": "the overview has no pager, and Page Up/Down do nothing there; a type page has ‹ › and “Page N of M”"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/search-pages.spec.ts",
+          "name": "on a type page the list scrolls on by itself and ‹ › move a page at a time, fetching first when needed"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/search-pages.spec.ts",
+          "name": "› past what has arrived fetches the next page first, then lands on its first row"
         }
       ]
     },
     {
       "id": "NP-FIND-005",
       "group": "np-find",
-      "title": "A filter for sections and services, kept; Track / Artist / Album fields and ISRC",
-      "contract": "Filter in the popover's header opens a sheet with the sections to show (Songs, Artists, Albums) and the services to ask (Apple Music, Deezer, MusicBrainz, YouTube, SoundCloud). Saved, it lives in the player's settings store (kv \"player:search\"), survives a reload, marks the button, and asks a search on screen again; at least one section and one service stay on, said in the sheet. The pill's own switch folds out Track, Artist, Album and ISRC fields, starting from what was typed; while they are out the pill shows them merged, read-only, and folded away they stay merged in it. A search from the fields asks track, artist and album rather than q. An ISRC — typed in the pill or its field — is searched as an ISRC; a malformed one is explained before anything is asked.",
-      "example": "Track “harbour lamps” + Artist “Lantern Choir” → GET …/catalog/search?track=harbour+lamps&artist=Lantern+Choir; the pill reads “harbour lamps Lantern Choir”.",
+      "title": "A filter for sections and services, kept; Track / Artist / Album fields and ISRC; a type page’s own field",
+      "contract": "Filter in the popover's header opens a sheet with the sections to show (Songs, Artists, Albums, Playlists) and the services to ask (Apple Music, Deezer, MusicBrainz, YouTube, SoundCloud). Saved, it lives in the player's settings store (kv \"player:search\"), survives a reload, marks the button, and asks a search on screen again; at least one section and one service stay on, said in the sheet. The pill's own switch folds out Track, Artist, Album and ISRC fields, starting from what was typed; while they are out the pill shows them merged, read-only, and folded away they stay merged in it. A search from the fields asks track, artist and album rather than q. An ISRC — typed in the pill or its field — is searched as an ISRC; a malformed one is explained before anything is asked. A type page (NP-FIND-004) has a field of its own, prefilled with the words searched and named for the type (“Search songs”): Enter there searches that type alone (sections=<type>, from offset 0, a page at a time), and the segmented control beside it switches type, searching the new type for the same words.",
+      "example": "Track “harbour lamps” + Artist “Lantern Choir” → GET …/catalog/search?track=harbour+lamps&artist=Lantern+Choir; the pill reads “harbour lamps Lantern Choir”. On the Songs page, “lantern” ⏎ → GET …/catalog/search?q=lantern&sections=tracks&offset=0&limit=25.",
       "authority": "adopted",
       "owners": [
         "music-player/src/shell/search/index.ts",
@@ -2305,15 +2315,20 @@
           "type": "test",
           "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
           "name": "track, artist and album fields fold out of the pill and back into it; an ISRC is searched as one"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/search-pages.spec.ts",
+          "name": "See all opens the type’s page: a scoped field, the segmented control, and a search of that type alone"
         }
       ]
     },
     {
       "id": "NP-FIND-006",
       "group": "np-find",
-      "title": "Album, artist and song details stack, and go back",
-      "contract": "An album row opens its details (catalog/album): cover, title, artist, year · label · genre · song count, its platforms, \"Open in Music\" (NP-FIND-007) and its songs, each auditionable and addable. An artist row opens theirs (catalog/artist): picture (an album cover when the platform has none), genre, fans, top songs and albums; an album there drills into that album. A song row opens the song: its cover, platforms (with any other homes enrichment found), genre, label and year from catalog/enrich (\"Looking up…\" while MusicBrainz is asked, a sentence if it cannot be), its ISRC, Add to Library, Download… (the helper's fetch sheet with a stated basis, as the Download key; a store-only song says there is nothing to fetch), and its lyrics from catalog/lyrics — synced lines with their times, or plain, or \"No lyrics found\", or an instrumental said as one. Details stack; Back and Escape walk them back, and the keys come back to the row they left.",
-      "example": "",
+      "title": "One card, centred under the field: album, artist and song details stack inside it, and go back",
+      "contract": "The popover is one card that hangs centred under the header's search field at every width — the same centre x as the field, min(560px, 100vw − 20px) wide, moved only as far as it must to stay on screen, with a small caret at the field's centre keeping the joint between the two (the Aqua skin's rounded card); on a phone it spans the width. Everything the search shows opens inside that card, with Back: the overview, a type's page, and the details. An album row opens its details (catalog/album): cover, title, artist, year · label · genre · song count, its platforms, \"Open in Music\" (NP-FIND-007) and its songs, each auditionable and addable. An artist row opens theirs (catalog/artist): picture (an album cover when the platform has none), genre, fans, top songs and albums; an album there drills into that album. A song row opens the song: its cover, platforms (with any other homes enrichment found), genre, label and year from catalog/enrich (\"Looking up…\" while MusicBrainz is asked, a sentence if it cannot be), its ISRC, Add to Library, Download… (the helper's fetch sheet with a stated basis, as the Download key; a store-only song says there is nothing to fetch), and its lyrics from catalog/lyrics — synced lines with their times, or plain, or \"No lyrics found\", or an instrumental said as one. Details stack; Back and Escape walk them back, and the keys come back to the row they left.",
+      "example": "At 1280 px the card is 560 wide under the pill's centre; at 390 px it is 370 wide, 10 px from each edge; an album opened inside it is the same card, with Back.",
       "authority": "adopted",
       "owners": [
         "music-player/src/shell/search/index.ts",
@@ -2337,6 +2352,11 @@
           "type": "test",
           "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
           "name": "keys move through every section; Enter opens what it is on, Escape goes back, Ctrl+Enter adds"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/search-pages.spec.ts",
+          "name": "the card is centred under the field at 390, 820 and 1280 px, and never off screen"
         }
       ]
     },
@@ -2411,6 +2431,62 @@
           "type": "test",
           "path": "music-player/tests/e2e/np/collections.spec.ts",
           "name": "an album from search opens in the list too, and starred, it is kept under Albums"
+        }
+      ]
+    },
+    {
+      "id": "NP-FIND-009",
+      "group": "np-find",
+      "title": "Playlists are a type of their own: public playlists keylessly, the person’s starred lists above them",
+      "contract": "Search lists playlists as it lists songs, artists and albums (UX-CAT-005): the overview shows three with “See all N”, and the Playlists page lists them all, a page of twelve at a time. A playlist row shows its picture (or a 2×2 mosaic of its first songs' covers when the service gave them), its title, its platform badge, and “Playlist on Deezer · owner · N songs”. Public playlists come from Deezer's public API through whichever server answers — the hub, the companion, or this browser over JSONP — with no key; the other services say they have nothing in the section. Choosing one opens it in the music list the way an album opens (NP-FIND-007): its link is resolved page by page, the silver bar names it, and the star keeps it (NP-FIND-008). On the Playlists page the person's starred playlists sit first under “In your library” (“From the catalog” below), each opening again from there.",
+      "example": "Playlists: 30 for “harbour” — In your library: Kept Lanterns (Playlist on Spotify · Ada · 9 songs); From the catalog: Mix 01 (Playlist on Deezer · Playlist Editor · 40 songs), Mix 02… Page 1 of 3.",
+      "authority": "adopted",
+      "owners": [
+        "music-player/src/shell/search/index.ts",
+        "music-player/src/shell/search/view.ts",
+        "music-player/src/shell/search/client.ts",
+        "music-player/scripts/make-shell.py",
+        "music-player/index.html",
+        "packages/domain/src/catalog/providers/deezer.ts",
+        "packages/contracts/src/api/catalog.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/search-pages.spec.ts",
+          "name": "Playlists is a type: Deezer’s public playlists, the starred ones above them, and one opens like an album"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/search-pages.spec.ts",
+          "name": "with only this browser, the Playlists type still answers: Deezer’s playlist search over JSONP"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-engine.test.ts",
+          "name": "lists public playlists from Deezer as a section of their own, keylessly (UX-CAT-005)"
+        }
+      ]
+    },
+    {
+      "id": "NP-FIND-010",
+      "group": "np-find",
+      "title": "A song from search goes to Up Next, a playlist or the library through the row’s menu",
+      "contract": "Every song row in the search — the overview, a type page, an album's or artist's songs — has a “…” at its end, and right-click or a long press on the row does the same: the shell's contextual menu opens over the song with exactly Add to Up Next, Add to Playlist ▸ (the person's playlists, ticked where one holds the song, and New Playlist…), Add to Library (“In your library”, disabled, once it is), Download… (the helper's fetch sheet; disabled, saying why, for a store-only song) and Audition (disabled when the song has no clip; “Stop Audition” while it plays). Filing a song that is not in the library yet adds it first — quietly, over the library's own wall (library:add), kept in library:state so a playlist that holds it still finds it after a reload; nothing plays — and then queues or files it; the HUD confirms (NP-MENU-003) and the row's + reads ✓. The + badge stays the one-click Add to Library. From the field, Ctrl/Cmd+Enter adds the hot song and Shift+Enter queues it to Up Next. Escape closes the menu before it closes the popover; the menu's first enabled command takes the keys; on a touch screen the commands are 44 px tall and a submenu unfolds in place.",
+      "example": "“One” ▸ … ▸ Add to Up Next → HUD “Up Next: “One””; Add to Playlist ▸ New Playlist… → the sheet → “Added to “Harbour Nights””.",
+      "authority": "adopted",
+      "owners": [
+        "music-player/src/shell/search/index.ts",
+        "music-player/src/shell/search/view.ts",
+        "music-player/src/shell/search/client.ts",
+        "music-player/scripts/make-shell.py",
+        "music-player/index.html"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/search-pages.spec.ts",
+          "name": "a song row’s menu: “…”, right-click and long-press open it; it queues to Up Next, files into a playlist and adds to the library"
         }
       ]
     },
@@ -2822,6 +2898,32 @@
           "type": "test",
           "path": "local-helper/tests/unit/resolve-paging.test.ts",
           "name": "keeps 1,500 entries of a playlist and 3,000 songs of a Spotify playlist when the cap allows"
+        }
+      ]
+    },
+    {
+      "id": "UX-CAT-005",
+      "group": "catalog",
+      "title": "Playlists are a search section, keyless from Deezer",
+      "contract": "A catalog search can be asked for `playlists` beside `tracks`, `artists` and `albums` (`sections=`, CatalogSearchSection). Deezer's public `/search/playlist` answers it — paged with its own `index`/`limit` — and each row is a CatalogPlaylist: id (`deezer:<id>`), title, owner, trackCount, pictureUrl (the playlist's own picture), covers (the first four songs' artwork only when the service gives them without a call per row; else empty, and the picture stands for it), sources (one, whose url opens the playlist through `resolve`, NP-FIND-007) and rank. A private playlist is never a row. The other services say they have nothing in the section (`skipped`), the merger keeps playlists one row by id, `done.page.playlists` and `done.totals.playlists` page them like the rest, and a client that predates the section still parses the stream (the arrays and page default). The hub and the helper pass `sections` through unchanged.",
+      "example": "GET /api/v1/catalog/search?q=harbour&sections=playlists&limit=12 → results{playlists:[{id:\"deezer:14632517341\", title:\"Relaxing Classical Music\", owner:\"Playlist Editor\", trackCount:101, pictureUrl:\"https://cdn-images.dzcdn.net/…\", covers:[], sources:[{platform:\"deezer\", url:\"https://www.deezer.com/playlist/14632517341\"}]}]} … done{page:{playlists:{offset:0, limit:12, hasMore:true}}}",
+      "authority": "adopted",
+      "owners": [
+        "packages/contracts/src/api/catalog.ts",
+        "packages/domain/src/catalog/engine.ts",
+        "packages/domain/src/catalog/merge.ts",
+        "packages/domain/src/catalog/providers/deezer.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-engine.test.ts",
+          "name": "lists public playlists from Deezer as a section of their own, keylessly (UX-CAT-005)"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-engine.test.ts",
+          "name": "a search of every section asks Deezer for playlists beside the rest, and the overview’s done counts them"
         }
       ]
     },

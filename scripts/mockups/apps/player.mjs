@@ -103,15 +103,21 @@ const LINKS = [
   ...SETTINGS.map((id) => ({ selector: `#pt-${id.slice('settings-'.length)}`, to: id, in: [...SETTINGS, 'settings-src-hub'] })),
   { selector: '#prefsBack', to: 'now-playing', in: [...SETTINGS, 'settings-src-hub'] },
   { selector: '#hubTest', to: 'settings-src-hub', in: ['settings-src'] },
-  // The search: its views lead where they led in the app (NP-FIND-003..008).
-  { selector: '.srch__more', to: 'search-see-all', in: ['search', 'search-keys', 'search-page-2'] },
-  { selector: '.srch__row--artist', to: 'search-artist', in: ['search', 'search-keys', 'search-page-2'] },
-  { selector: '.srch__row--album', to: 'search-album', in: ['search', 'search-keys', 'search-page-2', 'search-artist'] },
-  { selector: '#srchList .srch__row:not(.srch__more):not(.srch__row--artist):not(.srch__row--album) .srch__title', to: 'search-song', in: ['search', 'search-keys', 'search-page-2', 'search-album'] },
-  { selector: '#srchBack', to: 'search', in: ['search-see-all', 'search-artist', 'search-album', 'search-song'] },
-  { selector: '#srchFilterBtn', to: 'search-filter', in: ['search', 'search-keys', 'search-page-2', 'search-see-all'] },
+  // The search: its views lead where they led in the app (NP-FIND-003..010).
+  { selector: '.srch__sec[aria-label="Playlists"] .srch__more', to: 'search-playlists', in: ['search', 'search-keys'] },
+  { selector: '.srch__more', to: 'search-see-all', in: ['search', 'search-keys'] },
+  { selector: '.srch__segbtn[data-type="playlists"]', to: 'search-playlists', in: ['search-see-all'] },
+  { selector: '.srch__segbtn[data-type="tracks"]', to: 'search-see-all', in: ['search-playlists'] },
+  { selector: '.srch__row--artist', to: 'search-artist', in: ['search', 'search-keys'] },
+  { selector: '.srch__row--album', to: 'search-album', in: ['search', 'search-keys', 'search-artist'] },
+  { selector: '#srchList .srch__row:not(.srch__more):not(.srch__row--artist):not(.srch__row--album):not(.srch__row--coll) .srch__title', to: 'search-song', in: ['search', 'search-keys', 'search-album'] },
+  { selector: '.srch__menu', to: 'search-row-menu', in: ['search', 'search-keys', 'search-see-all'] },
+  { selector: '#ctx .ctx__item', to: 'search', in: ['search-row-menu'] },
+  { selector: '.srch__row--pl, .srch__row--saved', to: 'playlist-in-list', in: ['search', 'search-playlists'] },
+  { selector: '#srchBack', to: 'search', in: ['search-see-all', 'search-playlists', 'search-artist', 'search-album', 'search-song'] },
+  { selector: '#srchFilterBtn', to: 'search-filter', in: ['search', 'search-keys', 'search-see-all', 'search-playlists'] },
   { selector: '#srchFilterCancel, #srchFilter button[type="submit"]', to: 'search', in: ['search-filter'] },
-  { selector: '#qMore', to: 'search-advanced', in: ['search', 'search-keys', 'search-page-2'] },
+  { selector: '#qMore', to: 'search-advanced', in: ['search', 'search-keys'] },
   { selector: '#qMore', to: 'search', in: ['search-advanced'] },
   { selector: '.srch__row--coll', to: 'playlist-in-list', in: ['pasted-link'] },
   { selector: '.srch__btn[data-act="list"]', to: 'playlist-in-list', in: ['search-album'] },
@@ -280,19 +286,20 @@ export default {
     await page.fill('#q', 'harbour');
     await page.press('#q', 'Enter');
     await settle(2500);
-    await snap({ id: 'search', title: 'Search', group: 'Search', note: 'Search runs on Enter and streams in: songs, artists and albums in sections, each row with the platforms it is on, and a quiet line saying how every service did (one is cooling down). Songs have a 30-second preview, time and tempo, and + to add them. In this mockup the field searches the stock songs as you type and press Enter; the arrows and Page Up/Down move through every section.', ...pop });
+    await snap({ id: 'search', title: 'Search', group: 'Search', note: 'Search runs on Enter and streams in a calm overview: five songs, three artists, albums and playlists, each with “See all N”, every row with the platforms it is on, and a quiet line saying how every service did (one is cooling down). No pager here. Songs have a 30-second preview, time and tempo, + to add them and “…” for their menu. The card hangs centred under the field. In this mockup the field searches the stock songs as you type and press Enter; the arrows move through every section.', ...pop });
     await page.press('#q', 'ArrowDown');
     await page.press('#q', 'ArrowDown');
     await settle(300);
-    await snap({ id: 'search-keys', title: 'Search ▸ a row chosen with the keys', group: 'Search', note: 'Arrow keys move the highlight through every section; Enter previews a song (or opens an artist or album), Ctrl+Enter adds the song, Escape goes back and then closes.', ...pop });
-    await page.press('#q', 'PageDown');
-    await settle(1200);
-    await snap({ id: 'search-page-2', title: 'Search ▸ page 2', group: 'Search', note: 'The results a page at a time: ‹ › and Page Up/Down turn it, and the footer says which page of how many. Later pages are fetched from the catalog as they are wanted.', ...pop });
-    await page.press('#q', 'PageUp');
-    await settle(600);
-    await inPop('.srch__more', 1500);
-    await snap({ id: 'search-see-all', title: 'Search ▸ See all songs', group: 'Search', note: 'One section alone, under Back: the rest of its pages arrive as it scrolls, until it says that is all.', ...pop });
+    await snap({ id: 'search-keys', title: 'Search ▸ a row chosen with the keys', group: 'Search', note: 'Arrow keys move the highlight through every section; Enter previews a song (or opens an artist or album), Ctrl+Enter adds the song, Shift+Enter queues it to Up Next, Escape goes back and then closes.', ...pop });
+    await inPop('.srch__sec[aria-label="Songs"] .srch__more', 1500);
+    await snap({ id: 'search-see-all', title: 'Search ▸ See all songs (a type page)', group: 'Search', note: 'One type alone, under Back: a field that searches songs only, a control to switch type, the list scrolling on by itself, and the one pager — ‹ › and “Page N of M” move a page at a time, fetching from the catalog first when needed.', ...pop });
+    await inPop('.srch__segbtn[data-type="playlists"]', 1500);
+    await snap({ id: 'search-playlists', title: 'Search ▸ Playlists', group: 'Search', note: 'Playlists are a type of their own: public playlists from Deezer, keylessly, each with its picture, owner and song count; the person’s starred lists sit above them under “In your library”. One opens in the music list like an album, with the star.', ...pop });
     await inPop('#srchBack', 600);
+    await inPop('#srchList .srch__row[data-i="0"] .srch__menu', 600);
+    await snap({ id: 'search-row-menu', title: 'Search ▸ a song’s menu', group: 'Search', note: 'A song row’s “…” (or right-click, or a long press) opens the contextual menu: Add to Up Next, Add to Playlist ▸, Add to Library, Download…, Audition. Filing a catalog song adds it to the library quietly first; the HUD confirms.', dismiss: 'search', dismissOutside: '#ctx' });
+    await page.keyboard.press('Escape');
+    await settle(400);
     await inPop('.srch__row--artist', 1500);
     await snap({ id: 'search-artist', title: 'Search ▸ an artist', group: 'Search', note: 'An artist: picture, genre and fans, their top songs and albums. An album here drills into it; Back walks back.', ...pop });
     await inPop('#srchList .srch__row--album', 1500);
@@ -320,7 +327,7 @@ export default {
     await page.fill('#q', fixtures.playlistLink);
     await page.press('#q', 'Enter');
     await settle(2500);
-    await snap({ id: 'pasted-link', title: 'Pasted playlist link', group: 'Search', note: 'A pasted Spotify playlist, read by the companion: one listing that names its platform, its cover a 2×2 mosaic of its first four songs’ covers. Opening it shows it in the music list.', ...pop });
+    await snap({ id: 'pasted-link', title: 'Pasted playlist link', group: 'Search', note: 'A pasted Spotify playlist, read by the companion: one listing that names its platform, its cover a 2×2 mosaic of its first four songs’ covers. Opening it shows it in the music list, as a playlist from the Playlists type does.', ...pop });
     await inPop('.srch__row--coll', 1500);
     await snap({ id: 'playlist-in-list', title: 'A playlist in the music list', group: 'Search', note: 'Opened, the playlist shows the way an album does: the silver bar names it, its songs are the rows, and the star beside its name keeps it in the library.' });
     await click('#libColStar', { ms: 600 });
