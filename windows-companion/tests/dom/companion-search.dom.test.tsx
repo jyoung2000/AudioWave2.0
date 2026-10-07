@@ -93,6 +93,10 @@ describe('Search in the companion', () => {
     const lights = within(songs).getAllByRole('option')[0]!;
     expect(within(lights).getByLabelText('On Deezer, Apple Music, YouTube Music')).toBeTruthy();
     expect(lights.textContent).toContain('118 BPM');
+    // The credit line (UX-CAT-006) and the explicit mark on a song the store lists a contributor for.
+    const wall = within(songs).getAllByRole('option').find((o) => o.textContent?.startsWith('Harbour Wall'))!;
+    expect(wall.textContent).toContain('Cassette Bloom feat. Ada Moss · Harbour Lights');
+    expect(wall.textContent).toContain('explicit');
     expect(within(screen.getByRole('list', { name: 'Services asked' })).getByText('SoundCloud').parentElement?.textContent).toMatch(/resting/);
     expect(screen.getByText('Linked, not searched: Spotify.')).toBeTruthy();
     const [search] = bridge.sent('catalog:search');

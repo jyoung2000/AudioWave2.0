@@ -286,7 +286,7 @@ export default {
     await page.fill('#q', 'harbour');
     await page.press('#q', 'Enter');
     await settle(2500);
-    await snap({ id: 'search', title: 'Search', group: 'Search', note: 'Search runs on Enter and streams in a calm overview: five songs, three artists, albums and playlists, each with “See all N”, every row with the platforms it is on, and a quiet line saying how every service did (one is cooling down). No pager here. Songs have a 30-second preview, time and tempo, + to add them and “…” for their menu. The card hangs centred under the field. In this mockup the field searches the stock songs as you type and press Enter; the arrows move through every section.', ...pop });
+    await snap({ id: 'search', title: 'Search', group: 'Search', note: 'Search runs on Enter and streams in a calm overview: five songs, three artists, albums and playlists, each with “See all N”, every row with the platforms it is on, and a quiet line saying how every service did (one is cooling down). No pager here. Songs have a 30-second preview, their credit line (“feat. …” when a store lists a contributor), a small E when explicit, time and tempo, + to add them and “…” for their menu. The card hangs centred under the field. In this mockup the field searches the stock songs as you type and press Enter; the arrows move through every section.', ...pop });
     await page.press('#q', 'ArrowDown');
     await page.press('#q', 'ArrowDown');
     await settle(300);

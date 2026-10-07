@@ -2201,7 +2201,7 @@
       "id": "NP-FIND-003",
       "group": "np-find",
       "title": "Search is music, live: a calm overview of songs, artists, albums and playlists, each naming its platforms",
-      "contract": "A search in the header (Enter) asks the catalog — the paired hub's /api/v1/catalog/search with the device credential, else the companion's /helper/v1/catalog/search, else the engine run in this browser against the keyless services that answer a page (iTunes, MusicBrainz and LRCLIB over CORS; Deezer over JSONP) — and reads its NDJSON as it arrives. Rows appear as each service answers and upsert by id (a later chunk's merged copy replaces its row in place); they are sorted by rank, ties by arrival. One song is one row: the engine merges its services' copies, and the player applies the engine's own identity (sameRecording) and merger (mergeTrack) to whatever still arrives apart — another chunk, another page — so a copy already shown joins that row with its badge instead of making a second; a live, remix or other version stays its own row. The first view after Enter is a calm overview (owner, 2026-10-07): Songs (five), Artists (three), Albums (three) and Playlists (three), each group ending in “See all N” (N+ while more may exist) that opens that type's own page (NP-FIND-004). The overview has no pager — no dots, no ‹ ›, no page count — and Page Up/Down do nothing there. Every row shows each platform it is on as a small badge (Apple Music, Deezer, YouTube, YouTube Music, SoundCloud, Bandcamp, Spotify, MusicBrainz…); a Spotify song says \"plays from YouTube Music\". A quiet line under the count names every service in the engine's states — a count, searching…, nothing, failed, timed out, cooling down until a time, needs yt-dlp — with the reason on hover, the platforms that only contributed links (done.linkedOnly: \"Spotify: links only\"), and who answered; with only this browser it says plainly that YouTube and SoundCloud results need the hub or the companion. A failure says plainly what happened. Arrows move through every row of every section, Enter auditions a song with a clip or opens what it is on, Ctrl/Cmd+Enter adds the song, Shift+Enter queues it to Up Next (NP-FIND-010), Escape goes back a level and then closes; the rows are a listbox of groups with options, and a live region says the counts.",
+      "contract": "A search in the header (Enter) asks the catalog — the paired hub's /api/v1/catalog/search with the device credential, else the companion's /helper/v1/catalog/search, else the engine run in this browser against the keyless services that answer a page (iTunes, MusicBrainz and LRCLIB over CORS; Deezer over JSONP) — and reads its NDJSON as it arrives. Rows appear as each service answers and upsert by id (a later chunk's merged copy replaces its row in place); they are sorted by rank, ties by arrival. One song is one row: the engine merges its services' copies, and the player applies the engine's own identity (sameRecording) and merger (mergeTrack) to whatever still arrives apart — another chunk, another page — so a copy already shown joins that row with its badge instead of making a second; a live, remix or other version stays its own row. The first view after Enter is a calm overview (owner, 2026-10-07): Songs (five), Artists (three), Albums (three) and Playlists (three), each group ending in “See all N” (N+ while more may exist) that opens that type's own page (NP-FIND-004). The overview has no pager — no dots, no ‹ ›, no page count — and Page Up/Down do nothing there. Every row shows each platform it is on as a small badge (Apple Music, Deezer, YouTube, YouTube Music, SoundCloud, Bandcamp, Spotify, MusicBrainz…); a Spotify song says \"plays from YouTube Music\". A quiet line under the count names every service in the engine's states — a count, searching…, nothing, failed, timed out, cooling down until a time, needs yt-dlp — with the reason on hover, the platforms that only contributed links (done.linkedOnly: \"Spotify: links only\"), and who answered; with only this browser it says plainly that YouTube and SoundCloud results need the hub or the companion. A failure says plainly what happened. Arrows move through every row of every section, Enter auditions a song with a clip or opens what it is on, Ctrl/Cmd+Enter adds the song, Shift+Enter queues it to Up Next (NP-FIND-010), Escape goes back a level and then closes; the rows are a listbox of groups with options, and a live region says the counts. A song row shows its cover, title, credit line (the main artist, then “feat. …” from the other credited names), album and year, time, BPM and a small “E” when the store marks it explicit; these arrive with the engine’s last chunk before done (UX-CAT-006: Deezer’s detail by id, ISRC or one exact search, the Cover Art Archive for a MusicBrainz-only cover) and upsert the row in place, so a row may gain “feat.”, its BPM, its E and its cover a moment after it first appeared. The browser’s own Deezer tempo lookup runs only for rows still without a BPM once the search is done.",
       "example": "“harbour”: Results: 12 songs · 2 artists · 2 albums · 4 playlists — Apple Music 6 · Deezer 9 · MusicBrainz cooling down until 12:05 · YouTube 4 · SoundCloud failed — through the companion on this PC; under Songs, “See all 12+ songs”.",
       "authority": "adopted",
       "owners": [
@@ -2209,7 +2209,8 @@
         "music-player/src/shell/search/view.ts",
         "music-player/src/shell/search/client.ts",
         "music-player/scripts/make-shell.py",
-        "music-player/index.html"
+        "music-player/index.html",
+        "packages/domain/src/catalog/view.ts"
       ],
       "evidence": [
         {
@@ -2251,6 +2252,11 @@
           "type": "test",
           "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
           "name": "a later page never repeats a song already shown: its platforms join the row it is"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
+          "name": "the engine’s last chunk fills a row in place: it gains “feat.”, BPM, the E mark and a cover (UX-CAT-006)"
         }
       ]
     },
@@ -2797,7 +2803,7 @@
       "id": "UX-CAT-003",
       "group": "catalog",
       "title": "Search finds music, never a “search on YouTube” offer, and every result says where it is",
-      "contract": "The catalog answers with songs, artists and albums only. It never returns an entry whose only purpose is to send the person to search another site; YouTube and SoundCloud are searched by the server (yt-dlp) and their results are songs like any other. Every track, artist and album carries at least one source naming its platform, and a song from Spotify that plays from YouTube Music carries both, the second marked as spotDL’s match. A pasted link is not searched: the search says to resolve it, and resolve says what it is or, for a link it cannot read (a private or Spotify-made playlist, a Tidal link without a SongLink key), why — in words. A row shows at most three platform badges and counts the rest (+N), so the title is never cut short by them; every platform is named in the row's tooltip and on the song's page.",
+      "contract": "The catalog answers with songs, artists and albums only. It never returns an entry whose only purpose is to send the person to search another site; YouTube and SoundCloud are searched by the server (yt-dlp) and their results are songs like any other. Every track, artist and album carries at least one source naming its platform, and a song from Spotify that plays from YouTube Music carries both, the second marked as spotDL’s match. A pasted link is not searched: the search says to resolve it, and resolve says what it is or, for a link it cannot read (a private or Spotify-made playlist, a Tidal link without a SongLink key), why — in words. A row shows at most three platform badges and counts the rest (+N), so the title is never cut short by them; every platform is named in the row's tooltip and on the song's page. The facts a row carries beyond its platforms — cover, BPM, featured artists, explicit, date, ISRC, album — and where each comes from are UX-CAT-006.",
       "example": "{\"sources\":[{\"platform\":\"spotify\",\"matchedBy\":\"link\"},{\"platform\":\"youtube-music\",\"matchedBy\":\"spotdl\"}]} — shown as “Spotify · plays from YouTube Music”.",
       "authority": "adopted",
       "owners": [
@@ -2928,6 +2934,91 @@
       ]
     },
     {
+      "id": "UX-CAT-006",
+      "group": "catalog",
+      "title": "Every result carries its facts",
+      "contract": "Every song a search page, an album page or an artist’s top songs list carries, on all three apps, has its cover, title, duration, BPM, featured artists, explicit mark, release date and year, ISRC and album when any keyless service knows them — not only the stores’ search rows, which carry no tempo and no contributors. After a page is assembled (every service’s chunk and the cross-links) the engine fills each row with a bounded, concurrent, cached lookup: a Deezer source → `/track/{id}` (bpm, contributors → `artists`, isrc, explicit_lyrics, release_date, cover_xl, track_position, disk_number, the album’s title); else an ISRC → `/track/isrc:{isrc}`; else one exact “artist title” Deezer search, taken only when it is the same recording (`sameRecording`); a MusicBrainz-only row still without a cover takes the Cover Art Archive’s front image for the recording’s first release (`/release/{mbid}/front-500` answers 307 when it exists, 404 when not; asked with redirects unfollowed). Nothing known is overwritten — only nulls are filled, the fuller date wins, an iTunes row keeps its 600 px artwork — and a video thumbnail gives way to a store’s square cover as the merger’s rule has it. Budget: at most 8 lookups in flight, 6 s a page (4 s for a detail page), the first chunk never waits; the filled rows are one last `results` chunk with `provider: null` before `done`, upserted by id like the cross-link chunks, and `?stream=0` folds them in. Answers are cached a day by Deezer id, by ISRC and by the name they were found by; Deezer’s quota (error code 4) ends the page’s lookups and rests the service, and a service switched off, resting or left out of the search is not asked. A row’s credit line (`creditLine`) is the main artist, then “feat. A & B” from the other credited names when the artist line does not already name them — repeats dropped, order kept, four at most then “& others” — on the row and the song page of the player, the hub and the companion; a song the store marks explicit shows a small “E” beside its title, read as “explicit”. The player’s own Deezer tempo lookup is a fallback for rows still without a BPM once the search is done (an older hub’s rows), never a race with the engine.",
+      "example": "Deezer’s search row “Get Lucky (feat. Pharrell Williams and Nile Rodgers)” by Daft Punk arrives with bpm: null and artists: [“Daft Punk”]; the last chunk before done carries the same id with bpm: 116.1, artists: [“Daft Punk”, “Pharrell Williams”, “Nile Rodgers”], isrc: “USQX91300108”, explicit: false, releaseDate: “2013-05-20”, trackNumber: 8 — the row reads “Daft Punk feat. Pharrell Williams & Nile Rodgers — Random Access Memories · 2013 · 116 bpm”.",
+      "authority": "adopted",
+      "owners": [
+        "packages/domain/src/catalog/hydrate.ts",
+        "packages/domain/src/catalog/engine.ts",
+        "packages/domain/src/catalog/view.ts",
+        "packages/domain/src/catalog/providers/musicbrainz.ts",
+        "music-player/src/shell/search/view.ts",
+        "music-player/src/shell/search/index.ts",
+        "docker-container/src/web/views/Search.tsx",
+        "windows-companion/src/renderer/views/Search.tsx"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-hydrate.test.ts",
+          "name": "fills a search page’s rows from Deezer’s detail in one last merge-only chunk before done"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-hydrate.test.ts",
+          "name": "a MusicBrainz-only row takes the Cover Art Archive’s front cover for its first release, never following the hop"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-hydrate.test.ts",
+          "name": "fills an ISRC-only row from /track/isrc:, and a store-less row by one exact search taken only for the same recording"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-hydrate.test.ts",
+          "name": "never downgrades: an iTunes row keeps its 600 px artwork and its own credit line, and gains what it lacked"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-hydrate.test.ts",
+          "name": "asks at most eight at a time, starts nothing past the budget, and never holds done for a slow answer"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-hydrate.test.ts",
+          "name": "keeps a detail for a day, under its id and its ISRC: the next page or search asks nothing"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-hydrate.test.ts",
+          "name": "respects Deezer’s quota: the first code-4 answer ends the page’s lookups and rests the service"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-hydrate.test.ts",
+          "name": "an album’s songs and an artist’s top songs are filled in too"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-hydrate.test.ts",
+          "name": "names the main artist, then the featured ones a store lists as contributors"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/integration/catalog.test.ts",
+          "name": "a page’s rows carry bpm, contributors, ISRC and explicit after the hydration chunk, before done (UX-CAT-006)"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
+          "name": "the engine’s last chunk fills a row in place: it gains “feat.”, BPM, the E mark and a cover (UX-CAT-006)"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "shows cover, title, artist, album, its platforms, BPM, time, the explicit marker and a preview"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-search.dom.test.tsx",
+          "name": "folds the chunks the main process passes on, says every service’s state, and shows rows that are music"
+        }
+      ]
+    },
+    {
       "id": "UX-SEARCH-001",
       "group": "search",
       "title": "One field finds music; the advanced fields fold back into it; the filter is kept",
@@ -3003,7 +3094,7 @@
       "id": "UX-SEARCH-003",
       "group": "search",
       "title": "A row is music, and says where it is",
-      "contract": "Every song row shows its cover, title, artist, album, time, BPM when known, an explicit mark and a play control for its 30-second preview (Apple Music or Deezer), and one chip per platform it is on; a song that plays only through Spotify says it plays from YouTube Music via spotDL. No row offers to “search on” a site. A song opens to its genre, label and year (MusicBrainz), its lyrics (synced when LRCLIB has them), its preview, and Download: on the hub into the queue with the rights basis, saying which source was chosen and what was written into the tags; on the companion through the helper, as every download on that PC.",
+      "contract": "Every song row shows its cover, title, credit line (`creditLine`: the main artist, then “feat. …” from the other credited names when the artist line does not already name them), album, time, BPM, an explicit mark and a play control for its 30-second preview (Apple Music or Deezer), and one chip per platform it is on; a song that plays only through Spotify says it plays from YouTube Music via spotDL. No row offers to “search on” a site. A song opens to its genre, label and year (MusicBrainz), its lyrics (synced when LRCLIB has them), its preview, and Download: on the hub into the queue with the rights basis, saying which source was chosen and what was written into the tags; on the companion through the helper, as every download on that PC. Those facts come with the search itself: the engine fills every page’s rows before done (UX-CAT-006 — Deezer’s detail, the Cover Art Archive), as one merge-only chunk the window folds in by id, so a row gains its BPM, its featured artists and its cover a moment after it first appeared; the song page says the same credit line.",
       "authority": "adopted",
       "owners": [
         "docker-container/src/web/views/Search.tsx",
@@ -3037,6 +3128,16 @@
           "type": "test",
           "path": "windows-companion/tests/contract/catalog-ipc.test.ts",
           "name": "a download takes the helper’s own path from the song’s best source, with the rights basis"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-search.dom.test.tsx",
+          "name": "folds the chunks the main process passes on, says every service’s state, and shows rows that are music"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-hydrate.test.ts",
+          "name": "names the main artist, then the featured ones a store lists as contributors"
         }
       ]
     },
