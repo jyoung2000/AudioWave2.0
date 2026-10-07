@@ -17,7 +17,7 @@
  * tab strip is a roving-tabindex group (UX-KEY-001): one tab stop, arrows and Home/End move the
  * selection, locked tabs are skipped.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { BRANDING, type NetworkConfig, type OverviewMetrics, type SessionInfo } from '@now-playing/contracts';
 import { api, setCsrfToken } from './lib/api.js';
 import { useAction, useResource, useStoredState, type Resource } from './lib/hooks.js';
@@ -40,7 +40,9 @@ import { DiagnosticsView } from './views/Diagnostics.js';
 import { BackupView } from './views/Backup.js';
 import { RecommendationsView } from './views/Recommendations.js';
 import { MusicSearchSettingsView } from './views/CatalogSettings.js';
-import { SearchView } from './views/Search.js';
+/* Search carries the catalog's view code (and its stream reader): it loads when the tab is first
+   opened, so the window everyone signs in to stays inside its first-load budget. */
+const SearchView = lazy(() => import('./views/Search.js').then((m) => ({ default: m.SearchView })));
 
 const PRODUCT = BRANDING.products.hub;
 
@@ -425,7 +427,11 @@ function sectionBody(id: ViewId): ReactNode {
     case 'catalog':
       return <MusicSearchSettingsView />;
     case 'search':
-      return <SearchView />;
+      return (
+        <Suspense fallback={<Note>Loading search…</Note>}>
+          <SearchView />
+        </Suspense>
+      );
     case 'library':
       return <LibraryView />;
     case 'downloads':
