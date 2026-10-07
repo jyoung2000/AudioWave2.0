@@ -5,7 +5,7 @@
  * and rests (`cooling-down` with the time) rather than being refused. It has no ISRC lookup and no
  * artist pictures, and says so by not being asked.
  */
-import type { CatalogAlbum, CatalogArtist, CatalogQuery, CatalogSection, CatalogTrack } from '@now-playing/contracts';
+import type { CatalogAlbum, CatalogArtist, CatalogQuery, CatalogSearchSection, CatalogSection, CatalogTrack } from '@now-playing/contracts';
 import { arr, calendarDate, getJson, num, posInt, str, webUrl, yearOf, type CatalogFetch, type Json } from '../http.js';
 import { Budget, type Now } from '../limits.js';
 import { ProviderResting, emptyResult, type CatalogProvider, type ProviderResult, type ProviderSearchOptions } from '../provider.js';
@@ -150,7 +150,7 @@ const ENTITY: Record<CatalogSection, string> = { tracks: 'song', artists: 'music
 
 export class ItunesProvider implements CatalogProvider {
   readonly id = 'itunes' as const;
-  readonly sections: readonly CatalogSection[] = ['tracks', 'artists', 'albums'];
+  readonly sections: readonly CatalogSearchSection[] = ['tracks', 'artists', 'albums'];
   readonly timeoutMs: number;
 
   constructor(readonly client: ItunesClient) {
@@ -163,7 +163,7 @@ export class ItunesProvider implements CatalogProvider {
 
   async search(query: CatalogQuery, options: ProviderSearchOptions): Promise<ProviderResult> {
     const out = emptyResult();
-    const sections = options.sections.filter((s) => this.sections.includes(s));
+    const sections = options.sections.filter((s): s is CatalogSection => s in ENTITY);
     // One call per section, side by side. A section the budget refused is left out; only when every
     // section was refused (or failed) does the provider report it.
     const settled = await Promise.allSettled(

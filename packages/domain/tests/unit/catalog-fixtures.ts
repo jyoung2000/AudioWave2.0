@@ -54,6 +54,7 @@ export const STANDARD_ROUTES: Route[] = [
   [/api\.deezer\.com\/search\/track/, 'deezer-search-track'],
   [/api\.deezer\.com\/search\/artist/, 'deezer-search-artist'],
   [/api\.deezer\.com\/search\/album/, 'deezer-search-album'],
+  [/api\.deezer\.com\/search\/playlist/, 'deezer-search-playlist'],
   [/api\.deezer\.com\/track\/isrc:USQX91300108/, 'deezer-isrc'],
   [/api\.deezer\.com\/track\/isrc:/, 'deezer-isrc-missing'],
   [/musicbrainz\.org\/ws\/2\/recording\?query=/, 'musicbrainz-recording-search'],

@@ -48,8 +48,19 @@ export const CatalogProviderId = z.enum(['itunes', 'deezer', 'musicbrainz', 'you
 export type CatalogProviderId = z.infer<typeof CatalogProviderId>;
 export const CATALOG_PROVIDERS: readonly CatalogProviderId[] = CatalogProviderId.options;
 
+/** The three item sections every catalog client draws: songs, artists and albums. */
 export const CatalogSection = z.enum(['tracks', 'artists', 'albums']);
 export type CatalogSection = z.infer<typeof CatalogSection>;
+
+/**
+ * Everything a search can be asked for (`sections=`): the item sections and `playlists` — public
+ * playlists, keyless from Deezer (owner requirement, 2026-10-07; UX-CAT-005). Older clients that
+ * draw only the three item sections keep `CatalogSection`; the stream's `playlists` arrays and page
+ * default to empty and null, so their chunks still parse.
+ */
+export const CatalogSearchSection = z.enum(['tracks', 'artists', 'albums', 'playlists']);
+export type CatalogSearchSection = z.infer<typeof CatalogSearchSection>;
+export const CATALOG_SEARCH_SECTIONS: readonly CatalogSearchSection[] = CatalogSearchSection.options;
 
 /**
  * How a source was tied to the song: found by that service's own search (`search`), by the same
@@ -127,6 +138,24 @@ export const CatalogAlbum = z.object({
 });
 export type CatalogAlbum = z.infer<typeof CatalogAlbum>;
 
+/**
+ * A public playlist a search found (UX-CAT-005). Opened, it is a collection like an album: resolve
+ * its first source's `url` for its songs (NP-FIND-007). `covers` are the first four songs' artwork
+ * when the service gave them cheaply (a listing never costs a call per playlist); else it is empty
+ * and `pictureUrl` — the playlist's own picture — stands for it.
+ */
+export const CatalogPlaylist = z.object({
+  id: z.string().max(260),
+  title: z.string().max(300),
+  owner: z.string().max(300).nullable().default(null),
+  trackCount: z.number().int().nonnegative().nullable().default(null),
+  pictureUrl: z.string().max(2048).nullable().default(null),
+  covers: z.array(z.string().max(2048)).max(4).default([]),
+  sources: z.array(CatalogSource).min(1).max(20),
+  rank: z.number().default(0),
+});
+export type CatalogPlaylist = z.infer<typeof CatalogPlaylist>;
+
 /** What a query was read as. A pasted link is resolved, not searched. */
 export const CatalogQuery = z.object({
   kind: z.enum(['text', 'advanced', 'isrc', 'url']),
@@ -197,7 +226,7 @@ export const CatalogSearchRequest = z
     track: z.string().trim().max(200).optional(),
     artist: z.string().trim().max(200).optional(),
     album: z.string().trim().max(200).optional(),
-    sections: csv(CatalogSection).optional(),
+    sections: csv(CatalogSearchSection).optional(),
     providers: csv(CatalogProviderId).optional(),
     offset: z.coerce.number().int().min(0).max(1000).default(0),
     limit: z.coerce.number().int().min(1).max(CATALOG_MAX_LIMIT).default(25),
@@ -216,6 +245,8 @@ export const CatalogSearchResultsChunk = z.object({
   tracks: z.array(CatalogTrack),
   artists: z.array(CatalogArtist),
   albums: z.array(CatalogAlbum),
+  /** Public playlists (UX-CAT-005); empty from a server that predates them. */
+  playlists: z.array(CatalogPlaylist).default([]),
   status: z.array(CatalogSourceStatus),
 });
 export const CatalogSearchDoneChunk = z.object({
@@ -223,9 +254,9 @@ export const CatalogSearchDoneChunk = z.object({
   seq: z.number().int().nonnegative(),
   query: CatalogQuery,
   status: z.array(CatalogSourceStatus),
-  page: z.object({ tracks: CatalogPage.nullable(), artists: CatalogPage.nullable(), albums: CatalogPage.nullable() }),
+  page: z.object({ tracks: CatalogPage.nullable(), artists: CatalogPage.nullable(), albums: CatalogPage.nullable(), playlists: CatalogPage.nullable().default(null) }),
   /** Rows after merging, per section. */
-  totals: z.object({ tracks: z.number().int().nonnegative(), artists: z.number().int().nonnegative(), albums: z.number().int().nonnegative() }),
+  totals: z.object({ tracks: z.number().int().nonnegative(), artists: z.number().int().nonnegative(), albums: z.number().int().nonnegative(), playlists: z.number().int().nonnegative().default(0) }),
   /** A pasted link is not searched: the client should call `resolve` with it. */
   resolve: z.string().max(2048).nullable().default(null),
   /**
@@ -245,6 +276,7 @@ export const CatalogSearchAggregate = z.object({
   tracks: z.array(CatalogTrack),
   artists: z.array(CatalogArtist),
   albums: z.array(CatalogAlbum),
+  playlists: z.array(CatalogPlaylist).default([]),
   status: z.array(CatalogSourceStatus),
   page: CatalogSearchDoneChunk.shape.page,
   resolve: z.string().max(2048).nullable().default(null),

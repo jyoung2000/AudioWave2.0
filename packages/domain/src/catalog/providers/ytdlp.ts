@@ -7,7 +7,7 @@
  * servers: `--ignore-config` first, the search behind `--`, and the words cleaned of control
  * characters and capped, so nothing typed into a search box can become a flag.
  */
-import type { CatalogQuery, CatalogSection, CatalogSource, CatalogTrack } from '@now-playing/contracts';
+import type { CatalogQuery, CatalogSearchSection, CatalogSource, CatalogTrack } from '@now-playing/contracts';
 import { OFFICIAL_SOURCES, matchArtist } from '../merge.js';
 import { cleanVideoTitle } from '../../titles.js';
 import { arr, isObject, num, str, webUrl, type Json } from '../http.js';
@@ -154,7 +154,7 @@ export function toolSearchTracks(platform: ToolSearchPlatform, document: unknown
 }
 
 export class ToolSearchProvider implements CatalogProvider {
-  readonly sections: readonly CatalogSection[] = ['tracks'];
+  readonly sections: readonly CatalogSearchSection[] = ['tracks'];
 
   constructor(
     readonly id: ToolSearchPlatform,

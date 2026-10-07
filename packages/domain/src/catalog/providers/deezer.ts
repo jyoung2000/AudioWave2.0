@@ -7,7 +7,7 @@
  * advanced fields, and when that finds nothing — measured 2026-10-06, `artist:` matched nothing at
  * all — the same words are asked as plain text, so a broken filter costs precision, not answers.
  */
-import type { CatalogAlbum, CatalogArtist, CatalogPlatform, CatalogQuery, CatalogSection, CatalogTrack } from '@now-playing/contracts';
+import type { CatalogAlbum, CatalogArtist, CatalogPlatform, CatalogPlaylist, CatalogQuery, CatalogSearchSection, CatalogTrack } from '@now-playing/contracts';
 import { arr, calendarDate, CatalogHttpError, getJson, isObject, num, posInt, str, webUrl, yearOf, type CatalogFetch, type Json } from '../http.js';
 import { emptyResult, type CatalogProvider, type ProviderResult, type ProviderSearchOptions } from '../provider.js';
 
@@ -92,6 +92,28 @@ export function deezerArtist(row: Json): CatalogArtist | null {
   const name = str(row['name']);
   if (id === null || !name) return null;
   return { id: `deezer:${id}`, name, pictureUrl: webUrl(row['picture_xl']) ?? webUrl(row['picture_big']), albumCount: posInt(row['nb_album']), fans: num(row['nb_fan']) !== null ? Math.round(num(row['nb_fan'])!) : null, genre: null, sources: [source('artist', id)], rank: 0 };
+}
+
+/**
+ * A public playlist as `/search/playlist` lists it (UX-CAT-005): its own picture (`picture_xl`; a
+ * four-cover mosaic when Deezer composed one, which is still one picture), its owner and song count.
+ * The listing carries no songs, so `covers` stays empty: the mosaic would cost a call per row.
+ */
+export function deezerPlaylist(row: Json): CatalogPlaylist | null {
+  const id = num(row['id']);
+  const title = str(row['title']);
+  if (id === null || !title || row['public'] === false) return null;
+  const user = isObject(row['user']) ? row['user'] : isObject(row['creator']) ? row['creator'] : null;
+  return {
+    id: `deezer:${id}`,
+    title,
+    owner: str(user?.['name']),
+    trackCount: posInt(row['nb_tracks']),
+    pictureUrl: webUrl(row['picture_xl']) ?? dzCover(row['md5_image'], 'playlist'),
+    covers: [],
+    sources: [source('playlist', id)],
+    rank: 0,
+  };
 }
 
 /** A Lucene-ish quote for Deezer's field syntax: no quotes inside, no runaway length. */
@@ -207,11 +229,11 @@ export class DeezerClient {
   }
 }
 
-const ENDPOINT: Record<CatalogSection, string> = { tracks: '/search/track', artists: '/search/artist', albums: '/search/album' };
+const ENDPOINT: Record<CatalogSearchSection, string> = { tracks: '/search/track', artists: '/search/artist', albums: '/search/album', playlists: '/search/playlist' };
 
 export class DeezerProvider implements CatalogProvider {
   readonly id = 'deezer' as const;
-  readonly sections: readonly CatalogSection[] = ['tracks', 'artists', 'albums'];
+  readonly sections: readonly CatalogSearchSection[] = ['tracks', 'artists', 'albums', 'playlists'];
   readonly timeoutMs: number;
 
   constructor(readonly client: DeezerClient) {
@@ -231,9 +253,10 @@ export class DeezerProvider implements CatalogProvider {
       return out;
     }
     const sections = options.sections.filter((s) => this.sections.includes(s));
-    const ask = async (section: CatalogSection): Promise<Json[]> => {
+    const ask = async (section: CatalogSearchSection): Promise<Json[]> => {
       const page = `&index=${options.offset}&limit=${options.limit}`;
-      if (query.kind === 'advanced') {
+      // The field syntax is for songs, artists and albums; a playlist is found by its words alone.
+      if (query.kind === 'advanced' && section !== 'playlists') {
         const strict = await this.client.list(`${ENDPOINT[section]}?q=${encodeURIComponent(deezerAdvanced(query))}${page}`, options.signal);
         if (strict.rows.length) return strict.rows;
       }
@@ -247,6 +270,7 @@ export class DeezerProvider implements CatalogProvider {
       if (section === 'tracks') out.tracks = result.value.map((r) => deezerTrack(r)).filter((t): t is CatalogTrack => t !== null);
       if (section === 'albums') out.albums = result.value.map(deezerAlbum).filter((a): a is CatalogAlbum => a !== null);
       if (section === 'artists') out.artists = result.value.map(deezerArtist).filter((a): a is CatalogArtist => a !== null);
+      if (section === 'playlists') out.playlists = result.value.map(deezerPlaylist).filter((p): p is CatalogPlaylist => p !== null);
     });
     const failed = settled.find((r): r is PromiseRejectedResult => r.status === 'rejected');
     if (failed && settled.every((r) => r.status === 'rejected')) throw failed.reason;

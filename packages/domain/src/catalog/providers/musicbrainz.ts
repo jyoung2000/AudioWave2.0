@@ -6,7 +6,7 @@
  * MusicBrainz asks applications for a meaningful User-Agent and no more than one request a second.
  * Every call here goes through one `Pacer`, shared by search and enrichment.
  */
-import type { CatalogEnrichment, CatalogPlatform, CatalogQuery, CatalogSection, CatalogSource, CatalogTrack } from '@now-playing/contracts';
+import type { CatalogEnrichment, CatalogPlatform, CatalogQuery, CatalogSearchSection, CatalogSource, CatalogTrack } from '@now-playing/contracts';
 import { arr, calendarDate, getJson, isObject, num, str, yearOf, type CatalogFetch, type Json } from '../http.js';
 import { Pacer, type Now, type Sleep } from '../limits.js';
 import { emptyResult, type CatalogProvider, type ProviderResult, type ProviderSearchOptions } from '../provider.js';
@@ -207,7 +207,7 @@ export function musicbrainzLucene(query: CatalogQuery): string {
 
 export class MusicBrainzProvider implements CatalogProvider {
   readonly id = 'musicbrainz' as const;
-  readonly sections: readonly CatalogSection[] = ['tracks'];
+  readonly sections: readonly CatalogSearchSection[] = ['tracks'];
   readonly timeoutMs: number;
 
   constructor(readonly client: MusicBrainzClient) {

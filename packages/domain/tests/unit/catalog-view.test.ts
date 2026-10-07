@@ -24,7 +24,7 @@ const track = (patch: Partial<CatalogTrack> & Pick<CatalogTrack, 'id' | 'title' 
 
 const status = (provider: CatalogSourceStatus['provider'], state: CatalogSourceStatus['state'], patch: Partial<CatalogSourceStatus> = {}): CatalogSourceStatus => ({ provider, state, count: 0, latencyMs: null, error: null, retryAt: null, ...patch });
 const query = { kind: 'text' as const, text: 'harbour', track: null, artist: null, album: null, isrc: null, url: null };
-const results = (seq: number, tracks: CatalogTrack[], st: CatalogSourceStatus[]): CatalogSearchChunk => ({ type: 'results', seq, provider: 'itunes', query, tracks, artists: [], albums: [], status: st });
+const results = (seq: number, tracks: CatalogTrack[], st: CatalogSourceStatus[]): CatalogSearchChunk => ({ type: 'results', seq, provider: 'itunes', query, tracks, artists: [], albums: [], playlists: [], status: st });
 
 describe('the live feed (UX-SEARCH-002)', () => {
   it('upserts rows by id: a later chunk replaces a row in place, a new one is added after', () => {
@@ -35,7 +35,7 @@ describe('the live feed (UX-SEARCH-002)', () => {
     expect(state.tracks.map((t) => t.title)).toEqual(['Harbour (merged)', 'Wall', 'Fog']);
     // By rank, then in the order they arrived.
     expect(byRank(state.tracks).map((t) => t.id)).toEqual(['b', 'a', 'c']);
-    state = foldCatalogChunk(state, { type: 'done', seq: 3, query, status: [status('itunes', 'ok'), status('deezer', 'ok')], page: { tracks: { offset: 0, limit: 25, hasMore: true }, artists: null, albums: null }, totals: { tracks: 3, artists: 0, albums: 0 }, resolve: null, linkedOnly: [] });
+    state = foldCatalogChunk(state, { type: 'done', seq: 3, query, status: [status('itunes', 'ok'), status('deezer', 'ok')], page: { tracks: { offset: 0, limit: 25, hasMore: true }, artists: null, albums: null, playlists: null }, totals: { tracks: 3, artists: 0, albums: 0, playlists: 0 }, resolve: null, linkedOnly: [] });
     expect(state.done?.page.tracks?.hasMore).toBe(true);
     expect(state.tracks).toHaveLength(3);
   });

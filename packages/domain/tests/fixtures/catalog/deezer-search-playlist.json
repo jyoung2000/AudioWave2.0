@@ -1,0 +1,56 @@
+{
+  "data": [
+    {
+      "id": 14632517341,
+      "title": "Relaxing Classical Music",
+      "public": true,
+      "nb_tracks": 101,
+      "link": "https://www.deezer.com/playlist/14632517341",
+      "picture": "https://api.deezer.com/playlist/14632517341/image",
+      "picture_small": "https://cdn-images.dzcdn.net/images/playlist/ca698c69567ce9f8d4fc19dab12867d3/56x56-000000-80-0-0.jpg",
+      "picture_medium": "https://cdn-images.dzcdn.net/images/playlist/ca698c69567ce9f8d4fc19dab12867d3/250x250-000000-80-0-0.jpg",
+      "picture_big": "https://cdn-images.dzcdn.net/images/playlist/ca698c69567ce9f8d4fc19dab12867d3/500x500-000000-80-0-0.jpg",
+      "picture_xl": "https://cdn-images.dzcdn.net/images/playlist/ca698c69567ce9f8d4fc19dab12867d3/1000x1000-000000-80-0-0.jpg",
+      "checksum": "2e49b6ee41cb31cb5cbaf3d189497f3b",
+      "tracklist": "https://api.deezer.com/playlist/14632517341/tracks",
+      "creation_date": "2025-12-03 09:13:36",
+      "md5_image": "ca698c69567ce9f8d4fc19dab12867d3",
+      "picture_type": "playlist",
+      "user": { "id": 1, "name": "Playlist Editor", "tracklist": "https://api.deezer.com/user/1/flow", "type": "user" },
+      "type": "playlist"
+    },
+    {
+      "id": 61857696,
+      "title": "Pearl Harbor Soundtrack",
+      "public": true,
+      "nb_tracks": 10,
+      "link": "https://www.deezer.com/playlist/61857696",
+      "picture": "https://api.deezer.com/playlist/61857696/image",
+      "picture_xl": "https://cdn-images.dzcdn.net/images/cover/fe9f2f1290275e57df54a32e18d31471/1000x1000-000000-80-0-0.jpg",
+      "checksum": "0d2ba9e7c0d1e8c2e9f0a1b2c3d4e5f6",
+      "tracklist": "https://api.deezer.com/playlist/61857696/tracks",
+      "creation_date": "2019-06-02 10:11:12",
+      "md5_image": "fe9f2f1290275e57df54a32e18d31471",
+      "picture_type": "cover",
+      "user": { "id": 2, "name": "Deezer Listener", "tracklist": "https://api.deezer.com/user/2/flow", "type": "user" },
+      "type": "playlist"
+    },
+    {
+      "id": 14313616061,
+      "title": "Coin/Harbour/Bear Hands",
+      "public": true,
+      "nb_tracks": 213,
+      "link": "https://www.deezer.com/playlist/14313616061",
+      "picture": "https://api.deezer.com/playlist/14313616061/image",
+      "picture_xl": "https://cdn-images.dzcdn.net/images/cover/ad07a51e2ed70c0dac2934f7fe1c42b3-8f054d55fc294a6caeec7a15bc80c533-b6dcbe673c094aef93f834cfd1fa0665-ce32014b0939cd0747206b47aa9aa5cc/1000x1000-000000-80-0-0.jpg",
+      "tracklist": "https://api.deezer.com/playlist/14313616061/tracks",
+      "creation_date": "2025-09-14 21:08:51",
+      "md5_image": "ad07a51e2ed70c0dac2934f7fe1c42b3-8f054d55fc294a6caeec7a15bc80c533-b6dcbe673c094aef93f834cfd1fa0665-ce32014b0939cd0747206b47aa9aa5cc",
+      "picture_type": "cover",
+      "user": { "id": 3, "name": "anonymous", "tracklist": "https://api.deezer.com/user/3/flow", "type": "user" },
+      "type": "playlist"
+    }
+  ],
+  "total": 150,
+  "next": "https://api.deezer.com/search/playlist?q=harbour&limit=3&index=3"
+}

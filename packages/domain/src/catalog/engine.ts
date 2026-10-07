@@ -24,7 +24,8 @@ import type {
   CatalogSearchAggregate,
   CatalogSearchChunk,
   CatalogSearchDoneChunk,
-  CatalogSection,
+  CatalogPlaylist,
+  CatalogSearchSection,
   CatalogSource,
   CatalogSourceStatus,
   CatalogTrack,
@@ -44,7 +45,8 @@ import { parseCatalogQuery, parseMusicLink, type MusicLink } from './query.js';
 import { LinkReadError, TOOL_PLATFORMS, collectAllPages, collectionRef, coversOf, pageOf, pickDownloadSource, trackFromLink, type CollectedList, type LinkRead, type LinkReader, type LinkTrack } from './links.js';
 import { LrclibClient, OdesliClient } from './services.js';
 
-export const ALL_SECTIONS: readonly CatalogSection[] = ['tracks', 'artists', 'albums'];
+/** Every section a search can be asked for; `playlists` is listed by Deezer alone (UX-CAT-005). */
+export const ALL_SECTIONS: readonly CatalogSearchSection[] = ['tracks', 'artists', 'albums', 'playlists'];
 const ALL_PROVIDERS: readonly CatalogProviderId[] = ['itunes', 'deezer', 'musicbrainz', 'youtube', 'soundcloud'];
 /** The platforms a service's search finds songs on; any other platform on a row only came as a link. */
 const PROVIDER_PLATFORMS: Record<CatalogProviderId, CatalogPlatform[]> = { itunes: ['apple-music'], deezer: ['deezer'], musicbrainz: ['musicbrainz'], youtube: ['youtube', 'youtube-music'], soundcloud: ['soundcloud'] };
@@ -81,7 +83,7 @@ export interface CatalogSearchInput {
   track?: string | undefined;
   artist?: string | undefined;
   album?: string | undefined;
-  sections?: readonly CatalogSection[] | undefined;
+  sections?: readonly CatalogSearchSection[] | undefined;
   providers?: readonly CatalogProviderId[] | undefined;
   offset?: number | undefined;
   limit?: number | undefined;
@@ -168,14 +170,14 @@ export class CatalogEngine {
     const list = (): CatalogSourceStatus[] => ALL_PROVIDERS.filter((id) => statuses.has(id)).map((id) => statuses.get(id)!);
 
     if (query.kind === 'url') {
-      yield { type: 'done', seq, query, status: [], page: { tracks: null, artists: null, albums: null }, totals: { tracks: 0, artists: 0, albums: 0 }, resolve: query.url, linkedOnly: [] };
+      yield { type: 'done', seq, query, status: [], page: { tracks: null, artists: null, albums: null, playlists: null }, totals: { tracks: 0, artists: 0, albums: 0, playlists: 0 }, resolve: query.url, linkedOnly: [] };
       return;
     }
 
     const wanted = new Set(input.providers?.length ? input.providers : ALL_PROVIDERS);
     const enabled = this.options.enabled?.() ?? {};
     const running: Array<Promise<Outcome>> = [];
-    const askedSections = new Set<CatalogSection>();
+    const askedSections = new Set<CatalogSearchSection>();
     for (const id of ALL_PROVIDERS) {
       if (!wanted.has(id)) continue;
       const provider = this.providers.get(id);
@@ -203,10 +205,10 @@ export class CatalogEngine {
       running.push(tagged);
     }
 
-    yield { type: 'results', seq: seq++, provider: null, query, tracks: [], artists: [], albums: [], status: list() };
+    yield { type: 'results', seq: seq++, provider: null, query, tracks: [], artists: [], albums: [], playlists: [], status: list() };
 
     const merger = new CatalogMerger(query);
-    const full: Partial<Record<CatalogSection, boolean>> = {};
+    const full: Partial<Record<CatalogSearchSection, boolean>> = {};
     // One song is one row across pages too: a later page's copy of a song an earlier page sent comes
     // back with that row's id (an upsert), never as a new row.
     const sessionKey = JSON.stringify([query.kind, query.text, query.track, query.artist, query.album, query.isrc, [...wanted].sort()]);
@@ -227,8 +229,8 @@ export class CatalogEngine {
       const { o, i } = await Promise.race(pending.values());
       pending.delete(i);
       statuses.set(o.provider.id, o.status);
-      const changed = o.result ? merger.add(o.result) : { tracks: [], artists: [], albums: [] };
-      for (const [section, more] of Object.entries(o.result?.full ?? {})) if (more) full[section as CatalogSection] = true;
+      const changed = o.result ? merger.add(o.result) : { tracks: [], artists: [], albums: [], playlists: [] };
+      for (const [section, more] of Object.entries(o.result?.full ?? {})) if (more) full[section as CatalogSearchSection] = true;
       yield { type: 'results', seq: seq++, provider: o.provider.id, query, ...changed, tracks: canonical(changed.tracks), status: list() };
     }
 
@@ -245,7 +247,7 @@ export class CatalogEngine {
         const found = await this.withDeadline(this.crossLinks(track, signal), deadline - this.now()).catch(() => [] as CatalogSource[]);
         if (!found.length) continue;
         const patched = merger.patchTrack(track.id, (t) => ({ ...t, sources: mergeSources(t.sources, found) }));
-        if (patched) yield { type: 'results', seq: seq++, provider: null, query, tracks: canonical([patched]), artists: [], albums: [], status: list() };
+        if (patched) yield { type: 'results', seq: seq++, provider: null, query, tracks: canonical([patched]), artists: [], albums: [], playlists: [], status: list() };
       }
     }
 
@@ -260,15 +262,15 @@ export class CatalogEngine {
     }
     const searched = new Set<CatalogPlatform>(ALL_PROVIDERS.filter((id) => statuses.get(id) && statuses.get(id)!.state !== 'skipped').flatMap((id) => PROVIDER_PLATFORMS[id]));
     const linkedOnly: CatalogPlatform[] = [];
-    for (const row of [...snapshot.tracks, ...snapshot.artists, ...snapshot.albums]) for (const s of row.sources) if (!searched.has(s.platform) && !linkedOnly.includes(s.platform)) linkedOnly.push(s.platform);
-    const page = (section: CatalogSection) => (sections.includes(section) && askedSections.has(section) ? { offset, limit, hasMore: Boolean(full[section]) } : null);
+    for (const row of [...snapshot.tracks, ...snapshot.artists, ...snapshot.albums, ...snapshot.playlists]) for (const s of row.sources) if (!searched.has(s.platform) && !linkedOnly.includes(s.platform)) linkedOnly.push(s.platform);
+    const page = (section: CatalogSearchSection) => (sections.includes(section) && askedSections.has(section) ? { offset, limit, hasMore: Boolean(full[section]) } : null);
     const done: CatalogSearchDoneChunk = {
       type: 'done',
       seq,
       query,
       status: list(),
-      page: { tracks: page('tracks'), artists: page('artists'), albums: page('albums') },
-      totals: { tracks: snapshot.tracks.length, artists: snapshot.artists.length, albums: snapshot.albums.length },
+      page: { tracks: page('tracks'), artists: page('artists'), albums: page('albums'), playlists: page('playlists') },
+      totals: { tracks: snapshot.tracks.length, artists: snapshot.artists.length, albums: snapshot.albums.length, playlists: snapshot.playlists.length },
       resolve: null,
       linkedOnly,
     };
@@ -299,6 +301,7 @@ export class CatalogEngine {
     const tracks = new Map<string, CatalogTrack>();
     const artists = new Map<string, CatalogArtist>();
     const albums = new Map<string, CatalogAlbum>();
+    const playlists = new Map<string, CatalogPlaylist>();
     let last: CatalogSearchChunk | null = null;
     for await (const chunk of this.search(input, signal)) {
       last = chunk;
@@ -306,6 +309,7 @@ export class CatalogEngine {
       for (const t of chunk.tracks) tracks.set(t.id, t);
       for (const a of chunk.artists) artists.set(a.id, a);
       for (const a of chunk.albums) albums.set(a.id, a);
+      for (const p of chunk.playlists) playlists.set(p.id, p);
     }
     const done = last?.type === 'done' ? last : null;
     const byRank = <T extends { rank: number }>(rows: T[]): T[] => rows.map((row, i) => ({ row, i })).sort((a, b) => b.row.rank - a.row.rank || a.i - b.i).map(({ row }) => row);
@@ -314,13 +318,14 @@ export class CatalogEngine {
       tracks: byRank([...tracks.values()]),
       artists: byRank([...artists.values()]),
       albums: byRank([...albums.values()]),
+      playlists: byRank([...playlists.values()]),
       status: done?.status ?? [],
-      page: done?.page ?? { tracks: null, artists: null, albums: null },
+      page: done?.page ?? { tracks: null, artists: null, albums: null, playlists: null },
       resolve: done?.resolve ?? null,
     };
   }
 
-  private async ask(provider: CatalogProvider, query: CatalogQuery, page: { offset: number; limit: number; sections: CatalogSection[] }, outer?: AbortSignal): Promise<Outcome> {
+  private async ask(provider: CatalogProvider, query: CatalogQuery, page: { offset: number; limit: number; sections: CatalogSearchSection[] }, outer?: AbortSignal): Promise<Outcome> {
     const started = this.now();
     const controller = new AbortController();
     const onAbort = (): void => controller.abort();
@@ -337,7 +342,7 @@ export class CatalogEngine {
       });
       const result = await Promise.race([work, deadline]);
       this.health.success(provider.id);
-      const count = result.tracks.length + result.artists.length + result.albums.length;
+      const count = result.tracks.length + result.artists.length + result.albums.length + result.playlists.length;
       return { provider, result, status: statusFor(provider.id, { state: count ? 'ok' : 'empty', count, latencyMs: this.now() - started }) };
     } catch (error) {
       const latencyMs = this.now() - started;

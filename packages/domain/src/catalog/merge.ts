@@ -14,7 +14,7 @@
  * stores (Deezer, Apple Music, Spotify) write titles and credits the way a library wants them;
  * MusicBrainz next; a YouTube upload's title is the last resort.
  */
-import type { CatalogAlbum, CatalogArtist, CatalogPlatform, CatalogQuery, CatalogSource, CatalogTrack } from '@now-playing/contracts';
+import type { CatalogAlbum, CatalogArtist, CatalogPlatform, CatalogPlaylist, CatalogQuery, CatalogSource, CatalogTrack } from '@now-playing/contracts';
 import { normalizeText } from '../identity.js';
 
 export const DURATION_TOLERANCE_MS = 3000;
@@ -242,6 +242,8 @@ export interface MergeUpdate {
   tracks: CatalogTrack[];
   artists: CatalogArtist[];
   albums: CatalogAlbum[];
+  /** Public playlists (UX-CAT-005): one service lists them, so they are one row by id. */
+  playlists: CatalogPlaylist[];
 }
 
 /**
@@ -252,11 +254,12 @@ export class CatalogMerger {
   private readonly tracks: CatalogTrack[] = [];
   private readonly artists: CatalogArtist[] = [];
   private readonly albums: CatalogAlbum[] = [];
+  private readonly playlists: CatalogPlaylist[] = [];
 
   constructor(private readonly query: CatalogQuery) {}
 
   add(rows: Partial<MergeUpdate>): MergeUpdate {
-    const changed: MergeUpdate = { tracks: [], artists: [], albums: [] };
+    const changed: MergeUpdate = { tracks: [], artists: [], albums: [], playlists: [] };
     (rows.tracks ?? []).forEach((row, position) => {
       const ranked = { ...row, rank: rankOf(this.query, row, position) };
       const index = this.tracks.findIndex((t) => sameRecording(t, ranked));
@@ -282,6 +285,14 @@ export class CatalogMerger {
       else this.albums[index] = next;
       upsert(changed.albums, next);
     });
+    (rows.playlists ?? []).forEach((row, position) => {
+      const ranked = { ...row, rank: rankOf(this.query, { title: row.title, artist: row.owner, sources: row.sources }, position) };
+      const index = this.playlists.findIndex((p) => p.id === ranked.id);
+      const next = index === -1 ? ranked : { ...this.playlists[index]!, ...ranked, rank: Math.max(this.playlists[index]!.rank, ranked.rank) };
+      if (index === -1) this.playlists.push(next);
+      else this.playlists[index] = next;
+      upsert(changed.playlists, next);
+    });
     return changed;
   }
 
@@ -295,7 +306,7 @@ export class CatalogMerger {
 
   snapshot(): MergeUpdate {
     const byRank = <T extends { rank: number }>(rows: T[]): T[] => rows.map((row, i) => ({ row, i })).sort((a, b) => b.row.rank - a.row.rank || a.i - b.i).map(({ row }) => row);
-    return { tracks: byRank(this.tracks), artists: byRank(this.artists), albums: byRank(this.albums) };
+    return { tracks: byRank(this.tracks), artists: byRank(this.artists), albums: byRank(this.albums), playlists: byRank(this.playlists) };
   }
 }
 

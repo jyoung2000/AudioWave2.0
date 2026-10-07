@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CatalogSearchChunk, CatalogResolveResult, CatalogSearchAggregate } from '@now-playing/contracts';
-import { CatalogEngine, CatalogHttpError, LinkReadError, Pacer, ProviderHealth, deezerTrack, itunesTrack, musicbrainzTrack, parseOdesli, readCatalogStream, ndjsonLine, toolSearchTracks, type CatalogEngineOptions, type LinkReader, type ToolSearchRunner } from '@now-playing/domain/catalog';
+import { CatalogEngine, CatalogHttpError, LinkReadError, Pacer, ProviderHealth, deezerPlaylist, deezerTrack, itunesTrack, musicbrainzTrack, parseOdesli, readCatalogStream, ndjsonLine, toolSearchTracks, type CatalogEngineOptions, type LinkReader, type ToolSearchRunner } from '@now-playing/domain/catalog';
 import { STANDARD_ROUTES, fixture, fixtureFetch, type Route } from './catalog-fixtures.js';
 
 const noSleep = async (): Promise<void> => undefined;
@@ -150,6 +150,46 @@ describe('the live search feed', () => {
     expect(calls.some((u) => u.includes('offset=25') && u.includes('limit=2'))).toBe(true);
     expect(all.page.tracks).toEqual({ offset: 25, limit: 2, hasMore: true });
     expect(all.page.artists).toBeNull();
+  });
+
+  it('lists public playlists from Deezer as a section of their own, keylessly (UX-CAT-005)', async () => {
+    const { engine: e, calls } = engine();
+    const chunks = await collect(e.search({ q: 'harbour', sections: ['playlists'], limit: 3 }));
+    for (const c of chunks) expect(CatalogSearchChunk.safeParse(c).success).toBe(true);
+    expect(calls.filter((u) => u.includes('api.deezer.com/search/playlist?q=harbour&index=0&limit=3'))).toHaveLength(1);
+    // Only Deezer lists playlists: the others say they have nothing in the section asked for.
+    const done = chunks.at(-1)!;
+    if (done.type !== 'done') throw new Error('no done');
+    expect(done.status.find((s) => s.provider === 'deezer')).toMatchObject({ state: 'ok', count: 3 });
+    for (const id of ['itunes', 'musicbrainz', 'youtube', 'soundcloud'] as const) expect(done.status.find((s) => s.provider === id)).toMatchObject({ state: 'skipped', error: 'It has nothing in the sections asked for' });
+    expect(done.page).toEqual({ tracks: null, artists: null, albums: null, playlists: { offset: 0, limit: 3, hasMore: true } });
+    expect(done.totals.playlists).toBe(3);
+    const rows = chunks.find((c) => c.type === 'results' && c.provider === 'deezer');
+    if (rows?.type !== 'results') throw new Error('no deezer chunk');
+    expect(rows.playlists[0]).toMatchObject({
+      id: 'deezer:14632517341',
+      title: 'Relaxing Classical Music',
+      owner: 'Playlist Editor',
+      trackCount: 101,
+      pictureUrl: 'https://cdn-images.dzcdn.net/images/playlist/ca698c69567ce9f8d4fc19dab12867d3/1000x1000-000000-80-0-0.jpg',
+      covers: [],
+    });
+    // Its link is what the apps resolve to open it like an album (NP-FIND-007).
+    expect(rows.playlists[0]!.sources).toEqual([{ platform: 'deezer', id: '14632517341', url: 'https://www.deezer.com/playlist/14632517341', previewUrl: null, matchedBy: 'search' }]);
+    expect(rows.playlists.map((p) => p.title)).toContain('Coin/Harbour/Bear Hands');
+    // The aggregate carries them too, ranked; a private playlist is never a row.
+    const all = await e.searchAll({ q: 'harbour', sections: ['playlists'], limit: 3 });
+    expect(all.playlists.map((p) => p.id)).toHaveLength(3);
+    expect(deezerPlaylist({ id: 7, title: 'Mine', public: false, nb_tracks: 2 })).toBeNull();
+    expect(deezerPlaylist({ id: 8, title: 'Theirs', nb_tracks: 2, md5_image: 'ca698c69567ce9f8d4fc19dab12867d3' })).toMatchObject({ pictureUrl: expect.stringContaining('/images/playlist/ca698c69567ce9f8d4fc19dab12867d3/') });
+  });
+
+  it('a search of every section asks Deezer for playlists beside the rest, and the overview’s done counts them', async () => {
+    const { engine: e } = engine();
+    const all = await e.searchAll({ q: 'daft punk get lucky', limit: 3 });
+    expect(all.playlists.length).toBe(3);
+    expect(all.page.playlists).toEqual({ offset: 0, limit: 3, hasMore: true });
+    expect([...all.tracks, ...all.albums, ...all.artists, ...all.playlists].every((r) => r.sources.length > 0)).toBe(true);
   });
 
   it('adds the best rows’ other homes (Spotify, Tidal…) from MusicBrainz before done', async () => {

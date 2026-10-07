@@ -424,8 +424,9 @@ const search = [
       tracks: { offset: 0, limit: 25, hasMore: true },
       artists: { offset: 0, limit: 25, hasMore: false },
       albums: { offset: 0, limit: 25, hasMore: false },
+      playlists: null,
     },
-    totals: { tracks: 9, artists: 3, albums: 2 },
+    totals: { tracks: 9, artists: 3, albums: 2, playlists: 0 },
     resolve: null,
     // Spotify came only as MusicBrainz's link for one song: linked, not searched.
     linkedOnly: ['spotify'],

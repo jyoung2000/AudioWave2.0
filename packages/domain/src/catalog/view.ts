@@ -20,6 +20,7 @@ import {
   type CatalogProviderId,
   type CatalogSearchChunk,
   type CatalogSearchDoneChunk,
+  type CatalogSearchSection,
   type CatalogSection,
   type CatalogSource,
   type CatalogSourceStatus,
@@ -144,6 +145,8 @@ export const CATALOG_PROVIDER_LABELS: Record<CatalogProviderId, string> = {
 };
 
 export const CATALOG_SECTION_LABELS: Record<CatalogSection, string> = { tracks: 'Songs', artists: 'Artists', albums: 'Albums' };
+/** The same, for every section a search can be asked for (UX-CAT-005). */
+export const CATALOG_SEARCH_SECTION_LABELS: Record<CatalogSearchSection, string> = { ...CATALOG_SECTION_LABELS, playlists: 'Playlists' };
 
 export type CatalogDot = 'ok' | 'warn' | 'bad' | 'busy' | 'off';
 

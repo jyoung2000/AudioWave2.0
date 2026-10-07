@@ -84,7 +84,7 @@ describe('no repeats across pages', () => {
       sections: ['tracks'],
       timeoutMs: 1000,
       supports: () => true,
-      search: async (_q, { offset }) => ({ tracks: offset === 0 ? pageOne : pageTwo, artists: [], albums: [], full: { tracks: offset === 0 } }),
+      search: async (_q, { offset }) => ({ tracks: offset === 0 ? pageOne : pageTwo, artists: [], albums: [], playlists: [], full: { tracks: offset === 0 } }),
     };
     const engine = new CatalogEngine({ fetch: async () => Promise.reject(new Error('no network')), userAgent: 'AirwaveTest/1.0 (test)', crossLinkTop: 0 });
     engine.register(provider);
@@ -110,7 +110,7 @@ describe('no repeats across pages', () => {
       sections: ['tracks'],
       timeoutMs: 1000,
       supports: () => true,
-      search: async () => ({ tracks: [store('9101', 'deezer', { sources: [{ platform: 'deezer', id: '9101', url: 'https://www.deezer.com/track/9101', previewUrl: null, matchedBy: 'search' }, { platform: 'spotify', id: 's', url: 'https://open.spotify.com/track/s', previewUrl: null, matchedBy: 'musicbrainz' }] })], artists: [], albums: [], full: {} }),
+      search: async () => ({ tracks: [store('9101', 'deezer', { sources: [{ platform: 'deezer', id: '9101', url: 'https://www.deezer.com/track/9101', previewUrl: null, matchedBy: 'search' }, { platform: 'spotify', id: 's', url: 'https://open.spotify.com/track/s', previewUrl: null, matchedBy: 'musicbrainz' }] })], artists: [], albums: [], playlists: [], full: {} }),
     };
     const engine = new CatalogEngine({ fetch: async () => Promise.reject(new Error('no network')), userAgent: 'AirwaveTest/1.0 (test)', crossLinkTop: 0 });
     engine.register(provider);
