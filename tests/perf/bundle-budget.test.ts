@@ -176,8 +176,12 @@ const BUNDLES: Bundle[] = [
      * And to 2508 for that search's second and third rounds (owner, 2026-10-06): the results pager that
      * fetches later pages, whole-list loading with its progress in the music list, and the engine's
      * merger applied across chunks and pages — measured, 3 KB, in the lazy chunk and the shell's HTML.
+     *
+     * And to 2516 after merging the engine's whole-list paging and one-row merge (DEC-039, 2026-10-06):
+     * the lazy search chunk carries the engine, so its new paging, merge and view helpers grew it from
+     * 104 to 112 KB — measured. The entry is unchanged (249).
      */
-    totalBudgetKb: 2508,
+    totalBudgetKb: 2516,
     // Three.js belongs to the constellation and the jewel case; the tag reader only to a scan.
     mustBeSplit: ['three', 'music-metadata'],
   },
