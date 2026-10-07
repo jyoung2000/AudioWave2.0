@@ -290,7 +290,9 @@ test('it is a page at both widths, and a section has its own address', async ({ 
 
   await page.setViewportSize({ width: 1280, height: 900 }); await page.waitForTimeout(500);
   expect(await page.isVisible('.prefs__tabs') && await page.isVisible('#pp-player'), 'widening brings the toolbar back and keeps the section').toBe(true);
-  expect(await page.textContent('#prefsBackLbl'), 'where back means out again').toBe('Airwave');
+  // The toolbar is CSS and shows at once; the bar's label is repainted by the width query's change
+  // event, which a slow runner delivers after a fixed wait had already read it (CI, 2026-10-07).
+  await expect(page.locator('#prefsBackLbl'), 'where back means out again').toHaveText('Airwave', { timeout: 10_000 });
   await leavePrefs(page);
   expect(!(await prefsShown(page)) && !(await page.evaluate(() => (document.querySelector('.player') as HTMLElement).hidden)), 'and leaving gives the player back').toBe(true);
 
