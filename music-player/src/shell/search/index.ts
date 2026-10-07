@@ -31,9 +31,22 @@ import type {
   CatalogTrackPage,
   SavedCollection,
 } from '@now-playing/contracts';
-import { CATALOG_PLATFORM_LABELS, CATALOG_PROVIDERS } from '@now-playing/contracts';
+import {
+  CATALOG_PAGE_MAX,
+  CATALOG_PLATFORM_LABELS,
+  CATALOG_PROVIDERS,
+} from '@now-playing/contracts';
 import { mergeTrack, pickDownloadSource, sameRecording } from '@now-playing/domain/catalog';
-import { ask, clients, jsonp, legacyHubSearch, Refused, Unreachable, type CatalogClient, type SearchParams } from './client.js';
+import {
+  ask,
+  clients,
+  jsonp,
+  legacyHubSearch,
+  Refused,
+  Unreachable,
+  type CatalogClient,
+  type SearchParams,
+} from './client.js';
 import * as V from './view.js';
 
 /* ------------------------------------------------------------------ shapes */
@@ -71,11 +84,20 @@ class Bag<T extends { id: string; rank: number }> {
   ) {}
   /** The row already shown that is this one: by id, else by recording. */
   private find(row: T): { row: T; at: number } | undefined {
-    return this.rows.find((r) => r.row.id === row.id) ?? (this.same ? this.rows.find((r) => this.same!(r.row, row)) : undefined);
+    return (
+      this.rows.find((r) => r.row.id === row.id) ??
+      (this.same ? this.rows.find((r) => this.same!(r.row, row)) : undefined)
+    );
   }
   private fold(have: { row: T }, row: T): void {
     // A later chunk's copy replaces its row in place; what this page already folded in stays.
-    have.row = this.merge ? (have.row.id === row.id ? this.merge(row, have.row) : this.merge(have.row, row)) : have.row.id === row.id ? row : have.row;
+    have.row = this.merge
+      ? have.row.id === row.id
+        ? this.merge(row, have.row)
+        : this.merge(have.row, row)
+      : have.row.id === row.id
+        ? row
+        : have.row;
   }
   upsert(list: readonly T[]): void {
     for (const row of list) {
@@ -110,13 +132,16 @@ class Bag<T extends { id: string; rank: number }> {
   }
 }
 
-const sameSong = (a: CatalogTrack, b: CatalogTrack): boolean => a.id !== b.id && sameRecording(a, b);
+const sameSong = (a: CatalogTrack, b: CatalogTrack): boolean =>
+  a.id !== b.id && sameRecording(a, b);
 
 interface Results {
   tracks: Bag<CatalogTrack>;
   artists: Bag<CatalogArtist>;
   albums: Bag<CatalogAlbum>;
   status: CatalogSourceStatus[];
+  /** Platforms that only contributed links (a song's other homes), named on the status line. */
+  linkedOnly: string[];
   done: boolean;
   more: Record<CatalogSection, boolean>;
   /** The offset each section's next page is asked from, and which sections are being asked now. */
@@ -128,15 +153,54 @@ interface Results {
   error: string | null;
 }
 
-const freshResults = (): Results => ({ tracks: new Bag<CatalogTrack>(sameSong, mergeTrack), artists: new Bag(), albums: new Bag(), status: [], done: false, more: { tracks: false, artists: false, albums: false }, next: { tracks: 0, artists: 0, albums: 0 }, pending: new Set(), page: 0, via: '', error: null });
+const freshResults = (): Results => ({
+  tracks: new Bag<CatalogTrack>(sameSong, mergeTrack),
+  artists: new Bag(),
+  albums: new Bag(),
+  status: [],
+  linkedOnly: [],
+  done: false,
+  more: { tracks: false, artists: false, albums: false },
+  next: { tracks: 0, artists: 0, albums: 0 },
+  pending: new Set(),
+  page: 0,
+  via: '',
+  error: null,
+});
 
 type View =
   | { kind: 'results' }
-  | { kind: 'link'; url: string; result: CatalogResolveResult | null; error: string | null; client: CatalogClient | null }
+  | {
+      kind: 'link';
+      url: string;
+      result: CatalogResolveResult | null;
+      error: string | null;
+      client: CatalogClient | null;
+    }
   | { kind: 'all'; section: CatalogSection; res: Results; ctl: AbortController }
-  | { kind: 'album'; id: string; title: string; detail: CatalogAlbumDetail | null; error: string | null; client: CatalogClient | null }
-  | { kind: 'artist'; id: string; name: string; detail: CatalogArtistDetail | null; error: string | null }
-  | { kind: 'song'; t: CatalogTrack; enrich: CatalogEnrichment | null; enrichSaid: string | null; lyrics: CatalogLyrics | null; lyricsSaid: string | null };
+  | {
+      kind: 'album';
+      id: string;
+      title: string;
+      detail: CatalogAlbumDetail | null;
+      error: string | null;
+      client: CatalogClient | null;
+    }
+  | {
+      kind: 'artist';
+      id: string;
+      name: string;
+      detail: CatalogArtistDetail | null;
+      error: string | null;
+    }
+  | {
+      kind: 'song';
+      t: CatalogTrack;
+      enrich: CatalogEnrichment | null;
+      enrichSaid: string | null;
+      lyrics: CatalogLyrics | null;
+      lyricsSaid: string | null;
+    };
 
 /** What the shell's library (index.html) offers this module; see make-shell.py, "the music list". */
 interface ShellList {
@@ -176,8 +240,8 @@ export interface ListedCollection {
 
 const PREVIEW_N: Record<CatalogSection, number> = { tracks: 5, artists: 3, albums: 3 };
 const PAGE_LIMIT = 25;
-/** One page of an album's or playlist's songs, as the contract allows (catalog/resolve, catalog/album). */
-const LIST_PAGE = 200;
+/** One page of an album's or playlist's songs: the contract's page limit (catalog/resolve, catalog/album). */
+const LIST_PAGE = CATALOG_PAGE_MAX;
 const FILTER_KEY = 'player:search';
 const SECTIONS: CatalogSection[] = ['tracks', 'artists', 'albums'];
 
@@ -196,13 +260,32 @@ export function installSearch(): SearchApi {
     say?: (s: string) => void;
     NP_PLAYER?: { playing?(): boolean; pause(): void; resume(): void };
     outputVolume?: number;
-    hubPeople?: { ready(): boolean; hubName(): string; search(q: string): Promise<Array<{ id: string; name: string; playlists: number; img: string | null }>>; open(id: string): void };
+    hubPeople?: {
+      ready(): boolean;
+      hubName(): string;
+      search(
+        q: string,
+      ): Promise<Array<{ id: string; name: string; playlists: number; img: string | null }>>;
+      open(id: string): void;
+    };
     NP_LIST?: ShellList;
     NP_FETCH?: (song: unknown) => void;
     LIBRARY?: Array<{ id: string; title: string; url?: string | null }>;
     NP_SRCH_CLIP?: number;
     NP_SRCH_ARM_MS?: number;
-    NP_FIND?: (q: string) => Promise<Array<{ t: string; a: string; al: string; d: number | null; bpm: number | null; p: string | null; u: string | null }>>;
+    NP_FIND?: (
+      q: string,
+    ) => Promise<
+      Array<{
+        t: string;
+        a: string;
+        al: string;
+        d: number | null;
+        bpm: number | null;
+        p: string | null;
+        u: string | null;
+      }>
+    >;
     srchClose?: () => void;
   };
   const $ = <E extends HTMLElement>(id: string): E => document.getElementById(id) as E;
@@ -235,14 +318,19 @@ export function installSearch(): SearchApi {
   let seq = 0;
   let ctl: AbortController | null = null;
   const added = new Set<string>();
-  let filter: Filter = { sections: { tracks: true, artists: true, albums: true }, providers: { itunes: true, deezer: true, musicbrainz: true, youtube: true, soundcloud: true } };
+  let filter: Filter = {
+    sections: { tracks: true, artists: true, albums: true },
+    providers: { itunes: true, deezer: true, musicbrainz: true, youtube: true, soundcloud: true },
+  };
 
   void Promise.resolve(w.kv.get(FILTER_KEY))
     .then((v) => {
       const f = v as Partial<Filter> | null;
       if (f && typeof f === 'object') {
-        for (const s of SECTIONS) if (typeof f.sections?.[s] === 'boolean') filter.sections[s] = f.sections[s];
-        for (const p of CATALOG_PROVIDERS) if (typeof f.providers?.[p] === 'boolean') filter.providers[p] = f.providers[p];
+        for (const s of SECTIONS)
+          if (typeof f.sections?.[s] === 'boolean') filter.sections[s] = f.sections[s];
+        for (const p of CATALOG_PROVIDERS)
+          if (typeof f.providers?.[p] === 'boolean') filter.providers[p] = f.providers[p];
         paintFilterBtn();
       }
     })
@@ -275,8 +363,17 @@ export function installSearch(): SearchApi {
   }
 
   function sectionRows(r: Results, section: CatalogSection, limit: number): Opt[] {
-    const list = section === 'tracks' ? r.tracks.list : section === 'artists' ? r.artists.list : r.albums.list;
-    return list.slice(0, limit).map((x) => (section === 'tracks' ? { kind: 'track', t: x as CatalogTrack } : section === 'artists' ? { kind: 'artist', a: x as CatalogArtist } : { kind: 'album', al: x as CatalogAlbum }));
+    const list =
+      section === 'tracks' ? r.tracks.list : section === 'artists' ? r.artists.list : r.albums.list;
+    return list
+      .slice(0, limit)
+      .map((x) =>
+        section === 'tracks'
+          ? { kind: 'track', t: x as CatalogTrack }
+          : section === 'artists'
+            ? { kind: 'artist', a: x as CatalogArtist }
+            : { kind: 'album', al: x as CatalogAlbum },
+      );
   }
 
   function optHTML(o: Opt, i: number): string {
@@ -290,7 +387,8 @@ export function installSearch(): SearchApi {
       case 'collection':
         return V.collectionRowHTML(o.c, i);
       case 'more': {
-        const bag = o.section === 'tracks' ? res.tracks : o.section === 'artists' ? res.artists : res.albums;
+        const bag =
+          o.section === 'tracks' ? res.tracks : o.section === 'artists' ? res.artists : res.albums;
         return V.moreRowHTML(o.section, PREVIEW_N[o.section], bag.size, res.more[o.section], i);
       }
     }
@@ -320,13 +418,23 @@ export function installSearch(): SearchApi {
 
   function totalsLine(r: Results): string {
     return wanted()
-      .map((s) => V.count((s === 'tracks' ? r.tracks : s === 'artists' ? r.artists : r.albums).size, s))
+      .map((s) =>
+        V.count((s === 'tracks' ? r.tracks : s === 'artists' ? r.artists : r.albums).size, s),
+      )
       .join(' · ');
   }
 
-  function paintStatus(list: CatalogSourceStatus[], via: string): void {
+  function paintStatus(
+    list: CatalogSourceStatus[],
+    via: string,
+    linked: readonly string[] = [],
+  ): void {
     statusEl.hidden = !list.length && !via;
-    statusEl.innerHTML = list.length ? V.statusHTML(list, via) : via ? `<span class="srch__via2">Through ${V.esc(via)}</span>` : '';
+    statusEl.innerHTML = list.length
+      ? V.statusHTML(list, via, linked)
+      : via
+        ? `<span class="srch__via2">Through ${V.esc(via)}</span>`
+        : '';
   }
 
   function render(): void {
@@ -351,7 +459,7 @@ export function installSearch(): SearchApi {
   function renderResults(): void {
     const r = res;
     const n = r.tracks.size + r.artists.size + r.albums.size;
-    paintStatus(r.status, r.via);
+    paintStatus(r.status, r.via, r.linkedOnly);
     if (!n) {
       options = [];
       if (!r.done) {
@@ -365,9 +473,18 @@ export function installSearch(): SearchApi {
         body.innerHTML = msg(V.esc(r.error));
         live.textContent = 'Search failed';
       } else {
-        const said = V.statusWords(r.status.filter((s) => s.state === 'failed' || s.state === 'timeout' || s.state === 'cooling-down'));
-        const failedAll = r.status.length > 0 && r.status.every((s) => s.state !== 'ok' && s.state !== 'empty');
-        body.innerHTML = msg(failedAll ? `Couldn’t search just now — ${V.esc(said || 'no service answered')}.` : `No matches for “${V.esc(lastLabel)}”.`);
+        const said = V.statusWords(
+          r.status.filter(
+            (s) => s.state === 'failed' || s.state === 'timeout' || s.state === 'cooling-down',
+          ),
+        );
+        const failedAll =
+          r.status.length > 0 && r.status.every((s) => s.state !== 'ok' && s.state !== 'empty');
+        body.innerHTML = msg(
+          failedAll
+            ? `Couldn’t search just now — ${V.esc(said || 'no service answered')}.`
+            : `No matches for “${V.esc(lastLabel)}”.`,
+        );
         live.textContent = failedAll ? 'Search failed' : 'No results';
       }
       return;
@@ -383,13 +500,22 @@ export function installSearch(): SearchApi {
     const { known, more } = pageCount(r);
     count.innerHTML = `<b>Results:</b> ${totalsLine(r)}${r.done && !r.pending.size ? '' : ' …'}`;
     const shown = groups.some((g) => g.opts.length);
-    body.innerHTML = shown ? listbox(groups, 'Search results') + (r.error ? msg(V.esc(r.error)) : '') : msg(r.pending.size ? `${V.spinner()}<span>Loading page ${r.page + 1}…</span>` : 'Nothing more.');
+    body.innerHTML = shown
+      ? listbox(groups, 'Search results') + (r.error ? msg(V.esc(r.error)) : '')
+      : msg(
+          r.pending.size
+            ? `${V.spinner()}<span>Loading page ${r.page + 1}…</span>`
+            : 'Nothing more.',
+        );
     if (!shown) options = [];
     // The pager: ‹ dots › and "Page 2 of 4" (or "4+" while a section says there is more).
     const of = Math.max(known, r.page + 1);
     foot.hidden = known < 2 && !more;
     if (!foot.hidden) {
-      $('srchDots').innerHTML = Array.from({ length: Math.min(of, 12) }, (_, i) => `<i${i === r.page ? ' class="is-on"' : ''}></i>`).join('');
+      $('srchDots').innerHTML = Array.from(
+        { length: Math.min(of, 12) },
+        (_, i) => `<i${i === r.page ? ' class="is-on"' : ''}></i>`,
+      ).join('');
       $<HTMLButtonElement>('srchPrev').disabled = r.page === 0;
       $<HTMLButtonElement>('srchNext').disabled = r.page >= known - 1 && !more;
       $('srchPageOf').textContent = `Page ${r.page + 1} of ${of}${more ? '+' : ''}`;
@@ -402,7 +528,9 @@ export function installSearch(): SearchApi {
     if (!v.result && !v.error) {
       options = [];
       count.innerHTML = 'Reading the link…';
-      const slow = /spotify\.com\//.test(v.url) ? ' Spotify links are read by spotDL, which can take a minute.' : '';
+      const slow = /spotify\.com\//.test(v.url)
+        ? ' Spotify links are read by spotDL, which can take a minute.'
+        : '';
       body.innerHTML = msg(`${V.spinner()}<span>Reading the link…${slow}</span>`);
       live.textContent = 'Reading the link';
       return;
@@ -426,9 +554,23 @@ export function installSearch(): SearchApi {
     if (r.track) opts.push({ kind: 'track', t: r.track });
     if (r.artist) opts.push({ kind: 'artist', a: r.artist });
     if (r.collection) opts.push({ kind: 'collection', c: r.collection });
-    count.innerHTML = r.track ? '<b>Results:</b> 1 song' : r.collection ? `<b>${V.esc(r.collection.ref.kind === 'album' ? 'Album' : 'Playlist')}:</b> ${V.esc(CATALOG_PLATFORM_LABELS[r.collection.ref.platform])}` : '<b>Artist</b>';
-    body.innerHTML = listbox([{ label: null, opts }], 'The pasted link') + (r.collection ? msg('Open it to see its songs in the music list, where the star keeps it in your library.') : '');
-    live.textContent = r.track ? `1 song: ${r.track.title}` : r.collection ? `${r.collection.ref.title}, ${V.collectionWords(r.collection)}` : 'An artist';
+    count.innerHTML = r.track
+      ? '<b>Results:</b> 1 song'
+      : r.collection
+        ? `<b>${V.esc(r.collection.ref.kind === 'album' ? 'Album' : 'Playlist')}:</b> ${V.esc(CATALOG_PLATFORM_LABELS[r.collection.ref.platform])}`
+        : '<b>Artist</b>';
+    body.innerHTML =
+      listbox([{ label: null, opts }], 'The pasted link') +
+      (r.collection
+        ? msg(
+            'Open it to see its songs in the music list, where the star keeps it in your library.',
+          )
+        : '');
+    live.textContent = r.track
+      ? `1 song: ${r.track.title}`
+      : r.collection
+        ? `${r.collection.ref.title}, ${V.collectionWords(r.collection)}`
+        : 'An artist';
   }
 
   function renderAll(v: Extract<View, { kind: 'all' }>): void {
@@ -437,8 +579,16 @@ export function installSearch(): SearchApi {
     paintStatus(r.status, r.via);
     count.innerHTML = `<b>${V.SECTION_LABEL[v.section]}:</b> ${V.count(bag.size, v.section)}${r.more[v.section] ? '+' : ''} for “${V.esc(lastLabel)}”`;
     const opts = sectionRows(r, v.section, bag.size);
-    const tail = r.pending.has(v.section) ? msg(`${V.spinner()}<span>Loading more…</span>`) : r.error ? msg(V.esc(r.error)) : !r.more[v.section] && bag.size ? `<div class="srch__end">That’s all ${V.count(bag.size, v.section)}.</div>` : '';
-    body.innerHTML = opts.length ? listbox([{ label: null, opts }], `All ${V.SECTION_LABEL[v.section].toLowerCase()}`) + tail : tail || msg(`${V.spinner()}<span>Loading…</span>`);
+    const tail = r.pending.has(v.section)
+      ? msg(`${V.spinner()}<span>Loading more…</span>`)
+      : r.error
+        ? msg(V.esc(r.error))
+        : !r.more[v.section] && bag.size
+          ? `<div class="srch__end">That’s all ${V.count(bag.size, v.section)}.</div>`
+          : '';
+    body.innerHTML = opts.length
+      ? listbox([{ label: null, opts }], `All ${V.SECTION_LABEL[v.section].toLowerCase()}`) + tail
+      : tail || msg(`${V.spinner()}<span>Loading…</span>`);
     live.textContent = `${V.count(bag.size, v.section)}${r.more[v.section] ? ', more as you scroll' : ''}`;
   }
 
@@ -447,12 +597,22 @@ export function installSearch(): SearchApi {
     count.innerHTML = `<b>Album:</b> ${V.esc(v.title)}`;
     if (!v.detail) {
       options = [];
-      body.innerHTML = msg(v.error ? V.esc(v.error) : `${V.spinner()}<span>Opening the album…</span>`);
+      body.innerHTML = msg(
+        v.error ? V.esc(v.error) : `${V.spinner()}<span>Opening the album…</span>`,
+      );
       live.textContent = v.error ?? 'Opening the album';
       return;
     }
     const { album, page } = v.detail;
-    const facts = [album.year ?? album.releaseDate?.slice(0, 4), album.label, album.genre, page.total ? `${page.total} songs` : null].filter(Boolean).map((x) => V.esc(x)).join(' · ');
+    const facts = [
+      album.year ?? album.releaseDate?.slice(0, 4),
+      album.label,
+      album.genre,
+      page.total ? `${page.total} songs` : null,
+    ]
+      .filter(Boolean)
+      .map((x) => V.esc(x))
+      .join(' · ');
     const head = V.detailHead({
       cover: V.coverHTML(album.artworkUrl),
       title: album.title,
@@ -461,7 +621,12 @@ export function installSearch(): SearchApi {
       badges: V.badgesHTML(album.sources),
       actions: '<button class="srch__btn" type="button" data-act="list">Open in Music</button>',
     });
-    body.innerHTML = head + listbox([{ label: 'Songs', opts: page.tracks.map((t) => ({ kind: 'track' as const, t })) }], `${album.title}: songs`);
+    body.innerHTML =
+      head +
+      listbox(
+        [{ label: 'Songs', opts: page.tracks.map((t) => ({ kind: 'track' as const, t })) }],
+        `${album.title}: songs`,
+      );
     live.textContent = `${album.title}, ${page.tracks.length} songs`;
   }
 
@@ -470,15 +635,33 @@ export function installSearch(): SearchApi {
     count.innerHTML = `<b>Artist:</b> ${V.esc(v.name)}`;
     if (!v.detail) {
       options = [];
-      body.innerHTML = msg(v.error ? V.esc(v.error) : `${V.spinner()}<span>Opening the artist…</span>`);
+      body.innerHTML = msg(
+        v.error ? V.esc(v.error) : `${V.spinner()}<span>Opening the artist…</span>`,
+      );
       live.textContent = v.error ?? 'Opening the artist';
       return;
     }
     const { artist, topTracks, albums } = v.detail;
-    const facts = [artist.genre, artist.fans ? `${artist.fans.toLocaleString('en-US')} fans` : null, artist.albumCount ? `${artist.albumCount} ${artist.albumCount === 1 ? 'album' : 'albums'}` : null].filter(Boolean).map((x) => V.esc(x)).join(' · ');
+    const facts = [
+      artist.genre,
+      artist.fans ? `${artist.fans.toLocaleString('en-US')} fans` : null,
+      artist.albumCount
+        ? `${artist.albumCount} ${artist.albumCount === 1 ? 'album' : 'albums'}`
+        : null,
+    ]
+      .filter(Boolean)
+      .map((x) => V.esc(x))
+      .join(' · ');
     // Apple has no artist pictures: the first album's cover stands in.
     const picture = artist.pictureUrl ?? albums[0]?.artworkUrl ?? null;
-    const head = V.detailHead({ cover: V.coverHTML(picture, true), title: artist.name, sub: '', facts, badges: V.badgesHTML(artist.sources), actions: '' });
+    const head = V.detailHead({
+      cover: V.coverHTML(picture, true),
+      title: artist.name,
+      sub: '',
+      facts,
+      badges: V.badgesHTML(artist.sources),
+      actions: '',
+    });
     body.innerHTML =
       head +
       listbox(
@@ -503,26 +686,51 @@ export function installSearch(): SearchApi {
       genre ? `<span class="srch__fact"><b>Genre</b> ${V.esc(genre)}</span>` : '',
       label ? `<span class="srch__fact"><b>Label</b> ${V.esc(label)}</span>` : '',
       year ? `<span class="srch__fact"><b>Year</b> ${V.esc(year)}</span>` : '',
-      t.isrc ?? e?.isrc ? `<span class="srch__fact"><b>ISRC</b> ${V.esc(t.isrc ?? e?.isrc)}</span>` : '',
-      !e && !v.enrichSaid ? '<span class="srch__fact srch__fact--wait">Looking up genre, label and year…</span>' : '',
+      (t.isrc ?? e?.isrc)
+        ? `<span class="srch__fact"><b>ISRC</b> ${V.esc(t.isrc ?? e?.isrc)}</span>`
+        : '',
+      !e && !v.enrichSaid
+        ? '<span class="srch__fact srch__fact--wait">Looking up genre, label and year…</span>'
+        : '',
       v.enrichSaid ? `<span class="srch__fact srch__fact--wait">${V.esc(v.enrichSaid)}</span>` : '',
     ]
       .filter(Boolean)
       .join('');
-    const sources = e ? [...t.sources, ...e.sources.filter((s) => !t.sources.some((x) => x.platform === s.platform))] : t.sources;
+    const sources = e
+      ? [
+          ...t.sources,
+          ...e.sources.filter((s) => !t.sources.some((x) => x.platform === s.platform)),
+        ]
+      : t.sources;
     const dl = pickDownloadSource(sources);
     const actions =
-      (added.has(t.id) ? '<button class="srch__btn" type="button" disabled>In your library</button>' : '<button class="srch__btn" type="button" data-act="add">Add to Library</button>') +
+      (added.has(t.id)
+        ? '<button class="srch__btn" type="button" disabled>In your library</button>'
+        : '<button class="srch__btn" type="button" data-act="add">Add to Library</button>') +
       `<button class="srch__btn" type="button" data-act="download"${dl ? ` title="Fetched by the helper on this PC from ${V.esc(CATALOG_PLATFORM_LABELS[dl.platform])}"` : ' aria-disabled="true" title="Only in stores (Apple Music, Deezer): there is no copy the helper can fetch"'}>Download…</button>`;
-    const head = V.detailHead({ cover: V.coverHTML(t.artworkUrl), title: t.title, sub: V.songSub(t), facts, badges: V.badgesHTML(sources), actions });
+    const head = V.detailHead({
+      cover: V.coverHTML(t.artworkUrl),
+      title: t.title,
+      sub: V.songSub(t),
+      facts,
+      badges: V.badgesHTML(sources),
+      actions,
+    });
     const lyr = v.lyrics
       ? v.lyrics.found
         ? v.lyrics.instrumental
           ? msg('An instrumental: no words to show.')
-          : V.lyricsHTML(v.lyrics.synced, v.lyrics.plain) || msg('LRCLIB has this song but no words for it.')
+          : V.lyricsHTML(v.lyrics.synced, v.lyrics.plain) ||
+            msg('LRCLIB has this song but no words for it.')
         : msg('No lyrics found for this song on LRCLIB.')
-      : msg(v.lyricsSaid ? V.esc(v.lyricsSaid) : `${V.spinner()}<span>Looking for the lyrics…</span>`);
-    body.innerHTML = head + listbox([{ label: null, opts: [{ kind: 'track', t }] }], t.title) + `<div class="srch__cap srch__cap--lyrics">Lyrics${v.lyrics?.synced ? ' <span>(synced)</span>' : ''}</div>` + lyr;
+      : msg(
+          v.lyricsSaid ? V.esc(v.lyricsSaid) : `${V.spinner()}<span>Looking for the lyrics…</span>`,
+        );
+    body.innerHTML =
+      head +
+      listbox([{ label: null, opts: [{ kind: 'track', t }] }], t.title) +
+      `<div class="srch__cap srch__cap--lyrics">Lyrics${v.lyrics?.synced ? ' <span>(synced)</span>' : ''}</div>` +
+      lyr;
     live.textContent = `${t.title}${genre ? `, ${genre}` : ''}${year ? `, ${year}` : ''}`;
   }
 
@@ -549,6 +757,7 @@ export function installSearch(): SearchApi {
       r.albums.upsert(chunk.albums);
     } else {
       r.done = true;
+      r.linkedOnly = (chunk.linkedOnly ?? []).map((pf) => CATALOG_PLATFORM_LABELS[pf]);
       for (const s of SECTIONS) {
         const pg = chunk.page[s];
         if (pg) r.next[s] = Math.max(r.next[s], pg.offset + pg.limit);
@@ -561,7 +770,12 @@ export function installSearch(): SearchApi {
    * One search against the first client that answers. `onChunk` sees every chunk as it arrives; a
    * server that cannot be reached before its first chunk is passed over for the next.
    */
-  async function stream(p: SearchParams, signal: AbortSignal, onChunk: (c: CatalogSearchChunk, client: CatalogClient) => void, legacy: boolean): Promise<{ resolve: string | null }> {
+  async function stream(
+    p: SearchParams,
+    signal: AbortSignal,
+    onChunk: (c: CatalogSearchChunk, client: CatalogClient) => void,
+    legacy: boolean,
+  ): Promise<{ resolve: string | null }> {
     const list = await clients();
     let last: unknown = null;
     for (const c of list) {
@@ -577,14 +791,60 @@ export function installSearch(): SearchApi {
         return { resolve };
       } catch (err) {
         if (signal.aborted) throw err;
-        if (got) throw new Refused(`The search stopped part way (${err instanceof Error ? err.message : 'connection lost'}); these are the answers that came.`);
+        if (got)
+          throw new Refused(
+            `The search stopped part way (${err instanceof Error ? err.message : 'connection lost'}); these are the answers that came.`,
+          );
         // A hub from before the catalog still searches songs (NP-FIND-001).
-        if (legacy && c.kind === 'hub' && err instanceof Unreachable && err.status === 404 && p.q && !p.offset) {
+        if (
+          legacy &&
+          c.kind === 'hub' &&
+          err instanceof Unreachable &&
+          err.status === 404 &&
+          p.q &&
+          !p.offset
+        ) {
           const rows = await legacyHubSearch(p.q, signal).catch(() => null);
           if (rows && rows.length) {
-            const query = { kind: 'text' as const, text: p.q, track: null, artist: null, album: null, isrc: null, url: null };
-            onChunk({ type: 'results', seq: 0, provider: null, query, tracks: rows, artists: [], albums: [], status: [] }, { ...c, label: `${c.label} (songs only: it has no catalog yet)` });
-            onChunk({ type: 'done', seq: 1, query, status: [], page: { tracks: { offset: 0, limit: rows.length, hasMore: false }, artists: null, albums: null }, totals: { tracks: rows.length, artists: 0, albums: 0 }, resolve: null }, { ...c, label: `${c.label} (songs only: it has no catalog yet)` });
+            const query = {
+              kind: 'text' as const,
+              text: p.q,
+              track: null,
+              artist: null,
+              album: null,
+              isrc: null,
+              url: null,
+            };
+            onChunk(
+              {
+                type: 'results',
+                seq: 0,
+                provider: null,
+                query,
+                tracks: rows,
+                artists: [],
+                albums: [],
+                status: [],
+              },
+              { ...c, label: `${c.label} (songs only: it has no catalog yet)` },
+            );
+            onChunk(
+              {
+                type: 'done',
+                seq: 1,
+                query,
+                status: [],
+                page: {
+                  tracks: { offset: 0, limit: rows.length, hasMore: false },
+                  artists: null,
+                  albums: null,
+                },
+                totals: { tracks: rows.length, artists: 0, albums: 0 },
+                resolve: null,
+                linkedOnly: [],
+              },
+              { ...c, label: `${c.label} (songs only: it has no catalog yet)` },
+            );
             lendClips(p.q, rows);
             return { resolve: null };
           }
@@ -599,10 +859,26 @@ export function installSearch(): SearchApi {
     throw last instanceof Error ? last : new Error('Nothing could be reached');
   }
 
-  function params(q: string, adv: AdvFields | null, sections: readonly CatalogSection[], offset: number): SearchParams {
+  function params(
+    q: string,
+    adv: AdvFields | null,
+    sections: readonly CatalogSection[],
+    offset: number,
+  ): SearchParams {
     const providers = CATALOG_PROVIDERS.filter((p) => filter.providers[p]);
-    const base = { sections, providers: providers.length ? providers : [...CATALOG_PROVIDERS], offset, limit: PAGE_LIMIT };
-    if (adv && !adv.isrc) return { ...base, track: adv.track || undefined, artist: adv.artist || undefined, album: adv.album || undefined };
+    const base = {
+      sections,
+      providers: providers.length ? providers : [...CATALOG_PROVIDERS],
+      offset,
+      limit: PAGE_LIMIT,
+    };
+    if (adv && !adv.isrc)
+      return {
+        ...base,
+        track: adv.track || undefined,
+        artist: adv.artist || undefined,
+        album: adv.album || undefined,
+      };
     return { ...base, q: adv?.isrc ? adv.isrc : q };
   }
 
@@ -615,7 +891,11 @@ export function installSearch(): SearchApi {
     ctl?.abort();
     lastQ = q;
     lastAdv = adv;
-    lastLabel = adv ? (adv.isrc ? `ISRC ${adv.isrc}` : [adv.track, adv.artist, adv.album].filter(Boolean).join(' · ')) : q;
+    lastLabel = adv
+      ? adv.isrc
+        ? `ISRC ${adv.isrc}`
+        : [adv.track, adv.artist, adv.album].filter(Boolean).join(' · ')
+      : q;
     hot = -1;
     const mine = ++seq;
     const signal = (ctl = new AbortController()).signal;
@@ -632,11 +912,16 @@ export function installSearch(): SearchApi {
     stack = [{ kind: 'results' }];
     open();
     render();
-    stream(params(q, adv, wanted(), 0), signal, (chunk, client) => {
-      if (mine !== seq) return;
-      upsert(r, chunk, client);
-      if (top()?.kind === 'results') render();
-    }, true)
+    stream(
+      params(q, adv, wanted(), 0),
+      signal,
+      (chunk, client) => {
+        if (mine !== seq) return;
+        upsert(r, chunk, client);
+        if (top()?.kind === 'results') render();
+      },
+      true,
+    )
       .then(({ resolve }) => {
         if (mine !== seq) return;
         // The server read it as a link after all: resolve it.
@@ -660,11 +945,16 @@ export function installSearch(): SearchApi {
 
   function failureWords(err: unknown): string {
     if (err instanceof Refused) return err.message;
-    if (err instanceof Unreachable) return 'Couldn’t search: neither the hub, the companion nor the music services answered. Check the connection and try again.';
+    if (err instanceof Unreachable)
+      return 'Couldn’t search: neither the hub, the companion nor the music services answered. Check the connection and try again.';
     return `Couldn’t search: ${err instanceof Error ? err.message : 'something went wrong'}.`;
   }
 
-  async function readLink(v: Extract<View, { kind: 'link' }>, mine: number, signal: AbortSignal): Promise<void> {
+  async function readLink(
+    v: Extract<View, { kind: 'link' }>,
+    mine: number,
+    signal: AbortSignal,
+  ): Promise<void> {
     try {
       const { value, client } = await ask((c) => c.resolve(v.url, 0, 100, signal));
       if (mine !== seq) return;
@@ -672,12 +962,19 @@ export function installSearch(): SearchApi {
       v.client = client;
     } catch (err) {
       if (mine !== seq || signal.aborted) return;
-      v.error = err instanceof Refused ? err.message : `The link could not be read: ${err instanceof Error ? err.message : 'no answer'}.`;
+      v.error =
+        err instanceof Refused
+          ? err.message
+          : `The link could not be read: ${err instanceof Error ? err.message : 'no answer'}.`;
     }
     if (top() === v) render();
   }
 
-  const bagOf = (r: Results, s: CatalogSection): Bag<CatalogTrack> | Bag<CatalogArtist> | Bag<CatalogAlbum> => (s === 'tracks' ? r.tracks : s === 'artists' ? r.artists : r.albums);
+  const bagOf = (
+    r: Results,
+    s: CatalogSection,
+  ): Bag<CatalogTrack> | Bag<CatalogArtist> | Bag<CatalogAlbum> =>
+    s === 'tracks' ? r.tracks : s === 'artists' ? r.artists : r.albums;
 
   /** Pages known so far (each section at its overview size), and whether any section says there is more. */
   function pageCount(r: Results): { known: number; more: boolean } {
@@ -691,7 +988,12 @@ export function installSearch(): SearchApi {
    * section's next offset (offset/limit/hasMore, as the engine pages). A song a later page brings again
    * is not shown twice; a page that adds nothing new is followed by the next while there is more.
    */
-  async function extend(r: Results, s: CatalogSection, signal: AbortSignal, after: () => void): Promise<void> {
+  async function extend(
+    r: Results,
+    s: CatalogSection,
+    signal: AbortSignal,
+    after: () => void,
+  ): Promise<void> {
     if (r.pending.has(s) || !r.more[s]) return;
     r.pending.add(s);
     const offset = Math.max(r.next[s], PAGE_LIMIT);
@@ -699,12 +1001,17 @@ export function installSearch(): SearchApi {
     const fresh = freshResults();
     after();
     try {
-      await stream(params(lastQ, lastAdv, [s], offset), signal, (chunk, client) => {
-        if (mine !== seq) return;
-        upsert(fresh, chunk, client);
-        if (fresh.status.length) r.status = fresh.status;
-        r.via = fresh.via;
-      }, false);
+      await stream(
+        params(lastQ, lastAdv, [s], offset),
+        signal,
+        (chunk, client) => {
+          if (mine !== seq) return;
+          upsert(fresh, chunk, client);
+          if (fresh.status.length) r.status = fresh.status;
+          r.via = fresh.via;
+        },
+        false,
+      );
       r.pending.delete(s);
       if (mine !== seq) return;
       const got = bagOf(r, s).append(bagOf(fresh, s).list as never);
@@ -726,7 +1033,10 @@ export function installSearch(): SearchApi {
     const r = res;
     if (top()?.kind !== 'results') return;
     const { known, more } = pageCount(r);
-    const to = Math.max(0, Math.min(r.page + delta, more ? Math.max(known, r.page + 1) : known - 1));
+    const to = Math.max(
+      0,
+      Math.min(r.page + delta, more ? Math.max(known, r.page + 1) : known - 1),
+    );
     if (to === r.page) return;
     stopPreview();
     r.page = to;
@@ -734,12 +1044,14 @@ export function installSearch(): SearchApi {
     const again = (): void => {
       if (top()?.kind !== 'results' || res !== r) return;
       // A page that turned out empty once every section has answered steps back to the last one.
-      if (!r.pending.size && r.page > 0 && r.page >= pageCount(r).known) r.page = pageCount(r).known - 1;
+      if (!r.pending.size && r.page > 0 && r.page >= pageCount(r).known)
+        r.page = pageCount(r).known - 1;
       render();
     };
     const signal = ctl?.signal ?? new AbortController().signal;
     // Fetched a page ahead of what is shown, so turning on finds it there.
-    for (const s of wanted()) if (bagOf(r, s).size < (to + 2) * PREVIEW_N[s]) void extend(r, s, signal, again);
+    for (const s of wanted())
+      if (bagOf(r, s).size < (to + 2) * PREVIEW_N[s]) void extend(r, s, signal, again);
     render();
     if (hotAt === -1) body.scrollTop = 0;
     else if (hotAt === -2) {
@@ -761,7 +1073,12 @@ export function installSearch(): SearchApi {
     r.more[section] = res.more[section];
     r.next[section] = res.next[section];
     r.done = true;
-    const v: Extract<View, { kind: 'all' }> = { kind: 'all', section, res: r, ctl: new AbortController() };
+    const v: Extract<View, { kind: 'all' }> = {
+      kind: 'all',
+      section,
+      res: r,
+      ctl: new AbortController(),
+    };
     push(v);
     render();
     body.scrollTop = 0;
@@ -788,7 +1105,14 @@ export function installSearch(): SearchApi {
 
   function openAlbum(al: Pick<CatalogAlbum, 'id' | 'title'>): void {
     stopPreview();
-    const v: Extract<View, { kind: 'album' }> = { kind: 'album', id: al.id, title: al.title, detail: null, error: null, client: null };
+    const v: Extract<View, { kind: 'album' }> = {
+      kind: 'album',
+      id: al.id,
+      title: al.title,
+      detail: null,
+      error: null,
+      client: null,
+    };
     push(v);
     render();
     const mine = seq;
@@ -798,7 +1122,8 @@ export function installSearch(): SearchApi {
         v.client = client;
       })
       .catch((err: unknown) => {
-        v.error = err instanceof Refused ? err.message : 'The album could not be opened: nothing answered.';
+        v.error =
+          err instanceof Refused ? err.message : 'The album could not be opened: nothing answered.';
       })
       .finally(() => {
         if (mine === seq && top() === v) render();
@@ -807,7 +1132,13 @@ export function installSearch(): SearchApi {
 
   function openArtist(a: Pick<CatalogArtist, 'id' | 'name'>): void {
     stopPreview();
-    const v: Extract<View, { kind: 'artist' }> = { kind: 'artist', id: a.id, name: a.name, detail: null, error: null };
+    const v: Extract<View, { kind: 'artist' }> = {
+      kind: 'artist',
+      id: a.id,
+      name: a.name,
+      detail: null,
+      error: null,
+    };
     push(v);
     render();
     const mine = seq;
@@ -816,7 +1147,10 @@ export function installSearch(): SearchApi {
         v.detail = value;
       })
       .catch((err: unknown) => {
-        v.error = err instanceof Refused ? err.message : 'The artist could not be opened: nothing answered.';
+        v.error =
+          err instanceof Refused
+            ? err.message
+            : 'The artist could not be opened: nothing answered.';
       })
       .finally(() => {
         if (mine === seq && top() === v) render();
@@ -826,7 +1160,14 @@ export function installSearch(): SearchApi {
   /** Genre, label and year from enrichment; lyrics, synced or plain (NP-FIND-006). */
   function openSong(t: CatalogTrack): void {
     stopPreview();
-    const v: Extract<View, { kind: 'song' }> = { kind: 'song', t, enrich: null, enrichSaid: null, lyrics: null, lyricsSaid: null };
+    const v: Extract<View, { kind: 'song' }> = {
+      kind: 'song',
+      t,
+      enrich: null,
+      enrichSaid: null,
+      lyrics: null,
+      lyricsSaid: null,
+    };
     push(v);
     render();
     const mine = seq;
@@ -838,7 +1179,10 @@ export function installSearch(): SearchApi {
         v.enrich = value;
       })
       .catch((err: unknown) => {
-        v.enrichSaid = err instanceof Refused ? `MusicBrainz: ${err.message}` : 'Genre, label and year could not be looked up just now.';
+        v.enrichSaid =
+          err instanceof Refused
+            ? `MusicBrainz: ${err.message}`
+            : 'Genre, label and year could not be looked up just now.';
       })
       .finally(again);
     if (!t.artist) {
@@ -850,7 +1194,8 @@ export function installSearch(): SearchApi {
         v.lyrics = value;
       })
       .catch((err: unknown) => {
-        v.lyricsSaid = err instanceof Refused ? err.message : 'The lyrics could not be looked up just now.';
+        v.lyricsSaid =
+          err instanceof Refused ? err.message : 'The lyrics could not be looked up just now.';
       })
       .finally(again);
   }
@@ -895,19 +1240,27 @@ export function installSearch(): SearchApi {
 
   /** The next page of a list, from whichever server answers: an album by its id, anything else by its link. */
   function pager(ref: CatalogCollectionRef): (offset: number) => Promise<CatalogTrackPage> {
-    const byId = ref.kind === 'album' && (ref.platform === 'deezer' || ref.platform === 'apple-music');
+    const byId =
+      ref.kind === 'album' && (ref.platform === 'deezer' || ref.platform === 'apple-music');
     return async (offset) => {
       // Pages of up to 200 (the contract's page limit), however long the list: no cap here (owner, 2026-10-06).
-      const { value } = await ask((c) => (byId ? c.album(`${ref.platform}:${ref.id}`, offset, LIST_PAGE).then((d) => d.page) : c.resolve(ref.url, offset, LIST_PAGE).then((r) => {
-        if (!r.collection) throw new Refused(r.reason ?? 'The list could not be read again.');
-        return r.collection.page;
-      })));
+      const { value } = await ask((c) =>
+        byId
+          ? c.album(`${ref.platform}:${ref.id}`, offset, LIST_PAGE).then((d) => d.page)
+          : c.resolve(ref.url, offset, LIST_PAGE).then((r) => {
+              if (!r.collection) throw new Refused(r.reason ?? 'The list could not be read again.');
+              return r.collection.page;
+            }),
+      );
       return value;
     };
   }
 
   /** Opens an album or playlist in the music list the way an album opens (NP-FIND-007). */
-  function showInList(c: Pick<CatalogCollection, 'ref' | 'artworkUrl' | 'covers'>, first: CatalogTrackPage | null): void {
+  function showInList(
+    c: Pick<CatalogCollection, 'ref' | 'artworkUrl' | 'covers'>,
+    first: CatalogTrackPage | null,
+  ): void {
     const list = w.NP_LIST;
     if (!list) {
       say('The music list is not ready yet');
@@ -930,7 +1283,12 @@ export function installSearch(): SearchApi {
         const page = await next(offset);
         offset = page.offset + page.tracks.length;
         // Every page until the server says there is no more: a playlist of any length loads whole.
-        return { rows: page.tracks.map(songFor), hasMore: page.hasMore && page.tracks.length > 0, total: page.total, capped: page.capped };
+        return {
+          rows: page.tracks.map(songFor),
+          hasMore: page.hasMore && page.tracks.length > 0,
+          total: page.total,
+          capped: page.capped,
+        };
       },
     };
     close();
@@ -958,7 +1316,9 @@ export function installSearch(): SearchApi {
       else say('Only Deezer and Apple Music artists open here; the songs are listed beside it.');
     } else if (o.kind === 'collection') showInList(o.c, o.c.page);
     else if (top()?.kind === 'song') {
-      const el = body.querySelector<HTMLElement>(`.srch__row[data-i="${i}"] .srch__art[data-preview]`);
+      const el = body.querySelector<HTMLElement>(
+        `.srch__row[data-i="${i}"] .srch__art[data-preview]`,
+      );
       if (el) preview(i, el);
     } else openSong(o.t);
   }
@@ -968,7 +1328,20 @@ export function installSearch(): SearchApi {
     if (!o || o.kind !== 'track' || added.has(o.t.id)) return;
     added.add(o.t.id);
     const s = songFor(o.t);
-    document.dispatchEvent(new CustomEvent('library:add', { detail: { title: s.title, artist: s.artist, album: s.album, duration: s.duration, bpm: s.bpm, date: s.date, platform: s.platform, url: s.url } }));
+    document.dispatchEvent(
+      new CustomEvent('library:add', {
+        detail: {
+          title: s.title,
+          artist: s.artist,
+          album: s.album,
+          duration: s.duration,
+          bpm: s.bpm,
+          date: s.date,
+          platform: s.platform,
+          url: s.url,
+        },
+      }),
+    );
     render();
   }
 
@@ -976,15 +1349,32 @@ export function installSearch(): SearchApi {
   function download(t: CatalogTrack, sources: CatalogTrack['sources']): void {
     const dl = pickDownloadSource(sources);
     if (!dl) {
-      say('This song is only in stores (Apple Music, Deezer): there is no copy the helper can fetch.');
+      say(
+        'This song is only in stores (Apple Music, Deezer): there is no copy the helper can fetch.',
+      );
       return;
     }
     if (!added.has(t.id)) {
       added.add(t.id);
       const s = songFor({ ...t, sources: [dl, ...t.sources] });
-      document.dispatchEvent(new CustomEvent('library:add', { detail: { title: s.title, artist: s.artist, album: s.album, duration: s.duration, bpm: s.bpm, date: s.date, platform: s.platform, url: s.url } }));
+      document.dispatchEvent(
+        new CustomEvent('library:add', {
+          detail: {
+            title: s.title,
+            artist: s.artist,
+            album: s.album,
+            duration: s.duration,
+            bpm: s.bpm,
+            date: s.date,
+            platform: s.platform,
+            url: s.url,
+          },
+        }),
+      );
     }
-    const row = (w.LIBRARY ?? []).find((x) => x.title.toLowerCase() === t.title.toLowerCase().slice(0, 120));
+    const row = (w.LIBRARY ?? []).find(
+      (x) => x.title.toLowerCase() === t.title.toLowerCase().slice(0, 120),
+    );
     if (row && w.NP_FETCH) {
       if (!row.url) row.url = dl.url;
       close();
@@ -1010,7 +1400,10 @@ export function installSearch(): SearchApi {
               if (!hit?.id) throw new Error('no match');
               return jsonp(`https://api.deezer.com/track/${hit.id}`, 7000).then((tr) => {
                 const bpm = (tr as { bpm?: number })?.bpm;
-                return { bpm: bpm && bpm > 0 ? Math.round(bpm) : null, d: hit.duration && hit.duration > 0 ? Math.round(hit.duration) : null };
+                return {
+                  bpm: bpm && bpm > 0 ? Math.round(bpm) : null,
+                  d: hit.duration && hit.duration > 0 ? Math.round(hit.duration) : null,
+                };
               });
             })
             .catch(() => ({ bpm: null, d: null })),
@@ -1021,7 +1414,11 @@ export function installSearch(): SearchApi {
         if (m.d && !t.durationMs) t.durationMs = m.d * 1000;
         if (m.bpm && added.has(t.id)) {
           // The song already moved into the library; hand the late answer over the same wall.
-          document.dispatchEvent(new CustomEvent('library:bpm', { detail: { title: t.title, artist: songFor(t).artist, bpm: m.bpm } }));
+          document.dispatchEvent(
+            new CustomEvent('library:bpm', {
+              detail: { title: t.title, artist: songFor(t).artist, bpm: m.bpm },
+            }),
+          );
         }
         const el = body.querySelector(`.srch__row[data-i="${i}"]`);
         if (el && options[i] === o) {
@@ -1038,21 +1435,48 @@ export function installSearch(): SearchApi {
   function lendClips(q: string, rows: CatalogTrack[]): void {
     const wanting = rows.filter((r) => !V.previewOf(r));
     if (!wanting.length) return;
-    fetch(`https://itunes.apple.com/search?media=music&entity=song&limit=25&term=${encodeURIComponent(q)}`)
+    fetch(
+      `https://itunes.apple.com/search?media=music&entity=song&limit=25&term=${encodeURIComponent(q)}`,
+    )
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: { results?: Array<{ trackName?: string; artistName?: string; previewUrl?: string; trackTimeMillis?: number }> } | null) => {
-        let changed = false;
-        for (const r of wanting) {
-          const m = (d?.results ?? []).find(
-            (x) => x.previewUrl && (x.trackName ?? '').toLowerCase() === r.title.toLowerCase() && (x.artistName ?? '').toLowerCase() === (r.artists[0] ?? '').toLowerCase() && !(r.durationMs && x.trackTimeMillis && Math.abs(r.durationMs - x.trackTimeMillis) > 3000),
-          );
-          if (m?.previewUrl && /^https?:/.test(m.previewUrl)) {
-            r.sources.push({ platform: 'apple-music', id: null, url: '', previewUrl: m.previewUrl, matchedBy: 'metadata' });
-            changed = true;
+      .then(
+        (
+          d: {
+            results?: Array<{
+              trackName?: string;
+              artistName?: string;
+              previewUrl?: string;
+              trackTimeMillis?: number;
+            }>;
+          } | null,
+        ) => {
+          let changed = false;
+          for (const r of wanting) {
+            const m = (d?.results ?? []).find(
+              (x) =>
+                x.previewUrl &&
+                (x.trackName ?? '').toLowerCase() === r.title.toLowerCase() &&
+                (x.artistName ?? '').toLowerCase() === (r.artists[0] ?? '').toLowerCase() &&
+                !(
+                  r.durationMs &&
+                  x.trackTimeMillis &&
+                  Math.abs(r.durationMs - x.trackTimeMillis) > 3000
+                ),
+            );
+            if (m?.previewUrl && /^https?:/.test(m.previewUrl)) {
+              r.sources.push({
+                platform: 'apple-music',
+                id: null,
+                url: '',
+                previewUrl: m.previewUrl,
+                matchedBy: 'metadata',
+              });
+              changed = true;
+            }
           }
-        }
-        if (changed && top()?.kind === 'results') render();
-      })
+          if (changed && top()?.kind === 'results') render();
+        },
+      )
       .catch(() => undefined);
   }
 
@@ -1062,7 +1486,10 @@ export function installSearch(): SearchApi {
   let armedEl: HTMLElement | null = null;
   function canArm(): boolean {
     try {
-      return matchMedia('(hover: hover) and (pointer: fine)').matches && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+      return (
+        matchMedia('(hover: hover) and (pointer: fine)').matches &&
+        !matchMedia('(prefers-reduced-motion: reduce)').matches
+      );
     } catch {
       return false;
     }
@@ -1097,9 +1524,11 @@ export function installSearch(): SearchApi {
       el.style.setProperty('--arm-ms', `${ms}ms`);
       el.classList.add('is-arming');
       // Two frames: the class lands with the ring empty, then the transition carries it full.
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        if (armedEl === el) el.style.setProperty('--p', '1');
-      }));
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          if (armedEl === el) el.style.setProperty('--p', '1');
+        }),
+      );
       armTimer = window.setTimeout(() => {
         const target = armedEl;
         disarm();
@@ -1301,10 +1730,16 @@ export function installSearch(): SearchApi {
 
   /* -------------------------------------------- advanced fields and ISRC */
 
-  const advIn = (name: string): HTMLInputElement => advForm.elements.namedItem(name) as HTMLInputElement;
+  const advIn = (name: string): HTMLInputElement =>
+    advForm.elements.namedItem(name) as HTMLInputElement;
   const advOpen = (): boolean => !advForm.hidden;
   function advValues(): AdvFields {
-    return { track: advIn('track').value.trim(), artist: advIn('artist').value.trim(), album: advIn('album').value.trim(), isrc: advIn('isrc').value.trim().toUpperCase().replace(/[-\s]/g, '') };
+    return {
+      track: advIn('track').value.trim(),
+      artist: advIn('artist').value.trim(),
+      album: advIn('album').value.trim(),
+      isrc: advIn('isrc').value.trim().toUpperCase().replace(/[-\s]/g, ''),
+    };
   }
   /** The fields merged into one line of words, for the header field when they fold away. */
   function merged(f: AdvFields): string {
@@ -1317,7 +1752,8 @@ export function installSearch(): SearchApi {
       const q = input.value.trim();
       if (q && !urlish(q)) {
         if (/^[A-Z]{2}-?[A-Z0-9]{3}-?\d{2}-?\d{5}$/i.test(q)) advIn('isrc').value = q;
-        else if (!advIn('track').value && !advIn('artist').value && !advIn('album').value) advIn('track').value = q;
+        else if (!advIn('track').value && !advIn('artist').value && !advIn('album').value)
+          advIn('track').value = q;
       }
       advForm.hidden = false;
       input.readOnly = true;
@@ -1350,7 +1786,9 @@ export function installSearch(): SearchApi {
     }
     if (f.isrc && !/^[A-Z]{2}[A-Z0-9]{3}\d{7}$/.test(f.isrc)) {
       stack = [];
-      body.innerHTML = msg('An ISRC is two letters, three letters or digits, then seven digits — like USQX91300108.');
+      body.innerHTML = msg(
+        'An ISRC is two letters, three letters or digits, then seven digits — like USQX91300108.',
+      );
       return;
     }
     input.value = merged(f);
@@ -1367,22 +1805,46 @@ export function installSearch(): SearchApi {
 
   const dialog = $<HTMLDialogElement>('srchFilter');
   function paintFilterBtn(): void {
-    const off = SECTIONS.filter((s) => !filter.sections[s]).length + CATALOG_PROVIDERS.filter((p) => !filter.providers[p]).length;
+    const off =
+      SECTIONS.filter((s) => !filter.sections[s]).length +
+      CATALOG_PROVIDERS.filter((p) => !filter.providers[p]).length;
     filterBtn.classList.toggle('is-on', off > 0);
-    filterBtn.setAttribute('aria-label', off ? `Filter: ${off} switched off` : 'Filter sections and services');
+    filterBtn.setAttribute(
+      'aria-label',
+      off ? `Filter: ${off} switched off` : 'Filter sections and services',
+    );
   }
   filterBtn.addEventListener('click', () => {
-    for (const s of SECTIONS) (dialog.querySelector(`input[name="sec"][value="${s}"]`) as HTMLInputElement).checked = filter.sections[s];
-    for (const p of CATALOG_PROVIDERS) (dialog.querySelector(`input[name="pf"][value="${p}"]`) as HTMLInputElement).checked = filter.providers[p];
+    for (const s of SECTIONS)
+      (dialog.querySelector(`input[name="sec"][value="${s}"]`) as HTMLInputElement).checked =
+        filter.sections[s];
+    for (const p of CATALOG_PROVIDERS)
+      (dialog.querySelector(`input[name="pf"][value="${p}"]`) as HTMLInputElement).checked =
+        filter.providers[p];
     $('srchFilterMsg').textContent = '';
     dialog.showModal();
   });
   $('srchFilterCancel').addEventListener('click', () => dialog.close());
   dialog.querySelector('form')!.addEventListener('submit', (e) => {
     e.preventDefault();
-    const next: Filter = { sections: { tracks: false, artists: false, albums: false }, providers: { itunes: false, deezer: false, musicbrainz: false, youtube: false, soundcloud: false } };
-    for (const s of SECTIONS) next.sections[s] = (dialog.querySelector(`input[name="sec"][value="${s}"]`) as HTMLInputElement).checked;
-    for (const p of CATALOG_PROVIDERS) next.providers[p] = (dialog.querySelector(`input[name="pf"][value="${p}"]`) as HTMLInputElement).checked;
+    const next: Filter = {
+      sections: { tracks: false, artists: false, albums: false },
+      providers: {
+        itunes: false,
+        deezer: false,
+        musicbrainz: false,
+        youtube: false,
+        soundcloud: false,
+      },
+    };
+    for (const s of SECTIONS)
+      next.sections[s] = (
+        dialog.querySelector(`input[name="sec"][value="${s}"]`) as HTMLInputElement
+      ).checked;
+    for (const p of CATALOG_PROVIDERS)
+      next.providers[p] = (
+        dialog.querySelector(`input[name="pf"][value="${p}"]`) as HTMLInputElement
+      ).checked;
     if (!SECTIONS.some((s) => next.sections[s])) {
       $('srchFilterMsg').textContent = 'Keep at least one section.';
       return;
@@ -1413,13 +1875,19 @@ export function installSearch(): SearchApi {
     const was = hot;
     // Past the overview page's last row (or before its first) the arrows turn the page.
     if (top()?.kind === 'results' && Math.abs(delta) === 1 && hot >= 0) {
-      if (delta > 0 && hot === n - 1 && (res.page < pageCount(res).known - 1 || pageCount(res).more)) return turnPage(1, 0);
+      if (
+        delta > 0 &&
+        hot === n - 1 &&
+        (res.page < pageCount(res).known - 1 || pageCount(res).more)
+      )
+        return turnPage(1, 0);
       if (delta < 0 && hot === 0 && res.page > 0) return turnPage(-1, -2);
     }
     hot = Math.max(0, Math.min(n - 1, hot < 0 ? (delta > 0 ? 0 : n - 1) : hot + delta));
     applyHot();
     const v = top();
-    if (v?.kind === 'all' && hot === n - 1 && (was === hot || delta > 1 || hot >= n - 3)) void loadMore(v);
+    if (v?.kind === 'all' && hot === n - 1 && (was === hot || delta > 1 || hot >= n - 3))
+      void loadMore(v);
   }
 
   input.addEventListener('keydown', (e) => {
@@ -1465,7 +1933,9 @@ export function installSearch(): SearchApi {
       if (showing && o && !pop.classList.contains('is-stale')) {
         e.preventDefault();
         // A song with a clip plays it; one without opens its details.
-        const el = body.querySelector<HTMLElement>(`.srch__row[data-i="${hot}"] .srch__art[data-preview]`);
+        const el = body.querySelector<HTMLElement>(
+          `.srch__row[data-i="${hot}"] .srch__art[data-preview]`,
+        );
         if (o.kind === 'track' && el && top()?.kind !== 'song') preview(hot, el);
         else activate(hot);
         return;
@@ -1536,9 +2006,21 @@ export function installSearch(): SearchApi {
     if (act) {
       e.preventDefault();
       const v = top();
-      if (act.dataset['act'] === 'list' && v?.kind === 'album' && v.detail) showInList({ ref: v.detail.collection, artworkUrl: v.detail.album.artworkUrl, covers: v.detail.page.tracks.map((t) => t.artworkUrl).filter((u): u is string => Boolean(u)).slice(0, 4) }, v.detail.page);
+      if (act.dataset['act'] === 'list' && v?.kind === 'album' && v.detail)
+        showInList(
+          {
+            ref: v.detail.collection,
+            artworkUrl: v.detail.album.artworkUrl,
+            covers: v.detail.page.tracks
+              .map((t) => t.artworkUrl)
+              .filter((u): u is string => Boolean(u))
+              .slice(0, 4),
+          },
+          v.detail.page,
+        );
       if (act.dataset['act'] === 'add' && v?.kind === 'song') addToLibrary(0);
-      if (act.dataset['act'] === 'download' && v?.kind === 'song') download(v.t, v.enrich ? [...v.t.sources, ...v.enrich.sources] : v.t.sources);
+      if (act.dataset['act'] === 'download' && v?.kind === 'song')
+        download(v.t, v.enrich ? [...v.t.sources, ...v.enrich.sources] : v.t.sources);
       return;
     }
     if (target.closest('a, .srch__add')) return;
@@ -1565,17 +2047,35 @@ export function installSearch(): SearchApi {
     input.focus();
   });
   document.addEventListener('mousedown', (e) => {
-    if (!pop.hidden && !(e.target as Element).closest('.search') && !(e.target as Element).closest('#srchFilter')) close();
+    if (
+      !pop.hidden &&
+      !(e.target as Element).closest('.search') &&
+      !(e.target as Element).closest('#srchFilter')
+    )
+      close();
   });
 
   /** Kept for the shell's "keep this song" (the radio's on-air menu): songs for a query, in the old row shape. */
   w.NP_FIND = async (q: string) => {
     const signal = AbortSignal.timeout(8000);
     const r = freshResults();
-    await stream(params(q, null, ['tracks'], 0), signal, (chunk, client) => upsert(r, chunk, client), true).catch(() => undefined);
+    await stream(
+      params(q, null, ['tracks'], 0),
+      signal,
+      (chunk, client) => upsert(r, chunk, client),
+      true,
+    ).catch(() => undefined);
     return r.tracks.list.slice(0, 10).map((t) => {
       const s = songFor(t);
-      return { t: t.title, a: t.artist, al: t.album ?? '', d: s.duration || null, bpm: s.bpm, p: s.platform, u: s.url || null };
+      return {
+        t: t.title,
+        a: t.artist,
+        al: t.album ?? '',
+        d: s.duration || null,
+        bpm: s.bpm,
+        p: s.platform,
+        u: s.url || null,
+      };
     });
   };
 

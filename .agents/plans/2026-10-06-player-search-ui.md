@@ -46,8 +46,9 @@ A server that cannot be reached is passed over for the next; a refusal (400, 422
 
 - **Sync of kept albums and playlists.** The player keeps `SavedCollection`s in `library:state` on this device. It
   has no path that syncs library state through the hub today (the hub holds a profile's *shared* playlists as CSV,
-  by choice, per playlist), so nothing was invented: the hub needs a library-state or saved-collections route
-  first, then the player sends these.
+  by choice, per playlist). The hub agent added `/api/v1/catalog/saved` (GET/PUT/DELETE) in the same shape, but it
+  is admin-only (cookie), and the player holds a device credential: wiring it needs a device scope on that route
+  (or a per-device copy) first. Not invented here.
 - **Downloading through the hub.** "Download…" in a song's details does what the player does today: the song joins
   the library with its best download link and the helper's fetch sheet fetches it. The hub's
   `POST /api/v1/catalog/download` (YouTube Music → YouTube → SoundCloud → Bandcamp → spotDL, tags, lyrics) is not

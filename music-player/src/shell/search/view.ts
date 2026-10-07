@@ -18,7 +18,10 @@ import {
 import { webUrl } from './client.js';
 
 export function esc(t: unknown): string {
-  return String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+  return String(t ?? '').replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+  );
 }
 
 export function fmtTime(sec: number): string {
@@ -31,16 +34,33 @@ export const NOTE =
 const PERSON =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.2" r="4.2"/><path d="M3.8 21c.6-4.6 4-7.2 8.2-7.2s7.6 2.6 8.2 7.2z"/></svg>';
 
-export const SECTION_LABEL: Record<CatalogSection, string> = { tracks: 'Songs', artists: 'Artists', albums: 'Albums' };
-export const SECTION_NOUN: Record<CatalogSection, [string, string]> = { tracks: ['song', 'songs'], artists: ['artist', 'artists'], albums: ['album', 'albums'] };
-export const PROVIDER_LABEL: Record<CatalogProviderId, string> = { itunes: 'Apple Music', deezer: 'Deezer', musicbrainz: 'MusicBrainz', youtube: 'YouTube', soundcloud: 'SoundCloud' };
+export const SECTION_LABEL: Record<CatalogSection, string> = {
+  tracks: 'Songs',
+  artists: 'Artists',
+  albums: 'Albums',
+};
+export const SECTION_NOUN: Record<CatalogSection, [string, string]> = {
+  tracks: ['song', 'songs'],
+  artists: ['artist', 'artists'],
+  albums: ['album', 'albums'],
+};
+export const PROVIDER_LABEL: Record<CatalogProviderId, string> = {
+  itunes: 'Apple Music',
+  deezer: 'Deezer',
+  musicbrainz: 'MusicBrainz',
+  youtube: 'YouTube',
+  soundcloud: 'SoundCloud',
+};
 
-export const count = (n: number, s: CatalogSection): string => `${n} ${SECTION_NOUN[s][n === 1 ? 0 : 1]}`;
+export const count = (n: number, s: CatalogSection): string =>
+  `${n} ${SECTION_NOUN[s][n === 1 ? 0 : 1]}`;
 
 /** The clip a row can play: Apple's, then Deezer's, then any other; http(s) only. */
 export function previewOf(t: CatalogTrack): string | null {
   const order: CatalogPlatform[] = ['apple-music', 'deezer'];
-  const sorted = [...t.sources].sort((a, b) => (order.indexOf(a.platform) + 1 || 9) - (order.indexOf(b.platform) + 1 || 9));
+  const sorted = [...t.sources].sort(
+    (a, b) => (order.indexOf(a.platform) + 1 || 9) - (order.indexOf(b.platform) + 1 || 9),
+  );
   for (const s of sorted) {
     const u = webUrl(s.previewUrl);
     if (u) return u;
@@ -50,7 +70,16 @@ export function previewOf(t: CatalogTrack): string | null {
 
 /** Spotify plays from YouTube Music, through spotDL: spotDL's own match, or the one it finds at download. */
 export function spotifyVia(sources: readonly CatalogSource[]): boolean {
-  return sources.some((s) => s.platform === 'spotify') && !sources.some((s) => s.platform !== 'spotify' && s.platform !== 'youtube-music' && s.matchedBy !== 'musicbrainz' && s.matchedBy !== 'odesli');
+  return (
+    sources.some((s) => s.platform === 'spotify') &&
+    !sources.some(
+      (s) =>
+        s.platform !== 'spotify' &&
+        s.platform !== 'youtube-music' &&
+        s.matchedBy !== 'musicbrainz' &&
+        s.matchedBy !== 'odesli',
+    )
+  );
 }
 
 /** Every platform the item is on, once each, in the order the sources name them (UX-CAT-003). */
@@ -73,7 +102,11 @@ export function badgesHTML(sources: readonly CatalogSource[]): string {
   const said = `On ${words.join(', ')}${via ? '; Spotify plays from YouTube Music through spotDL' : ''}`;
   return (
     `<span class="srch__pfs" title="${esc(said)}">` +
-    list.map((p) => `<span class="srch__badge" data-pf="${p}">${esc(CATALOG_PLATFORM_LABELS[p])}</span>`).join('') +
+    list
+      .map(
+        (p) => `<span class="srch__badge" data-pf="${p}">${esc(CATALOG_PLATFORM_LABELS[p])}</span>`,
+      )
+      .join('') +
     (via ? '<span class="srch__via">plays from YouTube Music</span>' : '') +
     '</span>'
   );
@@ -82,13 +115,22 @@ export function badgesHTML(sources: readonly CatalogSource[]): string {
 /** The words for the second line of a song: who, then the album, then the year. */
 export function songSub(t: CatalogTrack): string {
   // With an album, its year; without one (an upload, a pasted link), the whole date it was released.
-  const tail = t.album ? [t.album, t.year ?? (t.releaseDate ? t.releaseDate.slice(0, 4) : null)].filter(Boolean).join(' · ') : (t.releaseDate ?? '');
+  const tail = t.album
+    ? [t.album, t.year ?? (t.releaseDate ? t.releaseDate.slice(0, 4) : null)]
+        .filter(Boolean)
+        .join(' · ')
+    : (t.releaseDate ?? '');
   return t.artist ? (tail ? `${t.artist} — ${tail}` : t.artist) : tail;
 }
 
 /** An image address: http(s), or an inline picture (`data:image/…`), which an <img> cannot run. */
 export function imgUrl(u: unknown): string | null {
-  if (typeof u === 'string' && /^data:image\/(png|jpeg|gif|webp|svg\+xml)[;,]/i.test(u) && u.length <= 200_000) return u;
+  if (
+    typeof u === 'string' &&
+    /^data:image\/(png|jpeg|gif|webp|svg\+xml)[;,]/i.test(u) &&
+    u.length <= 200_000
+  )
+    return u;
   return webUrl(u);
 }
 
@@ -142,7 +184,13 @@ export function trackRowHTML(t: CatalogTrack, i: number, added: boolean): string
 }
 
 export function artistRowHTML(a: CatalogArtist, i: number): string {
-  const facts = [a.genre, a.albumCount ? `${a.albumCount} ${a.albumCount === 1 ? 'album' : 'albums'}` : null, a.fans ? `${a.fans.toLocaleString('en-US')} fans` : null].filter(Boolean).join(' · ');
+  const facts = [
+    a.genre,
+    a.albumCount ? `${a.albumCount} ${a.albumCount === 1 ? 'album' : 'albums'}` : null,
+    a.fans ? `${a.fans.toLocaleString('en-US')} fans` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   return opt(
     i,
     ' srch__row--artist',
@@ -155,7 +203,13 @@ export function artistRowHTML(a: CatalogArtist, i: number): string {
 }
 
 export function albumRowHTML(al: CatalogAlbum, i: number): string {
-  const facts = [al.artist, al.year ?? (al.releaseDate ? al.releaseDate.slice(0, 4) : null), al.trackCount ? `${al.trackCount} songs` : null].filter(Boolean).join(' · ');
+  const facts = [
+    al.artist,
+    al.year ?? (al.releaseDate ? al.releaseDate.slice(0, 4) : null),
+    al.trackCount ? `${al.trackCount} songs` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   return opt(
     i,
     ' srch__row--album',
@@ -167,13 +221,26 @@ export function albumRowHTML(al: CatalogAlbum, i: number): string {
   );
 }
 
-export function moreRowHTML(section: CatalogSection, shown: number, known: number, more: boolean, i: number): string {
+export function moreRowHTML(
+  section: CatalogSection,
+  shown: number,
+  known: number,
+  more: boolean,
+  i: number,
+): string {
   const label = `See all ${SECTION_LABEL[section].toLowerCase()}${known > shown ? ` (${known}${more ? '+' : ''})` : ''}`;
-  return opt(i, ' srch__more', `<span class="srch__morelabel">${esc(label)}</span><span class="srch__go" aria-hidden="true">›</span>`);
+  return opt(
+    i,
+    ' srch__more',
+    `<span class="srch__morelabel">${esc(label)}</span><span class="srch__go" aria-hidden="true">›</span>`,
+  );
 }
 
 /** A 2×2 mosaic of the first four songs' covers; the list's own cover when fewer than four have one. */
-export function mosaicHTML(c: Pick<CatalogCollection, 'artworkUrl' | 'covers'>, cls = 'srch__art'): string {
+export function mosaicHTML(
+  c: Pick<CatalogCollection, 'artworkUrl' | 'covers'>,
+  cls = 'srch__art',
+): string {
   const covers = c.covers.map(imgUrl).filter((u): u is string => Boolean(u));
   if (covers.length >= 4) {
     return `<span class="${cls} srch__mosaic" aria-hidden="true">${covers
@@ -188,7 +255,13 @@ export function mosaicHTML(c: Pick<CatalogCollection, 'artworkUrl' | 'covers'>, 
 export function collectionWords(c: CatalogCollection): string {
   const kind = c.ref.kind === 'album' ? 'Album' : 'Playlist';
   const n = c.page.total ?? c.page.tracks.length;
-  return [`${kind} on ${CATALOG_PLATFORM_LABELS[c.ref.platform]}`, c.ref.owner, n ? `${n.toLocaleString('en-US')} ${n === 1 ? 'song' : 'songs'}` : null].filter(Boolean).join(' · ');
+  return [
+    `${kind} on ${CATALOG_PLATFORM_LABELS[c.ref.platform]}`,
+    c.ref.owner,
+    n ? `${n.toLocaleString('en-US')} ${n === 1 ? 'song' : 'songs'}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 export function collectionRowHTML(c: CatalogCollection, i: number): string {
@@ -219,20 +292,44 @@ const STATE_WORDS: Record<CatalogSourceStatus['state'], string> = {
 function clock(iso: string | null): string {
   if (!iso) return '';
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '' : `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  return Number.isNaN(d.getTime())
+    ? ''
+    : `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
 /** One quiet line: each service and how it did, in the engine's own states (UX-CAT-001). */
-export function statusHTML(list: readonly CatalogSourceStatus[], via: string): string {
+export function statusHTML(
+  list: readonly CatalogSourceStatus[],
+  via: string,
+  linked: readonly string[] = [],
+): string {
   const parts = list.map((s) => {
     const word =
-      s.state === 'ok' ? String(s.count) : s.state === 'cooling-down' ? `cooling down${s.retryAt ? ` until ${clock(s.retryAt)}` : ''}` : s.state === 'skipped' && /yt-dlp/.test(s.error ?? '') ? 'needs yt-dlp' : STATE_WORDS[s.state];
+      s.state === 'ok'
+        ? String(s.count)
+        : s.state === 'cooling-down'
+          ? `cooling down${s.retryAt ? ` until ${clock(s.retryAt)}` : ''}`
+          : s.state === 'skipped' && /yt-dlp/.test(s.error ?? '')
+            ? 'needs yt-dlp'
+            : STATE_WORDS[s.state];
     const why = s.error ? ` title="${esc(s.error)}"` : '';
     return `<span class="srch__st" data-state="${s.state}"${why}>${esc(PROVIDER_LABEL[s.provider])} ${esc(word)}</span>`;
   });
   // With no hub and no companion, this browser asks what answers a page; yt-dlp is the servers'.
-  const browserOnly = via === 'this browser' ? '<span class="srch__note"> YouTube and SoundCloud results need the hub or the companion.</span>' : '';
-  return parts.join('<span class="srch__dot" aria-hidden="true"> · </span>') + (via ? `<span class="srch__via2"> — through ${esc(via)}.</span>` : '') + browserOnly;
+  const browserOnly =
+    via === 'this browser'
+      ? '<span class="srch__note"> YouTube and SoundCloud results need the hub or the companion.</span>'
+      : '';
+  // Platforms the search found only as other homes of its songs (MusicBrainz's links), not by searching them.
+  const links = linked.length
+    ? `<span class="srch__dot" aria-hidden="true"> · </span><span class="srch__st" data-state="linked">${esc(linked.join(', '))}: links only</span>`
+    : '';
+  return (
+    parts.join('<span class="srch__dot" aria-hidden="true"> · </span>') +
+    links +
+    (via ? `<span class="srch__via2"> — through ${esc(via)}.</span>` : '') +
+    browserOnly
+  );
 }
 
 /** The same, said plainly for a screen reader and for the failure message. */
@@ -245,13 +342,21 @@ export function statusWords(list: readonly CatalogSourceStatus[]): string {
 
 export function spinner(): string {
   let s = '<span class="srch__spin" aria-hidden="true">';
-  for (let i = 0; i < 12; i++) s += `<i style="transform:rotate(${i * 30}deg);animation-delay:${(i / 12 - 1).toFixed(3)}s"></i>`;
+  for (let i = 0; i < 12; i++)
+    s += `<i style="transform:rotate(${i * 30}deg);animation-delay:${(i / 12 - 1).toFixed(3)}s"></i>`;
   return `${s}</span>`;
 }
 
 /* ---------------------------------------------------------- detail heads */
 
-export function detailHead(o: { cover: string; title: string; sub: string; facts: string; badges: string; actions: string }): string {
+export function detailHead(o: {
+  cover: string;
+  title: string;
+  sub: string;
+  facts: string;
+  badges: string;
+  actions: string;
+}): string {
   return (
     `<div class="srch__detail">${o.cover}` +
     '<div class="srch__dmeta">' +
@@ -275,7 +380,9 @@ export function lyricsHTML(synced: string | null, plain: string | null): string 
       .split(/\r?\n/)
       .map((l) => /^\[(\d+):(\d+)(?:\.\d+)?\]\s?(.*)$/.exec(l))
       .filter((m): m is RegExpExecArray => Boolean(m))
-      .map((m) => `<p class="srch__lyr"><time>${Number(m[1])}:${m[2]}</time> ${esc(m[3] || '♪')}</p>`);
+      .map(
+        (m) => `<p class="srch__lyr"><time>${Number(m[1])}:${m[2]}</time> ${esc(m[3] || '♪')}</p>`,
+      );
     if (lines.length) return `<div class="srch__lyrics" data-kind="synced">${lines.join('')}</div>`;
   }
   if (plain) {
