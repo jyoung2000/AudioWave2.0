@@ -1510,10 +1510,67 @@
         "sorted",
         "narrowed by scope chip",
         "filtered by the bar",
-        "an album or playlist from the catalog (search-collection-list)"
+        "an album or playlist from the catalog (search-collection-list)",
+        "Discover: ranked by the chosen algorithm, the chip and Refresh in the silver bar (player-shell-discover)"
       ],
-      "rules": ["NP-LIST-001", "UX-KEY-001", "UX-STATE-001", "NP-FIND-007", "NP-FIND-008"],
+      "rules": [
+        "NP-LIST-001",
+        "UX-KEY-001",
+        "UX-STATE-001",
+        "NP-FIND-007",
+        "NP-FIND-008",
+        "NP-DISC-001"
+      ],
       "guideAnchor": "shell",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-shell-discover",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Music list ▸ Discover",
+      "entry": "library menu ▸ Discover",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts",
+        "music-player/src/shell/recommend/rank.ts"
+      ],
+      "components": ["shell markup (design/frontends/origin/airwave-now-playing.html)"],
+      "states": [
+        "ranked by the chosen algorithm (the chip names it, in its colour; the scope chip tinted)",
+        "refreshed: a new seed, what this session showed left out, N new songs spoken",
+        "everything eligible shown once: started over, and said so",
+        "capped at fifty with Load more",
+        "leaned: Familiar / Adventurous, or toward a genre (the chip's suffix)",
+        "nothing eligible (every song starred or queued)"
+      ],
+      "rules": ["NP-DISC-001", "NP-DISC-002", "NP-DISC-003", "NP-DISC-005", "NP-DATA-003"],
+      "guideAnchor": "shell",
+      "authority": "adopted"
+    },
+    {
+      "id": "player-shell-algorithm-menu",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Discover ▸ the algorithm menu",
+      "entry": "the chip in the silver bar while Discover is on show",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/recommend/rank.ts"
+      ],
+      "components": ["shell markup (design/frontends/origin/airwave-now-playing.html)"],
+      "states": [
+        "every algorithm, built in and yours, with its colour dot, mode and what it favours; a tick on the current one",
+        "Lean ▸ Familiar / Balanced / Adventurous, the library's genres, Reset lean",
+        "New Songs, Start Discover Over, Edit Algorithms…",
+        "touch: 44px rows"
+      ],
+      "rules": ["NP-DISC-003", "NP-DISC-004", "NP-DISC-005", "NP-MENU-001"],
+      "guideAnchor": "screens",
       "authority": "adopted"
     },
     {
@@ -1799,8 +1856,16 @@
         "music-player/src/shell/bridge.ts"
       ],
       "components": ["shell markup (design/frontends/origin/airwave-now-playing.html)"],
-      "states": ["defaults", "edited", "saved algorithm", "reverted"],
-      "rules": ["NP-PREF-001"],
+      "states": [
+        "defaults",
+        "edited",
+        "saved algorithm",
+        "reverted",
+        "the swatch and the legend: every algorithm in its colour; a built-in's is fixed",
+        "a colour picked from the twelve; one another algorithm uses, refused in a sentence",
+        "the preview beside the sliders ranks through the same ranker as Discover"
+      ],
+      "rules": ["NP-PREF-001", "NP-DISC-001", "NP-DISC-004"],
       "guideAnchor": "screens",
       "authority": "adopted"
     },

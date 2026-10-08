@@ -32,7 +32,16 @@ def surface(sid, title, entry, states, rules, extra=()):
             'states': states, 'rules': rules, 'guideAnchor': 'screens', 'authority': 'adopted'}
 
 NEW = [
-    surface('library', 'Library', 'the list under the player; Music view', ['empty (nothing indexed)', 'rows from this device', 'link rows from search', 'sorted', 'narrowed by scope chip', 'filtered by the bar'], ['NP-LIST-001', 'UX-KEY-001', 'UX-STATE-001']),
+    surface('library', 'Library', 'the list under the player; Music view', ['empty (nothing indexed)', 'rows from this device', 'link rows from search', 'sorted', 'narrowed by scope chip', 'filtered by the bar', 'Discover: ranked by the chosen algorithm, the chip and Refresh in the silver bar (player-shell-discover)'], ['NP-LIST-001', 'UX-KEY-001', 'UX-STATE-001', 'NP-DISC-001']),
+    # Discover (NP-DISC-001..005, 2026-10-07): ranked by the chosen algorithm; the silver bar refreshes it, names the algorithm and leans it.
+    surface('discover', 'Music list ▸ Discover', 'library menu ▸ Discover',
+            ['ranked by the chosen algorithm (the chip names it, in its colour; the scope chip tinted)', 'refreshed: a new seed, what this session showed left out, N new songs spoken',
+             'everything eligible shown once: started over, and said so', 'capped at fifty with Load more', "leaned: Familiar / Adventurous, or toward a genre (the chip's suffix)", 'nothing eligible (every song starred or queued)'],
+            ['NP-DISC-001', 'NP-DISC-002', 'NP-DISC-003', 'NP-DISC-005', 'NP-DATA-003'], ['music-player/src/shell/recommend/rank.ts']),
+    surface('algorithm-menu', 'Discover ▸ the algorithm menu', 'the chip in the silver bar while Discover is on show',
+            ['every algorithm, built in and yours, with its colour dot, mode and what it favours; a tick on the current one', "Lean ▸ Familiar / Balanced / Adventurous, the library's genres, Reset lean",
+             'New Songs, Start Discover Over, Edit Algorithms…', 'touch: 44px rows'],
+            ['NP-DISC-003', 'NP-DISC-004', 'NP-DISC-005', 'NP-MENU-001'], ['music-player/src/shell/recommend/rank.ts']),
     surface('now-playing', 'Now Playing', 'the jewel case and transport at the top of the page', ['nothing playing', 'a track from this device playing (the bar follows the element)', 'paused', 'a link row chosen (does not pretend to play)', 'a station (LIVE)', 'a channel (video bar, LIVE)'], ['NP-TRANS-001', 'UX-KEY-002']),
     surface('search-popover', 'Search popover', 'the header search field', ['empty', 'results from companion / iTunes', 'enriched rows from the paired hub (features, album, genre, bpm)', 'pasted link resolved', 'auditioning (click, or a five-second hold that fills the ring)', 'no clip (says why)', 'people on the hub'], ['NP-PRIN-002', 'NP-FIND-001']),
     # The catalog search (DEC-039, 2026-10-06): its views beyond the overview, and the music list's side.

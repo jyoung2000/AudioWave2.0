@@ -23,16 +23,19 @@ function shellCss() {
   return blocks[0];
 }
 
-/** Two artists, two albums, four songs each — the e2e suites' seed (music-player/tests/e2e/np/_shell.ts). */
+/**
+ * Two artists, two albums, four songs each — the e2e suites' seed (music-player/tests/e2e/np/_shell.ts) — with a
+ * genre apiece (RIFF INFO IGNR), so Discover's algorithm has genres to rank by and its Lean menu has a Genre list.
+ */
 export const SEED = [
-  ['01 Harbour Morning.wav', 'Harbour Morning', 'Alder Quartet', 'First Light'],
-  ['02 Gantry.wav', 'Gantry', 'Alder Quartet', 'First Light'],
-  ['03 Blue Hour.wav', 'Blue Hour', 'Alder Quartet', 'First Light'],
-  ['04 Tideline.wav', 'Tideline', 'Alder Quartet', 'First Light'],
-  ['05 Paper Harbour.wav', 'Paper Harbour', 'Birch Ensemble', 'Late Shift'],
-  ['06 Closing Hour.wav', 'Closing Hour', 'Birch Ensemble', 'Late Shift'],
-  ['07 Ember Line.wav', 'Ember Line', 'Birch Ensemble', 'Late Shift'],
-  ['08 Slow Carousel.wav', 'Slow Carousel', 'Birch Ensemble', 'Late Shift'],
+  ['01 Harbour Morning.wav', 'Harbour Morning', 'Alder Quartet', 'First Light', 'Jazz'],
+  ['02 Gantry.wav', 'Gantry', 'Alder Quartet', 'First Light', 'Jazz'],
+  ['03 Blue Hour.wav', 'Blue Hour', 'Alder Quartet', 'First Light', 'Jazz'],
+  ['04 Tideline.wav', 'Tideline', 'Alder Quartet', 'First Light', 'Jazz'],
+  ['05 Paper Harbour.wav', 'Paper Harbour', 'Birch Ensemble', 'Late Shift', 'Folk'],
+  ['06 Closing Hour.wav', 'Closing Hour', 'Birch Ensemble', 'Late Shift', 'Folk'],
+  ['07 Ember Line.wav', 'Ember Line', 'Birch Ensemble', 'Late Shift', 'Folk'],
+  ['08 Slow Carousel.wav', 'Slow Carousel', 'Birch Ensemble', 'Late Shift', 'Folk'],
 ];
 
 /** Generated in the page: 8 kHz PCM with RIFF INFO tags, indexed through the shell's own import path. */
@@ -80,7 +83,7 @@ export function addSongs(list) {
     // A fixed date, so "added" and "modified" read the same on every run.
     return new File([buf], name, { type: 'audio/wav', lastModified: Date.UTC(2026, 8, 12, 18, 30) });
   };
-  const files = list.map(([file, title, artist, album], i) => wav(file, 180 + i * 17, { INAM: title, IART: artist, IPRD: album }));
+  const files = list.map(([file, title, artist, album, genre], i) => wav(file, 180 + i * 17, { INAM: title, IART: artist, IPRD: album, ...(genre ? { IGNR: genre } : {}) }));
   return window.NP_LIBRARY.addFiles(files).then((r) => r.added);
 }
 
@@ -99,6 +102,13 @@ const LINKS = [
   { selector: '#ctx [data-act="parent"]', to: 'row-menu-playlists', in: ['row-menu'] },
   { selector: '#ctx .ctx__sub [data-act="new-add"]', to: 'new-playlist-sheet', in: ['row-menu-playlists'] },
   { selector: '#sheetCancel, #sheetCreate', to: 'now-playing', in: ['new-playlist-sheet'] },
+  // Discover (NP-DISC-001..005): from the library menu; its chip opens the algorithm menu; Refresh and a pick land back on it.
+  { selector: '#ipodMenu .ipod__item', text: 'Discover', to: 'discover', in: ['library-menu'] },
+  { selector: '#libAlgoChip', to: 'discover-algo-menu', in: ['discover'] },
+  { selector: '#libDiscRefresh', to: 'discover', in: ['discover'] },
+  { selector: '#libScopeClear', to: 'now-playing', in: ['discover'] },
+  { selector: '#ctx [data-act="algo-pick"], #ctx [data-act="algo-refresh"], #ctx [data-act="algo-restart"]', to: 'discover', in: ['discover-algo-menu'] },
+  { selector: '#ctx [data-act="algo-edit"]', to: 'settings-rec', in: ['discover-algo-menu'] },
   { selector: '#profile', to: 'settings-stats', in: [...MAIN, 'library', 'recent'] },
   ...SETTINGS.map((id) => ({ selector: `#pt-${id.slice('settings-'.length)}`, to: id, in: [...SETTINGS, 'settings-src-hub'] })),
   { selector: '#prefsBack', to: 'now-playing', in: [...SETTINGS, 'settings-src-hub'] },
@@ -270,6 +280,16 @@ export default {
     await settle(300);
     await snap({ id: 'new-playlist-sheet', title: 'New playlist sheet', group: 'Music', note: 'Add to Playlist ▸ New Playlist…, answered in the sheet.', dismiss: 'now-playing', dismissOutside: '#sheet' });
     await click('#sheetCancel', { ms: 500 });
+
+    // ---- Discover (NP-DISC-001..005): ranked by the chosen algorithm; the silver bar shows it and refreshes it
+    await click('#libMenuBtn', { ms: 400 });
+    await click('#ipodMenu .ipod__item:has-text("Discover")', { ms: 600 });
+    await snap({ id: 'discover', title: 'Discover', group: 'Music', note: 'Discover, ranked by the chosen algorithm — here Airwave default in For you, with Gantry just played: Alder Quartet leads as the strong tier, Birch Ensemble follows, and Gantry itself is left out for a week. The silver bar carries the algorithm chip in its colour (name · mode, and any lean), and ↻ New songs, which re-seeds and leaves out what this session has shown; the scope chip wears a thin tint of the colour.' });
+    await click('#libAlgoChip', { ms: 500 });
+    await snap({ id: 'discover-algo-menu', title: 'Discover ▸ the algorithm menu', group: 'Music', note: 'The chip’s menu: every algorithm, built in and yours, each with its colour dot, mode and a line on what it favours, a tick on the one in use; Lean ▸ Familiar / Balanced / Adventurous and the library’s genres; New Songs, Start Discover Over, and Edit Algorithms…, which opens Settings ▸ Recommendations.', dismiss: 'discover', dismissOutside: '#ctx' });
+    await page.keyboard.press('Escape');
+    await settle(300);
+    await click('#libScopeClear', { ms: 500 });
 
     // ---- Search: the music catalog, through the companion on this PC (NP-FIND-001..008)
     const pop = { dismiss: 'now-playing', dismissOutside: '#searchBox' };

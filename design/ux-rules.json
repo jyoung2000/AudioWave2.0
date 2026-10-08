@@ -94,6 +94,10 @@
     {
       "id": "search",
       "title": "Music search in the hub and the companion"
+    },
+    {
+      "id": "np-discover",
+      "title": "Player shell — Discover and the recommendation algorithm"
     }
   ],
   "rules": [
@@ -1845,7 +1849,7 @@
       "id": "NP-DATA-003",
       "group": "np-data",
       "title": "Recommendations are counted from the shelf's own record",
-      "contract": "What Discover shows is logged once per song per day; a play started there is a recommendation taken. The funnel reads recommended → started → heard to the end → replayed → added or favourited from those logs, never from estimates.",
+      "contract": "What Discover shows is logged once per song per day (`recShown: {id, at}` — every page it shows, on opening, on Refresh, on Load more and after an algorithm or lean change, the same record); a play started there is a recommendation taken. The funnel reads recommended → started → heard to the end → replayed → added or favourited from those logs, never from estimates. The ranker reads the same record back as impressions for its overexposure penalty (NP-DISC-001).",
       "example": "",
       "authority": "adopted",
       "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
@@ -3202,6 +3206,165 @@
           "type": "test",
           "path": "docker-container/tests/e2e/search.spec.ts",
           "name": "searches, opens a song and comes back with the keyboard alone, on stock answers"
+        }
+      ]
+    },
+    {
+      "id": "NP-DISC-001",
+      "group": "np-discover",
+      "title": "Discover is ranked by the chosen algorithm, through one ranker",
+      "contract": "Discover (library menu ▸ Discover) is the recommendation engine's ranking of the eligible songs — owned, not starred, not waiting in Up Next — under the current algorithm (Settings ▸ Recommendations, `cfg.algoCur`) and its mode, using every attribute a song carries: plays and skips, tempo, genre, release and added dates, what Discover has shown before. The ranker is a pure function (music-player/src/shell/recommend/rank.ts, `window.NP_RECOMMEND`): the weighted factors less the engine's penalties, then the familiarity mix (each tier's share), the artist cap and exploration — deterministic for a seed, so the same library and settings give the same list. The preview beside the sliders ranks through the same call (seed 0), and a change there re-ranks an open Discover. A factor this library cannot feed scores zero and the panel says so beside its slider, read from the rows themselves. The mode's `excludeOwned` is not applied to a library that is all owned (NPD-032).",
+      "example": "Eight seeded songs, Alder Quartet played, Airwave default in For you: the strong tier (Alder) opens the list, Birch Ensemble follows, Gantry (played this week) is left out. Crate digger in Deep cuts leaves out every artist you know and ranks what you have heard least first.",
+      "authority": "adopted",
+      "owners": [
+        "music-player/src/shell/recommend/rank.ts",
+        "music-player/src/shell/bridge.ts",
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/recommend-rank.test.ts",
+          "name": "gives the same order for the same library, log, config and seed, and another for another seed"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/recommend-rank.test.ts",
+          "name": "Airwave default leans on the artists you play; Crate digger puts the least-played first"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/recommend-rank.test.ts",
+          "name": "leaves out starred songs, queued songs and anything played inside the repeat window"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/recommend-rank.test.ts",
+          "name": "reads tempo, genre, release and added dates, and says which factors this library can feed"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/discover.spec.ts",
+          "name": "opens ranked by the chosen algorithm, with the chip and Refresh in the silver bar"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/prefs.spec.ts",
+          "name": "the recommender ranks, and its validation is enforced here"
+        }
+      ]
+    },
+    {
+      "id": "NP-DISC-002",
+      "group": "np-discover",
+      "title": "Refresh gives new songs; Load more extends the list",
+      "contract": "While Discover is on show the silver bar has a Refresh button (\"New songs\", ↻, a 44px target on touch). It re-seeds and re-ranks, leaves out what this Discover session has already shown until everything eligible has been shown once — then starts over and the HUD and the live region say so — scrolls the list to its top and announces \"N new songs\" in the list's live region. Shift-click, or the menu's Start Discover Over, clears the shown record first. Discover shows fifty at a time; a Load more row under the rows says how many are left and extends the same ranking without moving what is already shown, and announces how many more. Opening Discover again shows the list as it stands; the menu's Discover row counts what is eligible.",
+      "example": "56 songs: a page of 50 and \"Load more — 6 more songs\". Refresh: \"6 new songs\". Refresh again: \"50 new songs — everything eligible has been shown once, so Discover started over\".",
+      "authority": "adopted",
+      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/discover.spec.ts",
+          "name": "Refresh re-seeds, leaves out what was shown until everything has been, pages with Load more, and speaks"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/recommend-rank.test.ts",
+          "name": "a refresh excludes what was already shown, and says how many were eligible"
+        }
+      ]
+    },
+    {
+      "id": "NP-DISC-003",
+      "group": "np-discover",
+      "title": "The algorithm chip: see and change the algorithm from the bar",
+      "contract": "While Discover is on show the silver bar carries a chip with the current algorithm's colour dot, name and mode (\"Crate digger · Deep cuts\", plus any lean as a suffix); the scope chip wears a thin tint of the colour. Clicking it opens the shell's own menu (NP-MENU-001 behaviour: arrows, Return, Escape back to the chip) under it: every algorithm, built in and yours, each with its colour dot, mode and one line on what it favours (from its two largest effective weights and its exploration rate), a tick on the current one; Lean ▸; New Songs; Start Discover Over; Edit Algorithms…, which opens Settings ▸ Recommendations. Choosing one sets `cfg.algoCur` and its mode, saves, re-ranks Discover at once from the top and the HUD says which algorithm is on. Settings and the chip share one source of truth: a choice in either shows in the other.",
+      "example": "Chip: \"Airwave default · For you\". Menu row: \"Crate digger · Deep cuts — Favours what you have heard least and what sounds like what you play, wide exploration\". HUD: \"Discover ranked by “Crate digger” · Deep cuts\".",
+      "authority": "adopted",
+      "owners": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/recommend/rank.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/discover.spec.ts",
+          "name": "the chip’s menu switches the algorithm: the list re-ranks, the HUD says so, and Settings shows the same choice"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/recommend-rank.test.ts",
+          "name": "describes an algorithm from its largest weights and its exploration"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/a11y.spec.ts",
+          "name": "@a11y Discover, with the algorithm chip, Refresh and the open algorithm menu, has no detectable violations"
+        }
+      ]
+    },
+    {
+      "id": "NP-DISC-004",
+      "group": "np-discover",
+      "title": "Every algorithm has a colour of its own",
+      "contract": "An algorithm carries `color` (`#rrggbb`), saved with `cfg.algos`, exported and imported in `.airwave-algorithm.json` as `color` (optional on import: a file without one, or with one another algorithm here already wears, gets the next free hue). The twelve hues are tokens.json `algorithm` (--np-algo-*), thirty degrees apart; the built-ins are fixed — Airwave default blue, Late night indigo, Crate digger orange. A new or duplicated algorithm takes the next hue no other algorithm uses, in palette order; with all twelve taken, the least-used hue farthest from the others. Settings ▸ Recommendations shows the swatch beside the name and a legend of every algorithm in its colour; the swatch opens a keyboard-operable menu of the twelve, naming who has each, and a colour another algorithm uses is refused in a plain sentence. The colour is on the bar chip, the menu's dots, the Settings legend and the scope chip's tint.",
+      "example": "Duplicate Airwave default twice: the copies are red, then gold (orange is Crate digger's). Pick blue for a copy: \"“Airwave default” already uses blue — pick another, or recolour that one first.\"",
+      "authority": "adopted",
+      "owners": [
+        "packages/aqua-ui/src/styles/tokens.json",
+        "packages/aqua-ui/src/styles/now-playing.css",
+        "music-player/src/shell/recommend/rank.ts",
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/discover.spec.ts",
+          "name": "every algorithm has a colour of its own: new ones take the next free hue, a taken one is refused, and they survive a reload and an import without one"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/recommend-rank.test.ts",
+          "name": "hands out the next unused hue, never one another algorithm has"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/recommend-rank.test.ts",
+          "name": "with all twelve taken, picks the least crowded hue, farthest from the others"
+        }
+      ]
+    },
+    {
+      "id": "NP-DISC-005",
+      "group": "np-discover",
+      "title": "Lean: a different taste or genre without editing the algorithm",
+      "contract": "The chip's menu has Lean ▸ Familiar / Balanced / Adventurous and, when the library carries genres, the genres to lean toward. A lean biases the ranking for this player without touching the saved algorithm: Familiar lowers exploration and raises the artists and genres you play (the mix leans on the strong tier); Adventurous widens exploration and raises what you have heard least (the mix leans on the far tiers); a genre lean scores that genre's songs as fully in your taste, treats the genre as known and triples the genre weight. The lean is kept in the player's settings (`cfg.lean`), shown on the chip as a suffix (\"· Adventurous\", \"· Jazz\"), and Reset lean clears it; the HUD says what changed.",
+      "example": "\"Airwave default · For you · Adventurous · Folk\": Birch Ensemble's folk songs open the list.",
+      "authority": "adopted",
+      "owners": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/recommend/rank.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/discover.spec.ts",
+          "name": "a lean bends the ranking without editing the algorithm: Adventurous, then a genre; Reset clears it"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/recommend-rank.test.ts",
+          "name": "a genre lean moves that genre up without touching the saved weights"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/recommend-rank.test.ts",
+          "name": "Familiar and Adventurous bend exploration and discovery, Balanced leaves the algorithm alone"
         }
       ]
     }
