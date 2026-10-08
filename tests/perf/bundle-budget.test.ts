@@ -184,7 +184,7 @@ const BUNDLES: Bundle[] = [
      * And to 2536 for the redrawn search (NP-FIND-003..010, 2026-10-07): the overview, the one-type
      * pages with their arrows and scroll paging, the Playlists section and the row menu grew the
      * lazy search chunk from 112 to 121 KB — measured. The entry is unchanged (250).
-     */
+     *
      * And to 2543 for every result carrying its facts (UX-CAT-006, 2026-10-07): the lazy search chunk
      * — which carries the engine for a player with neither hub nor companion — gains the page
      * hydration (Deezer detail by id, ISRC and name; the Cover Art Archive; the pool and the
