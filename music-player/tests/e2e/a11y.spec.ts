@@ -26,6 +26,15 @@ test('@a11y the library, with music in it, has no detectable violations', async 
   await analyse(page, 'library');
 });
 
+test('@a11y Discover, with the algorithm chip, Refresh and the open algorithm menu, has no detectable violations', async ({ page }) => {
+  await seed(page, SEED.slice(0, 4));
+  await page.click('#libMenuBtn'); await page.waitForTimeout(250);
+  await page.click('#ipodMenu .ipod__item:has-text("Discover")'); await page.waitForTimeout(400);
+  await analyse(page, 'Discover');
+  await page.click('#libAlgoChip'); await page.waitForTimeout(300);
+  await analyse(page, 'Discover ▸ the algorithm menu');
+});
+
 for (const [tab, name] of [['#pt-stats', 'Statistics'], ['#pt-rec', 'Recommendations'], ['#pt-src', 'Sources'], ['#pt-player', 'Player'], ['#pt-eq', 'Equalizer']] as const) {
   test(`@a11y Settings ▸ ${name} has no detectable violations`, async ({ page }) => {
     await page.click('#profile');

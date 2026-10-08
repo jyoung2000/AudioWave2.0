@@ -189,3 +189,196 @@ test.describe('narrow', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), 'nor does Statistics').toBe(false);
   });
 });
+
+/* ---- Discover is ranked by the chosen algorithm (NP-DISC-001..005, 2026-10-07) ---- */
+
+type DiscWin = {
+  NP_DISCOVER: {
+    ids(): string[] | null;
+    state(): { seed: number; shown: number; eligible: number; more: number | null; wrapped: boolean };
+    rank(): Array<{ id: string; title: string; score: number; tier: string; explored: boolean }>;
+  };
+};
+const discIds = (p: Page) => p.evaluate(() => (window as unknown as DiscWin).NP_DISCOVER.ids());
+const discState = (p: Page) => p.evaluate(() => (window as unknown as DiscWin).NP_DISCOVER.state());
+const rowTitles = (p: Page) => p.$$eval('#libraryRows tr[data-id] .lib-title', (n) => n.map((x) => (x.textContent ?? '').trim()));
+const algoVar = (p: Page, sel: string) => p.$eval(sel, (n) => getComputedStyle(n).getPropertyValue('--algo').trim());
+async function openDiscover(p: Page): Promise<void> {
+  await p.click('#libMenuBtn'); await p.waitForTimeout(250);
+  await p.click('#ipodMenu .ipod__item:has-text("Discover")'); await p.waitForTimeout(400);
+}
+/** The e2e seed with genres: Alder Quartet is Jazz, Birch Ensemble is Folk. */
+const GENRED: SeedTrack[] = SEED.map((t) => ({ ...t, seconds: 3, genre: t.artist === 'Alder Quartet' ? 'Jazz' : 'Folk' }));
+
+test.describe('Discover, ranked', () => {
+  test.use({ acceptDownloads: true });
+
+  test('opens ranked by the chosen algorithm, with the chip and Refresh in the silver bar', async ({ page }) => {
+    await boot(page);
+    await seed(page, GENRED);
+    await openDiscover(page);
+    await expect(page.locator('#libScopeLabel')).toHaveText('Discover');
+    await expect(page.locator('#libAlgoChip'), 'the chip is in the bar').toBeVisible();
+    await expect(page.locator('#libAlgoName'), 'and names the algorithm and its mode').toHaveText('Airwave default · For you');
+    expect(await algoVar(page, '.lib-scope'), 'in its colour').toBe('#2f61c1');
+    await expect(page.locator('#libDiscRefresh'), 'Refresh is beside it').toBeVisible();
+    expect(await page.getAttribute('#libDiscRefresh', 'aria-label')).toBe('New songs');
+    expect(await page.$eval('#libScope', (n) => n.classList.contains('is-tinted')), 'the scope chip wears a thin tint').toBe(true);
+    const ids = (await discIds(page))!;
+    expect(ids, 'every unstarred, unqueued song is eligible').toHaveLength(8);
+    const ranked = await page.evaluate(() => (window as unknown as DiscWin).NP_DISCOVER.rank());
+    expect(ids, 'the list is the ranker’s order, not the library’s').toEqual(ranked.map((r) => r.id));
+    expect(await rowTitles(page), 'and the rows follow it').toEqual(ranked.map((r) => r.title));
+    expect(await page.$eval('#libMore', (n) => (n as HTMLElement).hidden), 'eight songs need no Load more').toBe(true);
+    // the same list twice: deterministic for a seed
+    await page.click('#libScopeClear'); await page.waitForTimeout(200);
+    await openDiscover(page);
+    expect(await discIds(page), 'reopened, the same list').toEqual(ids);
+    await page.click('#libraryRows tr[data-id]:nth-child(1)'); await page.waitForTimeout(400);
+    await expect.poll(async () => (await plays(page)).at(-1)?.via, { message: 'a play from it is still a recommendation taken (NP-DATA-003)' }).toBe('discover');
+  });
+
+  test('Refresh re-seeds, leaves out what was shown until everything has been, pages with Load more, and speaks', async ({ page }) => {
+    await boot(page);
+    // 56 short songs: fifty on the first page, six behind Load more
+    const many: SeedTrack[] = [...GENRED, ...Array.from({ length: 48 }, (_, i) => ({ file: `${String(i + 9).padStart(2, '0')} Cut ${i + 1}.wav`, title: `Cut ${i + 1}`, artist: `Group ${(i % 6) + 1}`, album: `Volume ${(i % 4) + 1}`, seconds: 2, genre: i % 2 ? 'Electronic' : 'Ambient' }))];
+    await seed(page, many);
+    await openDiscover(page);
+    const first = (await discIds(page))!;
+    expect(first, 'fifty at a time').toHaveLength(50);
+    await expect(page.locator('#libMoreBtn'), 'Load more says how many are left').toHaveText('Load more — 6 more songs');
+    await page.click('#libMoreBtn'); await page.waitForTimeout(300);
+    expect((await discIds(page))!.length, 'Load more extends the same ranking').toBe(56);
+    expect((await discIds(page))!.slice(0, 50), 'without moving what was already shown').toEqual(first);
+    await expect(page.locator('#libFindLive')).toHaveText('6 more songs — 56 shown');
+    // start over, then refresh: the second page is what the first one left out
+    await page.click('#libDiscRefresh', { modifiers: ['Shift'] }); await page.waitForTimeout(400);
+    const page1 = (await discIds(page))!;
+    expect(page1).toHaveLength(50);
+    await expect(page.locator('#libFindLive')).toHaveText('50 new songs — started over');
+    await page.click('#libDiscRefresh'); await page.waitForTimeout(400);
+    const page2 = (await discIds(page))!;
+    expect(page2, 'what the first page did not show').toHaveLength(6);
+    expect(page2.some((id) => page1.includes(id)), 'none of them already shown').toBe(false);
+    await expect(page.locator('#libFindLive'), 'the live region says how many').toHaveText('6 new songs');
+    expect((await discState(page)).seed, 'each refresh is a new seed').toBeGreaterThan(1);
+    await page.click('#libDiscRefresh'); await page.waitForTimeout(400);
+    expect((await discIds(page))!.length, 'everything shown once: it starts over').toBe(50);
+    await expect(page.locator('#libFindLive')).toContainText('everything eligible has been shown once, so Discover started over');
+    expect(await page.$eval('#libraryScroll', (n) => n.scrollTop), 'and the list is at its top').toBe(0);
+  });
+
+  test('the chip’s menu switches the algorithm: the list re-ranks, the HUD says so, and Settings shows the same choice', async ({ page }) => {
+    await boot(page);
+    const rows = await seed(page, GENRED);
+    // a few plays of Alder Quartet (the rows come back sorted by title, so pick them by name), so the algorithms have something to disagree about
+    const alder = rows.filter((r) => r.artist === 'Alder Quartet').map((r) => r.id);
+    await page.evaluate(async ([ids]) => {
+      const now = Date.now(), DAY = 864e5;
+      const pl = [0, 1, 2, 3].map((i) => ({ id: ids[i % 2]!, at: now - (10 + i) * DAY, via: 'library', secs: 120, dur: 120, end: true }));
+      const w = window as unknown as KvWin;
+      const cur = ((await w.kv.get('library:state')) as Record<string, unknown>) ?? {};
+      w.kv.set('library:state', { ...cur, plays: pl });
+      await new Promise((r) => setTimeout(r, 300));
+    }, [alder] as const);
+    await reload(page);
+    await openDiscover(page);
+    const before = (await discIds(page))!;
+    await page.click('#libAlgoChip'); await page.waitForTimeout(300);
+    await expect(page.locator('#ctx'), 'the shell’s own menu kit opens under the chip (NP-MENU-001)').toBeVisible();
+    expect(await page.getAttribute('#libAlgoChip', 'aria-expanded')).toBe('true');
+    const items = await page.$$eval('#ctx [data-act="algo-pick"]', (n) => n.map((x) => ({ name: (x.textContent ?? '').replace(/^\s*✓/, '').trim(), on: x.getAttribute('aria-checked'), color: (x as HTMLElement).style.getPropertyValue('--algo').trim(), desc: x.querySelector('.ctx__desc')?.textContent ?? '' })));
+    expect(items.map((i) => i.name.split('·')[0]!.trim()), 'every algorithm, built in and yours').toEqual(['Airwave default', 'Late night', 'Crate digger']);
+    expect(items.map((i) => i.on), 'with a tick on the current one').toEqual(['true', 'false', 'false']);
+    expect(new Set(items.map((i) => i.color)).size, 'each with its own colour dot').toBe(3);
+    expect(items[2]!.desc, 'and a line on what it favours').toBe('Favours what you have heard least and what sounds like what you play, wide exploration');
+    expect(await page.$('#ctx [data-act="algo-edit"]'), 'and the way to Settings').not.toBeNull();
+    await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+    expect(await page.evaluate(() => document.activeElement?.id), 'Escape closes it and gives the chip its focus back').toBe('libAlgoChip');
+    await page.click('#libAlgoChip'); await page.waitForTimeout(300);
+    await page.click('#ctx [data-act="algo-pick"][data-id="crate-digger"]'); await page.waitForTimeout(500);
+    await expect(page.locator('#libAlgoName')).toHaveText('Crate digger · Deep cuts');
+    expect(await algoVar(page, '.lib-scope')).toBe('#d4782a');
+    await expect(page.locator('#toast'), 'the HUD names the algorithm now on').toContainText('Discover ranked by “Crate digger” · Deep cuts');
+    const after = (await discIds(page))!;
+    expect(after, 'deep cuts leave out the artists you know: Alder Quartet is gone').toHaveLength(4);
+    expect(after).not.toEqual(before);
+    await page.click('#libAlgoChip'); await page.waitForTimeout(300);
+    await page.click('#ctx [data-act="algo-edit"]'); await page.waitForTimeout(800);
+    expect(await page.$eval('#algoPick', (n) => (n as HTMLSelectElement).value), 'Settings ▸ Recommendations shows the same algorithm: one source of truth').toBe('crate-digger');
+    expect(await algoVar(page, '#algoColor'), 'with its swatch').toBe('#d4782a');
+    expect(await page.$$eval('#algoLegend button', (n) => n.map((x) => [x.textContent?.trim(), x.getAttribute('aria-pressed')])), 'and the list of every algorithm in its colour').toEqual([['Airwave default', 'false'], ['Late night', 'false'], ['Crate digger', 'true']]);
+    // and the other way: a choice in Settings reaches Discover
+    await page.selectOption('#algoPick', 'late-night'); await page.waitForTimeout(400);
+    await page.click('#prefsBack'); await page.waitForTimeout(600);
+    await expect(page.locator('#libAlgoName')).toHaveText('Late night · Similar sounds');
+  });
+
+  test('a lean bends the ranking without editing the algorithm: Adventurous, then a genre; Reset clears it', async ({ page }) => {
+    await boot(page);
+    await seed(page, GENRED);
+    await openDiscover(page);
+    await page.click('#libAlgoChip'); await page.waitForTimeout(300);
+    await page.click('#ctx [data-act="parent"]'); await page.waitForTimeout(200);
+    expect(await page.$$eval('#ctx [data-act="algo-lean"]', (n) => n.map((x) => (x.textContent ?? '').replace(/^\s*✓/, '').trim())), 'three quick modes').toEqual(['Familiar', 'Balanced', 'Adventurous']);
+    expect(await page.$$eval('#ctx [data-act="algo-genre"]', (n) => n.map((x) => (x.textContent ?? '').replace(/^\s*✓/, '').trim())), 'and the library’s genres').toEqual(['Folk', 'Jazz']);
+    await page.click('#ctx [data-act="algo-lean"][data-lean="adventurous"]'); await page.waitForTimeout(400);
+    await expect(page.locator('#libAlgoName')).toHaveText('Airwave default · For you · Adventurous');
+    await page.click('#libAlgoChip'); await page.waitForTimeout(300);
+    await page.click('#ctx [data-act="parent"]'); await page.waitForTimeout(200);
+    await page.click('#ctx [data-act="algo-genre"][data-genre="Folk"]'); await page.waitForTimeout(400);
+    await expect(page.locator('#libAlgoName')).toHaveText('Airwave default · For you · Adventurous · Folk');
+    const titles = await rowTitles(page);
+    const folk = SEED.filter((t) => t.artist === 'Birch Ensemble').map((t) => t.title);
+    expect(folk.includes(titles[0]!), 'Folk rises: the list opens on a Birch Ensemble song: ' + titles.join(', ')).toBe(true);
+    const ranked = await page.evaluate(() => (window as unknown as DiscWin).NP_DISCOVER.rank());
+    const minFolk = Math.min(...ranked.filter((r) => folk.includes(r.title)).map((r) => r.score));
+    const maxJazz = Math.max(...ranked.filter((r) => !folk.includes(r.title)).map((r) => r.score));
+    expect(minFolk, 'every Folk song outscores every Jazz song').toBeGreaterThan(maxJazz);
+    await page.click('#profile'); await page.waitForTimeout(300); await page.click('#pt-rec'); await page.waitForTimeout(500);
+    expect(await page.$eval('#rw-genreAffinity', (n) => (n as HTMLInputElement).value), 'the saved weight is untouched').toBe('15');
+    await page.click('#prefsBack'); await page.waitForTimeout(500);
+    await reload(page);
+    await openDiscover(page);
+    await expect(page.locator('#libAlgoName'), 'the lean is kept in the player’s settings').toHaveText('Airwave default · For you · Adventurous · Folk');
+    await page.click('#libAlgoChip'); await page.waitForTimeout(300);
+    await page.click('#ctx [data-act="parent"]'); await page.waitForTimeout(200);
+    await page.click('#ctx [data-act="algo-lean-reset"]'); await page.waitForTimeout(400);
+    await expect(page.locator('#libAlgoName')).toHaveText('Airwave default · For you');
+  });
+
+  test('every algorithm has a colour of its own: new ones take the next free hue, a taken one is refused, and they survive a reload and an import without one', async ({ page }) => {
+    await boot(page, '#settings/rec');
+    expect(await algoVar(page, '#algoColor'), 'Airwave default is blue').toBe('#2f61c1');
+    expect(await page.$eval('#algoColor', (n) => (n as HTMLButtonElement).disabled), 'a built-in keeps its colour').toBe(true);
+    await page.click('#algoDup'); await page.waitForTimeout(300);
+    const c1 = await algoVar(page, '#algoColor');
+    await page.click('#algoDup'); await page.waitForTimeout(300);
+    const c2 = await algoVar(page, '#algoColor');
+    expect([c1, c2].every((c) => !['#2f61c1', '#5c55c9', '#d4782a'].includes(c)) && c1 !== c2, 'the copies take hues nobody has: ' + c1 + ', ' + c2).toBe(true);
+    expect(c1, 'in palette order, the first free').toBe('#c8403a');
+    await page.click('#algoColor'); await page.waitForTimeout(300);
+    const swatches = await page.$$eval('#ctx [data-act="algo-color"]', (n) => n.map((x) => [(x.textContent ?? '').replace(/^\s*✓/, '').trim(), x.getAttribute('aria-disabled')]));
+    expect(swatches, 'twelve hues, the taken ones named').toHaveLength(12);
+    expect(swatches.find((s) => s[0]?.startsWith('Blue'))?.[0], 'with who has it').toBe('Blue· Airwave default');
+    // aria-disabled, not disabled: it can still be chosen, and the refusal is said in words
+    await page.click('#ctx [data-act="algo-color"][data-color="#2f61c1"]', { force: true }); await page.waitForTimeout(300);
+    await expect(page.locator('#algoMsg'), 'a colour another algorithm uses is refused, in a sentence').toContainText('“Airwave default” already uses blue');
+    expect(await algoVar(page, '#algoColor')).toBe(c2);
+    await page.click('#algoColor'); await page.waitForTimeout(300);
+    await page.click('#ctx [data-act="algo-color"][data-color="#3a9a5e"]'); await page.waitForTimeout(300);
+    expect(await algoVar(page, '#algoColor'), 'a free one is taken').toBe('#3a9a5e');
+    await expect(page.locator('#algoMsg')).toContainText('is now green');
+    await page.evaluate(() => (window as unknown as { algoImportText(t: string, n: string): void }).algoImportText(JSON.stringify({ format: 'airwave-algorithm', version: 1, name: 'From a friend', mode: 'for-you', config: { ranking: { tasteMatch: 0.5 } } }), 'friend.airwave-algorithm.json'));
+    await page.waitForTimeout(400);
+    const imported = await algoVar(page, '#algoColor');
+    expect(['#2f61c1', '#5c55c9', '#d4782a', c1, '#3a9a5e'].includes(imported), 'a file without a colour still gets one nobody has: ' + imported).toBe(false);
+    await reload(page);
+    const legend = await page.$$eval('#algoLegend button', (n) => n.map((x) => (x as HTMLElement).style.getPropertyValue('--algo').trim()));
+    expect(legend, 'six algorithms, six colours, after a reload').toHaveLength(6);
+    expect(new Set(legend).size).toBe(6);
+    const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#algoExportFile')]);
+    const text = await (await dl.createReadStream()).toArray().then((b) => Buffer.concat(b as Buffer[]).toString('utf8'));
+    expect(JSON.parse(text).color, 'the file carries the colour').toBe(imported);
+  });
+});
