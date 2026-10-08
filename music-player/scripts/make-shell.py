@@ -2916,12 +2916,21 @@ replace('''  @media (pointer: coarse) { .lib-scope__star { width: 44px; height: 
     .lib-scope__refresh { width: 44px; height: 44px; margin: -13px -6px; font-size: 19px; }
     .lib-scope__algo { height: 26px; border-radius: 13px; padding: 0 10px 0 8px; }
   }
+  /* on a phone the word "Discover" keeps its place; the chip and the field give way instead */
+  .lib-scope.is-discover .lib-scope__scope,
+  .lib-scope__scope.is-tinted .lib-scope__label { flex-shrink: 0; }
+  @media (max-width: 480px) {
+    .lib-scope.is-discover .lib-scope__algo { max-width: 34vw; }
+    .lib-scope.is-discover .lib-find { max-width: 28vw; }
+  }
   /* the algorithm menu's rows: a dot, the name and mode, and a line on what it favours
      (.ctx qualifies them: the menu's own rules come later in this sheet) */
-  .ctx .ctx__item--algo { height: auto; padding-top: 3px; padding-bottom: 3px; flex-wrap: wrap; line-height: 16px; white-space: normal; }
+  .ctx .ctx__item--algo { display: grid; grid-template-columns: auto auto 1fr; align-items: center; height: auto; padding-top: 3px; padding-bottom: 3px; line-height: 16px; white-space: normal; }
   .ctx .ctx__item--algo .ctx__dot { margin-right: 7px; }
-  .ctx .ctx__dim { margin-left: 4px; opacity: 0.6; white-space: nowrap; }
-  .ctx .ctx__desc { flex: 0 0 100%; max-width: 280px; padding-left: 16px; font-size: 11px; line-height: 14px; opacity: 0.7; white-space: normal; }
+  .ctx .ctx__item--algo .ctx__check { top: 3px; }
+  .ctx .ctx__dim { margin-left: 4px; opacity: 0.6; white-space: nowrap; justify-self: start; }
+  .ctx .ctx__desc { grid-column: 1 / -1; max-width: 280px; padding-left: 16px; font-size: 11px; line-height: 14px; opacity: 0.7; white-space: normal; }
+  .ctx.ctx--touch .ctx__item--algo { height: auto; line-height: 18px; padding-top: 8px; padding-bottom: 8px; }
   .ctx .ctx__item:hover .ctx__desc,
   .ctx .ctx__item:focus-visible .ctx__desc { opacity: 0.9; }
   .ctx .ctx__sub--wide { min-width: 200px; }
@@ -2960,6 +2969,7 @@ replace('''  @media (pointer: coarse) { .lib-scope__star { width: 44px; height: 
   }
   .algobar__swatch .algobar__dot { width: 12px; height: 12px; }
   .algobar__swatch:disabled { opacity: 0.7; }
+  @media (pointer: coarse) { .algobar__swatch { width: 44px; height: 44px; } }
   .algobar__swatch:focus-visible { outline: 2px solid var(--prefs-focus-strong); outline-offset: 1px; }
   .algobar__legend { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 6px 0 0 158px; font-size: 10px; color: var(--prefs-soft); }
   .algobar__legend button { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: default; }
@@ -3381,6 +3391,7 @@ replace('''    /* Songs you own but have not starred, newest ids first — a rea
       chip.hidden = !on;
       rf.hidden = !on;
       scope.classList.toggle('is-tinted', on);
+      chip.parentNode.classList.toggle('is-discover', on);
       if (!on) { more.hidden = true; return; }
       var a = algoCurrent();
       chip.parentNode.style.setProperty('--algo', a.color);
