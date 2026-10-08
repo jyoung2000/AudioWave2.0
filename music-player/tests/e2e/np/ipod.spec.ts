@@ -103,8 +103,17 @@ test('Now Playing orders playing > queue > history, Discover excludes starred, p
   await resetToLibrary(page);
   await page.click('#libMenuBtn'); await page.waitForTimeout(200);
   await page.click('#ipodMenu .ipod__item[data-i="1"]'); await page.waitForTimeout(350);
-  // ported: 6 of the 8 seeded rows (two are starred), where the demo had 14 of 16
-  expect(await count(page), 'Discover excludes starred').toBe(6);
+  // ported: the demo had 14 of 16 (two starred). Discover is ranked now (NP-DISC-001): besides the two
+  // starred it leaves out what is queued and what was just played (the engine's repeat window), so the
+  // count is read from the state rather than assumed.
+  const eligible = await page.evaluate(async () => {
+    const w = window as unknown as { kv: { get(k: string): Promise<unknown> }; LIBRARY: Array<{ id: string }> };
+    const st = ((await w.kv.get('library:state')) ?? {}) as { starred?: Record<string, boolean>; queue?: string[]; plays?: Array<{ id: string }> };
+    const played = new Set((st.plays ?? []).map((p) => p.id));
+    return w.LIBRARY.filter((s) => !st.starred?.[s.id] && !(st.queue ?? []).includes(s.id) && !played.has(s.id)).length;
+  });
+  expect(eligible, 'the two starred rows are among those left out').toBeLessThanOrEqual(6);
+  expect(await count(page), 'Discover excludes starred, queued and just-played songs').toBe(eligible);
 
   await resetToLibrary(page);
   await page.click('#libMenuBtn'); await page.waitForTimeout(200);

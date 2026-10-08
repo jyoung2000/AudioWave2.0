@@ -2930,6 +2930,8 @@ replace('''  @media (pointer: coarse) { .lib-scope__star { width: 44px; height: 
   .ctx .ctx__item--algo { display: grid; grid-template-columns: auto auto 1fr; align-items: center; height: auto; padding-top: 3px; padding-bottom: 3px; line-height: 16px; white-space: normal; }
   .ctx .ctx__item--algo .ctx__dot { margin-right: 7px; }
   .ctx .ctx__item--algo .ctx__check { top: 3px; }
+  /* these menus' captions read at AA contrast: the ink, not the dimmed caption ink */
+  .ctx .ctx__head--algo { color: var(--ctx-ink); }
   .ctx .ctx__dim { margin-left: 4px; opacity: 0.6; white-space: nowrap; justify-self: start; }
   .ctx .ctx__desc { grid-column: 1 / -1; max-width: 280px; padding-left: 16px; font-size: 11px; line-height: 14px; opacity: 0.7; white-space: normal; }
   .ctx.ctx--touch .ctx__item--algo { height: auto; line-height: 18px; padding-top: 8px; padding-bottom: 8px; }
@@ -3425,14 +3427,14 @@ replace('''    /* Songs you own but have not starred, newest ids first — a rea
       var lean = ['familiar', 'balanced', 'adventurous'].map(function (k) {
         return radioItem('', 'algo-lean', 'data-lean="' + k + '" title="' + esc(LEAN_WHY[k]) + '"', (cfg.lean.explore || 'balanced') === k, esc(LEAN_NAME[k]));
       }).join('') +
-      (genres.length ? '<div class="ctx__sep" role="separator"></div><div class="ctx__head" role="presentation">Genre</div>' +
+      (genres.length ? '<div class="ctx__sep" role="separator"></div><div class="ctx__head ctx__head--algo" role="presentation">Genre</div>' +
         genres.map(function (g) {
           return radioItem('', 'algo-genre', 'data-genre="' + esc(g) + '"', !!cfg.lean.genre && cfg.lean.genre.toLowerCase() === g.toLowerCase(), esc(g));
         }).join('') : '') +
       '<div class="ctx__sep" role="separator"></div>' +
       '<button class="ctx__item" type="button" role="menuitem" data-act="algo-lean-reset"' + (leaned ? '' : ' disabled') + '>Reset lean</button>';
       ctx.innerHTML =
-        '<div class="ctx__head" role="presentation">Algorithm</div>' + algos +
+        '<div class="ctx__head ctx__head--algo" role="presentation">Algorithm</div>' + algos +
         '<div class="ctx__sep" role="separator"></div>' +
         '<div class="ctx__item ctx__item--parent" role="menuitem" tabindex="0" aria-haspopup="menu" aria-expanded="false" data-act="parent">' +
           'Lean' + (leaned ? '<span class="ctx__dim">\\u00b7 ' + esc(((cfg.lean.explore && cfg.lean.explore !== 'balanced') ? LEAN_NAME[cfg.lean.explore] : '') +
@@ -3448,7 +3450,7 @@ replace('''    /* Songs you own but have not starred, newest ids first — a rea
     }
     function buildColorMenu() {
       var cur = algoCurrent();
-      ctx.innerHTML = '<div class="ctx__head" role="presentation">Colour of \\u201c' + esc(cur.name) + '\\u201d</div>' +
+      ctx.innerHTML = '<div class="ctx__head ctx__head--algo" role="presentation">Colour of \\u201c' + esc(cur.name) + '\\u201d</div>' +
         ALGO_PALETTE.map(function (c) {
           var owner = algoColorOwner(c, cur.id);
           return radioItem('ctx__item--color', 'algo-color', 'data-color="' + c + '" style="--algo:' + c + '"' + (owner ? ' aria-disabled="true"' : ''), algoNorm(cur.color) === c,
