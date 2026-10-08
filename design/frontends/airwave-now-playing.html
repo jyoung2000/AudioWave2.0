@@ -54,7 +54,7 @@ Airwave — the living mockup.
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="mockup-of" content="player">
-<meta name="mockup-inputs" content="c629f088f050ace8">
+<meta name="mockup-inputs" content="9ff0182266240e97">
 <title>Airwave — mockup</title>
 <style data-mock-source="music-player/index.html">
   :root {
@@ -1053,6 +1053,8 @@ Airwave — the living mockup.
   .ctx .ctx__item--algo { display: grid; grid-template-columns: auto auto 1fr; align-items: center; height: auto; padding-top: 3px; padding-bottom: 3px; line-height: 16px; white-space: normal; }
   .ctx .ctx__item--algo .ctx__dot { margin-right: 7px; }
   .ctx .ctx__item--algo .ctx__check { top: 3px; }
+  /* these menus' captions read at AA contrast: the ink, not the dimmed caption ink */
+  .ctx .ctx__head--algo { color: var(--ctx-ink); }
   .ctx .ctx__dim { margin-left: 4px; opacity: 0.6; white-space: nowrap; justify-self: start; }
   .ctx .ctx__desc { grid-column: 1 / -1; max-width: 280px; padding-left: 16px; font-size: 11px; line-height: 14px; opacity: 0.7; white-space: normal; }
   .ctx.ctx--touch .ctx__item--algo { height: auto; line-height: 18px; padding-top: 8px; padding-bottom: 8px; }
@@ -21246,7 +21248,7 @@ button.seg:active .ico{transform:translateY(1px)}
     </div>
   </section>
   <div class="ctx" id="ctx" role="menu" aria-label="Algorithm" style="left: 404.75px; top: 558.5px;">
-    <div class="ctx__head" role="presentation">
+    <div class="ctx__head ctx__head--algo" role="presentation">
       Algorithm
     </div>
     <button class="ctx__item ctx__item--algo" type="button" role="menuitemradio" aria-checked="true" data-act="algo-pick" data-id="default" style="--algo:#2f61c1" data-mock-go="discover">
