@@ -2831,6 +2831,769 @@ replace('''      var first = ctx.querySelector('.ctx__item');
       if (first) first.focus({ preventScroll: true });
       menuOpenedAt = Date.now();''')
 
+# ---- Discover (NP-DISC-001..005, 2026-10-07): the chosen algorithm ranks it; the silver bar refreshes it, shows the
+# algorithm and leans it; every algorithm has a colour of its own. The ranker is src/shell/recommend/rank.ts, reached as
+# window.NP_RECOMMEND; the Settings preview ranks through the same function. The twelve hues come from tokens.json.
+import json as _json
+
+_tokens = _json.loads((ROOT / 'packages' / 'aqua-ui' / 'src' / 'styles' / 'tokens.json').read_text(encoding='utf-8'))
+ALGO_HUES = [(k, v.lower()) for k, v in _tokens['algorithm'].items()]
+assert len(ALGO_HUES) == 12, 'tokens.json: the algorithm palette has twelve hues'
+
+# the palette as custom properties beside the statistics hues
+replace('''    --viz-g5: #c94f6d; --viz-g6: #0f94ad; --viz-g7: #a8861a; --viz-g0: #9a9a98;
+''', '''    --viz-g5: #c94f6d; --viz-g6: #0f94ad; --viz-g7: #a8861a; --viz-g0: #9a9a98;
+    /* The twelve algorithm hues (NP-DISC-004): tokens.json `algorithm`, copied here by make-shell.py. */
+''' + ''.join(f'    --np-algo-{k}: {v};\n' for k, v in ALGO_HUES))
+
+# the chip, the refresh button, the menu rows, Load more and the swatch
+replace('''  @media (pointer: coarse) { .lib-scope__star { width: 44px; height: 44px; margin: -9px -8px; font-size: 19px; } }
+''', '''  @media (pointer: coarse) { .lib-scope__star { width: 44px; height: 44px; margin: -9px -8px; font-size: 19px; } }
+
+  /* Discover in the silver bar (NP-DISC-002/003): the algorithm chip — a dot in its colour, its name,
+     mode and lean — and the refresh button. --algo is the current algorithm's colour. */
+  .lib-scope { --algo: var(--np-algo-blue); }
+  .lib-scope__algo {
+    flex: 0 1 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    height: 18px;
+    padding: 0 7px 0 5px;
+    border: 1px solid var(--scope-btn-edge);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.35);
+    color: var(--scope-ink);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 16px;
+    white-space: nowrap;
+    cursor: default;
+  }
+  .lib-scope__algo[hidden] { display: none; }
+  .lib-scope__algoname { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .lib-scope__dot, .ctx__dot, .algobar__dot {
+    flex: none;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--algo);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(255, 255, 255, 0.5);
+  }
+  .lib-scope__algo:hover { background: rgba(255, 255, 255, 0.6); }
+  .lib-scope__algo:active,
+  .lib-scope__algo[aria-expanded="true"] { background: rgba(0, 0, 0, 0.1); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.22); }
+  .lib-scope__algo:focus { outline: none; }
+  .lib-scope__algo:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
+  /* the thin tint on Discover's scope chip: the algorithm's colour under its name */
+  .lib-scope__scope.is-tinted .lib-scope__label { box-shadow: inset 0 -2px 0 var(--algo); }
+  .lib-scope__refresh {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 18px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: none;
+    color: var(--scope-ink);
+    font: inherit;
+    font-size: 14px;
+    line-height: 1;
+    cursor: default;
+  }
+  .lib-scope__refresh[hidden] { display: none; }
+  .lib-scope__refresh:hover { background: rgba(0, 0, 0, 0.07); }
+  .lib-scope__refresh:active { background: rgba(0, 0, 0, 0.13); border-color: var(--scope-btn-edge); }
+  .lib-scope__refresh:focus { outline: none; }
+  .lib-scope__refresh:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
+  /* 44px targets on a touch screen, overlapping the 26px bar rather than growing it */
+  @media (pointer: coarse) {
+    .lib-scope__refresh { width: 44px; height: 44px; margin: -13px -6px; font-size: 19px; }
+    .lib-scope__algo { height: 26px; border-radius: 13px; padding: 0 10px 0 8px; }
+  }
+  /* the algorithm menu's rows: a dot, the name and mode, and a line on what it favours
+     (.ctx qualifies them: the menu's own rules come later in this sheet) */
+  .ctx .ctx__item--algo { height: auto; padding-top: 3px; padding-bottom: 3px; flex-wrap: wrap; line-height: 16px; white-space: normal; }
+  .ctx .ctx__item--algo .ctx__dot { margin-right: 7px; }
+  .ctx .ctx__dim { margin-left: 4px; opacity: 0.6; white-space: nowrap; }
+  .ctx .ctx__desc { flex: 0 0 100%; max-width: 280px; padding-left: 16px; font-size: 11px; line-height: 14px; opacity: 0.7; white-space: normal; }
+  .ctx .ctx__item:hover .ctx__desc,
+  .ctx .ctx__item:focus-visible .ctx__desc { opacity: 0.9; }
+  .ctx .ctx__sub--wide { min-width: 200px; }
+  .ctx .ctx__item--color .ctx__dot { margin-right: 7px; }
+  /* Load more, under Discover's rows */
+  .lib-more { display: flex; justify-content: center; padding: 8px 0 10px; }
+  .lib-more[hidden] { display: none; }
+  .lib-more__btn {
+    height: 22px;
+    padding: 0 12px;
+    border: 1px solid var(--scope-btn-edge);
+    border-radius: 11px;
+    background: linear-gradient(180deg, var(--scope-top), var(--scope-bot));
+    color: var(--scope-ink);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: default;
+  }
+  .lib-more__btn:active { filter: brightness(0.92); }
+  .lib-more__btn:focus { outline: none; }
+  .lib-more__btn:focus-visible { outline: 2px solid rgba(24, 160, 235, 0.9); outline-offset: 1px; }
+  @media (pointer: coarse) { .lib-more__btn { height: 44px; border-radius: 22px; font-size: 13px; } }
+  /* the swatch and the legend in Settings ▸ Recommendations (NP-DISC-004) */
+  .algobar__swatch {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid var(--prefs-well-edge);
+    border-radius: 4px;
+    background: var(--prefs-well-bg);
+    cursor: default;
+  }
+  .algobar__swatch .algobar__dot { width: 12px; height: 12px; }
+  .algobar__swatch:disabled { opacity: 0.7; }
+  .algobar__swatch:focus-visible { outline: 2px solid var(--prefs-focus-strong); outline-offset: 1px; }
+  .algobar__legend { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 6px 0 0 158px; font-size: 10px; color: var(--prefs-soft); }
+  .algobar__legend button { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: default; }
+  .algobar__legend button[aria-pressed="true"] { color: var(--prefs-ink); font-weight: 700; }
+  .algobar__legend button:focus-visible { outline: 2px solid var(--prefs-focus-strong); outline-offset: 1px; border-radius: 2px; }
+  @container (max-width: 560px) { .algobar__legend { margin-left: 0; } }
+''')
+
+# the silver bar: the chip and the refresh button after the scope, before the field
+replace('''        <button class="lib-scope__clear" type="button" id="libScopeClear" hidden
+                aria-label="Show all songs">&#10005;</button>
+      </span>
+''', '''        <button class="lib-scope__clear" type="button" id="libScopeClear" hidden
+                aria-label="Show all songs">&#10005;</button>
+      </span>
+
+      <!-- Discover only (NP-DISC-002/003): the algorithm ranking it, and new songs. -->
+      <button class="lib-scope__algo" type="button" id="libAlgoChip" hidden aria-haspopup="menu" aria-expanded="false">
+        <span class="lib-scope__dot" aria-hidden="true"></span><span class="lib-scope__algoname" id="libAlgoName"></span>
+      </button>
+      <button class="lib-scope__refresh" type="button" id="libDiscRefresh" hidden aria-label="New songs"
+              title="New songs \u2014 Shift-click to start over">&#8635;</button>
+''')
+
+# Load more, after the rows
+replace('''        <tbody id="libraryRows"></tbody>
+      </table>
+      </div>
+''', '''        <tbody id="libraryRows"></tbody>
+      </table>
+      <div class="lib-more" id="libMore" hidden><button class="lib-more__btn" type="button" id="libMoreBtn">Load more</button></div>
+      </div>
+''')
+
+# Settings ▸ Recommendations: the swatch beside the name, and a legend of every algorithm in its colour
+replace('''            <select class="prefs__select algobar__pick" id="algoPick"></select>
+            <input class="prefs__field algobar__name" id="algoName" type="text" maxlength="60"
+''', '''            <select class="prefs__select algobar__pick" id="algoPick"></select>
+            <button class="algobar__swatch" type="button" id="algoColor" aria-haspopup="menu" aria-expanded="false"
+                    aria-label="Colour of this algorithm"><span class="algobar__dot" aria-hidden="true"></span></button>
+            <input class="prefs__field algobar__name" id="algoName" type="text" maxlength="60"
+''')
+replace('''          <p class="algobar__msg" id="algoMsg" role="status"></p>
+        </div>
+''', '''          <p class="algobar__msg" id="algoMsg" role="status"></p>
+          <p class="algobar__legend" id="algoLegend" aria-label="Every algorithm, in its colour"></p>
+        </div>
+''')
+
+# ---- the shell's script: the palette, colours on the algorithms, the ranker, Discover, the chip and its menu ----
+replace('''    cfg.algo = algoClone(ALGO_DEFAULTS);
+
+    /* Three algorithms ship built in.''', '''    cfg.algo = algoClone(ALGO_DEFAULTS);
+
+    /* The twelve algorithm hues (NP-DISC-004), from tokens.json `algorithm` via make-shell.py: every
+       algorithm wears one, no two the same. Built-ins have fixed hues; a new one takes the next free. */
+    var ALGO_PALETTE = [''' + ', '.join(f"'{v}'" for _, v in ALGO_HUES) + '''];
+    var ALGO_HUE_NAME = {''' + ', '.join(f"'{v}': '{k.capitalize()}'" for k, v in ALGO_HUES) + '''};
+
+    /* Three algorithms ship built in.''')
+replace('''        { id: 'default', name: 'Airwave default', mode: 'for-you', cfg: algoClone(ALGO_DEFAULTS), builtin: true },
+        { id: 'late-night', name: 'Late night', mode: 'playlist', cfg: late, builtin: true },
+        { id: 'crate-digger', name: 'Crate digger', mode: 'deep', cfg: dig, builtin: true },
+''', '''        { id: 'default', name: 'Airwave default', mode: 'for-you', cfg: algoClone(ALGO_DEFAULTS), builtin: true, color: ALGO_PALETTE[7] },
+        { id: 'late-night', name: 'Late night', mode: 'playlist', cfg: late, builtin: true, color: ALGO_PALETTE[8] },
+        { id: 'crate-digger', name: 'Crate digger', mode: 'deep', cfg: dig, builtin: true, color: ALGO_PALETTE[1] },
+''')
+
+# The eight factors say honestly what this library can feed them, read from the rows themselves (genre and
+# tempo arrive with the catalog and the companion; release and added dates with the indexer).
+replace_between('''    /* The eight ranking factors, with what each one measures and — because''', '''        has: function () { return true; } },
+    ];''', '''    /* The eight ranking factors, with what each one measures and whether this
+       library has anything to measure it with — read from the rows as they are
+       (NP-DISC-001): tempo and genre arrive with the catalog and the companion,
+       release and added dates with the indexer. Saying so beside the slider
+       beats a factor that silently scores zero. */
+    function algoAvail() {
+      var R = window.NP_RECOMMEND;
+      if (R) return R.factorAvailability(LIB, state.plays);
+      var none = { has: false, note: '' };
+      return { tasteMatch: none, artistAffinity: none, genreAffinity: none, collaborative: none, recency: none, popularityFit: none, moodContext: none, discoveryBonus: { has: true, note: '' } };
+    }
+    function algoHas(key) { return function () { return !!algoAvail()[key].has; }; }
+    function algoNote(key) { return algoAvail()[key].note || ''; }
+    var ALGO_FACTORS = [
+      { key: 'tasteMatch',     name: 'Taste match',
+        why: 'Similarity to what you play, from the track’s own attributes: tempo and genre.', has: algoHas('tasteMatch') },
+      { key: 'artistAffinity', name: 'Artist affinity',
+        why: 'How much of your listening belongs to this artist.', has: algoHas('artistAffinity') },
+      { key: 'genreAffinity',  name: 'Genre affinity',
+        why: 'How much of your listening belongs to this genre.', has: algoHas('genreAffinity') },
+      { key: 'collaborative',  name: 'Collaborative',
+        why: 'What listeners with overlapping taste played.', has: algoHas('collaborative') },
+      { key: 'recency',        name: 'Recency',
+        why: 'How recently the track was released, added, or last played.', has: algoHas('recency') },
+      { key: 'popularityFit',  name: 'Popularity fit',
+        why: 'How well the track’s popularity matches the popularity you usually choose.', has: algoHas('popularityFit') },
+      { key: 'moodContext',    name: 'Mood context',
+        why: 'Fit with the mood or playlist context the request carries.', has: algoHas('moodContext') },
+      { key: 'discoveryBonus', name: 'Discovery',
+        why: 'Favours what you have heard least. Pulls against play count.', has: algoHas('discoveryBonus') },
+    ];''')
+replace('''          '<p class="weight__why" id="rwd-' + f.key + '">' + esc(f.why) +
+            (dead ? ' <em>' + esc(f.note || 'No data for this here.') + '</em>'
+                  : (f.note ? ' <em>' + esc(f.note) + '</em>' : '')) + '</p>' +''', '''          '<p class="weight__why" id="rwd-' + f.key + '">' + esc(f.why) +
+            (dead ? ' <em>' + esc(algoNote(f.key) || 'No data for this here.') + '</em>'
+                  : (algoNote(f.key) ? ' <em>' + esc(algoNote(f.key)) + '</em>' : '')) + '</p>' +''')
+
+# The preview ranks through the shared ranker (seed 0, so it is stable), the same call Discover makes.
+replace_between('''    /* ---- the preview ----''', '''    var recPicked = null;''', '''    /* ---- the preview ----
+       The same ranker Discover uses (src/shell/recommend/rank.ts, NP-DISC-001),
+       over this library, with a fixed seed so the list beside the sliders only
+       moves when a setting does. Factors the library cannot feed score zero; the
+       panel says which, beside the slider. */
+
+    function recRank() {
+      var R = window.NP_RECOMMEND;
+      var songs = LIB.filter(function (sg) { return (sg.kind || 'music') === 'music'; });
+      if (!R) return [];
+      return R.rankSongs({
+        songs: songs, plays: state.plays, starred: starredIds(), queued: state.queue, shown: state.recShown,
+        cfg: cfg.algo, mode: algoMode, seed: 0, lean: cfg.lean,
+      }).rows;
+    }
+    function starredIds() { return Object.keys(state.starred).filter(function (id) { return state.starred[id]; }); }
+
+    var recPicked = null;''')
+replace('''        '<div class="why__row why__row--pen"><span>' + (pick.pen
+          ? 'Played in the last ' + cfg.algo.penalties.repeatWindowDays + ' days — ' + Math.round(pick.pen * 100) + '% off'
+          : 'No penalty') + '</span><b>' ''', '''        '<div class="why__row why__row--pen"><span>' + (pick.pen
+          ? 'Penalties (a recent play, skips, times shown) — ' + Math.round(pick.pen * 100) + '% off'
+          : 'No penalty') + '</span><b>' ''')
+# the Settings preview and Discover stay one: a change beside the sliders re-ranks an open Discover too
+replace('''      renderWhy(ranked);
+    }
+''', '''      renderWhy(ranked);
+      discSync();
+    }
+''')
+
+# preferences: the lean (NP-DISC-005) and the colours (NP-DISC-004) are kept with the rest
+replace('''      algo: null,            // filled from ALGO_DEFAULTS once it is declared
+''', '''      algo: null,            // filled from ALGO_DEFAULTS once it is declared
+      lean: { explore: 'balanced', genre: null },   // a session bias on Discover (NP-DISC-005)
+''')
+replace('''          return { id: a.id, name: String(a.name || 'Untitled').slice(0, 60),
+                   mode: ALGO_MODES.indexOf(a.mode) >= 0 ? a.mode : 'for-you', cfg: algoFromAny(a.cfg).cfg };
+        });
+      } else if (saved.algo && algoDiff(cfg.algo, ALGO_DEFAULTS)) {
+        cfg.algos = [{ id: 'u-mine', name: 'My algorithm', mode: 'for-you', cfg: algoClone(cfg.algo) }];
+        cfg.algoCur = 'u-mine';
+      }
+      if (typeof saved.algoCur === 'string') cfg.algoCur = saved.algoCur;
+      if (ALGO_MODES.indexOf(saved.algoMode) >= 0) cfg.algoMode = saved.algoMode;
+      algoLink(true);
+''', '''          return { id: a.id, name: String(a.name || 'Untitled').slice(0, 60),
+                   mode: ALGO_MODES.indexOf(a.mode) >= 0 ? a.mode : 'for-you', cfg: algoFromAny(a.cfg).cfg, color: algoNorm(a.color) };
+        });
+      } else if (saved.algo && algoDiff(cfg.algo, ALGO_DEFAULTS)) {
+        cfg.algos = [{ id: 'u-mine', name: 'My algorithm', mode: 'for-you', cfg: algoClone(cfg.algo), color: algoNextColor() }];
+        cfg.algoCur = 'u-mine';
+      }
+      /* a file from before there were colours, or one edited by hand: every algorithm gets a hue of its own */
+      algoAssignColors();
+      if (typeof saved.algoCur === 'string') cfg.algoCur = saved.algoCur;
+      if (ALGO_MODES.indexOf(saved.algoMode) >= 0) cfg.algoMode = saved.algoMode;
+      if (saved.lean && typeof saved.lean === 'object') {
+        if (/^(familiar|balanced|adventurous)$/.test(saved.lean.explore)) cfg.lean.explore = saved.lean.explore;
+        if (typeof saved.lean.genre === 'string' && saved.lean.genre.trim()) cfg.lean.genre = saved.lean.genre.trim().slice(0, 60);
+      }
+      algoLink(true);
+''')
+
+# colours: helpers beside the saved-algorithm helpers
+replace('''    function algoCurrent() { return algoEntry(cfg.algoCur) || ALGO_BUILTINS[0]; }
+''', '''    function algoCurrent() { return algoEntry(cfg.algoCur) || ALGO_BUILTINS[0]; }
+
+    /* ---- colours (NP-DISC-004) ----
+       One hue per algorithm, never two alike: the chip in the silver bar, the
+       menu's dots and the swatch in Settings all wear it. The arithmetic (next
+       free hue, farthest hue once all twelve are taken) is the ranker module's. */
+    function algoNorm(c) { var R = window.NP_RECOMMEND; return R ? R.normalizeColor(c) : (typeof c === 'string' ? c.toLowerCase() : null); }
+    function algoUsedColors(except) {
+      return algoEntries().filter(function (a) { return a.id !== except; }).map(function (a) { return a.color; });
+    }
+    function algoNextColor(except) {
+      var R = window.NP_RECOMMEND;
+      return R ? R.nextColor(algoUsedColors(except), ALGO_PALETTE) : ALGO_PALETTE[0];
+    }
+    function algoColorOwner(c, except) {
+      c = algoNorm(c);
+      return algoEntries().filter(function (a) { return a.id !== except && algoNorm(a.color) === c; })[0] || null;
+    }
+    function algoColorTaken(c, except) { return !!algoColorOwner(c, except); }
+    /* every algorithm has a colour of its own: a missing or shared one gets the next free hue */
+    function algoAssignColors() {
+      var seen = {};
+      ALGO_BUILTINS.forEach(function (a) { seen[a.color] = 1; });
+      cfg.algos.forEach(function (a) {
+        var c = algoNorm(a.color);
+        if (!c || seen[c]) c = algoNextColor(a.id);
+        a.color = c;
+        seen[c] = 1;
+      });
+    }
+    function algoHueName(c) { return ALGO_HUE_NAME[algoNorm(c) || ''] || 'its own colour'; }
+    function algoDescribe(a) { var R = window.NP_RECOMMEND; return R ? R.describeAlgorithm(a.cfg, a.mode) : ''; }
+''')
+replace('''      var name = algoUniqueName(a.name + ' copy');
+      var mine = { id: algoNewId(), name: name, mode: algoMode, cfg: cfg.algo };
+      cfg.algos.push(mine);
+''', '''      var name = algoUniqueName(a.name + ' copy');
+      var mine = { id: algoNewId(), name: name, mode: algoMode, cfg: cfg.algo, color: algoNextColor() };
+      cfg.algos.push(mine);
+''')
+replace('''      var name = algoUniqueName(a.name + ' copy');
+      var mine = { id: algoNewId(), name: name, mode: algoMode, cfg: algoClone(cfg.algo) };
+      cfg.algos.push(mine);
+''', '''      var name = algoUniqueName(a.name + ' copy');
+      var mine = { id: algoNewId(), name: name, mode: algoMode, cfg: algoClone(cfg.algo), color: algoNextColor() };
+      cfg.algos.push(mine);
+''')
+replace('''        var a = { id: algoNewId() + cfg.algos.length, name: algoUniqueName(String(it.name || stem).trim().slice(0, 60) || stem),
+                  mode: ALGO_MODES.indexOf(it.mode) >= 0 ? it.mode : 'for-you', cfg: m.cfg };
+        cfg.algos.push(a);
+''', '''        /* its own colour when the file carries one nobody here uses; else the next free hue */
+        var want = algoNorm(it.color);
+        var a = { id: algoNewId() + cfg.algos.length, name: algoUniqueName(String(it.name || stem).trim().slice(0, 60) || stem),
+                  mode: ALGO_MODES.indexOf(it.mode) >= 0 ? it.mode : 'for-you', cfg: m.cfg,
+                  color: want && !algoColorTaken(want) ? want : algoNextColor() };
+        cfg.algos.push(a);
+''')
+replace('''    function algoFileEntry(a, mode) { return { name: a.name, mode: mode || a.mode, config: a === algoCurrent() ? cfg.algo : a.cfg }; }
+''', '''    function algoFileEntry(a, mode) { return { name: a.name, mode: mode || a.mode, color: a.color, config: a === algoCurrent() ? cfg.algo : a.cfg }; }
+''')
+replace('''      var ok = algoDownload(file, { format: 'airwave-algorithm', version: 1, name: e.name, mode: e.mode, config: e.config });
+''', '''      var ok = algoDownload(file, { format: 'airwave-algorithm', version: 1, name: e.name, mode: e.mode, color: e.color, config: e.config });
+''')
+replace('''      if (k === 'algo') return size({ format: 'airwave-algorithm', version: 1, algorithms: cfg.algos.map(function (a) { return { name: a.name, mode: a.mode, config: a.cfg }; }) });
+''', '''      if (k === 'algo') return size({ format: 'airwave-algorithm', version: 1, algorithms: cfg.algos.map(function (a) { return { name: a.name, mode: a.mode, color: a.color, config: a.cfg }; }) });
+''')
+
+# the bar in Settings: the swatch and the legend; the algorithm chosen there is the one Discover uses
+replace('''      var del = document.getElementById('algoDel');
+      del.disabled = !!a.builtin;
+      del.textContent = algoConfirmDel === a.id ? 'Delete — click again' : 'Delete';
+''', '''      var del = document.getElementById('algoDel');
+      del.disabled = !!a.builtin;
+      del.textContent = algoConfirmDel === a.id ? 'Delete — click again' : 'Delete';
+      var sw = document.getElementById('algoColor');
+      sw.style.setProperty('--algo', a.color);
+      sw.disabled = !!a.builtin;
+      sw.title = a.builtin ? 'Built-in algorithms keep their colours — Duplicate to make one you can recolour.'
+                           : 'Colour: ' + algoHueName(a.color) + ' — click to change';
+      sw.setAttribute('aria-label', 'Colour of this algorithm: ' + algoHueName(a.color) + (a.builtin ? ' (built in, fixed)' : ''));
+      document.getElementById('algoLegend').innerHTML = algoEntries().map(function (x) {
+        return '<button type="button" data-algo="' + esc(x.id) + '" aria-pressed="' + (x.id === a.id) + '" style="--algo:' + esc(x.color) + '"' +
+          ' title="' + esc(algoDescribe(x)) + '"><span class="algobar__dot" aria-hidden="true"></span>' + esc(x.name) + '</button>';
+      }).join('');
+      paintScope();
+''')
+replace('''    document.getElementById('algoPick').addEventListener('change', function () {
+      if (!algoEntry(this.value)) return;
+      cfg.algoCur = this.value;
+      algoLink(false);
+      cfgSave();
+      recPicked = null;
+      algoRefresh('');
+    });
+''', '''    document.getElementById('algoPick').addEventListener('change', function () {
+      if (!algoEntry(this.value)) return;
+      cfg.algoCur = this.value;
+      algoLink(false);
+      cfgSave();
+      recPicked = null;
+      algoRefresh('');
+    });
+    document.getElementById('algoLegend').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-algo]');
+      if (!b || !algoEntry(b.dataset.algo)) return;
+      cfg.algoCur = b.dataset.algo;
+      algoLink(false);
+      cfgSave();
+      recPicked = null;
+      algoRefresh('');
+    });
+    /* the swatch: a menu of the twelve hues; one another algorithm wears is refused, in words */
+    document.getElementById('algoColor').addEventListener('click', function () {
+      if (this.disabled) return;
+      openColorMenu(this);
+    });
+''')
+
+# ---- Discover: ranked, refreshed, with the algorithm chip and its menu ----
+replace('''    /* Songs you own but have not starred, newest ids first — a real set rather
+       than a shelf that pretends to recommend. */
+    function discoverIds() {
+      return LIB.filter(function (sg) { return !state.starred[sg.id]; })
+                .map(function (sg) { return sg.id; });
+    }
+''', '''    /* ---- Discover (NP-DISC-001/002) ----
+       Ranked by the chosen algorithm through the same ranker the preview beside
+       the sliders uses — never "newest first" pretending to recommend. Eligible:
+       a song you own, not starred, not waiting in Up Next. The order is fixed by
+       a seed, so the same library and settings give the same list; Refresh
+       changes the seed and leaves out what this session has already shown,
+       until everything eligible has been shown once — then it starts over and
+       says so. Fifty at a time; Load more extends the same ranking. */
+    var DISC_PAGE = 50;
+    var dsc = { seed: 1, shown: {}, cap: DISC_PAGE, ids: null, base: [], wrapped: false, stale: false };
+
+    function discSongs() { return LIB.filter(function (sg) { return (sg.kind || 'music') === 'music'; }); }
+    function discCount() {
+      return discSongs().filter(function (sg) { return !state.starred[sg.id] && state.queue.indexOf(sg.id) < 0; }).length;
+    }
+    function discRank(exclude) {
+      var R = window.NP_RECOMMEND;
+      var songs = discSongs();
+      if (!R) {
+        var plain = songs.filter(function (sg) { return !state.starred[sg.id] && exclude.indexOf(sg.id) < 0; });
+        return { rows: plain.map(function (sg) { return { song: sg }; }), eligible: plain.length };
+      }
+      return R.rankSongs({
+        songs: songs, plays: state.plays, starred: starredIds(), queued: state.queue, shown: state.recShown,
+        exclude: exclude, cfg: cfg.algo, mode: cfg.algoMode, seed: dsc.seed, lean: cfg.lean,
+      });
+    }
+    /* rank once for this list; the page and Load more slice the same order */
+    function discBuild(exclude) {
+      var r = discRank(exclude);
+      dsc.wrapped = false;
+      if (!r.rows.length && exclude.length) {
+        dsc.shown = {};
+        dsc.wrapped = true;
+        r = discRank([]);
+        exclude = [];
+      }
+      dsc.base = exclude;
+      dsc.ids = r.rows.map(function (x) { return x.song.id; });
+      dsc.eligible = r.eligible;
+      dsc.stale = false;
+    }
+    function discPage() {
+      var page = dsc.ids.slice(0, dsc.cap);
+      page.forEach(function (id) { dsc.shown[id] = 1; });
+      return { kind: 'discover', label: 'Discover', ids: page, ordered: true,
+               more: dsc.ids.length - page.length, eligible: dsc.eligible, seed: dsc.seed };
+    }
+    /* from the library menu: the list as it stands, or a first one */
+    function discOpen() {
+      if (!dsc.ids || dsc.stale) discBuild(Object.keys(dsc.shown));
+      return discPage();
+    }
+    function discShowing() { return !!focus && focus.kind === 'discover'; }
+    /* Refresh: a new seed, leaving out what this session has shown (Shift, or the menu: start over) */
+    function discRefresh(startOver) {
+      if (startOver) dsc.shown = {};
+      dsc.seed = (dsc.seed + 1) % 1000000;
+      dsc.cap = DISC_PAGE;
+      discBuild(Object.keys(dsc.shown));
+      selectedId = null;
+      setFocus(discPage());
+      var sc = document.getElementById('libraryScroll');
+      if (sc) sc.scrollTop = 0;
+      var n = focus.ids.length;
+      var said = n + ' new song' + (n === 1 ? '' : 's');
+      if (dsc.wrapped) said += ' \\u2014 everything eligible has been shown once, so Discover started over';
+      else if (startOver) said += ' \\u2014 started over';
+      findLive.textContent = said;
+      say(said);
+    }
+    /* the algorithm or the lean changed: a fresh list under it, from the top */
+    function discRerank() {
+      dsc.shown = {};
+      dsc.cap = DISC_PAGE;
+      dsc.ids = null;
+      if (!discShowing()) return;
+      discBuild([]);
+      setFocus(discPage(), true);
+      var sc = document.getElementById('libraryScroll');
+      if (sc) sc.scrollTop = 0;
+    }
+    /* a setting moved beside the sliders: the same list, re-ranked quietly (same seed, same exclusions) */
+    function discSync() {
+      if (!discShowing()) { dsc.ids = null; return; }
+      discBuild(dsc.base);
+      setFocus(discPage(), true);
+    }
+    function discMore() {
+      if (!discShowing()) return;
+      var before = focus.ids.length;
+      dsc.cap += DISC_PAGE;
+      setFocus(discPage(), true);
+      var added = focus.ids.length - before;
+      findLive.textContent = added + ' more song' + (added === 1 ? '' : 's') + ' \\u2014 ' + focus.ids.length + ' shown';
+      var row = tbody.querySelectorAll('tr[data-id]')[before];
+      if (row) { row.tabIndex = 0; row.focus({ preventScroll: true }); row.scrollIntoView({ block: 'nearest' }); }
+    }
+    document.getElementById('libMoreBtn').addEventListener('click', discMore);
+    document.getElementById('libDiscRefresh').addEventListener('click', function (e) { discRefresh(!!e.shiftKey); });
+
+    /* ---- the chip (NP-DISC-003/005): the algorithm's colour, name, mode and lean ---- */
+    var LEAN_NAME = { familiar: 'Familiar', balanced: 'Balanced', adventurous: 'Adventurous' };
+    var LEAN_WHY = { familiar: 'Less exploration; artists and genres you play count for more.',
+                     balanced: 'The algorithm as saved.',
+                     adventurous: 'Wide exploration; what you have heard least counts for more.' };
+    function algoChipText(a) {
+      var t = a.name + ' \\u00b7 ' + (MODE_NAME[cfg.algoMode] || cfg.algoMode);
+      if (cfg.lean.explore && cfg.lean.explore !== 'balanced') t += ' \\u00b7 ' + LEAN_NAME[cfg.lean.explore];
+      if (cfg.lean.genre) t += ' \\u00b7 ' + cfg.lean.genre;
+      return t;
+    }
+    function paintDisc() {
+      var chip = document.getElementById('libAlgoChip');
+      var rf = document.getElementById('libDiscRefresh');
+      var more = document.getElementById('libMore');
+      if (!chip) return;
+      var on = discShowing();
+      chip.hidden = !on;
+      rf.hidden = !on;
+      scope.classList.toggle('is-tinted', on);
+      if (!on) { more.hidden = true; return; }
+      var a = algoCurrent();
+      chip.parentNode.style.setProperty('--algo', a.color);
+      document.getElementById('libAlgoName').textContent = algoChipText(a);
+      chip.title = algoDescribe(a) + '. Click to change the algorithm or lean it.';
+      chip.setAttribute('aria-label', 'Algorithm: ' + algoChipText(a) + '. ' + algoDescribe(a) + '. Change the algorithm or lean it');
+      more.hidden = !(focus.more > 0);
+      document.getElementById('libMoreBtn').textContent = 'Load more \\u2014 ' + focus.more + ' more song' + (focus.more === 1 ? '' : 's');
+    }
+    function libGenres() {
+      var seen = {}, out = [];
+      discSongs().forEach(function (sg) { var g = String(sg.genre || '').trim(); if (g && !seen[g.toLowerCase()]) { seen[g.toLowerCase()] = 1; out.push(g); } });
+      return out.sort(function (a, b) { return a.localeCompare(b); });
+    }
+    var ctxAlgo = null;   // { back } while the chip's or the swatch's menu is up
+    function radioItem(cls, act, data, on, label, extra) {
+      return '<button class="ctx__item' + (cls ? ' ' + cls : '') + '" type="button" role="menuitemradio" aria-checked="' + on + '"' +
+        ' data-act="' + act + '" ' + data + '><span class="ctx__check" aria-hidden="true">' + (on ? '\\u2713' : '') + '</span>' + label + (extra || '') + '</button>';
+    }
+    function buildAlgoMenu() {
+      var cur = algoCurrent();
+      var genres = libGenres();
+      var leaned = (cfg.lean.explore && cfg.lean.explore !== 'balanced') || !!cfg.lean.genre;
+      var algos = algoEntries().map(function (a) {
+        return radioItem('ctx__item--algo', 'algo-pick', 'data-id="' + esc(a.id) + '" style="--algo:' + esc(a.color) + '"', a.id === cur.id,
+          '<span class="ctx__dot" aria-hidden="true"></span>' + esc(a.name) + '<span class="ctx__dim">\\u00b7 ' + esc(MODE_NAME[a.mode] || a.mode) + '</span>',
+          '<span class="ctx__desc">' + esc(algoDescribe(a)) + '</span>');
+      }).join('');
+      var lean = ['familiar', 'balanced', 'adventurous'].map(function (k) {
+        return radioItem('', 'algo-lean', 'data-lean="' + k + '" title="' + esc(LEAN_WHY[k]) + '"', (cfg.lean.explore || 'balanced') === k, esc(LEAN_NAME[k]));
+      }).join('') +
+      (genres.length ? '<div class="ctx__sep" role="separator"></div><div class="ctx__head" role="presentation">Genre</div>' +
+        genres.map(function (g) {
+          return radioItem('', 'algo-genre', 'data-genre="' + esc(g) + '"', !!cfg.lean.genre && cfg.lean.genre.toLowerCase() === g.toLowerCase(), esc(g));
+        }).join('') : '') +
+      '<div class="ctx__sep" role="separator"></div>' +
+      '<button class="ctx__item" type="button" role="menuitem" data-act="algo-lean-reset"' + (leaned ? '' : ' disabled') + '>Reset lean</button>';
+      ctx.innerHTML =
+        '<div class="ctx__head" role="presentation">Algorithm</div>' + algos +
+        '<div class="ctx__sep" role="separator"></div>' +
+        '<div class="ctx__item ctx__item--parent" role="menuitem" tabindex="0" aria-haspopup="menu" aria-expanded="false" data-act="parent">' +
+          'Lean' + (leaned ? '<span class="ctx__dim">\\u00b7 ' + esc(((cfg.lean.explore && cfg.lean.explore !== 'balanced') ? LEAN_NAME[cfg.lean.explore] : '') +
+            (cfg.lean.genre ? ((cfg.lean.explore && cfg.lean.explore !== 'balanced') ? ', ' : '') + cfg.lean.genre : '')) + '</span>' : '') +
+          '<span class="ctx__chev" aria-hidden="true"></span>' +
+          '<div class="ctx__sub ctx__sub--wide" role="menu" aria-label="Lean">' + lean + '</div>' +
+        '</div>' +
+        '<div class="ctx__sep" role="separator"></div>' +
+        '<button class="ctx__item" type="button" role="menuitem" data-act="algo-refresh">New Songs</button>' +
+        '<button class="ctx__item" type="button" role="menuitem" data-act="algo-restart">Start Discover Over</button>' +
+        '<div class="ctx__sep" role="separator"></div>' +
+        '<button class="ctx__item" type="button" role="menuitem" data-act="algo-edit">Edit Algorithms\\u2026</button>';
+    }
+    function buildColorMenu() {
+      var cur = algoCurrent();
+      ctx.innerHTML = '<div class="ctx__head" role="presentation">Colour of \\u201c' + esc(cur.name) + '\\u201d</div>' +
+        ALGO_PALETTE.map(function (c) {
+          var owner = algoColorOwner(c, cur.id);
+          return radioItem('ctx__item--color', 'algo-color', 'data-color="' + c + '" style="--algo:' + c + '"' + (owner ? ' aria-disabled="true"' : ''), algoNorm(cur.color) === c,
+            '<span class="ctx__dot" aria-hidden="true"></span>' + esc(ALGO_HUE_NAME[c]) + (owner ? '<span class="ctx__dim">\\u00b7 ' + esc(owner.name) + '</span>' : ''));
+        }).join('');
+    }
+    function openAlgoMenuAt(build, back) {
+      ctxSong = null; ctxItem = null; ctxMulti = null; ctxCat = null;
+      ctxAlgo = { back: back };
+      build();
+      var r = back.getBoundingClientRect();
+      ctx.classList.toggle('ctx--touch', matchMedia('(pointer: coarse)').matches);
+      ctx.setAttribute('aria-label', back.id === 'algoColor' ? 'Colours' : 'Algorithm');
+      back.setAttribute('aria-expanded', 'true');
+      placeMenu(r.left, r.bottom + 4);
+    }
+    function openAlgoMenu(back) { openAlgoMenuAt(buildAlgoMenu, back); }
+    function openColorMenu(back) { openAlgoMenuAt(buildColorMenu, back); }
+    document.getElementById('libAlgoChip').addEventListener('click', function () {
+      if (!ctx.hidden && ctxAlgo) { closeMenu(); return; }
+      openAlgoMenu(this);
+    });
+    /* the preview in Settings may not be built yet; when it is, it follows */
+    function algoSettingsRefresh() { if (recBooted) { recPicked = null; algoRefresh(''); } else paintScope(); }
+    function runAlgoAction(act, item) {
+      var a;
+      if (act === 'algo-pick') {
+        if (!algoEntry(item.dataset.id)) return;
+        cfg.algoCur = item.dataset.id;
+        algoLink(false);
+        cfgSave();
+        discRerank();
+        algoSettingsRefresh();
+        a = algoCurrent();
+        say('Discover ranked by \\u201c' + a.name + '\\u201d \\u00b7 ' + (MODE_NAME[cfg.algoMode] || cfg.algoMode));
+      } else if (act === 'algo-lean') {
+        cfg.lean.explore = item.dataset.lean;
+        cfgSave();
+        discRerank();
+        algoSettingsRefresh();
+        say('Leaning ' + LEAN_NAME[cfg.lean.explore].toLowerCase() + ' \\u2014 ' + LEAN_WHY[cfg.lean.explore]);
+      } else if (act === 'algo-genre') {
+        var g = item.dataset.genre;
+        cfg.lean.genre = cfg.lean.genre && cfg.lean.genre.toLowerCase() === g.toLowerCase() ? null : g;
+        cfgSave();
+        discRerank();
+        algoSettingsRefresh();
+        say(cfg.lean.genre ? 'Leaning toward ' + cfg.lean.genre : 'No longer leaning toward ' + g);
+      } else if (act === 'algo-lean-reset') {
+        cfg.lean = { explore: 'balanced', genre: null };
+        cfgSave();
+        discRerank();
+        algoSettingsRefresh();
+        say('Lean reset \\u2014 the algorithm as saved');
+      } else if (act === 'algo-refresh') {
+        discRefresh(false);
+      } else if (act === 'algo-restart') {
+        discRefresh(true);
+      } else if (act === 'algo-edit') {
+        route('#settings/rec');
+        readRoute();
+      } else if (act === 'algo-color') {
+        a = algoCurrent();
+        if (a.builtin) return;
+        var c = item.dataset.color;
+        var owner = algoColorOwner(c, a.id);
+        if (owner) { algoMsg('\\u201c' + owner.name + '\\u201d already uses ' + algoHueName(c).toLowerCase() + ' \\u2014 pick another, or recolour that one first.', 'err'); return; }
+        a.color = c;
+        cfgSave();
+        paintAlgoBar();
+        algoMsg('\\u201c' + a.name + '\\u201d is now ' + algoHueName(c).toLowerCase() + '.', 'ok');
+      }
+    }
+    /* for the tests and the mockup: what Discover shows, under which seed */
+    window.NP_DISCOVER = {
+      ids: function () { return discShowing() ? focus.ids.slice() : null; },
+      state: function () { return { seed: dsc.seed, shown: Object.keys(dsc.shown).length, eligible: dsc.eligible, more: discShowing() ? focus.more : null, wrapped: dsc.wrapped }; },
+      refresh: discRefresh,
+      rank: function () { return discRank([]).rows.map(function (r) { return { id: r.song.id, title: r.song.title, score: r.score, tier: r.tier, explored: r.explored }; }); },
+    };
+''')
+# the library menu's Discover row counts what is eligible and builds the list only when chosen
+replace('''          { label: 'Discover', count: discoverIds().length,
+            focus: { kind: 'discover', label: 'Discover', ids: discoverIds() } },
+''', '''          { label: 'Discover', count: discCount(), discover: true },
+''')
+replace('''      setFocus(it.focus);
+      if (findEl.value) { findEl.value = ''; query = ''; findClear.hidden = true; render(); }
+      ipodClose();
+      say('Showing \\u201c' + it.focus.label + '\\u201d');
+''', '''      var f = it.discover ? discOpen() : it.focus;
+      selectedId = it.discover ? null : selectedId;
+      setFocus(f);
+      if (findEl.value) { findEl.value = ''; query = ''; findClear.hidden = true; render(); }
+      ipodClose();
+      say(it.discover ? 'Discover \\u2014 ranked by \\u201c' + algoCurrent().name + '\\u201d \\u00b7 ' + (MODE_NAME[cfg.algoMode] || cfg.algoMode)
+                      : 'Showing \\u201c' + f.label + '\\u201d');
+''')
+# the silver bar paints the chip with the scope
+replace('''    function paintScope() {
+      if (!scope) return;
+      paintStar();
+''', '''    function paintScope() {
+      if (!scope) return;
+      paintStar();
+      paintDisc();
+''')
+# a star pressed in Discover: the row stays under the pointer; the next list leaves it out
+replace('''        logAct(isStar ? (bag[id] ? 'favorite' : 'unfavorite') : (bag[id] ? 'download' : 'undownload'), id);
+        save();
+        if (!isStar) say(bag[id] ? 'Saved for offline' : 'Removed from downloads');
+''', '''        logAct(isStar ? (bag[id] ? 'favorite' : 'unfavorite') : (bag[id] ? 'download' : 'undownload'), id);
+        save();
+        if (isStar) dsc.stale = true;
+        if (!isStar) say(bag[id] ? 'Saved for offline' : 'Removed from downloads');
+''')
+# the menu element: the chip's and the swatch's commands, and the way back to them
+replace('''      var sg = ctxSong;
+      closeMenu();
+      runAction(act, item, sg);
+    });
+''', '''      if (act.indexOf('algo-') === 0) {
+        closeMenu();
+        runAlgoAction(act, item);
+        return;
+      }
+      var sg = ctxSong;
+      closeMenu();
+      runAction(act, item, sg);
+    });
+''')
+replace('''      var catBack = ctxCat && ctxCat.back;
+      ctxSong = null;
+      ctxItem = null;
+      ctxMulti = null;
+      ctxCat = null;
+      ctx.classList.remove('ctx--touch');
+      if (row) row.focus();
+      else if (mrow) mrow.focus();
+      else if (back && document.contains(back)) back.focus();
+      else if (catBack && document.contains(catBack)) catBack.focus({ preventScroll: true });
+''', '''      var catBack = ctxCat && ctxCat.back;
+      var algoBack = ctxAlgo && ctxAlgo.back;
+      ctxSong = null;
+      ctxItem = null;
+      ctxMulti = null;
+      ctxCat = null;
+      ctxAlgo = null;
+      ctx.classList.remove('ctx--touch');
+      ctx.setAttribute('aria-label', 'Song actions');
+      if (algoBack) algoBack.setAttribute('aria-expanded', 'false');
+      if (row) row.focus();
+      else if (mrow) mrow.focus();
+      else if (back && document.contains(back)) back.focus();
+      else if (catBack && document.contains(catBack)) catBack.focus({ preventScroll: true });
+      else if (algoBack && document.contains(algoBack)) algoBack.focus({ preventScroll: true });
+''')
+
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):
     assert bad not in text, f'left behind: {bad}'
