@@ -84,6 +84,10 @@ beforeAll(async () => {
   answer('api.deezer.com/search/album', 'deezer-search-album');
   answer('api.deezer.com/track/isrc:USQX91300108', 'deezer-isrc');
   answer('api.deezer.com/track/isrc:', 'deezer-isrc-missing');
+  // A song's own detail (bpm, contributors, explicit, the full date): what fills a page's rows (UX-CAT-006).
+  answer('api.deezer.com/track/67238735', 'deezer-isrc');
+  answer('api.deezer.com/track/66609426', 'deezer-track');
+  hub.fetch.on('coverartarchive.org/release/', () => ({ status: 404, body: 'Not Found' }));
   answer('api.deezer.com/album/6575789/tracks', 'deezer-album-tracks');
   answer('api.deezer.com/album/6575789', 'deezer-album');
   answer('api.deezer.com/playlist/908622995/tracks', 'deezer-playlist-tracks');
@@ -129,6 +133,29 @@ describe('catalog search on the hub', () => {
     expect(calls.map((c) => c.at(-1))).toEqual(expect.arrayContaining(['ytsearch3:daft punk get lucky', 'scsearch3:daft punk get lucky']));
     expect(calls.every((c) => c[0] === '--ignore-config' && c.at(-2) === '--')).toBe(true);
   }, 30_000);
+
+  it('a page’s rows carry bpm, contributors, ISRC and explicit after the hydration chunk, before done (UX-CAT-006)', async () => {
+    const response = await get('/api/v1/catalog/search?q=daft%20punk%20get%20lucky&sections=tracks&providers=deezer,itunes');
+    expect(response.statusCode).toBe(200);
+    const chunks = response.body
+      .trim()
+      .split('\n')
+      .map((line) => CatalogSearchChunk.parse(JSON.parse(line)));
+    const done = chunks.at(-1)!;
+    const filled = chunks.at(-2)!;
+    expect(done.type).toBe('done');
+    expect(filled.type).toBe('results');
+    if (filled.type !== 'results') return;
+    // Merge-only, like the cross-link chunks: no provider, rows upserted by the id they arrived with.
+    expect(filled.provider).toBeNull();
+    const lucky = filled.tracks.find((t) => t.sources.some((s) => s.platform === 'deezer' && s.id === '67238735'))!;
+    expect(lucky).toMatchObject({ bpm: 116.1, isrc: 'USQX91300108', explicit: false, artists: ['Daft Punk', 'Pharrell Williams', 'Nile Rodgers'] });
+    const earlier = chunks.find((c) => c.type === 'results' && c.provider !== null && c.tracks.some((t) => t.id === lucky.id));
+    expect(earlier).toBeDefined();
+    // The folded answer carries the same facts.
+    const all = CatalogSearchAggregate.parse((await get('/api/v1/catalog/search?q=daft%20punk%20get%20lucky&stream=0&sections=tracks&providers=deezer,itunes')).json());
+    expect(all.tracks.find((t) => t.id === lucky.id)).toMatchObject({ bpm: 116.1, artists: ['Daft Punk', 'Pharrell Williams', 'Nile Rodgers'] });
+  });
 
   it('answers once with ?stream=0, every row naming where it came from', async () => {
     const response = await get('/api/v1/catalog/search?q=get%20lucky&stream=0&sections=tracks&providers=deezer,itunes');

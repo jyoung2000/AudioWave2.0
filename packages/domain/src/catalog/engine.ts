@@ -35,11 +35,13 @@ import { DomainError } from '../errors.js';
 import { CatalogHttpError, type CatalogFetch } from './http.js';
 import { ProviderHealth, TtlCache, describeError, statusFor, type Now, type Sleep } from './limits.js';
 import { CatalogMerger, mergeSources, mergeTrack, sameRecording } from './merge.js';
+import { HYDRATE_BUDGET_MS, HYDRATE_CONCURRENCY, HYDRATE_MAX_ROWS, fillTrack, needsFacts, runPool, trackChanged } from './hydrate.js';
+import { headLike } from './http.js';
 import { ProviderResting, type CatalogProvider, type ProviderResult } from './provider.js';
 import { ApplePageChanged, fetchApplePlaylistPage, type ApplePlaylistPage } from './providers/applemusic-page.js';
-import { DeezerClient, DeezerProvider } from './providers/deezer.js';
+import { DeezerClient, DeezerProvider, deezerTrack } from './providers/deezer.js';
 import { ItunesClient, ItunesProvider } from './providers/itunes.js';
-import { MusicBrainzClient, MusicBrainzProvider } from './providers/musicbrainz.js';
+import { MusicBrainzClient, MusicBrainzProvider, releaseOfRecording } from './providers/musicbrainz.js';
 import { ToolSearchProvider, type ToolSearchRunner } from './providers/ytdlp.js';
 import { parseCatalogQuery, parseMusicLink, type MusicLink } from './query.js';
 import { LinkReadError, TOOL_PLATFORMS, collectAllPages, collectionRef, coversOf, pageOf, pickDownloadSource, trackFromLink, type CollectedList, type LinkRead, type LinkReader, type LinkTrack } from './links.js';
@@ -74,6 +76,13 @@ export interface CatalogEngineOptions {
   crossLinkTop?: number | undefined;
   /** And how long that may take in all (default 5 s). */
   crossLinkBudgetMs?: number | undefined;
+  /**
+   * Whether a page's rows are filled in with their facts before `done` (UX-CAT-006; default on):
+   * bpm, contributors, ISRC, explicit, the full date and cover from Deezer's detail, a MusicBrainz
+   * row's cover from the Cover Art Archive. `hydrateBudgetMs` bounds the whole page (default 6 s).
+   */
+  hydrate?: boolean | undefined;
+  hydrateBudgetMs?: number | undefined;
   /** Per-call timeouts, shortened by tests. */
   timeouts?: Partial<Record<'itunes' | 'deezer' | 'musicbrainz' | 'tools' | 'lrclib' | 'odesli', number>> | undefined;
 }
@@ -110,6 +119,10 @@ export class CatalogEngine {
   private readonly searchCache: TtlCache<ProviderResult>;
   private readonly linksCache: TtlCache<CatalogSource[]>;
   private readonly applePageCache: TtlCache<ApplePlaylistPage | null>;
+  /** Deezer's full record of a song, by `deezer:<id>`, `isrc:<ISRC>` and the name it was found by. */
+  private readonly factsCache: TtlCache<CatalogTrack | null>;
+  /** The Cover Art Archive's front image for a release, by release id (null: none listed). */
+  private readonly coverCache: TtlCache<string | null>;
   private readonly sessions = new Map<string, { at: number; rows: Array<{ track: CatalogTrack; offset: number }> }>();
 
   constructor(private readonly options: CatalogEngineOptions) {
@@ -127,6 +140,8 @@ export class CatalogEngine {
     this.searchCache = new TtlCache(5 * 60_000, 300, this.now);
     this.linksCache = new TtlCache(24 * 3600_000, 1000, this.now);
     this.applePageCache = new TtlCache(10 * 60_000, 50, this.now);
+    this.factsCache = new TtlCache(24 * 3600_000, 3000, this.now);
+    this.coverCache = new TtlCache(24 * 3600_000, 1000, this.now);
     this.register(new ItunesProvider(this.itunes));
     this.register(new DeezerProvider(this.deezer));
     this.register(new MusicBrainzProvider(this.musicbrainz));
@@ -251,6 +266,14 @@ export class CatalogEngine {
       }
     }
 
+    // Every result carries its facts (UX-CAT-006): the page's rows, filled in from Deezer's detail and
+    // the Cover Art Archive within a budget, sent as one last merge-only chunk the clients upsert by id.
+    if (this.options.hydrate !== false && !signal?.aborted && sections.includes('tracks')) {
+      const filled = await this.hydrateTracks(merger.snapshot().tracks, { signal, askDeezer: wanted.has('deezer') && statuses.get('deezer')?.state !== 'skipped' });
+      const patched = filled.map((t) => merger.patchTrack(t.id, () => t)).filter((t): t is CatalogTrack => t !== null);
+      if (patched.length) yield { type: 'results', seq: seq++, provider: null, query, tracks: canonical(patched), artists: [], albums: [], playlists: [], status: list() };
+    }
+
     const snapshot = merger.snapshot();
     if (session) {
       for (const row of snapshot.tracks) {
@@ -368,6 +391,106 @@ export class CatalogEngine {
     return Promise.race([work, new Promise<never>((_, reject) => (timer = setTimeout(() => reject(new CatalogHttpError('Out of time', 'timeout')), Math.max(ms, 0))))]).finally(() => clearTimeout(timer));
   }
 
+  /* ------------------------------------------------------------- the facts */
+
+  /**
+   * The rows' nulls filled in (UX-CAT-006): a Deezer source's `/track/{id}`, else the ISRC's
+   * `/track/isrc:`, else one exact Deezer search taken only for the same recording; and a
+   * MusicBrainz-only row's cover from the Cover Art Archive. At most `HYDRATE_CONCURRENCY` lookups in
+   * flight, nothing started past the budget, every answer cached for a day (by Deezer id, by ISRC and
+   * by the name it was found by). Deezer's quota (code 4) and its cooldown are respected: the first
+   * refusal ends this page's Deezer lookups and rests the service as a search would.
+   * Returns only the rows that changed, with their ids as given, so a chunk can upsert them.
+   */
+  async hydrateTracks(tracks: readonly CatalogTrack[], options: { signal?: AbortSignal | undefined; budgetMs?: number | undefined; max?: number | undefined; askDeezer?: boolean | undefined } = {}): Promise<CatalogTrack[]> {
+    const deadline = this.now() + (options.budgetMs ?? this.options.hydrateBudgetMs ?? HYDRATE_BUDGET_MS);
+    const rows = tracks.filter(needsFacts).slice(0, options.max ?? HYDRATE_MAX_ROWS);
+    if (!rows.length) return [];
+    const deezer = { on: (options.askDeezer ?? true) && this.options.enabled?.()?.deezer !== false && !this.health.coolingUntil('deezer') };
+    const results = await runPool(rows, (row) => this.hydrateOne(row, deezer, deadline, options.signal), { concurrency: HYDRATE_CONCURRENCY, deadline, now: this.now, ...(options.signal ? { signal: options.signal } : {}) });
+    const out: CatalogTrack[] = [];
+    rows.forEach((row, i) => {
+      const filled = results.get(i);
+      if (filled && trackChanged(row, filled)) out.push(filled);
+    });
+    return out;
+  }
+
+  private async hydrateOne(row: CatalogTrack, deezer: { on: boolean }, deadline: number, signal?: AbortSignal): Promise<CatalogTrack> {
+    let out = row;
+    if (deezer.on) {
+      const detail = await this.deezerDetail(row, deezer, deadline, signal);
+      if (detail) out = fillTrack(out, detail.track, detail.matchedBy);
+    }
+    if (!out.artworkUrl && out.sources.length && out.sources.every((s) => s.platform === 'musicbrainz')) {
+      const recording = out.sources[0]!.id;
+      const release = recording ? releaseOfRecording(recording) : null;
+      if (release) {
+        const cover = await this.withDeadline(this.coverCache.get(release, () => this.coverArtFront(release, signal)), deadline - this.now()).catch(() => null);
+        if (cover) out = { ...out, artworkUrl: cover };
+      }
+    }
+    return out;
+  }
+
+  /** Deezer's full record of the row's recording, and how it was tied to the row. */
+  private async deezerDetail(row: CatalogTrack, deezer: { on: boolean }, deadline: number, signal?: AbortSignal): Promise<{ track: CatalogTrack; matchedBy: CatalogSource['matchedBy'] } | null> {
+    const guard = <T>(work: Promise<T>): Promise<T | null> =>
+      this.withDeadline(work, deadline - this.now()).catch((error: unknown) => {
+        if (error instanceof CatalogHttpError && error.kind === 'rate-limited') {
+          deezer.on = false;
+          this.health.restUntil('deezer', this.now() + Math.max(1000, error.retryAfterMs ?? 5000), error.message);
+        }
+        return null;
+      });
+    // What a detail says is kept under its own id and its ISRC too, so the next row or page that
+    // reaches the same song asks nothing.
+    const keep = (detail: CatalogTrack | null): CatalogTrack | null => {
+      if (detail) {
+        const id = detail.sources[0]?.id;
+        if (id) this.factsCache.put(`deezer:${id}`, detail);
+        if (detail.isrc) this.factsCache.put(`isrc:${detail.isrc}`, detail);
+      }
+      return detail;
+    };
+    const own = row.sources.find((s) => s.platform === 'deezer' && s.id);
+    if (own?.id) {
+      const id = own.id;
+      const track = await guard(this.factsCache.get(`deezer:${id}`, () => this.deezer.track(id, signal).then(keep)));
+      return track ? { track, matchedBy: 'search' } : null;
+    }
+    if (row.isrc) {
+      const isrc = row.isrc;
+      const track = await guard(this.factsCache.get(`isrc:${isrc}`, () => this.deezer.byIsrc(isrc, signal).then(keep)));
+      return track ? { track, matchedBy: 'isrc' } : null;
+    }
+    const words = `${row.artists[0] ?? row.artist} ${row.title}`.replace(/\s+/g, ' ').trim();
+    if (!words || !row.title) return null;
+    const key = `name:${words.toLowerCase()}|${row.durationMs ? Math.round(row.durationMs / 5000) : ''}`;
+    const track = await guard(
+      this.factsCache.get(key, async () => {
+        const found = await this.deezer.list(`/search/track?q=${encodeURIComponent(words)}&limit=5`, signal);
+        const hit = found.rows.map((r) => deezerTrack(r)).find((c): c is CatalogTrack => c !== null && sameRecording(row, c));
+        const id = hit?.sources[0]?.id;
+        if (!id) return null;
+        return this.factsCache.get(`deezer:${id}`, () => this.deezer.track(id, signal).then(keep));
+      }),
+    );
+    return track ? { track, matchedBy: 'metadata' } : null;
+  }
+
+  /**
+   * The Cover Art Archive's front image for a release, keylessly: `/release/{id}/front-500` answers
+   * 307 to the archive when the release has a front cover (an <img> follows that), 404 when it has
+   * none. Asked with redirects unfollowed (measured 2026-10-07; the hop is to archive.org, which the
+   * servers' allowlists do not reach and need not). Null when there is no cover.
+   */
+  private async coverArtFront(releaseId: string, signal?: AbortSignal): Promise<string | null> {
+    const url = `https://coverartarchive.org/release/${encodeURIComponent(releaseId)}/front-500`;
+    const { found } = await headLike(this.options.fetch, url, { timeoutMs: this.options.timeouts?.musicbrainz ?? 8000, signal });
+    return found ? url : null;
+  }
+
   /* ----------------------------------------------------------- cross-links */
 
   /**
@@ -442,7 +565,7 @@ export class CatalogEngine {
       const link: MusicLink = { platform: 'deezer', kind: 'album', id: native, url: `https://www.deezer.com/album/${native}` };
       return {
         album: found.album,
-        page: { tracks: found.tracks.slice(0, limit), offset, limit, total, hasMore: offset + Math.min(found.tracks.length, limit) < Math.min(total ?? 0, CATALOG_COLLECTION_CAP), capped: (total ?? 0) > CATALOG_COLLECTION_CAP },
+        page: { tracks: await this.withFacts(found.tracks.slice(0, limit), signal), offset, limit, total, hasMore: offset + Math.min(found.tracks.length, limit) < Math.min(total ?? 0, CATALOG_COLLECTION_CAP), capped: (total ?? 0) > CATALOG_COLLECTION_CAP },
         collection: collectionRef(link, 'album', found.album.title, found.album.artist),
       };
     }
@@ -451,9 +574,20 @@ export class CatalogEngine {
       if (!found) throw new DomainError('not-found', 'Apple Music has no album with that id');
       const url = found.album.sources[0]?.url ?? `https://music.apple.com/album/${native}`;
       const link: MusicLink = { platform: 'apple-music', kind: 'album', id: native, url };
-      return { album: found.album, page: pageOf(found.tracks, offset, limit, found.album.trackCount ?? found.tracks.length, false), collection: collectionRef(link, 'album', found.album.title, found.album.artist) };
+      const page = pageOf(found.tracks, offset, limit, found.album.trackCount ?? found.tracks.length, false);
+      page.tracks = await this.withFacts(page.tracks, signal);
+      return { album: found.album, page, collection: collectionRef(link, 'album', found.album.title, found.album.artist) };
     }
     throw new DomainError('unsupported', `Albums are opened from Deezer or Apple Music; ${platform} albums are opened by pasting their link`);
+  }
+
+  /** A detail page's songs with their facts filled in (UX-CAT-006), within a shorter budget than a search's. */
+  private async withFacts(tracks: CatalogTrack[], signal?: AbortSignal): Promise<CatalogTrack[]> {
+    if (this.options.hydrate === false || !tracks.length) return tracks;
+    const filled = await this.hydrateTracks(tracks, { signal, budgetMs: Math.min(this.options.hydrateBudgetMs ?? HYDRATE_BUDGET_MS, 4000) });
+    if (!filled.length) return tracks;
+    const byId = new Map(filled.map((t) => [t.id, t]));
+    return tracks.map((t) => byId.get(t.id) ?? t);
   }
 
   async artist(id: string, input: { albumsOffset?: number; albumsLimit?: number; topLimit?: number } = {}, signal?: AbortSignal): Promise<CatalogArtistDetail> {
@@ -464,13 +598,13 @@ export class CatalogEngine {
     if (platform === 'deezer') {
       const found = await this.upstream(() => this.deezer.artist(native, albumsOffset, albumsLimit, topLimit, signal), 'Deezer');
       if (!found) throw new DomainError('not-found', 'Deezer has no artist with that id');
-      return { artist: found.artist, topTracks: found.topTracks, albums: found.albums, albumsPage: { offset: albumsOffset, limit: albumsLimit, hasMore: found.albumsTotal !== null ? albumsOffset + found.albums.length < found.albumsTotal : found.albums.length >= albumsLimit } };
+      return { artist: found.artist, topTracks: await this.withFacts(found.topTracks, signal), albums: found.albums, albumsPage: { offset: albumsOffset, limit: albumsLimit, hasMore: found.albumsTotal !== null ? albumsOffset + found.albums.length < found.albumsTotal : found.albums.length >= albumsLimit } };
     }
     if (platform === 'apple-music') {
       const found = await this.upstream(() => this.itunes.artist(native, albumsOffset + albumsLimit, topLimit, signal), 'Apple Music');
       if (!found) throw new DomainError('not-found', 'Apple Music has no artist with that id');
       const albums = found.albums.slice(albumsOffset, albumsOffset + albumsLimit);
-      return { artist: found.artist, topTracks: found.topTracks.slice(0, topLimit), albums, albumsPage: { offset: albumsOffset, limit: albumsLimit, hasMore: found.albums.length >= albumsOffset + albumsLimit } };
+      return { artist: found.artist, topTracks: await this.withFacts(found.topTracks.slice(0, topLimit), signal), albums, albumsPage: { offset: albumsOffset, limit: albumsLimit, hasMore: found.albums.length >= albumsOffset + albumsLimit } };
     }
     throw new DomainError('unsupported', `Artists are opened from Deezer or Apple Music, not ${platform}`);
   }

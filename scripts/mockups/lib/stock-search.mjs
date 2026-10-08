@@ -121,7 +121,8 @@ export function catalogTrack(s) {
     id: `deezer:${s.id}`,
     title: s.t,
     artist: s.a,
-    artists: [s.a],
+    // Deezer's detail lists the contributors (UX-CAT-006): a stock song can have featured artists.
+    artists: s.feat ? [s.a, ...s.feat] : [s.a],
     album: s.al,
     albumArtist: s.a,
     durationMs: s.d * 1000,
@@ -132,7 +133,7 @@ export function catalogTrack(s) {
     trackNumber: CATALOGUE.filter((x) => x.al === s.al).indexOf(s) + 1,
     discNumber: 1,
     bpm: s.bpm,
-    explicit: false,
+    explicit: Boolean(s.explicit),
     genre: s.genre,
     label: info.label,
     sources: sourcesOf(s, i),
@@ -320,7 +321,7 @@ export function catalogResolve(url) {
 export function behaviourData() {
   const label = { deezer: 'Deezer', 'apple-music': 'Apple Music', 'youtube-music': 'YouTube Music', youtube: 'YouTube', spotify: 'Spotify' };
   return {
-    songs: CATALOGUE.map((s) => ({ t: s.t, a: s.a, al: s.al, d: s.d, bpm: s.bpm, art: s.art, year: albumInfo(s.al).year, pfs: [...new Set(sourcesOf(s, CATALOGUE.indexOf(s)).map((x) => label[x.platform]))] })),
+    songs: CATALOGUE.map((s) => ({ t: s.t, a: s.a, who: s.feat ? `${s.a} feat. ${s.feat.join(' & ')}` : s.a, x: Boolean(s.explicit), al: s.al, d: s.d, bpm: s.bpm, art: s.art, year: albumInfo(s.al).year, pfs: [...new Set(sourcesOf(s, CATALOGUE.indexOf(s)).map((x) => label[x.platform]))] })),
     artists: ARTIST_NAMES.map((name) => {
       const a = catalogArtistRow(name);
       return { name, sub: [a.genre, `${a.albumCount} ${a.albumCount === 1 ? 'album' : 'albums'}`, `${a.fans.toLocaleString('en-US')} fans`].join(' · '), art: a.pictureUrl };

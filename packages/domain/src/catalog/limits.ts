@@ -35,6 +35,14 @@ export class TtlCache<V> {
     return value;
   }
 
+  /** Keep a value already in hand under another key (a Deezer detail under its ISRC too). */
+  put(key: string, value: V): void {
+    const at = this.now();
+    this.entries.delete(key);
+    while (this.entries.size >= this.max) this.entries.delete(this.entries.keys().next().value!);
+    this.entries.set(key, { at, value: Promise.resolve(value) });
+  }
+
   get size(): number {
     return this.entries.size;
   }

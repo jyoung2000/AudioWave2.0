@@ -142,7 +142,17 @@
     picture(r, song.art);
     r.querySelector('.srch__title').textContent = song.t;
     badges(r, song.pfs);
-    r.querySelector('.srch__sub').textContent = song.a + ' — ' + song.al + ' · ' + song.year;
+    r.querySelector('.srch__sub').textContent = (song.who || song.a) + ' — ' + song.al + ' · ' + song.year;
+    var x = r.querySelector('.srch__x');
+    if (x && !song.x) x.remove();
+    if (!x && song.x) {
+      var mark = document.createElement('span');
+      mark.className = 'srch__x';
+      mark.title = 'Explicit';
+      mark.setAttribute('aria-label', 'explicit');
+      mark.textContent = 'E';
+      r.querySelector('.srch__title').after(mark);
+    }
     r.querySelector('.srch__time').textContent = fmt(song.d);
     r.querySelector('.srch__bpm').textContent = song.bpm ? song.bpm + ' bpm' : '';
     var genre = r.querySelector('.srch__genre');

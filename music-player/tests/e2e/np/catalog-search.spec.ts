@@ -14,6 +14,7 @@ import {
   album,
   artist,
   COMPANION,
+  cover,
   done,
   fulfillStream,
   json,
@@ -288,6 +289,66 @@ test('one song from three sources in separate chunks is one row with three badge
   await expect(page.locator('#srchCount')).toHaveText(
     'Results: 2 songs · 0 artists · 0 albums · 0 playlists',
   );
+});
+
+test('the engine’s last chunk fills a row in place: it gains “feat.”, BPM, the E mark and a cover (UX-CAT-006)', async ({
+  page,
+}) => {
+  // What a search answer gives first: the title and the main artist, no tempo, no contributors, no
+  // cover, nothing said about explicit words. Deezer's detail, asked by the engine after every
+  // service answered, arrives as one merge-only chunk under the same id.
+  const bare = track('deezer:3001', 'Quay Lights', {
+    artist: 'Lantern Choir',
+    artists: ['Lantern Choir'],
+    bpm: null,
+    explicit: null,
+    artworkUrl: null,
+    isrc: null,
+    sources: [src('deezer', '3001')],
+    rank: 90,
+  });
+  const filled = {
+    ...bare,
+    artists: ['Lantern Choir', 'Ada Moss', 'Ivo Rask'],
+    bpm: 124,
+    explicit: true,
+    isrc: 'GBXXX2500001',
+    artworkUrl: cover(200),
+    releaseDate: '2019-05-03',
+    sources: [src('deezer', '3001', { previewUrl: 'https://cdnt-preview.dzcdn.net/3001.mp3' })],
+  };
+  // The browser's own tempo lookup (Deezer JSONP) must have nothing left to ask for.
+  let deezerAsked = 0;
+  await page.route('**/api.deezer.com/**', (r) => {
+    deezerAsked += 1;
+    return r.abort();
+  });
+  await companion(page, (path, route) => {
+    if (path !== 'search') return route.fulfill(json({ message: 'no' }, 404));
+    return fulfillStream(route, [
+      results(0, null, 'quay', {}, PENDING),
+      results(1, 'deezer', 'quay', { tracks: [bare] }, FINAL),
+      results(2, null, 'quay', { tracks: [filled] }, FINAL),
+      done(3, 'quay', FINAL, { tracks: false }),
+    ]);
+  });
+  await searchFor(page, 'quay');
+  const songs = page.locator('#srchList .srch__sec[aria-label="Songs"] .srch__row');
+  await expect(songs).toHaveCount(1);
+  const row = songs.first();
+  await expect(row.locator('.srch__title')).toHaveText('Quay Lights');
+  // One row still (upserted by id), now with every fact the detail carried.
+  await expect(row.locator('.srch__sub')).toHaveText(
+    'Lantern Choir feat. Ada Moss & Ivo Rask — Night Ferries · 2019',
+  );
+  await expect(row.locator('.srch__bpm')).toHaveText('124 bpm');
+  await expect(row.locator('.srch__x')).toHaveText('E');
+  await expect(row.locator('.srch__x')).toHaveAttribute('aria-label', 'explicit');
+  await expect(row.locator('.srch__art img')).toHaveAttribute('src', /^data:image\/svg\+xml/);
+  // The clip the detail brought is playable from the tile.
+  await expect(row.locator('button.srch__art[data-preview]')).toHaveCount(1);
+  await page.waitForTimeout(300);
+  expect(deezerAsked).toBe(0);
 });
 
 test('a later page never repeats a song already shown: its platforms join the row it is', async ({

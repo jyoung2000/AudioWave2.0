@@ -21,6 +21,7 @@ import { CATALOG_COLLECTION_CAP, CATALOG_PROVIDERS } from '@now-playing/contract
 import {
   albumLine,
   appendPage,
+  creditLine,
   appendTracks,
   byRank,
   CATALOG_PROVIDER_LABELS,
@@ -757,7 +758,7 @@ function SongPage({ track, client, preview, say }: { track: CatalogTrack; client
       <DetailHead
         art={<Art url={track.artworkUrl} size="big" />}
         title={track.title}
-        lines={[track.artist, albumLine(track) || null, [formatDuration(track.durationMs), track.bpm ? `${Math.round(track.bpm)} BPM` : null, track.explicit ? 'Explicit' : null].filter(Boolean).join(' · ') || null]}
+        lines={[creditLine(track), albumLine(track) || null, [formatDuration(track.durationMs), track.bpm ? `${Math.round(track.bpm)} BPM` : null, track.explicit ? 'Explicit' : null].filter(Boolean).join(' · ') || null]}
         sources={track.sources}
         star={
           clip ? (
@@ -1012,7 +1013,7 @@ function TrackList({ label, tracks, preview, onOpen, empty, numbered }: { label:
                   </span>
                 ) : null}
               </span>
-              <span className="mrow__sub">{[t.artist, t.album].filter(Boolean).join(' · ')}</span>
+              <span className="mrow__sub">{[creditLine(t), t.album].filter(Boolean).join(' · ')}</span>
               <Platforms sources={t.sources} />
             </span>
             <span className="mrow__meta">

@@ -185,7 +185,14 @@ const BUNDLES: Bundle[] = [
      * pages with their arrows and scroll paging, the Playlists section and the row menu grew the
      * lazy search chunk from 112 to 121 KB — measured. The entry is unchanged (250).
      */
-    totalBudgetKb: 2536,
+     * And to 2543 for every result carrying its facts (UX-CAT-006, 2026-10-07): the lazy search chunk
+     * — which carries the engine for a player with neither hub nor companion — gains the page
+     * hydration (Deezer detail by id, ISRC and name; the Cover Art Archive; the pool and the
+     * filling), the credit line and the E mark, on top of the redrawn search's type pages, playlists
+     * and row menu that landed since the last measure: 112 → 129 KB. Measured: 2543 KB in all. The
+     * entry is unchanged (249).
+     */
+    totalBudgetKb: 2543,
     // Three.js belongs to the constellation and the jewel case; the tag reader only to a scan.
     mustBeSplit: ['three', 'music-metadata'],
   },
