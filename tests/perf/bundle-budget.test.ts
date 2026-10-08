@@ -70,8 +70,14 @@ const BUNDLES: Bundle[] = [
      * And to 249 for the catalog search's loader (NP-FIND-003, 2026-10-06): the bridge's dynamic import
      * of src/shell/search and the few lines that keep an Enter pressed before it lands — measured, under
      * 1 KB (248.6 KB, which rounds up). The search itself is a lazy chunk, fetched after the shell runs.
+     *
+     * And to 258 for the recommendation ranker (NP-DISC-001, 2026-10-07): src/shell/recommend/rank.ts —
+     * the factors, penalties, familiarity mix, artist cap, seeded exploration, the one-line description
+     * and the colour arithmetic — published by the bridge as window.NP_RECOMMEND, plus the five fields a
+     * row now carries for it. Eager on purpose: Discover is one click from the first screen and must
+     * rank the moment it opens, and the Settings preview ranks through the same call. Measured, 9 KB.
      */
-    entryBudgetKb: 249,
+    entryBudgetKb: 258,
     /*
      * The total rose from 1600 to 1900 when the hero gained the reference's jewel case.
      *
@@ -191,8 +197,14 @@ const BUNDLES: Bundle[] = [
      * filling), the credit line and the E mark, on top of the redrawn search's type pages, playlists
      * and row menu that landed since the last measure: 112 → 129 KB. Measured: 2543 KB in all. The
      * entry is unchanged (249).
+     *
+     * And to 2575 for Discover ranked by the chosen algorithm (NP-DISC-001..005, 2026-10-07): the
+     * ranker in the entry (the 9 KB above) and, inline in the shell's HTML, Discover's paging and
+     * refresh, the algorithm chip and its menu, the lean, the colour swatch, picker and legend, and
+     * their styles — measured, 23 KB of markup, script and CSS. Nothing new is fetched lazily; the
+     * search chunk is unchanged.
      */
-    totalBudgetKb: 2543,
+    totalBudgetKb: 2575,
     // Three.js belongs to the constellation and the jewel case; the tag reader only to a scan.
     mustBeSplit: ['three', 'music-metadata'],
   },
