@@ -43,7 +43,7 @@ export interface HubCatalogDeps {
 export function hubCatalogFetch(http: SafeHttpClient): CatalogFetch {
   return async (url, init) => {
     try {
-      const res = await http.request(url, { allowedHosts: CATALOG_API_HOSTS, headers: init.headers, signal: init.signal, timeoutMs: 20_000, maxBytes: 4 * 1024 * 1024 });
+      const res = await http.request(url, { allowedHosts: CATALOG_API_HOSTS, headers: init.headers, signal: init.signal, timeoutMs: 20_000, maxBytes: 4 * 1024 * 1024, followRedirects: init.redirect !== 'manual' });
       return { status: res.status, headers: res.headers, json: () => res.json(), text: () => res.text() };
     } catch (error) {
       if (error instanceof ProviderHttpError && error.status !== null) {

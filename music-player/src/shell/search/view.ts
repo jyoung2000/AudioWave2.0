@@ -17,6 +17,7 @@ import {
   type CatalogTrack,
   type SavedCollection,
 } from '@now-playing/contracts';
+import { creditLine } from '@now-playing/domain/catalog';
 import { webUrl } from './client.js';
 
 export function esc(t: unknown): string {
@@ -124,7 +125,10 @@ export function badgesHTML(sources: readonly CatalogSource[]): string {
   );
 }
 
-/** The words for the second line of a song: who, then the album, then the year. */
+/**
+ * The words for the second line of a song: who (the credit line, UX-CAT-006: the main artist and
+ * "feat. …" from the other credited names), then the album, then the year.
+ */
 export function songSub(t: CatalogTrack): string {
   // With an album, its year; without one (an upload, a pasted link), the whole date it was released.
   const tail = t.album
@@ -132,7 +136,15 @@ export function songSub(t: CatalogTrack): string {
         .filter(Boolean)
         .join(' · ')
     : (t.releaseDate ?? '');
-  return t.artist ? (tail ? `${t.artist} — ${tail}` : t.artist) : tail;
+  const who = creditLine(t);
+  return who ? (tail ? `${who} — ${tail}` : who) : tail;
+}
+
+/** The small "E" beside an explicit song's title (UX-CAT-006); nothing when the store says it is clean or does not say. */
+export function explicitHTML(t: Pick<CatalogTrack, 'explicit'>): string {
+  return t.explicit === true
+    ? '<span class="srch__x" title="Explicit" aria-label="explicit">E</span>'
+    : '';
 }
 
 /** An image address: http(s), or an inline picture (`data:image/…`), which an <img> cannot run. */
@@ -185,7 +197,7 @@ export function trackRowHTML(t: CatalogTrack, i: number, added: boolean): string
     '',
     artHTML(t, i) +
       '<span class="srch__meta">' +
-      `<span class="srch__line"><span class="srch__title">${esc(t.title)}</span>${badgesHTML(t.sources)}</span>` +
+      `<span class="srch__line"><span class="srch__title">${esc(t.title)}</span>${explicitHTML(t)}${badgesHTML(t.sources)}</span>` +
       `<span class="srch__sub">${esc(songSub(t))}</span>` +
       '</span>' +
       (t.genre ? `<span class="srch__genre">${esc(t.genre)}</span>` : '') +

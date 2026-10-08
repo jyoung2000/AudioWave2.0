@@ -46,5 +46,28 @@
     "tracklist": "https://api.deezer.com/album/6575789/tracks",
     "type": "album"
   },
-  "type": "track"
+  "type": "track",
+  "contributors": [
+    {
+      "id": 27,
+      "name": "Daft Punk",
+      "link": "https://www.deezer.com/artist/27",
+      "role": "Main",
+      "type": "artist"
+    },
+    {
+      "id": 103,
+      "name": "Pharrell Williams",
+      "link": "https://www.deezer.com/artist/103",
+      "role": "Main",
+      "type": "artist"
+    },
+    {
+      "id": 7207,
+      "name": "Nile Rodgers",
+      "link": "https://www.deezer.com/artist/7207",
+      "role": "Main",
+      "type": "artist"
+    }
+  ]
 }

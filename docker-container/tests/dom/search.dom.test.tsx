@@ -133,6 +133,8 @@ describe('what a row says (UX-SEARCH-003)', () => {
     expect(lights.textContent).toContain('preview');
     const wall = within(songs).getAllByRole('option').find((o) => o.textContent?.startsWith('Harbour Wall'))!;
     expect(wall.textContent).toContain('explicit');
+    // The credit line (UX-CAT-006): the store's contributors become "feat. …" when the artist line does not name them.
+    expect(wall.textContent).toContain('Cassette Bloom feat. Ada Moss · Harbour Lights');
     // Music only: no row offers to "search on" a site.
     expect(document.body.textContent).not.toMatch(/search on|search youtube|open it on/i);
   });

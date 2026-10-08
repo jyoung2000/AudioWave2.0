@@ -36,12 +36,33 @@ function firstRelease(row: Json): Json | null {
   return [...pool].sort((a, b) => String(a['date'] ?? '9999').localeCompare(String(b['date'] ?? '9999')))[0] ?? null;
 }
 
+/**
+ * The first release of each recording a search listed, by recording id, so a MusicBrainz-only row
+ * (which has no cover) can be given the Cover Art Archive's front image for that release when the
+ * page is filled in (UX-CAT-006). A `CatalogTrack` has no field for it, and rows are copied as they
+ * merge, so this is kept beside them, bounded.
+ */
+const RELEASE_OF_RECORDING = new Map<string, string>();
+const RELEASES_KEPT = 2000;
+
+export function releaseOfRecording(recordingId: string): string | null {
+  return RELEASE_OF_RECORDING.get(recordingId) ?? null;
+}
+
+function rememberRelease(recordingId: string, releaseId: string): void {
+  RELEASE_OF_RECORDING.delete(recordingId);
+  while (RELEASE_OF_RECORDING.size >= RELEASES_KEPT) RELEASE_OF_RECORDING.delete(RELEASE_OF_RECORDING.keys().next().value!);
+  RELEASE_OF_RECORDING.set(recordingId, releaseId);
+}
+
 export function musicbrainzTrack(row: Json): CatalogTrack | null {
   const id = str(row['id'], 40);
   const title = str(row['title']);
   const { line, names } = credit(row);
   if (!id || !title || !line) return null;
   const release = firstRelease(row);
+  const releaseId = str(release?.['id'], 40);
+  if (releaseId && /^[0-9a-f-]{36}$/.test(releaseId)) rememberRelease(id, releaseId);
   const releaseDate = calendarDate(row['first-release-date']) ?? calendarDate(release?.['date']);
   const isrcs = Array.isArray(row['isrcs']) ? (row['isrcs'] as unknown[]).filter((i): i is string => typeof i === 'string' && /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/.test(i)) : [];
   const length = num(row['length']);

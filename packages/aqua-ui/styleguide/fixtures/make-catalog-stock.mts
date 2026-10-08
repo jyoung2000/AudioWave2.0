@@ -126,7 +126,8 @@ const wall = track(
   120,
   [deezer(9102), yt('mockHW0002')],
   120,
-  { trackNumber: 2, explicit: true },
+  // Deezer's detail lists the contributors (UX-CAT-006): the row says "Cassette Bloom feat. Ada Moss".
+  { trackNumber: 2, explicit: true, artists: ['Cassette Bloom', 'Ada Moss'], isrc: 'QZAAA2600102' },
 );
 const ember = track(
   'deezer:9108',

@@ -52,6 +52,9 @@ chunks as bytes arrive. Cancel by aborting the fetch: the server stops the servi
   copy (more `sources`, better title/artwork). Sort by `rank` (desc), ties by arrival.
 - Zero to two `results` with `provider: null` and a track or two: the best rows' other homes
   (Spotify, YouTube Music, Tidal… from MusicBrainz, `matchedBy: 'musicbrainz'`).
+- One more `results` with `provider: null`, when anything was learned: the page's rows **filled in**
+  with their facts (UX-CAT-006, below) — bpm, contributors, ISRC, explicit, the full date, the store's
+  cover — under the ids they arrived with. Upsert them like any chunk.
 - Last: `done` — final `status`, `page.{tracks,artists,albums}` `{ offset, limit, hasMore }` (null for a
   section not asked), `totals`, and `resolve`: a pasted link is **not searched** — `done` arrives alone with
   `resolve: <url>`; call `catalog/resolve`.
@@ -112,6 +115,55 @@ Example (trimmed, from the fixtures):
   Music" (play/download the second). Albums/playlists/artists list every song (Spotify sources only; the
   YouTube Music match is per song, at download time — spotDL does it). Search rows show Spotify only when
   MusicBrainz (or SongLink with a key) links them. **There is no Spotify free-text search**, by decision.
+
+### Every result carries its facts (owner, 2026-10-07; UX-CAT-006)
+
+The stores' search rows carry no tempo and no contributors (Deezer's `/search/track` has neither;
+iTunes and MusicBrainz never give BPM; MusicBrainz rows have no cover), so until now every song
+arrived with `bpm: null`, features only when yt-dlp parsed them from a title, and the player filled BPM
+by itself with a JSONP lookup per row. Now the engine fills every page (`hydrateTracks`,
+`catalog/hydrate.ts`), and the three apps draw what it sends.
+
+- **After** every service's chunk and the cross-links, **before** `done`: the page's rows that still
+  lack a fact (`needsFacts`), the top 25 by rank, are looked up with at most **8 in flight** and
+  **6 s** for the whole page (`HYDRATE_CONCURRENCY`, `HYDRATE_BUDGET_MS`; `hydrateBudgetMs` in the
+  options; `hydrate: false` turns it off). The first chunk never waits. What was learned goes out as one
+  `results` chunk, `provider: null`, rows under the ids they arrived with; `?stream=0` folds it in.
+  `album()` and `artist()` fill their songs the same way within 4 s.
+- **Where each fact comes from**, per row, in order:
+  1. a Deezer source → `GET /track/{id}`: `bpm`, `contributors` → `artists`, `isrc`, `explicit_lyrics`,
+     `release_date`, `album.cover_xl`, `track_position`, `disk_number`, `album.title`, the preview;
+  2. else an ISRC → `GET /track/isrc:{isrc}` (the same record; the Deezer source joins the row with
+     `matchedBy: 'isrc'`);
+  3. else one exact Deezer search, `/search/track?q=<main artist> <title>&limit=5`, taken only for a hit
+     that is the same recording by the merger's own `sameRecording` (names, version, ±3 s) → its
+     `/track/{id}` (`matchedBy: 'metadata'`);
+  4. a MusicBrainz-only row still without a cover → the Cover Art Archive,
+     `GET /release/{first release mbid}/front-500` with redirects **unfollowed**: 307 means the cover
+     exists (the address is kept as `artworkUrl`; an `<img>` follows the hop to archive.org), 404 means
+     none. The release id is remembered beside the row when MusicBrainz's search is parsed
+     (`releaseOfRecording`). Measured 2026-10-07: the archive answers CORS too.
+  iTunes rows keep their 600 px artwork and their own credit line; `fillTrack` fills **only nulls**, the
+  fuller date wins, the credit list grows only when the detail names more people, and a video or upload
+  thumbnail (YouTube, YouTube Music, SoundCloud as the row's only platforms) gives way to the store's
+  square cover, as the merger's rule has it.
+- **Caching and quota**: a day, keyed by `deezer:<id>`, `isrc:<ISRC>` and the name searched
+  (`factsCache`, 3000 entries; the Cover Art Archive by release id, `coverCache`). A detail is kept under
+  its ISRC too, so a later row that knows only the ISRC asks nothing. Deezer's quota error (code 4)
+  ends the page's Deezer lookups and rests the service as a search would (`health.restUntil`); a
+  service switched off, cooling down or left out of the search's `providers` is not asked.
+- `CatalogRequestInit.redirect: 'manual'` is new: the hub's `SafeHttpClient` honours it with
+  `followRedirects: false`, the helper's guarded fetch returns the 3xx as the answer, the player's
+  browser fetch maps an `opaqueredirect` to a 307.
+- **What the apps draw**: `creditLine(track)` (`catalog/view.ts`) — the main artist, then "feat. A & B"
+  from `artists[1..]` when the artist line does not already name them, four at most then "& others" —
+  on the row and the song page of all three; a small "E" beside an explicit song's title (the player's
+  `.srch__x`; the hub and companion already had `.cap--x`). The player's own tempo lookup
+  (`enrichTempo`) runs only once the search is `done`, for rows still without a BPM.
+- Tests: `catalog-hydrate.test.ts` (fixtures `deezer-track.json` and `deezer-isrc.json` are
+  `/track/{id}` answers recorded 2026-10-06/07 and trimmed; the archive's 307/404 answered inline),
+  the hub's `catalog.test.ts` ("a page's rows carry bpm…"), the player's `catalog-search.spec.ts`
+  ("the engine's last chunk fills a row in place…"), and both DOM suites' credit line on "Harbour Wall".
 
 ### Resolve, collections and saving (owner requirements)
 

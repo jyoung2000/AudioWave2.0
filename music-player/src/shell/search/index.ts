@@ -556,7 +556,9 @@ export function installSearch(): SearchApi {
     else renderSong(v);
     if (hot >= options.length) hot = options.length - 1;
     applyHot();
-    enrichTempo();
+    // The engine fills a page's facts itself (UX-CAT-006): the browser's own tempo lookup is the
+    // fallback for what is still missing once the search is done, never a race with it.
+    if ((v.kind !== 'results' && v.kind !== 'type') || res.done) enrichTempo();
   }
 
   /** The overview: a short group per type with "See all N", and no pager (NP-FIND-003). */
@@ -1769,6 +1771,8 @@ export function installSearch(): SearchApi {
   body.addEventListener('pointercancel', cancelPress);
 
   /* ----------------------------------------------- tempo, lent from Deezer */
+  // A fallback (UX-CAT-006): the engine's hydration fills bpm on every server and in this browser;
+  // this asks Deezer only for the rows still without one after `done` (an older hub's rows).
 
   const bpmCache = new Map<string, Promise<{ bpm: number | null; d: number | null }>>();
   function enrichTempo(): void {

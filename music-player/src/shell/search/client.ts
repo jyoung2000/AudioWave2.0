@@ -331,7 +331,13 @@ const browserFetch: CatalogFetch = async (url, init) => {
   const host = new URL(url).hostname;
   if (host === 'api.deezer.com') return answered(await jsonp(url, 9000, init.signal));
   try {
-    return await fetch(url, { signal: init.signal, headers: { Accept: 'application/json' } });
+    const res = await fetch(url, {
+      signal: init.signal,
+      headers: { Accept: 'application/json' },
+      ...(init.redirect ? { redirect: init.redirect } : {}),
+    });
+    // A redirect left unfollowed is opaque to a page (status 0): say what it was, a redirect.
+    return res.type === 'opaqueredirect' ? { ...answered(null), status: 307 } : res;
   } catch (err) {
     // iTunes has answered without CORS on some storefronts; it speaks JSONP too (`callback`).
     if (host === 'itunes.apple.com' && !init.signal.aborted)

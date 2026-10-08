@@ -160,7 +160,7 @@ export default {
     await page.fill('input[aria-label="Search for music"]', CATALOG_STOCK.query);
     await click('.srch__bar button[type="submit"]', { ms: 1500 });
     await until(searched, undefined, { what: 'the search results' });
-    await snap({ id: 'search-results', title: 'Search ▸ Results', group: 'Search', note: 'Every service’s state on one line (one resting, with when it is back); Songs, Artists and Albums, each row with its platforms, BPM, time, the explicit mark and a preview; See All.' });
+    await snap({ id: 'search-results', title: 'Search ▸ Results', group: 'Search', note: 'Every service’s state on one line (one resting, with when it is back); Songs, Artists and Albums, each row with its platforms, credit line (“feat. …” when a store lists a contributor), BPM, time, the explicit mark and a preview; See All.' });
     await click('.srch__bar button.push:has-text("Filter")', { ms: 600 });
     await snap({ id: 'search-filter', title: 'Search ▸ Filter (sheet)', group: 'Search', note: 'Which sections are shown and which services are asked, kept for this browser.', dismiss: 'search-results', dismissOutside: '.sheet' });
     await page.keyboard.press('Escape');

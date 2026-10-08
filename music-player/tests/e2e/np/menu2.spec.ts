@@ -69,9 +69,11 @@ test('Change Artist… opens a prefilled dialog, renames, and the focus follows 
   await page.click('#ctx [data-act="edit-artist"]'); await page.waitForTimeout(350);
   expect((await page.textContent('#sheetTitle')) === 'Change Artist' && (await page.textContent('#sheetCreate')) === 'Save', 'dialog retitled').toBe(true);
   expect((await page.inputValue('#sheetInput')).length, 'dialog prefilled').toBeGreaterThan(0);
-  await page.fill('#sheetInput', 'Fennel Grove Trio'); await page.click('#sheetCreate'); await page.waitForTimeout(400);
-  expect(await page.textContent('#toast'), 'artist renamed').toContain('Fennel Grove Trio');
-  expect(await page.textContent('#libScopeLabel'), 'focus followed the rename').toBe('Fennel Grove Trio');
+  await page.fill('#sheetInput', 'Fennel Grove Trio'); await page.click('#sheetCreate');
+  // The sheet closes, the rename lands and the HUD changes a beat later; on a slow runner a fixed
+  // 400 ms still read the "Showing …" HUD from the step before (CI, 2026-10-07). Waited for, not slept.
+  await expect(page.locator('#toast'), 'artist renamed').toContainText('Fennel Grove Trio', { timeout: 10_000 });
+  await expect(page.locator('#libScopeLabel'), 'focus followed the rename').toHaveText('Fennel Grove Trio', { timeout: 10_000 });
 });
 
 test('rename persists across reload', async ({ page }) => {

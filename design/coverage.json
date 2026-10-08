@@ -371,8 +371,14 @@
       "entry": "(React specimen, not served — DEC-019) typing in the status-bar search",
       "sourcePaths": ["music-player/src/components/SearchPopover.tsx"],
       "components": ["ProviderMark"],
-      "states": ["counting", "results", "none", "dismissed (arrow brings back)"],
-      "rules": ["UX-FEED-001", "UX-KEY-001"],
+      "states": [
+        "counting",
+        "results",
+        "none",
+        "dismissed (arrow brings back)",
+        "a row filled in by the engine’s last chunk: “feat. …”, BPM, the E mark and a cover arrive after the row (UX-CAT-006)"
+      ],
+      "rules": ["UX-FEED-001", "UX-KEY-001", "UX-CAT-006"],
       "guideAnchor": "overlays",
       "authority": "proposed"
     },
@@ -2339,7 +2345,8 @@
         "an artist: picture, top songs, albums (more as you scroll)",
         "a pasted playlist: its 2×2 mosaic, platform and length; opened like an album with every song; starred",
         "a link that cannot be read: the reason in words",
-        "a failure: the reason in words under the field"
+        "a failure: the reason in words under the field",
+        "a row filled in by the engine’s last chunk: the credit line (“feat. …”), BPM, the explicit mark and a cover arrive after the row (UX-CAT-006)"
       ],
       "rules": [
         "UX-SEARCH-001",
@@ -2353,7 +2360,8 @@
         "UX-CAT-002",
         "UX-CAT-003",
         "UX-CAT-004",
-        "UX-KEY-001"
+        "UX-KEY-001",
+        "UX-CAT-006"
       ],
       "guideAnchor": "screens",
       "mockup": "hub-search",
@@ -2430,7 +2438,8 @@
         "a pasted playlist: its 2×2 mosaic, platform and length; opened like an album with every song; starred",
         "a link that cannot be read: the reason in words",
         "a failure: the reason in words under the field",
-        "the helper not running: the reason in words"
+        "the helper not running: the reason in words",
+        "a row filled in by the engine’s last chunk: the credit line (“feat. …”), BPM, the explicit mark and a cover arrive after the row (UX-CAT-006)"
       ],
       "rules": [
         "UX-SEARCH-001",
@@ -2444,7 +2453,8 @@
         "UX-CAT-002",
         "UX-CAT-003",
         "UX-CAT-004",
-        "UX-KEY-001"
+        "UX-KEY-001",
+        "UX-CAT-006"
       ],
       "guideAnchor": "screens",
       "mockup": "companion-search",

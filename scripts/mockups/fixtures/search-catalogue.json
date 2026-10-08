@@ -1,5 +1,5 @@
 {
-  "about": "Stock songs for the player mockup's search: invented artists and albums, no real recordings. The capture answers the shell's catalog search, details, lyrics and pasted links (the companion's /helper/v1/catalog/*) from this list, and the mockup's search behaviour filters the same list as you type. Songs: t title, a artist, al album, d seconds, bpm, genre. Albums: year and label. Playlist: a pasted Spotify playlist made of stock songs. Playlists: public playlists the catalog's Playlists section lists (Deezer-style), each made of stock songs. Lyrics: invented lines for the song details.",
+  "about": "Stock songs for the player mockup's search: invented artists and albums, no real recordings. The capture answers the shell's catalog search, details, lyrics and pasted links (the companion's /helper/v1/catalog/*) from this list, and the mockup's search behaviour filters the same list as you type. Songs: t title, a artist, al album, d seconds, bpm, genre; feat (featured artists) and explicit where a store would say so (UX-CAT-006). Albums: year and label. Playlist: a pasted Spotify playlist made of stock songs. Playlists: public playlists the catalog's Playlists section lists (Deezer-style), each made of stock songs. Lyrics: invented lines for the song details.",
   "songs": [
     {
       "t": "Harbour Lights",
@@ -15,7 +15,9 @@
       "al": "Harbour Lights",
       "d": 187,
       "bpm": 120,
-      "genre": "Indie Pop"
+      "genre": "Indie Pop",
+      "feat": ["Ada Moss"],
+      "explicit": true
     },
     {
       "t": "Harbour Morning (Acoustic)",
