@@ -15,6 +15,7 @@
     "size": ["--aqua-"],
     "motion": ["--aqua-motion-"],
     "font": ["--aqua-font-"],
+    "algorithm": ["--np-algo-"],
     "airwave": ["--"]
   },
   "map": {

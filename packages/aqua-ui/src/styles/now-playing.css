@@ -26,6 +26,23 @@
   --np-bar-edge: rgb(31 41 45 / 22%);
   --np-bar-emboss: rgb(255 255 255 / 55%);
 
+  /* The twelve algorithm hues (NP-DISC-004): one per saved recommendation algorithm, never two
+     alike — the chip in the music list's silver bar, the menu's dots, the swatch in Settings.
+     Thirty degrees apart around the wheel at a lightness a white tick reads on; the shell
+     (music-player/scripts/make-shell.py) copies them from tokens.json. */
+  --np-algo-red: #c8403a;
+  --np-algo-orange: #d4782a;
+  --np-algo-gold: #b8961e;
+  --np-algo-olive: #7ca02a;
+  --np-algo-green: #3a9a5e;
+  --np-algo-teal: #1f9a8f;
+  --np-algo-cyan: #1d8fb8;
+  --np-algo-blue: #2f61c1;
+  --np-algo-indigo: #5c55c9;
+  --np-algo-violet: #8a4fc2;
+  --np-algo-magenta: #b9459b;
+  --np-algo-rose: #c94f6d;
+
   --np-page: #fff;
   --np-ink: #1b1c1f;
   --np-meta: #575757;

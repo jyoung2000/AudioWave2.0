@@ -32,6 +32,7 @@ import { toTrackRef } from '../state/store.js';
 import { registerServiceWorker } from '../lib/pwa.js';
 import type { RemoteSong, ShellAwsp } from './awsp.js';
 import type { SearchApi } from './search/index.js';
+import * as recommend from './recommend/rank.js';
 import { detectBackend } from '../lib/tool-backend.js';
 import { runFetch, ToolError } from '../lib/tools-core.js';
 import type { SavedHelper } from '../lib/fetch-helper.js';
@@ -79,6 +80,11 @@ export interface ShellSong {
   bpm: number | null;
   platform: string;
   url: string | null;
+  /** What the recommender reads besides the above (NP-DISC-001): the file's genre, its release date and the day it reached the library. */
+  genre: string | null;
+  date: string | null;
+  added: string | null;
+  liked: boolean;
   /** Not in the shell's own rows: says the file is on this device, so the transport can play it. */
   local: true;
 }
@@ -124,6 +130,8 @@ declare global {
     NP_BRIDGE?: { version: number; log: string[] };
     /** Resolves with the header search once its lazy chunk has installed itself (NP-FIND-*), or null. */
     NP_SEARCH_READY?: Promise<SearchApi | null>;
+    /** The recommendation ranker (src/shell/recommend, NP-DISC-001): Discover and the Settings preview rank through it. */
+    NP_RECOMMEND?: typeof recommend;
     __npStart?: () => void;
     outputVolume?: number;
   }
@@ -240,9 +248,13 @@ function rowOf(track: Track): ShellSong {
     artist: track.artistName ?? '',
     album: track.albumName ?? '',
     duration: Math.round((track.durationMs ?? 0) / 1000),
-    bpm: null,
+    bpm: track.bpm ?? null,
     platform: 'This device',
     url: null,
+    genre: track.genre ?? null,
+    date: track.releaseDate ?? (track.year ? String(track.year) : null),
+    added: track.createdAt ?? null,
+    liked: !!track.liked,
     local: true,
   };
 }
@@ -464,6 +476,9 @@ async function boot(): Promise<void> {
   installTools(db);
   window.NP_HUB = { status: () => hub.getStatus() };
   window.LIBRARY = await loadRows(db);
+  // The ranker Discover and the Settings preview share (NP-DISC-001): pure functions, a few KB, in
+  // the first load because Discover is one click from the first screen.
+  window.NP_RECOMMEND = recommend;
   window.NP_BRIDGE = { version: 1, log };
   // Streaming from a PC: a lazy chunk, and never in the single-file build — a file:// page has no
   // service worker to be the bridge, and the wasm client would be megabytes inlined for nothing.
