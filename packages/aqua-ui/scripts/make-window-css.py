@@ -65,8 +65,71 @@ assert len(extra) > 20, 'the hub design should add tiles, tables and the gate'
 # The designs are frozen history (design/decisions.md DEC-038): a change to the window kit is made
 # here, as an edit to what was copied out, asserted against the exact text it replaces so a drift
 # is a loud failure, the way music-player/scripts/make-shell.py records the player's.
-# Each entry is (output file, old text, new text). None yet: both sheets are the designs' own.
-EDITS: list[tuple[str, str, str]] = []
+# Each entry is (output file, old text, new text).
+EDITS: list[tuple[str, str, str]] = [
+    # The search's row menu and type control (UX-SEARCH-009, UX-SEARCH-012; owner, 2026-10-07): the
+    # designs draw neither, and both windows need the same two, so they join the kit here — a 10.6
+    # contextual menu (white, the selection's blue under the pointer or the keys, a tick column, a
+    # submenu arrow, 44px commands on a touch screen) and a segmented control of push-button halves.
+    ('airwave-window.css', '/* the "this is a mockup" plate under the window */', '''/* ============================================================ menus
+   A contextual menu, as 10.6 drew one: a white sheet with a soft shadow,
+   commands 20px tall with a tick column, the selection's blue on the
+   command under the pointer or the keys, a separator, and a submenu that
+   hangs beside its command. Opened from a row's "…" or a right-click. */
+.menu {
+  position: fixed;
+  z-index: 40;
+  min-width: 200px;
+  max-width: min(320px, calc(100vw - 16px));
+  padding: 4px 0;
+  margin: 0;
+  list-style: none;
+  background: rgba(255,255,255,.97);
+  border: 1px solid rgba(0,0,0,.28);
+  border-radius: 5px;
+  box-shadow: 0 8px 22px rgba(0,0,0,.32), 0 1px 3px rgba(0,0,0,.2);
+  font-size: 12px;
+  color: var(--ink);
+}
+.menu--sub { position: absolute; top: -5px; left: 100%; }
+.menu--sub.is-flip { left: auto; right: 100%; }
+.menu__row { position: relative; }
+.menu__item {
+  appearance: none; border: 0; background: none; font: inherit; color: inherit;
+  display: flex; flex-wrap: wrap; align-items: center; column-gap: 6px;
+  width: 100%; min-height: 20px; padding: 1px 18px 1px 20px;
+  text-align: left; white-space: nowrap; cursor: default; position: relative;
+}
+.menu__item[aria-checked="true"]::before { content: "\\2713"; position: absolute; left: 6px; font-size: 11px; }
+.menu__item .menu__arrow { margin-left: auto; padding-left: 14px; font-size: 9px; }
+.menu__item:focus { outline: none; }
+.menu__item:not([aria-disabled="true"]):hover, .menu__item:not([aria-disabled="true"]):focus, .menu__item[aria-expanded="true"] {
+  background: linear-gradient(var(--sel-top), var(--sel-mid) 45%, var(--sel-bot));
+  color: var(--sel-ink);
+}
+.menu__item[aria-disabled="true"] { color: var(--ink-3); }
+.menu__note { flex-basis: 100%; font-size: 11px; white-space: normal; }
+.menu__sep { height: 1px; margin: 5px 0; background: var(--row-divider); }
+@media (pointer: coarse) { .menu__item { min-height: 44px; } }
+
+/* A segmented control of push-button halves: one choice of a few, held
+   down while it is the one shown (a tab list to a screen reader). */
+.seg { display: inline-flex; flex-wrap: wrap; border-radius: 11px; box-shadow: 0 1px 0 rgba(255,255,255,.6); }
+.seg__btn {
+  appearance: none; font: inherit; color: var(--aq-ink);
+  height: 22px; padding: 0 12px; margin: 0;
+  border: 1px solid var(--btn-edge); border-left-width: 0;
+  background: linear-gradient(var(--btn-top), var(--btn-mid) 55%, var(--btn-bot));
+  cursor: default; white-space: nowrap;
+}
+.seg__btn:first-child { border-left-width: 1px; border-radius: 11px 0 0 11px; padding-left: 14px; }
+.seg__btn:last-child { border-radius: 0 11px 11px 0; padding-right: 14px; }
+.seg__btn[aria-selected="true"] { background: linear-gradient(var(--chrome-lower), var(--chrome-upper)); box-shadow: inset 0 1px 3px rgba(0,0,0,.35); font-weight: 700; }
+.seg__btn:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--aq-ring), 0 0 2px 3px var(--aq-halo); position: relative; z-index: 1; }
+@media (pointer: coarse) { .seg__btn { height: 44px; } }
+
+/* the "this is a mockup" plate under the window */'''),
+]
 
 
 def edited(name: str, css: str) -> str:
