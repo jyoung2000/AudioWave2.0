@@ -212,9 +212,14 @@ const BUNDLES: Bundle[] = [
     name: 'hub-admin',
     distDir: join(repoRoot, 'docker-container', 'dist', 'web'),
     html: 'index.html',
-    // Currently 534KB, all of it the first load: the admin GUI is one screen behind a login.
+    // The admin GUI is one screen behind a login; Search is the one lazy chunk.
     entryBudgetKb: 560,
-    totalBudgetKb: 580,
+    // Measured 2026-10-09 (UX-SEARCH-007…012, DEC-040): 589KB in all — the entry 545KB (index JS
+    // 515KB, CSS 30KB, HTML 1KB, unchanged by the search) and the lazy Search chunk 43KB (13.7KB
+    // gzipped), which grew by about 14KB with a type's own page, Playlists and a song's menu. The
+    // first load is unchanged and still under its 560KB budget; the total moves from 580KB to 600KB
+    // for the chunk that loads only when Search is opened.
+    totalBudgetKb: 600,
     mustBeSplit: [],
   },
 ];
