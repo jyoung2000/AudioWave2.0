@@ -2314,7 +2314,8 @@
         "docker-container/src/web/lib/catalog.ts",
         "docker-container/src/web/lib/api.ts",
         "docker-container/src/web/styles.css",
-        "packages/domain/src/catalog/view.ts"
+        "packages/domain/src/catalog/view.ts",
+        "docker-container/src/web/lib/menu.tsx"
       ],
       "components": [
         "Group",
@@ -2328,18 +2329,28 @@
         ".well of .rows list boxes",
         ".cap chips",
         ".art covers and 2×2 mosaic",
-        ".pager",
+        ".srch__foot (‹ › and “Page N of M”)",
         ".kv",
-        ".lyrics"
+        ".lyrics",
+        ".seg segmented control (tab list)",
+        ".menu contextual menu (window kit)"
       ],
       "states": [
         "nothing asked yet: the field, Track/Artist/Album, Filter…",
         "searching: every service “asking…”, rows folding in as each answers",
+        "the calm overview, centred under the field: Songs (five), Artists, Albums and Playlists (three each), each with “See all N”, no pager, the services’ line under them (UX-SEARCH-007, UX-SEARCH-011)",
         "done: each service’s state in words (one resting, with when it is back) and the platforms that only gave links",
-        "Songs, Artists and Albums, eight a page, with Previous, numbers, Next and “Page 1 of 2 or more”",
         "a section with nothing (“No songs.”) and a filtered search (“Showing … from …”)",
-        "Filter… (sheet): sections and services; refuses a choice that shows nothing",
-        "See All: one section, loaded as you scroll, “That’s everything the services found.” at the end",
+        "Filter… (sheet): sections (Songs, Artists, Albums, Playlists) and services; refuses a choice that shows nothing",
+        "a type’s own page (See all): heading, Back, its own field, the Songs · Artists · Albums · Playlists control, the services’ line and the list (UX-SEARCH-009)",
+        "a type’s page reading on: the next offset at once, “Loading more…” as it scrolls, “That’s all N songs.” at the end",
+        "a type’s page footer: ‹ › and “Page N of M” (“M+” while more may exist), landing on a page’s first row, fetched first when needed",
+        "another type chosen in the control, or the type’s field searched: that type alone, from the start",
+        "Playlists: the starred ones first under “In your library”, then Deezer’s public playlists, twelve a page; one opened like an album (UX-SEARCH-010)",
+        "a song row’s menu (“…”, right-click, Shift+F10): Add to Up Next (▸ groups), Add to Playlist…, Add to Library…, Download…, Audition, Open Details (UX-SEARCH-012)",
+        "Add to Up Next: queued in a group (“Up Next in Studio: …, number 3.”), the hub’s reason when it could not, “Queueing needs a group” with none",
+        "Add to Library… / Add to Playlist… / Download… (sheet): the rights basis (and format), into the hub’s download queue; Add to Playlist says the hub keeps no playlists of its own",
+        "a song only a store has: nothing to queue or fetch, said in words",
         "a song: cover, platforms, preview, genre/label/year (looking it up…), synced or plain lyrics (or none, or instrumental), Download with the rights basis and what happened",
         "an album: cover, label, date, songs, the star",
         "an artist: picture, top songs, albums (more as you scroll)",
@@ -2361,7 +2372,12 @@
         "UX-CAT-003",
         "UX-CAT-004",
         "UX-KEY-001",
-        "UX-CAT-006"
+        "UX-CAT-006",
+        "UX-SEARCH-009",
+        "UX-SEARCH-010",
+        "UX-SEARCH-011",
+        "UX-SEARCH-012",
+        "UX-CAT-005"
       ],
       "guideAnchor": "screens",
       "mockup": "hub-search",
@@ -2406,7 +2422,9 @@
         "windows-companion/src/renderer/search-kit.tsx",
         "windows-companion/src/renderer/styles.css",
         "windows-companion/src/main/catalog.ts",
-        "windows-companion/src/shared/ipc.ts"
+        "windows-companion/src/shared/ipc.ts",
+        "windows-companion/src/renderer/menu.tsx",
+        "windows-companion/src/main/hub.ts"
       ],
       "components": [
         "Group",
@@ -2420,18 +2438,28 @@
         ".well of .rows list boxes",
         ".cap chips",
         ".art covers and 2×2 mosaic",
-        ".pager",
+        ".srch__foot (‹ › and “Page N of M”)",
         ".kv",
-        ".lyrics"
+        ".lyrics",
+        ".seg segmented control (tab list)",
+        ".menu contextual menu (window kit)"
       ],
       "states": [
         "nothing asked yet: the field, Track/Artist/Album, Filter…",
         "searching: every service “asking…”, rows folding in as each answers",
+        "the calm overview, centred under the field: Songs (five), Artists, Albums and Playlists (three each), each with “See all N”, no pager, the services’ line under them (UX-SEARCH-007, UX-SEARCH-011)",
         "done: each service’s state in words (one resting, with when it is back) and the platforms that only gave links",
-        "Songs, Artists and Albums, eight a page, with Previous, numbers, Next and “Page 1 of 2 or more”",
         "a section with nothing (“No songs.”) and a filtered search (“Showing … from …”)",
-        "Filter… (sheet): sections and services; refuses a choice that shows nothing",
-        "See All: one section, loaded as you scroll, “That’s everything the services found.” at the end",
+        "Filter… (sheet): sections (Songs, Artists, Albums, Playlists) and services; refuses a choice that shows nothing",
+        "a type’s own page (See all): heading, Back, its own field, the Songs · Artists · Albums · Playlists control, the services’ line and the list (UX-SEARCH-009)",
+        "a type’s page reading on: the next offset at once, “Loading more…” as it scrolls, “That’s all N songs.” at the end",
+        "a type’s page footer: ‹ › and “Page N of M” (“M+” while more may exist), landing on a page’s first row, fetched first when needed",
+        "another type chosen in the control, or the type’s field searched: that type alone, from the start",
+        "Playlists: the starred ones first under “In your library”, then Deezer’s public playlists, twelve a page; one opened like an album (UX-SEARCH-010)",
+        "a song row’s menu (“…”, right-click, Shift+F10): Add to Up Next (▸ groups), Add to Playlist…, Add to Library…, Download…, Audition, Open Details (UX-SEARCH-012)",
+        "Add to Up Next: the paired hub’s group (the companion has no queue), its reason when it could not, or why there is no group (no hub, no permission, not in one)",
+        "Add to Library… / Add to Playlist… / Download… (sheet): the rights basis (and format), through the helper into this PC’s library; Add to Playlist says the companion keeps no playlists of its own",
+        "a song only a store has: nothing to queue or fetch, said in words",
         "a song: cover, platforms, preview, genre/label/year (looking it up…), synced or plain lyrics (or none, or instrumental), Download to this PC through the helper",
         "an album: cover, label, date, songs, the star",
         "an artist: picture, top songs, albums (more as you scroll)",
@@ -2454,7 +2482,12 @@
         "UX-CAT-003",
         "UX-CAT-004",
         "UX-KEY-001",
-        "UX-CAT-006"
+        "UX-CAT-006",
+        "UX-SEARCH-009",
+        "UX-SEARCH-010",
+        "UX-SEARCH-011",
+        "UX-SEARCH-012",
+        "UX-CAT-005"
       ],
       "guideAnchor": "screens",
       "mockup": "companion-search",
@@ -2825,19 +2858,22 @@
     },
     {
       "id": "flow-find-music",
-      "title": "Find music, open it, keep it or download it (hub and companion)",
+      "title": "Find music, open a type’s page, queue or keep a song, keep a playlist (hub and companion)",
       "preconditions": "The hub (signed in) or the companion with its helper running; no account or key anywhere.",
       "steps": [
         "Search ▸ type a song, an artist, an album, an ISRC or paste a link",
-        "Watch each service answer on the status line; page through Songs, Artists, Albums",
-        "Open a song: preview, genre, label, year, lyrics",
-        "Download it (hub: into the queue with the rights basis; companion: through the helper)",
+        "A calm overview arrives as each service answers, in one column under the field: five songs, three artists, albums and playlists, each with “See all N”; the services’ line under them",
+        "See all songs: the Songs page reads on as it scrolls; ‹ › or Page Up/Down move a page at a time; its own field searches songs alone; the control switches to Artists, Albums or Playlists",
+        "Playlists: the starred ones first, then Deezer’s public ones; open one like an album",
+        "A song’s “…” (or right-click, Shift+F10): Add to Up Next (a group’s queue — on the companion, the paired hub’s), Add to Library… or Add to Playlist… (with the rights basis), Download…, Audition — the status line confirms",
+        "Open a song: preview, genre, label, year, lyrics; download it (hub: into the queue with the rights basis; companion: through the helper)",
         "Or open an album or a pasted playlist and star it into the library"
       ],
       "failures": [
         "A service resting or failing: said on the status line, the others still answer",
         "A link that cannot be read: the reason in words",
-        "A song only in a store: Download says it cannot be fetched from anywhere",
+        "A song only in a store: nothing to queue or fetch, said in words",
+        "No group to queue to (or, on the companion, no hub paired): said in a sentence",
         "The companion’s helper not running: the reason, with where to fix it"
       ],
       "surfaces": ["hub-search", "hub-catalog", "companion-search"],
@@ -2849,7 +2885,11 @@
         "UX-SEARCH-005",
         "UX-SEARCH-007",
         "UX-CAT-002",
-        "UX-CAT-004"
+        "UX-CAT-004",
+        "UX-SEARCH-009",
+        "UX-SEARCH-010",
+        "UX-SEARCH-011",
+        "UX-SEARCH-012"
       ],
       "evidence": [
         "docker-container/tests/dom/search.dom.test.tsx",
@@ -2858,7 +2898,9 @@
         "docker-container/tests/integration/catalog.test.ts",
         "docker-container/tests/e2e/search.spec.ts",
         "packages/domain/tests/unit/catalog-one-row.test.ts",
-        "packages/domain/tests/unit/catalog-paging.test.ts"
+        "packages/domain/tests/unit/catalog-paging.test.ts",
+        "windows-companion/tests/integration/companion-and-hub.test.ts",
+        "packages/domain/tests/unit/catalog-view.test.ts"
       ]
     }
   ],

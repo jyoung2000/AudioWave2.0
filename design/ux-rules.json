@@ -2922,7 +2922,9 @@
         "packages/contracts/src/api/catalog.ts",
         "packages/domain/src/catalog/engine.ts",
         "packages/domain/src/catalog/merge.ts",
-        "packages/domain/src/catalog/providers/deezer.ts"
+        "packages/domain/src/catalog/providers/deezer.ts",
+        "docker-container/src/web/views/Search.tsx",
+        "windows-companion/src/renderer/views/Search.tsx"
       ],
       "evidence": [
         {
@@ -3026,7 +3028,7 @@
       "id": "UX-SEARCH-001",
       "group": "search",
       "title": "One field finds music; the advanced fields fold back into it; the filter is kept",
-      "contract": "The Search tool takes free text, an ISRC or a pasted link from any platform. Track, Artist and Album are an expandable set of fields; put away, whatever they hold is folded back into the one line, so nothing typed is lost. Filter… is a sheet choosing the sections shown (Songs, Artists, Albums) and the services asked; it will not take a choice that shows nothing, and it is kept — per browser on the hub, in the companion’s settings store — and searching again applies it at once. Search is disabled, with the reason, until there is something to look for.",
+      "contract": "The Search tool takes free text, an ISRC or a pasted link from any platform. Track, Artist and Album are an expandable set of fields; put away, whatever they hold is folded back into the one line, so nothing typed is lost. Filter… is a sheet choosing the sections shown (Songs, Artists, Albums, Playlists) and the services asked; it will not take a choice that shows nothing, and it is kept — per browser on the hub, in the companion’s settings store — and searching again applies it at once. Search is disabled, with the reason, until there is something to look for.",
       "authority": "adopted",
       "owners": [
         "docker-container/src/web/views/Search.tsx",
@@ -3062,7 +3064,7 @@
       "id": "UX-SEARCH-002",
       "group": "search",
       "title": "Results arrive live, and every service’s state is said",
-      "contract": "Results fold in as each service answers (the NDJSON feed), upserted by id and ordered by rank, ties by arrival. One line under the field names each service with its lamp and its state in words — asking…, N found, nothing found, failed, took too long, resting (with when it is back), not asked — and the platforms that only contributed links; a live region says, once, how far the search has got and what it found.",
+      "contract": "Results fold in as each service answers (the NDJSON feed), upserted by id and ordered by rank, ties by arrival. One line under the results — under the overview’s groups, and on a type’s page between its control and its list — names each service with its lamp and its state in words — asking…, N found, nothing found, failed, took too long, resting (with when it is back), not asked — and the platforms that only contributed links; a live region says, once, how far the search has got and what it found (playlists among it when some came).",
       "authority": "adopted",
       "owners": [
         "docker-container/src/web/views/Search.tsx",
@@ -3098,7 +3100,7 @@
       "id": "UX-SEARCH-003",
       "group": "search",
       "title": "A row is music, and says where it is",
-      "contract": "Every song row shows its cover, title, credit line (`creditLine`: the main artist, then “feat. …” from the other credited names when the artist line does not already name them), album, time, BPM, an explicit mark and a play control for its 30-second preview (Apple Music or Deezer), and one chip per platform it is on; a song that plays only through Spotify says it plays from YouTube Music via spotDL. No row offers to “search on” a site. A song opens to its genre, label and year (MusicBrainz), its lyrics (synced when LRCLIB has them), its preview, and Download: on the hub into the queue with the rights basis, saying which source was chosen and what was written into the tags; on the companion through the helper, as every download on that PC. Those facts come with the search itself: the engine fills every page’s rows before done (UX-CAT-006 — Deezer’s detail, the Cover Art Archive), as one merge-only chunk the window folds in by id, so a row gains its BPM, its featured artists and its cover a moment after it first appeared; the song page says the same credit line.",
+      "contract": "Every song row shows its cover, title, credit line (`creditLine`: the main artist, then “feat. …” from the other credited names when the artist line does not already name them), album, time, BPM, an explicit mark, a play control for its 30-second preview (Apple Music or Deezer), its “…” (the row’s menu, UX-SEARCH-012), and one chip per platform it is on; a song that plays only through Spotify says it plays from YouTube Music via spotDL. No row offers to “search on” a site. A song opens to its genre, label and year (MusicBrainz), its lyrics (synced when LRCLIB has them), its preview, and Download: on the hub into the queue with the rights basis, saying which source was chosen and what was written into the tags; on the companion through the helper, as every download on that PC. Those facts come with the search itself: the engine fills every page’s rows before done (UX-CAT-006 — Deezer’s detail, the Cover Art Archive), as one merge-only chunk the window folds in by id, so a row gains its BPM, its featured artists and its cover a moment after it first appeared; the song page says the same credit line.",
       "authority": "adopted",
       "owners": [
         "docker-container/src/web/views/Search.tsx",
@@ -3246,8 +3248,8 @@
     {
       "id": "UX-SEARCH-007",
       "group": "search",
-      "title": "Songs, Artists and Albums come in pages",
-      "contract": "Each section of the results shows a page of eight with a pager: Previous, the page numbers (the current one marked), Next, and the count in words (“Page 2 of 3 or more”). The arrow keys move a page from anywhere in the pager, Home and End go to the first and the last loaded. Past what is loaded, Next asks the services for that section’s next offset while they say there is more. A page survives opening a row and coming Back. See All keeps infinite scroll.",
+      "title": "After a search, a calm overview: a few of each kind, “See all N”, and no pager",
+      "contract": "The owner’s words (2026-10-07, given for the player and carried to the hub and the companion): “don’t show pagination for the search list until the user clicks See all … it feels too hectic.” After a search the results are a calm overview: Songs (five), Artists (three), Albums (three) and Playlists (three) — the kinds the filter shows — each group ending in “See all N” (“See all 9+ songs”, N+ while the services say more may exist) that opens that type’s own page (UX-SEARCH-009). The services’ line sits under the groups (UX-SEARCH-002). The overview has no pager: no page numbers, no ‹ ›, no page count. Rows still fold in live as each service answers, one row per song. This replaces the numbered eight-row pager the overview had.",
       "authority": "adopted",
       "owners": [
         "docker-container/src/web/views/Search.tsx",
@@ -3260,30 +3262,31 @@
         {
           "type": "test",
           "path": "docker-container/tests/dom/search.dom.test.tsx",
-          "name": "pages Songs with numbers, Previous and Next and a count, by pointer or arrow keys, asking the services for the next offset at the end"
+          "name": "the overview is calm: five songs and three of the rest, each with “See all N”, the services under them, and no pager"
         },
         {
           "type": "test",
-          "path": "packages/domain/tests/unit/catalog-view.test.ts",
-          "name": "counts the pages loaded, says when there are more, and asks for the next offset only at the end"
+          "path": "docker-container/tests/e2e/search.spec.ts",
+          "name": "searches, opens a song and comes back with the keyboard alone, on stock answers"
         },
         {
           "type": "test",
           "path": "windows-companion/tests/dom/companion-search.dom.test.tsx",
-          "name": "pages Songs with numbers and Next, asking for the next offset at the end (UX-SEARCH-007)"
+          "name": "the overview has no pager; See all opens the Songs page, which reads on and moves a page at a time (UX-SEARCH-007, UX-SEARCH-009)"
         },
         {
           "type": "test",
-          "path": "docker-container/tests/dom/search.dom.test.tsx",
-          "name": "See All opens every song and loads the next page without repeating one"
+          "path": "packages/domain/tests/unit/catalog-view.test.ts",
+          "name": "shows a few of each kind on the overview and pages a type in 25 songs or 12 of the rest"
         }
-      ]
+      ],
+      "example": "“harbour”: Songs (5 of 9), See all 9+ songs; Artists (3), See all 3 artists; Albums (2), See all 2 albums; Playlists (3), See all 14 playlists; then iTunes 3 found · Deezer 6 found · … SoundCloud resting."
     },
     {
       "id": "UX-SEARCH-008",
       "group": "search",
       "title": "Search is keyboard-first and says where it is",
-      "contract": "Each list is a list box with one tab stop: the arrows, Page Up/Down, Home and End move the highlight, Enter opens, Space plays a song’s preview. Opening a row stacks a page with Back, and the focus moves to its heading; Escape goes back. The filter is a modal sheet: the focus starts in it, stays in it, and returns to Filter… when it closes. A live region carries the search’s progress.",
+      "contract": "Each list is a list box with one tab stop: the arrows, Home and End move the highlight, Page Up/Down move eight rows (on a type’s page they turn its pages, UX-SEARCH-009), Enter opens, Space plays a song’s preview, and Shift+F10 or the Menu key opens a song’s menu (UX-SEARCH-012). A type’s page has a tab list for its kinds (the arrows switch it) and a tab panel for its list; turning a page moves the keys to that page’s first row. Opening a row or a type stacks a page with Back, and the focus moves to its heading; Escape walks back a page, and on the overview puts the results away and gives the keys back to the field — never from a field being typed in, and a menu’s Escape closes only the menu. The filter is a modal sheet: the focus starts in it, stays in it, and returns to Filter… when it closes. A live region carries the search’s progress, and another the window’s confirmations.",
       "authority": "adopted",
       "owners": [
         "docker-container/src/web/views/Search.tsx",
@@ -3305,8 +3308,212 @@
         },
         {
           "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "Escape walks back a page, then puts the results away"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "the segmented control switches type, searching the new type alone for the same words"
+        },
+        {
+          "type": "test",
           "path": "docker-container/tests/e2e/search.spec.ts",
           "name": "searches, opens a song and comes back with the keyboard alone, on stock answers"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/e2e/search.spec.ts",
+          "name": "@a11y the search results, the filter sheet, a type page, a row’s menu and a song have no detectable violations"
+        }
+      ]
+    },
+    {
+      "id": "UX-SEARCH-009",
+      "group": "search",
+      "title": "One type per page: it scrolls on by itself, and ‹ › with “Page N of M” move it a page at a time",
+      "contract": "The owner’s words (2026-10-07): “The search list pagination should have arrows and let the user infinite scroll the search bar list, go to the next or previous page … these should have a separate search list page where the user can search for specifically that type of music media.” “See all” on the overview opens a page for that type alone — Songs, Artists, Albums or Playlists — in the same column, under Back: a heading, the count with the words searched (“31 songs for “harbour””, N+ while more may exist), a field of its own (“Search songs”, prefilled; Enter searches that type alone, `sections=<type>`, from offset 0), a segmented control (Songs · Artists · Albums · Playlists, a tab list) that searches the new type for the same words, the services’ line, and the list. From “See all” the page starts with the overview’s rows and asks that type’s next offset at once; afterwards it asks again whenever the end of the list comes near or the keys reach its last rows, while the services say more may exist (to their offset bound of 1000) — infinite scroll, “Loading more…” while a page is coming, and “That’s all N songs.” at the end. A song a later page brings again is not shown twice (by id and by `sameRecording`). The pager lives here alone, in a footer that stays put at the foot of the pane while the list scrolls: ‹ › and “Page N of M” (“M+” while more may exist). Pages are 25 songs, or 12 artists, albums or playlists; each row carries its page (`data-page`). ‹ › and Page Up/Down (from the list or the field) go to the previous or next page’s first row — fetching that page first when it has not arrived — and move the keys there; the count follows the scroll, and at the very end the last page is the one on show. Nothing is sliced from the first answer: later pages are fetched from the engine.",
+      "example": "“See all 9+ songs” → Songs: 31 songs for “harbour”, Page 1 of 2 (the next offset asked at once); › lands on song 26, Page 2 of 2; the Songs field with “harbour lights” ⏎ → GET …/catalog/search?q=harbour+lights&sections=tracks&limit=25, Page 1 of 1+; › asks offset 25 first, then lands on its first row.",
+      "authority": "adopted",
+      "owners": [
+        "docker-container/src/web/views/Search.tsx",
+        "docker-container/src/web/lib/catalog.ts",
+        "windows-companion/src/renderer/views/Search.tsx",
+        "windows-companion/src/renderer/catalog.ts",
+        "packages/domain/src/catalog/view.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "See all opens the Songs page: it reads on at once, ‹ › and Page Up/Down move a page and land on its first row"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "› past what has arrived fetches that page first, then lands on its first row"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "the segmented control switches type, searching the new type alone for the same words"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/e2e/search.spec.ts",
+          "name": "searches, opens a song and comes back with the keyboard alone, on stock answers"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-search.dom.test.tsx",
+          "name": "the overview has no pager; See all opens the Songs page, which reads on and moves a page at a time (UX-SEARCH-007, UX-SEARCH-009)"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-view.test.ts",
+          "name": "counts the pages loaded, says when there are more, and asks for the next offset only at the end"
+        }
+      ]
+    },
+    {
+      "id": "UX-SEARCH-010",
+      "group": "search",
+      "title": "Playlists are a type: Deezer’s public playlists, the starred ones first",
+      "contract": "Search lists playlists as it lists songs, artists and albums (UX-CAT-005): the filter has Playlists, the overview shows three with “See all N”, and the Playlists page lists them a page of twelve at a time. A playlist row shows its picture (or a 2×2 mosaic when the service gave four covers), its title, its platform chip and “Playlist on Deezer · owner · N songs”. Public playlists come from Deezer’s public API through the hub or the companion’s helper, keylessly. On the Playlists page the starred playlists whose title or owner holds the words searched sit first under “In your library” (the hub admin’s `/api/v1/catalog/saved`, the companion’s own store), “From the catalog” below. Choosing one opens it the way an album opens (UX-SEARCH-004): its link resolved page by page, every song, with the star (UX-SEARCH-005).",
+      "example": "Playlists: 14 playlists for “harbour” — In your library: ★ Harbour Mix (Playlist · Spotify · 6 songs); From the catalog: Harbour Evenings (Playlist on Deezer · Playlist Editor · 40 songs) … Page 1 of 2.",
+      "authority": "adopted",
+      "owners": [
+        "docker-container/src/web/views/Search.tsx",
+        "docker-container/src/web/lib/catalog.ts",
+        "windows-companion/src/renderer/views/Search.tsx",
+        "windows-companion/src/renderer/catalog.ts",
+        "packages/domain/src/catalog/view.ts",
+        "packages/domain/src/catalog/providers/deezer.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "Deezer’s public playlists, the starred ones first under “In your library”, and one opens like an album"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-search.dom.test.tsx",
+          "name": "Playlists is a type: the starred ones first, then Deezer’s, twelve a page (UX-SEARCH-010)"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/contract/catalog-ipc.test.ts",
+          "name": "a search can ask for playlists alone, and they reach the window in the chunks (UX-SEARCH-010)"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-view.test.ts",
+          "name": "says what a playlist is, and finds the starred ones for the words searched"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-view.test.ts",
+          "name": "folds playlists by id like every other kind"
+        }
+      ]
+    },
+    {
+      "id": "UX-SEARCH-011",
+      "group": "search",
+      "title": "One column, centred under the field: results, type pages and details open in it",
+      "contract": "The owner’s words (2026-10-07): “Update the search modal UI and UX to be centered under the search bar.” In the hub’s Search tab and the companion’s Search tool the search is one column, at most 720px wide and centred in the pane, with the field at its top: the overview, a type’s page with its sticky footer, and every detail — an album, an artist, a song, a playlist — open in that same column under the field, with Back. A narrow window narrows the column with it.",
+      "example": "Hub at 1280 px: the pane is 740 px wide, the column 720 px, its centre the pane’s; the Playlists page’s footer stays inside it at the foot of the pane.",
+      "authority": "adopted",
+      "owners": [
+        "docker-container/src/web/views/Search.tsx",
+        "docker-container/src/web/styles.css",
+        "windows-companion/src/renderer/views/Search.tsx",
+        "windows-companion/src/renderer/styles.css"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "docker-container/tests/e2e/search.spec.ts",
+          "name": "the results are one column centred under the field, and a type page and its footer stay in it"
+        }
+      ]
+    },
+    {
+      "id": "UX-SEARCH-012",
+      "group": "search",
+      "title": "A song from search goes to Up Next, a playlist or the library through the row’s menu",
+      "contract": "The owner’s words (2026-10-07): “ensure the user can add songs from search to their Now Playing queue, playlist, or music library.” Every song row — the overview, a type’s page, an album’s, a playlist’s or an artist’s songs — has a “…” at its end; a right-click, or Shift+F10 or the Menu key on the highlighted row, opens the same menu: the window kit’s contextual menu (`.menu` in airwave-window.css), keyboard-operable (the arrows, Home and End, Right and Left for a submenu, Enter and Space, Escape back to the list, Tab or a click away closes it; on a touch screen its commands are 44px tall). It offers Add to Up Next, Add to Playlist…, Add to Library…, Download…, Audition (Stop Audition while it plays; disabled, saying why, without a clip) and Open Details. Add to Up Next is a group’s queue — on the hub, `POST /api/v1/groups/:id/requests` with the song’s best fetchable link (YouTube Music, YouTube, SoundCloud, Bandcamp, spotDL), a submenu when there are several active groups; the companion has no queue of its own, so the paired hub’s groups it is in (`hub:groups`, `hub:request`), or a sentence saying queueing needs a group (no hub, no permission to join groups, not in one). A song only a store has says there is nothing to queue or fetch. Add to Library… is a download with a stated rights basis — on the hub into its download queue (`POST /api/v1/catalog/download`, Music ▸ Downloads, what the hub’s library is made of), on the companion through the helper’s own path into this PC’s library. Neither app keeps playlists of its own (the hub holds players’ shared copies; the companion holds synced copies it never changes), so Add to Playlist… says so in its sheet and adds the song to the library instead — no store is invented. Download… is the same with a choice of format. Every action confirms in the window’s status line, which is a live region.",
+      "example": "Hub: “Harbour Lights” ▸ … ▸ Add to Up Next ▸ Studio → POST /groups/…/requests {query: https://music.youtube.com/watch?v=…} → “Up Next in Studio: “Harbour Lights”, number 3.” Companion with no hub: “Queueing needs a group on a hub: this companion has no queue of its own. Pair a hub under Remote first.”",
+      "authority": "adopted",
+      "owners": [
+        "docker-container/src/web/views/Search.tsx",
+        "docker-container/src/web/lib/catalog.ts",
+        "windows-companion/src/renderer/views/Search.tsx",
+        "windows-companion/src/renderer/catalog.ts",
+        "packages/domain/src/catalog/view.ts",
+        "docker-container/src/web/lib/menu.tsx",
+        "windows-companion/src/renderer/menu.tsx",
+        "packages/aqua-ui/scripts/make-window-css.py",
+        "packages/aqua-ui/src/styles/airwave-window.css",
+        "windows-companion/src/main/hub.ts",
+        "windows-companion/src/shared/ipc.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "“…” opens it; Add to Up Next ▸ a group queues the song’s fetchable source through the group’s requests, and says so"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "right-click and Shift+F10 open it too; the keys walk it, and Escape gives the keys back to the list"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "Add to Library and Download… go to the hub’s queue with a rights basis; Add to Playlist says the hub keeps none"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "a song only a store has says there is nothing to fetch; with no group, queueing says it needs one"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "Audition plays the clip and then reads Stop Audition"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/e2e/search.spec.ts",
+          "name": "a song row’s “…” and right-click open its menu; the keys walk it and Add to Library asks for the rights basis"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-search.dom.test.tsx",
+          "name": "a song row’s “…”: Add to Up Next goes to the paired hub’s group, Add to Library through the helper with a basis (UX-SEARCH-012)"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-search.dom.test.tsx",
+          "name": "with no hub paired, Up Next says plainly that queueing needs a group (UX-SEARCH-012)"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/contract/catalog-ipc.test.ts",
+          "name": "a group is an id and a name; a request names the group by id and the song by its link or its name"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/integration/companion-and-hub.test.ts",
+          "name": "lists the groups this companion is in, and a request comes back with the hub’s own answer"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/integration/companion-and-hub.test.ts",
+          "name": "says why there is no group to offer: no hub, or no permission to join groups"
         }
       ]
     },
