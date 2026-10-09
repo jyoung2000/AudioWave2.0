@@ -72,7 +72,9 @@ export const answers = {
   'helper:token': { token: null },
   // The Search tool (DEC-039): the stock catalog; a search and a resolve are answered live by apps/companion.mjs.
   'catalog:saved': CATALOG_STOCK.saved,
-  'catalog:filter': { sections: ['tracks', 'artists', 'albums'], providers: ['itunes', 'deezer', 'musicbrainz', 'youtube', 'soundcloud'] },
+  'catalog:filter': { sections: ['tracks', 'artists', 'albums', 'playlists'], providers: ['itunes', 'deezer', 'musicbrainz', 'youtube', 'soundcloud'] },
+  // Search ▸ a song's Add to Up Next: the companion has no queue, so the paired hub's group (the hub mockup's Kitchen).
+  'hub:groups': { items: [{ id: '01a10fe5-a06d-709d-9469-badda23fe07d', name: 'Kitchen' }], reason: null },
   'catalog:cancel': { ok: true },
   'catalog:album': { result: CATALOG_STOCK.album, reason: null },
   'catalog:artist': { result: CATALOG_STOCK.artist, reason: null },
@@ -96,7 +98,7 @@ export const answers = {
     hubFingerprint: '0E3B-A5CF-B84B-00D1-6248-DE87-59BD-297B',
     connected: true,
     reason: null,
-    scopes: ['library:read', 'library:share', 'files:serve'],
+    scopes: ['library:read', 'library:share', 'files:serve', 'group:member'],
     lastSyncAt: at(6),
   },
   'hub:sharing': { enabled: true },

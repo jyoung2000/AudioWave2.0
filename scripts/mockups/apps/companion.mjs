@@ -16,7 +16,7 @@ import { CATALOG_STOCK, resolveAnswer, searchChunks } from '../lib/stock-catalog
 
 const ORIGIN = 'http://127.0.0.1:47920';
 const TABS = ['library', 'search', 'live-tv', 'remote', 'settings'];
-const SEARCH = ['search-results', 'search-filter', 'search-song', 'search-link', 'search-playlist'];
+const SEARCH = ['search-results', 'search-row-menu', 'search-filter', 'search-song', 'search-see-all', 'search-playlists', 'search-link', 'search-playlist'];
 const ALL = [...TABS, 'settings-backup', 'library-remove-folder', ...SEARCH];
 
 /** The preload bridge, as the page sees it: each call is a request the mockup's router answers. */
@@ -67,12 +67,18 @@ const LINKS = [
   ...TABS.map((tab) => ({ selector: `#companion-tab-${tab}`, to: tab, in: ALL })),
   { selector: '#folders button[aria-label^="Remove "]', to: 'library-remove-folder', in: ['library'] },
   { selector: 'dialog.sheet button', to: 'library', in: ['library-remove-folder'] },
-  // Search (DEC-039): the results, the filter sheet, a song, a pasted playlist and the list it opens.
+  // Search (DEC-039, UX-SEARCH-007…012): the calm overview, a song row's menu, the filter sheet, a song, a
+  // type's own page (Songs) and the Playlists page, a pasted playlist and the list it opens.
   { selector: '.srch__bar button[type="submit"]', to: 'search-results', in: ['search'] },
+  { selector: '[role="listbox"][aria-label="Songs"] [data-menu]', to: 'search-row-menu', in: ['search-results'] },
   { selector: '.srch__bar button.push', text: 'Filter', to: 'search-filter', in: ['search-results'] },
   { selector: 'dialog.sheet--form .sheet__acts button', to: 'search-results', in: ['search-filter'] },
   { selector: '[role="listbox"][aria-label="Songs"] li', to: 'search-song', in: ['search-results'] },
-  { selector: '.srch__nav button', to: 'search-results', in: ['search-song'] },
+  { selector: '.srch__seeall button', text: 'songs', to: 'search-see-all', in: ['search-results'] },
+  { selector: '.srch__seeall button', text: 'playlists', to: 'search-playlists', in: ['search-results'] },
+  { selector: '.srch__seg button', text: 'Playlists', to: 'search-playlists', in: ['search-see-all'] },
+  { selector: '.srch__seg button', text: 'Songs', to: 'search-see-all', in: ['search-playlists'] },
+  { selector: '.srch__nav button', to: 'search-results', in: ['search-song', 'search-see-all', 'search-playlists'] },
   { selector: '[role="listbox"][aria-label="The playlist"] li', to: 'search-playlist', in: ['search-link'] },
   { selector: '.srch__nav button', to: 'search-link', in: ['search-playlist'] },
 ];
@@ -139,7 +145,13 @@ export default {
     await page.fill('input[aria-label="Search for music"]', CATALOG_STOCK.query);
     await click('.srch__bar button[type="submit"]', { ms: 1500 });
     await until(() => [...document.querySelectorAll('.srch [role="status"]')].some((s) => /^Done/.test(s.textContent ?? '')), undefined, { what: 'the search results' });
-    await snap({ id: 'search-results', title: 'Search ▸ Results', group: 'Search', note: 'Every service’s state on one line, the platforms that only gave links, and Songs, Artists and Albums in pages, each row with its platforms, credit line (“feat. …” when a store lists a contributor), BPM, time, the explicit mark and preview.' });
+    await snap({ id: 'search-results', title: 'Search ▸ Results', group: 'Search', note: 'The calm overview: five songs, three artists, albums and playlists, each with “See all N”, and no pager; each row with its platforms, credit line (“feat. …” when a store lists a contributor), BPM, time, the explicit mark, preview and its “…”; every service’s state on one line under them, and the platforms that only gave links.' });
+    // A song row's menu (UX-SEARCH-012): the companion has no queue, so Up Next is the paired hub's group.
+    await click('[role="listbox"][aria-label="Songs"] [data-menu]', { ms: 800 });
+    await until(() => Boolean(document.querySelector('.menu .menu__item')) && /Kitchen/.test(document.querySelector('.menu')?.textContent ?? ''), undefined, { what: 'the row menu with the hub’s group' });
+    await snap({ id: 'search-row-menu', title: 'Search ▸ A song’s menu', group: 'Search', note: 'A song row’s “…” (or a right-click, or Shift+F10): Add to Up Next (the paired hub’s group: the companion has no queue of its own), Add to Playlist… (it keeps none, so this PC’s library, said in its sheet), Add to Library…, Download…, Audition and Open Details.', dismiss: 'search-results', dismissOutside: '.menu' });
+    await page.keyboard.press('Escape');
+    await settle(400);
     await click('.srch__bar button.push:has-text("Filter")', { ms: 600 });
     await snap({ id: 'search-filter', title: 'Search ▸ Filter (sheet)', group: 'Search', note: 'Which sections are shown and which services are asked, kept on this PC.', dismiss: 'search-results', dismissOutside: '.sheet' });
     await page.keyboard.press('Escape');
@@ -147,6 +159,14 @@ export default {
     await click('[role="listbox"][aria-label="Songs"] li', { ms: 1500 });
     await until(() => Boolean(document.querySelector('.lyrics')), undefined, { what: 'the song' });
     await snap({ id: 'search-song', title: 'Search ▸ A song', group: 'Search', note: 'Genre, label and year, synced lyrics, the preview, and Download to this PC through the helper.' });
+    await click('.srch__nav button', { ms: 800 });
+    // A type's own page (UX-SEARCH-009) and the Playlists page (UX-SEARCH-010).
+    await click('.srch__seeall button:has-text("songs")', { ms: 1500 });
+    await until(() => document.querySelector('.srch__pageof')?.textContent === 'Page 1 of 2', undefined, { what: 'the Songs page' });
+    await snap({ id: 'search-see-all', title: 'Search ▸ Songs (a type’s page)', group: 'Search', note: 'See all: Songs alone, under Back — the count, a field that searches songs only, the Songs · Artists · Albums · Playlists control, the services’ line and the list, which reads on as it scrolls; the footer’s ‹ › and “Page 1 of 2” stay put and land on a page’s first row.' });
+    await click('.srch__seg button:has-text("Playlists")', { ms: 1500 });
+    await until(() => document.querySelectorAll('[role="listbox"][aria-label="Playlists from the catalog"] li').length === 14, undefined, { what: 'the Playlists page' });
+    await snap({ id: 'search-playlists', title: 'Search ▸ Playlists', group: 'Search', note: 'Playlists as a type: the one starred on this PC first, under “In your library”, then Deezer’s public playlists, twelve a page; one opens like an album.' });
     await click('.srch__nav button', { ms: 800 });
     await page.fill('input[aria-label="Search for music"]', CATALOG_STOCK.playlistUrl);
     await click('.srch__bar button[type="submit"]', { ms: 1500 });

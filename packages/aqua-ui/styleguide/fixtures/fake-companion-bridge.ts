@@ -19,7 +19,7 @@ import catalog from './catalog-stock.json';
  * search's chunks reach the window as `event:catalog-chunk`, as the main process sends them.
  */
 const listeners = new Map<string, Set<(payload: unknown) => void>>();
-const FILTER = { sections: ['tracks', 'artists', 'albums'], providers: ['itunes', 'deezer', 'musicbrainz', 'youtube', 'soundcloud'] };
+const FILTER = { sections: ['tracks', 'artists', 'albums', 'playlists'], providers: ['itunes', 'deezer', 'musicbrainz', 'youtube', 'soundcloud'] };
 const CATALOG: Record<string, (request: Record<string, unknown>) => unknown> = {
   'catalog:search': async (request) => {
     const q = String(request['q'] ?? '');
@@ -35,6 +35,8 @@ const CATALOG: Record<string, (request: Record<string, unknown>) => unknown> = {
   'catalog:enrich': () => ({ result: catalog.enrich, reason: null }),
   'catalog:saved': () => catalog.saved,
   'catalog:filter': () => FILTER,
+  // A song's Add to Up Next goes to a paired hub's group (UX-SEARCH-012): one, as the hub specimen has.
+  'hub:groups': () => ({ items: [{ id: '01a10fe5-a06d-709d-9469-badda23fe07d', name: 'Kitchen' }], reason: null }),
 };
 
 const RECORDED = recording as { recordedAt: string; channels: Record<string, unknown> };

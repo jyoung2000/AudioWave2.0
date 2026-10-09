@@ -15,7 +15,7 @@
  *     real one said; a change is refused with a sentence, which the view shows as it shows any
  *     refused action.
  */
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import * as Hub from '../../../docker-container/src/web/ui.js';
 import * as Companion from '../../../windows-companion/src/renderer/ui.js';
 import { BackupView as HubBackupView } from '../../../docker-container/src/web/views/Backup.js';
@@ -37,6 +37,31 @@ import { SettingsView } from '../../../windows-companion/src/renderer/views/Sett
 import { useChannel } from '../../../windows-companion/src/renderer/hooks.js';
 import type { TabIconId } from '../../../docker-container/src/web/icons.js';
 import { CompanionWindow, HubWindow } from './airwave-screens.js';
+
+/**
+ * A view shown one press in: once a button whose words are `press` appears inside it, it is pressed
+ * once — the way the guide opens a Search type's own page (UX-SEARCH-009) without the view knowing.
+ */
+function Pressed({ press, children }: { press: string; children: ReactNode }) {
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const node = box.current;
+    if (!node) return undefined;
+    let done = false;
+    const look = (): void => {
+      const button = done ? null : Array.from(node.querySelectorAll('button')).find((b) => b.textContent?.trim() === press && !b.disabled);
+      if (!button) return;
+      done = true;
+      observer.disconnect();
+      button.click();
+    };
+    const observer = new MutationObserver(look);
+    observer.observe(node, { childList: true, subtree: true, characterData: true, attributes: true });
+    look();
+    return () => observer.disconnect();
+  }, [press]);
+  return <div ref={box}>{children}</div>;
+}
 
 /* ====================================================================== hub */
 
@@ -72,6 +97,23 @@ export const HubNetworkScreen = () => <HubSections tab="system" sections={[{ id:
 export const HubBackupScreen = () => <HubSections tab="system" sections={[{ id: 'backup', title: 'Backup', view: <HubBackupView /> }]} />;
 /** Search, as a hub answers "harbour" from the stock catalog (the music services are not recorded). */
 export const HubSearchScreen = () => <HubSections tab="search" sections={[{ id: 'search', title: 'Search', view: <HubSearchView initialQuery="harbour" /> }]} />;
+/** The same, one press in: “See all 14 playlists” — Playlists as a type, the starred one first (UX-SEARCH-009, UX-SEARCH-010). */
+export const HubSearchPlaylistsScreen = () => (
+  <HubSections
+    tab="search"
+    sections={[
+      {
+        id: 'search',
+        title: 'Search',
+        view: (
+          <Pressed press="See all 14 playlists">
+            <HubSearchView initialQuery="harbour" />
+          </Pressed>
+        ),
+      },
+    ]}
+  />
+);
 export const HubMusicSearchScreen = () => <HubSections tab="music" sections={[{ id: 'catalog', title: 'Music search', view: <MusicSearchSettingsView /> }]} />;
 export const HubDiagnosticsScreen = () => <HubSections tab="system" sections={[{ id: 'diagnostics', title: 'Diagnostics', view: <DiagnosticsView /> }]} />;
 
@@ -140,6 +182,16 @@ export const CompanionSearchScreen = () => (
   <CompanionWindow tab="search" hubLine="No hub paired" dot="off" counts="0 folders · 0 playlists · 0 guides · 0 devices">
     <Sect id="search" title="Search">
       <CompanionSearchView initialQuery="harbour" />
+    </Sect>
+  </CompanionWindow>
+);
+/** The same, one press in: “See all 9+ songs” — the Songs page reading on, with its pager (UX-SEARCH-009). */
+export const CompanionSearchSongsScreen = () => (
+  <CompanionWindow tab="search" hubLine="No hub paired" dot="off" counts="0 folders · 0 playlists · 0 guides · 0 devices">
+    <Sect id="search" title="Search">
+      <Pressed press="See all 9+ songs">
+        <CompanionSearchView initialQuery="harbour" />
+      </Pressed>
     </Sect>
   </CompanionWindow>
 );
