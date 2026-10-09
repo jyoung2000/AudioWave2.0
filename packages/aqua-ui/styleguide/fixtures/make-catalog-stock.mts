@@ -23,6 +23,7 @@ import {
   SavedCollection,
   type CatalogAlbum,
   type CatalogArtist,
+  type CatalogPlaylist,
   type CatalogSource,
   type CatalogSourceStatus,
   type CatalogTrack,
@@ -311,6 +312,74 @@ const sessions = album(
   { releaseDate: '2025-11-02', year: 2025, trackCount: 6, rank: 100 },
 );
 
+/* Deezer's public playlists (UX-CAT-005): fourteen, so the Playlists page has two pages of twelve */
+const PLAYLIST_NAMES: Array<[string, string, number]> = [
+  ['Harbour Evenings', 'Playlist Editor', 40],
+  ['Harbour Lights & Friends', 'Pier Records', 18],
+  ['Quiet Harbour', 'Lantern Choir', 27],
+  ['Harbour Morning Coffee', 'Playlist Editor', 52],
+  ['Harbour Folk', 'Alder Quartet', 15],
+  ['Late Harbour Jazz', 'Birch Ensemble', 33],
+  ['Harbour Walks', 'Pier Records', 21],
+  ['Harbour Radio', 'Playlist Editor', 60],
+  ['Rainy Harbour', 'Night Ferry Radio', 24],
+  ['Harbour Classics', 'Playlist Editor', 75],
+  ['Harbour Dance Floor', 'Low Tide Signal', 30],
+  ['Harbour Sleep', 'Playlist Editor', 45],
+  ['Harbour Road Trip', 'Quiet Atlas', 38],
+  ['Harbour Acoustic', 'Velvet Orchard', 19],
+];
+const playlists: CatalogPlaylist[] = PLAYLIST_NAMES.map(([title, owner, trackCount], i) => {
+  const id = String(9401 + i);
+  return {
+    id: `deezer:${id}`,
+    title,
+    owner,
+    trackCount,
+    pictureUrl: coverFor(title),
+    covers: [],
+    sources: [src('deezer', id, `https://www.deezer.com/playlist/${id}`)],
+    rank: 100 - i,
+  };
+});
+
+/* See All ▸ Songs reads on: twenty more songs on the next page, so the Songs page has two pages of 25 */
+const MORE_SONGS: Array<[string, string, string, number, number | null]> = [
+  ['Harbour Bells', 'Quiet Atlas', 'Paper Maps', 201, 98],
+  ['Tidewater', 'Low Tide Signal', 'Coastal Static', 244, 84],
+  ['Harbour Glass', 'Velvet Orchard', 'Small Hours', 192, 104],
+  ['Salt Lanterns', 'Fennel Grove Trio', 'Brass & Bramble', 217, 90],
+  ['Pier at Dusk', 'Alder Quartet', 'First Light Sessions', 229, 72],
+  ['Harbour Rain', 'Cassette Bloom', 'Harbour Lights', 205, 112],
+  ['Mooring Lines', 'Birch Ensemble', 'Late Shift (Demos)', 263, 96],
+  ['Breakwater', 'Low Tide Signal', 'Coastal Static', 312, 78],
+  ['Harbour Clock', 'Quiet Atlas', 'Paper Maps', 188, 108],
+  ['Lighthouse Hymn', 'Alder Quartet', 'First Light Sessions', 246, 66],
+  ['Ferry Lights', 'Velvet Orchard', 'Small Hours', 199, 118],
+  ['Quayside', 'Fennel Grove Trio', 'Brass & Bramble', 176, 124],
+  ['Harbour Swim', 'Cassette Bloom', 'Harbour Lights', 214, 120],
+  ['Anchor Song', 'Birch Ensemble', 'Live at the Granary', 238, null],
+  ['Gull Weather', 'Quiet Atlas', 'Paper Maps', 207, 101],
+  ['Harbour Streets', 'Low Tide Signal', 'Coastal Static', 271, 88],
+  ['Low Water', 'Velvet Orchard', 'Small Hours', 183, 94],
+  ['Fog Signal', 'Fennel Grove Trio', 'Brass & Bramble', 222, 80],
+  ['Harbour Choir', 'Alder Quartet', 'First Light Sessions', 258, 70],
+  ['Dock Lamps', 'Cassette Bloom', 'Harbour Lights', 196, 116],
+];
+const moreSongs = MORE_SONGS.map(([title, artistName, albumName, seconds, bpm], i) =>
+  track(
+    `deezer:${9130 + i}`,
+    title,
+    artistName,
+    albumName,
+    seconds,
+    bpm,
+    [deezer(9130 + i)],
+    36 - i,
+    { releaseDate: '2024-04-12', year: 2024 },
+  ),
+);
+
 const at = (
   state: CatalogSourceStatus['state'],
   provider: CatalogSourceStatus['provider'],
@@ -383,6 +452,7 @@ const search = [
     ],
     artists: [bloom, birch],
     albums: [lightsAlbum],
+    playlists,
     status: statusAfter(2),
   },
   {
@@ -425,16 +495,16 @@ const search = [
       tracks: { offset: 0, limit: 25, hasMore: true },
       artists: { offset: 0, limit: 25, hasMore: false },
       albums: { offset: 0, limit: 25, hasMore: false },
-      playlists: null,
+      playlists: { offset: 0, limit: 25, hasMore: false },
     },
-    totals: { tracks: 9, artists: 3, albums: 2, playlists: 0 },
+    totals: { tracks: 9, artists: 3, albums: 2, playlists: 14 },
     resolve: null,
     // Spotify came only as MusicBrainz's link for one song: linked, not searched.
     linkedOnly: ['spotify'],
   },
 ];
 
-/* See All ▸ Songs, the next page: one song already shown (dropped by id), two more */
+/* See All ▸ Songs, the next page: one song already shown (dropped by id), twenty-two more */
 const page2 = [
   {
     type: 'results',
@@ -451,7 +521,7 @@ const page2 = [
     seq: 1,
     provider: 'deezer',
     query: QUERY,
-    tracks: [only(wall, ['deezer']), ferry],
+    tracks: [only(wall, ['deezer']), ferry, ...moreSongs],
     artists: [],
     albums: [],
     status: statusAfter(2),
@@ -477,7 +547,7 @@ const page2 = [
       albums: null,
       playlists: null,
     },
-    totals: { tracks: 3, artists: 0, albums: 0, playlists: 0 },
+    totals: { tracks: 23, artists: 0, albums: 0, playlists: 0 },
     resolve: null,
   },
 ];
@@ -539,7 +609,7 @@ const mix = {
 
 const document = {
   about:
-    'What a hub or a companion helper answers the music catalog for one search ("harbour"), a further page, a pasted Spotify playlist and an Apple Music playlist link, an album, an artist, a song’s lyrics and details, the saved list and the settings — invented music, drawn covers, previews never fetched. Written by make-catalog-stock.mts; every answer parsed by its contract.',
+    'What a hub or a companion helper answers the music catalog for one search ("harbour") with its fourteen public playlists, a further page of songs, a pasted Spotify playlist and an Apple Music playlist link, an album, an artist, a song’s lyrics and details, the saved list and the settings — invented music, drawn covers, previews never fetched. Written by make-catalog-stock.mts; every answer parsed by its contract.',
   recordedAt: RECORDED_AT,
   query: 'harbour',
   playlistUrl: PLAYLIST_URL,

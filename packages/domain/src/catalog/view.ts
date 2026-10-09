@@ -17,6 +17,7 @@ import {
   type CatalogCollection,
   type CatalogCollectionRef,
   type CatalogPlatform,
+  type CatalogPlaylist,
   type CatalogProviderId,
   type CatalogSearchChunk,
   type CatalogSearchDoneChunk,
@@ -36,13 +37,15 @@ export interface CatalogResults {
   tracks: CatalogTrack[];
   artists: CatalogArtist[];
   albums: CatalogAlbum[];
+  /** Public playlists (UX-CAT-005): Deezer's, when the search asked for the section. */
+  playlists: CatalogPlaylist[];
   /** Every service's latest state: from the first chunk on, replaced by each later one. */
   status: CatalogSourceStatus[];
   /** The closing chunk, once it has arrived: paging, totals, and a pasted link to resolve. */
   done: CatalogSearchDoneChunk | null;
 }
 
-export const EMPTY_RESULTS: CatalogResults = { tracks: [], artists: [], albums: [], status: [], done: null };
+export const EMPTY_RESULTS: CatalogResults = { tracks: [], artists: [], albums: [], playlists: [], status: [], done: null };
 
 /** Replace rows already shown, in place (so arrival order holds), and add new ones at the end. */
 export function upsertById<T extends { id: string }>(list: readonly T[], rows: readonly T[]): T[] {
@@ -66,6 +69,7 @@ export function foldCatalogChunk(state: CatalogResults, chunk: CatalogSearchChun
     tracks: upsertById(state.tracks, chunk.tracks),
     artists: upsertById(state.artists, chunk.artists),
     albums: upsertById(state.albums, chunk.albums),
+    playlists: upsertById(state.playlists, chunk.playlists),
     status: chunk.status.length ? chunk.status : state.status,
     done: state.done,
   };
@@ -97,10 +101,40 @@ export function appendTracks(shown: readonly CatalogTrack[], page: readonly Cata
   return appendPage(shown, page, sameRecording);
 }
 
-/* ------------------------------------------------------------------ pages of a section */
+/* ------------------------------------------------------------------ the overview and a type's page */
+
+/**
+ * The calm overview (UX-SEARCH-007, owner 2026-10-07): a few of each kind, each group ending in
+ * "See all N", and no pager. The same counts as the player's (NP-FIND-003).
+ */
+export const OVERVIEW_ROWS: Record<CatalogSearchSection, number> = { tracks: 5, artists: 3, albums: 3, playlists: 3 };
+
+/** A type's own page (UX-SEARCH-009) is paged in these: 25 songs, or 12 artists, albums or playlists. */
+export const TYPE_PAGE_ROWS: Record<CatalogSearchSection, number> = { tracks: 25, artists: 12, albums: 12, playlists: 12 };
+
+/** The kinds in the order every window shows them. */
+export const SEARCH_TYPES: readonly CatalogSearchSection[] = ['tracks', 'artists', 'albums', 'playlists'];
+
+const NOUNS: Record<CatalogSearchSection, [string, string]> = { tracks: ['song', 'songs'], artists: ['artist', 'artists'], albums: ['album', 'albums'], playlists: ['playlist', 'playlists'] };
+
+/** "12+ songs", "1 artist": a count with its kind, `+` while the services say there is more. */
+export function typeCount(section: CatalogSearchSection, n: number, more: boolean): string {
+  const [one, many] = NOUNS[section];
+  return `${n}${more ? '+' : ''} ${n === 1 && !more ? one : many}`;
+}
+
+/** The overview's way into a type's page: "See all 12+ songs". */
+export function seeAllText(section: CatalogSearchSection, n: number, more: boolean): string {
+  return `See all ${typeCount(section, n, more)}`;
+}
+
+/** The end of a type's page, once the services have nothing more: "That’s all 31 songs." */
+export function thatsAllText(section: CatalogSearchSection, n: number): string {
+  return `That’s all ${typeCount(section, n, false)}.`;
+}
 
 export interface SectionPages {
-  /** 0-based page shown. */
+  /** 0-based page on show. */
   page: number;
   /** Pages that can be drawn from the rows already loaded. */
   known: number;
@@ -110,14 +144,14 @@ export interface SectionPages {
   canNext: boolean;
   /** The next page needs rows the window has not loaded yet: ask the server for its next `offset`. */
   fetchForNext: boolean;
-  /** "Page 2 of 3", "Page 2 of 3 or more". */
+  /** "Page 2 of 3", "Page 2 of 3+" (the owner's words: M+ while more may exist). */
   label: string;
 }
 
 /**
- * Where a section's pager stands (UX-SEARCH-007): pages of `size` over the rows loaded so far, with
- * the services' `hasMore` saying whether there are pages past them. The rows of a page are
- * `rows.slice(page * size, page * size + size)`.
+ * Where a type page's pager stands (UX-SEARCH-009): pages of `size` over the rows loaded so far, with
+ * the services' `hasMore` saying whether there are pages past them. Page `n` starts at row
+ * `n * size`; ‹ › scroll to that row, and fetch first when `fetchForNext` says it has not arrived.
  */
 export function sectionPages(loaded: number, size: number, page: number, more: boolean): SectionPages {
   const known = Math.max(1, Math.ceil(loaded / size));
@@ -130,8 +164,23 @@ export function sectionPages(loaded: number, size: number, page: number, more: b
     canPrev: at > 0,
     canNext: !lastKnown || more,
     fetchForNext: lastKnown && more,
-    label: `Page ${at + 1} of ${known}${more ? ' or more' : ''}`,
+    label: `Page ${at + 1} of ${known}${more ? '+' : ''}`,
   };
+}
+
+/** "Playlist on Deezer · Playlist Editor · 40 songs" (NP-FIND-009). */
+export function playlistLine(playlist: Pick<CatalogPlaylist, 'sources' | 'owner' | 'trackCount'>): string {
+  const platform = playlist.sources[0] ? platformLabel(playlist.sources[0].platform) : null;
+  return [platform ? `Playlist on ${platform}` : 'Playlist', playlist.owner, playlist.trackCount === null ? null : count(playlist.trackCount, 'song')].filter(Boolean).join(' · ');
+}
+
+/**
+ * The starred lists a type's page shows first, "In your library": those of `kind` whose title or
+ * owner holds every word searched (all of them when nothing was typed).
+ */
+export function savedMatching(items: readonly SavedCollection[], kind: 'album' | 'playlist', words: string): SavedCollection[] {
+  const terms = words.toLowerCase().split(/\s+/).filter(Boolean);
+  return items.filter((item) => item.ref.kind === kind && terms.every((term) => `${item.ref.title} ${item.ref.owner ?? ''}`.toLowerCase().includes(term)));
 }
 
 /* ------------------------------------------------------------------ the services */
@@ -201,11 +250,12 @@ export function sourceStateText(status: CatalogSourceStatus, now: number): strin
 }
 
 /** The status line's one sentence for a screen reader: "Searching: 2 of 5 services have answered." */
-export function statusSummary(status: readonly CatalogSourceStatus[], done: boolean, totals?: { tracks: number; artists: number; albums: number }): string {
+export function statusSummary(status: readonly CatalogSourceStatus[], done: boolean, totals?: { tracks: number; artists: number; albums: number; playlists?: number }): string {
   if (!status.length) return '';
   const answered = status.filter((s) => s.state !== 'pending').length;
   if (!done) return `Searching: ${answered} of ${status.length} services have answered.`;
-  const found = totals ? [count(totals.tracks, 'song'), count(totals.artists, 'artist'), count(totals.albums, 'album')].join(', ') : null;
+  // Playlists are said only when some came: a search that did not ask for them has nothing to say.
+  const found = totals ? [count(totals.tracks, 'song'), count(totals.artists, 'artist'), count(totals.albums, 'album'), totals.playlists ? count(totals.playlists, 'playlist') : null].filter(Boolean).join(', ') : null;
   const trouble = status.filter((s) => s.state === 'failed' || s.state === 'timeout' || s.state === 'cooling-down').map((s) => CATALOG_PROVIDER_LABELS[s.provider]);
   return [`Done${found ? `: ${found}` : ''}.`, trouble.length ? `${trouble.join(', ')} did not answer.` : null].filter(Boolean).join(' ');
 }

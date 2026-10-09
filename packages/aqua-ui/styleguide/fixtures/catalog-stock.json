@@ -1,5 +1,5 @@
 {
-  "about": "What a hub or a companion helper answers the music catalog for one search (\"harbour\"), a further page, a pasted Spotify playlist and an Apple Music playlist link, an album, an artist, a song’s lyrics and details, the saved list and the settings — invented music, drawn covers, previews never fetched. Written by make-catalog-stock.mts; every answer parsed by its contract.",
+  "about": "What a hub or a companion helper answers the music catalog for one search (\"harbour\") with its fourteen public playlists, a further page of songs, a pasted Spotify playlist and an Apple Music playlist link, an album, an artist, a song’s lyrics and details, the saved list and the settings — invented music, drawn covers, previews never fetched. Written by make-catalog-stock.mts; every answer parsed by its contract.",
   "recordedAt": "2026-10-06T12:00:00.000Z",
   "query": "harbour",
   "playlistUrl": "https://open.spotify.com/playlist/0MockHarbourMix0000001",
@@ -493,7 +493,260 @@
           "rank": 130
         }
       ],
-      "playlists": [],
+      "playlists": [
+        {
+          "id": "deezer:9401",
+          "title": "Harbour Evenings",
+          "owner": "Playlist Editor",
+          "trackCount": 40,
+          "pictureUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCg2Myw1OCUsNjQlKSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iaHNsKDExMSw2MiUsMzAlKSIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSJ1cmwoI2cpIi8+PGNpcmNsZSBjeD0iMTQ2IiBjeT0iNTgiIHI9IjM2IiBmaWxsPSJoc2woMjQzLDcwJSw4OCUpIiBmaWxsLW9wYWNpdHk9Ii4zNSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSI5IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii41Ii8+PHRleHQgeD0iMTgiIHk9IjE3OCIgZm9udC1mYW1pbHk9IkhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMzAiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjkyIj5IRTwvdGV4dD48L3N2Zz4=",
+          "covers": [],
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9401",
+              "url": "https://www.deezer.com/playlist/9401",
+              "previewUrl": null,
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 100
+        },
+        {
+          "id": "deezer:9402",
+          "title": "Harbour Lights & Friends",
+          "owner": "Pier Records",
+          "trackCount": 18,
+          "pictureUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgzMDgsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgzNTYsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDEyOCw3MCUsODglKSIgZmlsbC1vcGFjaXR5PSIuMzUiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iOSIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuNSIvPjx0ZXh0IHg9IjE4IiB5PSIxNzgiIGZvbnQtZmFtaWx5PSJIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii45MiI+SEw8L3RleHQ+PC9zdmc+",
+          "covers": [],
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9402",
+              "url": "https://www.deezer.com/playlist/9402",
+              "previewUrl": null,
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 99
+        },
+        {
+          "id": "deezer:9403",
+          "title": "Quiet Harbour",
+          "owner": "Lantern Choir",
+          "trackCount": 27,
+          "pictureUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxMTIsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgxNjAsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDI5Miw3MCUsODglKSIgZmlsbC1vcGFjaXR5PSIuMzUiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iOSIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuNSIvPjx0ZXh0IHg9IjE4IiB5PSIxNzgiIGZvbnQtZmFtaWx5PSJIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii45MiI+UUg8L3RleHQ+PC9zdmc+",
+          "covers": [],
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9403",
+              "url": "https://www.deezer.com/playlist/9403",
+              "previewUrl": null,
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 98
+        },
+        {
+          "id": "deezer:9404",
+          "title": "Harbour Morning Coffee",
+          "owner": "Playlist Editor",
+          "trackCount": 52,
+          "pictureUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxODgsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgyMzYsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDgsNzAlLDg4JSkiIGZpbGwtb3BhY2l0eT0iLjM1Ii8+PGNpcmNsZSBjeD0iMTQ2IiBjeT0iNTgiIHI9IjkiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjUiLz48dGV4dCB4PSIxOCIgeT0iMTc4IiBmb250LWZhbWlseT0iSGVsdmV0aWNhLCBBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIzMCIgZm9udC13ZWlnaHQ9IjcwMCIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuOTIiPkhNPC90ZXh0Pjwvc3ZnPg==",
+          "covers": [],
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9404",
+              "url": "https://www.deezer.com/playlist/9404",
+              "previewUrl": null,
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 97
+        },
+        {
+          "id": "deezer:9405",
+          "title": "Harbour Folk",
+          "owner": "Alder Quartet",
+          "trackCount": 15,
+          "pictureUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxMDgsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgxNTYsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDI4OCw3MCUsODglKSIgZmlsbC1vcGFjaXR5PSIuMzUiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iOSIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuNSIvPjx0ZXh0IHg9IjE4IiB5PSIxNzgiIGZvbnQtZmFtaWx5PSJIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii45MiI+SEY8L3RleHQ+PC9zdmc+",
+          "covers": [],
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9405",
+              "url": "https://www.deezer.com/playlist/9405",
+              "previewUrl": null,
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 96
+        },
+        {
+          "id": "deezer:9406",
+          "title": "Late Harbour Jazz",
+          "owner": "Birch Ensemble",
+          "trackCount": 33,
+          "pictureUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgzOSw1OCUsNjQlKSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iaHNsKDg3LDYyJSwzMCUpIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiIGZpbGw9InVybCgjZykiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iMzYiIGZpbGw9ImhzbCgyMTksNzAlLDg4JSkiIGZpbGwtb3BhY2l0eT0iLjM1Ii8+PGNpcmNsZSBjeD0iMTQ2IiBjeT0iNTgiIHI9IjkiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjUiLz48dGV4dCB4PSIxOCIgeT0iMTc4IiBmb250LWZhbWlseT0iSGVsdmV0aWNhLCBBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIzMCIgZm9udC13ZWlnaHQ9IjcwMCIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuOTIiPkxIPC90ZXh0Pjwvc3ZnPg==",
+          "covers": [],
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9406",
+              "url": "https://www.deezer.com/playlist/9406",
+              "previewUrl": null,
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 95
+        },
+        {
+          "id": "deezer:9407",
+          "title": "Harbour Walks",
+          "owner": "Pier Records",
+          "trackCount": 21,
+          "pictureUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgyODYsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgzMzQsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDEwNiw3MCUsODglKSIgZmlsbC1vcGFjaXR5PSIuMzUiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iOSIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuNSIvPjx0ZXh0IHg9IjE4IiB5PSIxNzgiIGZvbnQtZmFtaWx5PSJIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii45MiI+SFc8L3RleHQ+PC9zdmc+",
+          "covers": [],
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9407",
+              "url": "https://www.deezer.com/playlist/9407",
+              "previewUrl": null,
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 94
+        },
+        {
+          "id": "deezer:9408",
+          "title": "Harbour Radio",
+          "owner": "Playlist Editor",
+          "trackCount": 60,
+          "pictureUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgyMDcsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgyNTUsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDI3LDcwJSw4OCUpIiBmaWxsLW9wYWNpdHk9Ii4zNSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSI5IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii41Ii8+PHRleHQgeD0iMTgiIHk9IjE3OCIgZm9udC1mYW1pbHk9IkhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMzAiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjkyIj5IUjwvdGV4dD48L3N2Zz4=",
+          "covers": [],
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9408",
+              "url": "https://www.deezer.com/playlist/9408",
+              "previewUrl": null,
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 93
+        },
+        {
+          "id": "deezer:9409",
+          "title": "Rainy Harbour",
+          "owner": "Night Ferry Radio",
+          "trackCount": 24,
+          "pictureUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxNyw1OCUsNjQlKSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iaHNsKDY1LDYyJSwzMCUpIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiIGZpbGw9InVybCgjZykiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iMzYiIGZpbGw9ImhzbCgxOTcsNzAlLDg4JSkiIGZpbGwtb3BhY2l0eT0iLjM1Ii8+PGNpcmNsZSBjeD0iMTQ2IiBjeT0iNTgiIHI9IjkiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjUiLz48dGV4dCB4PSIxOCIgeT0iMTc4IiBmb250LWZhbWlseT0iSGVsdmV0aWNhLCBBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIzMCIgZm9udC13ZWlnaHQ9IjcwMCIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuOTIiPlJIPC90ZXh0Pjwvc3ZnPg==",
+          "covers": [],
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9409",
+              "url": "https://www.deezer.com/playlist/9409",
+              "previewUrl": null,
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 92
+        },
+        {
+          "id": "deezer:9410",
+          "title": "Harbour Classics",
+          "owner": "Playlist Editor",
+          "trackCount": 75,
+          "pictureUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgyOTMsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgzNDEsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDExMyw3MCUsODglKSIgZmlsbC1vcGFjaXR5PSIuMzUiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iOSIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuNSIvPjx0ZXh0IHg9IjE4IiB5PSIxNzgiIGZvbnQtZmFtaWx5PSJIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii45MiI+SEM8L3RleHQ+PC9zdmc+",
+          "covers": [],
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9410",
+              "url": "https://www.deezer.com/playlist/9410",
+              "previewUrl": null,
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 91
+        },
+        {
+          "id": "deezer:9411",
+          "title": "Harbour Dance Floor",
+          "owner": "Low Tide Signal",
+          "trackCount": 30,
+          "pictureUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxNjMsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgyMTEsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDM0Myw3MCUsODglKSIgZmlsbC1vcGFjaXR5PSIuMzUiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iOSIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuNSIvPjx0ZXh0IHg9IjE4IiB5PSIxNzgiIGZvbnQtZmFtaWx5PSJIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii45MiI+SEQ8L3RleHQ+PC9zdmc+",
+          "covers": [],
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9411",
+              "url": "https://www.deezer.com/playlist/9411",
+              "previewUrl": null,
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 90
+        },
+        {
+          "id": "deezer:9412",
+          "title": "Harbour Sleep",
+          "owner": "Playlist Editor",
+          "trackCount": 45,
+          "pictureUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxODcsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgyMzUsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDcsNzAlLDg4JSkiIGZpbGwtb3BhY2l0eT0iLjM1Ii8+PGNpcmNsZSBjeD0iMTQ2IiBjeT0iNTgiIHI9IjkiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjUiLz48dGV4dCB4PSIxOCIgeT0iMTc4IiBmb250LWZhbWlseT0iSGVsdmV0aWNhLCBBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIzMCIgZm9udC13ZWlnaHQ9IjcwMCIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuOTIiPkhTPC90ZXh0Pjwvc3ZnPg==",
+          "covers": [],
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9412",
+              "url": "https://www.deezer.com/playlist/9412",
+              "previewUrl": null,
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 89
+        },
+        {
+          "id": "deezer:9413",
+          "title": "Harbour Road Trip",
+          "owner": "Quiet Atlas",
+          "trackCount": 38,
+          "pictureUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCg5LDU4JSw2NCUpIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSJoc2woNTcsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDE4OSw3MCUsODglKSIgZmlsbC1vcGFjaXR5PSIuMzUiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iOSIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuNSIvPjx0ZXh0IHg9IjE4IiB5PSIxNzgiIGZvbnQtZmFtaWx5PSJIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii45MiI+SFI8L3RleHQ+PC9zdmc+",
+          "covers": [],
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9413",
+              "url": "https://www.deezer.com/playlist/9413",
+              "previewUrl": null,
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 88
+        },
+        {
+          "id": "deezer:9414",
+          "title": "Harbour Acoustic",
+          "owner": "Velvet Orchard",
+          "trackCount": 19,
+          "pictureUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgzNTksNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCg0Nyw2MiUsMzAlKSIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSJ1cmwoI2cpIi8+PGNpcmNsZSBjeD0iMTQ2IiBjeT0iNTgiIHI9IjM2IiBmaWxsPSJoc2woMTc5LDcwJSw4OCUpIiBmaWxsLW9wYWNpdHk9Ii4zNSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSI5IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii41Ii8+PHRleHQgeD0iMTgiIHk9IjE3OCIgZm9udC1mYW1pbHk9IkhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMzAiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjkyIj5IQTwvdGV4dD48L3N2Zz4=",
+          "covers": [],
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9414",
+              "url": "https://www.deezer.com/playlist/9414",
+              "previewUrl": null,
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 87
+        }
+      ],
       "status": [
         {
           "provider": "itunes",
@@ -1030,9 +1283,9 @@
         "tracks": { "offset": 0, "limit": 25, "hasMore": true },
         "artists": { "offset": 0, "limit": 25, "hasMore": false },
         "albums": { "offset": 0, "limit": 25, "hasMore": false },
-        "playlists": null
+        "playlists": { "offset": 0, "limit": 25, "hasMore": false }
       },
-      "totals": { "tracks": 9, "artists": 3, "albums": 2, "playlists": 0 },
+      "totals": { "tracks": 9, "artists": 3, "albums": 2, "playlists": 14 },
       "resolve": null,
       "linkedOnly": ["spotify"]
     }
@@ -1169,6 +1422,586 @@
             }
           ],
           "rank": 40
+        },
+        {
+          "id": "deezer:9130",
+          "title": "Harbour Bells",
+          "artist": "Quiet Atlas",
+          "artists": ["Quiet Atlas"],
+          "album": "Paper Maps",
+          "albumArtist": "Quiet Atlas",
+          "durationMs": 201000,
+          "isrc": null,
+          "artworkUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgzMTQsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgyLDYyJSwzMCUpIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiIGZpbGw9InVybCgjZykiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iMzYiIGZpbGw9ImhzbCgxMzQsNzAlLDg4JSkiIGZpbGwtb3BhY2l0eT0iLjM1Ii8+PGNpcmNsZSBjeD0iMTQ2IiBjeT0iNTgiIHI9IjkiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjUiLz48dGV4dCB4PSIxOCIgeT0iMTc4IiBmb250LWZhbWlseT0iSGVsdmV0aWNhLCBBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIzMCIgZm9udC13ZWlnaHQ9IjcwMCIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuOTIiPlBNPC90ZXh0Pjwvc3ZnPg==",
+          "releaseDate": "2024-04-12",
+          "year": 2024,
+          "trackNumber": null,
+          "discNumber": 1,
+          "bpm": 98,
+          "explicit": false,
+          "genre": null,
+          "label": null,
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9130",
+              "url": "https://www.deezer.com/track/9130",
+              "previewUrl": "https://cdnt-preview.mockup.invalid/9130.mp3",
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 36
+        },
+        {
+          "id": "deezer:9131",
+          "title": "Tidewater",
+          "artist": "Low Tide Signal",
+          "artists": ["Low Tide Signal"],
+          "album": "Coastal Static",
+          "albumArtist": "Low Tide Signal",
+          "durationMs": 244000,
+          "isrc": null,
+          "artworkUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxOTYsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgyNDQsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDE2LDcwJSw4OCUpIiBmaWxsLW9wYWNpdHk9Ii4zNSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSI5IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii41Ii8+PHRleHQgeD0iMTgiIHk9IjE3OCIgZm9udC1mYW1pbHk9IkhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMzAiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjkyIj5DUzwvdGV4dD48L3N2Zz4=",
+          "releaseDate": "2024-04-12",
+          "year": 2024,
+          "trackNumber": null,
+          "discNumber": 1,
+          "bpm": 84,
+          "explicit": false,
+          "genre": null,
+          "label": null,
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9131",
+              "url": "https://www.deezer.com/track/9131",
+              "previewUrl": "https://cdnt-preview.mockup.invalid/9131.mp3",
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 35
+        },
+        {
+          "id": "deezer:9132",
+          "title": "Harbour Glass",
+          "artist": "Velvet Orchard",
+          "artists": ["Velvet Orchard"],
+          "album": "Small Hours",
+          "albumArtist": "Velvet Orchard",
+          "durationMs": 192000,
+          "isrc": null,
+          "artworkUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgyMyw1OCUsNjQlKSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iaHNsKDcxLDYyJSwzMCUpIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiIGZpbGw9InVybCgjZykiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iMzYiIGZpbGw9ImhzbCgyMDMsNzAlLDg4JSkiIGZpbGwtb3BhY2l0eT0iLjM1Ii8+PGNpcmNsZSBjeD0iMTQ2IiBjeT0iNTgiIHI9IjkiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjUiLz48dGV4dCB4PSIxOCIgeT0iMTc4IiBmb250LWZhbWlseT0iSGVsdmV0aWNhLCBBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIzMCIgZm9udC13ZWlnaHQ9IjcwMCIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuOTIiPlNIPC90ZXh0Pjwvc3ZnPg==",
+          "releaseDate": "2024-04-12",
+          "year": 2024,
+          "trackNumber": null,
+          "discNumber": 1,
+          "bpm": 104,
+          "explicit": false,
+          "genre": null,
+          "label": null,
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9132",
+              "url": "https://www.deezer.com/track/9132",
+              "previewUrl": "https://cdnt-preview.mockup.invalid/9132.mp3",
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 34
+        },
+        {
+          "id": "deezer:9133",
+          "title": "Salt Lanterns",
+          "artist": "Fennel Grove Trio",
+          "artists": ["Fennel Grove Trio"],
+          "album": "Brass & Bramble",
+          "albumArtist": "Fennel Grove Trio",
+          "durationMs": 217000,
+          "isrc": null,
+          "artworkUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxOTksNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgyNDcsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDE5LDcwJSw4OCUpIiBmaWxsLW9wYWNpdHk9Ii4zNSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSI5IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii41Ii8+PHRleHQgeD0iMTgiIHk9IjE3OCIgZm9udC1mYW1pbHk9IkhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMzAiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjkyIj5CQjwvdGV4dD48L3N2Zz4=",
+          "releaseDate": "2024-04-12",
+          "year": 2024,
+          "trackNumber": null,
+          "discNumber": 1,
+          "bpm": 90,
+          "explicit": false,
+          "genre": null,
+          "label": null,
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9133",
+              "url": "https://www.deezer.com/track/9133",
+              "previewUrl": "https://cdnt-preview.mockup.invalid/9133.mp3",
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 33
+        },
+        {
+          "id": "deezer:9134",
+          "title": "Pier at Dusk",
+          "artist": "Alder Quartet",
+          "artists": ["Alder Quartet"],
+          "album": "First Light Sessions",
+          "albumArtist": "Alder Quartet",
+          "durationMs": 229000,
+          "isrc": null,
+          "artworkUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxNTAsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgxOTgsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDMzMCw3MCUsODglKSIgZmlsbC1vcGFjaXR5PSIuMzUiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iOSIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuNSIvPjx0ZXh0IHg9IjE4IiB5PSIxNzgiIGZvbnQtZmFtaWx5PSJIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii45MiI+Rkw8L3RleHQ+PC9zdmc+",
+          "releaseDate": "2024-04-12",
+          "year": 2024,
+          "trackNumber": null,
+          "discNumber": 1,
+          "bpm": 72,
+          "explicit": false,
+          "genre": null,
+          "label": null,
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9134",
+              "url": "https://www.deezer.com/track/9134",
+              "previewUrl": "https://cdnt-preview.mockup.invalid/9134.mp3",
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 32
+        },
+        {
+          "id": "deezer:9135",
+          "title": "Harbour Rain",
+          "artist": "Cassette Bloom",
+          "artists": ["Cassette Bloom"],
+          "album": "Harbour Lights",
+          "albumArtist": "Cassette Bloom",
+          "durationMs": 205000,
+          "isrc": null,
+          "artworkUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxMjEsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgxNjksNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDMwMSw3MCUsODglKSIgZmlsbC1vcGFjaXR5PSIuMzUiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iOSIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuNSIvPjx0ZXh0IHg9IjE4IiB5PSIxNzgiIGZvbnQtZmFtaWx5PSJIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii45MiI+SEw8L3RleHQ+PC9zdmc+",
+          "releaseDate": "2024-04-12",
+          "year": 2024,
+          "trackNumber": null,
+          "discNumber": 1,
+          "bpm": 112,
+          "explicit": false,
+          "genre": null,
+          "label": null,
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9135",
+              "url": "https://www.deezer.com/track/9135",
+              "previewUrl": "https://cdnt-preview.mockup.invalid/9135.mp3",
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 31
+        },
+        {
+          "id": "deezer:9136",
+          "title": "Mooring Lines",
+          "artist": "Birch Ensemble",
+          "artists": ["Birch Ensemble"],
+          "album": "Late Shift (Demos)",
+          "albumArtist": "Birch Ensemble",
+          "durationMs": 263000,
+          "isrc": null,
+          "artworkUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxNzYsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgyMjQsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDM1Niw3MCUsODglKSIgZmlsbC1vcGFjaXR5PSIuMzUiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iOSIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuNSIvPjx0ZXh0IHg9IjE4IiB5PSIxNzgiIGZvbnQtZmFtaWx5PSJIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii45MiI+TFM8L3RleHQ+PC9zdmc+",
+          "releaseDate": "2024-04-12",
+          "year": 2024,
+          "trackNumber": null,
+          "discNumber": 1,
+          "bpm": 96,
+          "explicit": false,
+          "genre": null,
+          "label": null,
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9136",
+              "url": "https://www.deezer.com/track/9136",
+              "previewUrl": "https://cdnt-preview.mockup.invalid/9136.mp3",
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 30
+        },
+        {
+          "id": "deezer:9137",
+          "title": "Breakwater",
+          "artist": "Low Tide Signal",
+          "artists": ["Low Tide Signal"],
+          "album": "Coastal Static",
+          "albumArtist": "Low Tide Signal",
+          "durationMs": 312000,
+          "isrc": null,
+          "artworkUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxOTYsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgyNDQsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDE2LDcwJSw4OCUpIiBmaWxsLW9wYWNpdHk9Ii4zNSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSI5IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii41Ii8+PHRleHQgeD0iMTgiIHk9IjE3OCIgZm9udC1mYW1pbHk9IkhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMzAiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjkyIj5DUzwvdGV4dD48L3N2Zz4=",
+          "releaseDate": "2024-04-12",
+          "year": 2024,
+          "trackNumber": null,
+          "discNumber": 1,
+          "bpm": 78,
+          "explicit": false,
+          "genre": null,
+          "label": null,
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9137",
+              "url": "https://www.deezer.com/track/9137",
+              "previewUrl": "https://cdnt-preview.mockup.invalid/9137.mp3",
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 29
+        },
+        {
+          "id": "deezer:9138",
+          "title": "Harbour Clock",
+          "artist": "Quiet Atlas",
+          "artists": ["Quiet Atlas"],
+          "album": "Paper Maps",
+          "albumArtist": "Quiet Atlas",
+          "durationMs": 188000,
+          "isrc": null,
+          "artworkUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgzMTQsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgyLDYyJSwzMCUpIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiIGZpbGw9InVybCgjZykiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iMzYiIGZpbGw9ImhzbCgxMzQsNzAlLDg4JSkiIGZpbGwtb3BhY2l0eT0iLjM1Ii8+PGNpcmNsZSBjeD0iMTQ2IiBjeT0iNTgiIHI9IjkiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjUiLz48dGV4dCB4PSIxOCIgeT0iMTc4IiBmb250LWZhbWlseT0iSGVsdmV0aWNhLCBBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIzMCIgZm9udC13ZWlnaHQ9IjcwMCIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuOTIiPlBNPC90ZXh0Pjwvc3ZnPg==",
+          "releaseDate": "2024-04-12",
+          "year": 2024,
+          "trackNumber": null,
+          "discNumber": 1,
+          "bpm": 108,
+          "explicit": false,
+          "genre": null,
+          "label": null,
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9138",
+              "url": "https://www.deezer.com/track/9138",
+              "previewUrl": "https://cdnt-preview.mockup.invalid/9138.mp3",
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 28
+        },
+        {
+          "id": "deezer:9139",
+          "title": "Lighthouse Hymn",
+          "artist": "Alder Quartet",
+          "artists": ["Alder Quartet"],
+          "album": "First Light Sessions",
+          "albumArtist": "Alder Quartet",
+          "durationMs": 246000,
+          "isrc": null,
+          "artworkUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxNTAsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgxOTgsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDMzMCw3MCUsODglKSIgZmlsbC1vcGFjaXR5PSIuMzUiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iOSIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuNSIvPjx0ZXh0IHg9IjE4IiB5PSIxNzgiIGZvbnQtZmFtaWx5PSJIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii45MiI+Rkw8L3RleHQ+PC9zdmc+",
+          "releaseDate": "2024-04-12",
+          "year": 2024,
+          "trackNumber": null,
+          "discNumber": 1,
+          "bpm": 66,
+          "explicit": false,
+          "genre": null,
+          "label": null,
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9139",
+              "url": "https://www.deezer.com/track/9139",
+              "previewUrl": "https://cdnt-preview.mockup.invalid/9139.mp3",
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 27
+        },
+        {
+          "id": "deezer:9140",
+          "title": "Ferry Lights",
+          "artist": "Velvet Orchard",
+          "artists": ["Velvet Orchard"],
+          "album": "Small Hours",
+          "albumArtist": "Velvet Orchard",
+          "durationMs": 199000,
+          "isrc": null,
+          "artworkUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgyMyw1OCUsNjQlKSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iaHNsKDcxLDYyJSwzMCUpIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiIGZpbGw9InVybCgjZykiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iMzYiIGZpbGw9ImhzbCgyMDMsNzAlLDg4JSkiIGZpbGwtb3BhY2l0eT0iLjM1Ii8+PGNpcmNsZSBjeD0iMTQ2IiBjeT0iNTgiIHI9IjkiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjUiLz48dGV4dCB4PSIxOCIgeT0iMTc4IiBmb250LWZhbWlseT0iSGVsdmV0aWNhLCBBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIzMCIgZm9udC13ZWlnaHQ9IjcwMCIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuOTIiPlNIPC90ZXh0Pjwvc3ZnPg==",
+          "releaseDate": "2024-04-12",
+          "year": 2024,
+          "trackNumber": null,
+          "discNumber": 1,
+          "bpm": 118,
+          "explicit": false,
+          "genre": null,
+          "label": null,
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9140",
+              "url": "https://www.deezer.com/track/9140",
+              "previewUrl": "https://cdnt-preview.mockup.invalid/9140.mp3",
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 26
+        },
+        {
+          "id": "deezer:9141",
+          "title": "Quayside",
+          "artist": "Fennel Grove Trio",
+          "artists": ["Fennel Grove Trio"],
+          "album": "Brass & Bramble",
+          "albumArtist": "Fennel Grove Trio",
+          "durationMs": 176000,
+          "isrc": null,
+          "artworkUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxOTksNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgyNDcsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDE5LDcwJSw4OCUpIiBmaWxsLW9wYWNpdHk9Ii4zNSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSI5IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii41Ii8+PHRleHQgeD0iMTgiIHk9IjE3OCIgZm9udC1mYW1pbHk9IkhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMzAiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjkyIj5CQjwvdGV4dD48L3N2Zz4=",
+          "releaseDate": "2024-04-12",
+          "year": 2024,
+          "trackNumber": null,
+          "discNumber": 1,
+          "bpm": 124,
+          "explicit": false,
+          "genre": null,
+          "label": null,
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9141",
+              "url": "https://www.deezer.com/track/9141",
+              "previewUrl": "https://cdnt-preview.mockup.invalid/9141.mp3",
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 25
+        },
+        {
+          "id": "deezer:9142",
+          "title": "Harbour Swim",
+          "artist": "Cassette Bloom",
+          "artists": ["Cassette Bloom"],
+          "album": "Harbour Lights",
+          "albumArtist": "Cassette Bloom",
+          "durationMs": 214000,
+          "isrc": null,
+          "artworkUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxMjEsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgxNjksNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDMwMSw3MCUsODglKSIgZmlsbC1vcGFjaXR5PSIuMzUiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iOSIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuNSIvPjx0ZXh0IHg9IjE4IiB5PSIxNzgiIGZvbnQtZmFtaWx5PSJIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii45MiI+SEw8L3RleHQ+PC9zdmc+",
+          "releaseDate": "2024-04-12",
+          "year": 2024,
+          "trackNumber": null,
+          "discNumber": 1,
+          "bpm": 120,
+          "explicit": false,
+          "genre": null,
+          "label": null,
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9142",
+              "url": "https://www.deezer.com/track/9142",
+              "previewUrl": "https://cdnt-preview.mockup.invalid/9142.mp3",
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 24
+        },
+        {
+          "id": "deezer:9143",
+          "title": "Anchor Song",
+          "artist": "Birch Ensemble",
+          "artists": ["Birch Ensemble"],
+          "album": "Live at the Granary",
+          "albumArtist": "Birch Ensemble",
+          "durationMs": 238000,
+          "isrc": null,
+          "artworkUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCg4MSw1OCUsNjQlKSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iaHNsKDEyOSw2MiUsMzAlKSIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSJ1cmwoI2cpIi8+PGNpcmNsZSBjeD0iMTQ2IiBjeT0iNTgiIHI9IjM2IiBmaWxsPSJoc2woMjYxLDcwJSw4OCUpIiBmaWxsLW9wYWNpdHk9Ii4zNSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSI5IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii41Ii8+PHRleHQgeD0iMTgiIHk9IjE3OCIgZm9udC1mYW1pbHk9IkhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMzAiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjkyIj5MQTwvdGV4dD48L3N2Zz4=",
+          "releaseDate": "2024-04-12",
+          "year": 2024,
+          "trackNumber": null,
+          "discNumber": 1,
+          "bpm": null,
+          "explicit": false,
+          "genre": null,
+          "label": null,
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9143",
+              "url": "https://www.deezer.com/track/9143",
+              "previewUrl": "https://cdnt-preview.mockup.invalid/9143.mp3",
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 23
+        },
+        {
+          "id": "deezer:9144",
+          "title": "Gull Weather",
+          "artist": "Quiet Atlas",
+          "artists": ["Quiet Atlas"],
+          "album": "Paper Maps",
+          "albumArtist": "Quiet Atlas",
+          "durationMs": 207000,
+          "isrc": null,
+          "artworkUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgzMTQsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgyLDYyJSwzMCUpIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiIGZpbGw9InVybCgjZykiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iMzYiIGZpbGw9ImhzbCgxMzQsNzAlLDg4JSkiIGZpbGwtb3BhY2l0eT0iLjM1Ii8+PGNpcmNsZSBjeD0iMTQ2IiBjeT0iNTgiIHI9IjkiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjUiLz48dGV4dCB4PSIxOCIgeT0iMTc4IiBmb250LWZhbWlseT0iSGVsdmV0aWNhLCBBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIzMCIgZm9udC13ZWlnaHQ9IjcwMCIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuOTIiPlBNPC90ZXh0Pjwvc3ZnPg==",
+          "releaseDate": "2024-04-12",
+          "year": 2024,
+          "trackNumber": null,
+          "discNumber": 1,
+          "bpm": 101,
+          "explicit": false,
+          "genre": null,
+          "label": null,
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9144",
+              "url": "https://www.deezer.com/track/9144",
+              "previewUrl": "https://cdnt-preview.mockup.invalid/9144.mp3",
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 22
+        },
+        {
+          "id": "deezer:9145",
+          "title": "Harbour Streets",
+          "artist": "Low Tide Signal",
+          "artists": ["Low Tide Signal"],
+          "album": "Coastal Static",
+          "albumArtist": "Low Tide Signal",
+          "durationMs": 271000,
+          "isrc": null,
+          "artworkUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxOTYsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgyNDQsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDE2LDcwJSw4OCUpIiBmaWxsLW9wYWNpdHk9Ii4zNSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSI5IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii41Ii8+PHRleHQgeD0iMTgiIHk9IjE3OCIgZm9udC1mYW1pbHk9IkhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMzAiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjkyIj5DUzwvdGV4dD48L3N2Zz4=",
+          "releaseDate": "2024-04-12",
+          "year": 2024,
+          "trackNumber": null,
+          "discNumber": 1,
+          "bpm": 88,
+          "explicit": false,
+          "genre": null,
+          "label": null,
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9145",
+              "url": "https://www.deezer.com/track/9145",
+              "previewUrl": "https://cdnt-preview.mockup.invalid/9145.mp3",
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 21
+        },
+        {
+          "id": "deezer:9146",
+          "title": "Low Water",
+          "artist": "Velvet Orchard",
+          "artists": ["Velvet Orchard"],
+          "album": "Small Hours",
+          "albumArtist": "Velvet Orchard",
+          "durationMs": 183000,
+          "isrc": null,
+          "artworkUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgyMyw1OCUsNjQlKSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iaHNsKDcxLDYyJSwzMCUpIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiIGZpbGw9InVybCgjZykiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iMzYiIGZpbGw9ImhzbCgyMDMsNzAlLDg4JSkiIGZpbGwtb3BhY2l0eT0iLjM1Ii8+PGNpcmNsZSBjeD0iMTQ2IiBjeT0iNTgiIHI9IjkiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjUiLz48dGV4dCB4PSIxOCIgeT0iMTc4IiBmb250LWZhbWlseT0iSGVsdmV0aWNhLCBBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIzMCIgZm9udC13ZWlnaHQ9IjcwMCIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuOTIiPlNIPC90ZXh0Pjwvc3ZnPg==",
+          "releaseDate": "2024-04-12",
+          "year": 2024,
+          "trackNumber": null,
+          "discNumber": 1,
+          "bpm": 94,
+          "explicit": false,
+          "genre": null,
+          "label": null,
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9146",
+              "url": "https://www.deezer.com/track/9146",
+              "previewUrl": "https://cdnt-preview.mockup.invalid/9146.mp3",
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 20
+        },
+        {
+          "id": "deezer:9147",
+          "title": "Fog Signal",
+          "artist": "Fennel Grove Trio",
+          "artists": ["Fennel Grove Trio"],
+          "album": "Brass & Bramble",
+          "albumArtist": "Fennel Grove Trio",
+          "durationMs": 222000,
+          "isrc": null,
+          "artworkUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxOTksNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgyNDcsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDE5LDcwJSw4OCUpIiBmaWxsLW9wYWNpdHk9Ii4zNSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSI5IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii41Ii8+PHRleHQgeD0iMTgiIHk9IjE3OCIgZm9udC1mYW1pbHk9IkhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMzAiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjkyIj5CQjwvdGV4dD48L3N2Zz4=",
+          "releaseDate": "2024-04-12",
+          "year": 2024,
+          "trackNumber": null,
+          "discNumber": 1,
+          "bpm": 80,
+          "explicit": false,
+          "genre": null,
+          "label": null,
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9147",
+              "url": "https://www.deezer.com/track/9147",
+              "previewUrl": "https://cdnt-preview.mockup.invalid/9147.mp3",
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 19
+        },
+        {
+          "id": "deezer:9148",
+          "title": "Harbour Choir",
+          "artist": "Alder Quartet",
+          "artists": ["Alder Quartet"],
+          "album": "First Light Sessions",
+          "albumArtist": "Alder Quartet",
+          "durationMs": 258000,
+          "isrc": null,
+          "artworkUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxNTAsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgxOTgsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDMzMCw3MCUsODglKSIgZmlsbC1vcGFjaXR5PSIuMzUiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iOSIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuNSIvPjx0ZXh0IHg9IjE4IiB5PSIxNzgiIGZvbnQtZmFtaWx5PSJIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii45MiI+Rkw8L3RleHQ+PC9zdmc+",
+          "releaseDate": "2024-04-12",
+          "year": 2024,
+          "trackNumber": null,
+          "discNumber": 1,
+          "bpm": 70,
+          "explicit": false,
+          "genre": null,
+          "label": null,
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9148",
+              "url": "https://www.deezer.com/track/9148",
+              "previewUrl": "https://cdnt-preview.mockup.invalid/9148.mp3",
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 18
+        },
+        {
+          "id": "deezer:9149",
+          "title": "Dock Lamps",
+          "artist": "Cassette Bloom",
+          "artists": ["Cassette Bloom"],
+          "album": "Harbour Lights",
+          "albumArtist": "Cassette Bloom",
+          "durationMs": 196000,
+          "isrc": null,
+          "artworkUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxMjEsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgxNjksNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDMwMSw3MCUsODglKSIgZmlsbC1vcGFjaXR5PSIuMzUiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iOSIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuNSIvPjx0ZXh0IHg9IjE4IiB5PSIxNzgiIGZvbnQtZmFtaWx5PSJIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii45MiI+SEw8L3RleHQ+PC9zdmc+",
+          "releaseDate": "2024-04-12",
+          "year": 2024,
+          "trackNumber": null,
+          "discNumber": 1,
+          "bpm": 116,
+          "explicit": false,
+          "genre": null,
+          "label": null,
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "9149",
+              "url": "https://www.deezer.com/track/9149",
+              "previewUrl": "https://cdnt-preview.mockup.invalid/9149.mp3",
+              "matchedBy": "search"
+            }
+          ],
+          "rank": 17
         }
       ],
       "artists": [],
@@ -1367,7 +2200,7 @@
         "albums": null,
         "playlists": null
       },
-      "totals": { "tracks": 3, "artists": 0, "albums": 0, "playlists": 0 },
+      "totals": { "tracks": 23, "artists": 0, "albums": 0, "playlists": 0 },
       "resolve": null,
       "linkedOnly": []
     }

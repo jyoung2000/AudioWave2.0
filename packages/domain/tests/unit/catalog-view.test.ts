@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CatalogSearchChunk, CatalogSourceStatus, CatalogTrack } from '@now-playing/contracts';
-import { appendTracks, byRank, collapseFields, sectionPages, collectionLine, coverArt, EMPTY_RESULTS, embeddedText, foldCatalogChunk, formatDuration, parseLrc, playsFromText, previewOf, queryKind, retryText, savedCollectionOf, sourceDot, sourceStateText, statusSummary } from '@now-playing/domain/catalog';
+import { appendTracks, byRank, collapseFields, OVERVIEW_ROWS, playlistLine, savedMatching, seeAllText, sectionPages, thatsAllText, TYPE_PAGE_ROWS, typeCount, collectionLine, coverArt, EMPTY_RESULTS, embeddedText, foldCatalogChunk, formatDuration, parseLrc, playsFromText, previewOf, queryKind, retryText, savedCollectionOf, sourceDot, sourceStateText, statusSummary } from '@now-playing/domain/catalog';
 
 const track = (patch: Partial<CatalogTrack> & Pick<CatalogTrack, 'id' | 'title' | 'artist'>): CatalogTrack => ({
   artists: [],
@@ -47,12 +47,38 @@ describe('the live feed (UX-SEARCH-002)', () => {
   });
 });
 
-describe('pages of a section (UX-SEARCH-007)', () => {
+describe('the overview and a type’s page (UX-SEARCH-007, UX-SEARCH-009, UX-SEARCH-010)', () => {
   it('counts the pages loaded, says when there are more, and asks for the next offset only at the end', () => {
-    expect(sectionPages(25, 10, 0, true)).toMatchObject({ page: 0, known: 3, canPrev: false, canNext: true, fetchForNext: false, label: 'Page 1 of 3 or more' });
+    expect(sectionPages(25, 10, 0, true)).toMatchObject({ page: 0, known: 3, canPrev: false, canNext: true, fetchForNext: false, label: 'Page 1 of 3+' });
     expect(sectionPages(25, 10, 2, true)).toMatchObject({ page: 2, canPrev: true, canNext: true, fetchForNext: true });
     expect(sectionPages(25, 10, 2, false)).toMatchObject({ canNext: false, fetchForNext: false, label: 'Page 3 of 3' });
     expect(sectionPages(0, 10, 4, false)).toMatchObject({ page: 0, known: 1, label: 'Page 1 of 1' });
+  });
+
+  it('shows a few of each kind on the overview and pages a type in 25 songs or 12 of the rest', () => {
+    expect(OVERVIEW_ROWS).toEqual({ tracks: 5, artists: 3, albums: 3, playlists: 3 });
+    expect(TYPE_PAGE_ROWS).toEqual({ tracks: 25, artists: 12, albums: 12, playlists: 12 });
+    expect(seeAllText('tracks', 9, true)).toBe('See all 9+ songs');
+    expect(seeAllText('artists', 1, false)).toBe('See all 1 artist');
+    expect(typeCount('playlists', 14, false)).toBe('14 playlists');
+    expect(thatsAllText('tracks', 31)).toBe('That’s all 31 songs.');
+  });
+
+  it('says what a playlist is, and finds the starred ones for the words searched', () => {
+    const deezer = { platform: 'deezer' as const, id: '1', url: 'https://www.deezer.com/playlist/1', previewUrl: null, matchedBy: 'search' as const };
+    expect(playlistLine({ sources: [deezer], owner: 'Playlist Editor', trackCount: 40 })).toBe('Playlist on Deezer · Playlist Editor · 40 songs');
+    expect(playlistLine({ sources: [deezer], owner: null, trackCount: null })).toBe('Playlist on Deezer');
+    const kept = (kind: 'album' | 'playlist', title: string, owner: string | null) => ({ ref: { platform: 'spotify' as const, kind, id: title, url: `https://open.spotify.com/${kind}/${title}`, title, owner }, savedAt: '2026-10-07T00:00:00.000Z', artworkUrl: null, covers: [], trackCount: null });
+    const items = [kept('playlist', 'Harbour Mix', 'Ada'), kept('playlist', 'Night Drive', 'Ada'), kept('album', 'Harbour Lights', 'Cassette Bloom')];
+    expect(savedMatching(items, 'playlist', 'harbour').map((i) => i.ref.title)).toEqual(['Harbour Mix']);
+    expect(savedMatching(items, 'playlist', '').map((i) => i.ref.title)).toEqual(['Harbour Mix', 'Night Drive']);
+  });
+
+  it('folds playlists by id like every other kind', () => {
+    const list = { id: 'deezer:1', title: 'Harbour Mix', owner: null, trackCount: 3, pictureUrl: null, covers: [], sources: [{ platform: 'deezer' as const, id: '1', url: 'https://www.deezer.com/playlist/1', previewUrl: null, matchedBy: 'search' as const }], rank: 1 };
+    const chunk = { ...results(1, [], []), playlists: [list] } as CatalogSearchChunk;
+    const again = { ...results(2, [], []), playlists: [{ ...list, trackCount: 4 }] } as CatalogSearchChunk;
+    expect(foldCatalogChunk(foldCatalogChunk(EMPTY_RESULTS, chunk), again).playlists).toEqual([{ ...list, trackCount: 4 }]);
   });
 });
 
@@ -75,6 +101,7 @@ describe('a service in words (UX-SEARCH-002, UX-CAT-001)', () => {
   it('sums the line up for a screen reader', () => {
     expect(statusSummary([status('itunes', 'ok'), status('deezer', 'pending')], false)).toBe('Searching: 1 of 2 services have answered.');
     expect(statusSummary([status('itunes', 'ok'), status('soundcloud', 'failed')], true, { tracks: 3, artists: 1, albums: 0 })).toBe('Done: 3 songs, 1 artist, 0 albums. SoundCloud did not answer.');
+    expect(statusSummary([status('deezer', 'ok')], true, { tracks: 3, artists: 1, albums: 0, playlists: 14 })).toBe('Done: 3 songs, 1 artist, 0 albums, 14 playlists.');
   });
 });
 
