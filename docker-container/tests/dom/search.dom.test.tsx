@@ -1,8 +1,11 @@
 /**
- * The hub's Search tab, rendered (DEC-039; UX-SEARCH-001…006): the live feed folded as it arrives,
- * every service's state on one line, rows that are music and say where they are, the filter sheet,
- * See All with the next page, a pasted playlist with its mosaic and star, an unreadable link's
- * reason, a song's details and lyrics and its download into the queue, and the Music search settings.
+ * The hub's Search tab, rendered (DEC-039; UX-SEARCH-001…012): the live feed folded as it arrives,
+ * every service's state on one line, rows that are music and say where they are, the calm overview
+ * without a pager, a type's own page (its field, the control, infinite scroll and ‹ › with
+ * "Page N of M"), Playlists with the starred ones first, a song row's menu (Up Next into a group's
+ * queue, the library, Download…), the filter sheet, a pasted playlist with its mosaic and star, an
+ * unreadable link's reason, a song's details and lyrics and its download into the queue, Escape
+ * walking back, and the Music search settings.
  *
  * The catalog answers from the stock answers (packages/aqua-ui/styleguide/fixtures/catalog-stock.json),
  * never the network; the saved list, the download and the settings go through a fake hub.
@@ -91,16 +94,16 @@ describe('the search (UX-SEARCH-001, UX-SEARCH-002)', () => {
     renderSearch(client);
     await searchFor('harbour');
     const songs = await screen.findByRole('listbox', { name: 'Songs' });
-    // Eight shown of nine: Harbour Lights came three times (iTunes, Deezer, YouTube) and is one row.
-    await waitFor(() => expect(within(songs).getAllByRole('option')).toHaveLength(8));
+    // The overview's five of nine: Harbour Lights came three times (iTunes, Deezer, YouTube) and is one row.
+    await waitFor(() => expect(within(songs).getAllByRole('option')).toHaveLength(5));
     expect(within(songs).getAllByRole('option').filter((o) => o.textContent?.startsWith('Harbour Lights'))).toHaveLength(1);
     const services = screen.getByRole('list', { name: 'Services asked' });
     expect(within(services).getByText('iTunes').parentElement?.textContent).toContain('3 found');
     expect(within(services).getByText('SoundCloud').parentElement?.textContent).toMatch(/resting/);
-    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Done: 9 songs, 3 artists, 2 albums. SoundCloud did not answer.'));
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Done: 9 songs, 3 artists, 2 albums, 14 playlists. SoundCloud did not answer.'));
     // Which platforms were searched (the line above) and which only contributed links.
     expect(screen.getByText('Linked, not searched: Spotify.')).toBeTruthy();
-    expect(searches[0]).toMatchObject({ fields: { q: 'harbour' }, sections: ['tracks', 'artists', 'albums'], providers: ['itunes', 'deezer', 'musicbrainz', 'youtube', 'soundcloud'] });
+    expect(searches[0]).toMatchObject({ fields: { q: 'harbour' }, sections: ['tracks', 'artists', 'albums', 'playlists'], providers: ['itunes', 'deezer', 'musicbrainz', 'youtube', 'soundcloud'] });
   });
 
   it('puts the Track, Artist and Album fields back into the line when they are closed', async () => {
@@ -144,7 +147,7 @@ describe('what a row says (UX-SEARCH-003)', () => {
     renderSearch(stockClient().client);
     await searchFor('harbour');
     const songs = await screen.findByRole('listbox', { name: 'Songs' });
-    await waitFor(() => expect(within(songs).getAllByRole('option')).toHaveLength(8));
+    await waitFor(() => expect(within(songs).getAllByRole('option')).toHaveLength(5));
     songs.focus();
     const first = songs.getAttribute('aria-activedescendant');
     await userEvent.keyboard('{ArrowDown}');
@@ -170,7 +173,7 @@ describe('what a row says (UX-SEARCH-003)', () => {
     renderSearch(stockClient().client);
     await searchFor('harbour');
     const songs = await screen.findByRole('listbox', { name: 'Songs' });
-    await waitFor(() => expect(within(songs).getAllByRole('option')).toHaveLength(8));
+    await waitFor(() => expect(within(songs).getAllByRole('option')).toHaveLength(5));
     await userEvent.click(within(songs).getAllByRole('option')[0]!);
     await screen.findByRole('heading', { name: 'Download to this hub' });
     await userEvent.selectOptions(screen.getByLabelText('Allowed because:'), 'creator-download');
@@ -181,40 +184,273 @@ describe('what a row says (UX-SEARCH-003)', () => {
   });
 });
 
-describe('pages of a section (UX-SEARCH-007)', () => {
-  it('pages Songs with numbers, Previous and Next and a count, by pointer or arrow keys, asking the services for the next offset at the end', async () => {
+describe('the overview and a type’s page (UX-SEARCH-007, UX-SEARCH-009)', () => {
+  it('the overview is calm: five songs and three of the rest, each with “See all N”, the services under them, and no pager', async () => {
+    fakeHub(SAVED_EMPTY);
+    renderSearch(stockClient().client);
+    await searchFor('harbour');
+    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/^Done/));
+    expect(within(screen.getByRole('listbox', { name: 'Songs' })).getAllByRole('option')).toHaveLength(5);
+    expect(within(screen.getByRole('listbox', { name: 'Artists' })).getAllByRole('option')).toHaveLength(3);
+    expect(within(screen.getByRole('listbox', { name: 'Albums' })).getAllByRole('option')).toHaveLength(2);
+    expect(within(screen.getByRole('listbox', { name: 'Playlists' })).getAllByRole('option')).toHaveLength(3);
+    for (const name of ['See all 9+ songs', 'See all 3 artists', 'See all 2 albums', 'See all 14 playlists']) expect(screen.getByRole('button', { name })).toBeTruthy();
+    // No page numbers, no ‹ ›, no page count anywhere on the overview.
+    expect(screen.queryByRole('navigation')).toBeNull();
+    expect(document.body.textContent).not.toMatch(/Page \d+ of/);
+    // The services' line sits under the groups.
+    const groups = Array.from(document.querySelectorAll('.srch > fieldset'));
+    expect(groups.at(-1)!.compareDocumentPosition(screen.getByRole('list', { name: 'Services asked' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('See all opens the Songs page: it reads on at once, ‹ › and Page Up/Down move a page and land on its first row', async () => {
     fakeHub(SAVED_EMPTY);
     const { client, searches } = stockClient();
     renderSearch(client);
     await searchFor('harbour');
-    const songs = await screen.findByRole('listbox', { name: 'Songs' });
     await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/^Done/));
+    await userEvent.click(screen.getByRole('button', { name: 'See all 9+ songs' }));
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Songs', level: 2 }));
+    // Seeded with the overview's nine, then the next offset of Songs alone, at once: one song already shown is dropped.
+    await waitFor(() => expect(searches.at(-1)).toMatchObject({ sections: ['tracks'], offset: 25, limit: 25 }));
+    const list = screen.getByRole('listbox', { name: 'All songs' });
+    await waitFor(() => expect(within(list).getAllByRole('option')).toHaveLength(31));
+    expect(screen.getByText('31 songs for “harbour”')).toBeTruthy();
+    expect(screen.getByText('That’s all 31 songs.')).toBeTruthy();
     const pager = screen.getByRole('navigation', { name: 'Songs pages' });
-    expect(within(pager).getByText('Page 1 of 2 or more')).toBeTruthy();
-    expect(within(pager).getByRole('button', { name: 'Songs, page 1' }).getAttribute('aria-current')).toBe('page');
+    expect(within(pager).getByText('Page 1 of 2')).toBeTruthy();
     expect((within(pager).getByRole('button', { name: 'Previous page of songs' }) as HTMLButtonElement).disabled).toBe(true);
-    expect(within(songs).getAllByRole('option')).toHaveLength(8);
+    expect(within(list).getAllByRole('option')[25]!.dataset['page']).toBe('2');
+    await userEvent.click(within(pager).getByRole('button', { name: 'Next page of songs' }));
+    expect(within(pager).getByText('Page 2 of 2')).toBeTruthy();
+    expect(document.activeElement).toBe(list);
+    expect(list.getAttribute('aria-activedescendant')).toBe(within(list).getAllByRole('option')[25]!.id);
+    // Page Up from the list: back to the first page's first row.
+    await userEvent.keyboard('{PageUp}');
+    await waitFor(() => expect(within(pager).getByText('Page 1 of 2')).toBeTruthy());
+    expect(list.getAttribute('aria-activedescendant')).toBe(within(list).getAllByRole('option')[0]!.id);
+  });
 
-    await userEvent.click(within(pager).getByRole('button', { name: 'Songs, page 2' }));
-    expect(within(screen.getByRole('listbox', { name: 'Songs' })).getAllByRole('option')).toHaveLength(1);
-    // Past what is loaded: the next offset of Songs alone, then its rows join the pages.
-    within(pager).getByRole('button', { name: 'Next page of songs' }).focus();
-    await userEvent.keyboard('{ArrowRight}');
+  it('› past what has arrived fetches that page first, then lands on its first row', async () => {
+    fakeHub(SAVED_EMPTY);
+    const { client, searches } = stockClient();
+    renderSearch(client);
+    await searchFor('harbour');
+    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/^Done/));
+    await userEvent.click(screen.getByRole('button', { name: 'See all 9+ songs' }));
+    // The page's own field searches songs alone, from the start, a page of 25 at a time.
+    const field = screen.getByRole('searchbox', { name: 'Search songs' });
+    expect((field as HTMLInputElement).value).toBe('harbour');
+    await userEvent.clear(field);
+    await userEvent.type(field, 'harbour lights{Enter}');
+    await waitFor(() => expect(searches.at(-1)).toMatchObject({ fields: { q: 'harbour lights' }, sections: ['tracks'], offset: 0, limit: 25 }));
+    const pager = await screen.findByRole('navigation', { name: 'Songs pages' });
+    await waitFor(() => expect(within(pager).getByText('Page 1 of 1+')).toBeTruthy());
+    expect(document.activeElement).toBe(screen.getByRole('searchbox', { name: 'Search songs' }));
+    await userEvent.click(within(pager).getByRole('button', { name: 'Next page of songs' }));
     await waitFor(() => expect(searches.at(-1)).toMatchObject({ sections: ['tracks'], offset: 25 }));
     await waitFor(() => expect(within(pager).getByText('Page 2 of 2')).toBeTruthy());
-    expect(within(screen.getByRole('listbox', { name: 'Songs' })).getAllByRole('option')).toHaveLength(3);
-    within(pager).getByRole('button', { name: 'Songs, page 2' }).focus();
-    await userEvent.keyboard('{Home}');
-    expect(within(pager).getByText('Page 1 of 2')).toBeTruthy();
-    // A page survives opening a song and coming Back.
-    await userEvent.keyboard('{End}');
-    await userEvent.click(within(screen.getByRole('listbox', { name: 'Songs' })).getAllByRole('option')[0]!);
-    await userEvent.click(await screen.findByRole('button', { name: 'Back to Results' }));
-    expect(within(await screen.findByRole('navigation', { name: 'Songs pages' })).getByText('Page 2 of 2')).toBeTruthy();
+    const list = screen.getByRole('listbox', { name: 'All songs' });
+    expect(list.getAttribute('aria-activedescendant')).toBe(within(list).getAllByRole('option')[25]!.id);
+  });
+
+  it('the segmented control switches type, searching the new type alone for the same words', async () => {
+    fakeHub(SAVED_EMPTY);
+    const { client, searches } = stockClient();
+    renderSearch(client);
+    await searchFor('harbour');
+    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/^Done/));
+    await userEvent.click(screen.getByRole('button', { name: 'See all 3 artists' }));
+    const tabs = screen.getByRole('tablist', { name: 'Kind of music' });
+    expect(within(tabs).getAllByRole('tab').map((t) => t.textContent)).toEqual(['Songs', 'Artists', 'Albums', 'Playlists']);
+    expect(within(tabs).getByRole('tab', { name: 'Artists' }).getAttribute('aria-selected')).toBe('true');
+    within(tabs).getByRole('tab', { name: 'Artists' }).focus();
+    await userEvent.keyboard('{ArrowRight}');
+    await waitFor(() => expect(searches.at(-1)).toMatchObject({ fields: { q: 'harbour' }, sections: ['albums'], offset: 0, limit: 12 }));
+    expect(await screen.findByRole('heading', { name: 'Albums', level: 2 })).toBeTruthy();
+    expect(document.activeElement).toBe(within(screen.getByRole('tablist')).getByRole('tab', { name: 'Albums' }));
+    expect(within(await screen.findByRole('tabpanel')).getByRole('listbox', { name: 'All albums' })).toBeTruthy();
+  });
+
+  it('Escape walks back a page, then puts the results away', async () => {
+    fakeHub(SAVED_EMPTY);
+    renderSearch(stockClient().client);
+    await searchFor('harbour');
+    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/^Done/));
+    await userEvent.click(screen.getByRole('button', { name: 'See all 3 artists' }));
+    await userEvent.keyboard('{Escape}');
+    const songs = await screen.findByRole('listbox', { name: 'Songs' });
+    songs.focus();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('listbox', { name: 'Songs' })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole('searchbox', { name: 'Search for music' }));
   });
 });
 
-describe('the filter and See All (UX-SEARCH-001, UX-SEARCH-002)', () => {
+describe('Playlists (UX-SEARCH-010)', () => {
+  it('Deezer’s public playlists, the starred ones first under “In your library”, and one opens like an album', async () => {
+    fakeHub({ 'GET /catalog/saved': { body: stock.saved } });
+    const { client } = stockClient();
+    const resolved: string[] = [];
+    const resolve = client.resolve;
+    client.resolve = async (url, offset, limit, signal) => {
+      resolved.push(url);
+      return resolve(url, offset, limit, signal);
+    };
+    renderSearch(client);
+    await searchFor('harbour');
+    const overview = await screen.findByRole('listbox', { name: 'Playlists' });
+    await waitFor(() => expect(within(overview).getAllByRole('option')).toHaveLength(3));
+    expect(within(overview).getAllByRole('option')[0]!.textContent).toContain('Playlist on Deezer · Playlist Editor · 40 songs');
+    await waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/^Done/));
+    await userEvent.click(screen.getByRole('button', { name: 'See all 14 playlists' }));
+    const kept = screen.getByRole('listbox', { name: 'Your playlists' });
+    expect(within(kept).getByRole('option').textContent).toContain('Harbour Mix');
+    expect(screen.getByRole('heading', { name: 'In your library', level: 3 })).toBeTruthy();
+    const catalog = screen.getByRole('listbox', { name: 'Playlists from the catalog' });
+    expect(within(catalog).getAllByRole('option')).toHaveLength(14);
+    expect(within(screen.getByRole('navigation', { name: 'Playlists pages' })).getByText('Page 1 of 2')).toBeTruthy();
+    expect(screen.getByText('That’s all 14 playlists.')).toBeTruthy();
+    await userEvent.click(within(catalog).getAllByRole('option')[0]!);
+    expect(await screen.findByRole('heading', { name: 'Harbour Evenings', level: 2 })).toBeTruthy();
+    expect(resolved).toEqual(['https://www.deezer.com/playlist/9401']);
+  });
+});
+
+describe('a song row’s menu (UX-SEARCH-012)', () => {
+  const GROUPS = {
+    'GET /groups': {
+      body: {
+        items: [
+          { id: '0192f0c0-0000-7000-8000-000000000001', name: 'Kitchen', status: 'active' },
+          { id: '0192f0c0-0000-7000-8000-000000000002', name: 'Studio', status: 'active' },
+          { id: '0192f0c0-0000-7000-8000-000000000003', name: 'Old Room', status: 'archived' },
+        ],
+      },
+    },
+  };
+
+  async function overviewSongs(): Promise<HTMLElement> {
+    await searchFor('harbour');
+    const songs = await screen.findByRole('listbox', { name: 'Songs' });
+    await waitFor(() => expect(within(songs).getAllByRole('option')).toHaveLength(5));
+    return songs;
+  }
+
+  it('“…” opens it; Add to Up Next ▸ a group queues the song’s fetchable source through the group’s requests, and says so', async () => {
+    const hub = fakeHub({ ...SAVED_EMPTY, ...GROUPS, 'POST /groups/0192f0c0-0000-7000-8000-000000000002/requests': { body: { queued: true, title: 'Harbour Lights', artistName: 'Cassette Bloom', position: 3, reason: null } } });
+    renderSearch(stockClient().client);
+    const songs = await overviewSongs();
+    const lights = within(songs).getAllByRole('option')[0]!;
+    await userEvent.click(lights.querySelector('[data-menu]')!);
+    const menu = screen.getByRole('menu', { name: '“Harbour Lights”' });
+    await waitFor(() => expect(within(menu).getByRole('menuitem', { name: 'Add to Up Next' }).getAttribute('aria-haspopup')).toBe('menu'));
+    expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent?.replace('▶', '').trim())).toEqual(['Add to Up Next', 'Add to Playlist…', 'Add to Library…', 'Download…', 'Audition', 'Open Details']);
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Add to Up Next' }));
+    const groups = screen.getByRole('menu', { name: 'Add to Up Next' });
+    // Active groups only.
+    expect(within(groups).getAllByRole('menuitem').map((i) => i.textContent)).toEqual(['Kitchen', 'Studio']);
+    await userEvent.click(within(groups).getByRole('menuitem', { name: 'Studio' }));
+    expect(screen.queryByRole('menu')).toBeNull();
+    await waitFor(() => expect(screen.getByTestId('status-strip').textContent).toBe('Up Next in Studio: “Harbour Lights”, number 3.'));
+    const [sent] = hub.sent('POST', '/groups/0192f0c0-0000-7000-8000-000000000002/requests');
+    // The best place the hub can fetch it from: YouTube Music.
+    expect(sent!.body).toMatchObject({ query: 'https://music.youtube.com/watch?v=mockHL0001' });
+  });
+
+  it('right-click and Shift+F10 open it too; the keys walk it, and Escape gives the keys back to the list', async () => {
+    fakeHub({ ...SAVED_EMPTY, ...GROUPS });
+    renderSearch(stockClient().client);
+    const songs = await overviewSongs();
+    await userEvent.pointer({ keys: '[MouseRight]', target: within(songs).getAllByRole('option')[1]! });
+    expect(screen.getByRole('menu', { name: '“Harbour Wall”' })).toBeTruthy();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(document.activeElement).toBe(songs);
+    // The list is still there: Escape closed the menu, not the results.
+    await userEvent.keyboard('{Shift>}{F10}{/Shift}');
+    const menu = screen.getByRole('menu', { name: '“Harbour Wall”' });
+    await waitFor(() => expect(within(menu).getByRole('menuitem', { name: 'Add to Up Next' }).getAttribute('aria-haspopup')).toBe('menu'));
+    expect(document.activeElement).toBe(within(menu).getAllByRole('menuitem')[0]);
+    await userEvent.keyboard('{ArrowDown}');
+    expect(document.activeElement?.textContent).toBe('Add to Playlist…');
+    await userEvent.keyboard('{End}');
+    expect(document.activeElement?.textContent).toBe('Open Details');
+    await userEvent.keyboard('{Enter}');
+    expect(await screen.findByRole('heading', { name: 'Harbour Wall', level: 2 })).toBeTruthy();
+  });
+
+  it('Add to Library and Download… go to the hub’s queue with a rights basis; Add to Playlist says the hub keeps none', async () => {
+    const hub = fakeHub({
+      ...SAVED_EMPTY,
+      ...GROUPS,
+      'POST /catalog/download': { status: 201, body: { job: { id: 'j1' }, source: { platform: 'youtube-music', id: 'mockHL0001', url: 'https://music.youtube.com/watch?v=mockHL0001', previewUrl: null, matchedBy: 'search' }, embedded: { isrc: true, genre: true, label: false, year: true, lyrics: true } } },
+    });
+    renderSearch(stockClient().client);
+    const songs = await overviewSongs();
+    const lights = within(songs).getAllByRole('option')[0]!;
+    await userEvent.click(lights.querySelector('[data-menu]')!);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Add to Playlist…' }));
+    let sheet = screen.getByRole('dialog', { name: 'Add to a playlist' });
+    expect(sheet.textContent).toContain('This hub keeps no playlists of its own');
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Cancel' }));
+    await userEvent.click(lights.querySelector('[data-menu]')!);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Add to Library…' }));
+    sheet = screen.getByRole('dialog', { name: 'Add “Harbour Lights” to the library' });
+    await userEvent.selectOptions(within(sheet).getByLabelText('Allowed because:'), 'creator-download');
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Add to Library' }));
+    await waitFor(() => expect(screen.getByTestId('status-strip').textContent).toBe('“Harbour Lights” is joining the hub’s library. Queued from YouTube Music. Tagged with ISRC, genre, year and lyrics. It is in Music ▸ Downloads.'));
+    expect(hub.sent('POST', '/catalog/download')[0]!.body).toMatchObject({ track: { id: 'deezer:9101' }, authorization: { basis: 'creator-download', acknowledged: true }, target: { destination: 'hub', format: 'original' } });
+    await userEvent.click(lights.querySelector('[data-menu]')!);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Download…' }));
+    sheet = screen.getByRole('dialog', { name: 'Download “Harbour Lights”' });
+    await userEvent.selectOptions(within(sheet).getByLabelText('Save as:'), 'flac');
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Download' }));
+    await waitFor(() => expect(hub.sent('POST', '/catalog/download')).toHaveLength(2));
+    expect(hub.sent('POST', '/catalog/download')[1]!.body).toMatchObject({ target: { destination: 'hub', format: 'flac' } });
+  });
+
+  it('a song only a store has says there is nothing to fetch; with no group, queueing says it needs one', async () => {
+    fakeHub({ ...SAVED_EMPTY, 'GET /groups': { body: { items: [] } } });
+    renderSearch(stockClient().client);
+    const songs = await overviewSongs();
+    const night = within(songs).getAllByRole('option').find((o) => o.textContent?.startsWith('Night Harbour'))!;
+    await userEvent.click(night.querySelector('[data-menu]')!);
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Add to Up Next' }));
+    expect(screen.getByTestId('status-strip').textContent).toBe('Queueing needs a group. Make one under Groups, then songs can join its Up Next.');
+    await userEvent.click(night.querySelector('[data-menu]')!);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Add to Library…' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByTestId('status-strip').textContent).toBe('“Night Harbour” is only in a store (Apple Music), so there is nothing the hub can fetch.');
+  });
+
+  it('Audition plays the clip and then reads Stop Audition', async () => {
+    fakeHub({ ...SAVED_EMPTY, ...GROUPS });
+    const played: string[] = [];
+    vi.stubGlobal(
+      'Audio',
+      class {
+        onended: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        constructor(readonly src: string) {
+          played.push(src);
+        }
+        play = async () => undefined;
+        pause = () => undefined;
+      },
+    );
+    renderSearch(stockClient().client);
+    const songs = await overviewSongs();
+    const lights = within(songs).getAllByRole('option')[0]!;
+    await userEvent.click(lights.querySelector('[data-menu]')!);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Audition' }));
+    expect(played).toEqual(['https://audio.mockup.invalid/preview/8101.m4a']);
+    await userEvent.click(lights.querySelector('[data-menu]')!);
+    expect(screen.getByRole('menuitem', { name: 'Stop Audition' })).toBeTruthy();
+  });
+});
+
+describe('the filter (UX-SEARCH-001, UX-SEARCH-002)', () => {
   it('is a sheet: it takes the focus, Escape puts it away, and Done keeps the choice and searches again', async () => {
     fakeHub(SAVED_EMPTY);
     const { client, searches } = stockClient();
@@ -235,10 +471,10 @@ describe('the filter and See All (UX-SEARCH-001, UX-SEARCH-002)', () => {
     await userEvent.click(within(dialog).getByLabelText('SoundCloud'));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
     await waitFor(() => expect(searches).toHaveLength(2));
-    expect(searches[1]).toMatchObject({ sections: ['tracks', 'artists'], providers: ['itunes', 'deezer', 'musicbrainz', 'youtube'] });
+    expect(searches[1]).toMatchObject({ sections: ['tracks', 'artists', 'playlists'], providers: ['itunes', 'deezer', 'musicbrainz', 'youtube'] });
     await waitFor(() => expect(screen.queryByRole('listbox', { name: 'Albums' })).toBeNull());
-    expect(JSON.parse(window.localStorage.getItem('np.admin.search.filter')!)).toEqual({ sections: ['tracks', 'artists'], providers: ['itunes', 'deezer', 'musicbrainz', 'youtube'] });
-    expect(screen.getByText(/Showing Songs, Artists from iTunes, Deezer, MusicBrainz, YouTube/)).toBeTruthy();
+    expect(JSON.parse(window.localStorage.getItem('np.admin.search.filter')!)).toEqual({ sections: ['tracks', 'artists', 'playlists'], providers: ['itunes', 'deezer', 'musicbrainz', 'youtube'] });
+    expect(screen.getByText(/Showing Songs, Artists, Playlists from iTunes, Deezer, MusicBrainz, YouTube/)).toBeTruthy();
   });
 
   it('will not take a filter that shows nothing', async () => {
@@ -246,27 +482,9 @@ describe('the filter and See All (UX-SEARCH-001, UX-SEARCH-002)', () => {
     renderSearch(stockClient().client);
     await userEvent.click(screen.getByRole('button', { name: 'Filter…' }));
     const dialog = screen.getByRole('dialog');
-    for (const label of ['Songs', 'Artists', 'Albums']) await userEvent.click(within(dialog).getByLabelText(label));
+    for (const label of ['Songs', 'Artists', 'Albums', 'Playlists']) await userEvent.click(within(dialog).getByLabelText(label));
     expect(within(dialog).getByText('Show at least one kind of result.')).toBeTruthy();
     expect((within(dialog).getByRole('button', { name: 'Done' }) as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  it('See All opens every song and loads the next page without repeating one', async () => {
-    fakeHub(SAVED_EMPTY);
-    const { client, searches } = stockClient();
-    renderSearch(client);
-    await searchFor('harbour');
-    await screen.findByRole('listbox', { name: 'Songs' });
-    await userEvent.click(await screen.findByRole('button', { name: 'See All Songs' }));
-    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'All Songs' }));
-    const all = screen.getByRole('listbox', { name: 'All songs' });
-    expect(within(all).getAllByRole('option')).toHaveLength(9);
-    await userEvent.click(screen.getByRole('button', { name: 'More Songs' }));
-    await waitFor(() => expect(within(all).getAllByRole('option')).toHaveLength(11));
-    expect(searches.at(-1)).toMatchObject({ sections: ['tracks'], offset: 25 });
-    expect(screen.getByText('That’s everything the services found.')).toBeTruthy();
-    await userEvent.click(screen.getByRole('button', { name: 'Back to Results' }));
-    expect(await screen.findByRole('listbox', { name: 'Songs' })).toBeTruthy();
   });
 });
 

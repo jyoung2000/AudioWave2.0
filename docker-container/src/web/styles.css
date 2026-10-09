@@ -492,7 +492,7 @@ a.push:active {
   margin: 3px 0;
 }
 
-/* ---------------------------------------------------------------- search (DEC-039, UX-SEARCH-001…006) */
+/* ---------------------------------------------------------------- search (DEC-039, UX-SEARCH-001…012) */
 /* Built from the window's own parts — a .barrow form, a .pref grid, .well lists of .rows, .cap chips —
    on the design's spacing (DEC-037): 2, 4, 6, 8, 12 and 16px, and its 24px row with a 36px cover. */
 .srch__bar .srch__q {
@@ -527,9 +527,6 @@ a.push:active {
   /* On the window grey, --ink-quiet is 4.3:1; --ink-2 is 5.9:1. */
   color: var(--ink-2);
 }
-.srch__count {
-  margin-left: 4px;
-}
 .srch__nav {
   flex-wrap: nowrap;
 }
@@ -552,32 +549,67 @@ a.push:active {
   margin-top: 12px;
 }
 
-/* a section's pages (UX-SEARCH-007): Previous, the numbers, Next, the count; See All at the end */
-.srch__pagerow {
-  justify-content: space-between;
+/* One centred column under the field (UX-SEARCH-011): the results, a type's page and every detail
+   open in it, no wider than a comfortable line of music. */
+.srch {
+  max-width: 720px;
+  margin-inline: auto;
 }
-.pager {
+.srch__seeall {
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+.srch__services {
+  margin: 0 0 16px;
+}
+
+/* a type's own page (UX-SEARCH-009): the count, its field, the control, the list and the pager */
+.srch__sub {
+  margin: 4px 0 8px;
+  color: var(--ink-2);
+}
+.srch__typebar {
+  margin: 0 0 8px;
+}
+.srch__seg {
+  margin: 0 0 8px;
+}
+.srch__subh {
+  margin: 12px 0 4px;
+  font-size: 12px;
+}
+.srch__type [role='tabpanel'] > .srch__services {
+  margin-bottom: 8px;
+}
+.srch__end .note {
+  margin: 8px 0;
+}
+/* the footer stays put while the list scrolls under it */
+.srch__foot {
+  position: sticky;
+  /* the pane's own 20px bottom padding: flush with the window's status strip */
+  bottom: -20px;
+  z-index: 2;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  gap: 12px;
+  margin: 8px 0 0;
+  padding: 4px 12px 5px;
+  background: linear-gradient(var(--chrome-upper), var(--chrome-lower));
+  border: 1px solid var(--chrome-sep);
+  border-radius: 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 -2px 6px rgba(0, 0, 0, 0.08);
 }
-.pager .push {
-  min-width: 0;
+.srch__foot .srch__step {
+  min-width: 36px;
   padding: 0 10px;
 }
-.pager .pager__n {
-  min-width: 26px;
-  padding: 0 6px;
-}
-.pager .push[aria-current='page'] {
-  border-image-source: var(--aq-def-22);
-  font-weight: 700;
-}
-.pager__count {
-  margin-left: 4px;
+.srch__pageof {
+  min-width: 96px;
+  text-align: center;
   font-size: 11px;
-  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
 }
 
 /* a list of music: cover, what it is and where, its tempo and time, and the preview */
@@ -668,6 +700,24 @@ a.push:active {
 }
 .mrow__play.is-playing {
   color: var(--link);
+}
+/* a song row's "…" (UX-SEARCH-012): the pointer's way to its menu; the keys use Shift+F10 */
+.mrow__more {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: var(--ink-2);
+  font-weight: 700;
+}
+.mrow__more:hover {
+  background: linear-gradient(var(--btn-top), var(--btn-bot));
+  box-shadow: inset 0 0 0 1px var(--btn-edge);
+}
+.mrows:focus li[aria-selected='true'] .mrow__more {
+  color: var(--sel-ink);
 }
 .cap--x {
   margin-left: 6px;

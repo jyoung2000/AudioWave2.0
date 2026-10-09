@@ -1,5 +1,5 @@
 /**
- * The Search tab in a real browser against the real hub (DEC-039; UX-SEARCH-001…008). The hub's
+ * The Search tab in a real browser against the real hub (DEC-039; UX-SEARCH-001…012). The hub's
  * own routes answer everything but the catalog, which the page asks of `/api/v1/catalog/*`: those
  * calls are answered here from the stock catalog (packages/aqua-ui/styleguide/fixtures/
  * catalog-stock.json), streamed as NDJSON the way the hub streams it, so no music service is ever
@@ -37,10 +37,12 @@ test('searches, opens a song and comes back with the keyboard alone, on stock an
   const field = page.getByRole('searchbox', { name: 'Search for music' });
   await field.fill('harbour');
   await field.press('Enter');
-  await expect(page.locator('.srch [role="status"]')).toHaveText('Done: 9 songs, 3 artists, 2 albums. SoundCloud did not answer.');
-  expect(asked[0]).toMatch(/^search\?q=harbour&sections=tracks%2Cartists%2Calbums&providers=itunes%2Cdeezer%2Cmusicbrainz%2Cyoutube%2Csoundcloud/);
+  await expect(page.locator('.srch [role="status"]')).toHaveText('Done: 9 songs, 3 artists, 2 albums, 14 playlists. SoundCloud did not answer.');
+  expect(asked[0]).toMatch(/^search\?q=harbour&sections=tracks%2Cartists%2Calbums%2Cplaylists&providers=itunes%2Cdeezer%2Cmusicbrainz%2Cyoutube%2Csoundcloud/);
   const songs = page.getByRole('listbox', { name: 'Songs' });
-  await expect(songs.getByRole('option')).toHaveCount(8);
+  // The calm overview: five songs, no pager (UX-SEARCH-007).
+  await expect(songs.getByRole('option')).toHaveCount(5);
+  await expect(page.getByRole('navigation')).toHaveCount(0);
   await songs.focus();
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Home');
@@ -49,12 +51,75 @@ test('searches, opens a song and comes back with the keyboard alone, on stock an
   await expect(page.getByText('Pier Records')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(songs).toBeVisible();
-  // Pages: Next past what is loaded asks for the next offset of Songs alone.
+  // See all: the Songs page reads on at once (the next offset of Songs alone), and › lands on page 2's first row.
+  await page.getByRole('button', { name: 'See all 9+ songs' }).click();
   const pager = page.getByRole('navigation', { name: 'Songs pages' });
-  await pager.getByRole('button', { name: 'Next page of songs' }).click();
+  await expect(pager.getByText('Page 1 of 2')).toBeVisible();
+  expect(asked.at(-1)).toMatch(/sections=tracks&.*offset=25/);
+  await expect(page.getByText('That’s all 31 songs.')).toBeAttached();
   await pager.getByRole('button', { name: 'Next page of songs' }).click();
   await expect(pager.getByText('Page 2 of 2')).toBeVisible();
-  expect(asked.at(-1)).toMatch(/sections=tracks&.*offset=25/);
+  const all = page.getByRole('listbox', { name: 'All songs' });
+  await expect(all).toBeFocused();
+  await expect(all.locator('[data-page="2"]').first()).toBeInViewport();
+  await page.keyboard.press('PageUp');
+  await expect(pager.getByText('Page 1 of 2')).toBeVisible();
+  // Escape walks back to the overview.
+  await page.keyboard.press('Escape');
+  await expect(songs).toBeVisible();
+});
+
+test('the results are one column centred under the field, and a type page and its footer stay in it', async ({ page }) => {
+  await stockCatalog(page);
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Search' }).click();
+  await page.getByRole('searchbox', { name: 'Search for music' }).fill('harbour');
+  await page.getByRole('button', { name: 'Search' }).click();
+  await expect(page.locator('.srch [role="status"]')).toHaveText(/^Done/);
+  const column = (await page.locator('.srch').boundingBox())!;
+  const pane = (await page.locator('.pane').boundingBox())!;
+  expect(column.width).toBeLessThanOrEqual(720);
+  expect(Math.abs(column.x + column.width / 2 - (pane.x + pane.width / 2))).toBeLessThan(12);
+  const field = (await page.getByRole('searchbox', { name: 'Search for music' }).boundingBox())!;
+  const songs = (await page.getByRole('listbox', { name: 'Songs' }).boundingBox())!;
+  expect(field.y).toBeLessThan(songs.y);
+  expect(songs.x).toBeGreaterThanOrEqual(column.x - 1);
+  expect(songs.x + songs.width).toBeLessThanOrEqual(column.x + column.width + 1);
+  await page.getByRole('button', { name: 'See all 14 playlists' }).click();
+  await expect(page.getByRole('listbox', { name: 'All playlists' }).getByRole('option')).toHaveCount(14);
+  // The footer stays put at the foot of the pane while the list scrolls under it.
+  const foot = page.getByRole('navigation', { name: 'Playlists pages' });
+  await expect(foot).toBeInViewport();
+  const box = (await foot.boundingBox())!;
+  expect(box.y + box.height).toBeLessThanOrEqual(pane.y + pane.height + 1);
+});
+
+test('a song row’s “…” and right-click open its menu; the keys walk it and Add to Library asks for the rights basis', async ({ page }) => {
+  await stockCatalog(page);
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Search' }).click();
+  await page.getByRole('searchbox', { name: 'Search for music' }).fill('harbour');
+  await page.getByRole('button', { name: 'Search' }).click();
+  const songs = page.getByRole('listbox', { name: 'Songs' });
+  await expect(songs.getByRole('option')).toHaveCount(5);
+  await songs.getByRole('option').first().locator('[data-menu]').click();
+  const menu = page.getByRole('menu', { name: '“Harbour Lights”' });
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole('menuitem')).toHaveText([/^Add to Up Next/, 'Add to Playlist…', 'Add to Library…', 'Download…', 'Audition', 'Open Details']);
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(songs).toBeFocused();
+  await songs.getByRole('option').nth(1).click({ button: 'right' });
+  const wall = page.getByRole('menu', { name: '“Harbour Wall”' });
+  await expect(wall).toBeVisible();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  await expect(wall.getByRole('menuitem', { name: 'Add to Library…' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  const sheet = page.getByRole('dialog', { name: 'Add “Harbour Wall” to the library' });
+  await expect(sheet.getByLabel('Allowed because:')).toBeVisible();
+  await sheet.getByRole('button', { name: 'Cancel' }).click();
+  await expect(sheet).toHaveCount(0);
 });
 
 test('a pasted playlist shows its mosaic and platform, opens like an album, and the star keeps it in the hub', async ({ page }) => {
@@ -77,7 +142,7 @@ test('a pasted playlist shows its mosaic and platform, opens like an album, and 
   await expect(page.getByRole('button', { name: /Star this playlist/ })).toHaveAttribute('aria-pressed', 'false');
 });
 
-test('@a11y the search results, the filter sheet and a song have no detectable violations', async ({ page }) => {
+test('@a11y the search results, the filter sheet, a type page, a row’s menu and a song have no detectable violations', async ({ page }) => {
   await stockCatalog(page);
   await page.goto('/');
   await page.getByRole('tab', { name: 'Search' }).click();
@@ -93,6 +158,17 @@ test('@a11y the search results, the filter sheet and a song have no detectable v
   await expect(page.getByRole('dialog', { name: 'Filter the search' })).toBeVisible();
   await check();
   await page.keyboard.press('Escape');
+  await page.getByRole('listbox', { name: 'Songs' }).getByRole('option').first().click({ button: 'right' });
+  await expect(page.getByRole('menu')).toBeVisible();
+  await check();
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'See all 9+ songs' }).click();
+  await expect(page.getByRole('navigation', { name: 'Songs pages' }).getByText('Page 1 of 2')).toBeVisible();
+  await check();
+  await page.getByRole('tab', { name: 'Playlists' }).click();
+  await expect(page.getByRole('listbox', { name: 'All playlists' }).getByRole('option')).toHaveCount(14);
+  await check();
+  await page.getByRole('button', { name: 'Back to Results' }).click();
   await page.getByRole('listbox', { name: 'Songs' }).getByRole('option').first().click();
   await expect(page.getByRole('region', { name: 'Lyrics, timed' })).toBeVisible();
   await check();
