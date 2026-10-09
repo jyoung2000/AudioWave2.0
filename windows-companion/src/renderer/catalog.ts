@@ -6,7 +6,7 @@
  * with the answers is the domain's (`@now-playing/domain/catalog`, view.ts).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CatalogAlbumDetail, CatalogArtistDetail, CatalogEnrichment, CatalogLyrics, CatalogProviderId, CatalogResolveResult, CatalogSearchChunk, CatalogSection, CatalogTrack, SavedCollection } from '@now-playing/contracts';
+import type { CatalogAlbumDetail, CatalogArtistDetail, CatalogEnrichment, CatalogLyrics, CatalogProviderId, CatalogResolveResult, CatalogSearchChunk, CatalogSearchSection, CatalogTrack, SavedCollection } from '@now-playing/contracts';
 import { CATALOG_PROVIDERS } from '@now-playing/contracts';
 import { collectionKey, EMPTY_RESULTS, foldCatalogChunk, type CatalogFields, type CatalogResults } from '@now-playing/domain/catalog';
 import { invoke, subscribe } from './bridge.js';
@@ -15,7 +15,7 @@ import { invoke, subscribe } from './bridge.js';
 
 export interface CatalogSearchParams {
   fields: CatalogFields;
-  sections: readonly CatalogSection[];
+  sections: readonly CatalogSearchSection[];
   providers: readonly CatalogProviderId[];
   offset?: number;
   limit?: number;
@@ -75,11 +75,12 @@ export function catalogError(error: unknown): Error {
 /* ------------------------------------------------------------------ the filter */
 
 export interface CatalogFilter {
-  sections: CatalogSection[];
+  sections: CatalogSearchSection[];
   providers: CatalogProviderId[];
 }
 
-export const ALL_SECTIONS: readonly CatalogSection[] = ['tracks', 'artists', 'albums'];
+/** Songs, Artists, Albums and Playlists (UX-CAT-005, UX-SEARCH-010), in the order the window shows them. */
+export const ALL_SECTIONS: readonly CatalogSearchSection[] = ['tracks', 'artists', 'albums', 'playlists'];
 export const DEFAULT_FILTER: CatalogFilter = { sections: [...ALL_SECTIONS], providers: [...CATALOG_PROVIDERS] };
 
 /** Which sections are shown and which services are asked, kept in the companion's settings store. */
@@ -112,6 +113,8 @@ export interface LiveSearch {
   error: Error | null;
   run: (params: CatalogSearchParams) => void;
   cancel: () => void;
+  /** Stop, and put the results away (Escape on the overview). */
+  clear: () => void;
 }
 
 /** One search at a time; a new one stops the last. Chunks are folded as they arrive (UX-SEARCH-002). */
@@ -152,8 +155,17 @@ export function useLiveSearch(client: Pick<CatalogClient, 'search'>): LiveSearch
     [client],
   );
 
+  const clear = useCallback(() => {
+    controller.current?.abort();
+    controller.current = null;
+    setRunning(false);
+    setAsked(null);
+    setResults(EMPTY_RESULTS);
+    setError(null);
+  }, []);
+
   useEffect(() => () => controller.current?.abort(), []);
-  return { results, asked, running, error, run, cancel };
+  return { results, asked, running, error, run, cancel, clear };
 }
 
 /* ------------------------------------------------------------------ a 30-second preview */

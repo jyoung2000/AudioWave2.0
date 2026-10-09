@@ -613,6 +613,9 @@ function registerHandlers(): void {
     return { enabled, reason: null };
   });
   handle('hub:sharing', () => ({ enabled: sharingEnabled() }));
+  // Search ▸ a song's Add to Up Next (UX-SEARCH-012): the companion has no queue, so a paired hub's group.
+  handle('hub:groups', () => hub!.groups());
+  handle('hub:request', (request) => hub!.requestInGroup((request as { groupId: string }).groupId, (request as { query: string }).query));
 
   handle('transfers:list', () => ({ items: [...transfers.values()] }));
 

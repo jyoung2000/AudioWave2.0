@@ -23,7 +23,7 @@ import {
   CatalogProviderId,
   CatalogResolveResult,
   CatalogSearchChunk,
-  CatalogSection,
+  CatalogSearchSection,
   CatalogSource,
   CatalogTrack,
   DownloadAuthorizationBasis,
@@ -83,6 +83,19 @@ export const HubConnection = z.object({
   lastSyncAt: z.iso.datetime({ offset: true }).nullable(),
 });
 export type HubConnection = z.infer<typeof HubConnection>;
+
+/** A paired hub's group a song from Search can join (UX-SEARCH-012): its id and its name, nothing else. */
+export const HubGroupChoice = z.object({ id: z.uuid(), name: z.string().min(1).max(80) });
+export type HubGroupChoice = z.infer<typeof HubGroupChoice>;
+
+/** What the hub said to a request: queued (and where), or why not, in its own words. */
+export const GroupRequestAnswer = z.object({
+  queued: z.boolean(),
+  title: z.string().max(300).nullable(),
+  position: z.number().int().positive().nullable(),
+  reason: z.string().max(600).nullable(),
+});
+export type GroupRequestAnswer = z.infer<typeof GroupRequestAnswer>;
 
 export const PairingChallenge = z.object({
   sessionId: z.uuid(),
@@ -465,15 +478,15 @@ export const CatalogSearchIpc = z.strictObject({
   track: z.string().max(200).optional(),
   artist: z.string().max(200).optional(),
   album: z.string().max(200).optional(),
-  sections: z.array(CatalogSection).min(1).max(3),
+  sections: z.array(CatalogSearchSection).min(1).max(4),
   providers: z.array(CatalogProviderId).min(1).max(5),
   offset: z.number().int().min(0).max(1000).default(0),
   limit: z.number().int().min(1).max(CATALOG_MAX_LIMIT).default(25),
 });
 export type CatalogSearchIpc = z.infer<typeof CatalogSearchIpc>;
 
-/** Which sections the Search tool shows and which services it asks, kept on this PC. */
-export const CatalogFilter = z.object({ sections: z.array(CatalogSection).min(1).max(3), providers: z.array(CatalogProviderId).min(1).max(5) });
+/** Which sections the Search tool shows (Songs, Artists, Albums and Playlists, UX-SEARCH-010) and which services it asks, kept on this PC. */
+export const CatalogFilter = z.object({ sections: z.array(CatalogSearchSection).min(1).max(4), providers: z.array(CatalogProviderId).min(1).max(5) });
 export type CatalogFilter = z.infer<typeof CatalogFilter>;
 
 const Answer = <T extends z.ZodType>(result: T) => z.object({ result: result.nullable(), reason: z.string().max(600).nullable() });
@@ -529,6 +542,14 @@ export const IPC = {
   'hub:share-library': { request: z.object({ enabled: z.boolean() }), response: z.object({ enabled: z.boolean(), reason: z.string().nullable() }) },
   /** Whether sharing is on, so the checkbox shows what was chosen rather than starting off every time. */
   'hub:sharing': { request: z.void(), response: z.object({ enabled: z.boolean() }) },
+  /**
+   * Up Next from Search (UX-SEARCH-012): the companion has no queue of its own, so a song goes to a
+   * paired hub's group. The groups this companion is in (active ones), or the reason there are none
+   * to offer — no hub paired, no permission to join groups, the hub out of reach — in a sentence.
+   */
+  'hub:groups': { request: z.void(), response: z.object({ items: z.array(HubGroupChoice).max(200), reason: z.string().max(600).nullable() }) },
+  /** A song into a group's queue the way a Discord /play is (`POST /groups/:id/requests`): its link, or "Artist - Title". */
+  'hub:request': { request: z.strictObject({ groupId: z.uuid(), query: z.string().trim().min(1).max(300) }), response: GroupRequestAnswer },
 
   'transfers:list': { request: z.void(), response: z.object({ items: z.array(TransferProgress) }) },
   'transfers:send': { request: z.object({ trackIds: z.array(z.uuid()).min(1).max(500) }), response: z.object({ queued: z.number().int(), reason: z.string().nullable() }) },

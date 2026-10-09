@@ -1,53 +1,73 @@
 /**
- * Search: the music catalog in the companion's window (DEC-039; rules UX-SEARCH-001…008, UX-CAT-001…004).
+ * Search: the music catalog in the companion's window (DEC-039; rules UX-SEARCH-001…012, UX-CAT-001…006).
  *
  * The same search the hub's Search tab is, with the same rules, on this PC: one field finds songs,
- * artists and albums across iTunes, Deezer, MusicBrainz, YouTube and SoundCloud, or reads a pasted
- * link from any platform, Spotify included. The answers stream in from the embedded helper (through
- * the main process, `catalog.ts`) and are folded by id; every service's state is on one line; Songs,
- * Artists and Albums page with numbers and Previous/Next, and See All scrolls on; opening a row stacks
- * a page with Back (Escape); an album or a pasted playlist has a star that keeps it in this PC's
- * library; a song shows genre, label, year and lyrics, and downloads through the helper as every
- * download on this PC does. The behaviour both apps share is `@now-playing/domain/catalog` (view.ts);
- * this file is the hub's view with the companion's kit (`search-kit.tsx`, DEC-026) and transport.
+ * artists, albums and playlists across iTunes, Deezer, MusicBrainz, YouTube and SoundCloud, or reads
+ * a pasted link from any platform, Spotify included. The answers stream in from the embedded helper
+ * (through the main process, `catalog.ts`) and are folded by id.
+ *
+ * The owner's shape (2026-10-07, the player's NP-FIND-003…010 carried here): one centred column
+ * under the field (UX-SEARCH-011). After a search, a calm overview — Songs (five), Artists, Albums
+ * and Playlists (three each), each with "See all N", the services' line under them, and no pager
+ * (UX-SEARCH-007). "See all" opens one type's own page — its field, the segmented control, the
+ * services' line and a list that scrolls on by itself while ‹ › and "Page N of M" move it a page at
+ * a time (UX-SEARCH-009). Playlists are a type, the starred ones first (UX-SEARCH-010). Every song
+ * row has a "…" (and a right-click) menu (UX-SEARCH-012): Add to Up Next (the companion has no queue
+ * of its own, so a paired hub's group), Add to Playlist and Add to Library (this PC's library,
+ * through the helper's download path), Download…, Audition and Open Details. Opening a row stacks a
+ * page with Back (Escape); an album or a playlist has a star that keeps it in this PC's library; a
+ * song shows genre, label, year and lyrics, and downloads through the helper as every download on
+ * this PC does. The behaviour both apps share is `@now-playing/domain/catalog` (view.ts); this file
+ * is the hub's view with the companion's kit (`search-kit.tsx`, DEC-026) and transport.
  */
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
-import type { CatalogAlbum, CatalogAlbumDetail, CatalogArtist, CatalogArtistDetail, CatalogCollection, CatalogEnrichment, CatalogLyrics, CatalogResolveResult, CatalogSection, CatalogSource, CatalogTrack, DownloadAuthorizationBasis, OutputFormat } from '@now-playing/contracts';
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
+import type { CatalogAlbum, CatalogAlbumDetail, CatalogArtist, CatalogArtistDetail, CatalogCollection, CatalogEnrichment, CatalogLyrics, CatalogPlaylist, CatalogResolveResult, CatalogSearchSection, CatalogSource, CatalogSourceStatus, CatalogTrack, DownloadAuthorizationBasis, OutputFormat, SavedCollection } from '@now-playing/contracts';
 import { CATALOG_COLLECTION_CAP, CATALOG_PROVIDERS } from '@now-playing/contracts';
 import {
   albumLine,
   appendPage,
-  creditLine,
   appendTracks,
   byRank,
   CATALOG_PROVIDER_LABELS,
-  CATALOG_SECTION_LABELS,
+  CATALOG_SEARCH_SECTION_LABELS,
   collapseFields,
   collectionLine,
   coverArt,
+  creditLine,
   EMPTY_FIELDS,
   EMPTY_RESULTS,
-  foldCatalogChunk,
+    foldCatalogChunk,
   formatDuration,
   hasQuery,
+  OVERVIEW_ROWS,
   parseLrc,
+  pickDownloadSource,
   platformLabel,
   platformsOf,
+  playlistLine,
   PLAYS_FROM_SPOTDL,
   playsThroughSpotdl,
   previewOf,
   savedCollectionOf,
-  sourceDot,
+  savedMatching,
+  SEARCH_TYPES,
+  seeAllText,
   sectionPages,
+  sourceDot,
   sourceStateText,
   statusSummary,
-  type SectionPages,
+  thatsAllText,
+  TYPE_PAGE_ROWS,
+  typeCount,
   type CatalogFields,
   type CatalogResults,
 } from '@now-playing/domain/catalog';
 import { invoke } from '../bridge.js';
-import { catalogError, companionCatalog, useCatalogFilter, useLiveSearch, usePreview, useSavedCollections, type CatalogClient, type CatalogFilter, type CatalogSearchParams, type Preview, type SavedCollections } from '../catalog.js';
+import { ALL_SECTIONS, catalogError, companionCatalog, useCatalogFilter, useLiveSearch, usePreview, useSavedCollections, type CatalogClient, type CatalogFilter, type CatalogSearchParams, type LiveSearch, type Preview, type SavedCollections } from '../catalog.js';
+import { Menu, type MenuAt, type MenuEntry } from '../menu.js';
 import { ActionError, Check, errorSentence, Field, Group, Note, Pop, Push, Sdot, Sheet, SearchUiProvider, useNow, useSearchUi } from '../search-kit.js';
+import type { HubGroupChoice } from '../../shared/ipc.js';
+
 /** Why this download is allowed: the same bases the hub and the helper record (DownloadAuthorizationBasis). */
 const BASIS_LABELS: Record<string, string> = {
   'user-owned': 'I own it',
@@ -57,15 +77,17 @@ const BASIS_LABELS: Record<string, string> = {
   licensed: 'Licensed',
 };
 
-/** Rows a page of a section shows on the results (UX-SEARCH-007); See All scrolls through them all. */
-const SECTION_PAGE = 8;
-/** Rows a See All page or a list asks for at a time. */
-const PAGE = 25;
+/** Rows an album, a playlist or an artist's albums ask for at a time. */
 const LIST_PAGE = 50;
+/** The services page a search to this offset at most (the contract's bound). */
+const OFFSET_MAX = 1000;
+
+type Row = CatalogTrack | CatalogArtist | CatalogAlbum | CatalogPlaylist;
 
 type Page =
   | { kind: 'results' }
-  | { kind: 'all'; section: CatalogSection }
+  /** A type's own page: `seed` starts it from the overview's rows; `focus` says what takes the keys. */
+  | { kind: 'type'; section: CatalogSearchSection; fields: CatalogFields; seed: boolean; n: number; focus?: 'tab' | 'field' }
   | { kind: 'album'; album: CatalogAlbum }
   | { kind: 'artist'; artist: CatalogArtist }
   | { kind: 'song'; track: CatalogTrack }
@@ -75,8 +97,8 @@ function pageTitle(page: Page): string {
   switch (page.kind) {
     case 'results':
       return 'Results';
-    case 'all':
-      return `All ${CATALOG_SECTION_LABELS[page.section]}`;
+    case 'type':
+      return CATALOG_SEARCH_SECTION_LABELS[page.section];
     case 'album':
       return page.album.title;
     case 'artist':
@@ -93,6 +115,23 @@ function albumPage(album: CatalogAlbum): Page {
   if (/^(deezer|apple-music):/.test(album.id)) return { kind: 'album', album };
   return { kind: 'list', url: album.sources[0]!.url, first: null, title: album.title };
 }
+
+/** A playlist opens like an album: its link resolved, page by page (UX-SEARCH-004, UX-SEARCH-010). */
+function playlistPage(playlist: CatalogPlaylist): Page {
+  return { kind: 'list', url: playlist.sources[0]!.url, first: null, title: playlist.title };
+}
+
+function rowsOf(results: CatalogResults, section: CatalogSearchSection): Row[] {
+  return section === 'tracks' ? byRank(results.tracks) : byRank<Row>(results[section]);
+}
+
+function sameFields(a: CatalogFields, b: CatalogFields): boolean {
+  return a.q === b.q && a.track === b.track && a.artist === b.artist && a.album === b.album;
+}
+
+/** Opens a song row's menu; given to every list of songs through context (UX-SEARCH-012). */
+type OpenSongMenu = (track: CatalogTrack, at: MenuAt, returnTo: HTMLElement | null) => void;
+const SongMenuContext = createContext<OpenSongMenu | null>(null);
 
 /* ------------------------------------------------------------------ the tab */
 
@@ -116,24 +155,25 @@ function SearchPane({ client, initialQuery }: { client: CatalogClient; initialQu
   const { present, say } = useSearchUi();
   const [stack, setStack] = useState<Page[]>([{ kind: 'results' }]);
   const heading = useRef<HTMLHeadingElement>(null);
+  const field = useRef<HTMLInputElement>(null);
+  const pages = useRef(0);
 
   const page = stack[stack.length - 1]!;
   const open = useCallback((next: Page) => setStack((s) => [...s, next]), []);
+  const replace = useCallback((next: Page) => setStack((s) => [...s.slice(0, -1), next]), []);
   const back = useCallback(() => setStack((s) => (s.length > 1 ? s.slice(0, -1) : s)), []);
+  const seeAll = useCallback((section: CatalogSearchSection, words: CatalogFields) => open({ kind: 'type', section, fields: words, seed: true, n: (pages.current += 1) }), [open]);
 
-  // A page that opens takes the focus to its heading, so a screen reader hears where it is.
+  // A page that opens takes the focus to its heading, so a screen reader hears where it is; a type
+  // switched or searched from its own page keeps the keys where they were.
   const depth = stack.length;
   useEffect(() => {
-    if (depth > 1) heading.current?.focus();
+    if (depth > 1 && !(page.kind === 'type' && page.focus)) heading.current?.focus();
   }, [depth, page]);
-
-  // Each section's pager, kept here so a page survives opening a row and coming Back (UX-SEARCH-007).
-  const [pagers, setPagers] = useState<Pagers>(FRESH_PAGERS);
 
   const search = (params: Omit<CatalogSearchParams, 'sections' | 'providers'>, using: CatalogFilter = filter): void => {
     preview.stop();
     setStack([{ kind: 'results' }]);
-    setPagers(FRESH_PAGERS);
     live.run({ ...params, sections: using.sections, providers: using.providers });
   };
 
@@ -175,96 +215,95 @@ function SearchPane({ client, initialQuery }: { client: CatalogClient; initialQu
     );
   };
 
+  const songMenu = useSongMenu({ preview, present, say, open });
+
   const now = useNow(5_000);
   const { results } = live;
   const summary = live.error ? errorSentence(live.error) : statusSummary(results.status, Boolean(results.done) && !live.running, results.done?.totals);
-  const filtered = filter.sections.length < 3 || filter.providers.length < CATALOG_PROVIDERS.length;
+  const filtered = filter.sections.length < ALL_SECTIONS.length || filter.providers.length < CATALOG_PROVIDERS.length;
+
+  // Escape walks back a page, then puts the results away (UX-SEARCH-008); never from a field being typed in.
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+    if (event.key !== 'Escape' || event.defaultPrevented || event.target instanceof HTMLInputElement) return;
+    if (stack.length > 1) {
+      event.preventDefault();
+      back();
+    } else if (live.asked) {
+      event.preventDefault();
+      preview.stop();
+      live.clear();
+      field.current?.focus();
+    }
+  };
 
   return (
-    <div className="srch">
-      <Group title="Find music" hint="Songs, artists and albums from iTunes, Deezer, MusicBrainz, YouTube and SoundCloud — or paste a link from any of them, Spotify included." className="srch__find">
-        <form className="barrow srch__bar" role="search" aria-label="Music" onSubmit={submit} noValidate>
-          <Field
-            type="search"
-            className="srch__q"
-            aria-label="Search for music"
-            placeholder="A song, an artist, an album, an ISRC or a link"
-            value={fields.q}
-            onChange={(event) => setFields({ ...fields, q: event.currentTarget.value })}
-          />
-          <Push type="submit" primary disabled={!hasQuery(fields)} reason="Type what to look for first.">
-            Search
-          </Push>
-          <Push aria-expanded={advanced} aria-controls="srch-fields" onClick={toggleAdvanced}>
-            Track, Artist, Album
-          </Push>
-          <Push onClick={openFilter} aria-describedby={filtered ? 'srch-filtered' : undefined}>
-            Filter…
-          </Push>
-        </form>
-        {advanced ? (
-          <div className="pref srch__fields" id="srch-fields">
-            {(['track', 'artist', 'album'] as const).map((key) => (
-              <FieldRow key={key} label={{ track: 'Track:', artist: 'Artist:', album: 'Album:' }[key]} value={fields[key]} onChange={(value) => setFields({ ...fields, [key]: value })} onEnter={() => hasQuery(fields) && search({ fields })} />
-            ))}
-          </div>
-        ) : null}
-        {filtered ? (
-          <p className="note" id="srch-filtered">
-            Showing {filter.sections.map((s) => CATALOG_SECTION_LABELS[s]).join(', ')} from {filter.providers.length === CATALOG_PROVIDERS.length ? 'every service' : filter.providers.map((p) => CATALOG_PROVIDER_LABELS[p]).join(', ')}.
-          </p>
-        ) : null}
-        {results.status.length ? (
-          <ul className="srcs" aria-label="Services asked">
-            {results.status.map((s) => (
-              <li key={s.provider} title={s.error ?? undefined}>
-                <Sdot kind={sourceDot(s.state)} inline />
-                <b>{CATALOG_PROVIDER_LABELS[s.provider]}</b> <span className="srcs__state">{sourceStateText(s, now)}</span>
-                {s.error ? <span className="sr">: {s.error}</span> : null}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        {results.done?.linkedOnly.length ? <p className="note srcs__links">Linked, not searched: {results.done.linkedOnly.map(platformLabel).join(', ')}.</p> : null}
-        <p className="sr" role="status" aria-live="polite">
-          {summary}
-        </p>
-        {live.error ? <Note bad>{errorSentence(live.error)}</Note> : null}
-      </Group>
-
-      {page.kind === 'results' ? (
-        <ResultsPage results={results} running={live.running} asked={live.asked} filter={filter} client={client} preview={preview} open={open} pagers={pagers} setPagers={setPagers} />
-      ) : (
-        // Escape goes back a page, as Back does, from anywhere in it but a field being typed in.
-        // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
-        <section
-          className="srch__page"
-          aria-labelledby="srch-page-h"
-          onKeyDown={(event) => {
-            if (event.key === 'Escape' && !(event.target instanceof HTMLInputElement)) {
-              event.preventDefault();
-              back();
-            }
-          }}
-        >
-          <div className="barrow barrow--above srch__nav">
-            <Push onClick={back} aria-label={`Back to ${pageTitle(stack[stack.length - 2]!)}`}>
-              ‹ Back
+    <SongMenuContext.Provider value={songMenu.open}>
+      {/* Escape belongs to the column as a whole, the way it does to the player's card. */}
+      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+      <div className="srch" onKeyDown={onKeyDown}>
+        <Group title="Find music" hint="Songs, artists, albums and playlists from iTunes, Deezer, MusicBrainz, YouTube and SoundCloud — or paste a link from any of them, Spotify included." className="srch__find">
+          <form className="barrow srch__bar" role="search" aria-label="Music" onSubmit={submit} noValidate>
+            <Field
+              ref={field}
+              type="search"
+              className="srch__q"
+              aria-label="Search for music"
+              placeholder="A song, an artist, an album, an ISRC or a link"
+              value={fields.q}
+              onChange={(event) => setFields({ ...fields, q: event.currentTarget.value })}
+            />
+            <Push type="submit" primary disabled={!hasQuery(fields)} reason="Type what to look for first.">
+              Search
             </Push>
-            <h2 id="srch-page-h" className="srch__h" tabIndex={-1} ref={heading}>
-              {pageTitle(page)}
-            </h2>
-          </div>
-          <div>
-            {page.kind === 'all' && live.asked ? <SeeAllPage key={`all-${page.section}`} section={page.section} results={results} asked={live.asked} client={client} preview={preview} open={open} /> : null}
-            {page.kind === 'album' ? <AlbumPage key={`album-${page.album.id}`} album={page.album} client={client} preview={preview} saved={saved} open={open} say={say} /> : null}
-            {page.kind === 'artist' ? <ArtistPage key={`artist-${page.artist.id}`} artist={page.artist} client={client} preview={preview} open={open} /> : null}
-            {page.kind === 'song' ? <SongPage key={`song-${page.track.id}`} track={page.track} client={client} preview={preview} say={say} /> : null}
-            {page.kind === 'list' ? <ListPage key={`list-${page.url}`} url={page.url} first={page.first} client={client} preview={preview} saved={saved} open={open} say={say} /> : null}
-          </div>
-        </section>
-      )}
-    </div>
+            <Push aria-expanded={advanced} aria-controls="srch-fields" onClick={toggleAdvanced}>
+              Track, Artist, Album
+            </Push>
+            <Push onClick={openFilter} aria-describedby={filtered ? 'srch-filtered' : undefined}>
+              Filter…
+            </Push>
+          </form>
+          {advanced ? (
+            <div className="pref srch__fields" id="srch-fields">
+              {(['track', 'artist', 'album'] as const).map((key) => (
+                <FieldRow key={key} label={{ track: 'Track:', artist: 'Artist:', album: 'Album:' }[key]} value={fields[key]} onChange={(value) => setFields({ ...fields, [key]: value })} onEnter={() => hasQuery(fields) && search({ fields })} />
+              ))}
+            </div>
+          ) : null}
+          {filtered ? (
+            <p className="note" id="srch-filtered">
+              Showing {filter.sections.map((s) => CATALOG_SEARCH_SECTION_LABELS[s]).join(', ')} from {filter.providers.length === CATALOG_PROVIDERS.length ? 'every service' : filter.providers.map((p) => CATALOG_PROVIDER_LABELS[p]).join(', ')}.
+            </p>
+          ) : null}
+          <p className="sr" role="status" aria-live="polite">
+            {summary}
+          </p>
+          {live.error ? <Note bad>{errorSentence(live.error)}</Note> : null}
+        </Group>
+
+        {page.kind === 'results' ? (
+          <Overview results={results} running={live.running} asked={live.asked} filter={filter} client={client} preview={preview} open={open} seeAll={seeAll} now={now} />
+        ) : (
+          <section className="srch__page" aria-labelledby="srch-page-h">
+            <div className="barrow barrow--above srch__nav">
+              <Push onClick={back} aria-label={`Back to ${pageTitle(stack[stack.length - 2]!)}`}>
+                ‹ Back
+              </Push>
+              <h2 id="srch-page-h" className="srch__h" tabIndex={-1} ref={heading}>
+                {pageTitle(page)}
+              </h2>
+            </div>
+            <div>
+              {page.kind === 'type' ? <TypePage key={`type-${page.n}`} page={page} live={live} filter={filter} client={client} preview={preview} saved={saved} open={open} replace={replace} now={now} next={() => (pages.current += 1)} /> : null}
+              {page.kind === 'album' ? <AlbumPage key={`album-${page.album.id}`} album={page.album} client={client} preview={preview} saved={saved} open={open} say={say} /> : null}
+              {page.kind === 'artist' ? <ArtistPage key={`artist-${page.artist.id}`} artist={page.artist} client={client} preview={preview} open={open} /> : null}
+              {page.kind === 'song' ? <SongPage key={`song-${page.track.id}`} track={page.track} client={client} preview={preview} say={say} /> : null}
+              {page.kind === 'list' ? <ListPage key={`list-${page.url}`} url={page.url} first={page.first} client={client} preview={preview} saved={saved} open={open} say={say} /> : null}
+            </div>
+          </section>
+        )}
+        {songMenu.menu}
+      </div>
+    </SongMenuContext.Provider>
   );
 }
 
@@ -302,16 +341,16 @@ function FilterSheet({ filter, onDone, onCancel }: { filter: CatalogFilter; onDo
   };
   const reason = !draft.sections.length ? 'Show at least one kind of result.' : !draft.providers.length ? 'Ask at least one service.' : null;
   // Kept in the order the window shows them, whatever order they were ticked in.
-  const ordered = (next: CatalogFilter): CatalogFilter => ({ sections: (['tracks', 'artists', 'albums'] as const).filter((s) => next.sections.includes(s)), providers: CATALOG_PROVIDERS.filter((p) => next.providers.includes(p)) });
+  const ordered = (next: CatalogFilter): CatalogFilter => ({ sections: ALL_SECTIONS.filter((s) => next.sections.includes(s)), providers: CATALOG_PROVIDERS.filter((p) => next.providers.includes(p)) });
   return (
     <Sheet title="Filter the search" onCancel={onCancel}>
       <p>Kept on this PC. Changing it searches again.</p>
       <div className="srch__filter">
         <fieldset>
           <legend>Show</legend>
-          {(['tracks', 'artists', 'albums'] as const).map((s) => (
+          {ALL_SECTIONS.map((s) => (
             <Check key={s} checked={draft.sections.includes(s)} onChange={(on) => flip('sections', s, on)}>
-              {CATALOG_SECTION_LABELS[s]}
+              {CATALOG_SEARCH_SECTION_LABELS[s]}
             </Check>
           ))}
         </fieldset>
@@ -335,119 +374,69 @@ function FilterSheet({ filter, onDone, onCancel }: { filter: CatalogFilter; onDo
   );
 }
 
-/* ------------------------------------------------------------------ the results */
+/* ------------------------------------------------------------------ the services' line */
 
-/** One section's pager: the page shown, rows loaded past the first answer, and where the next ask starts. */
-interface PagerState {
-  page: number;
-  extra: { tracks: CatalogTrack[]; artists: CatalogArtist[]; albums: CatalogAlbum[] };
-  /** The offset of the last page the server was asked for. */
-  offset: number;
-  /** The services' `hasMore` for that page; null until a further page was asked for. */
-  more: boolean | null;
-  busy: boolean;
-  error: Error | null;
-}
-type Pagers = Record<CatalogSection, PagerState>;
-const FRESH_PAGER: PagerState = { page: 0, extra: { tracks: [], artists: [], albums: [] }, offset: 0, more: null, busy: false, error: null };
-const FRESH_PAGERS: Pagers = { tracks: FRESH_PAGER, artists: FRESH_PAGER, albums: FRESH_PAGER };
-
-function sectionRows(section: CatalogSection, results: CatalogResults, extra: PagerState['extra']): Array<CatalogTrack | CatalogArtist | CatalogAlbum> {
-  if (section === 'tracks') return appendTracks(byRank(results.tracks), extra.tracks);
-  if (section === 'artists') return appendPage(byRank(results.artists), extra.artists);
-  return appendPage(byRank(results.albums), extra.albums);
+/** Every service with its lamp and its state in words, and the platforms that only gave links (UX-SEARCH-002). */
+function ServiceLine({ status, linkedOnly, now }: { status: readonly CatalogSourceStatus[]; linkedOnly: readonly CatalogSource['platform'][] | undefined; now: number }) {
+  if (!status.length) return null;
+  return (
+    <div className="srch__services">
+      <ul className="srcs" aria-label="Services asked">
+        {status.map((s) => (
+          <li key={s.provider} title={s.error ?? undefined}>
+            <Sdot kind={sourceDot(s.state)} inline />
+            <b>{CATALOG_PROVIDER_LABELS[s.provider]}</b> <span className="srcs__state">{sourceStateText(s, now)}</span>
+            {s.error ? <span className="sr">: {s.error}</span> : null}
+          </li>
+        ))}
+      </ul>
+      {linkedOnly?.length ? <p className="note srcs__links">Linked, not searched: {linkedOnly.map(platformLabel).join(', ')}.</p> : null}
+    </div>
+  );
 }
 
-function ResultsPage({ results, running, asked, filter, client, preview, open, pagers, setPagers }: { results: CatalogResults; running: boolean; asked: CatalogSearchParams | null; filter: CatalogFilter; client: CatalogClient; preview: Preview; open: (page: Page) => void; pagers: Pagers; setPagers: (update: (current: Pagers) => Pagers) => void }) {
+/* ------------------------------------------------------------------ the overview */
+
+/**
+ * The calm overview (UX-SEARCH-007): a few of each kind, "See all N" into each type's own page, the
+ * services' line under them, and no pager. Rows still fold in by id as each service answers.
+ */
+function Overview({ results, running, asked, filter, client, preview, open, seeAll, now }: { results: CatalogResults; running: boolean; asked: CatalogSearchParams | null; filter: CatalogFilter; client: CatalogClient; preview: Preview; open: (page: Page) => void; seeAll: (section: CatalogSearchSection, fields: CatalogFields) => void; now: number }) {
   const link = results.done?.resolve ?? null;
   if (!asked) return null;
   if (link) return <LinkResult key={link} url={link} client={client} preview={preview} open={open} />;
   const shown = filter.sections.filter((s) => results.done === null || results.done.page[s] !== null || results[s].length > 0);
-  const patch = (section: CatalogSection, next: Partial<PagerState>): void => setPagers((current) => ({ ...current, [section]: { ...current[section], ...next } }));
-
-  /** A page: drawn from what is loaded, or — past it, while the services have more — asked for first. */
-  const goTo = async (section: CatalogSection, target: number, state: SectionPages, pager: PagerState): Promise<void> => {
-    if (target <= state.known - 1 || !state.more) return patch(section, { page: Math.max(0, Math.min(target, state.known - 1)) });
-    const size = asked.limit ?? PAGE;
-    const offset = (pager.more === null ? (asked.offset ?? 0) : pager.offset) + size;
-    patch(section, { busy: true, error: null });
-    let page: CatalogResults = EMPTY_RESULTS;
-    try {
-      await client.search({ ...asked, sections: [section], offset, limit: size }, (chunk) => (page = foldCatalogChunk(page, chunk)), new AbortController().signal);
-      setPagers((current) => {
-        const before = current[section];
-        const extra = { ...before.extra, [section]: section === 'tracks' ? appendTracks(before.extra.tracks, byRank(page.tracks)) : appendPage(before.extra[section] as Array<{ id: string; rank: number }>, byRank(page[section] as Array<{ id: string; rank: number }>)) } as PagerState['extra'];
-        const loaded = sectionRows(section, results, extra).length;
-        return { ...current, [section]: { ...before, extra, offset, more: Boolean(page.done?.page[section]?.hasMore) && offset + size <= 1000, busy: false, page: Math.min(target, Math.max(0, Math.ceil(loaded / SECTION_PAGE) - 1)) } };
-      });
-    } catch (err) {
-      patch(section, { busy: false, error: catalogError(err) });
-    }
-  };
-
   return (
     <>
       {shown.map((section) => {
-        const pager = pagers[section];
-        const rows = sectionRows(section, results, pager.extra);
-        const more = pager.more ?? Boolean(results.done?.page[section]?.hasMore);
-        const state = sectionPages(rows.length, SECTION_PAGE, pager.page, more);
-        const slice = rows.slice(state.page * SECTION_PAGE, state.page * SECTION_PAGE + SECTION_PAGE);
-        const waiting = running && !rows.length;
-        const label = CATALOG_SECTION_LABELS[section];
+        const rows = rowsOf(results, section);
+        const more = Boolean(results.done?.page[section]?.hasMore);
+        const few = rows.slice(0, OVERVIEW_ROWS[section]);
+        const empty = running && !rows.length ? 'Asking…' : `No ${CATALOG_SEARCH_SECTION_LABELS[section].toLowerCase()}.`;
+        const label = CATALOG_SEARCH_SECTION_LABELS[section];
         return (
-          <Group key={section} title={label} tag={rows.length ? <span className="sub srch__count">{` ${rows.length}${more ? '+' : ''}`}</span> : null}>
-            {section === 'tracks' ? <TrackList label="Songs" tracks={slice as CatalogTrack[]} preview={preview} onOpen={(t) => open({ kind: 'song', track: t })} empty={waiting ? 'Asking…' : 'No songs.'} /> : null}
-            {section === 'artists' ? <ArtistList label="Artists" artists={slice as CatalogArtist[]} onOpen={(a) => open({ kind: 'artist', artist: a })} empty={waiting ? 'Asking…' : 'No artists.'} /> : null}
-            {section === 'albums' ? <AlbumList label="Albums" albums={slice as CatalogAlbum[]} onOpen={(a) => open(albumPage(a))} empty={waiting ? 'Asking…' : 'No albums.'} /> : null}
-            <div className="barrow srch__pagerow">
-              {state.known > 1 || state.more ? <Pager label={label} state={state} busy={pager.busy} onPage={(n) => void goTo(section, n, state, pager)} /> : null}
-              {rows.length > SECTION_PAGE || more ? <Push onClick={() => open({ kind: 'all', section })}>See All {label}</Push> : null}
-            </div>
-            <ActionError error={pager.error} />
+          <Group key={section} title={label}>
+            <RowList section={section} label={label} rows={few} preview={preview} open={open} empty={empty} />
+            {rows.length ? (
+              <div className="barrow srch__seeall">
+                <Push onClick={() => seeAll(section, asked.fields)}>{seeAllText(section, rows.length, more)}</Push>
+              </div>
+            ) : null}
           </Group>
         );
       })}
+      <ServiceLine status={results.status} linkedOnly={results.done?.linkedOnly} now={now} />
     </>
   );
 }
 
-/**
- * A section's pages (UX-SEARCH-007): Previous, the page numbers, Next, and the count in words. The
- * arrow keys move a page from anywhere in it, Home and End go to the first and the last loaded.
- */
-function Pager({ label, state, busy, onPage }: { label: string; state: SectionPages; busy: boolean; onPage: (page: number) => void }) {
-  const first = Math.max(0, Math.min(state.page - 3, state.known - 7));
-  const numbers = Array.from({ length: Math.min(7, state.known) }, (_, i) => first + i);
-  return (
-    // The arrow keys belong to the pager as a whole, as they do to a tab strip.
-    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
-    <nav
-      className="pager"
-      aria-label={`${label} pages`}
-      onKeyDown={(event) => {
-        const to = { ArrowLeft: state.canPrev ? state.page - 1 : null, ArrowRight: state.canNext ? state.page + 1 : null, Home: 0, End: state.known - 1 }[event.key];
-        if (to === undefined) return;
-        event.preventDefault();
-        if (to !== null && !busy) onPage(to);
-      }}
-    >
-      <Push className="pager__step" disabled={!state.canPrev} onClick={() => onPage(state.page - 1)} aria-label={`Previous page of ${label.toLowerCase()}`}>
-        ‹ Previous
-      </Push>
-      {numbers.map((n) => (
-        <Push key={n} className="pager__n" aria-current={n === state.page ? 'page' : undefined} aria-label={`${label}, page ${n + 1}`} onClick={() => onPage(n)}>
-          {n + 1}
-        </Push>
-      ))}
-      <Push className="pager__step" disabled={!state.canNext} busy={busy} onClick={() => onPage(state.page + 1)} aria-label={`Next page of ${label.toLowerCase()}`}>
-        Next ›
-      </Push>
-      <span className="pager__count" aria-live="polite">
-        {state.label}
-      </span>
-    </nav>
-  );
+/** A list of one kind of row: songs, artists, albums or playlists. */
+function RowList({ section, label, rows, preview, open, empty, pageSize, focusRequest, onPageKey, onActive }: { section: CatalogSearchSection; label: string; rows: readonly Row[]; preview: Preview; open: (page: Page) => void; empty: string; pageSize?: number; focusRequest?: FocusRequest | null; onPageKey?: (step: 1 | -1, index: number) => void; onActive?: (index: number) => void }) {
+  const paging = { ...(pageSize ? { pageSize } : {}), ...(focusRequest ? { focusRequest } : {}), ...(onPageKey ? { onPageKey } : {}), ...(onActive ? { onActive } : {}) };
+  if (section === 'tracks') return <TrackList label={label} tracks={rows as CatalogTrack[]} preview={preview} onOpen={(t) => open({ kind: 'song', track: t })} empty={empty} {...paging} />;
+  if (section === 'artists') return <ArtistList label={label} artists={rows as CatalogArtist[]} onOpen={(a) => open({ kind: 'artist', artist: a })} empty={empty} {...paging} />;
+  if (section === 'albums') return <AlbumList label={label} albums={rows as CatalogAlbum[]} onOpen={(a) => open(albumPage(a))} empty={empty} {...paging} />;
+  return <PlaylistList label={label} playlists={rows as CatalogPlaylist[]} onOpen={(p) => open(playlistPage(p))} empty={empty} {...paging} />;
 }
 
 /** A pasted link: resolved, not searched (UX-CAT-003, UX-SEARCH-004). */
@@ -480,76 +469,296 @@ function LinkResult({ url, client, preview, open }: { url: string; client: Catal
   );
 }
 
-/* ------------------------------------------------------------------ See All */
+/* ------------------------------------------------------------------ a type's own page */
 
-function SeeAllPage({ section, results, asked, client, preview, open }: { section: CatalogSection; results: CatalogResults; asked: CatalogSearchParams; client: CatalogClient; preview: Preview; open: (page: Page) => void }) {
-  const [rows, setRows] = useState<{ tracks: CatalogTrack[]; artists: CatalogArtist[]; albums: CatalogAlbum[] }>(() => ({ tracks: byRank(results.tracks), artists: byRank(results.artists), albums: byRank(results.albums) }));
-  const [offset, setOffset] = useState(asked.offset ?? 0);
-  const [hasMore, setHasMore] = useState(Boolean(results.done?.page[section]?.hasMore));
+interface FocusRequest {
+  index: number;
+  n: number;
+}
+
+/**
+ * One type's page (UX-SEARCH-009): its own field and the segmented control over the services' line
+ * and the list. The list scrolls on by itself — near its end, or when the keys reach its last rows,
+ * the next offset is asked for — and the footer's ‹ › (or Page Up/Down) move a page at a time,
+ * fetching that page first when it has not arrived, landing on its first row with the keys on it.
+ * The count follows the scroll. Pages are 25 songs, or 12 artists, albums or playlists.
+ */
+function TypePage({ page, live, filter, client, preview, saved, open, replace, now, next }: { page: Extract<Page, { kind: 'type' }>; live: LiveSearch; filter: CatalogFilter; client: CatalogClient; preview: Preview; saved: SavedCollections; open: (page: Page) => void; replace: (page: Page) => void; now: number; next: () => number }) {
+  const { section, fields } = page;
+  const size = TYPE_PAGE_ROWS[section];
+  const label = CATALOG_SEARCH_SECTION_LABELS[section];
+  const noun = label.toLowerCase();
+  const words = collapseFields(fields).q;
+  // Seeded from the overview only when it has finished answering the same words; else a search of its own.
+  const seeded = page.seed && live.asked !== null && !live.running && sameFields(live.asked.fields, fields) && live.asked.sections.includes(section);
+  const base = useMemo<CatalogSearchParams>(() => ({ fields, sections: [section], providers: filter.providers }), [fields, filter.providers, section]);
+
+  const [rows, setRows] = useState<Row[]>(() => (seeded ? rowsOf(live.results, section) : []));
+  const [status, setStatus] = useState<CatalogSourceStatus[]>(() => (seeded ? live.results.status : []));
+  const [linkedOnly, setLinkedOnly] = useState(() => (seeded ? live.results.done?.linkedOnly : undefined));
+  const [more, setMore] = useState(() => (seeded ? Boolean(live.results.done?.page[section]?.hasMore) : false));
+  const [running, setRunning] = useState(!seeded);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-  const inFlight = useRef(false);
+  const [shownPage, setShownPage] = useState(0);
+  const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
+  const [typed, setTyped] = useState(words);
 
-  const more = useCallback(async (): Promise<void> => {
-    if (inFlight.current || !hasMore) return;
-    inFlight.current = true;
+  // Where the next ask starts and how big a step is: the overview's page, or this page's own.
+  const cursor = useRef({ offset: seeded ? (live.asked?.offset ?? 0) : 0, step: seeded ? (live.asked?.limit ?? 25) : size });
+  // What the async paging reads: kept in step with every change of the rows, not a render later.
+  const latest = useRef({ rows, more });
+  const inFlight = useRef<Promise<void> | null>(null);
+  const alive = useRef(true);
+  useEffect(
+    () => () => {
+      alive.current = false;
+    },
+    [],
+  );
+
+  const append = useCallback(
+    (found: CatalogResults) => {
+      const fresh = rowsOf(found, section);
+      const current = latest.current.rows;
+      const after = section === 'tracks' ? appendTracks(current as CatalogTrack[], fresh as CatalogTrack[]) : appendPage(current, fresh);
+      latest.current.rows = after;
+      setRows(after);
+    },
+    [section],
+  );
+
+  /** The next offset of this type alone, once at a time; a second ask waits for the first. */
+  const fetchMore = useCallback((): Promise<void> => {
+    if (inFlight.current) return inFlight.current;
+    if (!latest.current.more) return Promise.resolve();
+    const offset = cursor.current.offset + cursor.current.step;
+    if (offset > OFFSET_MAX) {
+      setMore(false);
+      return Promise.resolve();
+    }
     setBusy(true);
     setError(null);
-    const next = offset + (asked.limit ?? PAGE);
-    let page: CatalogResults = EMPTY_RESULTS;
-    try {
-      await client.search({ ...asked, sections: [section], offset: next, limit: asked.limit ?? PAGE }, (chunk) => (page = foldCatalogChunk(page, chunk)), new AbortController().signal);
-      setRows((current) => ({ tracks: appendTracks(current.tracks, byRank(page.tracks)), artists: appendPage(current.artists, byRank(page.artists)), albums: appendPage(current.albums, byRank(page.albums)) }));
-      setOffset(next);
-      setHasMore(Boolean(page.done?.page[section]?.hasMore) && next + (asked.limit ?? PAGE) <= 1000);
-    } catch (err) {
-      setError(catalogError(err));
-    } finally {
-      inFlight.current = false;
-      setBusy(false);
+    let found: CatalogResults = EMPTY_RESULTS;
+    const work = client
+      .search({ ...base, offset, limit: cursor.current.step }, (chunk) => (found = foldCatalogChunk(found, chunk)), new AbortController().signal)
+      .then(() => {
+        if (!alive.current) return;
+        append(found);
+        cursor.current.offset = offset;
+        const after = Boolean(found.done?.page[section]?.hasMore) && offset + cursor.current.step <= OFFSET_MAX;
+        latest.current.more = after;
+        setMore(after);
+      })
+      .catch((err: unknown) => {
+        if (!alive.current) return;
+        setError(catalogError(err));
+        latest.current.more = false;
+        setMore(false);
+      })
+      .finally(() => {
+        inFlight.current = null;
+        if (alive.current) setBusy(false);
+      });
+    inFlight.current = work;
+    return work;
+  }, [append, base, client, section]);
+
+  // A search of its own (the type's field, the control), or — seeded — the next page at once.
+  useEffect(() => {
+    if (seeded) {
+      if (latest.current.more) void fetchMore();
+      return undefined;
     }
-  }, [asked, client, hasMore, offset, section]);
+    const controller = new AbortController();
+    let found: CatalogResults = EMPTY_RESULTS;
+    client
+      .search(
+        { ...base, offset: 0, limit: size },
+        (chunk) => {
+          found = foldCatalogChunk(found, chunk);
+          latest.current.rows = rowsOf(found, section);
+          setRows(latest.current.rows);
+          setStatus(found.status);
+          if (found.done) {
+            setLinkedOnly(found.done.linkedOnly);
+            const after = Boolean(found.done.page[section]?.hasMore);
+            latest.current.more = after;
+            setMore(after);
+          }
+        },
+        controller.signal,
+      )
+      .catch((err: unknown) => {
+        if (!controller.signal.aborted) setError(catalogError(err));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setRunning(false);
+      });
+    return () => controller.abort();
+    // Once, as the page opens: its words and type are fixed for its life (a new search is a new page).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  return (
-    <>
-      {section === 'tracks' ? <TrackList label="All songs" tracks={rows.tracks} preview={preview} onOpen={(t) => open({ kind: 'song', track: t })} empty="No songs." /> : null}
-      {section === 'artists' ? <ArtistList label="All artists" artists={rows.artists} onOpen={(a) => open({ kind: 'artist', artist: a })} empty="No artists." /> : null}
-      {section === 'albums' ? <AlbumList label="All albums" albums={rows.albums} onOpen={(a) => open(albumPage(a))} empty="No albums." /> : null}
-      <ActionError error={error} />
-      {hasMore ? <MoreRows label={`More ${CATALOG_SECTION_LABELS[section]}`} busy={busy} onMore={more} /> : <p className="note">That’s everything the services found.</p>}
-    </>
+  /** Page `target` (0-based): fetched first while it has not arrived, then its first row takes the keys. */
+  const goTo = useCallback(
+    async (target: number): Promise<void> => {
+      if (target < 0) return;
+      let have = latest.current.rows.length;
+      while (target * size >= have && latest.current.more) {
+        await fetchMore();
+        if (latest.current.rows.length === have) break;
+        have = latest.current.rows.length;
+      }
+      const last = Math.max(0, Math.ceil(latest.current.rows.length / size) - 1);
+      const to = Math.min(target, last);
+      setShownPage(to);
+      setFocusRequest({ index: to * size, n: Date.now() });
+    },
+    [fetchMore, size],
   );
-}
 
-/** Infinite scroll: the next page loads as this comes into view, and the button does the same by hand. */
-function MoreRows({ label, busy, onMore }: { label: string; busy: boolean; onMore: () => void }) {
+  // The count follows the scroll: the page of the first row in view; at the very end, the last one.
   const box = useRef<HTMLDivElement>(null);
-  const latest = useRef({ onMore, busy });
   useEffect(() => {
-    latest.current = { onMore, busy };
-  }, [onMore, busy]);
+    const pane = box.current?.closest('.pane');
+    if (!pane) return undefined;
+    let frame = 0;
+    const follow = (): void => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const items = box.current ? Array.from(box.current.querySelectorAll<HTMLElement>('[role="tabpanel"] [data-index]')) : [];
+        if (!items.length) return;
+        const top = pane.getBoundingClientRect().top;
+        if (pane.scrollTop + pane.clientHeight >= pane.scrollHeight - 2) return setShownPage(Math.ceil(items.length / size) - 1);
+        const first = items.findIndex((el) => el.getBoundingClientRect().bottom > top + 4);
+        if (first >= 0) setShownPage(Math.floor(first / size));
+      });
+    };
+    pane.addEventListener('scroll', follow, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      pane.removeEventListener('scroll', follow);
+    };
+  }, [size]);
+
+  // Infinite scroll: the end of the list coming near asks for the next page.
+  const end = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const node = box.current;
-    if (!node || typeof IntersectionObserver === 'undefined') return;
+    const node = end.current;
+    if (!node || typeof IntersectionObserver === 'undefined') return undefined;
     const observer = new IntersectionObserver((entries) => {
-      if (entries.some((e) => e.isIntersecting) && !latest.current.busy) latest.current.onMore();
-    }, { root: node.closest('.pane'), rootMargin: '160px' });
+      if (entries.some((e) => e.isIntersecting)) void fetchMore();
+    }, { root: node.closest('.pane'), rootMargin: '240px' });
     observer.observe(node);
     return () => observer.disconnect();
-  }, []);
+  }, [fetchMore]);
+
+  // What takes the keys as the page opens: the control or the field, when the page was made from them.
+  const tabs = useRef<HTMLDivElement>(null);
+  const typeField = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (page.focus === 'tab') tabs.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.focus();
+    if (page.focus === 'field') typeField.current?.focus();
+  }, [page.focus]);
+
+  const state = sectionPages(rows.length, size, shownPage, more);
+  const tabId = useId();
+  const panelId = useId();
+  const kept = section === 'playlists' ? savedMatching(saved.items, 'playlist', words) : [];
+
+  const switchTo = (to: CatalogSearchSection): void => {
+    if (to !== section) replace({ kind: 'type', section: to, fields: { ...EMPTY_FIELDS, q: words }, seed: false, n: next(), focus: 'tab' });
+  };
+  const onTabKey = (event: KeyboardEvent<HTMLDivElement>): void => {
+    const at = SEARCH_TYPES.indexOf(section);
+    const to = { ArrowRight: at + 1, ArrowLeft: at - 1, Home: 0, End: SEARCH_TYPES.length - 1 }[event.key];
+    if (to === undefined) return;
+    event.preventDefault();
+    switchTo(SEARCH_TYPES[(to + SEARCH_TYPES.length) % SEARCH_TYPES.length]!);
+  };
+  const searchType = (event: FormEvent): void => {
+    event.preventDefault();
+    if (!typed.trim()) return;
+    replace({ kind: 'type', section, fields: { ...EMPTY_FIELDS, q: typed.trim() }, seed: false, n: next(), focus: 'field' });
+  };
+
   return (
-    <div className="barrow" ref={box}>
-      <Push busy={busy} onClick={onMore}>
-        {label}
-      </Push>
+    <div className="srch__type" ref={box}>
+      <p className="srch__sub">
+        {running && !rows.length ? `Asking for ${noun}…` : `${typeCount(section, rows.length, more)} for “${words}”`}
+      </p>
+      <form className="barrow srch__typebar" role="search" aria-label={`Search ${noun}`} onSubmit={searchType} noValidate>
+        <Field
+          ref={typeField}
+          type="search"
+          className="srch__q"
+          aria-label={`Search ${noun}`}
+          value={typed}
+          onChange={(event) => setTyped(event.currentTarget.value)}
+          onKeyDown={(event) => {
+            // Page Up/Down turn the list's pages from the field too.
+            if (event.key === 'PageDown' || event.key === 'PageUp') {
+              event.preventDefault();
+              void goTo(state.page + (event.key === 'PageDown' ? 1 : -1));
+            }
+          }}
+        />
+        <Push type="submit" aria-label={`Search ${label}`} disabled={!typed.trim()} reason="Type what to look for first.">
+          Search
+        </Push>
+      </form>
+      {/* The arrows move along the control, as along any tab list. */}
+      {/* eslint-disable-next-line jsx-a11y/interactive-supports-focus */}
+      <div className="seg srch__seg" role="tablist" aria-label="Kind of music" ref={tabs} onKeyDown={onTabKey}>
+        {SEARCH_TYPES.map((t) => (
+          <button key={t} type="button" role="tab" className="seg__btn" id={t === section ? tabId : undefined} aria-selected={t === section} aria-controls={t === section ? panelId : undefined} tabIndex={t === section ? 0 : -1} onClick={() => switchTo(t)}>
+            {CATALOG_SEARCH_SECTION_LABELS[t]}
+          </button>
+        ))}
+      </div>
+      <div role="tabpanel" id={panelId} aria-labelledby={tabId}>
+        <ServiceLine status={status} linkedOnly={linkedOnly} now={now} />
+        {kept.length ? (
+          <>
+            <h3 className="srch__subh">In your library</h3>
+            <SavedList label="Your playlists" items={kept} onOpen={(s) => open({ kind: 'list', url: s.ref.url, first: null, title: s.ref.title })} />
+            <h3 className="srch__subh">From the catalog</h3>
+          </>
+        ) : null}
+        <RowList
+          section={section}
+          label={kept.length ? `${label} from the catalog` : `All ${noun}`}
+          rows={rows}
+          preview={preview}
+          open={open}
+          empty={running ? 'Asking…' : `No ${noun} for “${words}”.`}
+          pageSize={size}
+          focusRequest={focusRequest}
+          onPageKey={(step, index) => void goTo(Math.floor(index / size) + step)}
+          onActive={(index) => {
+            setShownPage(Math.floor(index / size));
+            if (index >= latest.current.rows.length - 3) void fetchMore();
+          }}
+        />
+        <ActionError error={error} />
+        <div className="srch__end" ref={end}>
+          {busy ? <Note>Loading more…</Note> : !more && rows.length && !running ? <Note>{thatsAllText(section, rows.length)}</Note> : null}
+        </div>
+        <nav className="srch__foot" aria-label={`${label} pages`}>
+          <Push className="srch__step" disabled={!state.canPrev} onClick={() => void goTo(state.page - 1)} aria-label={`Previous page of ${noun}`}>
+            ‹
+          </Push>
+          <span className="srch__pageof" aria-live="polite">
+            {state.label}
+          </span>
+          <Push className="srch__step" disabled={!state.canNext || busy} onClick={() => void goTo(state.page + 1)} aria-label={`Next page of ${noun}`}>
+            ›
+          </Push>
+        </nav>
+      </div>
     </div>
   );
-}
-
-/** Busy while a further page loads: set from the event that asked, never from an effect. */
-function busyWhile(setBusy: (on: boolean) => void, work: Promise<void>): void {
-  setBusy(true);
-  void work.finally(() => setBusy(false));
 }
 
 /* ------------------------------------------------------------------ album, playlist, artist */
@@ -595,6 +804,37 @@ function Star({ collection, saved, say }: { collection: CatalogCollection; saved
   );
 }
 
+/** Infinite scroll: the next page loads as this comes into view, and the button does the same by hand. */
+function MoreRows({ label, busy, onMore }: { label: string; busy: boolean; onMore: () => void }) {
+  const box = useRef<HTMLDivElement>(null);
+  const latest = useRef({ onMore, busy });
+  useEffect(() => {
+    latest.current = { onMore, busy };
+  }, [onMore, busy]);
+  useEffect(() => {
+    const node = box.current;
+    if (!node || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting) && !latest.current.busy) latest.current.onMore();
+    }, { root: node.closest('.pane'), rootMargin: '160px' });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <div className="barrow" ref={box}>
+      <Push busy={busy} onClick={onMore}>
+        {label}
+      </Push>
+    </div>
+  );
+}
+
+/** Busy while a further page loads: set from the event that asked, never from an effect. */
+function busyWhile(setBusy: (on: boolean) => void, work: Promise<void>): void {
+  setBusy(true);
+  void work.finally(() => setBusy(false));
+}
+
 function AlbumPage({ album, client, preview, saved, open, say }: { album: CatalogAlbum; client: CatalogClient; preview: Preview; saved: SavedCollections; open: (page: Page) => void; say: (text: string) => void }) {
   const [detail, setDetail] = useState<{ album: CatalogAlbum; collection: CatalogCollection | null; tracks: CatalogTrack[]; total: number | null; hasMore: boolean; capped: boolean } | null>(null);
   const [error, setError] = useState<Error | null>(null);
@@ -636,7 +876,7 @@ function AlbumPage({ album, client, preview, saved, open, say }: { album: Catalo
   );
 }
 
-/** An album or playlist read from its link (pasted, or a row from a platform without a detail route). */
+/** An album or playlist read from its link (pasted, a playlist row, or a platform without a detail route). */
 function ListPage({ url, first, client, preview, saved, open, say }: { url: string; first: CatalogResolveResult | null; client: CatalogClient; preview: Preview; saved: SavedCollections; open: (page: Page) => void; say: (text: string) => void }) {
   const [result, setResult] = useState<CatalogResolveResult | null>(first);
   const [tracks, setTracks] = useState<CatalogTrack[]>(first?.collection?.page.tracks ?? []);
@@ -739,6 +979,9 @@ const FORMATS: ReadonlyArray<{ value: OutputFormat; label: string }> = [
   { value: 'flac', label: 'FLAC' },
 ];
 
+/** The bases a person can state for a download from Search. */
+const SEARCH_BASES = Object.entries(BASIS_LABELS);
+
 function SongPage({ track, client, preview, say }: { track: CatalogTrack; client: CatalogClient; preview: Preview; say: (text: string) => void }) {
   const [about, setAbout] = useState<CatalogEnrichment | null>(null);
   const [aboutError, setAboutError] = useState<Error | null>(null);
@@ -831,22 +1074,25 @@ function Lyrics({ lyrics, error }: { lyrics: CatalogLyrics | null; error: Error 
   );
 }
 
+/** A song through the helper's own download path (`catalog:download`), as every download on this PC is. */
+async function downloadToPc(track: CatalogTrack, basis: DownloadAuthorizationBasis, format: OutputFormat): Promise<string> {
+  const answer = await invoke('catalog:download', { track, basis, ...(format !== 'original' ? { format } : {}) });
+  if (!answer.job || !answer.source) throw new Error(answer.reason ?? 'The helper could not start that download.');
+  return `Downloading from ${platformLabel(answer.source.platform)}${answer.source.platform === 'spotify' ? ' through spotDL (its YouTube Music match)' : ''}. It is saved where Settings ▸ Downloads says, with its tags and cover.`;
+}
+
 function DownloadGroup({ track, say }: { track: CatalogTrack; say: (text: string) => void }) {
   const [basis, setBasis] = useState<DownloadAuthorizationBasis>('user-owned');
   const [format, setFormat] = useState<OutputFormat>('original');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [done, setDone] = useState<string | null>(null);
-  const basisId = useId();
-  const formatId = useId();
 
   const download = async (): Promise<void> => {
     setBusy(true);
     setError(null);
     try {
-      const answer = await invoke('catalog:download', { track, basis, ...(format !== 'original' ? { format } : {}) });
-      if (!answer.job || !answer.source) throw new Error(answer.reason ?? 'The helper could not start that download.');
-      setDone(`Downloading from ${platformLabel(answer.source.platform)}${answer.source.platform === 'spotify' ? ' through spotDL (its YouTube Music match)' : ''}. It is saved where Settings ▸ Downloads says, with its tags and cover.`);
+      setDone(await downloadToPc(track, basis, format));
       say(`“${track.title}” is downloading.`);
     } catch (err) {
       setError(catalogError(err));
@@ -857,33 +1103,7 @@ function DownloadGroup({ track, say }: { track: CatalogTrack; say: (text: string
 
   return (
     <Group title="Download to this PC" hint="The helper fetches it from the best place it can — YouTube Music, YouTube, SoundCloud or Bandcamp, or through spotDL for a Spotify song — as every download on this PC does." last>
-      <div className="pref">
-        <label className="k" htmlFor={basisId}>
-          Allowed because:
-        </label>
-        <div className="v">
-          <Pop id={basisId} value={basis} onChange={(event) => setBasis(event.currentTarget.value as DownloadAuthorizationBasis)}>
-            {Object.entries(BASIS_LABELS)
-              .map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-          </Pop>
-        </div>
-        <label className="k" htmlFor={formatId}>
-          Save as:
-        </label>
-        <div className="v">
-          <Pop id={formatId} value={format} onChange={(event) => setFormat(event.currentTarget.value as OutputFormat)}>
-            {FORMATS.map((f) => (
-              <option key={f.value} value={f.value}>
-                {f.label}
-              </option>
-            ))}
-          </Pop>
-        </div>
-      </div>
+      <BasisAndFormat basis={basis} setBasis={setBasis} format={format} setFormat={setFormat} />
       <div className="barrow">
         <Push primary busy={busy} onClick={() => void download()}>
           Download
@@ -892,6 +1112,199 @@ function DownloadGroup({ track, say }: { track: CatalogTrack; say: (text: string
       {done ? <Note>{done}</Note> : <ActionError error={error} />}
     </Group>
   );
+}
+
+/** "Allowed because:" (the rights basis every download states, DEC-036) and, when asked, "Save as:". */
+function BasisAndFormat({ basis, setBasis, format, setFormat }: { basis: DownloadAuthorizationBasis; setBasis: (basis: DownloadAuthorizationBasis) => void; format?: OutputFormat; setFormat?: (format: OutputFormat) => void }) {
+  const basisId = useId();
+  const formatId = useId();
+  return (
+    <div className="pref">
+      <label className="k" htmlFor={basisId}>
+        Allowed because:
+      </label>
+      <div className="v">
+        <Pop id={basisId} value={basis} onChange={(event) => setBasis(event.currentTarget.value as DownloadAuthorizationBasis)}>
+          {SEARCH_BASES.map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </Pop>
+      </div>
+      {format && setFormat ? (
+        <>
+          <label className="k" htmlFor={formatId}>
+            Save as:
+          </label>
+          <div className="v">
+            <Pop id={formatId} value={format} onChange={(event) => setFormat(event.currentTarget.value as OutputFormat)}>
+              {FORMATS.map((f) => (
+                <option key={f.value} value={f.value}>
+                  {f.label}
+                </option>
+              ))}
+            </Pop>
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ a song row's menu (UX-SEARCH-012) */
+
+type AddWhy = 'library' | 'playlist' | 'download';
+
+/**
+ * Add to the library, or Download…: a song through the helper's download path with its rights basis,
+ * into this PC's library. The companion keeps no playlists of its own — the ones it holds are the
+ * players' copies, synced through the hub, and it never changes them — so Add to Playlist asks the
+ * same, saying so.
+ */
+function AddSheet({ track, why, onDone, onCancel }: { track: CatalogTrack; why: AddWhy; onDone: (text: string) => void; onCancel: () => void }) {
+  const [basis, setBasis] = useState<DownloadAuthorizationBasis>('user-owned');
+  const [format, setFormat] = useState<OutputFormat>('original');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const from = pickDownloadSource(track.sources);
+  const go = async (): Promise<void> => {
+    setBusy(true);
+    setError(null);
+    try {
+      const said = await downloadToPc(track, basis, why === 'download' ? format : 'original');
+      onDone(why === 'download' ? `“${track.title}” is downloading. ${said}` : `“${track.title}” is joining this PC’s library. ${said}`);
+    } catch (err) {
+      setError(catalogError(err));
+      setBusy(false);
+    }
+  };
+  const title = why === 'download' ? `Download “${track.title}”` : why === 'playlist' ? 'Add to a playlist' : `Add “${track.title}” to the library`;
+  return (
+    <Sheet title={title} onCancel={onCancel}>
+      {why === 'playlist' ? <p>The companion keeps no playlists of its own: the ones it holds are the players’, synced through the hub. Add “{track.title}” to this PC’s library instead, and a player can put it in one of its playlists.</p> : null}
+      <p>
+        The helper fetches it{from ? ` from ${platformLabel(from.platform)}` : ''} with its tags and cover, into the folder Settings ▸ Downloads names.
+      </p>
+      <BasisAndFormat basis={basis} setBasis={setBasis} {...(why === 'download' ? { format, setFormat } : {})} />
+      <ActionError error={error} />
+      <div className="sheet__acts">
+        <Push onClick={onCancel}>Cancel</Push>
+        <Push primary busy={busy} onClick={() => void go()}>
+          {why === 'download' ? 'Download' : 'Add to Library'}
+        </Push>
+      </div>
+    </Sheet>
+  );
+}
+
+/**
+ * The menu a song row opens (UX-SEARCH-012): Add to Up Next (the companion has no queue of its own,
+ * so a paired hub's group, through `hub:groups` and `hub:request`; a submenu when there are several),
+ * Add to Playlist, Add to Library, Download…, Audition and Open Details. Every action says what
+ * happened in the tool's status line, which is a live region.
+ */
+function useSongMenu({ preview, present, say, open }: { preview: Preview; present: (sheet: ReactNode | null) => void; say: (text: string) => void; open: (page: Page) => void }) {
+  const [shown, setShown] = useState<{ track: CatalogTrack; at: MenuAt; returnTo: HTMLElement | null } | null>(null);
+  const [groups, setGroups] = useState<HubGroupChoice[] | null>(null);
+  const [groupsError, setGroupsError] = useState<string | null>(null);
+  const asked = useRef(false);
+
+  // The groups are read once the tab opens, so the menu knows where Up Next goes when it opens;
+  // a failed read is tried again on the next menu.
+  const loadGroups = useCallback(() => {
+    if (asked.current) return;
+    asked.current = true;
+    invoke('hub:groups', undefined)
+      .then((answer) => {
+        setGroups(answer.items);
+        setGroupsError(answer.reason);
+        // Asked again next time when there was nothing to offer: a hub may be paired by then.
+        if (!answer.items.length) asked.current = false;
+      })
+      .catch((err: unknown) => {
+        asked.current = false;
+        setGroups([]);
+        setGroupsError(errorSentence(catalogError(err)));
+      });
+  }, []);
+  useEffect(loadGroups, [loadGroups]);
+
+  const openMenu = useCallback<OpenSongMenu>(
+    (track, at, returnTo) => {
+      setShown({ track, at, returnTo });
+      loadGroups();
+    },
+    [loadGroups],
+  );
+
+  const queue = async (track: CatalogTrack, group: HubGroupChoice): Promise<void> => {
+    const source = pickDownloadSource(track.sources);
+    if (!source) return say(storeOnly(track, 'queue'));
+    try {
+      const answer = await invoke('hub:request', { groupId: group.id, query: source.url });
+      say(answer.queued ? `Up Next in ${group.name}: “${answer.title ?? track.title}”${answer.position ? `, number ${answer.position}` : ''}.` : `${group.name} didn’t queue “${track.title}”: ${answer.reason ?? 'nothing that plays here matched it'}.`);
+    } catch (err) {
+      say(`“${track.title}” couldn’t be queued: ${errorSentence(catalogError(err))}`);
+    }
+  };
+
+  const add = (track: CatalogTrack, why: AddWhy): void => {
+    if (!pickDownloadSource(track.sources)) return say(storeOnly(track, why === 'download' ? 'download' : 'library'));
+    present(
+      <AddSheet
+        track={track}
+        why={why}
+        onCancel={() => present(null)}
+        onDone={(text) => {
+          present(null);
+          say(text);
+        }}
+      />,
+    );
+  };
+
+  const entries = (track: CatalogTrack): MenuEntry[] => {
+    const clip = previewOf(track.sources);
+    const playing = clip !== null && preview.playing === clip.url;
+    const fetchable = pickDownloadSource(track.sources) !== null;
+    const upNext: MenuEntry =
+      groups === null
+        ? { kind: 'item', label: 'Add to Up Next', disabled: true, note: 'Looking for groups…', onSelect: () => undefined }
+        : !groups.length
+          ? { kind: 'item', label: 'Add to Up Next', onSelect: () => say(groupsError ?? 'Queueing needs a group on a hub: this companion has no queue of its own.') }
+          : groups.length === 1 || !fetchable
+            ? { kind: 'item', label: groups.length === 1 ? `Add to Up Next (${groups[0]!.name})` : 'Add to Up Next', onSelect: () => void queue(track, groups[0]!) }
+            : { kind: 'sub', label: 'Add to Up Next', items: groups.map((g) => ({ kind: 'item', label: g.name, onSelect: () => void queue(track, g) })) };
+    return [
+      upNext,
+      { kind: 'item', label: 'Add to Playlist…', onSelect: () => add(track, 'playlist') },
+      { kind: 'item', label: 'Add to Library…', onSelect: () => add(track, 'library') },
+      { kind: 'sep' },
+      { kind: 'item', label: 'Download…', onSelect: () => add(track, 'download') },
+      clip ? { kind: 'item', label: playing ? 'Stop Audition' : 'Audition', onSelect: () => preview.toggle(clip.url) } : { kind: 'item', label: 'Audition', disabled: true, note: 'No 30-second clip', onSelect: () => undefined },
+      { kind: 'item', label: 'Open Details', onSelect: () => open({ kind: 'song', track }) },
+    ];
+  };
+
+  const menu = shown ? (
+    <Menu
+      label={`“${shown.track.title}”`}
+      at={shown.at}
+      entries={entries(shown.track)}
+      onClose={(refocus) => {
+        if (refocus) shown.returnTo?.focus();
+        setShown(null);
+      }}
+    />
+  ) : null;
+  return { open: openMenu, menu };
+}
+
+/** A song only a store has: nothing to queue, fetch or keep, said plainly. */
+function storeOnly(track: CatalogTrack, what: 'queue' | 'library' | 'download'): string {
+  const where = platformsOf(track.sources).map(platformLabel).join(', ');
+  return what === 'queue' ? `“${track.title}” is only in a store (${where}), so there is nothing to queue.` : `“${track.title}” is only in a store (${where}), so there is nothing the helper can fetch.`;
 }
 
 /* ------------------------------------------------------------------ rows */
@@ -930,15 +1343,38 @@ function Platforms({ sources }: { sources: readonly CatalogSource[] }) {
   );
 }
 
+interface ListboxPaging {
+  /** Rows a page holds: each row says its page (`data-page`), and Page Up/Down turn pages. */
+  pageSize?: number;
+  /** A row to land on: it takes the highlight, scrolls to the top and the list takes the keys. */
+  focusRequest?: FocusRequest | null;
+  onPageKey?: (step: 1 | -1, index: number) => void;
+  /** The highlight moved (the keys or a click). */
+  onActive?: (index: number) => void;
+}
+
 /**
  * A list box of music (UX-KEY-001, UX-SEARCH-008): one tab stop, the arrows, Home and End move the
- * highlight, Enter opens, Space plays a song's preview; a click opens (a click on ▶ plays).
+ * highlight, Page Up/Down move eight rows (or turn a type page's pages), Enter opens, Space plays a
+ * song's preview; a click opens (a click on ▶ plays). A song list's rows have a menu
+ * (UX-SEARCH-012): their "…", a right-click, or Shift+F10 and the Menu key on the highlighted row.
  */
-function Listbox<T>({ label, items, render, onOpen, onSpace, empty, hint }: { label: string; items: readonly T[]; render: (item: T, index: number) => ReactNode; onOpen: (item: T) => void; onSpace?: (item: T) => void; empty: string; hint?: string }) {
+function Listbox<T>({ label, items, render, onOpen, onSpace, onMenu, empty, hint, pageSize, focusRequest, onPageKey, onActive }: { label: string; items: readonly T[]; render: (item: T, index: number) => ReactNode; onOpen: (item: T) => void; onSpace?: (item: T) => void; onMenu?: (item: T, at: MenuAt, list: HTMLElement) => void; empty: string; hint?: string } & ListboxPaging) {
   const [active, setActive] = useState(0);
   const id = useId();
   const list = useRef<HTMLUListElement>(null);
   const at = Math.min(active, Math.max(0, items.length - 1));
+
+  // A page turned from the footer or the keys: its first row takes the highlight and the keys.
+  const request = focusRequest?.n;
+  useEffect(() => {
+    if (!focusRequest || !list.current) return;
+    setActive(focusRequest.index);
+    list.current.querySelector(`#${CSS.escape(`${id}-${focusRequest.index}`)}`)?.scrollIntoView?.({ block: 'start' });
+    list.current.focus({ preventScroll: true });
+    // Only when a new request is made.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [request]);
 
   if (!items.length) {
     return empty ? (
@@ -955,32 +1391,62 @@ function Listbox<T>({ label, items, render, onOpen, onSpace, empty, hint }: { la
   const move = (to: number): void => {
     const next = Math.max(0, Math.min(items.length - 1, to));
     setActive(next);
+    onActive?.(next);
     list.current?.querySelector(`#${CSS.escape(`${id}-${next}`)}`)?.scrollIntoView?.({ block: 'nearest' });
   };
+  const menuAt = (index: number, event?: { clientX: number; clientY: number }): void => {
+    if (!onMenu || !list.current) return;
+    const row = list.current.querySelector<HTMLElement>(`#${CSS.escape(`${id}-${index}`)}`);
+    const rect = row?.getBoundingClientRect();
+    // Shift+F10 and the Menu key come at (0, 0): anchor those on the row.
+    const point = event && (event.clientX || event.clientY) ? { x: event.clientX, y: event.clientY } : { x: (rect?.left ?? 0) + 40, y: (rect?.bottom ?? 0) - 4 };
+    onMenu(items[index]!, point, list.current);
+  };
   const onKeyDown = (event: KeyboardEvent<HTMLUListElement>): void => {
-    const step = { ArrowDown: 1, ArrowUp: -1, PageDown: 8, PageUp: -8 }[event.key];
-    if (step) move(at + step);
-    else if (event.key === 'Home') move(0);
-    else if (event.key === 'End') move(items.length - 1);
-    else if (event.key === 'Enter') onOpen(items[at]!);
-    else if (event.key === ' ' && onSpace) onSpace(items[at]!);
-    else return;
+    if ((event.key === 'PageDown' || event.key === 'PageUp') && onPageKey) onPageKey(event.key === 'PageDown' ? 1 : -1, at);
+    else if ((event.key === 'F10' && event.shiftKey) || event.key === 'ContextMenu') {
+      if (!onMenu) return;
+      menuAt(at);
+    } else {
+      const step = { ArrowDown: 1, ArrowUp: -1, PageDown: 8, PageUp: -8 }[event.key];
+      if (step) move(at + step);
+      else if (event.key === 'Home') move(0);
+      else if (event.key === 'End') move(items.length - 1);
+      else if (event.key === 'Enter') onOpen(items[at]!);
+      else if (event.key === ' ' && onSpace) onSpace(items[at]!);
+      else return;
+    }
     event.preventDefault();
   };
-  const onClick = (event: MouseEvent<HTMLUListElement>): void => {
+  const rowOf = (event: MouseEvent<HTMLUListElement>): number | null => {
     const row = (event.target as HTMLElement).closest<HTMLElement>('[data-index]');
-    if (!row) return;
-    const index = Number(row.dataset['index']);
+    return row ? Number(row.dataset['index']) : null;
+  };
+  const onClick = (event: MouseEvent<HTMLUListElement>): void => {
+    const index = rowOf(event);
+    if (index === null) return;
     setActive(index);
-    if ((event.target as HTMLElement).closest('[data-preview]') && onSpace) onSpace(items[index]!);
+    onActive?.(index);
+    const target = event.target as HTMLElement;
+    if (target.closest('[data-menu]') && onMenu) {
+      const rect = target.closest('[data-menu]')!.getBoundingClientRect();
+      onMenu(items[index]!, { x: rect.right - 8, y: rect.bottom + 2 }, event.currentTarget);
+    } else if (target.closest('[data-preview]') && onSpace) onSpace(items[index]!);
     else onOpen(items[index]!);
+  };
+  const onContextMenu = (event: MouseEvent<HTMLUListElement>): void => {
+    if (!onMenu) return;
+    const index = rowOf(event) ?? at;
+    event.preventDefault();
+    setActive(index);
+    menuAt(index, event);
   };
 
   return (
     <div className="well">
-      <ul ref={list} className="rows mrows" role="listbox" aria-label={label} tabIndex={0} aria-activedescendant={`${id}-${at}`} aria-describedby={hint ? `${id}-hint` : undefined} onKeyDown={onKeyDown} onClick={onClick}>
+      <ul ref={list} className="rows mrows" role="listbox" aria-label={label} tabIndex={0} aria-activedescendant={`${id}-${at}`} aria-describedby={hint ? `${id}-hint` : undefined} onKeyDown={onKeyDown} onClick={onClick} onContextMenu={onContextMenu}>
         {items.map((item, i) => (
-          <li key={i} id={`${id}-${i}`} role="option" aria-selected={i === at} data-index={i}>
+          <li key={i} id={`${id}-${i}`} role="option" aria-selected={i === at} data-index={i} data-page={pageSize ? Math.floor(i / pageSize) + 1 : undefined}>
             {render(item, i)}
           </li>
         ))}
@@ -994,7 +1460,8 @@ function Listbox<T>({ label, items, render, onOpen, onSpace, empty, hint }: { la
   );
 }
 
-function TrackList({ label, tracks, preview, onOpen, empty, numbered }: { label: string; tracks: readonly CatalogTrack[]; preview: Preview; onOpen: (track: CatalogTrack) => void; empty: string; numbered?: boolean }) {
+function TrackList({ label, tracks, preview, onOpen, empty, numbered, ...paging }: { label: string; tracks: readonly CatalogTrack[]; preview: Preview; onOpen: (track: CatalogTrack) => void; empty: string; numbered?: boolean } & ListboxPaging) {
+  const openMenu = useContext(SongMenuContext);
   return (
     <Listbox
       label={label}
@@ -1005,7 +1472,9 @@ function TrackList({ label, tracks, preview, onOpen, empty, numbered }: { label:
         const clip = previewOf(t.sources);
         if (clip) preview.toggle(clip.url);
       }}
-      hint="Enter opens the song. Space plays its 30-second preview, where it has one."
+      {...(openMenu ? { onMenu: (t: CatalogTrack, at: MenuAt, list: HTMLElement) => openMenu(t, at, list) } : {})}
+      hint={`Enter opens the song. Space plays its 30-second preview, where it has one.${openMenu ? ' Shift+F10 or the Menu key opens its menu: Up Next, a playlist, the library.' : ''}`}
+      {...paging}
       render={(t, i) => {
         const clip = previewOf(t.sources);
         const playing = clip !== null && preview.playing === clip.url;
@@ -1036,6 +1505,11 @@ function TrackList({ label, tracks, preview, onOpen, empty, numbered }: { label:
                 <span className="sr">{playing ? ', preview playing' : ', preview'}</span>
               </span>
             ) : null}
+            {openMenu ? (
+              <span className="mrow__more" data-menu title="More: Up Next, a playlist, the library (Shift+F10)" aria-hidden="true">
+                …
+              </span>
+            ) : null}
           </>
         );
       }}
@@ -1043,13 +1517,14 @@ function TrackList({ label, tracks, preview, onOpen, empty, numbered }: { label:
   );
 }
 
-function ArtistList({ label, artists, onOpen, empty }: { label: string; artists: readonly CatalogArtist[]; onOpen: (artist: CatalogArtist) => void; empty: string }) {
+function ArtistList({ label, artists, onOpen, empty, ...paging }: { label: string; artists: readonly CatalogArtist[]; onOpen: (artist: CatalogArtist) => void; empty: string } & ListboxPaging) {
   return (
     <Listbox
       label={label}
       items={artists}
       empty={empty}
       onOpen={onOpen}
+      {...paging}
       render={(a) => (
         <>
           <Art url={a.pictureUrl} round />
@@ -1064,13 +1539,14 @@ function ArtistList({ label, artists, onOpen, empty }: { label: string; artists:
   );
 }
 
-function AlbumList({ label, albums, onOpen, empty }: { label: string; albums: readonly CatalogAlbum[]; onOpen: (album: CatalogAlbum) => void; empty: string }) {
+function AlbumList({ label, albums, onOpen, empty, ...paging }: { label: string; albums: readonly CatalogAlbum[]; onOpen: (album: CatalogAlbum) => void; empty: string } & ListboxPaging) {
   return (
     <Listbox
       label={label}
       items={albums}
       empty={empty}
       onOpen={onOpen}
+      {...paging}
       render={(a) => (
         <>
           <Art url={a.artworkUrl} />
@@ -1086,6 +1562,53 @@ function AlbumList({ label, albums, onOpen, empty }: { label: string; albums: re
             </span>
             <span className="mrow__sub">{[a.artist, a.year, a.trackCount ? `${a.trackCount} songs` : null].filter(Boolean).join(' · ')}</span>
             <Platforms sources={a.sources} />
+          </span>
+        </>
+      )}
+    />
+  );
+}
+
+/** Public playlists (UX-SEARCH-010): the picture (or a mosaic), the title, "Playlist on Deezer · owner · N songs". */
+function PlaylistList({ label, playlists, onOpen, empty, ...paging }: { label: string; playlists: readonly CatalogPlaylist[]; onOpen: (playlist: CatalogPlaylist) => void; empty: string } & ListboxPaging) {
+  return (
+    <Listbox
+      label={label}
+      items={playlists}
+      empty={empty}
+      onOpen={onOpen}
+      {...paging}
+      render={(p) => (
+        <>
+          <CollectionArt collection={{ artworkUrl: p.pictureUrl, covers: p.covers }} />
+          <span className="mrow__main">
+            <span className="mrow__title">{p.title}</span>
+            <span className="mrow__sub">{playlistLine(p)}</span>
+            <Platforms sources={p.sources} />
+          </span>
+        </>
+      )}
+    />
+  );
+}
+
+/** The playlists starred on this PC, "In your library", first on the Playlists page (UX-SEARCH-010). */
+function SavedList({ label, items, onOpen }: { label: string; items: readonly SavedCollection[]; onOpen: (saved: SavedCollection) => void }) {
+  return (
+    <Listbox
+      label={label}
+      items={items}
+      empty=""
+      onOpen={onOpen}
+      render={(s) => (
+        <>
+          <CollectionArt collection={{ artworkUrl: s.artworkUrl, covers: s.covers }} />
+          <span className="mrow__main">
+            <span className="mrow__title">
+              <span aria-hidden="true">★ </span>
+              {s.ref.title}
+            </span>
+            <span className="mrow__sub">{collectionLine({ ref: s.ref, page: { total: s.trackCount } as CatalogCollection['page'] })}</span>
           </span>
         </>
       )}
@@ -1113,4 +1636,3 @@ function CollectionList({ label, collections, onOpen }: { label: string; collect
     />
   );
 }
-

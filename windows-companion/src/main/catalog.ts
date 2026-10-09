@@ -32,7 +32,7 @@ export interface CompanionCatalogOptions {
 const SAVED_KEY = 'catalog.saved';
 const FILTER_KEY = 'catalog.filter';
 const SAVED_CAP = 2000;
-const DEFAULT_FILTER: CatalogFilter = { sections: ['tracks', 'artists', 'albums'], providers: ['itunes', 'deezer', 'musicbrainz', 'youtube', 'soundcloud'] };
+const DEFAULT_FILTER: CatalogFilter = { sections: ['tracks', 'artists', 'albums', 'playlists'], providers: ['itunes', 'deezer', 'musicbrainz', 'youtube', 'soundcloud'] };
 
 type Answer<T> = { result: T | null; reason: string | null };
 

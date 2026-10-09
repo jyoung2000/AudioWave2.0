@@ -454,3 +454,36 @@ describe('a hub that is not the one you paired with', () => {
     }
   });
 });
+
+describe('Up Next from Search (UX-SEARCH-012)', () => {
+  /** The device's own Authorization header, read back from the credential the client stored. */
+  function deviceAuthorization(): string {
+    const credential = store.get<{ credentialId: string; secret: string } | null>('hub.credential', null)!;
+    return `Bearer ${credential.credentialId}.${credential.secret}`;
+  }
+
+  it('lists the groups this companion is in, and a request comes back with the hub’s own answer', async () => {
+    const client = new HubClient(store, 'Test PC', () => undefined);
+    await pairCompanion(client, ['library:read', 'group:member']);
+    expect(await client.groups()).toMatchObject({ items: [], reason: expect.stringMatching(/isn’t in a group/) });
+
+    const created = await hub.app.inject({ method: 'POST', url: '/api/v1/groups', headers: { authorization: deviceAuthorization() }, payload: { name: 'Kitchen' } });
+    expect(created.statusCode).toBe(201);
+    const groupId = (created.json() as { id: string }).id;
+    expect(await client.groups()).toEqual({ items: [{ id: groupId, name: 'Kitchen' }], reason: null });
+
+    // Nothing on this hub plays it: the answer is the hub's reason, in words, and nothing is queued.
+    const answer = await client.requestInGroup(groupId, 'Nobody - No Such Song Zzqx');
+    expect(answer.queued).toBe(false);
+    expect(answer.reason).toBeTruthy();
+    const queue = await hub.app.inject({ method: 'GET', url: `/api/v1/groups/${groupId}/queue`, headers: { authorization: deviceAuthorization() } });
+    expect((queue.json() as { queue: { items: unknown[] } }).queue.items).toHaveLength(0);
+  });
+
+  it('says why there is no group to offer: no hub, or no permission to join groups', async () => {
+    const client = new HubClient(store, 'Test PC', () => undefined);
+    expect(await client.groups()).toMatchObject({ items: [], reason: expect.stringMatching(/Pair a hub/) });
+    await pairCompanion(client, ['library:read']);
+    expect(await client.groups()).toMatchObject({ items: [], reason: expect.stringMatching(/permissions in the hub, under Devices/) });
+  });
+});

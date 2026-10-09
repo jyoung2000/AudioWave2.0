@@ -43,6 +43,8 @@ export const IPC_CHANNELS = [
   'hub:sync-now',
   'hub:share-library',
   'hub:sharing',
+  'hub:groups',
+  'hub:request',
 
   'transfers:list',
   'transfers:send',

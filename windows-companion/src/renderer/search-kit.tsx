@@ -13,7 +13,7 @@ export function Push({ primary, busy, reason, className, ...rest }: Omit<ButtonH
   return <KitPush {...rest} isDefault={primary} busy={busy} reason={reason ?? null} className={className} />;
 }
 
-export function Field({ className, mono, invalid, ...rest }: InputHTMLAttributes<HTMLInputElement> & { mono?: boolean; invalid?: boolean }) {
+export function Field({ className, mono, invalid, ...rest }: InputHTMLAttributes<HTMLInputElement> & { mono?: boolean; invalid?: boolean; ref?: Ref<HTMLInputElement> }) {
   return <input className={['field', mono && 'mono', invalid && 'bad-field', className].filter(Boolean).join(' ')} aria-invalid={invalid || undefined} spellCheck={false} autoComplete="off" {...rest} />;
 }
 

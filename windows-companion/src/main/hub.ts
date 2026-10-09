@@ -676,6 +676,50 @@ export class HubClient {
     }
   }
 
+  /* ------------------------------------------- Up Next from Search (UX-SEARCH-012) */
+
+  /**
+   * The paired hub's groups this companion is in, for Search's Add to Up Next: the companion has no
+   * queue of its own, so a song goes to a group's. Only the id and the name leave this method. Empty,
+   * with the reason in a sentence, when there is no hub, no permission to join groups, or no answer.
+   */
+  async groups(): Promise<{ items: Array<{ id: string; name: string }>; reason: string | null }> {
+    const credential = this.credential;
+    if (!credential) return { items: [], reason: 'Queueing needs a group on a hub: this companion has no queue of its own. Pair a hub under Remote first.' };
+    if (!this.hasScope('group:member')) return { items: [], reason: `${credential.hubName} didn’t let this companion join groups, so it can’t queue songs. Change its permissions in the hub, under Devices.` };
+    let response: Response;
+    try {
+      response = await fetchWithTimeout(`${credential.endpoint}/api/v1/groups`, { method: 'GET', headers: { accept: 'application/json', ...this.authHeaders() } });
+    } catch {
+      return { items: [], reason: `${credential.hubName} can’t be reached right now, so there is no group to queue to.` };
+    }
+    if (!response.ok) return { items: [], reason: `${credential.hubName} didn’t list its groups (${await problemMessage(response)}).` };
+    const parsed = z.object({ items: z.array(z.looseObject({ id: z.uuid(), name: z.string().min(1).max(80), status: z.string().optional() })) }).safeParse(await response.json().catch(() => null));
+    if (!parsed.success) return { items: [], reason: `${credential.hubName} answered with groups this companion doesn’t understand.` };
+    const items = parsed.data.items.filter((g) => g.status !== 'archived').slice(0, 200).map((g) => ({ id: g.id, name: g.name }));
+    return { items, reason: items.length ? null : `This companion isn’t in a group on ${credential.hubName} yet. Join or make one from a player, then songs can join its Up Next.` };
+  }
+
+  /** A song into a group's queue, the way a Discord /play is: the hub finds a playable copy and appends it. */
+  async requestInGroup(groupId: string, query: string): Promise<{ queued: boolean; title: string | null; position: number | null; reason: string | null }> {
+    const credential = this.credential;
+    if (!credential) return { queued: false, title: null, position: null, reason: 'Pair a hub under Remote first: queueing needs one of its groups.' };
+    let response: Response;
+    try {
+      response = await fetchWithTimeout(`${credential.endpoint}/api/v1/groups/${encodeURIComponent(groupId)}/requests`, {
+        method: 'POST',
+        headers: { accept: 'application/json', 'content-type': 'application/json', ...this.authHeaders() },
+        body: JSON.stringify({ query, idempotencyKey: `companion-${uuidv7()}` }),
+      });
+    } catch {
+      return { queued: false, title: null, position: null, reason: `${credential.hubName} can’t be reached right now.` };
+    }
+    if (!response.ok) return { queued: false, title: null, position: null, reason: await problemMessage(response) };
+    const parsed = z.object({ queued: z.boolean(), title: z.string().nullable(), position: z.number().int().positive().nullable(), reason: z.string().nullable() }).safeParse(await response.json().catch(() => null));
+    if (!parsed.success) return { queued: false, title: null, position: null, reason: `${credential.hubName} answered in a way this companion doesn’t understand.` };
+    return { queued: parsed.data.queued, title: parsed.data.title?.slice(0, 300) ?? null, position: parsed.data.position, reason: parsed.data.reason?.slice(0, 600) ?? null };
+  }
+
   private appVersion(): string {
     return this.options.appVersion ?? process.env['NP_VERSION'] ?? '0.0.0';
   }

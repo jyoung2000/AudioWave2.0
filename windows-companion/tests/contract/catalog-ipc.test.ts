@@ -103,7 +103,40 @@ describe('the Search tool’s channels', () => {
     expect(IPC['catalog:save'].response.parse(catalog.save(saved as never)).items).toHaveLength(1);
     expect(catalog.save({ ...saved, trackCount: 7 } as never).items.map((i) => i.trackCount)).toEqual([7]);
     expect(IPC['catalog:unsave'].response.parse(catalog.unsave(saved.ref as never)).items).toEqual([]);
-    expect(catalog.filter()).toEqual({ sections: ['tracks', 'artists', 'albums'], providers: ['itunes', 'deezer', 'musicbrainz', 'youtube', 'soundcloud'] });
+    expect(catalog.filter()).toEqual({ sections: ['tracks', 'artists', 'albums', 'playlists'], providers: ['itunes', 'deezer', 'musicbrainz', 'youtube', 'soundcloud'] });
     expect(catalog.setFilter({ sections: ['tracks'], providers: ['deezer'] })).toEqual({ sections: ['tracks'], providers: ['deezer'] });
+    // Playlists are a section of their own (UX-SEARCH-010), kept like the rest; a fifth kind is not.
+    expect(catalog.setFilter({ sections: ['playlists'], providers: ['deezer'] })).toEqual({ sections: ['playlists'], providers: ['deezer'] });
+    expect(IPC['catalog:filter:set'].request.safeParse({ sections: ['tracks', 'videos'], providers: ['deezer'] }).success).toBe(false);
+  });
+
+  it('a search can ask for playlists alone, and they reach the window in the chunks (UX-SEARCH-010)', async () => {
+    const { catalog, calls, sent } = standIn();
+    await catalog.search(IPC['catalog:search'].request.parse({ searchId: 's2', q: 'harbour', sections: ['playlists'], providers: ['deezer'], limit: 12 }));
+    expect(calls[0]!.url.searchParams.get('sections')).toBe('playlists');
+    expect(calls[0]!.url.searchParams.get('limit')).toBe('12');
+    const playlists = sent.flatMap((p) => (p.chunk as { type: string; playlists?: unknown[] }).playlists ?? []);
+    expect(playlists).toHaveLength(14);
+  });
+});
+
+describe('Up Next from Search (UX-SEARCH-012)', () => {
+  it('are allowlisted, with request and response contracts', () => {
+    for (const channel of ['hub:groups', 'hub:request'] as const) {
+      expect(IPC_CHANNELS).toContain(channel);
+      expect(IPC[channel].request).toBeDefined();
+    }
+  });
+
+  it('a group is an id and a name; a request names the group by id and the song by its link or its name', () => {
+    expect(IPC['hub:groups'].response.parse({ items: [{ id: '0192f0c0-0000-7000-8000-000000000001', name: 'Kitchen' }], reason: null }).items).toHaveLength(1);
+    expect(IPC['hub:groups'].response.parse({ items: [], reason: 'Pair a hub under Remote first.' }).reason).toMatch(/Pair a hub/);
+    expect(IPC['hub:request'].request.safeParse({ groupId: '0192f0c0-0000-7000-8000-000000000001', query: 'https://music.youtube.com/watch?v=mockHL0001' }).success).toBe(true);
+    // Never a path, never empty, never anything else.
+    expect(IPC['hub:request'].request.safeParse({ groupId: '../groups', query: 'x' }).success).toBe(false);
+    expect(IPC['hub:request'].request.safeParse({ groupId: '0192f0c0-0000-7000-8000-000000000001', query: '   ' }).success).toBe(false);
+    expect(IPC['hub:request'].request.safeParse({ groupId: '0192f0c0-0000-7000-8000-000000000001', query: 'x', extra: true }).success).toBe(false);
+    expect(IPC['hub:request'].response.parse({ queued: true, title: 'Harbour Lights', position: 2, reason: null })).toEqual({ queued: true, title: 'Harbour Lights', position: 2, reason: null });
+    expect(IPC['hub:request'].response.safeParse({ queued: false, title: null, position: 0, reason: 'x' }).success).toBe(false);
   });
 });
