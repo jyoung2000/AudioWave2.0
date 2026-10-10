@@ -91,6 +91,7 @@ export interface PlannedFetch {
   url: string;
   title: string;
   artist: string;
+  platform: string | null;
   /** Why this row and not another, said the way the rest of the app says things. */
   why: string;
 }
@@ -182,6 +183,7 @@ export function planLookAhead(input: LookAheadInput): LookAheadPlan {
       url: c.url,
       title: c.title,
       artist: c.artist,
+      platform: c.platform,
       why: 'Next in the radio, fetched while this song plays',
     });
   }

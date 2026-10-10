@@ -152,14 +152,62 @@ replace_between("    setInterval(function () {\n      if (!playing || dragging) 
                 "    /* Whether the bar follows the audio element (a track from this device) or the broadcast\n"
                 "       clock (the live session, which has no element here). */\n"
                 "    function engineDriven() { return !!(window.NP_PLAYER && chosen[mode] && chosen[mode].local); }\n"
-                "    function trackEnded() {\n"
-                "      /* the end of the track, reached by playing rather than by seeking */\n"
-                "      if (chosen[mode]) { reportHeard(mode, heardSecs[mode] >= total() * 0.9); heardSecs[mode] = 0; }\n"
-                "      if (repeatOn) { pos[mode] = 0; if (engineDriven()) { window.NP_PLAYER.seek(0); window.NP_PLAYER.resume(); } paint(); }\n"
-                "      else if (!document.dispatchEvent(new CustomEvent('transport:next', { cancelable: true }))) { /* the list played the next one */ }\n"
-                "      else setPlaying(false);\n"
-                "    }\n"
-                "    if (window.NP_PLAYER) {\n"
+                "    function trackEnded() {
+"
+                "      /* the end of the track, reached by playing rather than by seeking */
+"
+                "      if (chosen[mode]) { reportHeard(mode, heardSecs[mode] >= total() * 0.9); heardSecs[mode] = 0; }
+"
+                "      if (repeatOn) { pos[mode] = 0; if (engineDriven()) { window.NP_PLAYER.seek(0); window.NP_PLAYER.resume(); } paint(); return; }
+"
+                "      /* Try the prefetch ring first for an instant hand-off. */
+"
+                "      var nextId = await prefetchHandoff();
+"
+                "      if (nextId) {
+"
+                "        /* Mark the cached entry as played so the planner evicts it. */
+"
+                "        var ring = DISC_ONLINE?.prefetch?.ring || [];
+"
+                "        for (var i = 0; i < ring.length; i++) if (ring[i].id === nextId) { ring[i].played = true; break; }
+"
+                "        /* Play the cached track. */
+"
+                "        if (engineDriven() && window.NP_PLAYER) {
+"
+                "          var ok = await window.NP_PLAYER.play(nextId);
+"
+                "          if (ok?.ok) { pos[mode] = 0; paint(); return; }
+"
+                "        }
+"
+                "      }
+"
+                "      if (repeatOn) { pos[mode] = 0; if (engineDriven()) { window.NP_PLAYER.seek(0); window.NP_PLAYER.resume(); } paint(); }
+"
+                "      else if (!document.dispatchEvent(new CustomEvent('transport:next', { cancelable: true }))) { /* the list played the next one */ }
+"
+                "      else setPlaying(false);
+"
+                "    }
+"
+                "    /* ---- Discover look-ahead (NP-DISC-007/008): check the ring for a ready next track ---- */
+"
+                "    async function prefetchHandoff() {
+"
+                "      if (!window.NP_RECOMMEND || !window.NP_RECOMMEND.cachedNext) return null;
+"
+                "      var R = window.NP_RECOMMEND;
+"
+                "      var cached = R.cachedNext(DISC_ONLINE?.prefetch?.ring || []);
+"
+                "      if (!cached || cached.bytes <= 0) return null;
+"
+                "      return cached.id;
+"
+                "    }
+""    if (window.NP_PLAYER) {\n"
                 "      window.NP_PLAYER.onState(function (s) {\n"
                 "        if (!engineDriven() || dragging) return;\n"
                 "        var was = pos[mode];\n"
@@ -176,7 +224,8 @@ replace_between("    setInterval(function () {\n      if (!playing || dragging) 
                 "      if (!playing || dragging) return;\n"
                 "      if (isLive()) { pos[mode] += 1; paint(); return; }   // broadcast clock climbs\n"
                 "      if (engineDriven()) return;                          // the element keeps this time\n"
-                "      /* a row from somewhere else (a search result with a link) has no audio here: the bar\n"
+
+                "                "      /* Discover look-ahead planner (NP-DISC-007/008): run the planner and start fetches */\\n"\n                "      if (window.NP_RECOMMEND && window.NP_RECOMMEND.planLookAhead && window.NP_RECOMMEND.fetchAndCache) {\\n"\n                "        var R = window.NP_RECOMMEND;\\n"\n                "        var remaining = chosen[mode] ? Math.max(0, total() - pos[mode]) : 0;\\n"\n                "        var plan = R.planLookAhead({\\n"\n                "          enabled: DISC_ONLINE?.prefetch?.enabled,\\n"\n                "          remainingSec: remaining,\\n"\n                "          candidates: R.candidatesFrom ? R.candidatesFrom(DISC_ONLINE?.picks || []) : [],\\n"\n                "          cache: DISC_ONLINE?.prefetch?.ring || [],\\n"\n                "          inFlight: DISC_ONLINE?.prefetch?.inflight || [],\\n"\n                "          depth: DISC_ONLINE?.prefetch?.depth,\\n"\n                "          byteBudget: DISC_ONLINE?.prefetch?.byteBudget,\\n"\n                "          estimateFetchSec: DISC_ONLINE?.prefetch?.estimateFetchSec,\\n"\n                "          estimateBytes: DISC_ONLINE?.prefetch?.estimateBytes,\\n"\n                "        });\\n"\n                "        if (plan.fetch.length) {\\n"\n                "          plan.fetch.forEach(function (f) {\\n"\n                "            DISC_ONLINE.prefetch.inflight = DISC_ONLINE.prefetch.inflight || [];\\n"\n                "            DISC_ONLINE.prefetch.inflight.push(f.id);\\n"\n                "            R.fetchAndCache(f).then(function (res) {\\n"\n                "              if (res) {\\n"\n                "                var ring = DISC_ONLINE.prefetch.ring;\\n"\n                "                for (var i = 0; i < ring.length; i++) if (ring[i].id === f.id) { ring[i].bytes = res.bytes; ring[i].at = Date.now(); break; }\\n"\n                "                var inflight = DISC_ONLINE.prefetch.inflight;\\n"\n                "                var idx = inflight.indexOf(f.id); if (idx >= 0) inflight.splice(idx, 1);\\n"\n                "                DISC_ONLINE.prefetch.estimateFetchSec = Math.max(5, Math.min(60, (Date.now() - ring.find(c => c.id === f.id)?.at || Date.now()) / 1000));\\n"\n                "                DISC_ONLINE.prefetch.estimateBytes = Math.max(1024*1024, res.bytes);\\n"\n                "              } else {\\n"\n                "                var inflight = DISC_ONLINE.prefetch.inflight;\\n"\n                "                var idx = inflight.indexOf(f.id); if (idx >= 0) inflight.splice(idx, 1);\\n"\n                "              }\\n"\n                "            });\\n"\n                "          });\\n"\n                "        }\\n"\n                "        plan.evict.forEach(function (id) {\\n"\n                "          var ring = DISC_ONLINE.prefetch.ring;\\n"\n                "          var idx = ring.findIndex(function (c) { return c.id === id; });\\n"\n                "          if (idx >= 0) { R.evictEntry(ring[idx]); ring.splice(idx, 1); }\\n"\n                "        });\\n"\n                "      }\\n"\n                "      /* end planner */\\n"\n                "      /* a row from somewhere else (a search result with a link) has no audio here: the bar\n"
                 "         does not pretend to play it */\n"
                 "      if (chosen[mode]) { setPlaying(false); window.say('Only tracks on this device play here. Open it where it lives.'); return; }\n"
                 "      if (pos[mode] < total()) { pos[mode] += 1; paint(); if (pos[mode] >= total()) { if (repeatOn) { pos[mode] = 0; paint(); } else setPlaying(false); } }\n"
