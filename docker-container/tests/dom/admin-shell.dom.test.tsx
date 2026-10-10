@@ -263,9 +263,9 @@ describe('signed in', () => {
     await userEvent.click(run);
     expect((screen.getByLabelText(/^Run groups/) as HTMLInputElement).checked).toBe(true);
     expect(screen.queryByText('This panel could not be displayed')).toBeNull();
-    // Sixteen scopes, sixteen labels: none is shown as a bare id.
+    // Eighteen scopes (playlists:use and library:sync with DEC-041), eighteen labels: none is shown as a bare id.
     const boxes = within(screen.getByRole('group', { name: 'What this device may do' })).getAllByRole('checkbox');
-    expect(boxes).toHaveLength(16);
+    expect(boxes).toHaveLength(18);
     for (const box of boxes) expect(box.closest('label')?.textContent).toMatch(/^[A-Z][^:]+ [a-z]+:[a-z]+$/);
     // Empty lists are a quiet line in the list box.
     expect(await screen.findByText('None waiting.')).toBeTruthy();

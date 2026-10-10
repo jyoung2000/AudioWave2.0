@@ -1,9 +1,12 @@
 /**
- * The hub's playlist folder from the admin window (DEC-041; UX-PL-001…UX-PL-008): the routes, and
- * the words both Music ▸ Playlists and Search's Add to Playlist ▸ use.
+ * The hub's playlist folder from the admin window (DEC-041; UX-PL-001…UX-PL-008): the routes Music ▸
+ * Playlists and Search's Add to Playlist ▸ call. The words both say are the domain's
+ * (`folderPlaylistLine`, `folderEntryWhere`, `playlistLengthText`), shared with the companion.
  */
-import { CATALOG_PLATFORM_LABELS, type CatalogTrack, type FolderPlaylistEntry, type FolderPlaylistSummary } from '@now-playing/contracts';
+import type { CatalogTrack } from '@now-playing/contracts';
 import { api, apiUrl } from './api.js';
+
+export { folderEntryWhere as whereText, folderPlaylistLine as playlistSummaryLine, playlistLengthText as lengthText } from '@now-playing/domain/catalog';
 
 export const hubPlaylists = {
   list: (probe: { catalogId?: string; isrc?: string } = {}) => api('playlistsList', { query: probe }),
@@ -16,28 +19,3 @@ export const hubPlaylists = {
   move: (playlistId: string, entryId: string, to: number) => api('playlistsMove', { params: { playlistId }, body: { entryId, to } }),
   exportUrl: (playlistId: string) => apiUrl('playlistsExport', { playlistId }),
 };
-
-/** "1 h 5 min", "42 min", "3 min": a playlist's length. */
-export function lengthText(seconds: number): string {
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  return rest ? `${hours} h ${rest} min` : `${hours} h`;
-}
-
-/** The line under a playlist's name: "12 songs · 48 min", and where it came from when not from here. */
-export function playlistSummaryLine(p: FolderPlaylistSummary): string {
-  const songs = p.entryCount === 1 ? '1 song' : `${p.entryCount.toLocaleString('en')} songs`;
-  return [songs, p.durationSec ? lengthText(p.durationSec) : null, p.readOnly ? 'made outside Airwave' : null].filter(Boolean).join(' · ');
-}
-
-/** Where an entry plays from, in words (UX-PL-004). */
-export function whereText(entry: FolderPlaylistEntry): string {
-  if (entry.locationKind === 'library') return 'In the library';
-  if (entry.locationKind === 'url') {
-    const platform = entry.platforms[0] ?? entry.sources[0]?.platform;
-    return platform ? `Plays from ${CATALOG_PLATFORM_LABELS[platform]}` : 'Plays from its link';
-  }
-  return 'Not found: the file isn’t where the list says';
-}

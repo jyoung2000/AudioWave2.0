@@ -30,7 +30,6 @@ import { DevicesView } from './views/Devices.js';
 import { GroupsView } from './views/Groups.js';
 import { ProvidersView } from './views/Providers.js';
 import { LibraryView } from './views/Library.js';
-import { PlaylistsView } from './views/Playlists.js';
 import { DownloadsView } from './views/Downloads.js';
 import { LiveTvView } from './views/LiveTv.js';
 import { ProfilesView } from './views/Profiles.js';
@@ -44,6 +43,8 @@ import { MusicSearchSettingsView } from './views/CatalogSettings.js';
 /* Search carries the catalog's view code (and its stream reader): it loads when the tab is first
    opened, so the window everyone signs in to stays inside its first-load budget. */
 const SearchView = lazy(() => import('./views/Search.js').then((m) => ({ default: m.SearchView })));
+/* Playlists shares the catalog's words and the menu with Search: it loads when Music is first opened. */
+const PlaylistsView = lazy(() => import('./views/Playlists.js').then((m) => ({ default: m.PlaylistsView })));
 
 const PRODUCT = BRANDING.products.hub;
 
@@ -437,7 +438,11 @@ function sectionBody(id: ViewId): ReactNode {
     case 'library':
       return <LibraryView />;
     case 'playlists':
-      return <PlaylistsView />;
+      return (
+        <Suspense fallback={<Note>Loading playlists…</Note>}>
+          <PlaylistsView />
+        </Suspense>
+      );
     case 'downloads':
       // The design draws "Live TV from the companion" straight after Downloads, in the same tab. It
       // is part of this section (and its ledger entry) until the coverage ledger gives it its own.
