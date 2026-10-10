@@ -142,7 +142,7 @@ describe('the caps', () => {
 
 describe('starred collections for devices (library:sync)', () => {
   const star = (id: string, title: string): SavedCollection => ({
-    ref: { platform: 'deezer', kind: 'playlist', id, url: `https://www.deezer.com/playlist/${id}`, title, owner: null, trackCount: 10 },
+    ref: { platform: 'deezer', kind: 'playlist', id, url: `https://www.deezer.com/playlist/${id}`, title, owner: null },
     savedAt: '2026-10-10T12:00:00.000Z',
     artworkUrl: null,
     covers: [],

@@ -166,19 +166,27 @@ function PlaylistPage({ id, onBack }: { id: string; onBack: () => void }) {
   const [busy, setBusy] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
 
-  const load = useCallback(async (): Promise<void> => {
-    try {
-      const first = await companionPlaylists.page(id, 0, ENTRY_PAGE);
-      setPage(first);
-      setEntries(first.items);
-      setError(null);
-    } catch (err) {
-      setError(asError(err));
-    }
-  }, [id]);
+  // Read when it opens (its heading takes the focus), and again after every change.
+  const [reads, setReads] = useState(0);
+  const reload = useCallback(() => setReads((n) => n + 1), []);
   useEffect(() => {
-    void load().then(() => heading.current?.focus());
-  }, [load]);
+    let live = true;
+    companionPlaylists.page(id, 0, ENTRY_PAGE).then(
+      (first) => {
+        if (!live) return;
+        setPage(first);
+        setEntries(first.items);
+        setError(null);
+        if (reads === 0) heading.current?.focus();
+      },
+      (err: unknown) => {
+        if (live) setError(asError(err));
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [id, reads]);
 
   const more = async (): Promise<void> => {
     setBusy(true);
@@ -199,7 +207,7 @@ function PlaylistPage({ id, onBack }: { id: string; onBack: () => void }) {
   const act = async (work: () => Promise<FolderPlaylistSummary>, said: string): Promise<void> => {
     try {
       await work();
-      await load();
+      reload();
       say(said);
     } catch (err) {
       say(asError(err).message);
@@ -222,7 +230,7 @@ function PlaylistPage({ id, onBack }: { id: string; onBack: () => void }) {
         onSave={async (name) => {
           const renamed = await companionPlaylists.rename(id, name);
           present(null);
-          await load();
+          reload();
           say(`Renamed to “${renamed.name}”; its file is ${renamed.fileName}.`);
         }}
       />,

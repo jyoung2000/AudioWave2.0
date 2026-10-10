@@ -156,8 +156,7 @@ test('Add to Playlist ▸ New Playlist… files a song into the hub’s playlist
   await expect(entries.getByRole('option').first()).toContainText('Plays from');
   await expect(page.getByRole('link', { name: 'Export .m3u8' })).toHaveAttribute('download', 'E2E Harbour.m3u8');
   const results = await new AxeBuilder({ page }).include('#playlists').withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
-  expect(results.violations, results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`).join('
-')).toEqual([]);
+  expect(results.violations, results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`).join('\n')).toEqual([]);
   await page.getByRole('button', { name: 'Delete…' }).click();
   const ask = page.getByRole('alertdialog', { name: 'Delete “E2E Harbour”?' });
   await ask.getByRole('button', { name: 'Delete' }).click();

@@ -111,6 +111,15 @@ function summaryOf(p: LoadedPlaylist, probe?: SongProbe): FolderPlaylistSummary 
   };
 }
 
+/** A file that is there and is a file; anything unreadable is not. */
+function isPlainFile(path: string): boolean {
+  try {
+    return existsSync(path) && statSync(path).isFile();
+  } catch {
+    return false;
+  }
+}
+
 export class PlaylistFolderStore {
   private readonly cache = new Map<string, Cached>();
   private cachedDir: string | null = null;
@@ -255,13 +264,7 @@ export class PlaylistFolderStore {
     if (isAbsoluteLocation(location)) return { ...base, location: null, locationKind: 'missing' };
     const absolute = resolve(this.dir(), ...location.split(/[\\/]+/).filter(Boolean));
     if (!this.roots().some((root) => isInsideRoot(root, absolute))) return { ...base, locationKind: 'missing' };
-    let isFile = false;
-    try {
-      isFile = existsSync(absolute) && statSync(absolute).isFile();
-    } catch {
-      isFile = false;
-    }
-    if (!isFile) return { ...base, locationKind: 'missing' };
+    if (!isPlainFile(absolute)) return { ...base, locationKind: 'missing' };
     return { ...base, locationKind: 'library', trackId: this.options.trackIdForPath?.(absolute) ?? null };
   }
 

@@ -39,6 +39,7 @@ export interface ParsedM3u {
 /** Line breaks and other control characters cannot be allowed into a line: they would start a new one. */
 export function oneLine(text: string): string {
   // \s also takes U+2028 and U+2029, which JavaScript and some players read as line breaks.
+  // eslint-disable-next-line no-control-regex -- control characters are exactly what is being removed
   return text.replace(/[\x00-\x1f\x7f]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
@@ -53,7 +54,8 @@ export function isAbsoluteLocation(location: string): boolean {
 
 /** Read an M3U or M3U8 (a BOM, CRLF and extra blank lines are fine). Every non-comment line is an item. */
 export function parsePlaylistM3u(text: string, cap = PLAYLIST_FOLDER_ENTRY_CAP): ParsedM3u {
-  const lines = text.replace(/^﻿/, '').split(/\r\n|\r|\n/);
+  // A byte-order mark (U+FEFF) at the start is not part of the first line.
+  const lines = (text.charCodeAt(0) === 0xfeff ? text.slice(1) : text).split(/\r\n|\r|\n/);
   let name: string | null = null;
   const items: M3uItem[] = [];
   let pending: { durationSec: number | null; display: string | null } | null = null;

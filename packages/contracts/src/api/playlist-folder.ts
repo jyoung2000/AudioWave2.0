@@ -46,6 +46,7 @@ export const PlaylistName = z
   .min(1, 'A playlist needs a name.')
   .max(PLAYLIST_NAME_MAX)
   // Control characters never reach a file name or the M3U's #PLAYLIST line.
+  // eslint-disable-next-line no-control-regex -- control characters are exactly what is refused
   .refine((s) => !/[\u0000-\u001f\u007f]/.test(s), 'A name cannot hold control characters.');
 
 /**
