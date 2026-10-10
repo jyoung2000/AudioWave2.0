@@ -57,6 +57,7 @@ import {
 } from './client.js';
 import * as V from './view.js';
 import { installDiscoverOnline, type DiscoverOnline } from './discover.js';
+import { installVisit, type ShellVisit, type VisitTools } from './visit.js';
 
 /* ------------------------------------------------------------------ shapes */
 
@@ -337,6 +338,8 @@ export function installSearch(): SearchApi {
     NP_FETCH?: (song: unknown) => void;
     NP_SONG_MENU?: SongMenu;
     NP_DISC_ONLINE?: DiscoverOnline;
+    NP_VISIT?: ShellVisit;
+    NP_TOOLS?: VisitTools;
     LIBRARY?: Array<{ id: string; title: string; url?: string | null }>;
     NP_SRCH_CLIP?: number;
     NP_SRCH_ARM_MS?: number;
@@ -2491,6 +2494,8 @@ export function installSearch(): SearchApi {
 
   /* Discover's "From the catalog" set and its look-ahead (NP-DISC-006/007). */
   w.NP_DISC_ONLINE = installDiscoverOnline(findTracks, songFor);
+  /* A visitor's Play and Download…: the hub's catalog/download, else the helper, else its preview (NP-FIND-011/012). */
+  w.NP_VISIT = installVisit(() => w.NP_TOOLS);
 
   /** Kept for the shell's "keep this song" (the radio's on-air menu): songs for a query, in the old row shape. */
   w.NP_FIND = async (q: string) => {

@@ -92,9 +92,11 @@ A server that cannot be reached is passed over for the next; a refusal (400, 422
   by choice, per playlist). The hub agent added `/api/v1/catalog/saved` (GET/PUT/DELETE) in the same shape, but it
   is admin-only (cookie), and the player holds a device credential: wiring it needs a device scope on that route
   (or a per-device copy) first. Not invented here.
-- **Downloading through the hub.** "Download…" in a song's details does what the player does today: the song joins
-  the library with its best download link and the helper's fetch sheet fetches it. The hub's
-  `POST /api/v1/catalog/download` (YouTube Music → YouTube → SoundCloud → Bandcamp → spotDL, tags, lyrics) is not
-  wired into the player yet.
-- Songs of a catalog list on show are visitors in the music list: playing one chooses it (no sound unless it is
-  fetched), and the row menu's playlist actions file their ids like any other row.
+- ~~**Downloading through the hub.**~~ Done 2026-10-10 (NP-FIND-012): the fetch sheet uses the hub's
+  `POST /api/v1/catalog/download` when the device credential has `downloads:request` and `transfers:receive`, says
+  which source the hub chose and what it embedded, follows the job in `/api/v1/downloads` and reads the file back
+  from `/api/v1/files/<sha256>`; otherwise the helper's fetch, as before (`music-player/src/shell/search/visit.ts`).
+- ~~Songs of a catalog list on show are visitors~~ Done 2026-10-10 (NP-FIND-011): playing a visitor plays its
+  30-second preview, labelled "Preview", and opens the fetch sheet (hub, else helper); the row says "Fetching… N%" and
+  the song plays from this device when it lands. With nothing that can fetch it, the preview plays and the HUD says
+  what is needed. A visitor's right-click is the catalog song's menu, so Up Next and playlists file a library row.

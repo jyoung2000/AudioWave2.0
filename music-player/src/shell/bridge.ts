@@ -91,6 +91,12 @@ export interface ShellSong {
 
 export interface ShellPlayer {
   play(id: string): Promise<{ ok: boolean; reason: string | null }>;
+  /**
+   * A visitor's 30-second preview (NP-FIND-011): a platform's clip, or the look-ahead's `blob:` copy
+   * of it. It plays through the same element as everything else, so the transport follows it; the
+   * shell labels it "Preview" and never logs it as a play of the song.
+   */
+  playPreview(id: string, url: string, meta: { title: string; artist: string }): Promise<{ ok: boolean; reason: string | null }>;
   pause(): void;
   resume(): Promise<{ ok: boolean; reason: string | null }>;
   seek(seconds: number): void;
@@ -387,6 +393,29 @@ function installPlayer(db: PlayerDatabase, engine: PlaybackEngine): ShellPlayer 
       note(`play ${track.title}: ${result.ok ? 'ok' : result.reason}`);
       return result;
     },
+    async playPreview(id, url, meta) {
+      window.NP_AWSP?.indicate(false);
+      if (!/^(https?|blob):/.test(url)) return { ok: false, reason: 'That preview has no address this player can play.' };
+      const ref = {
+        trackId: id,
+        title: meta.title || 'Preview',
+        artistName: meta.artist || 'Unknown artist',
+        albumName: null,
+        durationMs: 30_000,
+        artworkId: null,
+        identity: {},
+        locators: [],
+        provider: 'local',
+        genre: null,
+        year: null,
+      } as unknown as TrackRef;
+      // A cut, not a crossfade: a preview is a sample, and fading a song into it would blur which is which.
+      await engine.load({ track: ref, url, crossfadeMs: 0 });
+      current = ref;
+      const result = await engine.play();
+      note(`preview ${meta.title}: ${result.ok ? 'ok' : result.reason}`);
+      return result;
+    },
     pause: () => engine.pause(),
     resume: () => engine.play(),
     seek: (seconds) => engine.seek(Math.max(0, seconds) * 1000),
@@ -419,7 +448,24 @@ export interface ShellTools {
    * Fetch a link through the helper and index what it saved. `basis` is the person's statement of
    * why they may have this file; the helper refuses without it, and so does this.
    */
-  fetch(url: string, basis: DownloadAuthorizationBasis): Promise<{ added: number; trackId: string | null; reason: string | null }>;
+  fetch(
+    url: string,
+    basis: DownloadAuthorizationBasis,
+    onProgress?: (p: { percent: number | null; stage: string }) => void,
+  ): Promise<{ added: number; trackId: string | null; reason: string | null }>;
+  /** Keep a file fetched elsewhere (the hub's catalog/download) in the library, as a copy. */
+  keep(file: File): Promise<{ trackId: string | null; reason: string | null }>;
+}
+
+/** Index fetched files as kept copies: a fetched file has no folder on this device to be read from again. */
+async function keepFetched(db: PlayerDatabase, files: readonly File[]): Promise<{ added: number; trackId: string | null }> {
+  const root: StoredRoot = { id: uuidv7(), kind: 'files', displayName: files[0]!.name, handle: null, trackCount: 0, addedAt: new Date().toISOString(), lastScanAt: null, lastScanError: null };
+  await db.put('roots', root);
+  const result = await indexPickedFiles(db, root.id, files, { keepCopies: true });
+  await db.put('roots', { ...root, trackCount: result.added + result.updated, lastScanAt: new Date().toISOString() });
+  await refreshRows(db);
+  const ref = (await db.getAllFromIndex('files', 'by-root', root.id))[0];
+  return { added: result.added, trackId: ref?.trackId ?? null };
 }
 
 function installTools(db: PlayerDatabase): ShellTools {
@@ -429,23 +475,28 @@ function installTools(db: PlayerDatabase): ShellTools {
       if (!backend) return null;
       return { label: backend.label, tools: backend.health.tools.map((t) => ({ id: t.id, present: t.present, version: t.version ?? null })) };
     },
-    async fetch(url, basis) {
+    async fetch(url, basis, onProgress) {
       const backend = await detectBackend(await getSetting<SavedHelper | null>(db, 'helper.saved', null));
       if (!backend) return { added: 0, trackId: null, reason: 'Fetching needs the local helper or the companion app running on this PC.' };
       try {
-        const { files } = await runFetch(backend, { url, tool: 'auto', format: 'original', authorization: { basis, acknowledged: true } }, () => undefined);
+        const { files } = await runFetch(backend, { url, tool: 'auto', format: 'original', authorization: { basis, acknowledged: true } }, (job) =>
+          onProgress?.({ percent: job.percent ?? null, stage: job.stage }),
+        );
         if (!files.length) return { added: 0, trackId: null, reason: 'The helper finished but saved no file.' };
-        const root: StoredRoot = { id: uuidv7(), kind: 'files', displayName: files[0]!.name, handle: null, trackCount: 0, addedAt: new Date().toISOString(), lastScanAt: null, lastScanError: null };
-        await db.put('roots', root);
-        // Kept as a copy: a fetched file has no folder on this device to be read from again.
-        const result = await indexPickedFiles(db, root.id, files, { keepCopies: true });
-        await db.put('roots', { ...root, trackCount: result.added + result.updated, lastScanAt: new Date().toISOString() });
-        await refreshRows(db);
-        const ref = (await db.getAllFromIndex('files', 'by-root', root.id))[0];
-        note(`fetched ${url}: ${result.added} added`);
-        return { added: result.added, trackId: ref?.trackId ?? null, reason: null };
+        const kept = await keepFetched(db, files);
+        note(`fetched ${url}: ${kept.added} added`);
+        return { added: kept.added, trackId: kept.trackId, reason: null };
       } catch (err) {
         return { added: 0, trackId: null, reason: err instanceof ToolError || err instanceof Error ? err.message : String(err) };
+      }
+    },
+    async keep(file) {
+      try {
+        const kept = await keepFetched(db, [file]);
+        note(`kept ${file.name}: ${kept.added} added`);
+        return kept.trackId ? { trackId: kept.trackId, reason: null } : { trackId: null, reason: 'The file arrived, but no audio could be read from it.' };
+      } catch (err) {
+        return { trackId: null, reason: err instanceof Error ? err.message : String(err) };
       }
     },
   };

@@ -98,6 +98,8 @@ const CONCURRENCY = 2;
 const QUERY_MS = 12_000;
 /** How many picks a refresh shows. */
 const PICKS = 12;
+/** Service states that mean "not reached" rather than "nothing found". */
+const UNREACHED = new Set<string>(['failed', 'timeout', 'cooling-down']);
 /** A preview larger than this is not a 30-second clip; it is not kept. */
 const CLIP_MAX = 3 * 1024 * 1024;
 
@@ -150,6 +152,9 @@ export function installDiscoverOnline(
           via = via ?? r.via;
           status.push(...r.status);
           for (const t of r.tracks) gathered.push({ row: foundRow(t), asked: q, extra: t });
+          // Answered, but only with failures (every service failed, timed out or is cooling down): unreached.
+          const tried = r.status.filter((s) => s.state !== 'skipped');
+          if (!r.tracks.length && tried.length && tried.every((s) => UNREACHED.has(s.state))) failed += 1;
         } catch (err) {
           if (mine.signal.aborted) return;
           failed += 1;
@@ -171,7 +176,7 @@ export function installDiscoverOnline(
           failed === queries.length
             ? refused
               ? `The catalog refused: ${refused}`
-              : 'Couldn’t reach the catalog: neither the hub, the companion nor the music services answered. Check the connection and refresh.'
+              : `Couldn’t reach the catalog: ${services || 'neither the hub, the companion nor the music services answered'}. Check the connection and refresh.`
             : `The catalog found nothing for ${list(asked)}${services ? ` (${services})` : ''}.`,
         queries: asked,
       };
@@ -223,7 +228,9 @@ export function installDiscoverOnline(
 
   const ring: CacheEntry[] = [];
   const blobs = new Map<string, string>();
+  /** Clips a page may not read (no CORS), and clips already played: neither is asked for again. */
   const failedClips = new Set<string>();
+  const playedClips = new Set<string>();
   let candidates: Candidate[] = [];
   let inFlight: string | null = null;
   let reason: string | null = null;
@@ -233,18 +240,21 @@ export function installDiscoverOnline(
     Boolean((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData);
   const enabled = (): boolean => on && !saveData() && navigator.onLine !== false;
 
+  /** The clip playing now: out of the ring, but its `blob:` URL stays alive until another is played. */
+  let playing: string | null = null;
+
   function letGo(id: string): void {
     const at = ring.findIndex((c) => c.id === id);
     if (at >= 0) ring.splice(at, 1);
     const url = blobs.get(id);
-    if (url) URL.revokeObjectURL(url);
     blobs.delete(id);
+    if (url && url !== playing) URL.revokeObjectURL(url);
   }
 
   function pump(): void {
     const plan = planLookAhead({
       enabled: enabled(),
-      candidates: candidates.map((c) => (failedClips.has(c.id) ? { ...c, url: null } : c)),
+      candidates: candidates.filter((c) => !playedClips.has(c.id)).map((c) => (failedClips.has(c.id) ? { ...c, url: null } : c)),
       cache: ring,
       inFlight: inFlight ? [inFlight] : [],
     });
@@ -294,6 +304,10 @@ export function installDiscoverOnline(
       return cachedFor(ring, id) ? (blobs.get(id) ?? null) : null;
     },
     played(id) {
+      playedClips.add(id);
+      const url = blobs.get(id) ?? null;
+      if (playing && playing !== url) URL.revokeObjectURL(playing);
+      playing = url;
       const c = ring.find((x) => x.id === id);
       if (c) c.played = true;
       pump();

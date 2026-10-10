@@ -1060,6 +1060,22 @@
   .algobar__legend button { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: default; }
   .algobar__legend button[aria-pressed="true"] { color: var(--prefs-ink); font-weight: 700; }
   .algobar__legend button:focus-visible { outline: 2px solid var(--prefs-focus-strong); outline-offset: 1px; border-radius: 2px; }
+  /* Discover's catalog set (NP-DISC-006): the heading row, a pick's platforms, a visitor's fetch (NP-FIND-011) */
+  .library tbody tr.lib-group,
+  .library tbody tr.lib-group:nth-child(even) { background: var(--lib-head-top); }
+  .library td.lib-group__cell { height: auto; padding: 7px 6px 5px; border-top: 1px solid var(--lib-head-rule); white-space: normal; line-height: 1.35; }
+  .lib-group__name { color: var(--lib-ink); font-weight: 700; }
+  .lib-group__said { color: var(--lib-soft); }
+  .lib-tline { display: flex; align-items: center; min-width: 0; }
+  /* the title keeps most of the cell; the marks give way first (clipped, never the title), as in the search */
+  .lib-tname { flex: 0 1 auto; min-width: min(70%, max-content); overflow: hidden; text-overflow: ellipsis; }
+  .lib-pfs { flex: 0 1 auto; min-width: 0; overflow: hidden; display: inline-flex; gap: 3px; margin-left: 6px; }
+  .lib-badge { padding: 0 4px; border-radius: 3px; background: var(--lib-badge); color: var(--lib-badge-ink); font-size: 9px; font-weight: 700; line-height: 13px; }
+  .lib-badge--more { background: transparent; }
+  .lib-state { flex: none; margin-left: 6px; color: var(--lib-accent); font-weight: 400; font-variant-numeric: tabular-nums; }
+  .library tbody tr[aria-selected="true"] .lib-badge { background: rgba(255, 255, 255, 0.28); color: #fff; }
+  .library tbody tr[aria-selected="true"] .lib-state { color: #fff; }
+  @media (pointer: coarse) { .lib-badge, .lib-group__cell { font-size: 12px; line-height: 16px; } }
   @container (max-width: 560px) { .algobar__legend { margin-left: 0; } }
 
   /* "add to library" — same 20x16 badge as the platform links so the row's
@@ -2085,6 +2101,20 @@
   }
 
   .player__where[hidden] { display: none; }
+
+  /* "Preview · 30 seconds — not the whole song": a visitor's clip, said as one (NP-FIND-011) */
+  .player__preview {
+    display: inline-block;
+    margin: 6px 0 0;
+    padding: 1px 7px;
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--player-meta);
+  }
+  .player__preview[hidden] { display: none; }
 
   /* scrubber */
 
@@ -7314,6 +7344,8 @@ window.AW.startStats = function () {
         <!-- Radio only: a track tells you its album, a broadcast tells you
              which station it is and where it is coming from. -->
         <p class="player__where" id="playerWhere" hidden></p>
+        <!-- A visitor's 30-second preview is said as one, never as the song (NP-FIND-011). -->
+        <p class="player__preview" id="playerPreview" hidden></p>
       </div>
     </div>
 
@@ -8831,7 +8863,7 @@ window.AW.startStats = function () {
 
     function setFocus(next, keepSort) {
       focus = next;
-      if (next && next.kind === 'discover') logShown(next.ids || []);
+      if (next && next.kind === 'discover') logShown(next.localIds || next.ids || []);
       if (!keepSort) sortExplicit = false;
       paintScope();
       render();
@@ -9118,6 +9150,7 @@ window.AW.startStats = function () {
                 : focus ? 'Nothing in \u201c' + esc(focus.label) + '\u201d.'
                 : 'No ' + esc(VIEW_LABEL[view] || 'items') + ' yet.';
         tbody.innerHTML = '<tr><td class="lib-empty" colspan="9">' + why + '</td></tr>';
+        discGroupRows();
         MQ.sync();
         return;
       }
@@ -9126,13 +9159,13 @@ window.AW.startStats = function () {
         var sel = sg.id === selectedId || multi.indexOf(sg.id) >= 0, playing = sg.title === np;
         var ini = INITIAL[sg.platform] || sg.platform.charAt(0);
         var roll = playing && !reduceQ.matches;
-        return '<tr data-id="' + sg.id + '" aria-selected="' + sel + '" tabindex="' + (sel ? 0 : -1) + '"' +
+        return '<tr data-id="' + sg.id + '"' + (sg.online ? ' data-online="1" title="' + esc(sg.why || '') + '"' : '') + ' aria-selected="' + sel + '" tabindex="' + (sel ? 0 : -1) + '"' +
             (playing ? ' class="is-playing" aria-current="true"' : '') + '>' +
           '<td class="lib-idx">' + (playing ? NP : (i + 1)) + '</td>' +
           '<td class="lib-icon"><a class="lib-pf" data-len="' + ini.length + '" href="' + esc(sg.url) + '"' +
             ' target="_blank" rel="noopener noreferrer" title="' + esc(sg.platform) + '"' +
             ' aria-label="Open ' + esc(sg.title) + ' on ' + esc(sg.platform) + ' in a new tab">' + ini + '</a></td>' +
-          '<td class="lib-title">' + (roll ? mq(sg.title) : esc(sg.title)) + '</td>' +
+          '<td class="lib-title">' + visitorTitle(sg, roll ? mq(sg.title) : esc(sg.title)) + '</td>' +
           '<td class="lib-col-artist">' + (roll ? mq(sg.artist) : esc(sg.artist)) + '</td>' +
           '<td class="lib-num">' + fmt(sg.duration) + '</td>' +
           '<td class="lib-num lib-col-bpm">' + (sg.bpm || '\u2014') + '</td>' +
@@ -9143,7 +9176,8 @@ window.AW.startStats = function () {
           '<td class="lib-col-album">' + esc(sg.album) + '</td>' +
         '</tr>';
       }).join('');
-      if (!selectedId) { var first = tbody.querySelector('tr'); if (first) first.tabIndex = 0; }
+      discGroupRows();
+      if (!selectedId) { var first = tbody.querySelector('tr[data-id]'); if (first) first.tabIndex = 0; }
       MQ.sync();
     }
 
@@ -9468,7 +9502,8 @@ window.AW.startStats = function () {
       var outgoing = playingSong();
       if (outgoing && outgoing.id !== id) remember(outgoing.id);
       remember(id);
-      logPlay(id);
+      /* a visitor (not on this device) plays at most its preview: that is not a play of the song */
+      if (sg.local || sg.remote) logPlay(id);
       document.dispatchEvent(new CustomEvent('library:play', { detail: { song: sg } }));
       /* the view is built from history, so playing something reorders it */
       if (focus && focus.kind === 'nowplaying') setFocus(nowPlayingFocus(), true);
@@ -9480,7 +9515,8 @@ window.AW.startStats = function () {
       if (!np) return;
       var i = -1;
       for (var k = 0; k < list.length; k++) if (list[k].id === np.id) { i = k; break; }
-      var nx = i >= 0 ? list[i + 1] : null;
+      var nx = null;
+      if (i >= 0) for (var q = i + 1; q < list.length && !nx; q++) if (!visitor(list[q])) nx = list[q];
       if (!nx) return;
       e.preventDefault();
       if (typeof select === 'function') select(nx.id, false);
@@ -9525,6 +9561,9 @@ window.AW.startStats = function () {
       var row = e.target.closest('tr');
       if (!row) return;
       if (btn) {
+        /* Download on a visitor fetches the song (the sheet), rather than marking a link "saved offline" */
+        var vsg = !btn.classList.contains('lib-star') && song(row.dataset.id);
+        if (vsg && visitor(vsg) && window.NP_FETCH) { window.NP_FETCH(vsg); return; }
         var id = row.dataset.id, isStar = btn.classList.contains('lib-star');
         var bag = isStar ? state.starred : state.saved;
         bag[id] = !bag[id];
@@ -9662,7 +9701,7 @@ window.AW.startStats = function () {
         say(multi.length + ' songs selected');
         return;
       }
-      var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+      var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr[data-id]'));
       var i = rows.indexOf(row);
       if (e.key === 'ArrowDown' && i < rows.length - 1) { e.preventDefault(); select(rows[i + 1].dataset.id, true); }
       else if (e.key === 'ArrowUp' && i > 0) { e.preventDefault(); select(rows[i - 1].dataset.id, true); }
@@ -10032,6 +10071,39 @@ window.AW.startStats = function () {
     }
     /* run: a command without the menu (Shift+Enter in the search queues the song to Up Next) */
     window.NP_SONG_MENU = { open: openCatMenu, close: closeMenu, run: function (act, c) { runCatAction(act, null, c); }, isOpen: function () { return !ctx.hidden && !!ctxCat; } };
+    /* A visitor in the music list — a song of a catalog list on show, an online Discover pick, a link row — is a
+       catalog song: the same menu, its commands acting on it (NP-FIND-010/011, NP-DISC-006). */
+    function visitor(sg) { return !!sg && !sg.local && !sg.remote && /^https?:/.test(sg.url || ''); }
+    function visitorSubject(sg, back) {
+      return {
+        song: { title: sg.title, artist: sg.artist, album: sg.album || '', duration: sg.duration || 0, bpm: sg.bpm || null,
+                date: sg.date || null, platform: sg.platform, url: sg.url, art: sg.art || null, preview: sg.preview || null },
+        inLibrary: LIB.indexOf(sg) >= 0 || !!catRow(sg),
+        canDownload: true,
+        canAudition: /^https?:/.test(sg.preview || ''),
+        auditioning: false,
+        touch: false,
+        back: back,
+        onAdd: function () {
+          var r = catEnsure(sg);
+          if (r) { save(); say('Added “' + r.title + '” to your library'); } else say('The song could not be added to the library');
+        },
+        onDownload: function () { if (window.NP_FETCH) window.NP_FETCH(sg); },
+        onAudition: function () { document.dispatchEvent(new CustomEvent('library:play', { detail: { song: sg, previewOnly: true } })); },
+        onFiled: function () {},
+      };
+    }
+    /* the row says how its fetch is going ("Fetching… 42%"), without redrawing the list */
+    document.addEventListener('library:fetching', function (e) {
+      var d = e.detail || {};
+      var tr = d.id && tbody.querySelector('tr[data-id="' + CSS.escape(d.id) + '"]');
+      if (!tr) return;
+      var cell = tr.querySelector('.lib-title'), st = cell && cell.querySelector('.lib-state'), sg = song(d.id);
+      if (!cell || !sg) return;
+      if (st && d.words) { st.textContent = d.words; return; }
+      cell.innerHTML = visitorTitle(sg, tr.classList.contains('is-playing') && !reduceQ.matches ? mq(sg.title) : esc(sg.title));
+      MQ.sync();
+    });
 
     /* Shared by both menus: clamp into the viewport, flip the submenu if it
        would run off the right edge, and put focus on the first command. */
@@ -10216,6 +10288,8 @@ window.AW.startStats = function () {
        says so. Fifty at a time; Load more extends the same ranking. */
     var DISC_PAGE = 50;
     var dsc = { seed: 1, shown: {}, cap: DISC_PAGE, ids: null, base: [], wrapped: false, stale: false };
+    /* the catalog set (NP-DISC-006): asked when a list is built, asked again on Refresh */
+    dsc.online = { seq: 0, state: 'idle', rows: [], said: '', via: null, shown: {} };
 
     function discSongs() { return LIB.filter(function (sg) { return (sg.kind || 'music') === 'music'; }); }
     function discCount() {
@@ -10251,21 +10325,33 @@ window.AW.startStats = function () {
     function discPage() {
       var page = dsc.ids.slice(0, dsc.cap);
       page.forEach(function (id) { dsc.shown[id] = 1; });
-      return { kind: 'discover', label: 'Discover', ids: page, ordered: true,
-               more: dsc.ids.length - page.length, eligible: dsc.eligible, seed: dsc.seed };
+      var f = { kind: 'discover', label: 'Discover', ids: page, ordered: true,
+                more: dsc.ids.length - page.length, eligible: dsc.eligible, seed: dsc.seed };
+      /* the catalog's picks follow the library's, in their own ranked order, under a heading row */
+      var o = dsc.online;
+      if (o.state !== 'idle' && o.state !== 'off') {
+        f.localIds = page;
+        f.online = o;
+        f.rows = page.map(song).filter(Boolean).concat(o.rows);
+        f.ids = page.concat(o.rows.map(function (r) { return r.id; }));
+      }
+      return f;
     }
     /* from the library menu: the list as it stands, or a first one */
     function discOpen() {
+      var fresh = !dsc.ids;
       if (!dsc.ids || dsc.stale) discBuild(Object.keys(dsc.shown));
+      if (fresh || dsc.online.state === 'idle') discAsk();
       return discPage();
     }
     function discShowing() { return !!focus && focus.kind === 'discover'; }
     /* Refresh: a new seed, leaving out what this session has shown (Shift, or the menu: start over) */
     function discRefresh(startOver) {
-      if (startOver) dsc.shown = {};
+      if (startOver) { dsc.shown = {}; dsc.online.shown = {}; }
       dsc.seed = (dsc.seed + 1) % 1000000;
       dsc.cap = DISC_PAGE;
       discBuild(Object.keys(dsc.shown));
+      discAsk();
       selectedId = null;
       setFocus(discPage());
       var sc = document.getElementById('libraryScroll');
@@ -10282,8 +10368,10 @@ window.AW.startStats = function () {
       dsc.shown = {};
       dsc.cap = DISC_PAGE;
       dsc.ids = null;
-      if (!discShowing()) return;
+      dsc.online.shown = {};
+      if (!discShowing()) { dsc.online.seq++; dsc.online.state = 'idle'; return; }
       discBuild([]);
+      discAsk();
       setFocus(discPage(), true);
       var sc = document.getElementById('libraryScroll');
       if (sc) sc.scrollTop = 0;
@@ -10306,6 +10394,80 @@ window.AW.startStats = function () {
     }
     document.getElementById('libMoreBtn').addEventListener('click', discMore);
     document.getElementById('libDiscRefresh').addEventListener('click', function (e) { discRefresh(!!e.shiftKey); });
+
+    /* ---- From the catalog (NP-DISC-006): asked through the search's own clients, ranked by the same ranker ---- */
+    function discOnlineOn() { return cfg.discOnline !== false; }
+    function discAsk() {
+      var o = dsc.online, my = ++o.seq;
+      o.rows = [];
+      o.said = '';
+      if (!discOnlineOn()) { o.state = 'off'; return; }
+      o.state = 'asking';
+      (window.NP_SEARCH_READY || Promise.resolve(null)).then(function () {
+        var D = window.NP_DISC_ONLINE;
+        if (my !== o.seq) return null;
+        if (!D) { o.state = 'failed'; o.said = 'The catalog search is not available in this copy of the player.'; discLanded(my); return null; }
+        return D.ask({ songs: discSongs(), plays: state.plays, cfg: cfg.algo, mode: cfg.algoMode, lean: cfg.lean,
+                       exclude: Object.keys(o.shown), queued: state.queue, shown: state.recShown, seed: dsc.seed }).then(function (a) {
+          if (my !== o.seq || a.state === 'cancelled') return;
+          o.state = a.state;
+          o.rows = a.rows;
+          o.said = a.said;
+          o.via = a.via;
+          a.rows.forEach(function (r) { o.shown[r.id] = 1; });
+          D.warm(a.rows);
+          discLanded(my);
+        });
+      }).catch(function (err) {
+        if (my !== o.seq) return;
+        o.state = 'failed';
+        o.said = 'Couldn’t ask the catalog: ' + ((err && err.message) || 'something went wrong') + '.';
+        discLanded(my);
+      });
+    }
+    /* the answer is in: the same list, with the catalog's set filled in (or its sentence), nothing moved above it */
+    function discLanded(my) {
+      if (my !== dsc.online.seq || !discShowing()) return;
+      var sc = document.getElementById('libraryScroll'), top = sc ? sc.scrollTop : 0;
+      setFocus(discPage(), true);
+      if (sc) sc.scrollTop = top;
+      /* said in the list's live region, not the HUD: the answer arrives unasked, and should not cover the transport */
+      var n = dsc.online.rows.length;
+      if (n) findLive.textContent = n + ' song' + (n === 1 ? '' : 's') + ' from the catalog, ranked by “' + algoCurrent().name + '”';
+    }
+    /* the heading row over the catalog's set: what it is, how it was ranked, who answered — or why there is nothing */
+    function discGroupRows() {
+      var o = focus && focus.kind === 'discover' && focus.online;
+      if (!o || sortExplicit) return;
+      var n = o.rows.length;
+      var words = o.state === 'asking' ? 'Asking the catalog for songs that fit “' + algoCurrent().name + '”…'
+        : n ? n + ' song' + (n === 1 ? '' : 's') + ' ranked by “' + algoCurrent().name + '” · ' + (MODE_NAME[cfg.algoMode] || cfg.algoMode) +
+              (o.via ? ', through ' + o.via : '') + ' — not on this device yet: choosing one plays its preview'
+        : o.said;
+      var head = document.createElement('tr');
+      head.className = 'lib-group';
+      head.innerHTML = '<td class="lib-group__cell" colspan="9"><span class="lib-group__name">From the catalog</span> ' +
+        '<span class="lib-group__said">' + esc(words) + '</span></td>';
+      var first = tbody.querySelector('tr[data-online]');
+      if (first) tbody.insertBefore(head, first); else tbody.appendChild(head);
+    }
+    /* A pick's platforms, after its title: short marks in the list's own monochrome badge (no logos), every
+       platform named in full in the tooltip and to a screen reader. The title gives way to them, never the reverse. */
+    var PF_MARK = { 'Apple Music': 'AM', Deezer: 'DZ', MusicBrainz: 'MB', YouTube: 'YT', 'YouTube Music': 'YTM', SoundCloud: 'SC',
+                    Spotify: 'SP', Bandcamp: 'BC', Tidal: 'TD', Qobuz: 'QB', 'Amazon Music': 'AMZ' };
+    function visitorTitle(sg, inner) {
+      var marks = '';
+      if (sg.online && sg.platforms && sg.platforms.length) {
+        var all = 'On ' + sg.platforms.join(', ');
+        marks = '<span class="lib-pfs" title="' + esc(all) + '"><span class="vh">' + esc(all) + '</span>' +
+          sg.platforms.slice(0, 3).map(function (p) { return '<span class="lib-badge" aria-hidden="true">' + esc(PF_MARK[p] || p.charAt(0)) + '</span>'; }).join('') +
+          (sg.platforms.length > 3 ? '<span class="lib-badge lib-badge--more" aria-hidden="true">+' + (sg.platforms.length - 3) + '</span>' : '') + '</span>';
+      }
+      var f = window.NP_FETCHING && window.NP_FETCHING[sg.id];
+      var state = f ? '<span class="lib-state">' + esc(f) + '</span>' : '';
+      if (!marks && !state) return inner;
+      return '<span class="lib-tline"><span class="lib-tname">' + inner + '</span>' + marks + state + '</span>';
+    }
 
     /* ---- the chip (NP-DISC-003/005): the algorithm's colour, name, mode and lean ---- */
     var LEAN_NAME = { familiar: 'Familiar', balanced: 'Balanced', adventurous: 'Adventurous' };
@@ -10377,6 +10539,9 @@ window.AW.startStats = function () {
         '<div class="ctx__sep" role="separator"></div>' +
         '<button class="ctx__item" type="button" role="menuitem" data-act="algo-refresh">New Songs</button>' +
         '<button class="ctx__item" type="button" role="menuitem" data-act="algo-restart">Start Discover Over</button>' +
+        '<button class="ctx__item" type="button" role="menuitemcheckbox" aria-checked="' + discOnlineOn() + '" data-act="algo-online"' +
+          ' title="Under your library’s songs, songs from the catalog ranked the same way"><span class="ctx__check" aria-hidden="true">' +
+          (discOnlineOn() ? '✓' : '') + '</span>From the Catalog</button>' +
         '<div class="ctx__sep" role="separator"></div>' +
         '<button class="ctx__item" type="button" role="menuitem" data-act="algo-edit">Edit Algorithms\u2026</button>';
     }
@@ -10439,6 +10604,14 @@ window.AW.startStats = function () {
         say('Lean reset \u2014 the algorithm as saved');
       } else if (act === 'algo-refresh') {
         discRefresh(false);
+      } else if (act === 'algo-online') {
+        cfg.discOnline = !discOnlineOn();
+        cfgSave();
+        if (window.NP_DISC_ONLINE) window.NP_DISC_ONLINE.enable(cfg.discOnline);
+        dsc.online.shown = {};
+        if (cfg.discOnline) discAsk(); else { dsc.online.seq++; dsc.online.state = 'off'; dsc.online.rows = []; }
+        if (discShowing()) setFocus(discPage(), true);
+        say(cfg.discOnline ? 'Discover asks the catalog too' : 'Discover shows only your library');
       } else if (act === 'algo-restart') {
         discRefresh(true);
       } else if (act === 'algo-edit') {
@@ -10458,7 +10631,13 @@ window.AW.startStats = function () {
     }
     /* for the tests and the mockup: what Discover shows, under which seed */
     window.NP_DISCOVER = {
-      ids: function () { return discShowing() ? focus.ids.slice() : null; },
+      ids: function () { return discShowing() ? (focus.localIds || focus.ids).slice() : null; },
+      /* the catalog's set as it stands: its state, its sentence, who answered, and the picks */
+      online: function () {
+        var o = dsc.online;
+        return { state: o.state, said: o.said, via: o.via, lookahead: window.NP_DISC_ONLINE ? window.NP_DISC_ONLINE.lookahead() : null,
+                 rows: o.rows.map(function (r) { return { id: r.id, title: r.title, artist: r.artist, platforms: r.platforms, why: r.why, preview: r.preview, explored: r.explored }; }) };
+      },
       state: function () { return { seed: dsc.seed, shown: Object.keys(dsc.shown).length, eligible: dsc.eligible, more: discShowing() ? focus.more : null, wrapped: dsc.wrapped }; },
       refresh: discRefresh,
       rank: function () { return discRank([]).rows.map(function (r) { return { id: r.song.id, title: r.song.title, score: r.score, tier: r.tier, explored: r.explored }; }); },
@@ -12573,7 +12752,7 @@ window.AW.startStats = function () {
       // those to the row instead. One listener — two would both fire for the
       // keyboard case and build, place and focus the menu twice.
       tbody.addEventListener('contextmenu', function (e) {
-        var row = e.target.closest('tr');
+        var row = e.target.closest('tr[data-id]');
         if (!row) return;
         e.preventDefault();
         var keyboard = e.button === 0 && e.clientX === 0 && e.clientY === 0;
@@ -12583,6 +12762,13 @@ window.AW.startStats = function () {
           return;
         }
         select(row.dataset.id, false);
+        /* a song not on this device gets the catalog song's menu: Up Next, a playlist, the library, Download… */
+        var vs = song(row.dataset.id);
+        if (vs && visitor(vs)) {
+          var vb = row.getBoundingClientRect();
+          openCatMenu(visitorSubject(vs, row), keyboard ? vb.left + 40 : e.clientX, keyboard ? vb.bottom - 4 : e.clientY);
+          return;
+        }
         if (keyboard) {
           var rr = row.getBoundingClientRect();
           openMenu(song(row.dataset.id), rr.left + 40, rr.bottom - 4);
@@ -12894,6 +13080,7 @@ window.AW.startStats = function () {
       sources: { music: '', m3u: '', epg: '', tv: '', movies: '' },
       algo: null,            // filled from ALGO_DEFAULTS once it is declared
       lean: { explore: 'balanced', genre: null },   // a session bias on Discover (NP-DISC-005)
+      discOnline: true,      // Discover asks the catalog too (NP-DISC-006); off in the chip's menu
       eq: { on: false, preset: 'Flat', preamp: 0,
             bands: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
     };
@@ -12963,6 +13150,7 @@ window.AW.startStats = function () {
         if (/^(familiar|balanced|adventurous)$/.test(saved.lean.explore)) cfg.lean.explore = saved.lean.explore;
         if (typeof saved.lean.genre === 'string' && saved.lean.genre.trim()) cfg.lean.genre = saved.lean.genre.trim().slice(0, 60);
       }
+      if (typeof saved.discOnline === 'boolean') cfg.discOnline = saved.discOnline;
       algoLink(true);
       if (saved.eq && typeof saved.eq === 'object') {
         if (typeof saved.eq.on === 'boolean') cfg.eq.on = saved.eq.on;
@@ -17214,7 +17402,8 @@ window.AW.startStats = function () {
     var heardSecs = { solo: 0, group: 0 };
     function reportHeard(m, ended) {
       var c = chosen[m];
-      if (!c || !c.id) return;
+      /* a visitor's preview is a sample of the song, not a listen to it */
+      if (!c || !c.id || c.visiting) return;
       document.dispatchEvent(new CustomEvent('player:heard', {
         detail: { id: c.id, secs: heardSecs[m], dur: c.duration, end: !!ended } }));
     }
@@ -17681,7 +17870,15 @@ window.AW.startStats = function () {
     var fetchSheet = null;
     /* the search's song details fetch through the same sheet (NP-FIND-006) */
     window.NP_FETCH = function (sg) { openFetch(sg); };
-    function openFetch(sg) {
+    /* what each visitor's fetch is doing, for its row and the preview label ("Fetching… 42%") */
+    window.NP_FETCHING = window.NP_FETCHING || {};
+    function fetchSays(id, words) {
+      if (words) window.NP_FETCHING[id] = words; else delete window.NP_FETCHING[id];
+      document.dispatchEvent(new CustomEvent('library:fetching', { detail: { id: id, words: words || null } }));
+    }
+    function hostOf(u) { return String(u || '').replace(/^https?:\/\//, '').split('/')[0]; }
+    function openFetch(sg, opts) {
+      opts = opts || {};
       if (!fetchSheet) {
         fetchSheet = document.createElement('dialog');
         fetchSheet.className = 'sheet'; fetchSheet.id = 'npFetch'; fetchSheet.setAttribute('aria-labelledby', 'npFetchTitle');
@@ -17689,7 +17886,7 @@ window.AW.startStats = function () {
           '<p class="sheet__title" id="npFetchTitle">Fetch this song</p>' +
           '<p class="sheet__msg" id="npFetchMsg"></p>' +
           '<fieldset class="np-fetch__bases"><legend class="sheet__msg">Why you may have it</legend>' +
-          BASES.map(function (b, i) { return '<label class="np-fetch__basis"><input type="radio" name="npBasis" value="' + b[0] + '"> <b>' + b[1] + '</b> — ' + b[2] + '</label>'; }).join('') +
+          BASES.map(function (b) { return '<label class="np-fetch__basis"><input type="radio" name="npBasis" value="' + b[0] + '"> <b>' + b[1] + '</b> — ' + b[2] + '</label>'; }).join('') +
           '</fieldset><p class="sheet__msg" id="npFetchState" role="status"></p></div>' +
           '<div class="sheet__actions"><button class="sheet__btn" type="button" id="npFetchCancel">Cancel</button>' +
           '<button class="sheet__btn sheet__btn--default" type="submit" id="npFetchGo" value="fetch">Fetch</button></div></form>';
@@ -17699,32 +17896,113 @@ window.AW.startStats = function () {
           e.preventDefault();
           var pick = fetchSheet.querySelector('input[name="npBasis"]:checked'), go = fetchSheet.querySelector('#npFetchGo'), st = fetchSheet.querySelector('#npFetchState');
           if (!pick) { st.textContent = 'Say why you may have this file first.'; return; }
-          if (!window.NP_TOOLS) { st.textContent = 'Fetching needs the local helper.'; return; }
-          var target = fetchSheet._song; go.disabled = true; st.textContent = 'Fetching…';
-          window.NP_TOOLS.fetch(target.url, pick.value).then(function (r) {
+          var route = fetchSheet._route;
+          if (!window.NP_VISIT || !route) { st.textContent = 'Still finding what can fetch it…'; return; }
+          if (route.kind === 'none') { st.textContent = 'Nothing can fetch it here: ' + route.why; return; }
+          var target = fetchSheet._song, cancel = fetchSheet.querySelector('#npFetchCancel');
+          go.disabled = true;
+          window.NP_VISIT.fetch(target, pick.value, function (s) {
+            fetchSays(target.id, s.stage === 'done' || s.stage === 'failed' ? null : s.words);
+            if (fetchSheet._song !== target) return;
+            st.textContent = [s.chosen, s.stage === 'done' || s.stage === 'failed' ? '' : s.words].filter(Boolean).join(' ');
+            /* queued: the hub has it; the sheet may go, and the row keeps counting */
+            if (s.stage === 'queued') cancel.textContent = 'Close';
+          }).then(function (s) {
             go.disabled = false;
-            if (!r.added) { st.textContent = r.reason || 'Nothing was saved.'; return; }
-            fetchSheet.close();
+            if (s.stage !== 'done') {
+              if (fetchSheet.open && fetchSheet._song === target) st.textContent = [s.chosen, s.words].filter(Boolean).join(' ');
+              else window.say(s.words);
+              return;
+            }
+            if (fetchSheet._song === target && fetchSheet.open) fetchSheet.close();
             /* the link row gives way to the real file */
             var lib = window.LIBRARY || [];
             for (var k = lib.length - 1; k >= 0; k--) if (lib[k].id === target.id) lib.splice(k, 1);
             document.dispatchEvent(new CustomEvent('library:refresh', { detail: { count: lib.length } }));
-            var got = lib.filter(function (s) { return s.id === r.trackId; })[0];
-            window.say('Fetched — it is in your library');
+            var got = lib.filter(function (x) { return x.id === s.trackId; })[0];
+            window.say('Fetched — “' + target.title + '” is in your library');
             if (got) document.dispatchEvent(new CustomEvent('library:play', { detail: { song: got } }));
           });
         });
       }
       fetchSheet._song = sg;
-      fetchSheet.querySelector('#npFetchMsg').textContent = '“' + sg.title + '”' + (sg.artist ? ' by ' + sg.artist : '') + (sg.date ? ' (' + sg.date + ')' : '') + ' — fetched by the helper on this PC from ' + sg.url.replace(/^https?:\/\//, '').split('/')[0] + ', then played from this device.';
-      fetchSheet.querySelector('#npFetchState').textContent = '';
+      fetchSheet._route = null;
+      var who = '“' + sg.title + '”' + (sg.artist ? ' by ' + sg.artist : '') + (sg.date ? ' (' + sg.date + ')' : '');
+      var msg = fetchSheet.querySelector('#npFetchMsg'), st = fetchSheet.querySelector('#npFetchState');
+      var meanwhile = opts.previewing ? ' Its 30-second preview plays meanwhile.' : '';
+      msg.textContent = who + ' — finding what can fetch it…';
+      st.textContent = window.NP_FETCHING[sg.id] || '';
+      fetchSheet.querySelector('#npFetchCancel').textContent = 'Cancel';
+      fetchSheet.querySelector('#npFetchGo').disabled = false;
       [].forEach.call(fetchSheet.querySelectorAll('input[name="npBasis"]'), function (x) { x.checked = false; });
-      window.NP_TOOLS.detect().then(function (h) {
-        fetchSheet.querySelector('#npFetchState').textContent = h ? 'Using ' + h.label + '.' : 'No helper is answering on this PC, so Fetch will say so.';
+      (window.NP_VISIT ? window.NP_VISIT.route() : Promise.resolve({ kind: 'none', label: '', why: 'the search is still loading.' })).then(function (r) {
+        if (fetchSheet._song !== sg) return;
+        fetchSheet._route = r;
+        if (r.kind === 'hub') {
+          msg.textContent = who + ' — fetched by ' + r.label + ' from the best source it has for it (YouTube Music, YouTube, SoundCloud, Bandcamp, then Spotify through spotDL), tagged, then played from this device.' + meanwhile;
+          if (!st.textContent) st.textContent = 'Using ' + r.label + '.';
+        } else if (r.kind === 'helper') {
+          msg.textContent = who + ' — fetched by the helper on this PC from ' + hostOf(sg.url) + ', then played from this device.' + meanwhile;
+          if (!st.textContent) st.textContent = 'Using ' + r.label + '.' + (r.why ? ' (' + r.why + '.)' : '');
+        } else {
+          msg.textContent = who + ' — at ' + hostOf(sg.url) + '; nothing on this device can fetch it.' + meanwhile;
+          st.textContent = 'Nothing can fetch it here: ' + r.why;
+        }
       });
-      fetchSheet.showModal();
+      if (!fetchSheet.open) fetchSheet.showModal();
     }
 
+    /* ---- a visitor chosen (NP-FIND-011): its preview, said as one, and the fetch of the whole song ---- */
+    var visitSeq = 0;
+    function paintPreview() {
+      var el = document.getElementById('playerPreview');
+      if (!el) return;
+      var c = chosen[mode];
+      var on = !!(c && c.preview);
+      el.hidden = !on;
+      el.textContent = on ? 'Preview · 30 seconds — not the whole song' + (window.NP_FETCHING[c.id] ? ' · ' + window.NP_FETCHING[c.id] : '') : '';
+    }
+    document.addEventListener('library:fetching', paintPreview);
+    function visit(sg, target, previewOnly) {
+      var c = chosen[target], my = ++visitSeq;
+      var D = window.NP_DISC_ONLINE;
+      var clip = (D && D.clip(sg.id)) || (/^https?:/.test(sg.preview || '') ? sg.preview : null);
+      if (clip && window.NP_PLAYER && window.NP_PLAYER.playPreview) {
+        c.preview = true;
+        c.duration = 30;
+        window.NP_PLAYER.playPreview(sg.id, clip, { title: sg.title, artist: sg.artist }).then(function (r) {
+          if (r.ok || chosen[target] !== c) return;
+          c.preview = false; setPlaying(false); paintPreview();
+          window.say(r.reason || 'The preview could not be played');
+        });
+        if (D) D.played(sg.id);
+      } else {
+        setPlaying(false);
+      }
+      var heard = clip ? 'Preview — 30 seconds of “' + sg.title + '”' : '“' + sg.title + '” has no preview';
+      if (previewOnly) { window.say(heard); return; }
+      if (window.NP_FETCHING[sg.id]) { window.say(heard + '; it is being fetched: ' + window.NP_FETCHING[sg.id]); return; }
+      if (!window.NP_VISIT) { window.say(heard + '. The whole song needs fetching first.'); return; }
+      window.NP_VISIT.route().then(function (route) {
+        if (my !== visitSeq || chosen[target] !== c) return;
+        if (route.kind === 'none') {
+          window.say(clip ? heard + '. The whole song needs fetching, and ' + route.why
+                          : 'Nothing can play “' + sg.title + '” here: it has no preview, and ' + route.why);
+          return;
+        }
+        window.say(heard + '; the whole song plays once ' + route.label + ' has fetched it.');
+        openFetch(sg, { previewing: !!clip });
+      });
+    }
+    /* a preview ends where it ends: it does not run on into the next row */
+    function previewEnded() {
+      var c = chosen[mode];
+      pos[mode] = 0;
+      setPlaying(false);
+      paint();
+      window.say('That was the 30-second preview of “' + c.title + '”' +
+        (window.NP_FETCHING[c.id] ? ' — the whole song plays when it has been fetched.' : ' — Download… fetches the whole song.'));
+    }
     /* switching modes by hand clears that mode's chosen track, which is how
        a group session gets back to the live edge */
     document.addEventListener('player:mode', function (e) {
@@ -17743,7 +18021,8 @@ window.AW.startStats = function () {
       var target = 'solo';
       reportHeard(mode, false);
       if (target !== mode) reportHeard(target, false);
-      chosen[target] = { id: sg.id, title: sg.title, artist: sg.artist, album: sg.album, duration: sg.duration, local: !!sg.local, remote: !!sg.remote };
+      chosen[target] = { id: sg.id, title: sg.title, artist: sg.artist, album: sg.album, duration: sg.duration, local: !!sg.local, remote: !!sg.remote,
+                         visiting: !sg.local && !sg.remote && /^https?:/.test(sg.url || ''), preview: false };
       heardSecs[target] = 0;
       window.ALBUMS[target].nowPlaying = sg.title;
       pos[target] = 0;
@@ -17756,13 +18035,17 @@ window.AW.startStats = function () {
           if (!r.ok) { setPlaying(false); if (r.reason) window.say(r.reason); }
         });
       }
+      /* not on this device: its preview, and the fetch that makes it the whole song (NP-FIND-011) */
+      else if (chosen[target].visiting) visit(sg, target, !!e.detail.previewOnly);
+      paintPreview();
     });
 
     /* Whether the bar follows the audio element (a track from this device) or the broadcast
        clock (the live session, which has no element here). */
-    function engineDriven() { return !!(window.NP_PLAYER && chosen[mode] && (chosen[mode].local || chosen[mode].remote)); }
+    function engineDriven() { return !!(window.NP_PLAYER && chosen[mode] && (chosen[mode].local || chosen[mode].remote || chosen[mode].preview)); }
     function trackEnded() {
       /* the end of the track, reached by playing rather than by seeking */
+      if (chosen[mode] && chosen[mode].preview) { previewEnded(); return; }
       if (chosen[mode]) { reportHeard(mode, heardSecs[mode] >= total() * 0.9); heardSecs[mode] = 0; }
       if (repeatOn) { pos[mode] = 0; if (engineDriven()) { window.NP_PLAYER.seek(0); window.NP_PLAYER.resume(); } paint(); }
       else if (!document.dispatchEvent(new CustomEvent('transport:next', { cancelable: true }))) { /* the list played the next one */ }
@@ -17787,7 +18070,7 @@ window.AW.startStats = function () {
       if (engineDriven()) return;                          // the element keeps this time
       /* a row from somewhere else (a search result with a link) has no audio here: the bar
          does not pretend to play it */
-      if (chosen[mode]) { setPlaying(false); window.say('Only tracks on this device play here. Open it where it lives.'); return; }
+      if (chosen[mode]) { setPlaying(false); if (!chosen[mode].visiting) window.say('Only tracks on this device play here. Open it where it lives.'); return; }
       if (pos[mode] < total()) { pos[mode] += 1; paint(); if (pos[mode] >= total()) { if (repeatOn) { pos[mode] = 0; paint(); } else setPlaying(false); } }
     }, 1000);
 
