@@ -9342,7 +9342,7 @@ window.AW.startStats = function () {
       sortKey = 'title'; sortDir = 1;
       selectedId = have.id;
       render();
-      play(have.id);
+      play(have.id, { quiet: true });
       var row = tbody.querySelector('tr[data-id="' + have.id + '"]');
       if (row && row.scrollIntoView) row.scrollIntoView({ block: 'nearest' });
     });
@@ -9491,7 +9491,7 @@ window.AW.startStats = function () {
       save();
     }
 
-    function play(id) {
+    function play(id, opts) {
       var sg = song(id);
       if (!sg) return;
       /* The outgoing track has to enter history before the new one takes over,
@@ -9503,7 +9503,7 @@ window.AW.startStats = function () {
       remember(id);
       /* a visitor (not on this device) plays at most its preview: that is not a play of the song */
       if (sg.local || sg.remote) logPlay(id);
-      document.dispatchEvent(new CustomEvent('library:play', { detail: { song: sg } }));
+      document.dispatchEvent(new CustomEvent('library:play', { detail: { song: sg, quiet: !!(opts && opts.quiet) } }));
       /* the view is built from history, so playing something reorders it */
       if (focus && focus.kind === 'nowplaying') setFocus(nowPlayingFocus(), true);
     }
@@ -18035,7 +18035,7 @@ window.AW.startStats = function () {
         });
       }
       /* not on this device: its preview, and the fetch that makes it the whole song (NP-FIND-011) */
-      else if (chosen[target].visiting) visit(sg, target, !!e.detail.previewOnly);
+      else if (chosen[target].visiting && !e.detail.quiet) visit(sg, target, !!e.detail.previewOnly);
       paintPreview();
     });
 

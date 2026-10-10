@@ -3661,7 +3661,7 @@ replace(r'''      if ((sg.local || sg.remote) && window.NP_PLAYER) {
         });
       }
       /* not on this device: its preview, and the fetch that makes it the whole song (NP-FIND-011) */
-      else if (chosen[target].visiting) visit(sg, target, !!e.detail.previewOnly);
+      else if (chosen[target].visiting && !e.detail.quiet) visit(sg, target, !!e.detail.previewOnly);
       paintPreview();
     });''')
 replace('''    function engineDriven() { return !!(window.NP_PLAYER && chosen[mode] && (chosen[mode].local || chosen[mode].remote)); }''',
@@ -4093,6 +4093,23 @@ replace('''  .algobar__legend button:focus-visible { outline: 2px solid var(--pr
   .library tbody tr[aria-selected="true"] .lib-state { color: #fff; }
   @media (pointer: coarse) { .lib-badge, .lib-group__cell { font-size: 12px; line-height: 16px; } }
 ''')
+
+# ---- adding a song chooses it quietly: no preview, no fetch sheet (NP-FIND-011) ---------------------------------
+# library:add selects the new row and plays it, as it always has. A link row is a visitor now, and choosing a visitor
+# auditions its preview and opens the fetch sheet; adding a song is not asking to hear it or to fetch it, so the
+# choice it makes is quiet. Playing the row afterwards (Return, a double-click, the transport) visits it as usual.
+replace("""    function play(id) {
+      var sg = song(id);
+      if (!sg) return;""", """    function play(id, opts) {
+      var sg = song(id);
+      if (!sg) return;""")
+replace("""      document.dispatchEvent(new CustomEvent('library:play', { detail: { song: sg } }));""",
+        """      document.dispatchEvent(new CustomEvent('library:play', { detail: { song: sg, quiet: !!(opts && opts.quiet) } }));""")
+replace("""      render();
+      play(have.id);
+      var row = tbody.querySelector('tr[data-id="' + have.id + '"]');""", """      render();
+      play(have.id, { quiet: true });
+      var row = tbody.querySelector('tr[data-id="' + have.id + '"]');""")
 
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):
