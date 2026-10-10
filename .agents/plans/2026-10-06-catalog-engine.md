@@ -268,11 +268,43 @@ album's cover stands in).
 - Deezer's `artist:"…"` filter matched nothing on 2026-10-06; advanced fields fall back to plain words.
 - SongLink/Odesli **closed keyless access** (401 `PUBLIC_API_ACCESS_DEPRECATED`, 2026-10-06): optional key.
 
+## Checked against the real services (2026-10-10)
+
+Run from the engine with the hub's own presets and parsers (`TOOL_PRESETS`, `fromYtDlp`/`fromSpotdl`,
+`probeToLinkRead`, `HubCatalogService.tagsFor`, `planFinalise`) over Node's `fetch`, yt-dlp 2026.08.19
+and spotDL 4.5.2 from PyPI, and FFmpeg 9.0. **The hub image itself was not run**: Docker Desktop's
+engine would not start on the machine that day. Latencies are one run each.
+
+| What | Result | Time |
+| --- | --- | --- |
+| `ytsearch10`/`scsearch10` "daft punk get lucky" | 10 + 10 real rows: titles, lengths, thumbnails; the artist's "Official Audio", a stranger's "Official Video" and a lyric upload (±3 s) are one row; no Topic upload came up | yt 1.5 s, sc 2.7–3.6 s |
+| All five services, tracks | 40 rows; cross-links (Spotify, Tidal, Qobuz from MusicBrainz); hydration filled bpm 116.1, contributors, ISRC, dates; five CAA 307s | first chunk 0.27 s, `done` 7.5 s |
+| SoundCloud set (Forss, Soulhack, 11) | every song filled by one `--playlist-items` run | 21 s (items run 14 s) |
+| Spotify track, `--preload` | spotDL wrote `[null]` (its YouTube Music search found no song, its yt-dlp could not open the video it fell back to); read again without the match | 26 s and 176 s failing; 18 s without |
+| Spotify playlist (Today's Top Hits, 50) | listed, `total` 50 | 184 s → 106 s with `--lyrics` |
+| Apple album (iTunes lookup) / playlist page | 14 songs / 50 of 50, owner and cover right | 0.9 s / 0.3 s |
+| Deezer `/track/isrc:`, enrich, LRCLIB, CAA | 200; genre/label/year + links; 78 synced lines; 307 with `Location`, 404 for none | 0.28 s, 4.7 s, 0.28 s, 0.6 s |
+| Downloads (CC BY-NC-SA "Code Monkey (Live 2014)" from Jonathan Coulton's SoundCloud; "Code Monkey" through spotDL) | M4A/MP3/FLAC/Opus tagged; MP3 USLT + TSRC | yt-dlp 6.6 s, spotDL 33 s |
+
+What changed because of it: SoundCloud Go+ snips (exactly 30 s) are not rows, and a page whose rows
+were left out still counts as full; a tool-read entry is its page, never the signed stream address a
+full entry carries; a SoundCloud set's bare `api-v2` source gives way to the described page; a Spotify
+song is read again without the match when `--preload` fails or passes `matchBudgetMs` (60 s);
+`spotdl save` gets `--lyrics` with no provider; a Spotify playlist's owner and picture stay unknown
+(spotDL's save file names neither); an MP3's lyrics are a USLT frame the hub writes after FFmpeg
+(`writeId3Lyrics`), its ISRC goes to FFmpeg as `TSRC`. Real yt-dlp answers, trimmed:
+`ytdlp-ytsearch-live.json`, `ytdlp-scsearch-live.json`.
+
 ## Not done here (for later)
 
 - UI in the three apps; persisting `SavedCollection` (player store, hub sync, companion).
 - Apple Music playlists past what their public page embeds (reported in `reason`). Tidal/Qobuz/Amazon links without a SongLink key.
-- MP3 lyrics land where FFmpeg puts the generic `lyrics` key (a TXXX frame rather than USLT); FLAC/Opus
-  get LYRICS, M4A ©lyr. Not checked against a real FFmpeg here.
+- M4A downloads carry no ISRC or label: FFmpeg's MP4 writer has no atom for them (a freeform
+  `----:com.apple.iTunes:ISRC` atom would need another writer). FFmpeg also files the source URL of an
+  MP3 as `TXXX:comment` rather than COMM.
+- The hub image's spotDL (the release's own build, with its own bundled yt-dlp) was not run on
+  2026-10-10; whether its `--preload` and downloads still reach YouTube Music needs the container.
+- The local helper has its own `fromSpotdl`/resolve path (`local-helper/src`), not changed here: its
+  Spotify playlist owner and its spotDL `save` arguments still behave as before.
 - The engine runs in a page, but a browser can only reach a service that sends CORS headers for it;
   not checked per service here. Until it is, the player should use the hub or the helper.
