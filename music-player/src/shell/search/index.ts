@@ -56,6 +56,7 @@ import {
   type SearchParams,
 } from './client.js';
 import * as V from './view.js';
+import { installDiscoverOnline, type DiscoverOnline } from './discover.js';
 
 /* ------------------------------------------------------------------ shapes */
 
@@ -243,6 +244,10 @@ export interface ListSong {
   platform: string;
   url: string;
   art: string | null;
+  /** Its 30-second preview (Apple Music's, then Deezer's): what a visitor plays while it is fetched. */
+  preview: string | null;
+  /** The catalog's own song, for the hub's catalog/download (it picks the source and tags the file). */
+  cat?: CatalogTrack;
 }
 
 /** An album or playlist as the music list shows it: rows now, more on request (NP-FIND-007). */
@@ -331,6 +336,7 @@ export function installSearch(): SearchApi {
     NP_LIST?: ShellList;
     NP_FETCH?: (song: unknown) => void;
     NP_SONG_MENU?: SongMenu;
+    NP_DISC_ONLINE?: DiscoverOnline;
     LIBRARY?: Array<{ id: string; title: string; url?: string | null }>;
     NP_SRCH_CLIP?: number;
     NP_SRCH_ARM_MS?: number;
@@ -1494,6 +1500,8 @@ export function installSearch(): SearchApi {
       platform: CATALOG_PLATFORM_LABELS[first.platform],
       url: first.url,
       art: t.artworkUrl,
+      preview: V.previewOf(t),
+      cat: t,
     };
   }
 
@@ -1686,6 +1694,7 @@ export function installSearch(): SearchApi {
         platform: s.platform,
         url: s.url,
         art: s.art,
+        preview: s.preview,
       },
       inLibrary: added.has(t.id),
       canDownload: Boolean(pickDownloadSource(t.sources)),
@@ -2465,17 +2474,28 @@ export function installSearch(): SearchApi {
     if (!pop.hidden && !ours(e.target as Element)) close();
   });
 
-  /** Kept for the shell's "keep this song" (the radio's on-air menu): songs for a query, in the old row shape. */
-  w.NP_FIND = async (q: string) => {
-    const signal = AbortSignal.timeout(8000);
+  /** Songs for one query, from whichever client answers: the catalog set and "keep this song" ask it. */
+  async function findTracks(
+    q: string,
+    signal: AbortSignal,
+  ): Promise<{ tracks: CatalogTrack[]; via: string; status: CatalogSourceStatus[] }> {
     const r = freshResults();
     await stream(
       params(q, null, ['tracks'], 0, OVERVIEW_LIMIT),
       signal,
       (chunk, client) => upsert(r, chunk, client),
       true,
-    ).catch(() => undefined);
-    return r.tracks.list.slice(0, 10).map((t) => {
+    );
+    return { tracks: r.tracks.list, via: r.via, status: r.status };
+  }
+
+  /* Discover's "From the catalog" set and its look-ahead (NP-DISC-006/007). */
+  w.NP_DISC_ONLINE = installDiscoverOnline(findTracks, songFor);
+
+  /** Kept for the shell's "keep this song" (the radio's on-air menu): songs for a query, in the old row shape. */
+  w.NP_FIND = async (q: string) => {
+    const found = await findTracks(q, AbortSignal.timeout(8000)).catch(() => null);
+    return (found?.tracks ?? []).slice(0, 10).map((t) => {
       const s = songFor(t);
       return {
         t: t.title,

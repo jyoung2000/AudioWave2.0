@@ -1,13 +1,13 @@
 /**
- * Discover's look-ahead ring (NP-DISC-007): fetch the next track while this one plays, evict it when
- * the playhead passes it unless it was starred, and never start a fetch that cannot finish in time.
- * Every rule here is decided without a network, a browser or a file — the module plans, the caller
- * does — which is what makes them testable at all.
+ * Discover's look-ahead (NP-DISC-007): the next online picks' previews, asked for ahead within a
+ * stated budget — two clips, 4 MB, one request at a time — and let go once played or no longer
+ * ahead. Every rule is decided without a network or a browser: the module plans, the caller does.
  */
 import { describe, expect, it } from 'vitest';
 import {
-  cachedNext,
+  cachedFor,
   describeCache,
+  LOOKAHEAD_BYTES,
   planLookAhead,
   type CacheEntry,
   type Candidate,
@@ -15,145 +15,86 @@ import {
 
 const MB = 1024 * 1024;
 
-const candidate = (over: Partial<Candidate> = {}): Candidate => ({
-  id: 'https://youtu.be/one',
-  url: 'https://youtu.be/one',
-  title: 'One',
+const candidate = (n: number, over: Partial<Candidate> = {}): Candidate => ({
+  id: `pick-${n}`,
+  url: `https://clips.example/${n}.m4a`,
+  title: `Song ${n}`,
   artist: 'Alder Quartet',
-  platform: 'youtube',
+  platform: 'Apple Music',
   ...over,
 });
 
-const entry = (over: Partial<CacheEntry> = {}): CacheEntry => ({
-  id: 'https://youtu.be/one',
-  title: 'One',
-  artist: 'Alder Quartet',
-  platform: 'youtube',
-  url: 'https://youtu.be/one',
-  bytes: 5 * MB,
-  at: 1,
+const entry = (n: number, over: Partial<CacheEntry> = {}): CacheEntry => ({
+  id: `pick-${n}`,
+  url: `https://clips.example/${n}.m4a`,
+  bytes: MB,
+  at: n,
   played: false,
-  starred: false,
   ...over,
 });
 
-/** The common shape: look-ahead on, a long song left, an empty ring, one candidate. */
-const base = (over: Partial<Parameters<typeof planLookAhead>[0]> = {}) => ({
-  enabled: true,
-  remainingSec: 200,
-  candidates: [candidate()],
-  cache: [] as CacheEntry[],
-  byteBudget: 64 * MB,
-  ...over,
-});
+const three = [candidate(1), candidate(2), candidate(3)];
 
-describe('the look-ahead plan', () => {
-  it('plans nothing at all while the person has not switched it on', () => {
-    const { fetch, reason } = planLookAhead(base({ enabled: false }));
-    expect(fetch).toEqual([]);
-    expect(reason).toBeNull();
+describe('what the look-ahead asks for', () => {
+  it('asks for nothing at all while it is off, and lets go of what it held', () => {
+    const plan = planLookAhead({ enabled: false, candidates: three, cache: [entry(1)] });
+    expect(plan.fetch).toEqual([]);
+    expect(plan.evict).toEqual(['pick-1']);
+    expect(plan.reason).toBeNull();
   });
 
-  it('fetches the best candidates first, up to the depth of the ring', () => {
-    const three = [candidate({ id: 'a', url: 'https://youtu.be/a' }), candidate({ id: 'b', url: 'https://youtu.be/b' }), candidate({ id: 'c', url: 'https://youtu.be/c' })];
-    const { fetch, reason } = planLookAhead(base({ candidates: three, depth: 2 }));
-    expect(fetch.map((f) => f.id)).toEqual(['a', 'b']);
-    expect(reason).toBeNull();
-    expect(fetch[0]!.why).toContain('while this song plays');
+  it('asks for the best pick first, one request at a time', () => {
+    const plan = planLookAhead({ enabled: true, candidates: three, cache: [] });
+    expect(plan.fetch.map((f) => f.id)).toEqual(['pick-1']);
+    const next = planLookAhead({ enabled: true, candidates: three, cache: [entry(1)] });
+    expect(next.fetch.map((f) => f.id)).toEqual(['pick-2']);
   });
 
-  it('never starts the same row twice, whether it is cached or already on its way', () => {
-    const { fetch } = planLookAhead(
-      base({
-        candidates: [candidate({ id: 'a', url: 'https://youtu.be/a' }), candidate({ id: 'b', url: 'https://youtu.be/b' })],
-        cache: [entry({ id: 'a', url: 'https://youtu.be/a' })],
-        inFlight: ['b'],
-        depth: 2,
-      }),
-    );
-    expect(fetch).toEqual([]);
+  it('starts nothing while a request is running, and says so', () => {
+    const plan = planLookAhead({ enabled: true, candidates: three, cache: [], inFlight: ['pick-1'] });
+    expect(plan.fetch).toEqual([]);
+    expect(plan.reason).toBe('A preview is already on its way');
   });
 
-  it('will not start a fetch that cannot finish before the song does, and says how long was left', () => {
-    const { fetch, reason } = planLookAhead(base({ remainingSec: 8, estimateFetchSec: 12, slackSec: 15 }));
-    expect(fetch).toEqual([]);
-    expect(reason).toContain('8s of this song left');
-    expect(reason).toContain('12s');
+  it('keeps only the depth it promises ahead, and says the ring is full', () => {
+    const plan = planLookAhead({ enabled: true, candidates: three, cache: [entry(2), entry(1)] });
+    expect(plan.fetch).toEqual([]);
+    expect(plan.keep).toEqual(['pick-1', 'pick-2']);
+    expect(plan.reason).toBe('2 previews are ready ahead');
   });
 
-  it('says the ring is already full rather than planning nothing in silence', () => {
-    const { fetch, reason } = planLookAhead(
-      base({ cache: [entry({ id: 'a', url: 'https://youtu.be/a' }), entry({ id: 'b', url: 'https://youtu.be/b' })], depth: 2 }),
-    );
-    expect(fetch).toEqual([]);
-    expect(reason).toContain('already ready');
+  it('passes over a pick with no preview, and says when none ahead has one', () => {
+    const plan = planLookAhead({ enabled: true, candidates: [candidate(1, { url: null }), candidate(2)], cache: [] });
+    expect(plan.fetch.map((f) => f.id)).toEqual(['pick-2']);
+    const none = planLookAhead({ enabled: true, candidates: [candidate(1, { url: null })], cache: [] });
+    expect(none.fetch).toEqual([]);
+    expect(none.reason).toBe('None of the next picks has a preview to ask for');
   });
 
-  it('skips a row with no address, because there is nothing to fetch', () => {
-    const noUrl = candidate({ id: 'no-url', url: null, title: 'No Address' });
-    const { fetch } = planLookAhead(base({ candidates: [noUrl], depth: 1 }));
-    expect(fetch).toEqual([]);
-    expect(planLookAhead(base({ candidates: [noUrl], depth: 1 })).reason).toContain('on its way');
+  it('stops at the byte budget, measured from what arrived, and explains itself', () => {
+    const plan = planLookAhead({ enabled: true, candidates: three, cache: [entry(1, { bytes: 3.5 * MB })], byteBudget: LOOKAHEAD_BYTES });
+    expect(plan.fetch).toEqual([]);
+    expect(plan.reason).toBe('The look-ahead holds 3.5 MB of the 4.0 MB it may use');
   });
 
-  it('stops at the byte budget and explains itself', () => {
-    const big = [candidate({ id: 'a', url: 'https://youtu.be/a' }), candidate({ id: 'b', url: 'https://youtu.be/b' })];
-    const { fetch, reason } = planLookAhead(
-      base({ candidates: big, depth: 2, byteBudget: 6 * MB, estimateBytes: 5 * MB, cache: [entry({ id: 'held', url: 'https://youtu.be/held', bytes: 5 * MB })] }),
-    );
-    // One fits (5 MB held + 5 MB = 10 MB > 6 MB is already over, so nothing further is planned).
-    expect(fetch).toHaveLength(0);
-    expect(reason).toContain('ring is full');
+  it('lets go of a played clip and of one no longer ahead', () => {
+    const plan = planLookAhead({ enabled: true, candidates: [candidate(2), candidate(3)], cache: [entry(1), entry(2, { played: true })] });
+    expect(plan.evict.sort()).toEqual(['pick-1', 'pick-2']);
+    expect(plan.fetch.map((f) => f.id)).toEqual(['pick-2']);
   });
 });
 
-describe('what the ring keeps', () => {
-  it('evicts what the playhead has passed, and never evicts what was starred', () => {
-    const played = entry({ id: 'played', url: 'https://youtu.be/played', played: true });
-    const kept = entry({ id: 'kept', url: 'https://youtu.be/kept', played: true, starred: true });
-    const { evict, keep } = planLookAhead(base({ cache: [played, kept] }));
-    expect(evict).toContain('played');
-    expect(evict).not.toContain('kept');
-    expect(keep).toContain('kept');
+describe('what the look-ahead hands back', () => {
+  it('a clip that arrived and was not played; nothing otherwise', () => {
+    const cache = [entry(1), entry(2, { bytes: 0 }), entry(3, { played: true })];
+    expect(cachedFor(cache, 'pick-1')?.id).toBe('pick-1');
+    expect(cachedFor(cache, 'pick-2')).toBeNull();
+    expect(cachedFor(cache, 'pick-3')).toBeNull();
+    expect(cachedFor(cache, 'pick-9')).toBeNull();
   });
 
-  it('keeps only the depth it promises ahead, and turns the rest over', () => {
-    const ring = [
-      entry({ id: 'a', url: 'https://youtu.be/a' }),
-      entry({ id: 'b', url: 'https://youtu.be/b' }),
-      entry({ id: 'c', url: 'https://youtu.be/c' }),
-    ];
-    const { evict, keep } = planLookAhead(base({ cache: ring, depth: 2 }));
-    expect(keep).toEqual(['a', 'b']);
-    expect(evict).toContain('c');
-  });
-
-  it('still evicts when look-ahead is off, so turning it off does not strand files', () => {
-    const { evict } = planLookAhead(base({ enabled: false, cache: [entry({ id: 'played', played: true })] }));
-    expect(evict).toEqual(['played']);
-  });
-});
-
-describe('the instant hand-off', () => {
-  it('hands off the oldest track that is actually on disk', () => {
-    const cache = [entry({ id: 'later', at: 9 }), entry({ id: 'sooner', at: 2, url: 'https://youtu.be/sooner' })];
-    expect(cachedNext(cache)!.id).toBe('sooner');
-  });
-
-  it('will not play a half-written file, and hands off nothing when the ring is empty', () => {
-    expect(cachedNext([entry({ id: 'writing', bytes: 0 })])).toBeNull();
-    expect(cachedNext([])).toBeNull();
-  });
-
-  it('never hands back something already played', () => {
-    expect(cachedNext([entry({ id: 'done', played: true })])).toBeNull();
-  });
-
-  it('says what the ring is holding, and whether anything was kept', () => {
-    expect(describeCache([])).toBe('Nothing fetched ahead yet.');
-    expect(describeCache([entry()])).toBe('1 track ready ahead of this song.');
-    expect(describeCache([entry(), entry({ id: 'two', url: 'https://youtu.be/two', starred: true })])).toBe(
-      '2 tracks ready, 1 kept in your library.',
-    );
+  it('says what it holds against its budget', () => {
+    expect(describeCache([])).toBe('No previews asked for ahead yet.');
+    expect(describeCache([entry(1), entry(2, { bytes: MB / 2 })])).toBe('2 previews are ready ahead (1.5 MB of 4.0 MB).');
   });
 });
