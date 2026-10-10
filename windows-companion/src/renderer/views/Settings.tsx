@@ -17,6 +17,7 @@ import { invoke } from '../bridge.js';
 import { ago } from '../format.js';
 import { useAction, useChannel, type Resource } from '../hooks.js';
 import { Check, LoadingRow, Pop, Progress, Push, Rows, type DotKind } from '../ui.js';
+import { PlaylistFolderGroup } from './Playlists.js';
 
 export const TOOL_NAMES: Record<HelperTool['id'], string> = { 'yt-dlp': 'yt-dlp', spotdl: 'spotDL', ffmpeg: 'FFmpeg' };
 
@@ -439,6 +440,8 @@ export function SettingsView({ helper, prefs, say }: { helper: Resource<HelperSt
           </div>
         </div>
       </fieldset>
+
+      <PlaylistFolderGroup say={say} />
 
       <fieldset>
         <legend>Network</legend>

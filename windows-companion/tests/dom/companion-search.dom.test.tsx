@@ -10,8 +10,8 @@
  * The main process is a fake answering from the stock catalog (packages/aqua-ui/styleguide/fixtures/
  * catalog-stock.json); nothing reaches a network.
  */
-import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import stock from '../../../packages/aqua-ui/styleguide/fixtures/catalog-stock.json';
 import { SearchView } from '../../src/renderer/views/Search.js';
@@ -159,15 +159,82 @@ describe('Search in the companion', () => {
     await userEvent.click(await within(menu).findByRole('menuitem', { name: 'Add to Up Next (Kitchen)' }));
     await waitFor(() => expect(bridge.sent('hub:request')[0]!.request).toEqual({ groupId: '0192f0c0-0000-7000-8000-000000000001', query: 'https://music.youtube.com/watch?v=mockHL0001' }));
     await waitFor(() => expect(screen.getAllByRole('status').some((s) => s.textContent === 'Up Next in Kitchen: “Harbour Lights”, number 2.')).toBe(true));
-    // Right-click opens the same menu; Add to Playlist says the companion keeps none and offers the library.
+    // Right-click opens the same menu; Add to Library goes through the helper with a basis.
     await userEvent.pointer({ keys: '[MouseRight]', target: lights });
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Add to Playlist…' }));
-    const sheet = await screen.findByRole('dialog', { name: 'Add to a playlist' });
-    expect(sheet.textContent).toContain('The companion keeps no playlists of its own');
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Add to Library…' }));
+    const sheet = await screen.findByRole('dialog', { name: 'Add “Harbour Lights” to the library' });
     await userEvent.click(within(sheet).getByRole('button', { name: 'Add to Library' }));
     await waitFor(() => expect(bridge.sent('catalog:download')[0]!.request).toMatchObject({ basis: 'user-owned', track: { id: 'deezer:9101' } }));
     expect(bridge.sent('catalog:download')[0]!.request).not.toHaveProperty('format');
     await waitFor(() => expect(screen.getAllByRole('status').some((s) => s.textContent?.startsWith('“Harbour Lights” is joining this PC’s library. Downloading from YouTube Music.'))).toBe(true));
+  });
+
+  const FOLDER = { path: 'C:\\Users\\Example\\Music\\Airwave Playlists', relativePath: null, isDefault: true, available: true, reason: null, playlistCount: 2, capped: false };
+  const summary = (id: string, name: string, hasTrack: boolean) => ({ id, name, fileName: `${name}.m3u8`, description: null, createdAt: '2026-10-10T12:00:00.000Z', updatedAt: '2026-10-10T12:00:00.000Z', entryCount: 3, durationSec: 600, covers: [], origin: 'airwave', readOnly: false, createdBy: 'companion', hasTrack });
+
+  it('Add to Playlist ▸ lists this PC’s playlists, ticked where the song is, and files it — with the library too, by default (CMP-PL-004)', async () => {
+    const bridge = installBridge({
+      'playlists:list': () => ({ folder: FOLDER, items: [summary('p1', 'Harbour Nights', true), summary('p2', 'Road Trip', false)] }),
+      'playlists:add': () => ({ result: { playlist: summary('p2', 'Road Trip', true), added: 1, skipped: 0 }, reason: null }),
+      'playlists:create': () => ({ result: summary('p3', 'Fresh', true), reason: null }),
+    });
+    render(<SearchView />);
+    await searchFor('harbour');
+    const songs = await screen.findByRole('listbox', { name: 'Songs' });
+    await waitFor(() => expect(within(songs).getAllByRole('option')).toHaveLength(5));
+    const lights = within(songs).getAllByRole('option')[0]!;
+    await userEvent.click(lights.querySelector('[data-menu]')!);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Add to Playlist' }));
+    const sub = screen.getByRole('menu', { name: 'Add to Playlist' });
+    await waitFor(() => expect(within(sub).getAllByRole('menuitemcheckbox').map((i) => [i.textContent, i.getAttribute('aria-checked')])).toEqual([['Harbour Nights', 'true'], ['Road Trip', 'false']]));
+    expect(bridge.sent('playlists:list')[0]!.request).toMatchObject({ catalogId: 'deezer:9101' });
+    await userEvent.click(within(sub).getByRole('menuitemcheckbox', { name: 'Road Trip' }));
+    let sheet = await screen.findByRole('dialog', { name: 'Add “Harbour Lights” to “Road Trip”' });
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Add to Playlist' }));
+    await waitFor(() => expect(screen.getAllByRole('status').some((s) => s.textContent?.startsWith('“Harbour Lights” is in “Road Trip” now. It is joining this PC’s library too. Downloading from YouTube Music.'))).toBe(true));
+    expect(bridge.sent('playlists:add')[0]!.request).toMatchObject({ playlistId: 'p2', tracks: [{ id: 'deezer:9101' }] });
+    expect(bridge.sent('catalog:download')[0]!.request).toMatchObject({ basis: 'user-owned' });
+    // New Playlist…
+    await userEvent.click(lights.querySelector('[data-menu]')!);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Add to Playlist' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'New Playlist…' }));
+    sheet = await screen.findByRole('dialog', { name: 'New Playlist' });
+    await userEvent.type(within(sheet).getByLabelText('Name:'), 'Fresh');
+    await userEvent.click(within(sheet).getByRole('checkbox', { name: 'Also add to Library' }));
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Create' }));
+    await waitFor(() => expect(bridge.sent('playlists:create')[0]!.request).toMatchObject({ name: 'Fresh', tracks: [{ id: 'deezer:9101' }] }));
+    expect(bridge.sent('catalog:download')).toHaveLength(1);
+  });
+
+  it('on touch, a long press on a row opens the same menu; a short tap or a moved finger does not (CMP-PL-006)', async () => {
+    installBridge({ 'playlists:list': () => ({ folder: FOLDER, items: [] }) });
+    render(<SearchView />);
+    await searchFor('harbour');
+    const songs = await screen.findByRole('listbox', { name: 'Songs' });
+    await waitFor(() => expect(within(songs).getAllByRole('option')).toHaveLength(5));
+    const wall = within(songs).getAllByRole('option')[1]!;
+    vi.useFakeTimers();
+    try {
+      fireEvent.pointerDown(wall, { pointerType: 'touch', clientX: 40, clientY: 40 });
+      fireEvent.pointerMove(wall, { pointerType: 'touch', clientX: 60, clientY: 40 });
+      act(() => vi.advanceTimersByTime(600));
+      expect(screen.queryByRole('menu')).toBeNull();
+      fireEvent.pointerDown(wall, { pointerType: 'touch', clientX: 40, clientY: 40 });
+      act(() => vi.advanceTimersByTime(300));
+      fireEvent.pointerUp(wall, { pointerType: 'touch' });
+      act(() => vi.advanceTimersByTime(600));
+      expect(screen.queryByRole('menu')).toBeNull();
+      fireEvent.pointerDown(wall, { pointerType: 'touch', clientX: 40, clientY: 40 });
+      fireEvent.pointerMove(wall, { pointerType: 'touch', clientX: 44, clientY: 43 });
+      act(() => vi.advanceTimersByTime(500));
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(screen.getByRole('menu', { name: '“Harbour Wall”' })).toBeTruthy();
+    // The click the finger leaves behind does not open the song as well.
+    fireEvent.pointerUp(wall, { pointerType: 'touch' });
+    fireEvent.click(wall);
+    expect(screen.queryByRole('heading', { name: 'Harbour Wall', level: 2 })).toBeNull();
   });
 
   it('with no hub paired, Up Next says plainly that queueing needs a group (UX-SEARCH-012)', async () => {
