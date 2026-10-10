@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CatalogSearchChunk, CatalogResolveResult, CatalogSearchAggregate } from '@now-playing/contracts';
-import { CatalogEngine, CatalogHttpError, LinkReadError, Pacer, ProviderHealth, deezerPlaylist, deezerTrack, itunesTrack, musicbrainzTrack, parseOdesli, readCatalogStream, ndjsonLine, toolSearchTracks, type CatalogEngineOptions, type LinkReader, type ToolSearchRunner } from '@now-playing/domain/catalog';
+import { CatalogEngine, CatalogHttpError, LinkReadError, Pacer, ProviderHealth, deezerPlaylist, deezerTrack, itunesTrack, musicbrainzTrack, parseOdesli, readCatalogStream, ndjsonLine, toolSearchTracks, ToolSearchProvider, type CatalogEngineOptions, type LinkReader, type ToolSearchRunner } from '@now-playing/domain/catalog';
 import { STANDARD_ROUTES, fixture, fixtureFetch, type Route } from './catalog-fixtures.js';
 
 const noSleep = async (): Promise<void> => undefined;
@@ -54,6 +54,31 @@ describe('provider answers, as catalog rows', () => {
       ['Lucky Day', 'Another Artist'],
     ]);
   });
+
+  it('yt-dlp as it answered live (2026-10-10): lengths, thumbnails, the SoundCloud page not its API address, no 30-second previews', () => {
+    const yt = toolSearchTracks('youtube', fixture('ytdlp-ytsearch-live'));
+    expect(yt).toHaveLength(6);
+    const audio = yt.find((t) => t.id === 'youtube:5NV6Rdv1a3I')!;
+    // The artist's own "Official Audio" is the radio edit's length, not the album's.
+    expect(audio).toMatchObject({ title: 'Get Lucky', artist: 'Daft Punk feat. Pharrell Williams & Nile Rodgers', durationMs: 249_000 });
+    expect(audio.artworkUrl).toMatch(/^https:\/\/i\.ytimg\.com\/vi\/5NV6Rdv1a3I\//);
+    expect(yt.find((t) => t.id === 'youtube:M7VTByl6WqA')).toMatchObject({ title: expect.stringMatching(/^Get Lucky \(Radio Edit\)/), durationMs: 251_000 });
+    for (const t of yt) expect(t.sources[0]!.url).toBe(`https://www.youtube.com/watch?v=${t.id.slice('youtube:'.length)}`);
+
+    const sc = toolSearchTracks('soundcloud', fixture('ytdlp-scsearch-live'));
+    // Daft Punk's own two uploads are Go+ snips: 30 s exactly, previews only. They are not rows.
+    expect(sc.map((t) => t.id)).toEqual(['soundcloud:88335161', 'soundcloud:2361385157', 'soundcloud:250790590']);
+    expect(sc[0]).toMatchObject({ artist: 'DJ KB', durationMs: 246_381, artworkUrl: expect.stringMatching(/^https:\/\/i1\.sndcdn\.com\/artworks-.*-t500x500\.jpg$/) });
+    for (const t of sc) expect(t.sources[0]!.url).toMatch(/^https:\/\/soundcloud\.com\/[^/]+\/[^/]+$/);
+    expect(sc.find((t) => t.genre)?.genre).toEqual(expect.any(String));
+  });
+
+  it('a page whose previews were left out is still a full page: whether there is more is what yt-dlp listed', async () => {
+    const provider = new ToolSearchProvider('soundcloud', async () => fixture('ytdlp-scsearch-live'));
+    const result = await provider.search({ kind: 'text', text: 'daft punk get lucky', track: null, artist: null, album: null, isrc: null, url: null }, { sections: ['tracks'], offset: 0, limit: 5, signal: new AbortController().signal });
+    expect(result.tracks).toHaveLength(3);
+    expect(result.full.tracks).toBe(true);
+  });
 });
 
 describe('the live search feed', () => {
@@ -69,7 +94,8 @@ describe('the live search feed', () => {
     expect(done.type).toBe('done');
     if (done.type !== 'done') return;
     expect(done.status.every((s) => s.state === 'ok')).toBe(true);
-    expect(done.page.tracks).toEqual({ offset: 0, limit: 3, hasMore: false });
+    // yt-dlp listed all three it was asked for (one a channel, left out), so YouTube may have more.
+    expect(done.page.tracks).toEqual({ offset: 0, limit: 3, hasMore: true });
     expect(done.seq).toBe(chunks.length - 1);
   });
 
@@ -258,6 +284,44 @@ describe('resolving a pasted link', () => {
       { platform: 'spotify', id: '4PTG3Z6ehGkBFwjybzWkR8', url: 'https://open.spotify.com/track/4PTG3Z6ehGkBFwjybzWkR8', previewUrl: null, matchedBy: 'link' },
       { platform: 'youtube-music', id: 'lYBUbBu4W08', url: 'https://music.youtube.com/watch?v=lYBUbBu4W08', previewUrl: null, matchedBy: 'spotdl' },
     ]);
+  });
+
+  it('a Spotify song whose YouTube Music match failed is read again without it, not called unreadable', async () => {
+    // spotDL 4.5.2 on 2026-10-10: `save --preload` found no YouTube Music "songs" result, fell back
+    // to a video its yt-dlp could not open, and wrote `[null]` — the hub reads that as "found nothing".
+    const reader = vi.fn<LinkReader>(async (url, opts) => {
+      if (opts.match) throw new LinkReadError('spotDL found nothing at that link', 'failed');
+      return spotifyReader(url, opts);
+    });
+    const { engine: e } = engine([], { linkReader: reader });
+    const r = await e.resolve('https://open.spotify.com/track/4PTG3Z6ehGkBFwjybzWkR8');
+    expect(r).toMatchObject({ kind: 'track', platform: 'spotify', reason: null });
+    expect(reader.mock.calls.map(([, o]) => o.match)).toEqual([true, false]);
+    expect(r.track!.sources.map((s) => s.platform)).toEqual(['spotify']);
+    // A missing tool is said as it is, once.
+    reader.mockClear();
+    reader.mockImplementation(async () => {
+      throw new LinkReadError('spotDL is not on this hub yet', 'tool-missing');
+    });
+    const missing = await e.resolve('https://open.spotify.com/track/1PTG3Z6ehGkBFwjybzWkR8');
+    expect(missing).toMatchObject({ kind: 'unavailable', reason: 'spotDL is not on this hub yet' });
+    expect(reader).toHaveBeenCalledTimes(1);
+  });
+
+  it('a YouTube Music match that takes too long is given up (its run told to stop), and the song read without it', async () => {
+    let matchSignal: AbortSignal | undefined;
+    const reader = vi.fn<LinkReader>(async (url, opts) => {
+      if (opts.match) {
+        matchSignal = opts.signal;
+        return new Promise<never>(() => undefined); // spotDL still searching
+      }
+      return spotifyReader(url, opts);
+    });
+    const { engine: e } = engine([], { linkReader: reader, matchBudgetMs: 20 });
+    const r = await e.resolve('https://open.spotify.com/track/4PTG3Z6ehGkBFwjybzWkR8');
+    expect(r).toMatchObject({ kind: 'track', reason: null });
+    expect(matchSignal?.aborted).toBe(true);
+    expect(reader.mock.calls.map(([, o]) => o.match)).toEqual([true, false]);
   });
 
   it('a Spotify playlist Spotify will not list says so, with the reason', async () => {

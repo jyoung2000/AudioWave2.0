@@ -1,0 +1,157 @@
+{
+  "_type": "playlist",
+  "id": "daft punk get lucky feat. pharrell williams and nile rodgers topic",
+  "title": "daft punk get lucky feat. pharrell williams and nile rodgers topic",
+  "extractor_key": "YoutubeSearch",
+  "webpage_url": "ytsearch10:daft punk get lucky feat. pharrell williams and nile rodgers topic",
+  "playlist_count": null,
+  "_version": {
+    "version": "2026.08.19"
+  },
+  "entries": [
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "5NV6Rdv1a3I",
+      "url": "https://www.youtube.com/watch?v=5NV6Rdv1a3I",
+      "title": "Daft Punk - Get Lucky (Official Audio) ft. Pharrell Williams, Nile Rodgers",
+      "duration": 249,
+      "channel": "Daft Punk",
+      "uploader": "Daft Punk",
+      "live_status": null,
+      "availability": null,
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/5NV6Rdv1a3I/hq720.jpg",
+          "height": 202,
+          "width": 360
+        },
+        {
+          "url": "https://i.ytimg.com/vi/5NV6Rdv1a3I/hq720.jpg",
+          "height": 404,
+          "width": 720
+        }
+      ]
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "DvE7O3bLQgE",
+      "url": "https://www.youtube.com/watch?v=DvE7O3bLQgE",
+      "title": "Daft Punk - Get Lucky (Feat. Pharrell Williams)",
+      "duration": 369,
+      "channel": "EXPO STORY",
+      "uploader": "EXPO STORY",
+      "live_status": null,
+      "availability": null,
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/DvE7O3bLQgE/hq720.jpg",
+          "height": 202,
+          "width": 360
+        },
+        {
+          "url": "https://i.ytimg.com/vi/DvE7O3bLQgE/hq720.jpg",
+          "height": 404,
+          "width": 720
+        }
+      ]
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "CCHdMIEGaaM",
+      "url": "https://www.youtube.com/watch?v=CCHdMIEGaaM",
+      "title": "Daft Punk - Get Lucky (Official Video) feat. Pharrell Williams and Nile Rodgers",
+      "duration": 248,
+      "channel": "convar HUN",
+      "uploader": "convar HUN",
+      "live_status": null,
+      "availability": null,
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/CCHdMIEGaaM/hq720.jpg",
+          "height": 202,
+          "width": 360
+        },
+        {
+          "url": "https://i.ytimg.com/vi/CCHdMIEGaaM/hq720.jpg",
+          "height": 404,
+          "width": 720
+        }
+      ]
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "5glDAaCaazc",
+      "url": "https://www.youtube.com/watch?v=5glDAaCaazc",
+      "title": "Daft Punk - Get Lucky (Lyrics) ft. Pharrell Williams, Nile Rodgers",
+      "duration": 246,
+      "channel": "7clouds",
+      "uploader": "7clouds",
+      "live_status": null,
+      "availability": null,
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/5glDAaCaazc/hq720.jpg",
+          "height": 202,
+          "width": 360
+        },
+        {
+          "url": "https://i.ytimg.com/vi/5glDAaCaazc/hq720.jpg",
+          "height": 404,
+          "width": 720
+        }
+      ]
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "M7VTByl6WqA",
+      "url": "https://www.youtube.com/watch?v=M7VTByl6WqA",
+      "title": "Daft Punk - Get Lucky (Radio Edit) [feat. Pharrell Williams] [Official]",
+      "duration": 251,
+      "channel": "Daft Punk",
+      "uploader": "Daft Punk",
+      "live_status": null,
+      "availability": null,
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/M7VTByl6WqA/hq720.jpg",
+          "height": 202,
+          "width": 360
+        },
+        {
+          "url": "https://i.ytimg.com/vi/M7VTByl6WqA/hq720.jpg",
+          "height": 404,
+          "width": 720
+        }
+      ]
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "jPAt1dejQUA",
+      "url": "https://www.youtube.com/watch?v=jPAt1dejQUA",
+      "title": "Daft Punk - Get Lucky (Album Version / Audio) ft. Pharrell Williams, Nile Rodgers",
+      "duration": 372,
+      "channel": "TheStruckFernVEVO",
+      "uploader": "TheStruckFernVEVO",
+      "live_status": null,
+      "availability": null,
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/jPAt1dejQUA/hq720.jpg",
+          "height": 202,
+          "width": 360
+        },
+        {
+          "url": "https://i.ytimg.com/vi/jPAt1dejQUA/hq720.jpg",
+          "height": 404,
+          "width": 720
+        }
+      ]
+    }
+  ]
+}

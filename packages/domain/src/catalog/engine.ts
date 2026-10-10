@@ -83,6 +83,12 @@ export interface CatalogEngineOptions {
    */
   hydrate?: boolean | undefined;
   hydrateBudgetMs?: number | undefined;
+  /**
+   * How long a Spotify song's read may spend on spotDL's YouTube Music match (`--preload`) before the
+   * song is read without it (default 60 s). A failing match ran 26 s and 176 s on 2026-10-10; a read
+   * without it, 18 s.
+   */
+  matchBudgetMs?: number | undefined;
   /** Per-call timeouts, shortened by tests. */
   timeouts?: Partial<Record<'itunes' | 'deezer' | 'musicbrainz' | 'tools' | 'lrclib' | 'odesli', number>> | undefined;
 }
@@ -102,6 +108,45 @@ interface Outcome {
   provider: CatalogProvider;
   result: ProviderResult | null;
   status: CatalogSourceStatus;
+}
+
+const MATCH_BUDGET_MS = 60_000;
+
+/**
+ * `run` with a signal that aborts when `parent` does or after `ms`, whichever is first; the timer is
+ * cleared when `run` settles. (Not `AbortSignal.any`, which older WebViews lack.)
+ */
+async function withBudget<T>(parent: AbortSignal | undefined, ms: number, run: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController();
+  const stop = (): void => controller.abort(parent?.reason);
+  if (parent?.aborted) stop();
+  parent?.addEventListener('abort', stop, { once: true });
+  const timer = setTimeout(() => controller.abort(new Error(`no answer within ${Math.round(ms / 1000)} s`)), ms);
+  // Stop waiting when the budget ends even if `run` does not listen to its signal.
+  const ended = new Promise<never>((_, reject) => {
+    if (controller.signal.aborted) reject(controller.signal.reason);
+    controller.signal.addEventListener('abort', () => reject(controller.signal.reason), { once: true });
+  });
+  try {
+    return await Promise.race([run(controller.signal), ended]);
+  } finally {
+    clearTimeout(timer);
+    parent?.removeEventListener('abort', stop);
+  }
+}
+
+/**
+ * A list entry once the tool has described it: the page it named replaces the address the listing
+ * gave on that platform. A SoundCloud set lists most songs as `api-v2.soundcloud.com/tracks/<n>`,
+ * an address no one can open and the hub's tool may not reach; keeping it beside the song's page
+ * would show the song twice on SoundCloud and could be picked for a download.
+ */
+function describedSources(listed: readonly CatalogSource[], described: readonly CatalogSource[]): CatalogSource[] {
+  const platforms = new Set(described.filter((s) => s.matchedBy === 'link').map((s) => s.platform));
+  return mergeSources(
+    described,
+    listed.filter((s) => !platforms.has(s.platform)),
+  );
 }
 
 export class CatalogEngine {
@@ -700,9 +745,18 @@ export class CatalogEngine {
     const match = link.platform === 'spotify' && link.kind === 'track';
     let read: LinkRead;
     try {
-      read = await this.resolveCache.get(`${link.url}|${match ? 'match' : ''}`, () => reader(link.url, { signal, match }));
+      read = await this.resolveCache.get(`${link.url}|${match ? 'match' : ''}`, () => (match ? withBudget(signal, this.options.matchBudgetMs ?? MATCH_BUDGET_MS, (budget) => reader(link.url, { signal: budget, match })) : reader(link.url, { signal, match })));
     } catch (error) {
-      return answer({ kind: 'unavailable', reason: this.unreadable(link, error) });
+      // spotDL's `--preload` writes `null` for the song when its YouTube Music match fails (no
+      // "songs" result, or a video its yt-dlp cannot open — measured 2026-10-10), although Spotify's
+      // own data was read. The song is still worth showing: read it again without the match, and
+      // spotDL matches it again when it is downloaded. A missing tool is not retried.
+      if (!match || signal?.aborted || (error instanceof LinkReadError && error.code === 'tool-missing')) return answer({ kind: 'unavailable', reason: this.unreadable(link, error) });
+      try {
+        read = await this.resolveCache.get(`${link.url}|`, () => reader(link.url, { signal, match: false }));
+      } catch (again) {
+        return answer({ kind: 'unavailable', reason: this.unreadable(link, again) });
+      }
     }
     const platform: CatalogPlatform = link.platform;
     if (read.kind === 'track') {
@@ -749,7 +803,7 @@ export class CatalogEngine {
       const read = await this.resolveCache.get(`${url}|`, () => reader(url, { signal })).catch(() => null);
       if (read?.kind !== 'track') return;
       const filled = trackFromLink(read.track, { platform: t.sources[0]!.platform });
-      if (filled) tracks[i] = { ...filled, id: t.id, album: t.album ?? filled.album, sources: mergeSources(t.sources, filled.sources) };
+      if (filled) tracks[i] = { ...filled, id: t.id, album: t.album ?? filled.album, sources: describedSources(t.sources, filled.sources) };
     };
     for (let k = 0; k < missing.length; k += 2) await Promise.all(missing.slice(k, k + 2).map(one));
   }
@@ -772,7 +826,7 @@ export class CatalogEngine {
       const entry = filled.get(t.id);
       if (!entry?.title) return t;
       const full = trackFromLink(entry, { platform: t.sources[0]!.platform, album: t.album });
-      return full ? { ...full, id: t.id, trackNumber: t.trackNumber, album: t.album ?? full.album, sources: mergeSources(t.sources, full.sources) } : t;
+      return full ? { ...full, id: t.id, trackNumber: t.trackNumber, album: t.album ?? full.album, sources: describedSources(t.sources, full.sources) } : t;
     });
   }
 

@@ -1,0 +1,141 @@
+{
+  "_type": "playlist",
+  "id": "daft punk get lucky",
+  "title": "daft punk get lucky",
+  "extractor_key": "SoundcloudSearch",
+  "webpage_url": "scsearch10:daft punk get lucky",
+  "playlist_count": null,
+  "_version": {
+    "version": "2026.08.19"
+  },
+  "entries": [
+    {
+      "_type": "url",
+      "ie_key": "Soundcloud",
+      "id": "254111945",
+      "url": "https://api.soundcloud.com/tracks/soundcloud%3Atracks%3A254111945",
+      "webpage_url": "https://soundcloud.com/daftpunkofficialmusic/get-lucky",
+      "title": "Get Lucky (feat. Pharrell Williams and Nile Rodgers)",
+      "track": "Get Lucky (feat. Pharrell Williams and Nile Rodgers)",
+      "uploader": "Daft Punk",
+      "artists": ["Daft Punk, Pharrell Williams, Nile Rodgers"],
+      "duration": 30,
+      "genres": ["Electronic"],
+      "license": "all-rights-reserved",
+      "thumbnails": [
+        {
+          "id": "t500x500",
+          "url": "https://i1.sndcdn.com/artworks-MfhmnWrUreVF-0-t500x500.jpg",
+          "width": 500,
+          "height": 500
+        },
+        {
+          "id": "original",
+          "url": "https://i1.sndcdn.com/artworks-MfhmnWrUreVF-0-original.jpg"
+        }
+      ]
+    },
+    {
+      "_type": "url",
+      "ie_key": "Soundcloud",
+      "id": "88335161",
+      "url": "https://api.soundcloud.com/tracks/soundcloud%3Atracks%3A88335161",
+      "webpage_url": "https://soundcloud.com/eldjkb/get-lucky-original-version",
+      "title": "Get Lucky [Original Version] - Daft Punk",
+      "track": "Get Lucky [Original Version] - Daft Punk",
+      "uploader": "DJ KB",
+      "artists": ["Daft Punk"],
+      "duration": 246.381,
+      "genres": ["Disco Electronic"],
+      "license": "all-rights-reserved",
+      "thumbnails": [
+        {
+          "id": "t500x500",
+          "url": "https://i1.sndcdn.com/artworks-000045765973-c2x8ko-t500x500.jpg",
+          "width": 500,
+          "height": 500
+        },
+        {
+          "id": "original",
+          "url": "https://i1.sndcdn.com/artworks-000045765973-c2x8ko-original.jpg"
+        }
+      ]
+    },
+    {
+      "_type": "url",
+      "ie_key": "Soundcloud",
+      "id": "254111762",
+      "url": "https://api.soundcloud.com/tracks/soundcloud%3Atracks%3A254111762",
+      "webpage_url": "https://soundcloud.com/daftpunkofficialmusic/get-lucky-radio-edit",
+      "title": "Get Lucky (Radio Edit - feat. Pharrell Williams and Nile Rodgers)",
+      "track": "Get Lucky (Radio Edit - feat. Pharrell Williams and Nile Rodgers)",
+      "uploader": "Daft Punk",
+      "artists": ["Daft Punk, Pharrell Williams, Nile Rodgers"],
+      "duration": 30,
+      "genres": ["Electronic"],
+      "license": "all-rights-reserved",
+      "thumbnails": [
+        {
+          "id": "t500x500",
+          "url": "https://i1.sndcdn.com/artworks-ULQtNP1judqK-0-t500x500.jpg",
+          "width": 500,
+          "height": 500
+        },
+        {
+          "id": "original",
+          "url": "https://i1.sndcdn.com/artworks-ULQtNP1judqK-0-original.jpg"
+        }
+      ]
+    },
+    {
+      "_type": "url",
+      "ie_key": "Soundcloud",
+      "id": "2361385157",
+      "url": "https://api.soundcloud.com/tracks/soundcloud%3Atracks%3A2361385157",
+      "webpage_url": "https://soundcloud.com/twindiplomacy/get-lucky-twin-diplomacy-1",
+      "title": "Daft Punk - Get Lucky (Twin Diplomacy Remix)",
+      "track": "Daft Punk - Get Lucky (Twin Diplomacy Remix)",
+      "uploader": "Twin Diplomacy",
+      "duration": 300.046,
+      "genres": ["Dance & EDM"],
+      "license": "all-rights-reserved",
+      "thumbnails": [
+        {
+          "id": "t500x500",
+          "url": "https://i1.sndcdn.com/artworks-swYr064zyRVLZ4dh-zDgDqQ-t500x500.jpg",
+          "width": 500,
+          "height": 500
+        },
+        {
+          "id": "original",
+          "url": "https://i1.sndcdn.com/artworks-swYr064zyRVLZ4dh-zDgDqQ-original.jpg"
+        }
+      ]
+    },
+    {
+      "_type": "url",
+      "ie_key": "Soundcloud",
+      "id": "250790590",
+      "url": "https://api.soundcloud.com/tracks/soundcloud%3Atracks%3A250790590",
+      "webpage_url": "https://soundcloud.com/liftedlifestyle/daft-punk-get-lucky-slowed",
+      "title": "Daft Punk - Get Lucky [SLOWED]",
+      "track": "Daft Punk - Get Lucky [SLOWED]",
+      "uploader": "Lifted Lifestyle Co.",
+      "duration": 295.256,
+      "genres": ["Downtempo"],
+      "license": "all-rights-reserved",
+      "thumbnails": [
+        {
+          "id": "t500x500",
+          "url": "https://i1.sndcdn.com/artworks-000150085739-qcau91-t500x500.jpg",
+          "width": 500,
+          "height": 500
+        },
+        {
+          "id": "original",
+          "url": "https://i1.sndcdn.com/artworks-000150085739-qcau91-original.jpg"
+        }
+      ]
+    }
+  ]
+}

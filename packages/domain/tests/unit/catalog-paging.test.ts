@@ -128,7 +128,10 @@ describe('a long list, page by page (no 200-song cap)', () => {
     expect(page.collection!.page).toMatchObject({ total: 300, hasMore: false });
     expect(page.collection!.page.tracks.map((t) => t.title)).toEqual(Array.from({ length: 50 }, (_, i) => `Song ${251 + i}`));
     expect(asked.find((a) => a && a[0] === 251)).toEqual(Array.from({ length: 50 }, (_, i) => 251 + i));
-    expect(page.collection!.page.tracks[0]!.sources.map((s) => s.url)).toContain('https://api.soundcloud.com/tracks/100250');
+    // The page the tool named replaces the bare API address the listing gave: one SoundCloud source,
+    // one anyone can open and the hub's tool may reach (measured on a real set, 2026-10-10).
+    expect(page.collection!.page.tracks[0]!.sources).toEqual([{ platform: 'soundcloud', id: 'band/song-251', url: 'https://soundcloud.com/band/song-251', previewUrl: null, matchedBy: 'link' }]);
+    expect(page.collection!.page.tracks[0]!.id).toBe('soundcloud:tracks/100250');
   });
 
   it('Apple Music: a playlist read from its public page, every song it carries, paged like any other', async () => {

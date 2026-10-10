@@ -6,8 +6,11 @@
  * renamed). LRCLIB's shape is real but its lyrics are placeholder lines, and its `lyricsfile` field
  * is dropped: song lyrics are not ours to copy. `odesli-deprecated.json` is SongLink's real keyless
  * answer that day (401 PUBLIC_API_ACCESS_DEPRECATED); `odesli-links.json` follows SongLink's
- * documented shape, since recording one needs a key. The `ytdlp-*.json` files follow yt-dlp's flat
- * output as recorded in docker-container/tests/fixtures/media-metadata/.
+ * documented shape, since recording one needs a key. `ytdlp-ytsearch.json` and `ytdlp-scsearch.json`
+ * are hand-built in yt-dlp's flat shape to stage the merges (a Topic upload never came up in a live
+ * search). `ytdlp-ytsearch-live.json` and `ytdlp-scsearch-live.json` are yt-dlp 2026.08.19's real
+ * answers on 2026-10-10, trimmed: fewer entries, no counts, uploader ids, formats or the
+ * `__x_forwarded_for_ip` field, and thumbnail addresses without their signed query.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

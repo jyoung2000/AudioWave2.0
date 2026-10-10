@@ -18,6 +18,8 @@ export type ToolSearchPlatform = 'youtube' | 'soundcloud';
 const PREFIX: Record<ToolSearchPlatform, string> = { youtube: 'ytsearch', soundcloud: 'scsearch' };
 /** yt-dlp lists a search lazily, but a deep page still costs a long listing. */
 export const TOOL_SEARCH_MAX = 100;
+/** The length SoundCloud gives a snipped (Go+) song: its 30-second preview, to the millisecond. */
+const SOUNDCLOUD_PREVIEW_SECONDS = 30;
 
 /** The words, safe to hand to yt-dlp: printable, single-spaced, at most 200 characters. */
 export function toolSearchTerm(text: string): string {
@@ -111,6 +113,11 @@ export function toolSearchTrack(platform: ToolSearchPlatform, row: Json): Catalo
       rank: 0,
     };
   }
+  // A SoundCloud Go+ song is "snipped" for everyone else: the search lists it at exactly 30 s (its
+  // own length has milliseconds, 246.381), and all it will play or download is a 30-second preview
+  // (`*_preview` formats only; measured 2026-10-10 on Daft Punk's own "Get Lucky"). It is not a
+  // home for the song, so it is not a row.
+  if (duration === SOUNDCLOUD_PREVIEW_SECONDS) return null;
   let path: string[];
   try {
     path = new URL(url).pathname.split('/').filter(Boolean);
@@ -137,7 +144,8 @@ export function toolSearchTrack(platform: ToolSearchPlatform, row: Json): Catalo
     discNumber: null,
     bpm: null,
     explicit: null,
-    genre: str(row['genre'], 100),
+    // A search entry names its genres as a list (`genres: ["Electronic"]`); a track page as `genre`.
+    genre: str(row['genre'], 100) ?? str(Array.isArray(row['genres']) ? (row['genres'] as unknown[])[0] : null, 100),
     label: null,
     sources: [{ platform: 'soundcloud', id, url: url.split('?')[0]!, previewUrl: null, matchedBy: 'search' }],
     rank: 0,
@@ -171,7 +179,10 @@ export class ToolSearchProvider implements CatalogProvider {
     if (!options.sections.includes('tracks') || options.offset >= TOOL_SEARCH_MAX) return out;
     const document = await this.run({ platform: this.id, args: toolSearchArgs(this.id, query.text, options.offset, options.limit), signal: options.signal });
     out.tracks = toolSearchTracks(this.id, document);
-    out.full.tracks = out.tracks.length >= options.limit && options.offset + options.limit < TOOL_SEARCH_MAX;
+    // Whether there is more is what yt-dlp listed, not what was kept: a page whose channels, sets or
+    // previews were left out is still a full page.
+    const listed = isObject(document) ? arr(document['entries']).length : 0;
+    out.full.tracks = listed >= options.limit && options.offset + options.limit < TOOL_SEARCH_MAX;
     return out;
   }
 }
