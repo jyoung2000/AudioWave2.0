@@ -43,7 +43,9 @@
           "shares:create",
           "profile:read",
           "profile:write",
-          "backup:read"
+          "backup:read",
+          "playlists:use",
+          "library:sync"
         ]
       }
     },
