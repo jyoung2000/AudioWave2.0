@@ -76,8 +76,13 @@ const BUNDLES: Bundle[] = [
      * and the colour arithmetic — published by the bridge as window.NP_RECOMMEND, plus the five fields a
      * row now carries for it. Eager on purpose: Discover is one click from the first screen and must
      * rank the moment it opens, and the Settings preview ranks through the same call. Measured, 9 KB.
+     *
+     * And to 260 for a visitor's preview and a fetched file kept (NP-FIND-011/012, 2026-10-10): the
+     * bridge's playPreview (a clip through the same engine) and tools.keep (the hub's file indexed as a
+     * copy) — measured, 259.0 KB (265,222 bytes: the entry 103,971, the shared chunk 154,951, the small
+     * chunks 6,300). The catalog set, its look-ahead and the hub's download stay in the lazy search chunk.
      */
-    entryBudgetKb: 258,
+    entryBudgetKb: 260,
     /*
      * The total rose from 1600 to 1900 when the hero gained the reference's jewel case.
      *
@@ -203,8 +208,14 @@ const BUNDLES: Bundle[] = [
      * refresh, the algorithm chip and its menu, the lean, the colour swatch, picker and legend, and
      * their styles — measured, 23 KB of markup, script and CSS. Nothing new is fetched lazily; the
      * search chunk is unchanged.
+     *
+     * And to 2615 for Discover's catalog set, its look-ahead, a visitor's preview and the hub's
+     * download (NP-DISC-006/007, NP-FIND-011/012, 2026-10-10): the lazy search chunk gains the
+     * online candidates, the look-ahead planner and runner, and the visit/fetch routes (now 144,493
+     * bytes), and the shell's HTML the catalog set's heading, marks and toggle, the preview label and
+     * the route-aware fetch sheet (now 948,028 bytes) — measured, 2609 KB in all, 34 KB more.
      */
-    totalBudgetKb: 2575,
+    totalBudgetKb: 2615,
     // Three.js belongs to the constellation and the jewel case; the tag reader only to a scan.
     mustBeSplit: ['three', 'music-metadata'],
   },

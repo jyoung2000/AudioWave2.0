@@ -16,21 +16,10 @@
  */
 import type { CatalogSourceStatus, CatalogTrack } from '@now-playing/contracts';
 import { CATALOG_PLATFORM_LABELS } from '@now-playing/contracts';
-import {
-  cachedFor,
-  describeCache,
-  explainFound,
-  onlineQueries,
-  planLookAhead,
-  rankFound,
-  type CacheEntry,
-  type Candidate,
-  type GatheredRow,
-  type RankConfig,
-  type RankLean,
-  type RankPlay,
-  type RankSong,
-} from '../recommend/index.js';
+// Imported here, in the lazy search chunk, so the catalog set and its look-ahead stay out of the first load.
+import { explainFound, onlineQueries, rankFound, type GatheredRow } from '../recommend/online.js';
+import { cachedFor, describeCache, planLookAhead, type CacheEntry, type Candidate } from '../recommend/prefetch.js';
+import type { RankConfig, RankLean, RankPlay, RankSong } from '../recommend/rank.js';
 import { Refused } from './client.js';
 import * as V from './view.js';
 import type { ListSong } from './index.js';

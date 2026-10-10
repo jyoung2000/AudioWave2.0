@@ -3758,7 +3758,7 @@
       "authority": "adopted",
       "owners": [
         "music-player/src/shell/recommend/online.ts",
-        "music-player/src/shell/recommend/index.ts",
+        "music-player/src/shell/recommend/rank.ts",
         "music-player/src/shell/search/discover.ts",
         "music-player/src/shell/search/index.ts",
         "music-player/index.html",

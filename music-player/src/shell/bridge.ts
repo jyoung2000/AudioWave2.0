@@ -32,7 +32,7 @@ import { toTrackRef } from '../state/store.js';
 import { registerServiceWorker } from '../lib/pwa.js';
 import type { RemoteSong, ShellAwsp } from './awsp.js';
 import type { SearchApi } from './search/index.js';
-import * as recommend from './recommend/index.js';
+import * as recommend from './recommend/rank.js';
 import { detectBackend } from '../lib/tool-backend.js';
 import { runFetch, ToolError } from '../lib/tools-core.js';
 import type { SavedHelper } from '../lib/fetch-helper.js';
