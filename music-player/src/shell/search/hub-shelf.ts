@@ -328,8 +328,8 @@ export function installHubShelf(): HubShelf {
   function refresh(): void {
     void reload().then((a) => {
       if (!a || !has('playlists:use')) {
-        if (lists !== null) changed();
         lists = null;
+        changed();
         return;
       }
       if (Date.now() - listsAt < 3000) return;
@@ -351,14 +351,37 @@ export function installHubShelf(): HubShelf {
   /** A line that is read and said, not run: focusable, so the keys reach it, but marked disabled. */
   const why = (mode: 'menu' | 'sheet', words: string, why: string): string => item(mode, 'hub-why', escape(words), ` aria-disabled="true" data-why="${escape(why)}" title="${escape(why)}"`);
 
-  function paint(group: HTMLElement, song: ShelfSong, mode: 'menu' | 'sheet'): void {
-    const local = group.parentElement?.querySelector<HTMLElement>('[data-hub-local]');
-    if (!acct) {
-      group.innerHTML = '';
-      group.hidden = true;
-      void reload().then((a) => a && group.isConnected && paint(group, song, mode));
-      return;
+  /** A submenu that grew after the menu was placed (the hub answered) is moved up to stay on screen. */
+  function keepOnScreen(sub: HTMLElement): void {
+    sub.style.top = '';
+    const r = sub.getBoundingClientRect();
+    if (!r.height) return;
+    const over = r.bottom - (window.innerHeight - 8);
+    if (over > 0) sub.style.top = `${-4 - Math.min(over, Math.max(0, r.top - 8))}px`;
+  }
+  function watchSub(group: HTMLElement): void {
+    const sub = group.closest<HTMLElement>('.ctx__sub');
+    const parent = sub?.closest<HTMLElement>('.ctx__item--parent');
+    if (!sub || !parent) return;
+    const again = (): void => void requestAnimationFrame(() => keepOnScreen(sub));
+    if (!parent.dataset['hubWatch']) {
+      parent.dataset['hubWatch'] = '1';
+      for (const type of ['mouseenter', 'focusin', 'click']) parent.addEventListener(type, again);
     }
+    again();
+  }
+
+  /** Read the pairing again first (it may have changed since the last menu), then draw the group. */
+  function paint(group: HTMLElement, song: ShelfSong, mode: 'menu' | 'sheet'): void {
+    group.innerHTML = '';
+    group.hidden = true;
+    void reload().then((a) => {
+      if (a && group.isConnected) draw(group, song, mode);
+    });
+  }
+
+  function draw(group: HTMLElement, song: ShelfSong, mode: 'menu' | 'sheet'): void {
+    const local = group.parentElement?.querySelector<HTMLElement>('[data-hub-local]');
     if (local) local.hidden = false;
     group.hidden = false;
     const hub = hubName();
@@ -386,6 +409,7 @@ export function installHubShelf(): HubShelf {
           })
           .join('');
         group.innerHTML = head + listed + item(mode, 'hub-new', `New Playlist on ${escape(hub)}…`);
+        if (mode === 'menu') watchSub(group);
       },
       (err: unknown) => {
         if (!group.isConnected) return;

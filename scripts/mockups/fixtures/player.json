@@ -28,6 +28,133 @@
       "publicEndpoint": null,
       "setupComplete": true,
       "codeOnlyPairingAvailable": false
+    },
+    "/api/v1/playlists": {
+      "folder": {
+        "path": "/data/playlists",
+        "relativePath": "playlists",
+        "isDefault": true,
+        "available": true,
+        "reason": null,
+        "playlistCount": 2,
+        "capped": false
+      },
+      "items": [
+        {
+          "id": "pl-harbour",
+          "name": "Harbour Evenings",
+          "fileName": "Harbour Evenings.m3u8",
+          "description": null,
+          "createdAt": "2026-10-03T18:00:00.000Z",
+          "updatedAt": "2026-10-03T18:00:00.000Z",
+          "entryCount": 3,
+          "durationSec": 640,
+          "covers": [],
+          "origin": "airwave",
+          "readOnly": false,
+          "createdBy": "mockup-device",
+          "hasTrack": true
+        },
+        {
+          "id": "pl-kitchen",
+          "name": "Kitchen Radio",
+          "fileName": "Kitchen Radio.m3u8",
+          "description": null,
+          "createdAt": "2026-10-03T18:00:00.000Z",
+          "updatedAt": "2026-10-03T18:00:00.000Z",
+          "entryCount": 12,
+          "durationSec": 2710,
+          "covers": [],
+          "origin": "airwave",
+          "readOnly": false,
+          "createdBy": "another-device",
+          "hasTrack": false
+        }
+      ]
+    },
+    "/api/v1/playlists/pl-harbour": {
+      "playlist": {
+        "id": "pl-harbour",
+        "name": "Harbour Evenings",
+        "fileName": "Harbour Evenings.m3u8",
+        "description": null,
+        "createdAt": "2026-10-03T18:00:00.000Z",
+        "updatedAt": "2026-10-03T18:00:00.000Z",
+        "entryCount": 3,
+        "durationSec": 640,
+        "covers": [],
+        "origin": "airwave",
+        "readOnly": false,
+        "createdBy": "mockup-device",
+        "hasTrack": null
+      },
+      "items": [
+        {
+          "id": "e1",
+          "title": "Harbour Morning",
+          "artist": "Alder Quartet",
+          "artists": ["Alder Quartet"],
+          "album": "First Light",
+          "durationSec": 214,
+          "location": "../library/Alder Quartet/First Light/01 Harbour Morning.flac",
+          "locationKind": "library",
+          "trackId": "hub-track-1",
+          "catalogId": null,
+          "isrc": null,
+          "artworkUrl": null,
+          "platforms": [],
+          "sources": [],
+          "addedAt": "2026-10-03T18:00:00.000Z",
+          "addedBy": "mockup-device"
+        },
+        {
+          "id": "e2",
+          "title": "Night Ferries",
+          "artist": "Lantern Choir",
+          "artists": ["Lantern Choir"],
+          "album": "Night Ferries",
+          "durationSec": 203,
+          "location": "https://www.deezer.com/track/900001",
+          "locationKind": "url",
+          "trackId": null,
+          "catalogId": "deezer:900001",
+          "isrc": null,
+          "artworkUrl": null,
+          "platforms": ["deezer"],
+          "sources": [
+            {
+              "platform": "deezer",
+              "id": "900001",
+              "url": "https://www.deezer.com/track/900001",
+              "previewUrl": null,
+              "matchedBy": "search"
+            }
+          ],
+          "addedAt": "2026-10-03T18:00:00.000Z",
+          "addedBy": "mockup-device"
+        },
+        {
+          "id": "e3",
+          "title": "Paper Harbour (live)",
+          "artist": "Birch Ensemble",
+          "artists": ["Birch Ensemble"],
+          "album": "Late Shift",
+          "durationSec": 223,
+          "location": null,
+          "locationKind": "missing",
+          "trackId": null,
+          "catalogId": null,
+          "isrc": null,
+          "artworkUrl": null,
+          "platforms": [],
+          "sources": [],
+          "addedAt": "2026-10-03T18:00:00.000Z",
+          "addedBy": "mockup-device"
+        }
+      ],
+      "offset": 0,
+      "total": 3,
+      "hasMore": false
     }
   },
   "playlistLink": "https://open.spotify.com/playlist/mockupHarbourNights",
@@ -193,5 +320,13 @@
         }
       ]
     }
+  },
+  "hubAccount": {
+    "base": "http://192.168.1.20:4546",
+    "credentialId": "00000000-0000-4000-8000-00000000c0de",
+    "secret": "mockup-not-a-secret-mockup-not-a-secret",
+    "scopes": ["playlists:use"],
+    "hubName": "Airwave Hub",
+    "deviceId": "mockup-device"
   }
 }

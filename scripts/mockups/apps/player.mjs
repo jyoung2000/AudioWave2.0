@@ -327,6 +327,31 @@ export default {
     await snap({ id: 'discover-algo-menu', title: 'Discover ▸ the algorithm menu', group: 'Music', note: 'The chip’s menu: every algorithm, built in and yours, each with its colour dot, mode and a line on what it favours, a tick on the one in use; Lean ▸ Familiar / Balanced / Adventurous and the library’s genres; New Songs, Start Discover Over, and Edit Algorithms…, which opens Settings ▸ Recommendations.', dismiss: 'discover', dismissOutside: '#ctx' });
     await page.keyboard.press('Escape');
     await settle(300);
+
+    // ---- The hub's playlists (DEC-041, NP-FIND-013/014): with Discover's catalog set on show (read through the
+    // companion), the player is paired with the sample hub, allowed to use its playlists — and unpaired after, so
+    // the search below still answers through the companion.
+    await page.evaluate((acct) => window.kv.set('player:hub', acct), fixtures.hubAccount);
+    if (await page.evaluate(() => !document.getElementById('ctx').hidden)) await page.mouse.click(5, 300);
+    await settle(300);
+    await page.locator('#libraryRows tr[data-online]').first().click({ button: 'right', position: { x: 200, y: 8 }, force: true });
+    await settle(400);
+    await click('#ctx [data-act="parent"]', { ms: 400 });
+    await until(() => !!document.querySelector('#ctx [data-hub-pl] [data-act="hub-new"]'), undefined, { what: 'the hub’s playlists in the menu' });
+    await settle(300);
+    await snap({ id: 'row-menu-hub-playlists', title: 'Row menu ▸ Add to Playlist, paired with a hub', group: 'Music', note: 'Paired with a hub that lets this player use its playlists (playlists:use, DEC-041): Add to Playlist keeps this player’s own playlists under “On this player”, and adds “On Airwave Hub” — the hub’s folder playlists, ticked where the song is already (Harbour Evenings), and New Playlist on Airwave Hub…. Choosing one files the catalog song there; the HUD confirms (NP-FIND-013). Without the permission the group says the hub hasn’t allowed it, and how to fix it.', dismiss: 'discover', dismissOutside: '#ctx' });
+    await page.keyboard.press('Escape');
+    await settle(300);
+    await click('#libMenuBtn', { ms: 400 });
+    await click('#ipodMenu .ipod__item:has-text("Playlists")', { ms: 400 });
+    await click('#ipodMenu .ipod__item:has-text("On Airwave Hub")', { ms: 600 });
+    await until(() => !!document.querySelector('#ipodMenu .ipod__item'), undefined, { what: 'the hub’s playlists in the library menu' });
+    await settle(300);
+    await snap({ id: 'library-menu-hub', title: 'Library menu ▸ Playlists ▸ On Airwave Hub', group: 'Music', note: 'The library menu’s Playlists lists “On Airwave Hub” after this player’s own and the starred lists: the hub’s folder playlists (NP-FIND-014).', dismiss: 'discover', dismissOutside: '#ipodMenu' });
+    await click('#ipodMenu .ipod__item:has-text("Harbour Evenings")', { ms: 1200 });
+    await snap({ id: 'hub-playlist', title: 'A playlist on the hub, in the music list', group: 'Music', note: 'A hub playlist opens the way an album does: the silver bar names it, “Playlist · Airwave Hub · 3 songs”, and its songs are the rows. Harbour Morning is in the hub’s library and streams from the hub; Night Ferries is kept by its Deezer link and plays its preview while it is fetched; Paper Harbour (live) is one the hub cannot place. No star — it is not a catalog list — and the “…” beside the name renames it, moves a song or deletes it, because this player made it; on anyone else’s list the bar says it is read-only (NP-FIND-014).' });
+    await page.evaluate(() => window.kv.set('player:hub', null));
+    await settle(300);
     await click('#libScopeClear', { ms: 500 });
 
     // ---- Search: the music catalog, through the companion on this PC (NP-FIND-001..008)
@@ -425,5 +450,6 @@ export default {
     await page.fill('#cfgHub', fixtures.hubBase);
     await click('#hubTest', { ms: 1500 });
     await snap({ id: 'settings-src-hub', title: 'Settings ▸ Sources (hub tested)', group: 'Settings', note: 'The hub’s address typed and tested: its name, version, checks and fingerprint.' });
+
   },
 };
