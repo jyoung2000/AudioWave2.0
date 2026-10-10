@@ -86,3 +86,16 @@ the hub's admin GUI and the companion. Both apps share the behaviour through
 Not done here: the hub admin and the companion cannot file a catalog song into a player's playlist
 (they hold no playlist store of their own); a song from search joins the library instead and says so.
 Long-press to open the menu on touch is the player's; the companion's touch path is the 44px "…".
+
+## Playlist folders in the hub and the companion (2026-10-10; DEC-041, UX-PL-001…008, CMP-PL-001…006)
+
+The owner: “Give the hub and companion app a folder to store or write playlists to.” What the third
+round left undone above is done: both apps keep a playlist folder (hub `<data>/playlists`, companion
+`Music\Airwave Playlists`), one `.m3u8` per playlist with an `.airwave.json` sidecar
+(`@now-playing/domain/playlist-folder`), and a song row’s Add to Playlist ▸ lists the folder’s
+playlists, ticked where the song is, plus New Playlist…; filing keeps the song’s link and “Also add
+to Library” (on) queues the download with its basis. Hub: Music ▸ Playlists and `/api/v1/playlists/*`
+(device scope `playlists:use`; starred collections for devices with `library:sync`). Companion:
+Library ▸ Playlists, Settings ▸ Playlists, twelve `playlists:*` channels, and a long press on touch
+opening a row’s menu. Mockup states: `search-add-to-playlist`, `music-playlist`, `music-playlist-folder`
+(hub), `search-add-to-playlist`, `library-playlist` (companion).

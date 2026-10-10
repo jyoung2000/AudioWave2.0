@@ -105,7 +105,7 @@ test('a song row’s “…” and right-click open its menu; the keys walk it a
   await songs.getByRole('option').first().locator('[data-menu]').click();
   const menu = page.getByRole('menu', { name: '“Harbour Lights”' });
   await expect(menu).toBeVisible();
-  await expect(menu.getByRole('menuitem')).toHaveText([/^Add to Up Next/, 'Add to Playlist…', 'Add to Library…', 'Download…', 'Audition', 'Open Details']);
+  await expect(menu.getByRole('menuitem')).toHaveText([/^Add to Up Next/, /^Add to Playlist/, 'Add to Library…', 'Download…', 'Audition', 'Open Details']);
   await page.keyboard.press('Escape');
   await expect(menu).toHaveCount(0);
   await expect(songs).toBeFocused();
@@ -120,6 +120,49 @@ test('a song row’s “…” and right-click open its menu; the keys walk it a
   await expect(sheet.getByLabel('Allowed because:')).toBeVisible();
   await sheet.getByRole('button', { name: 'Cancel' }).click();
   await expect(sheet).toHaveCount(0);
+});
+
+test('Add to Playlist ▸ New Playlist… files a song into the hub’s playlist folder, and Music ▸ Playlists opens it like an album (UX-PL-005, UX-PL-007)', async ({ page }) => {
+  await stockCatalog(page);
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Search' }).click();
+  await page.getByRole('searchbox', { name: 'Search for music' }).fill('harbour');
+  await page.getByRole('button', { name: 'Search' }).click();
+  const songs = page.getByRole('listbox', { name: 'Songs' });
+  await expect(songs.getByRole('option')).toHaveCount(5);
+  await songs.getByRole('option').first().locator('[data-menu]').click();
+  await page.getByRole('menuitem', { name: 'Add to Playlist' }).click();
+  await page.getByRole('menuitem', { name: 'New Playlist…' }).click();
+  const sheet = page.getByRole('dialog', { name: 'New Playlist' });
+  await sheet.getByLabel('Name:').fill('E2E Harbour');
+  // No download in a test run: the library is left out this time.
+  await sheet.getByRole('checkbox', { name: 'Also add to Library' }).uncheck();
+  await sheet.getByRole('button', { name: 'Create' }).click();
+  await expect(page.locator('.status')).toContainText('Made “E2E Harbour” with “Harbour Lights” in it.');
+  // The menu now ticks it.
+  await songs.getByRole('option').first().locator('[data-menu]').click();
+  await page.getByRole('menuitem', { name: 'Add to Playlist' }).click();
+  await expect(page.getByRole('menuitemcheckbox', { name: 'E2E Harbour' })).toHaveAttribute('aria-checked', 'true');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+
+  await page.getByRole('tab', { name: 'Music' }).click();
+  const lists = page.getByRole('listbox', { name: 'Playlists' });
+  await expect(lists.getByRole('option', { name: /E2E Harbour/ })).toBeVisible();
+  await lists.getByRole('option', { name: /E2E Harbour/ }).click();
+  await expect(page.getByRole('heading', { name: 'E2E Harbour', level: 2 })).toBeFocused();
+  const entries = page.getByRole('listbox', { name: 'Songs' });
+  await expect(entries.getByRole('option')).toHaveCount(1);
+  await expect(entries.getByRole('option').first()).toContainText('Plays from');
+  await expect(page.getByRole('link', { name: 'Export .m3u8' })).toHaveAttribute('download', 'E2E Harbour.m3u8');
+  const results = await new AxeBuilder({ page }).include('#playlists').withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
+  expect(results.violations, results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`).join('
+')).toEqual([]);
+  await page.getByRole('button', { name: 'Delete…' }).click();
+  const ask = page.getByRole('alertdialog', { name: 'Delete “E2E Harbour”?' });
+  await ask.getByRole('button', { name: 'Delete' }).click();
+  await expect(lists).toBeVisible();
+  await expect(lists.getByRole('option', { name: /E2E Harbour/ })).toHaveCount(0);
 });
 
 test('a pasted playlist shows its mosaic and platform, opens like an album, and the star keeps it in the hub', async ({ page }) => {

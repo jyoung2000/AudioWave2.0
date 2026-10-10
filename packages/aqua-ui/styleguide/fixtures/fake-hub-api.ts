@@ -11,6 +11,7 @@
 import { routePath, routes, type RouteName, type Routes } from '@now-playing/contracts';
 import recording from './hub-api.json';
 import catalog from './catalog-stock.json';
+import playlists from './playlists-stock.json';
 
 /**
  * The music catalog (DEC-039) is not in the recording — a recorded hub would have asked the real
@@ -25,6 +26,10 @@ const CATALOG: Partial<Record<RouteName, (query: Query) => unknown>> = {
   catalogEnrich: () => catalog.enrich,
   catalogSavedList: () => catalog.saved,
   catalogSettingsGet: () => catalog.settings,
+  // The playlist folder (DEC-041) is not in the recording either: three lists made from the stock's songs.
+  playlistsList: (query) => ({ folder: playlists.hub.folder, items: playlists.items.map((p) => ({ ...p, hasTrack: query['catalogId'] ? p.id === playlists.hasTrack : null })) }),
+  playlistsGet: () => playlists.page,
+  playlistsFolderGet: () => playlists.hub.folder,
 };
 
 export class ApiError extends Error {

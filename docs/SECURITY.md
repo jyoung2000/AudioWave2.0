@@ -48,7 +48,21 @@ This document is the threat model and the list of concrete mitigations for the A
 | Proxy / IP spoofing | `X-Forwarded-For` trusted only from configured CIDRs; IPs displayed truncated (default) or keyed-hash; full IPs only when explicitly enabled with retention | hub `network/` | hub tests |
 | Log / diagnostic secret leakage | pino redaction paths + `redactSecrets` deep redaction; diagnostics bundle excludes tokens, full IPs, raw history, audio and user paths | hub `observability/`; domain `security.ts` | domain + hub tests |
 | Supply chain / license | Pinned versions in lockfile, `pnpm audit` in CI (fails on high/critical), only allowlisted build scripts (`onlyBuiltDependencies`), `LICENSES.md` generated from installed packages, no CDN at runtime | root `pnpm-workspace.yaml`, `.github/workflows/ci.yml`, `scripts/licenses.mjs` | CI |
+| Playlist folders: traversal, symlinks, injected lines, oversized lists (DEC-041) | The hub's folder is a relative path under `<data>/playlists` or `<data>/library`, each segment allow-listed, re-checked by real path after it is made; names go through `sanitizeFilename` and are made unique; ids are opaque (`[A-Za-z0-9_-]`), never paths; symbolic links in the folder are not followed; a relative entry is only stat-ed when it resolves inside the playlist folder or a library root; absolute entries are never shown or followed; line breaks are stripped before anything reaches an M3U line; atomic writes; caps of 10,000 songs, 1,000 playlists, 500 songs a request, 16 MB per M3U, 64 MB per sidecar. The companion's folder is chosen only in the system picker, never named by the renderer | domain `playlist-folder/`; hub `playlists/service.ts`, `api/routes/playlists.ts`; companion `main/playlists.ts`, `shared/ipc.ts` | `packages/domain/tests/unit/playlist-folder.test.ts`; hub `tests/security/playlist-folder.test.ts`; companion `tests/contract/playlists-ipc.test.ts` |
 | Data integrity during migrations | Backup before migrating an existing database; migrations run in a transaction; restore takes a safety backup first | hub `db/`, `backup/` | hub tests |
+
+## Playlist folders and the device scopes for them (DEC-041)
+
+| Route | Admin session | Device |
+| --- | --- | --- |
+| `GET /api/v1/playlists`, `GET /api/v1/playlists/:id`, `GET /api/v1/playlists/:id/export` | yes | `playlists:use` |
+| `POST /api/v1/playlists`, `POST /api/v1/playlists/:id/entries` | yes (CSRF) | `playlists:use` — any list |
+| `PATCH`/`DELETE /api/v1/playlists/:id`, `POST /api/v1/playlists/:id/entries/move` | yes (CSRF) | `playlists:use` — only a list the device created |
+| `POST /api/v1/playlists/:id/entries/remove` | yes (CSRF) | `playlists:use` — entries it added, or any in a list it created |
+| `GET`/`PUT /api/v1/playlists/folder` | yes (CSRF) | never |
+| `GET`/`PUT`/`DELETE /api/v1/catalog/saved` | its own | `library:sync` — its own; the admin's read-only as `shared` |
+
+Every change is audited (`playlists.create`, `.update`, `.delete`, `.add`, `.remove`, `.folder`). Filing is additive and open to any device with the scope, because the hub is a shared shelf; anything that takes away from a list is kept to the admin and to the device that made the list or added the song. The playlist files hold relative paths inside the data volume and public source URLs only — never an absolute host path. Tests: `docker-container/tests/security/playlist-folder.test.ts` (traversal, symlinks, ids, CSRF, scopes, ownership, caps, starred collections), `docker-container/tests/integration/playlists.test.ts`.
 
 ## Outbound hosts of the music catalog (DEC-039)
 

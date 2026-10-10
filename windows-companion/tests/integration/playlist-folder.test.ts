@@ -65,7 +65,7 @@ afterEach(async () => {
 });
 
 describe('the companion’s playlist folder', () => {
-  it('starts at Music\\Airwave Playlists, the default, and answers by the IPC contract', async () => {
+  it('starts at Airwave Playlists in the Music folder, the default, and answers by the IPC contract', async () => {
     const folder = IPC['playlists:folder'].response.parse(await playlists.folder());
     expect(folder).toMatchObject({ path: join(root, 'Music', 'Airwave Playlists'), isDefault: true, available: true, playlistCount: 0 });
     expect(IPC['playlists:list'].response.parse(await playlists.list({})).items).toEqual([]);

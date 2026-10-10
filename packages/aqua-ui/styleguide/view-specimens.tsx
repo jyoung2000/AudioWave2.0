@@ -31,6 +31,8 @@ import { SharesView } from '../../../docker-container/src/web/views/Shares.js';
 import { MusicSearchSettingsView } from '../../../docker-container/src/web/views/CatalogSettings.js';
 import { SearchView as HubSearchView } from '../../../docker-container/src/web/views/Search.js';
 import { SearchView as CompanionSearchView } from '../../../windows-companion/src/renderer/views/Search.js';
+import { PlaylistsView as HubPlaylistsView } from '../../../docker-container/src/web/views/Playlists.js';
+import { PlaylistsView as CompanionPlaylistsView } from '../../../windows-companion/src/renderer/views/Playlists.js';
 import { AboutView } from '../../../windows-companion/src/renderer/views/About.js';
 import { BackupView as CompanionBackupView } from '../../../windows-companion/src/renderer/views/Backup.js';
 import { SettingsView } from '../../../windows-companion/src/renderer/views/Settings.js';
@@ -87,6 +89,8 @@ function HubSections({ tab, sections }: { tab: TabIconId; sections: ReadonlyArra
 
 export const HubGroupsScreen = () => <HubSections tab="groups" sections={[{ id: 'groups', title: 'Groups', view: <GroupsView /> }]} />;
 export const HubLibraryScreen = () => <HubSections tab="music" sections={[{ id: 'library', title: 'Library', view: <HubLibraryView /> }]} />;
+/** Music ▸ Playlists (DEC-041): the folder's three lists, the folder, and the players' shared copies. */
+export const HubPlaylistsScreen = () => <HubSections tab="music" sections={[{ id: 'playlists', title: 'Playlists', view: <HubPlaylistsView /> }]} />;
 /** In the hub, Live TV is drawn straight after Downloads, inside that section; here it is shown on its own. */
 export const HubLiveTvScreen = () => <HubSections tab="music" sections={[{ id: 'downloads', title: 'Downloads', view: <HubLiveTvView /> }]} />;
 export const HubRecommendationsScreen = () => <HubSections tab="music" sections={[{ id: 'recommendations', title: 'Recommendations', view: <RecommendationsView /> }]} />;
@@ -194,6 +198,17 @@ export const CompanionSearchSongsScreen = () => (
       </Pressed>
     </Sect>
   </CompanionWindow>
+);
+
+/** Library ▸ Playlists (DEC-041): this PC's playlist folder, its three lists with their mosaics. */
+export const CompanionPlaylistsScreen = () => (
+  <Companion.ConfirmProvider>
+    <CompanionWindow tab="library">
+      <Sect id="playlists" title="Playlists">
+        <CompanionPlaylistsView />
+      </Sect>
+    </CompanionWindow>
+  </Companion.ConfirmProvider>
 );
 
 export const CompanionAboutScreen = () => (
