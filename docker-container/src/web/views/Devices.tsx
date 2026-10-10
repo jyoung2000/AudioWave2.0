@@ -17,7 +17,7 @@ import { ActionError, Ago, Check, count, EmptyCells, EmptyRow, Field, Group, lis
 type Kind = 'player' | 'companion';
 
 /** What a new device is offered unless the operator changes it. */
-const DEFAULT_SCOPES: Scope[] = ['library:read', 'search:use', 'group:member', 'history:events', 'shares:create', 'profile:read', 'profile:write', 'backup:read'];
+const DEFAULT_SCOPES: Scope[] = ['library:read', 'search:use', 'group:member', 'history:events', 'shares:create', 'profile:read', 'profile:write', 'backup:read', 'playlists:use', 'library:sync'];
 
 interface Created {
   sessionId: string;

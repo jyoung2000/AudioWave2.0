@@ -13,6 +13,8 @@ export const SCOPE_LABELS: ReadonlyArray<readonly [Scope, string]> = [
   ['library:read', 'Browse the library'],
   ['search:use', 'Search'],
   ['playlists:sync', 'Sync playlists'],
+  ['playlists:use', 'File into the hub’s playlists'],
+  ['library:sync', 'Sync starred albums and playlists'],
   ['eq:sync', 'Sync EQ presets'],
   ['history:aggregate', 'Send listening totals'],
   ['history:events', 'Send each play'],

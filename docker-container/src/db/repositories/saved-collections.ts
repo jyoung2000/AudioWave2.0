@@ -27,6 +27,24 @@ export class SavedCollectionsRepository {
     });
   }
 
+  /** Every owner's lists whose id starts with `prefix` (`admin:`), one per ref, newest first: what devices see as shared. */
+  listShared(prefix: string): SavedCollection[] {
+    const rows = this.db.prepare<[number, string], Row>('SELECT body FROM saved_collections WHERE substr(owner_id, 1, ?) = ? ORDER BY saved_at DESC, collection_id LIMIT 2000').all(prefix.length, prefix);
+    const seen = new Set<string>();
+    return rows.flatMap((row) => {
+      try {
+        const parsed = SavedCollection.safeParse(JSON.parse(row.body));
+        if (!parsed.success) return [];
+        const key = `${parsed.data.ref.platform}:${parsed.data.ref.kind}:${parsed.data.ref.id}`;
+        if (seen.has(key)) return [];
+        seen.add(key);
+        return [parsed.data];
+      } catch {
+        return [];
+      }
+    });
+  }
+
   count(ownerId: string): number {
     return this.db.prepare<[string], { n: number }>('SELECT COUNT(*) AS n FROM saved_collections WHERE owner_id = ?').get(ownerId)?.n ?? 0;
   }

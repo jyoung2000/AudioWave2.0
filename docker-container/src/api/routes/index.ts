@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { HubContext } from '../../context.js';
 import { registerAdminRoutes } from './admin.js';
 import { registerCatalogRoutes } from './catalog.js';
+import { registerPlaylistRoutes } from './playlists.js';
 import { registerGroupRoutes } from './groups.js';
 import { registerMediaRoutes } from './media.js';
 import { registerPairingRoutes } from './pairing.js';
@@ -21,6 +22,7 @@ export function registerAllRoutes(app: FastifyInstance, ctx: HubContext): void {
   registerPairingRoutes(app, ctx);
   registerProviderRoutes(app, ctx);
   registerCatalogRoutes(app, ctx);
+  registerPlaylistRoutes(app, ctx);
   registerGroupRoutes(app, ctx);
   registerProfileRoutes(app, ctx);
   registerMediaRoutes(app, ctx);
