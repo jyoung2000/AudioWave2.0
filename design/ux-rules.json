@@ -2337,7 +2337,7 @@
       "id": "NP-FIND-006",
       "group": "np-find",
       "title": "One card, centred under the field: album, artist and song details stack inside it, and go back",
-      "contract": "The popover is one card that hangs centred under the header's search field at every width — the same centre x as the field, min(560px, 100vw − 20px) wide, moved only as far as it must to stay on screen, with a small caret at the field's centre keeping the joint between the two (the Aqua skin's rounded card); on a phone it spans the width. Everything the search shows opens inside that card, with Back: the overview, a type's page, and the details. An album row opens its details (catalog/album): cover, title, artist, year · label · genre · song count, its platforms, \"Open in Music\" (NP-FIND-007) and its songs, each auditionable and addable. An artist row opens theirs (catalog/artist): picture (an album cover when the platform has none), genre, fans, top songs and albums; an album there drills into that album. A song row opens the song: its cover, platforms (with any other homes enrichment found), genre, label and year from catalog/enrich (\"Looking up…\" while MusicBrainz is asked, a sentence if it cannot be), its ISRC, Add to Library, Download… (the helper's fetch sheet with a stated basis, as the Download key; a store-only song says there is nothing to fetch), and its lyrics from catalog/lyrics — synced lines with their times, or plain, or \"No lyrics found\", or an instrumental said as one. Details stack; Back and Escape walk them back, and the keys come back to the row they left.",
+      "contract": "The popover is one card that hangs centred under the header's search field at every width — the same centre x as the field, min(560px, 100vw − 20px) wide, moved only as far as it must to stay on screen, with a small caret at the field's centre keeping the joint between the two (the Aqua skin's rounded card); on a phone it spans the width. Everything the search shows opens inside that card, with Back: the overview, a type's page, and the details. An album row opens its details (catalog/album): cover, title, artist, year · label · genre · song count, its platforms, \"Open in Music\" (NP-FIND-007) and its songs, each auditionable and addable. An artist row opens theirs (catalog/artist): picture (an album cover when the platform has none), genre, fans, top songs and albums; an album there drills into that album. A song row opens the song: its cover, platforms (with any other homes enrichment found), genre, label and year from catalog/enrich (\"Looking up…\" while MusicBrainz is asked, a sentence if it cannot be), its ISRC, Add to Library, Download… (the fetch sheet with a stated basis, as the Download key: the hub when it may, else the helper, NP-FIND-012; a store-only song says there is nothing the helper can fetch), and its lyrics from catalog/lyrics — synced lines with their times, or plain, or \"No lyrics found\", or an instrumental said as one. Details stack; Back and Escape walk them back, and the keys come back to the row they left.",
       "example": "At 1280 px the card is 560 wide under the pill's centre; at 390 px it is 370 wide, 10 px from each edge; an album opened inside it is the same card, with Back.",
       "authority": "adopted",
       "owners": [
@@ -2374,7 +2374,7 @@
       "id": "NP-FIND-007",
       "group": "np-find",
       "title": "A pasted album or playlist is one listing that opens in the music list like an album",
-      "contract": "A pasted album or playlist (catalog/resolve, kind album or playlist) is one listing, not a page of rows: its title, its platform as a badge and in words with its owner and song count, and a cover that is a 2×2 mosaic of the first four songs' covers — or the list's own cover when fewer than four songs have one. Choosing it (or an album's \"Open in Music\") opens it in the music list the way an album opens: the silver bar names it and its songs are the rows, in the list's order. Every song loads, from any platform, with no cap: pages of up to 200 (offset / limit) are asked until the server says hasMore is false, the bar saying \"Playlist · Spotify · Loading 400 of 1,250…\" meanwhile and \"1,250 songs\" when done, and the rows already there can be played and fetched while the rest arrive (a server that still caps a list says \"(the first N)\"; one that fails part way says where it stopped). The songs are on show, not added: + or the Download key (through the helper) makes one the person's. Clearing the bar returns to the library.",
+      "contract": "A pasted album or playlist (catalog/resolve, kind album or playlist) is one listing, not a page of rows: its title, its platform as a badge and in words with its owner and song count, and a cover that is a 2×2 mosaic of the first four songs' covers — or the list's own cover when fewer than four songs have one. Choosing it (or an album's \"Open in Music\") opens it in the music list the way an album opens: the silver bar names it and its songs are the rows, in the list's order. Every song loads, from any platform, with no cap: pages of up to 200 (offset / limit) are asked until the server says hasMore is false, the bar saying \"Playlist · Spotify · Loading 400 of 1,250…\" meanwhile and \"1,250 songs\" when done, and the rows already there can be played (each a visitor: its preview while the hub or the companion fetches it, NP-FIND-011) and fetched while the rest arrive (a server that still caps a list says \"(the first N)\"; one that fails part way says where it stopped). The songs are on show, not added: + or the Download key (through the helper) makes one the person's. Clearing the bar returns to the library.",
       "example": "“Lantern Mix”, Playlist on Spotify · Ada · 1,250 songs → the bar: Playlist · Spotify · Loading 300 of 1,250… — Lantern Mix ☆ ⓧ, then Playlist · Spotify · 1,250 songs.",
       "authority": "adopted",
       "owners": [
@@ -2482,7 +2482,7 @@
       "id": "NP-FIND-010",
       "group": "np-find",
       "title": "A song from search goes to Up Next, a playlist or the library through the row’s menu",
-      "contract": "Every song row in the search — the overview, a type page, an album's or artist's songs — has a “…” at its end, and right-click or a long press on the row does the same: the shell's contextual menu opens over the song with exactly Add to Up Next, Add to Playlist ▸ (the person's playlists, ticked where one holds the song, and New Playlist…), Add to Library (“In your library”, disabled, once it is), Download… (the helper's fetch sheet; disabled, saying why, for a store-only song) and Audition (disabled when the song has no clip; “Stop Audition” while it plays). Filing a song that is not in the library yet adds it first — quietly, over the library's own wall (library:add), kept in library:state so a playlist that holds it still finds it after a reload; nothing plays — and then queues or files it; the HUD confirms (NP-MENU-003) and the row's + reads ✓. The + badge stays the one-click Add to Library. From the field, Ctrl/Cmd+Enter adds the hot song and Shift+Enter queues it to Up Next. Escape closes the menu before it closes the popover; the menu's first enabled command takes the keys; on a touch screen the commands are 44 px tall and a submenu unfolds in place.",
+      "contract": "Every song row in the search — the overview, a type page, an album's or artist's songs — has a “…” at its end, and right-click or a long press on the row does the same: the shell's contextual menu opens over the song with exactly Add to Up Next, Add to Playlist ▸ (the person's playlists, ticked where one holds the song, and New Playlist…), Add to Library (“In your library”, disabled, once it is), Download… (the fetch sheet: the hub when it may, else the helper, NP-FIND-012; disabled, saying why, for a store-only song) and Audition (disabled when the song has no clip; “Stop Audition” while it plays). Filing a song that is not in the library yet adds it first — quietly, over the library's own wall (library:add), kept in library:state so a playlist that holds it still finds it after a reload; nothing plays — and then queues or files it; the HUD confirms (NP-MENU-003) and the row's + reads ✓. The + badge stays the one-click Add to Library. From the field, Ctrl/Cmd+Enter adds the hot song and Shift+Enter queues it to Up Next. Escape closes the menu before it closes the popover; the menu's first enabled command takes the keys; on a touch screen the commands are 44 px tall and a submenu unfolds in place.",
       "example": "“One” ▸ … ▸ Add to Up Next → HUD “Up Next: “One””; Add to Playlist ▸ New Playlist… → the sheet → “Added to “Harbour Nights””.",
       "authority": "adopted",
       "owners": [
@@ -2497,6 +2497,79 @@
           "type": "test",
           "path": "music-player/tests/e2e/np/search-pages.spec.ts",
           "name": "a song row’s menu: “…”, right-click and long-press open it; it queues to Up Next, files into a playlist and adds to the library"
+        }
+      ]
+    },
+    {
+      "id": "NP-FIND-011",
+      "group": "np-find",
+      "title": "A song that is not on this device plays its preview, said as one, while the hub or the companion fetches it",
+      "contract": "A visitor — a song in the music list that is not on this device: a search result filed as a link row, a song of a catalog list on show, an online Discover pick — plays when chosen. Its 30-second preview (Apple Music's, then Deezer's; the look-ahead's copy when it has one) plays through the same transport, with \"Preview · 30 seconds — not the whole song\" under the title and the HUD saying the same; it is never logged as a play, never reported as heard, and when it ends it stops rather than running on into the next row (the list's own play-on skips visitors). When something can fetch the whole song, the fetch sheet opens over the preview: the paired hub when this device's credential may ask for downloads and receive files (downloads:request, transfers:receive), else the companion's helper. After the person says why they may have the file, the row and the preview label say \"Fetching… N%\", and when the song lands it joins the library as a kept copy and plays from this device. With nothing that can fetch it, the preview plays and the HUD says what the whole song needs; with no preview either, it says nothing can play it here, and why. A visitor's Download button and right-click are the catalog song's (NP-FIND-010).",
+      "example": "Choosing “Night Harbour” with a hub paired: “Preview — 30 seconds of “Night Harbour”; the whole song plays once the hub TOWER has fetched it.”, the sheet, then “Fetching… 40%” on the row.",
+      "authority": "adopted",
+      "owners": [
+        "music-player/src/shell/search/visit.ts",
+        "music-player/src/shell/bridge.ts",
+        "music-player/src/shell/search/index.ts",
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/discover-online.spec.ts",
+          "name": "with nothing to fetch it, its preview plays, said as one, and nothing is logged as a play"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/discover-online.spec.ts",
+          "name": "with no preview and nothing to fetch it, it says what is needed instead of pretending"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/discover-online.spec.ts",
+          "name": "with a hub, Play asks the hub to fetch it: the preview meanwhile, “Fetching… N%” on the row, then the song itself (NP-FIND-012)"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/collections.spec.ts",
+          "name": "a song on show plays its row and the Download key offers to fetch it through the helper"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/visit.test.ts",
+          "name": "reads what a fetched file is from its first bytes"
+        }
+      ]
+    },
+    {
+      "id": "NP-FIND-012",
+      "group": "np-find",
+      "title": "Download… goes through the hub when it may, and says which source it chose and what it embedded",
+      "contract": "The player's Download… for a catalog song — the transport's Download key, a visitor row's Download button, the row menu, a song's details — opens one fetch sheet that names who will fetch it. Paired with a hub whose device credential allows downloads:request and transfers:receive, it is the hub: POST /api/v1/catalog/download with the catalog song, the stated basis and destination \"player\"; the sheet then says, in the hub UI's words, which source the hub chose and what it embedded (\"Queued from YouTube Music. Tagged with ISRC, genre and lyrics.\"), the job's progress is read from /api/v1/downloads, and the finished file is read back from /api/v1/files/<sha256> into the library. Otherwise it is the companion's helper (\"fetched by the helper on this PC from <host>\"), which cannot fetch a store-only song and says so. With neither, or with a hub that has not allowed this device to download, the sheet says exactly that and Fetch claims nothing. No basis chosen is refused in a sentence.",
+      "example": "“Night Harbour” by Alder Quartet — fetched by the hub TOWER from the best source it has for it (YouTube Music, YouTube, SoundCloud, Bandcamp, then Spotify through spotDL), tagged, then played from this device.",
+      "authority": "adopted",
+      "owners": [
+        "music-player/src/shell/search/visit.ts",
+        "music-player/src/shell/bridge.ts",
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/discover-online.spec.ts",
+          "name": "with a hub, Play asks the hub to fetch it: the preview meanwhile, “Fetching… N%” on the row, then the song itself (NP-FIND-012)"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/discover-online.spec.ts",
+          "name": "paired without downloads allowed, Download… says why and claims nothing"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/visit.test.ts",
+          "name": "names a link row’s platform for the hub, and refuses a link it does not know"
         }
       ]
     },
@@ -3673,6 +3746,125 @@
           "type": "test",
           "path": "music-player/tests/unit/recommend-rank.test.ts",
           "name": "Familiar and Adventurous bend exploration and discovery, Balanced leaves the algorithm alone"
+        }
+      ]
+    },
+    {
+      "id": "NP-DISC-006",
+      "group": "np-discover",
+      "title": "From the catalog: songs this device does not have, ranked by the same algorithm",
+      "contract": "Under the library's ranked songs, Discover shows a set from the catalog, under a heading row \"From the catalog\". The queries come from the listener's own profile, as the ranker builds it from the play log: the artists played (most played first) and the genres played, a session lean's genre first; a mode that leaves out the artists you know (Deep cuts) asks for genres only, and one that leaves out your top artist does not ask for it. They are asked through whichever client answers the search — the paired hub, the companion on this PC, or, with neither, this browser's own engine against the keyless services (keyless-first) — two at a time. The answers are ranked by the same rankSongs, under the current algorithm, mode and lean, with the library supplying the taste and never offered again: what the device already has (the same recording, however spelled) and what this Discover session already showed are left out, and one recording is one pick. Twelve picks at most; each row carries its platforms as badges after the title, the catalog's artist credit, and why the ranker put it there (the strongest factor, or \"Picked to explore\") in its tooltip. The heading says how many, by which algorithm and mode, through whom, and that choosing one plays its preview (NP-FIND-011). Refresh asks the catalog again and shows what the session has not shown; a new algorithm or lean asks again from the top. Offline, with nothing played, with nothing answering, or with nothing new, the heading says which in a sentence. The rows' menu is the catalog song's (Add to Up Next, Add to Playlist ▸, Add to Library, Download…, Audition). The chip's menu has From the Catalog, a tick while it is on, kept in the player's settings; off, Discover shows only the library and asks nothing.",
+      "example": "Discover, Airwave default · For you: eight library songs, then “From the catalog — 2 songs ranked by “Airwave default” · For you, through the companion on this PC — not on this device yet: choosing one plays its preview”.",
+      "authority": "adopted",
+      "owners": [
+        "music-player/src/shell/recommend/online.ts",
+        "music-player/src/shell/recommend/rank.ts",
+        "music-player/src/shell/search/discover.ts",
+        "music-player/src/shell/search/index.ts",
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/discover-online.test.ts",
+          "name": "asks for the artists and genres actually played, most played first"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/discover-online.test.ts",
+          "name": "follows a mode that leaves out the artists you know: it asks for genres instead"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/discover-online.test.ts",
+          "name": "drops what this device already has, however the two spell it"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/discover-online.test.ts",
+          "name": "puts an artist you play above one you have never played"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/discover-online.test.ts",
+          "name": "ranks under the mode chosen, never another: Deep cuts keeps only artists you have never played"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/discover-online.test.ts",
+          "name": "names the factor that put it there and says it is not on this device yet"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/discover-online.spec.ts",
+          "name": "an online pick appears under the library’s songs, ranked by the current algorithm, with its platforms and why"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/discover-online.spec.ts",
+          "name": "its row menu adds it to the library, Up Next or a playlist; Download… opens the fetch sheet"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/discover-online.spec.ts",
+          "name": "Refresh asks the catalog again and shows what this session has not shown"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/discover-online.spec.ts",
+          "name": "offline it says so plainly, and so it does when nothing answers"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/discover-online.spec.ts",
+          "name": "with no hub and no companion, this browser’s own engine answers, keylessly"
+        }
+      ]
+    },
+    {
+      "id": "NP-DISC-007",
+      "group": "np-discover",
+      "title": "The look-ahead: the next picks’ previews, within a stated budget, never in the way",
+      "contract": "When the catalog's picks land, the next two picks that have a 30-second preview have it asked for ahead, so choosing one starts at once. The budget is stated and kept: two clips ahead at most, 4 MB held at most (measured from what arrived), one request at a time, each started only while the page is idle; a clip that will not come (no CORS, too large to be a clip) is streamed when chosen instead and never asked for again. Clips are held in memory as blob: URLs and let go once played or no longer among the next two; nothing is fetched while the catalog set is off, the browser asks to save data, or the device is offline. Whole songs are never fetched ahead: a fetch needs the person's statement of why they may have the file, made per song (NP-FIND-011). The UI never waits on the catalog or the look-ahead: the library's rows, the chip and Refresh answer while either is still out.",
+      "example": "Five picks with previews: two clips asked for, “2 previews are ready ahead (1.0 MB of 4.0 MB)”; the first played, the third is asked for.",
+      "authority": "adopted",
+      "owners": [
+        "music-player/src/shell/recommend/prefetch.ts",
+        "music-player/src/shell/search/discover.ts",
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/discover-prefetch.test.ts",
+          "name": "asks for the best pick first, one request at a time"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/discover-prefetch.test.ts",
+          "name": "keeps only the depth it promises ahead, and says the ring is full"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/discover-prefetch.test.ts",
+          "name": "stops at the byte budget, measured from what arrived, and explains itself"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/discover-prefetch.test.ts",
+          "name": "asks for nothing at all while it is off, and lets go of what it held"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/discover-prefetch.test.ts",
+          "name": "lets go of a played clip and of one no longer ahead"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/discover-online.spec.ts",
+          "name": "asks for the next picks’ previews within its budget, one at a time, and the UI never waits on it"
         }
       ]
     }

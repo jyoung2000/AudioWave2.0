@@ -246,3 +246,30 @@ Implement **G1** — let an online catalog result seed Discover — as a single 
 repository's own idiom (contract → source → rule ID + test → coverage ledger → regenerate the
 generated views), and run the gates in Phase 24 against it. G2–G4 are documented restrictions, not
 work items; §5 is a refusal, not a gap.
+
+---
+
+## 8. Addendum, 2026-10-10: what was built, and what this audit got wrong
+
+**One correction to §2.** The diagram's "Discover (lib/discover.ts → packages/recommendations) ranks the local
+library only" describes the React player's store. The served shell's Discover ranks through
+`music-player/src/shell/recommend/rank.ts` (`window.NP_RECOMMEND`, NPD-032). G1 was real either way: neither
+ranked anything the device did not have.
+
+**G1 is built** as NP-DISC-006 ("From the catalog") and NP-DISC-007 (the look-ahead), with two player gaps closed
+alongside it (NP-FIND-011, a visitor plays; NP-FIND-012, Download… through the hub):
+
+- `recommend/online.ts` derives the queries from the ranker's own profile of the play log and ranks the answers with
+  the same `rankSongs`, under the chosen algorithm, mode and lean. A mode that leaves out the artists you know asks
+  for genres instead of being swapped for another mode. `search/discover.ts` asks the catalog through whichever
+  client answers — hub, companion, or, keylessly, this browser — and says plainly when it is offline, has nothing to
+  ask for, or nothing answered.
+- `recommend/prefetch.ts` plans the look-ahead: the next two picks' 30-second previews, 4 MB at most, one request at a
+  time, only while the page is idle. The first draft of this work (commit `fd1a339`) planned to fetch whole songs
+  ahead under a rights acknowledgment given once in Settings; that was not built and is not done, because a fetch's
+  rights basis is stated per song (the fetch sheet) and cannot honestly cover songs nobody has chosen.
+- A visitor (a catalog song in the music list) plays its preview, labelled "Preview", while the hub
+  (`POST /api/v1/catalog/download`, device scopes `downloads:request` and `transfers:receive`) or the companion fetches
+  the whole song; it is never logged as a play.
+
+The gates run for that change are recorded in its commits, not here.

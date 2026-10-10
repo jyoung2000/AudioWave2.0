@@ -74,17 +74,18 @@ describe('the searches Discover asks for', () => {
     expect(q[1]!.weight).toBe(1);
   });
 
-  it('asks a session lean first and the seed artist next, and never asks the same word twice', () => {
-    const q = onlineQueries(LIB, PLAYS, defaults(), {
-      leanGenre: 'Jazz',
-      seed: { artist: 'Cedar Trio' },
-      artists: 1,
-      genres: 2,
-    });
-    // The lean is the person's own request; the seed is the strongest "more like this"; then the log.
-    expect(q.map((x) => x.q)).toEqual(['Jazz', 'Cedar Trio', 'alder quartet', 'folk']);
+  it('asks a session lean first, and never asks the same word twice', () => {
+    const q = onlineQueries(LIB, PLAYS, defaults(), { leanGenre: 'Jazz', artists: 1, genres: 2 });
+    // The lean is the person's own request; then the log, most played first.
+    expect(q.map((x) => x.q)).toEqual(['Jazz', 'alder quartet', 'folk']);
     // "Jazz" was asked as a lean and never again as a genre.
     expect(q.filter((x) => x.q.toLowerCase() === 'jazz')).toHaveLength(1);
+  });
+
+  it('follows a mode that leaves out the artists you know: it asks for genres instead', () => {
+    const q = onlineQueries(LIB, PLAYS, defaults(), { mode: 'deep', artists: 2, genres: 1 });
+    expect(q.map((x) => x.kind)).toEqual(['genre', 'genre']);
+    expect(q.map((x) => x.q)).toEqual(['jazz', 'folk']);
   });
 
   it('carries the genre only when the query was a genre', () => {
@@ -186,18 +187,53 @@ describe('ranking found rows with the listener algorithm', () => {
     expect(picks[0]!.row.parts.genreAffinity).toBeGreaterThan(0);
   });
 
-  it('refuses a mode whose cuts would empty the pool, and says it changed it', () => {
-    const { diagnostics } = rankFound({
-      gathered: gathered([row({ t: 'New Alder Song', a: 'Alder Quartet' })]),
+  it('ranks under the mode chosen, never another: Deep cuts keeps only artists you have never played', () => {
+    const { picks, diagnostics } = rankFound({
+      gathered: gathered([
+        row({ t: 'New Alder Song', a: 'Alder Quartet', u: 'https://youtu.be/alder' }),
+        row({ t: 'Unknown Thing', a: 'Nobody At All', u: 'https://youtu.be/nobody' }),
+      ]),
       library: LIB,
       plays: PLAYS,
       cfg: defaults(),
       mode: 'deep',
       now: NOW,
     });
-    // `deep` keeps only artists you have never played — the opposite of a radio from what you play.
-    expect(diagnostics.mode).toBe('for-you');
-    expect(diagnostics.modeChanged).toBe(true);
+    expect(diagnostics.mode).toBe('deep');
+    expect(picks.map((p) => p.song.title)).toEqual(['Unknown Thing']);
+    expect(diagnostics.ranked).toBe(1);
+  });
+
+  it('keeps the catalog’s own genre and the preview on the pick', () => {
+    const { picks } = rankFound({
+      gathered: gathered([row({ t: 'Quiet Pier', a: 'Someone Else', u: 'https://youtu.be/pier', g: 'Jazz', c: 'https://clips.example/pier.m4a' })]),
+      library: LIB,
+      plays: PLAYS,
+      cfg: defaults(),
+      mode: 'for-you',
+      now: NOW,
+    });
+    expect(picks[0]!.song.genre).toBe('Jazz');
+    expect(picks[0]!.preview).toBe('https://clips.example/pier.m4a');
+    expect(picks[0]!.row.parts.genreAffinity).toBeGreaterThan(0);
+  });
+
+  it('counts one recording once even when two copies have different addresses, and hands back what the caller attached', () => {
+    const asked = onlineQueries(LIB, PLAYS, defaults())[0]!;
+    const extra = { catalogId: 'deezer:1' };
+    const { picks } = rankFound({
+      gathered: [
+        { row: row({ t: 'Ember Line', a: 'Cedar Trio', u: 'https://youtu.be/one' }), asked, extra },
+        { row: row({ t: 'Ember Line', a: 'Cedar Trio', u: 'https://soundcloud.example/two' }), asked },
+      ],
+      library: LIB,
+      plays: PLAYS,
+      cfg: defaults(),
+      mode: 'for-you',
+      now: NOW,
+    });
+    expect(picks).toHaveLength(1);
+    expect(picks[0]!.extra).toBe(extra);
   });
 
   it('leaves out what the caller has already chosen', () => {
@@ -226,7 +262,7 @@ describe('what Discover says about an online pick', () => {
     });
     const said = explainFound(picks[0]!);
     expect(said).toContain('an artist you play');
-    expect(said).toContain('youtube');
+    expect(said).toContain('found on youtube');
     expect(said).toContain('not on this device yet');
   });
 });

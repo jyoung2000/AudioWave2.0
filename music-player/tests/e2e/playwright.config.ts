@@ -8,7 +8,8 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig, devices } from '@playwright/test';
 
-const PORT = 4173;
+/** 4173 unless NP_E2E_PORT says otherwise: a second checkout's preview on 4173 would otherwise be reused. */
+const PORT = Number(process.env['NP_E2E_PORT'] ?? 4173);
 
 /**
  * The ported airwave-np suites play real audio through the engine; Chromium's autoplay gate would

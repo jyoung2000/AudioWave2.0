@@ -87,6 +87,38 @@ export function addSongs(list) {
   return window.NP_LIBRARY.addFiles(files).then((r) => r.added);
 }
 
+/**
+ * Discover's "From the catalog" set (NP-DISC-006) on stock data: with Gantry played, the algorithm asks the
+ * catalog for "alder quartet" and "jazz", and the companion answers with these invented songs — one by an artist
+ * the library plays, one by a stranger in a genre it plays, and one the library already has (left out).
+ */
+const DISCOVER_PICKS = {
+  'alder quartet': [
+    ['501', 'Night Harbour', 'Alder Quartet', 'Second Light', 'Jazz', ['deezer', 'youtube']],
+    ['503', 'Gantry', 'Alder Quartet', 'First Light', 'Jazz', ['deezer']],
+  ],
+  jazz: [
+    ['502', 'Far Signal', 'Cedar Trio', 'Open Water', 'Jazz', ['deezer', 'soundcloud', 'youtube-music']],
+    ['501', 'Night Harbour', 'Alder Quartet', 'Second Light', 'Jazz', ['deezer', 'youtube']],
+  ],
+};
+const PICK_URL = { deezer: (id) => `https://www.deezer.com/track/${id}`, youtube: (id) => `https://www.youtube.com/watch?v=stock${id}`, 'youtube-music': (id) => `https://music.youtube.com/watch?v=stock${id}`, soundcloud: (id) => `https://soundcloud.com/stock/${id}` };
+function discoverAnswer(q) {
+  const rows = DISCOVER_PICKS[q];
+  if (!rows) return null;
+  const tracks = rows.map(([id, title, artist, album, genre, platforms], i) => ({
+    id: `deezer:${id}`, title, artist, artists: [artist], album, albumArtist: artist, durationMs: 200_000 + Number(id) * 100, isrc: null, artworkUrl: null,
+    releaseDate: '2025-03-14', year: 2025, trackNumber: 1, discNumber: 1, bpm: null, explicit: false, genre, label: null,
+    sources: platforms.map((pf) => ({ platform: pf, id: `${pf}-${id}`, url: PICK_URL[pf](id), previewUrl: null, matchedBy: 'search' })), rank: 90 - i,
+  }));
+  const query = { kind: 'text', text: q, track: null, artist: null, album: null, isrc: null, url: null };
+  const st = [{ provider: 'deezer', state: 'ok', count: tracks.length, latencyMs: null, error: null, retryAt: null }];
+  return [
+    { type: 'results', seq: 0, provider: 'deezer', query, tracks, artists: [], albums: [], playlists: [], status: st },
+    { type: 'done', seq: 1, query, status: st, page: { tracks: { offset: 0, limit: 25, hasMore: false }, artists: null, albums: null, playlists: null }, totals: { tracks: tracks.length, artists: 0, albums: 0, playlists: 0 }, resolve: null },
+  ].map((c) => `${JSON.stringify(c)}\n`).join('');
+}
+
 const MAIN = ['now-playing', 'radio', 'live-tv', 'tv', 'movies'];
 const SETTINGS = ['settings-stats', 'settings-rec', 'settings-src', 'settings-player', 'settings-eq'];
 
@@ -195,6 +227,10 @@ export default {
           return true;
         }
         // The music catalog, through the companion on this PC (DEC-039): the search streams NDJSON.
+        if (url.origin === HELPER && url.pathname === '/helper/v1/catalog/search' && url.searchParams.get('sections') === 'tracks' && discoverAnswer(url.searchParams.get('q') || '')) {
+          await route.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'application/x-ndjson' }, body: discoverAnswer(url.searchParams.get('q') || '') });
+          return true;
+        }
         if (url.origin === HELPER && url.pathname === '/helper/v1/catalog/search') {
           await route.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'application/x-ndjson' }, body: catalogSearch(url) });
           return true;
@@ -284,7 +320,9 @@ export default {
     // ---- Discover (NP-DISC-001..005): ranked by the chosen algorithm; the silver bar shows it and refreshes it
     await click('#libMenuBtn', { ms: 400 });
     await click('#ipodMenu .ipod__item:has-text("Discover")', { ms: 600 });
-    await snap({ id: 'discover', title: 'Discover', group: 'Music', note: 'Discover, ranked by the chosen algorithm — here Airwave default in For you, with Gantry just played: Alder Quartet leads as the strong tier, Birch Ensemble follows, and Gantry itself is left out for a week. The silver bar carries the algorithm chip in its colour (name · mode, and any lean), and ↻ New songs, which re-seeds and leaves out what this session has shown; the scope chip wears a thin tint of the colour.' });
+    await until(() => !!document.querySelector('#libraryRows tr[data-online]'), undefined, { what: 'Discover’s catalog set' });
+    await settle(400);
+    await snap({ id: 'discover', title: 'Discover', group: 'Music', note: 'Discover, ranked by the chosen algorithm — here Airwave default in For you, with Gantry just played: Alder Quartet leads as the strong tier, Birch Ensemble follows, and Gantry itself is left out for a week. Under the library’s songs, “From the catalog” (NP-DISC-006): songs this device does not have, found through the companion for the artist and the genre just played and ranked by the same algorithm — each with the platforms it is on as badges, and why it was picked on hover; Gantry, which the library already has, is not offered. Choosing one plays its 30-second preview, labelled as one, while the hub or the companion fetches it (NP-FIND-011). The silver bar carries the algorithm chip in its colour (name · mode, and any lean), and ↻ New songs, which re-seeds, asks the catalog again and leaves out what this session has shown; the scope chip wears a thin tint of the colour.' });
     await click('#libAlgoChip', { ms: 500 });
     await snap({ id: 'discover-algo-menu', title: 'Discover ▸ the algorithm menu', group: 'Music', note: 'The chip’s menu: every algorithm, built in and yours, each with its colour dot, mode and a line on what it favours, a tick on the one in use; Lean ▸ Familiar / Balanced / Adventurous and the library’s genres; New Songs, Start Discover Over, and Edit Algorithms…, which opens Settings ▸ Recommendations.', dismiss: 'discover', dismissOutside: '#ctx' });
     await page.keyboard.press('Escape');

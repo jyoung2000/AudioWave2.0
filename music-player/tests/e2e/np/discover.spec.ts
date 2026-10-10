@@ -12,6 +12,7 @@
  */
 import { expect, test, type Page } from '@playwright/test';
 import { boot, reload, resetToLibrary, row, seed, SEED, statsReady, stubOffline, watchErrors, type SeedTrack } from './_shell';
+import { stubServices } from './_catalog';
 
 const DAY = 864e5;
 type Play = { id: string; at: number; via?: string; secs?: number; dur?: number; end?: boolean };
@@ -27,7 +28,8 @@ const setRange = (p: Page, id: string, v: number) => p.evaluate(([id, v]) => {
 
 let errors: string[];
 test.use({ viewport: { width: 1280, height: 900 } });
-test.beforeEach(async ({ page }) => { errors = watchErrors(page); await stubOffline(page); });
+// Discover asks the catalog too (NP-DISC-006): none of it reaches the internet here.
+test.beforeEach(async ({ page }) => { errors = watchErrors(page); await stubOffline(page); await stubServices(page); });
 test.afterEach(() => { expect(errors, 'JS errors').toEqual([]); });
 
 test('a track’s seconds are measured, not assumed', async ({ page }) => {

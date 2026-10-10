@@ -1517,7 +1517,8 @@
         "narrowed by scope chip",
         "filtered by the bar",
         "an album or playlist from the catalog (search-collection-list)",
-        "Discover: ranked by the chosen algorithm, the chip and Refresh in the silver bar (player-shell-discover)"
+        "Discover: ranked by the chosen algorithm, the chip and Refresh in the silver bar (player-shell-discover)",
+        "visitor rows: a catalog song not on this device (preview, fetch, the catalog song’s menu)"
       ],
       "rules": [
         "NP-LIST-001",
@@ -1525,7 +1526,8 @@
         "UX-STATE-001",
         "NP-FIND-007",
         "NP-FIND-008",
-        "NP-DISC-001"
+        "NP-DISC-001",
+        "NP-FIND-011"
       ],
       "guideAnchor": "shell",
       "authority": "adopted"
@@ -1541,7 +1543,10 @@
         "music-player/index.html",
         "music-player/scripts/make-shell.py",
         "music-player/src/shell/bridge.ts",
-        "music-player/src/shell/recommend/rank.ts"
+        "music-player/src/shell/recommend/rank.ts",
+        "music-player/src/shell/recommend/online.ts",
+        "music-player/src/shell/recommend/prefetch.ts",
+        "music-player/src/shell/search/discover.ts"
       ],
       "components": ["shell markup (design/frontends/origin/airwave-now-playing.html)"],
       "states": [
@@ -1550,9 +1555,21 @@
         "everything eligible shown once: started over, and said so",
         "capped at fifty with Load more",
         "leaned: Familiar / Adventurous, or toward a genre (the chip's suffix)",
-        "nothing eligible (every song starred or queued)"
+        "nothing eligible (every song starred or queued)",
+        "From the catalog: asking (the heading says so; the library rows answer meanwhile)",
+        "From the catalog: picks ranked by the same algorithm, each with its platforms and why, through the hub / the companion / this browser",
+        "From the catalog: offline / nothing played / nothing answered / nothing new (a sentence in the heading)",
+        "From the catalog: the next two previews held ahead (2 clips, 4 MB)"
       ],
-      "rules": ["NP-DISC-001", "NP-DISC-002", "NP-DISC-003", "NP-DISC-005", "NP-DATA-003"],
+      "rules": [
+        "NP-DISC-001",
+        "NP-DISC-002",
+        "NP-DISC-003",
+        "NP-DISC-005",
+        "NP-DATA-003",
+        "NP-DISC-006",
+        "NP-DISC-007"
+      ],
       "guideAnchor": "shell",
       "authority": "adopted"
     },
@@ -1573,9 +1590,10 @@
         "every algorithm, built in and yours, with its colour dot, mode and what it favours; a tick on the current one",
         "Lean ▸ Familiar / Balanced / Adventurous, the library's genres, Reset lean",
         "New Songs, Start Discover Over, Edit Algorithms…",
-        "touch: 44px rows"
+        "touch: 44px rows",
+        "From the Catalog (ticked while on)"
       ],
-      "rules": ["NP-DISC-003", "NP-DISC-004", "NP-DISC-005", "NP-MENU-001"],
+      "rules": ["NP-DISC-003", "NP-DISC-004", "NP-DISC-005", "NP-MENU-001", "NP-DISC-006"],
       "guideAnchor": "screens",
       "authority": "adopted"
     },
@@ -1589,7 +1607,8 @@
       "sourcePaths": [
         "music-player/index.html",
         "music-player/scripts/make-shell.py",
-        "music-player/src/shell/bridge.ts"
+        "music-player/src/shell/bridge.ts",
+        "music-player/src/shell/search/visit.ts"
       ],
       "components": ["shell markup (design/frontends/origin/airwave-now-playing.html)"],
       "states": [
@@ -1598,9 +1617,10 @@
         "paused",
         "a link row chosen (does not pretend to play)",
         "a station (LIVE)",
-        "a channel (video bar, LIVE)"
+        "a channel (video bar, LIVE)",
+        "a visitor’s preview (“Preview · 30 seconds — not the whole song”), and “Fetching… N%” while it is fetched"
       ],
-      "rules": ["NP-TRANS-001", "UX-KEY-002"],
+      "rules": ["NP-TRANS-001", "UX-KEY-002", "NP-FIND-011"],
       "guideAnchor": "shell",
       "authority": "adopted"
     },
@@ -1672,9 +1692,10 @@
         "one row",
         "several rows (marquee)",
         "a station with a known song: the On air section (Up Next, Group Queue, Playlist)",
-        "touch: a long press on a station opens the same menu"
+        "touch: a long press on a station opens the same menu",
+        "a visitor (catalog song not on this device): Add to Up Next, Add to Playlist ▸, Add to Library, Download…, Audition"
       ],
-      "rules": ["NP-MENU-001", "NP-RADIO-002"],
+      "rules": ["NP-MENU-001", "NP-RADIO-002", "NP-FIND-010", "NP-FIND-011"],
       "guideAnchor": "screens",
       "authority": "adopted"
     },
@@ -1707,7 +1728,8 @@
         "music-player/index.html",
         "music-player/scripts/make-shell.py",
         "music-player/src/shell/bridge.ts",
-        "music-player/src/lib/tools-core.ts"
+        "music-player/src/lib/tools-core.ts",
+        "music-player/src/shell/search/visit.ts"
       ],
       "components": ["shell markup (design/frontends/origin/airwave-now-playing.html)"],
       "states": [
@@ -1716,9 +1738,12 @@
         "fetching",
         "refused by the helper (its reason)",
         "fetched and playing",
-        "the date beside the title, when the link row has one"
+        "the date beside the title, when the link row has one",
+        "the hub fetches it: the source it chose and what it embedded, then “Fetching… N%”",
+        "opened over a visitor’s preview (“Its 30-second preview plays meanwhile.”)",
+        "nothing can fetch it (the hub has not allowed downloads, no helper): said, and Fetch claims nothing"
       ],
-      "rules": ["UX-SAFE-001", "UX-FEED-001", "NP-FIND-002"],
+      "rules": ["UX-SAFE-001", "UX-FEED-001", "NP-FIND-002", "NP-FIND-011", "NP-FIND-012"],
       "guideAnchor": "screens",
       "authority": "adopted"
     },
@@ -2237,16 +2262,18 @@
         "music-player/src/shell/bridge.ts",
         "music-player/src/shell/search/index.ts",
         "music-player/src/shell/search/view.ts",
-        "music-player/src/shell/search/client.ts"
+        "music-player/src/shell/search/client.ts",
+        "music-player/src/shell/search/visit.ts"
       ],
       "components": ["shell markup (design/frontends/origin/airwave-now-playing.html)"],
       "states": [
         "genre, label and year being looked up",
         "enriched",
         "lyrics synced / plain / none / instrumental",
-        "Download… (the helper) / only in stores (says so)"
+        "Download… through the hub (its chosen source and tags)",
+        "Download… (the hub, else the helper) / only in stores (says so)"
       ],
-      "rules": ["NP-FIND-006", "NP-FIND-001"],
+      "rules": ["NP-FIND-006", "NP-FIND-001", "NP-FIND-012"],
       "guideAnchor": "screens",
       "authority": "adopted"
     },
@@ -2296,9 +2323,10 @@
         "every song, page by page, no cap",
         "a server that still caps it (the first N)",
         "stopped part way or could not be read (the reason)",
-        "star off / on"
+        "star off / on",
+        "a song played: its preview while the hub or the companion fetches it"
       ],
-      "rules": ["NP-FIND-007", "NP-FIND-008"],
+      "rules": ["NP-FIND-007", "NP-FIND-008", "NP-FIND-011"],
       "guideAnchor": "screens",
       "authority": "adopted"
     },
