@@ -223,8 +223,15 @@ const BUNDLES: Bundle[] = [
      * Plus the playlist folders' contracts (DEC-041, 2026-10-10): the 5 KB in the entry above, and the
      * folder-playlist words in @now-playing/domain/catalog that the lazy search chunk carries —
      * measured on their own, under 1 KB (0.7 KB minified). The combined figure is measured below.
+     *
+     * And to 2650 for the hub's shelf from the player (DEC-041; NP-FIND-008/013/014, 2026-10-10):
+     * filing into the hub's playlists, a hub playlist in the music list and the starred-list sync
+     * (search/hub-shelf.ts) in the lazy search chunk (now 161,166 bytes, 16.7 KB more), and in the
+     * shell's HTML the "On this player" / "On <hub>" groups, the bar's "…", the library menu's hub
+     * levels and the sync hooks (now 954,215 bytes, 6 KB more) — measured, 2635 KB in all. The entry
+     * is unchanged.
      */
-    totalBudgetKb: 2615,
+    totalBudgetKb: 2650,
     // Three.js belongs to the constellation and the jewel case; the tag reader only to a scan.
     mustBeSplit: ['three', 'music-metadata'],
   },
