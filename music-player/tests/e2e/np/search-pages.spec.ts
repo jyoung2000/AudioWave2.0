@@ -470,7 +470,8 @@ test('a song row’s menu: “…”, right-click and long-press open it; it que
   await row('One').locator('.srch__menu').click();
   const ctx = page.locator('#ctx');
   await expect(ctx).toBeVisible();
-  await expect(ctx.locator('.ctx__head')).toHaveText('One');
+  // (the menu's own heading; the submenu carries its group headings, NP-FIND-013)
+  await expect(ctx.locator('> .ctx__head')).toHaveText('One');
   expect(
     await ctx
       .locator('> .ctx__item')
