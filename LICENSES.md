@@ -65,7 +65,7 @@ No GPL/SSPL/non-commercial licenses are present in the production graph.
 | avvio | 9.3.0 | MIT | fastify |
 | balanced-match | 4.0.4 | MIT | brace-expansion |
 | better-sqlite3 | 13.0.3 | MIT | docker-container |
-| brace-expansion | 5.0.9 | MIT | minimatch |
+| brace-expansion | 5.0.12 | MIT | minimatch |
 | camelcase | 5.3.1 | MIT | yargs-parser |
 | chokidar | 5.0.0 | MIT | windows-companion |
 | cliui | 6.0.0 | ISC | yargs |
@@ -92,7 +92,7 @@ No GPL/SSPL/non-commercial licenses are present in the production graph.
 | fast-querystring | 1.1.2 | MIT | find-my-way |
 | fast-uri | 3.1.7 | BSD-3-Clause | ajv |
 | fast-uri | 4.1.4 | BSD-3-Clause | @fastify/ajv-compiler |
-| fastify | 5.12.1 | MIT | docker-container |
+| fastify | 5.12.2 | MIT | docker-container |
 | fastify-plugin | 6.0.0 | MIT | @fastify/cookie |
 | fastq | 1.20.3 | ISC | @fastify/static |
 | file-type | 21.3.4 | MIT | music-metadata |
@@ -177,7 +177,7 @@ No GPL/SSPL/non-commercial licenses are present in the production graph.
 | ts-mixer | 6.0.4 | MIT | @discordjs/builders |
 | tslib | 2.8.1 | 0BSD | @discordjs/voice |
 | uint8array-extras | 1.5.0 | MIT | file-type |
-| undici | 6.28.0 | MIT | @discordjs/rest |
+| undici | 6.29.0 | MIT | @discordjs/rest |
 | undici-types | 8.3.0 | MIT | @types/node |
 | util-deprecate | 1.0.2 | MIT | readable-stream |
 | which-module | 2.0.1 | ISC | yargs |
