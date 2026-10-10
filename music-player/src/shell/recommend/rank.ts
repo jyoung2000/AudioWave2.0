@@ -503,3 +503,8 @@ export function colorTaken(color: string, used: readonly (string | null | undefi
   const c = normalizeColor(color);
   return !!c && used.map(normalizeColor).includes(c);
 }
+
+/** Re-export the online Discover engine (NP-DISC-006) so it lives on window.NP_RECOMMEND. */
+export { onlineQueries, rankFound, explainFound, type AskedQuery, type OnlineQueryOptions, type OnlinePick, type GatheredRow, type FoundRow } from './online.js';
+/** Re-export the look-ahead ring (NP-DISC-007) so the shell can run it. */
+export { planLookAhead, cachedNext, describeCache, candidatesFrom, type Candidate, type CacheEntry, type LookAheadInput, type LookAheadPlan, type PlannedFetch } from './prefetch.js';
