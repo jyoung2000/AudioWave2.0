@@ -58,6 +58,7 @@ import {
 import * as V from './view.js';
 import { installDiscoverOnline, type DiscoverOnline } from './discover.js';
 import { installVisit, type ShellVisit, type VisitTools } from './visit.js';
+import { installHubShelf } from './hub-shelf.js';
 
 /* ------------------------------------------------------------------ shapes */
 
@@ -251,9 +252,23 @@ export interface ListSong {
   cat?: CatalogTrack;
 }
 
+/** A playlist in the paired hub's folder (NP-FIND-014): not a catalog list, so never starred. */
+export interface HubListRef {
+  platform: 'hub';
+  kind: 'playlist';
+  id: string;
+  url: string;
+  title: string;
+  owner: string | null;
+}
+
 /** An album or playlist as the music list shows it: rows now, more on request (NP-FIND-007). */
 export interface ListedCollection {
-  ref: CatalogCollectionRef;
+  ref: CatalogCollectionRef | HubListRef;
+  /** Shown after the count in the bar ("Shared on TOWER — read-only"). */
+  note?: string | null;
+  /** No star: a list the person cannot keep or change from here (the hub admin's shared lists). */
+  readOnly?: boolean;
   /** "Spotify", "Deezer": the list's platform, named in the bar. */
   platformLabel: string;
   artworkUrl: string | null;
@@ -314,7 +329,7 @@ const LONG_PRESS_MS = 500;
 /* ----------------------------------------------------------------- module */
 
 export interface SearchApi {
-  openSaved(saved: SavedCollection): void;
+  openSaved(saved: SavedCollection, opts?: { readOnly?: boolean; note?: string }): void;
 }
 
 let installed: SearchApi | null = null;
@@ -1530,6 +1545,7 @@ export function installSearch(): SearchApi {
   function showInList(
     c: Pick<CatalogCollection, 'ref' | 'artworkUrl' | 'covers'>,
     first: CatalogTrackPage | null,
+    opts?: { readOnly?: boolean; note?: string },
   ): void {
     const list = w.NP_LIST;
     if (!list) {
@@ -1549,6 +1565,8 @@ export function installSearch(): SearchApi {
       hasMore: first ? first.hasMore : true,
       loading: !first,
       error: null,
+      readOnly: opts?.readOnly ?? false,
+      note: opts?.note ?? null,
       async more() {
         const page = await next(offset);
         offset = page.offset + page.tracks.length;
@@ -1592,8 +1610,8 @@ export function installSearch(): SearchApi {
 
   const api = {
     /** A starred album or playlist, chosen from the library menu: its songs, read again. */
-    openSaved(saved: SavedCollection): void {
-      showInList({ ref: saved.ref, artworkUrl: saved.artworkUrl, covers: saved.covers }, null);
+    openSaved(saved: SavedCollection, opts?: { readOnly?: boolean; note?: string }): void {
+      showInList({ ref: saved.ref, artworkUrl: saved.artworkUrl, covers: saved.covers }, null, opts);
     },
   };
 
@@ -1698,6 +1716,7 @@ export function installSearch(): SearchApi {
         url: s.url,
         art: s.art,
         preview: s.preview,
+        cat: t,
       },
       inLibrary: added.has(t.id),
       canDownload: Boolean(pickDownloadSource(t.sources)),
@@ -2496,6 +2515,8 @@ export function installSearch(): SearchApi {
   w.NP_DISC_ONLINE = installDiscoverOnline(findTracks, songFor);
   /* A visitor's Play and Download…: the hub's catalog/download, else the helper, else its preview (NP-FIND-011/012). */
   w.NP_VISIT = installVisit(() => w.NP_TOOLS);
+  /* The paired hub's playlist folder and this player's starred lists kept in step (NP-FIND-008/013/014, DEC-041). */
+  installHubShelf();
 
   /** Kept for the shell's "keep this song" (the radio's on-air menu): songs for a query, in the old row shape. */
   w.NP_FIND = async (q: string) => {

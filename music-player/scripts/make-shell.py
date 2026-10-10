@@ -4094,6 +4094,222 @@ replace('''  .algobar__legend button:focus-visible { outline: 2px solid var(--pr
   @media (pointer: coarse) { .lib-badge, .lib-group__cell { font-size: 12px; line-height: 16px; } }
 ''')
 
+# ---- the hub's shelf (DEC-041; NP-FIND-008, NP-FIND-013, NP-FIND-014): its playlists and this player's stars --------
+# A song row's Add to Playlist ▸ keeps this player's playlists as they were, under "On this player", and gains a group
+# "On <hub>" that search/hub-shelf.ts fills: the hub's folder playlists, ticked where the song is, and New Playlist on
+# <hub>… (or, without playlists:use, why not and how to fix it). The library menu's Playlists gains "On <hub>" and
+# "Shared on <hub>"; a hub playlist opens in the music list like an album, with a "…" beside its name for Rename,
+# Delete and moving a song (only where this player made it), and Alt+↑/↓ on a row. A star or un-star is told to the
+# shelf, which keeps it in step with the hub (library:sync).
+_HUB_LOCAL = r'''<div class="ctx__head" role="presentation" data-hub-local hidden>On this player</div>'''
+replace(r'''          '<div class="ctx__sub" role="menu" aria-label="Playlists">' + lists +
+            '<div class="ctx__sep" role="separator"></div>' +
+            '<button class="ctx__item" type="button" role="menuitem" data-act="cat-new-add">New Playlist\u2026</button>' +
+          '</div>' +''', r'''          '<div class="ctx__sub" role="menu" aria-label="Playlists">' + '%s' + lists +
+            '<div class="ctx__sep" role="separator"></div>' +
+            '<button class="ctx__item" type="button" role="menuitem" data-act="cat-new-add">New Playlist\u2026</button>' +
+            '<div role="group" data-hub-pl></div>' +
+          '</div>' +''' % _HUB_LOCAL)
+replace(r'''          '<div class="ctx__sub" role="menu" aria-label="Playlists">' + items +
+            '<div class="ctx__sep" role="separator"></div>' +
+            '<button class="ctx__item" type="button" role="menuitem" data-act="new-add">New Playlist\u2026</button>' +
+          '</div>' +''', r'''          '<div class="ctx__sub" role="menu" aria-label="Playlists">' + '%s' + items +
+            '<div class="ctx__sep" role="separator"></div>' +
+            '<button class="ctx__item" type="button" role="menuitem" data-act="new-add">New Playlist\u2026</button>' +
+            '<div role="group" data-hub-pl></div>' +
+          '</div>' +''' % _HUB_LOCAL)
+replace(r'''          '<button class="sheet-act__btn" type="button" data-act="new-add">New Playlist\u2026</button>' +
+        '</div>' +''', r'''          '<button class="sheet-act__btn" type="button" data-act="new-add">New Playlist\u2026</button>' +
+        '</div>' +
+        '<div class="sheet-act__group" role="group" data-hub-pl hidden></div>' +''')
+replace('''      buildCatMenu(c);\n''', '''      buildCatMenu(c);\n      hubPaint(ctx, c.song, 'menu');\n''')
+replace('''      buildMenu(sg);\n      placeMenu(x, y);\n''', '''      buildMenu(sg);\n      hubPaint(ctx, sg, 'menu');\n      placeMenu(x, y);\n''')
+replace('''      buildSheet(sg);\n''', '''      buildSheet(sg);\n      hubPaint(actSheet, sg, 'sheet');\n''')
+# a visitor's menu files the catalog song itself
+replace(r'''                date: sg.date || null, platform: sg.platform, url: sg.url, art: sg.art || null, preview: sg.preview || null },''',
+        r'''                date: sg.date || null, platform: sg.platform, url: sg.url, art: sg.art || null, preview: sg.preview || null, cat: sg.cat || null },''')
+# every hub- command goes to the shelf, with what the menu was opened over
+replace('''      if (act.indexOf('m-') === 0) {
+        var ids = ctxMulti;''', '''      if (act.indexOf('hub-') === 0) {
+        var hubSubject = ctxCat ? { song: ctxCat.song } : ctxSong ? { song: ctxSong } : { list: focus && focus.col, row: selectedId ? { id: selectedId } : null };
+        closeMenu();
+        if (window.NP_HUB_SHELF) window.NP_HUB_SHELF.run(act, item, hubSubject);
+        return;
+      }
+      if (act.indexOf('m-') === 0) {
+        var ids = ctxMulti;''')
+replace('''    function runAction(act, item, sg) {
+      if (!sg) return;
+''', '''    function runAction(act, item, sg) {
+      if (!sg) return;
+      /* the touch sheet's hub group (the menu's goes through the click handler above) */
+      if (act.indexOf('hub-') === 0) { if (window.NP_HUB_SHELF) window.NP_HUB_SHELF.run(act, item, { song: sg }); return; }
+''')
+replace(r'''    /* A visitor in the music list — a song of a catalog list on show''', r'''    /* The hub's group in a song's Add to Playlist ▸ (or the touch sheet), filled by the shelf when paired. */
+    function hubPaint(root, sg, mode) {
+      var g = root.querySelector('[data-hub-pl]');
+      if (g && sg && window.NP_HUB_SHELF) window.NP_HUB_SHELF.paint(g, sg, mode);
+    }
+    /* The silver bar's "…" beside a hub playlist's name: Rename…, Move Song Up/Down, Delete… (NP-FIND-014). */
+    var hubMoreBtn = document.getElementById('libColMore');
+    hubMoreBtn.addEventListener('click', function () {
+      var c = focus && focus.col;
+      if (!c || !c.hub || !window.NP_HUB_SHELF) return;
+      ctxSong = null; ctxItem = null; ctxMulti = null; ctxCat = null;
+      ctx.innerHTML = window.NP_HUB_SHELF.listMenu(c, selectedId ? { id: selectedId } : null);
+      ctx.classList.remove('ctx--touch');
+      ctx.setAttribute('aria-label', 'Playlist actions');
+      ctxAlgo = { back: hubMoreBtn };
+      hubMoreBtn.setAttribute('aria-expanded', 'true');
+      var rb = hubMoreBtn.getBoundingClientRect();
+      placeMenu(rb.left, rb.bottom + 2);
+    });
+    /* Alt+↑/↓ moves the highlighted song of a hub playlist this player made */
+    tbody.addEventListener('keydown', function (e) {
+      if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+      var c = focus && focus.col;
+      var row = e.target.closest && e.target.closest('tr[data-id]');
+      if (!c || !c.hub || !row || !window.NP_HUB_SHELF) return;
+      if (window.NP_HUB_SHELF.moveSelected(c, { id: row.dataset.id }, e.key === 'ArrowUp' ? -1 : 1)) { e.preventDefault(); e.stopImmediatePropagation(); }
+    }, true);
+
+    /* A visitor in the music list — a song of a catalog list on show''')
+# the bar: no star on a hub playlist or a shared list; the "…" on a hub playlist; a note after the count
+replace('''        <button class="lib-scope__star" type="button" id="libColStar" hidden aria-pressed="false" aria-label="Save to your library">&#9734;</button>
+''', '''        <button class="lib-scope__star" type="button" id="libColStar" hidden aria-pressed="false" aria-label="Save to your library">&#9734;</button>
+        <button class="lib-scope__star" type="button" id="libColMore" hidden aria-haspopup="menu" aria-expanded="false" aria-label="Playlist actions">&hellip;</button>
+''')
+replace('''      var c = focus && focus.col;
+      b.hidden = !c;
+      if (!c) return;
+      var on = savedIndex(c.ref) >= 0;''', r'''      var c = focus && focus.col;
+      var more = document.getElementById('libColMore');
+      if (more) {
+        more.hidden = !(c && c.hub);
+        if (c && c.hub) more.setAttribute('aria-label', 'Actions for \u201c' + c.hub.name + '\u201d on ' + c.platformLabel);
+      }
+      b.hidden = !c || !!c.hub || !!c.readOnly;
+      if (b.hidden) return;
+      var on = savedIndex(c.ref) >= 0;''')
+replace(r'''      var c = focus && focus.col;
+      if (!c) return;
+      var at = savedIndex(c.ref);''', r'''      var c = focus && focus.col;
+      if (!c || c.hub || c.readOnly) return;
+      var at = savedIndex(c.ref);''')
+replace('''      save();
+      paintStar();
+    });
+    function showCollection(info) {''', '''      save();
+      paintStar();
+      /* the hub's copy follows (library:sync), through the shelf */
+      document.dispatchEvent(new CustomEvent('library:collections', { detail: { ref: c.ref, saved: at >= 0 ? null : cols()[cols().length - 1] } }));
+    });
+    function showCollection(info) {''')
+replace('''      if (c.capped) words += ' (the first ' + num(n) + ')';
+''', '''      if (c.capped) words += ' (the first ' + num(n) + ')';
+      if (c.note) words += ' \\u00b7 ' + c.note;
+''')
+replace('''      saved: function () { return cols().slice(); },
+''', '''      saved: function () { return cols().slice(); },
+      /* the shelf's merge with the hub (library:sync) */
+      replaceSaved: function (items) { state.collections = items.slice(); save(); paintStar(); if (ipodShowing()) ipodRender(); },
+      /* a hub playlist's song moved (the hub has already moved it) */
+      moveRow: function (id, to) {
+        var f = focus;
+        if (!f || !f.rows || !f.ids) return;
+        var i = f.ids.indexOf(id);
+        if (i < 0) return;
+        var r = f.rows.splice(i, 1)[0];
+        f.ids.splice(i, 1);
+        f.rows.splice(to, 0, r);
+        f.ids.splice(to, 0, id);
+        render();
+        select(id, true);
+      },
+      close: function () { setFocus(null); },
+''')
+# the library menu: "On <hub>" and "Shared on <hub>" under Playlists
+replace('''            : []).concat(savedItems('playlist')),
+          empty: 'No playlists yet',
+        };
+      }''', r'''            : []).concat(savedItems('playlist')).concat(hubItems()),
+          empty: 'No playlists yet',
+        };
+      }
+      if (id === 'hub' || id === 'hub-shared') {
+        var hs = window.NP_HUB_SHELF, st = hs ? hs.status() : { hubName: 'the hub', playlists: false };
+        if (id === 'hub-shared') {
+          return {
+            title: 'Shared on ' + st.hubName,
+            items: (hs ? hs.shared() : []).map(function (s) { return { label: s.ref.title, count: s.trackCount, saved: s, shared: st.hubName }; }),
+            empty: 'Nothing shared yet',
+          };
+        }
+        var pls = hs && st.playlists ? hs.playlists() : null;
+        return {
+          title: 'On ' + st.hubName,
+          items: (pls || []).map(function (p) { return { label: p.name, count: p.entryCount, hubList: p.id }; }),
+          empty: !st.playlists ? st.noScope : pls === null ? 'Checking ' + st.hubName + '\u2026' : 'No playlists on ' + st.hubName + ' yet',
+        };
+      }''')
+replace('''    function ipodRender() {''', r'''    function hubItems() {
+      var hs = window.NP_HUB_SHELF;
+      var st = hs && hs.status();
+      if (!st || !st.paired) return [];
+      var out = [{ label: 'On ' + st.hubName, count: (hs.playlists() || []).length, into: 'hub' }];
+      if (hs.shared().length) out.push({ label: 'Shared on ' + st.hubName, count: hs.shared().length, into: 'hub-shared' });
+      return out;
+    }
+    document.addEventListener('hub-shelf:change', function () { if (ipodShowing()) ipodRender(); });
+
+    function ipodRender() {''')
+replace('''      ipodStack = [];
+      ipodSel = 0;
+      ipodRender();
+      ipod.hidden = false;''', '''      ipodStack = [];
+      ipodSel = 0;
+      if (window.NP_HUB_SHELF) window.NP_HUB_SHELF.refresh();
+      ipodRender();
+      ipod.hidden = false;''')
+replace(r'''      if (it.saved) {
+        /* kept from the catalog: its songs are read again, through the search's own servers */
+        var kept = it.saved;
+        ipodClose();
+        (window.NP_SEARCH_READY || Promise.resolve(null)).then(function (api) {
+          if (api) api.openSaved(kept); else say('Search is not available, so \u201c' + kept.ref.title + '\u201d cannot be read');
+        });
+        return;
+      }''', r'''      if (it.hubList) {
+        ipodClose();
+        if (window.NP_HUB_SHELF) window.NP_HUB_SHELF.open(it.hubList);
+        return;
+      }
+      if (it.saved) {
+        /* kept from the catalog: its songs are read again, through the search's own servers */
+        var kept = it.saved, sharedOn = it.shared;
+        ipodClose();
+        (window.NP_SEARCH_READY || Promise.resolve(null)).then(function (api) {
+          /* the hub admin's starred lists are theirs: shown, never starred or changed from here */
+          if (api) api.openSaved(kept, sharedOn ? { readOnly: true, note: 'Shared on ' + sharedOn + ' \u2014 read-only' } : undefined);
+          else say('Search is not available, so \u201c' + kept.ref.title + '\u201d cannot be read');
+        });
+        return;
+      }''')
+# the shelf syncs once the library's state has loaded, never before (it would be overwritten)
+replace('''      followPlaying(false);
+      openOnNowPlaying();
+    });''', '''      followPlaying(false);
+      openOnNowPlaying();
+      window.NP_LIBRARY_LOADED = true;
+      document.dispatchEvent(new CustomEvent('library:loaded'));
+    });''')
+# a song of a hub playlist streams from the hub, not from a PC
+replace('''      if (c.remote) { window.say('This song streams from your PC'); return; }''',
+        '''      if (c.remote) { window.say(c.hub ? 'This song streams from the hub' : 'This song streams from your PC'); return; }''')
+replace('''local: !!sg.local, remote: !!sg.remote,
+                         visiting:''', '''local: !!sg.local, remote: !!sg.remote, hub: !!sg.hub,
+                         visiting:''')
+
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):
     assert bad not in text, f'left behind: {bad}'

@@ -85,6 +85,9 @@ export interface ShellSong {
   date: string | null;
   added: string | null;
   liked: boolean;
+  /** The file's catalog identity, for filing it into the hub's playlists (NP-FIND-013): its ISRC tag, and the page it came from. */
+  isrc: string | null;
+  link: string | null;
   /** Not in the shell's own rows: says the file is on this device, so the transport can play it. */
   local: true;
 }
@@ -129,6 +132,11 @@ declare global {
     NP_LIBRARY?: ShellLibrary;
     NP_TOOLS?: ShellTools;
     NP_HUB?: { status(): unknown };
+    /** The paired hub's playlists (search/hub-shelf.ts): a hub library entry on show streams through it. */
+    NP_HUB_SHELF?: {
+      streamable(id: string): { trackId: string; title: string; artist: string; durationMs: number | null } | null;
+      streamUrl(trackId: string): Promise<{ url: string } | { reason: string }>;
+    };
     NP_AWSP?: ShellAwsp;
     /** Resolves `NP_AWSP` once its module has loaded, or null in the single-file build (no service worker). */
     NP_AWSP_READY?: Promise<ShellAwsp | null>;
@@ -261,6 +269,8 @@ function rowOf(track: Track): ShellSong {
     date: track.releaseDate ?? (track.year ? String(track.year) : null),
     added: track.createdAt ?? null,
     liked: !!track.liked,
+    isrc: track.identity?.isrc ?? null,
+    link: track.locators.flatMap((l) => (l.kind === 'provider' && l.canonicalUrl ? [l.canonicalUrl] : []))[0] ?? null,
     local: true,
   };
 }
@@ -375,8 +385,37 @@ function installPlayer(db: PlayerDatabase, engine: PlaybackEngine): ShellPlayer 
     note(`play ${row.title} from the PC: ${result.ok ? 'ok' : result.reason}`);
     return result;
   }
+  /**
+   * A song of a hub playlist that the hub's library holds (NP-FIND-014): the hub signs a short-lived
+   * stream URL for it (`POST /library/stream-urls`), and it plays through the same element.
+   */
+  async function playHub(id: string, entry: { trackId: string; title: string; artist: string; durationMs: number | null }): Promise<{ ok: boolean; reason: string | null }> {
+    window.NP_AWSP?.indicate(false);
+    const signed = await window.NP_HUB_SHELF!.streamUrl(entry.trackId);
+    if (!('url' in signed)) return { ok: false, reason: signed.reason };
+    const ref = {
+      trackId: id,
+      title: entry.title || 'Untitled',
+      artistName: entry.artist || 'Unknown artist',
+      albumName: null,
+      durationMs: entry.durationMs,
+      artworkId: null,
+      identity: {},
+      locators: [],
+      provider: 'local',
+      genre: null,
+      year: null,
+    } as unknown as TrackRef;
+    await engine.load({ track: ref, url: signed.url, crossfadeMs: 0 });
+    current = ref;
+    const result = await engine.play();
+    note(`play ${entry.title} from the hub: ${result.ok ? 'ok' : result.reason}`);
+    return result;
+  }
   const player: ShellPlayer = {
     async play(id) {
+      const hubEntry = window.NP_HUB_SHELF?.streamable(id);
+      if (hubEntry) return playHub(id, hubEntry);
       const remote = remoteRow(id);
       if (remote) return playRemote(remote);
       window.NP_AWSP?.indicate(false);
