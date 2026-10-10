@@ -30,6 +30,8 @@ The hub API is generated from `packages/contracts/src/api/routes.ts`. The commit
 | Network, logs, diagnostics, backup, updates | `getNetwork`/`putNetwork` · `listLogs` · `diagnosticsBundle` · `createBackup` · `backupSpace` GET /backup/space · `listBackups` · `restoreBackup` · `downloadBackup` GET /backup/:backupId/download · `getBackupSettings`/`putBackupSettings` /backup/settings · `exportAll` · `importAll` · `getUpdates` · `getWindowsCompanionRelease`/`putWindowsCompanionRelease` |
 | Live TV | `getLiveTv` GET /live-tv · `putLiveTv` PUT /live-tv · `deleteLiveTv` DELETE /live-tv · `getLiveTvSummary` GET /live-tv/summary |
 | Shares | `createShare` · `listShareSources` GET /shares/sources · `listShares` · `revokeShare` · `resolveShare` · `streamShared` · `sharePage` |
+| Playlists (DEC-041) | `listFolderPlaylists` GET /playlists · `createFolderPlaylist` POST /playlists · `getFolderPlaylist` GET /playlists/:playlistId · `updateFolderPlaylist` PATCH /playlists/:playlistId · `deleteFolderPlaylist` DELETE /playlists/:playlistId · `addFolderPlaylistEntries` POST /playlists/:playlistId/entries · `removeFolderPlaylistEntries` POST /playlists/:playlistId/entries/remove · `moveFolderPlaylistEntry` POST /playlists/:playlistId/entries/move · `exportFolderPlaylist` GET /playlists/:playlistId/export · `getPlaylistFolder`/`putPlaylistFolder` /playlists/folder |
+| Starred collections | `listSavedCollections` GET /catalog/saved · `saveCollection` PUT /catalog/saved · `unsaveCollection` DELETE /catalog/saved |
 
 ### Profiles
 Device-only, scopes `profile:read` / `profile:write`; nothing is anonymous and the first-run gate applies. A profile belongs to the HubUser behind the credential.
@@ -57,6 +59,24 @@ The link the player understands is a fragment, so none of it reaches any server,
 
 ### Shared links from the admin window
 `GET /shares/sources` (admin) lists what the hub itself can share: `playlists` (synced to the hub, with at least one track: `{ id, name, trackCount }`) and `albums` from the hub library (`{ id, title, artistName, trackCount }`). An admin `POST /shares` with `kind: "playlist"` and no `items` builds the item list from the synced playlist; a device still sends its own `items`, as before. What a link grants is unchanged: items stream only where the hub holds the file, and the token is returned once.
+
+### Playlists in the hub's folder (DEC-041)
+The hub keeps playlists as files in `<data>/playlists` (Music ▸ Playlists ▸ Playlist folder changes it to a folder under `playlists/` or `library/`): one `<name>.m3u8` (`#EXTM3U`, `#PLAYLIST:<name>`, `#EXTINF:<secs>,<artist> - <title>`, then a path relative to the folder for a song in the hub's library, else the song's best source URL) and one `<name>.airwave.json` sidecar (`PlaylistSidecar`). Shapes: `packages/contracts/src/api/playlist-folder.ts`.
+
+- `GET /playlists?catalogId=&isrc=` → `{ folder: PlaylistFolderInfo, items: FolderPlaylistSummary[] }`; with a song, each summary's `hasTrack` says whether it holds it. Hand-made `.m3u`/`.m3u8` files are listed with `origin: "hand-made"`, `readOnly: true`.
+- `POST /playlists` `{ name, description?, tracks?: CatalogTrack[] }` → 201 `FolderPlaylistSummary`.
+- `GET /playlists/:playlistId?offset=&limit=` (≤ 200) → `FolderPlaylistPage`: each `FolderPlaylistEntry` has `locationKind` (`library` with the library's `trackId` to stream, `url`, or `missing`), its catalog id, ISRC, platforms and sources.
+- `PATCH /playlists/:playlistId` `{ name?, description? }` (the files are renamed), `DELETE /playlists/:playlistId` (the two files, never the songs).
+- `POST /playlists/:playlistId/entries` `{ tracks: CatalogTrack[] (≤ 500), position?, allowDuplicates? }` → `{ playlist, added, skipped }`; `POST …/entries/remove` `{ entryIds }`; `POST …/entries/move` `{ entryId, to }`.
+- `GET /playlists/:playlistId/export` → the `.m3u8` (`audio/x-mpegurl`, attachment).
+- `GET`/`PUT /playlists/folder` (admin only) `{ relativePath, move }` → `{ folder, moved, failed }`.
+
+Who may: an admin session, everything. A device needs **`playlists:use`**: it reads every list, creates lists, and adds songs to any; it renames, moves and deletes only in lists it created (`createdBy` is its device id), and removes only entries it added (`addedBy`) or entries in a list it created. Caps: 10,000 songs a playlist, 1,000 playlists a folder.
+
+**For a player filing into hub playlists:** `GET /api/v1/playlists?catalogId=<CatalogTrack.id>&isrc=<isrc>` for the submenu (ticks), `POST /api/v1/playlists/:playlistId/entries` with `{ tracks: [catalogTrack] }` to file, `POST /api/v1/playlists` with `{ name, tracks: [catalogTrack] }` for New Playlist…, and `GET /api/v1/playlists/:playlistId` to read one; a `library` entry streams through `POST /library/stream-urls` with its `trackId`.
+
+### Starred collections for devices
+`GET /catalog/saved` → `{ items: SavedCollection[], shared: SavedCollection[] }`: an admin gets its own starred lists (`shared` empty); a device with **`library:sync`** gets its own as `items` and the admin's as `shared` (read-only). `PUT /catalog/saved` (a `SavedCollection`) stars into the caller's own; `DELETE /catalog/saved?platform=&kind=&id=` un-stars the caller's own; both answer the same shape. A player syncing stars reads `GET`, then `PUT`/`DELETE` its changes.
 
 ### Live TV kept on the hub
 A paired companion keeps a copy of its Live TV on the hub, so players that cannot reach the companion's loopback helper get the same channels. Contract: `HubLiveTv = { channels: HubLiveTvChannel[], guide: HelperTvGuideEntry[], updatedAt: string | null, sourceDevice: { deviceId, name } | null }`, where `HubLiveTvChannel` is `HelperTvChannel` with `url` and `logo` held to http(s) links with no user name or password.

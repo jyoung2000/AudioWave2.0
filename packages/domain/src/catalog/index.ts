@@ -20,3 +20,4 @@ export * from './engine.js';
 export * from './ndjson.js';
 export * from './view.js';
 export * from './providers/applemusic-page.js';
+export * from './folder-playlists.js';

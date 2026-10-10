@@ -362,6 +362,10 @@ export const SavedCollection = z.object({
 });
 export type SavedCollection = z.infer<typeof SavedCollection>;
 
+/** The caller's starred lists, and (for a device) the hub admin's, read-only, as `shared`. */
+export const SavedCollectionList = z.object({ items: z.array(SavedCollection), shared: z.array(SavedCollection).default([]) });
+export type SavedCollectionList = z.infer<typeof SavedCollectionList>;
+
 export const CatalogCollection = z.object({
   ref: CatalogCollectionRef,
   /** The list's own cover, when the platform gives it one. */

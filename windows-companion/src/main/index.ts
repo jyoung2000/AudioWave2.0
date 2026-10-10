@@ -27,6 +27,7 @@ import { HubClient } from './hub.js';
 import { BackupManager } from './backup.js';
 import { EmbeddedHelper } from './helper.js';
 import { CompanionCatalog } from './catalog.js';
+import { CompanionPlaylists } from './playlists.js';
 import { AwspSupervisor, findAwspBinary } from './awsp.js';
 import { appUrlGuard, applySessionSecurity, applyWindowSecurity, enforceSingleInstance, guardWebContents, isTrustedSender, openExternally } from './security.js';
 import { CompanionStore, openCompanionDb } from './store.js';
@@ -50,6 +51,7 @@ let hub: HubClient | null = null;
 let backups: BackupManager | null = null;
 let helper: EmbeddedHelper | null = null;
 let catalog: CompanionCatalog | null = null;
+let playlists: CompanionPlaylists | null = null;
 let awsp: AwspSupervisor | null = null;
 let liveTv: LiveTv | null = null;
 let updates: UpdateChecker | null = null;
@@ -484,9 +486,11 @@ function registerHandlers(): void {
     return next;
   });
   handle('app:preferences:reset', () => {
-    savePreferences(DEFAULT_PREFERENCES);
+    // Where playlists are kept is a folder, not a preference: resetting does not lose them (DEC-041).
+    const next = { ...DEFAULT_PREFERENCES, playlistDir: preferences().playlistDir };
+    savePreferences(next);
     app.setLoginItemSettings({ openAtLogin: DEFAULT_PREFERENCES.launchAtLogin });
-    return DEFAULT_PREFERENCES;
+    return next;
   });
 
   handle('app:open-external', async (request) => openExternally((request as { url: string }).url));
@@ -730,6 +734,57 @@ function registerHandlers(): void {
   handle('catalog:filter', () => catalog!.filter());
   handle('catalog:filter:set', (request) => catalog!.setFilter(request as CatalogFilter));
 
+  // The playlist folder (DEC-041): Music\Airwave Playlists unless Settings ▸ Playlists chose another.
+  handle('playlists:list', (request) => playlists!.list(request as { catalogId?: string; isrc?: string }));
+  handle('playlists:get', (request) => {
+    const r = request as { playlistId: string; offset: number; limit: number };
+    return playlists!.page(r.playlistId, r.offset, r.limit);
+  });
+  handle('playlists:create', (request) => playlists!.create(request as Parameters<CompanionPlaylists['create']>[0]));
+  handle('playlists:update', (request) => {
+    const r = request as { playlistId: string; name?: string; description?: string | null };
+    return playlists!.update(r.playlistId, { name: r.name, description: r.description });
+  });
+  handle('playlists:delete', (request) => playlists!.delete((request as { playlistId: string }).playlistId));
+  handle('playlists:add', (request) => {
+    const r = request as { playlistId: string } & Parameters<CompanionPlaylists['add']>[1];
+    return playlists!.add(r.playlistId, r);
+  });
+  handle('playlists:remove', (request) => {
+    const r = request as { playlistId: string; entryIds: string[] };
+    return playlists!.remove(r.playlistId, r.entryIds);
+  });
+  handle('playlists:move', (request) => {
+    const r = request as { playlistId: string; entryId: string; to: number };
+    return playlists!.move(r.playlistId, r.entryId, r.to);
+  });
+  handle('playlists:export', async (request) => {
+    const id = (request as { playlistId: string }).playlistId;
+    const named = await playlists!.exportName(id);
+    if (!named.result) return { path: null, reason: named.reason };
+    const result = await dialog.showSaveDialog(mainWindow!, { title: 'Export playlist', defaultPath: join(app.getPath('documents'), named.result.fileName), filters: [{ name: 'M3U8 playlist', extensions: ['m3u8'] }] });
+    if (result.canceled || !result.filePath) return { path: null, reason: null };
+    return playlists!.exportTo(id, result.filePath);
+  });
+  handle('playlists:folder', () => playlists!.folder());
+  handle('playlists:pick-dir', async (request) => {
+    const move = (request as { move: boolean }).move;
+    const result = await dialog.showOpenDialog(mainWindow!, { title: 'Where should playlists be kept?', defaultPath: playlists!.dir(), properties: ['openDirectory', 'createDirectory'], buttonLabel: 'Use this folder' });
+    if (result.canceled || !result.filePaths[0]) return { folder: await playlists!.folder(), moved: 0, failed: [], reason: null };
+    const target = result.filePaths[0];
+    const moved = move ? await playlists!.moveTo(target) : { moved: 0, failed: [], reason: null };
+    // A move that could not start (the folder cannot be written) keeps the folder that works.
+    if (moved.reason) return { folder: await playlists!.folder(), ...moved };
+    savePreferences({ ...preferences(), playlistDir: target });
+    return { folder: await playlists!.folder(), ...moved };
+  });
+  handle('playlists:open-folder', async () => {
+    const dir = playlists!.dir();
+    mkdirSync(dir, { recursive: true });
+    const failure = await shell.openPath(dir);
+    return { ok: !failure, reason: failure || null };
+  });
+
   handle('backup:export-playlists', async () => {
     const playlists = store!.listPlaylists();
     if (!playlists.length) return { path: null, count: 0, reason: 'There are no playlists to export.' };
@@ -804,7 +859,7 @@ if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow())))
       writeSettings: (settings) => {
         const parsed = Preferences.safeParse((settings as { preferences?: unknown }).preferences ?? {});
         // Starting with Windows and the download folder belong to this PC, not to the backup.
-        if (parsed.success) savePreferences({ ...parsed.data, launchAtLogin: preferences().launchAtLogin, downloadDir: preferences().downloadDir });
+        if (parsed.success) savePreferences({ ...parsed.data, launchAtLogin: preferences().launchAtLogin, downloadDir: preferences().downloadDir, playlistDir: preferences().playlistDir });
         const links = (settings as { liveTv?: unknown }).liveTv;
         if (Array.isArray(links)) {
           const added = liveTv?.restoreLinks(links as Array<{ kind: unknown; url: unknown }>) ?? 0;
@@ -851,6 +906,12 @@ if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow())))
       },
       store: store!,
       send: (payload) => send('event:catalog-chunk', payload),
+    });
+    playlists = new CompanionPlaylists({
+      store,
+      chosenDir: () => preferences().playlistDir,
+      defaultDir: join(app.getPath('music'), 'Airwave Playlists'),
+      onChange: () => send('event:playlists-changed', { at: new Date().toISOString() }),
     });
     applySessionSecurity(session.defaultSession, DEV_SERVER_URL, isAppUrl);
     registerHandlers();
@@ -912,6 +973,7 @@ if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow())))
     void awsp?.stop();
     void watcher?.close();
     watcher = null;
+    playlists?.stop();
     store?.close();
   });
 }

@@ -25,6 +25,7 @@ import type { SearchService } from './providers/search-service.js';
 import type { RateLimitManager } from './providers/rate-limit-manager.js';
 import type { DownloadService } from './downloads/service.js';
 import type { HubCatalogService } from './catalog/service.js';
+import type { HubPlaylists } from './playlists/service.js';
 import type { LibraryService } from './library/service.js';
 import type { SyncService } from './sync/service.js';
 import type { FileStore } from './sync/files.js';
@@ -94,6 +95,8 @@ export interface HubContext {
   downloads: DownloadService;
   /** The music catalog: keyless search across services, details, resolve, lyrics, enrichment (DEC-039). */
   catalog: HubCatalogService;
+  /** The playlist folder (DEC-041): .m3u8 files and their sidecars under the data volume. */
+  playlists: HubPlaylists;
   library: LibraryService;
   sync: SyncService;
   files: FileStore;

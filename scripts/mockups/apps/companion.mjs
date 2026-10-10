@@ -13,11 +13,12 @@ import { importedStylesheets } from './hub.mjs';
 import { answers, now } from '../fixtures/companion.mjs';
 import { IPC, IPC_EVENTS } from '../../../windows-companion/src/shared/ipc.ts';
 import { CATALOG_STOCK, resolveAnswer, searchChunks } from '../lib/stock-catalog.mjs';
+import { playlistList } from '../lib/stock-playlists.mjs';
 
 const ORIGIN = 'http://127.0.0.1:47920';
 const TABS = ['library', 'search', 'live-tv', 'remote', 'settings'];
-const SEARCH = ['search-results', 'search-row-menu', 'search-filter', 'search-song', 'search-see-all', 'search-playlists', 'search-link', 'search-playlist'];
-const ALL = [...TABS, 'settings-backup', 'library-remove-folder', ...SEARCH];
+const SEARCH = ['search-results', 'search-row-menu', 'search-add-to-playlist', 'search-filter', 'search-song', 'search-see-all', 'search-playlists', 'search-link', 'search-playlist'];
+const ALL = [...TABS, 'settings-backup', 'library-remove-folder', 'library-playlist', ...SEARCH];
 
 /** The preload bridge, as the page sees it: each call is a request the mockup's router answers. */
 const BRIDGE = `(() => {
@@ -47,6 +48,8 @@ function catalogAnswer(channel, request) {
     return { __events: events, value: parse({ reason: null }) };
   }
   if (channel === 'catalog:resolve') return parse({ result: resolveAnswer(request.url), reason: null });
+  // The playlist folder (DEC-041): the song asked about is ticked in the first list.
+  if (channel === 'playlists:list') return parse({ ...playlistList('companion', request.catalogId), folder: answers['playlists:folder'] });
   return undefined;
 }
 
@@ -67,6 +70,10 @@ const LINKS = [
   ...TABS.map((tab) => ({ selector: `#companion-tab-${tab}`, to: tab, in: ALL })),
   { selector: '#folders button[aria-label^="Remove "]', to: 'library-remove-folder', in: ['library'] },
   { selector: 'dialog.sheet button', to: 'library', in: ['library-remove-folder'] },
+  // Library ▸ Playlists (DEC-041): a playlist opened like an album.
+  { selector: '#playlists [role="listbox"][aria-label="Playlists"] li', to: 'library-playlist', in: ['library'] },
+  { selector: '#playlists .srch__nav button', to: 'library', in: ['library-playlist'] },
+  { selector: '.menu [aria-haspopup="menu"]', text: 'Add to Playlist', to: 'search-add-to-playlist', in: ['search-row-menu'] },
   // Search (DEC-039, UX-SEARCH-007…012): the calm overview, a song row's menu, the filter sheet, a song, a
   // type's own page (Songs) and the Playlists page, a pasted playlist and the list it opens.
   { selector: '.srch__bar button[type="submit"]', to: 'search-results', in: ['search'] },
@@ -130,10 +137,10 @@ export default {
     await settle(1500);
     const notes = {
       search: 'Search before anything is asked: the field, Track/Artist/Album, Filter….',
-      library: 'Folders by kind (music, saved TV, movies) with Add Folder…, then the music the companion found, with its search.',
+      library: 'Folders by kind (music, saved TV, movies) with Add Folder…, then the music the companion found, with its search, and Playlists — this PC’s playlist folder, with their mosaics.',
       'live-tv': 'Channel playlists (M3U) and programme guides (XMLTV), each checked and kept, with what each holds.',
       remote: 'Streaming to your devices (pairing code, paired devices, last seen, network modes), the hub connection, and transfers.',
-      settings: 'Downloaders (check and update), General, Downloads, Network; Backup; About (cache, logs, update check).',
+      settings: 'Downloaders (check and update), General, Downloads, Playlists (the folder, Change…, Open Folder), Network; Backup; About (cache, logs, update check).',
     };
     for (const id of TABS) {
       if (id !== 'library') await click(`#companion-tab-${id}`, { ms: 1200 });
@@ -149,7 +156,15 @@ export default {
     // A song row's menu (UX-SEARCH-012): the companion has no queue, so Up Next is the paired hub's group.
     await click('[role="listbox"][aria-label="Songs"] [data-menu]', { ms: 800 });
     await until(() => Boolean(document.querySelector('.menu .menu__item')) && /Kitchen/.test(document.querySelector('.menu')?.textContent ?? ''), undefined, { what: 'the row menu with the hub’s group' });
-    await snap({ id: 'search-row-menu', title: 'Search ▸ A song’s menu', group: 'Search', note: 'A song row’s “…” (or a right-click, or Shift+F10): Add to Up Next (the paired hub’s group: the companion has no queue of its own), Add to Playlist… (it keeps none, so this PC’s library, said in its sheet), Add to Library…, Download…, Audition and Open Details.', dismiss: 'search-results', dismissOutside: '.menu' });
+    await snap({ id: 'search-row-menu', title: 'Search ▸ A song’s menu', group: 'Search', note: 'A song row’s “…” (or a right-click, Shift+F10, or a long press on touch): Add to Up Next (the paired hub’s group: the companion has no queue of its own), Add to Playlist ▸ (this PC’s playlists), Add to Library…, Download…, Audition and Open Details.', dismiss: 'search-results', dismissOutside: '.menu' });
+    await page.keyboard.press('Escape');
+    await settle(400);
+    // Add to Playlist ▸ (CMP-PL-004): this PC's playlists, the one holding the song ticked, and New Playlist….
+    await click('[role="listbox"][aria-label="Songs"] [data-menu]', { ms: 800 });
+    await click('.menu [aria-haspopup="menu"]:has-text("Add to Playlist")', { ms: 600 });
+    await until(() => Boolean(document.querySelector('.menu--sub [role="menuitemcheckbox"]')), undefined, { what: 'this PC’s playlists in the submenu' });
+    await snap({ id: 'search-add-to-playlist', title: 'Search ▸ Add to Playlist ▸', group: 'Search', note: 'Add to Playlist ▸ lists the playlists in this PC’s folder — ticked where the song is already — and New Playlist…; choosing one asks whether to add the song to this PC’s library too (on), with the rights basis.', dismiss: 'search-results', dismissOutside: '.menu' });
+    await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
     await settle(400);
     await click('.srch__bar button.push:has-text("Filter")', { ms: 600 });
@@ -180,6 +195,11 @@ export default {
     await snap({ id: 'settings-backup', title: 'Settings ▸ Backup and About', group: 'Tools', note: 'The Settings tool scrolled to Backup (folder, parts, schedule, archives) and About.' });
 
     await click('#companion-tab-library', { ms: 1000 });
+    // Library ▸ Playlists (CMP-PL-005): a playlist opened like an album.
+    await click('#playlists [role="listbox"][aria-label="Playlists"] li', { ms: 1500 });
+    await until(() => document.querySelectorAll('#playlists [role="listbox"][aria-label="Songs"] li').length > 1, undefined, { what: 'the playlist' });
+    await snap({ id: 'library-playlist', title: 'Library ▸ A playlist, opened', group: 'Tools', note: 'Opened like an album: the mosaic, its length and file, Rename…, Export… and Delete…; its songs, each saying where it plays from, moved by drag or Alt+↑/↓, taken out with Delete, and a long press on touch opening a song’s menu.' });
+    await click('#playlists .srch__nav button', { ms: 800 });
     const remove = page.getByRole('button', { name: 'Remove D:\\TV', exact: true }).first();
     if (await remove.count()) {
       await remove.click({ force: true });

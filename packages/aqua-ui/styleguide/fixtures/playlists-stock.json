@@ -1,0 +1,266 @@
+{
+  "about": "Playlists in a folder (DEC-041) for the style guide and the living mockups: what a hub’s /api/v1/playlists and a companion’s playlists:* answer for a folder of three lists. Made by hand from catalog-stock.json’s songs; the paths are placeholders.",
+  "hub": {
+    "folder": {
+      "path": "/data/playlists",
+      "relativePath": "playlists",
+      "isDefault": true,
+      "available": true,
+      "reason": null,
+      "playlistCount": 3,
+      "capped": false
+    }
+  },
+  "companion": {
+    "folder": {
+      "path": "C:\\Users\\Example\\Music\\Airwave Playlists",
+      "relativePath": null,
+      "isDefault": true,
+      "available": true,
+      "reason": null,
+      "playlistCount": 3,
+      "capped": false
+    }
+  },
+  "items": [
+    {
+      "id": "0192f0c0-0000-7000-8000-00000000b001",
+      "name": "Harbour Nights",
+      "fileName": "Harbour Nights.m3u8",
+      "description": null,
+      "createdAt": "2026-10-09T18:20:00.000Z",
+      "updatedAt": "2026-10-09T18:20:00.000Z",
+      "entryCount": 6,
+      "durationSec": 1316,
+      "covers": [
+        "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxMjEsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgxNjksNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDMwMSw3MCUsODglKSIgZmlsbC1vcGFjaXR5PSIuMzUiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iOSIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuNSIvPjx0ZXh0IHg9IjE4IiB5PSIxNzgiIGZvbnQtZmFtaWx5PSJIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii45MiI+SEw8L3RleHQ+PC9zdmc+",
+        "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxNTAsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgxOTgsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDMzMCw3MCUsODglKSIgZmlsbC1vcGFjaXR5PSIuMzUiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iOSIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuNSIvPjx0ZXh0IHg9IjE4IiB5PSIxNzgiIGZvbnQtZmFtaWx5PSJIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii45MiI+Rkw8L3RleHQ+PC9zdmc+",
+        "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgyMyw1OCUsNjQlKSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iaHNsKDcxLDYyJSwzMCUpIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiIGZpbGw9InVybCgjZykiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iMzYiIGZpbGw9ImhzbCgyMDMsNzAlLDg4JSkiIGZpbGwtb3BhY2l0eT0iLjM1Ii8+PGNpcmNsZSBjeD0iMTQ2IiBjeT0iNTgiIHI9IjkiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjUiLz48dGV4dCB4PSIxOCIgeT0iMTc4IiBmb250LWZhbWlseT0iSGVsdmV0aWNhLCBBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIzMCIgZm9udC13ZWlnaHQ9IjcwMCIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuOTIiPlNIPC90ZXh0Pjwvc3ZnPg==",
+        "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxOTYsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgyNDQsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDE2LDcwJSw4OCUpIiBmaWxsLW9wYWNpdHk9Ii4zNSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSI5IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii41Ii8+PHRleHQgeD0iMTgiIHk9IjE3OCIgZm9udC1mYW1pbHk9IkhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMzAiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjkyIj5DUzwvdGV4dD48L3N2Zz4="
+      ],
+      "origin": "airwave",
+      "readOnly": false,
+      "createdBy": "admin",
+      "hasTrack": null
+    },
+    {
+      "id": "0192f0c0-0000-7000-8000-00000000b002",
+      "name": "Road Trip",
+      "fileName": "Road Trip.m3u8",
+      "description": null,
+      "createdAt": "2026-10-09T18:20:00.000Z",
+      "updatedAt": "2026-10-09T18:20:00.000Z",
+      "entryCount": 14,
+      "durationSec": 3260,
+      "covers": [
+        "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxOTYsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgyNDQsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDE2LDcwJSw4OCUpIiBmaWxsLW9wYWNpdHk9Ii4zNSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSI5IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii41Ii8+PHRleHQgeD0iMTgiIHk9IjE3OCIgZm9udC1mYW1pbHk9IkhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMzAiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjkyIj5DUzwvdGV4dD48L3N2Zz4=",
+        "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxMjEsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgxNjksNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDMwMSw3MCUsODglKSIgZmlsbC1vcGFjaXR5PSIuMzUiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iOSIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuNSIvPjx0ZXh0IHg9IjE4IiB5PSIxNzgiIGZvbnQtZmFtaWx5PSJIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii45MiI+SEw8L3RleHQ+PC9zdmc+",
+        "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxOTksNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgyNDcsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDE5LDcwJSw4OCUpIiBmaWxsLW9wYWNpdHk9Ii4zNSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSI5IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii41Ii8+PHRleHQgeD0iMTgiIHk9IjE3OCIgZm9udC1mYW1pbHk9IkhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMzAiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjkyIj5CQjwvdGV4dD48L3N2Zz4=",
+        "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxNzYsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgyMjQsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDM1Niw3MCUsODglKSIgZmlsbC1vcGFjaXR5PSIuMzUiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iOSIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuNSIvPjx0ZXh0IHg9IjE4IiB5PSIxNzgiIGZvbnQtZmFtaWx5PSJIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii45MiI+TFM8L3RleHQ+PC9zdmc+"
+      ],
+      "origin": "airwave",
+      "readOnly": false,
+      "createdBy": "0192f0c0-0000-7000-8000-00000000c001",
+      "hasTrack": null
+    },
+    {
+      "id": "m-5f1d3c0a9e2b7c4d8a6f0e1b",
+      "name": "Old Favourites",
+      "fileName": "Old Favourites.m3u",
+      "description": null,
+      "createdAt": null,
+      "updatedAt": "2026-10-09T18:20:00.000Z",
+      "entryCount": 3,
+      "durationSec": 0,
+      "covers": [],
+      "origin": "hand-made",
+      "readOnly": true,
+      "createdBy": null,
+      "hasTrack": null
+    }
+  ],
+  "page": {
+    "playlist": {
+      "id": "0192f0c0-0000-7000-8000-00000000b001",
+      "name": "Harbour Nights",
+      "fileName": "Harbour Nights.m3u8",
+      "description": null,
+      "createdAt": "2026-10-09T18:20:00.000Z",
+      "updatedAt": "2026-10-09T18:20:00.000Z",
+      "entryCount": 6,
+      "durationSec": 1316,
+      "covers": [
+        "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxMjEsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgxNjksNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDMwMSw3MCUsODglKSIgZmlsbC1vcGFjaXR5PSIuMzUiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iOSIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuNSIvPjx0ZXh0IHg9IjE4IiB5PSIxNzgiIGZvbnQtZmFtaWx5PSJIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii45MiI+SEw8L3RleHQ+PC9zdmc+",
+        "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxNTAsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgxOTgsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDMzMCw3MCUsODglKSIgZmlsbC1vcGFjaXR5PSIuMzUiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iOSIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuNSIvPjx0ZXh0IHg9IjE4IiB5PSIxNzgiIGZvbnQtZmFtaWx5PSJIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii45MiI+Rkw8L3RleHQ+PC9zdmc+",
+        "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgyMyw1OCUsNjQlKSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iaHNsKDcxLDYyJSwzMCUpIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiIGZpbGw9InVybCgjZykiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iMzYiIGZpbGw9ImhzbCgyMDMsNzAlLDg4JSkiIGZpbGwtb3BhY2l0eT0iLjM1Ii8+PGNpcmNsZSBjeD0iMTQ2IiBjeT0iNTgiIHI9IjkiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjUiLz48dGV4dCB4PSIxOCIgeT0iMTc4IiBmb250LWZhbWlseT0iSGVsdmV0aWNhLCBBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIzMCIgZm9udC13ZWlnaHQ9IjcwMCIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuOTIiPlNIPC90ZXh0Pjwvc3ZnPg==",
+        "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxOTYsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgyNDQsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDE2LDcwJSw4OCUpIiBmaWxsLW9wYWNpdHk9Ii4zNSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSI5IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii41Ii8+PHRleHQgeD0iMTgiIHk9IjE3OCIgZm9udC1mYW1pbHk9IkhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMzAiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjkyIj5DUzwvdGV4dD48L3N2Zz4="
+      ],
+      "origin": "airwave",
+      "readOnly": false,
+      "createdBy": "admin",
+      "hasTrack": null
+    },
+    "items": [
+      {
+        "id": "e0-stock",
+        "title": "Harbour Lights",
+        "artist": "Cassette Bloom",
+        "artists": ["Cassette Bloom"],
+        "album": "Harbour Lights",
+        "durationSec": 214,
+        "location": "../library/music/Cassette Bloom/Harbour Lights.flac",
+        "locationKind": "library",
+        "trackId": "0192f0c0-0000-7000-8000-00000000a000",
+        "catalogId": "deezer:9101",
+        "isrc": "QZAAA2600101",
+        "artworkUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxMjEsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgxNjksNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDMwMSw3MCUsODglKSIgZmlsbC1vcGFjaXR5PSIuMzUiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iOSIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuNSIvPjx0ZXh0IHg9IjE4IiB5PSIxNzgiIGZvbnQtZmFtaWx5PSJIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii45MiI+SEw8L3RleHQ+PC9zdmc+",
+        "platforms": ["apple-music"],
+        "sources": [
+          {
+            "platform": "apple-music",
+            "id": "8101",
+            "url": "https://music.apple.com/gb/song/8101",
+            "previewUrl": "https://audio.mockup.invalid/preview/8101.m4a",
+            "matchedBy": "search"
+          }
+        ],
+        "addedAt": "2026-10-09T18:20:00.000Z",
+        "addedBy": "admin"
+      },
+      {
+        "id": "e1-stock",
+        "title": "Harbour Morning (Acoustic)",
+        "artist": "Alder Quartet",
+        "artists": ["Alder Quartet"],
+        "album": "First Light Sessions",
+        "durationSec": 212,
+        "location": "https://music.apple.com/gb/song/8103",
+        "locationKind": "url",
+        "trackId": null,
+        "catalogId": "apple-music:8103",
+        "isrc": null,
+        "artworkUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxNTAsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgxOTgsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDMzMCw3MCUsODglKSIgZmlsbC1vcGFjaXR5PSIuMzUiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iOSIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuNSIvPjx0ZXh0IHg9IjE4IiB5PSIxNzgiIGZvbnQtZmFtaWx5PSJIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii45MiI+Rkw8L3RleHQ+PC9zdmc+",
+        "platforms": ["apple-music"],
+        "sources": [
+          {
+            "platform": "apple-music",
+            "id": "8103",
+            "url": "https://music.apple.com/gb/song/8103",
+            "previewUrl": "https://audio.mockup.invalid/preview/8103.m4a",
+            "matchedBy": "search"
+          }
+        ],
+        "addedAt": "2026-10-09T18:20:00.000Z",
+        "addedBy": "admin"
+      },
+      {
+        "id": "e2-stock",
+        "title": "Night Harbour",
+        "artist": "Velvet Orchard",
+        "artists": ["Velvet Orchard"],
+        "album": "Small Hours",
+        "durationSec": 198,
+        "location": "https://music.apple.com/gb/song/8107",
+        "locationKind": "url",
+        "trackId": null,
+        "catalogId": "apple-music:8107",
+        "isrc": null,
+        "artworkUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgyMyw1OCUsNjQlKSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iaHNsKDcxLDYyJSwzMCUpIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiIGZpbGw9InVybCgjZykiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iMzYiIGZpbGw9ImhzbCgyMDMsNzAlLDg4JSkiIGZpbGwtb3BhY2l0eT0iLjM1Ii8+PGNpcmNsZSBjeD0iMTQ2IiBjeT0iNTgiIHI9IjkiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjUiLz48dGV4dCB4PSIxOCIgeT0iMTc4IiBmb250LWZhbWlseT0iSGVsdmV0aWNhLCBBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIzMCIgZm9udC13ZWlnaHQ9IjcwMCIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuOTIiPlNIPC90ZXh0Pjwvc3ZnPg==",
+        "platforms": ["apple-music"],
+        "sources": [
+          {
+            "platform": "apple-music",
+            "id": "8107",
+            "url": "https://music.apple.com/gb/song/8107",
+            "previewUrl": "https://audio.mockup.invalid/preview/8107.m4a",
+            "matchedBy": "search"
+          }
+        ],
+        "addedAt": "2026-10-09T18:20:00.000Z",
+        "addedBy": "admin"
+      },
+      {
+        "id": "e3-stock",
+        "title": "Harbour Wall",
+        "artist": "Cassette Bloom",
+        "artists": ["Cassette Bloom", "Ada Moss"],
+        "album": "Harbour Lights",
+        "durationSec": 187,
+        "location": "../library/music/Cassette Bloom/Harbour Wall.flac",
+        "locationKind": "library",
+        "trackId": "0192f0c0-0000-7000-8000-00000000a003",
+        "catalogId": "deezer:9102",
+        "isrc": "QZAAA2600102",
+        "artworkUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxMjEsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgxNjksNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDMwMSw3MCUsODglKSIgZmlsbC1vcGFjaXR5PSIuMzUiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iOSIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuNSIvPjx0ZXh0IHg9IjE4IiB5PSIxNzgiIGZvbnQtZmFtaWx5PSJIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii45MiI+SEw8L3RleHQ+PC9zdmc+",
+        "platforms": ["deezer"],
+        "sources": [
+          {
+            "platform": "deezer",
+            "id": "9102",
+            "url": "https://www.deezer.com/track/9102",
+            "previewUrl": "https://cdnt-preview.mockup.invalid/9102.mp3",
+            "matchedBy": "search"
+          }
+        ],
+        "addedAt": "2026-10-09T18:20:00.000Z",
+        "addedBy": "admin"
+      },
+      {
+        "id": "e4-stock",
+        "title": "Harbour Fog",
+        "artist": "Low Tide Signal",
+        "artists": ["Low Tide Signal"],
+        "album": "Coastal Static",
+        "durationSec": 302,
+        "location": "https://www.deezer.com/track/9106",
+        "locationKind": "url",
+        "trackId": null,
+        "catalogId": "deezer:9106",
+        "isrc": null,
+        "artworkUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxOTYsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgyNDQsNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDE2LDcwJSw4OCUpIiBmaWxsLW9wYWNpdHk9Ii4zNSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSI5IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii41Ii8+PHRleHQgeD0iMTgiIHk9IjE3OCIgZm9udC1mYW1pbHk9IkhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMzAiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjkyIj5DUzwvdGV4dD48L3N2Zz4=",
+        "platforms": ["deezer"],
+        "sources": [
+          {
+            "platform": "deezer",
+            "id": "9106",
+            "url": "https://www.deezer.com/track/9106",
+            "previewUrl": "https://cdnt-preview.mockup.invalid/9106.mp3",
+            "matchedBy": "search"
+          }
+        ],
+        "addedAt": "2026-10-09T18:20:00.000Z",
+        "addedBy": "admin"
+      },
+      {
+        "id": "e5-stock",
+        "title": "Ember Season",
+        "artist": "Cassette Bloom",
+        "artists": ["Cassette Bloom"],
+        "album": "Harbour Lights",
+        "durationSec": 203,
+        "location": "../library/music/Ember Season.mp3",
+        "locationKind": "missing",
+        "trackId": null,
+        "catalogId": "deezer:9108",
+        "isrc": null,
+        "artworkUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9ImhzbCgxMjEsNTglLDY0JSkiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9ImhzbCgxNjksNjIlLDMwJSkiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0idXJsKCNnKSIvPjxjaXJjbGUgY3g9IjE0NiIgY3k9IjU4IiByPSIzNiIgZmlsbD0iaHNsKDMwMSw3MCUsODglKSIgZmlsbC1vcGFjaXR5PSIuMzUiLz48Y2lyY2xlIGN4PSIxNDYiIGN5PSI1OCIgcj0iOSIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuNSIvPjx0ZXh0IHg9IjE4IiB5PSIxNzgiIGZvbnQtZmFtaWx5PSJIZWx2ZXRpY2EsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBmb250LXdlaWdodD0iNzAwIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii45MiI+SEw8L3RleHQ+PC9zdmc+",
+        "platforms": ["deezer"],
+        "sources": [
+          {
+            "platform": "deezer",
+            "id": "9108",
+            "url": "https://www.deezer.com/track/9108",
+            "previewUrl": "https://cdnt-preview.mockup.invalid/9108.mp3",
+            "matchedBy": "search"
+          }
+        ],
+        "addedAt": "2026-10-09T18:20:00.000Z",
+        "addedBy": "admin"
+      }
+    ],
+    "offset": 0,
+    "total": 6,
+    "hasMore": false
+  },
+  "hasTrack": "0192f0c0-0000-7000-8000-00000000b001"
+}

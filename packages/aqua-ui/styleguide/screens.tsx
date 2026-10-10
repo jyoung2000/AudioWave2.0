@@ -50,6 +50,7 @@ import {
 import {
   CompanionAboutScreen,
   CompanionBackupScreen,
+  CompanionPlaylistsScreen,
   CompanionSearchScreen,
   CompanionSearchSongsScreen,
   CompanionSettingsView,
@@ -60,6 +61,7 @@ import {
   HubLibraryScreen,
   HubLiveTvScreen,
   HubMusicSearchScreen,
+  HubPlaylistsScreen,
   HubNetworkScreen,
   HubProfilesScreen,
   HubRecommendationsScreen,
@@ -312,6 +314,13 @@ export const SCREENS: readonly Screen[] = [
     render: () => <HubLibraryScreen />,
   },
   {
+    id: 'hub-playlists',
+    product: 'hub',
+    label: 'Music ▸ Playlists',
+    note: 'The hub’s own Playlists view (DEC-041): the playlists kept as .m3u8 files in /data/playlists, each with its 2×2 mosaic and length — one made outside Airwave marked Hand-made — New Playlist…, the Playlist folder with Change…, and the players’ synced copies apart under Shared from players. Open a list for its songs, where each plays from, and Rename…, Export .m3u8 and Delete….',
+    render: () => <HubPlaylistsScreen />,
+  },
+  {
     id: 'hub-live-tv',
     product: 'hub',
     label: 'Music ▸ Live TV from the companion',
@@ -380,6 +389,13 @@ export const SCREENS: readonly Screen[] = [
     label: 'Library',
     note: 'Saved Music, Saved TV and Saved Movies, then the songs found. A folder whose drive is away is said so in its row and under the list.',
     render: () => <CompanionLibraryScreen />,
+  },
+  {
+    id: 'companion-playlists',
+    product: 'companion',
+    label: 'Library ▸ Playlists',
+    note: 'The companion’s own Playlists view (DEC-041): this PC’s playlists, kept as .m3u8 files in Airwave Playlists (in the Music folder), with their mosaics. Its folder, Change… and Open Folder are in Settings ▸ Playlists. On touch, a long press on a song opens its menu.',
+    render: () => <CompanionPlaylistsScreen />,
   },
   {
     id: 'companion-live-tv',

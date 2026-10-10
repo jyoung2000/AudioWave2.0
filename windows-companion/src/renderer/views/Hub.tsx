@@ -33,6 +33,8 @@ const SCOPE_WORDS: Record<string, string> = {
   'profile:read': 'read your profile',
   'profile:write': 'change your profile',
   'backup:read': 'read the hub’s backups',
+  'playlists:use': 'file songs into the hub’s playlists',
+  'library:sync': 'keep starred albums and playlists in step',
 };
 
 export function scopeWords(scopes: readonly string[]): string {

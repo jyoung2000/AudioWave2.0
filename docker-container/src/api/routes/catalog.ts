@@ -7,7 +7,7 @@
  */
 import { Readable } from 'node:stream';
 import type { FastifyInstance } from 'fastify';
-import { NDJSON_CONTENT_TYPE, routes } from '@now-playing/contracts';
+import { NDJSON_CONTENT_TYPE, routes, type SavedCollection } from '@now-playing/contracts';
 import { ndjsonLine } from '@now-playing/domain/catalog';
 import type { HubContext } from '../../context.js';
 import { DomainError } from '@now-playing/domain';
@@ -74,26 +74,30 @@ export function registerCatalogRoutes(app: FastifyInstance, ctx: HubContext): vo
   });
 
   /*
-   * Starred albums and playlists (UX-SEARCH-005), the admin's own: one owner per admin user, in the
-   * SavedCollection shape the player and the companion share, so the player's sync can carry them
-   * later without a second shape.
+   * Starred albums and playlists (UX-SEARCH-005), in the SavedCollection shape the player and the
+   * companion share. One owner per admin user (`admin:<id>`) and one per device (`device:<id>`, with
+   * `library:sync`, DEC-041). A device reads and writes its own, and reads the admin's as `shared`;
+   * it never writes anyone else's.
    */
-  const savedOwner = (principal: Principal): string => (principal.kind === 'admin' ? `admin:${principal.userId}` : actorId(principal));
+  const savedOwner = (principal: Principal): string => (principal.kind === 'admin' ? `admin:${principal.userId}` : `device:${actorId(principal)}`);
+  const savedLists = (principal: Principal): { items: SavedCollection[]; shared: SavedCollection[] } => {
+    const repo = ctx.repos.savedCollections;
+    return { items: repo.list(savedOwner(principal)), shared: principal.kind === 'device' ? repo.listShared('admin:') : [] };
+  };
 
-  registerRoute(app, ctx, routes.catalogSavedList, ({ principal }) => ({ items: ctx.repos.savedCollections.list(savedOwner(principal)) }));
+  registerRoute(app, ctx, routes.catalogSavedList, ({ principal }) => savedLists(principal));
 
   registerRoute(app, ctx, routes.catalogSavedPut, ({ body, principal }) => {
     const owner = savedOwner(principal);
     const repo = ctx.repos.savedCollections;
     if (!repo.has(owner, body.ref) && repo.count(owner) >= SAVED_COLLECTIONS_CAP) throw new DomainError('conflict', `The library already holds ${SAVED_COLLECTIONS_CAP} starred albums and playlists. Un-star some first.`);
     repo.put(owner, body);
-    return { items: repo.list(owner) };
+    return savedLists(principal);
   });
 
   registerRoute(app, ctx, routes.catalogSavedDelete, ({ query, principal }) => {
-    const owner = savedOwner(principal);
-    ctx.repos.savedCollections.remove(owner, query);
-    return { items: ctx.repos.savedCollections.list(owner) };
+    ctx.repos.savedCollections.remove(savedOwner(principal), query);
+    return savedLists(principal);
   });
 
   registerRoute(app, ctx, routes.catalogSettingsGet, () => ctx.catalog.settingsView());

@@ -28,9 +28,24 @@ import {
   CatalogTrack,
   DownloadAuthorizationBasis,
   EqPreset,
+  FolderPlaylistAdd,
+  FolderPlaylistAddResult,
+  FolderPlaylistCreate,
+  FolderPlaylistEntryId,
+  FolderPlaylistId,
+  FolderPlaylistList,
+  FolderPlaylistListQuery,
+  FolderPlaylistMove,
+  FolderPlaylistPage,
+  FolderPlaylistSummary,
+  FolderPlaylistUpdate,
   HelperJob,
   OutputFormat,
+  PLAYLIST_ADD_MAX,
+  PLAYLIST_FOLDER_ENTRY_CAP,
+  PLAYLIST_FOLDER_PAGE_MAX,
   Playlist,
+  PlaylistFolderInfo,
   SavedCollection,
   Track,
 } from '@now-playing/contracts';
@@ -399,6 +414,8 @@ export const Preferences = z.object({
   checkForUpdates: z.boolean().default(true),
   /** Where finished downloads are saved. Null: the Downloads folder inside Music. Set only through the folder picker. */
   downloadDir: z.string().nullable().default(null),
+  /** Where playlists are kept (DEC-041). Null: `Music\Airwave Playlists`. Set only through the folder picker (playlists:pick-dir). */
+  playlistDir: z.string().nullable().default(null),
   /** The format a download is saved in when the player does not name one. */
   downloadFormat: OutputFormat.default('original'),
   /** How many downloads run at once. */
@@ -429,7 +446,7 @@ export const PreferencesPatch = z.strictObject({
   helperPort: z.number().int().min(1024).max(65535).optional(),
   autoUpdateTools: z.boolean().optional(),
   checkForUpdates: z.boolean().optional(),
-  // No downloadDir: a folder is only ever chosen in the system's own picker (downloads:pick-dir).
+  // No downloadDir or playlistDir: a folder is only ever chosen in the system's own picker (downloads:pick-dir, playlists:pick-dir).
   downloadFormat: OutputFormat.optional(),
   downloadConcurrency: z.number().int().min(1).max(4).optional(),
   downloadRateKBps: z.number().int().min(1).max(1_000_000).nullable().optional(),
@@ -492,6 +509,7 @@ export type CatalogFilter = z.infer<typeof CatalogFilter>;
 const Answer = <T extends z.ZodType>(result: T) => z.object({ result: result.nullable(), reason: z.string().max(600).nullable() });
 const ListPage = { offset: z.number().int().min(0).max(CATALOG_COLLECTION_CAP).default(0), limit: z.number().int().min(1).max(CATALOG_PAGE_MAX).default(50) };
 const SavedList = z.object({ items: z.array(SavedCollection) });
+const PlaylistRef = { playlistId: FolderPlaylistId };
 
 /**
  * Every channel, with the shape of its request and its result.
@@ -613,6 +631,27 @@ export const IPC = {
   'catalog:unsave': { request: CatalogCollectionRef.pick({ platform: true, kind: true, id: true }), response: SavedList },
   'catalog:filter': { request: z.void(), response: CatalogFilter },
   'catalog:filter:set': { request: CatalogFilter, response: CatalogFilter },
+
+  /*
+   * The playlist folder (DEC-041; CMP-PL-001…CMP-PL-006): the same shapes the hub's /api/v1/playlists
+   * serves. Reads rescan the folder; a change answers with its result, or null and the reason.
+   */
+  /** Every playlist in the folder (hand-made ones too); with catalogId/isrc, whether each holds that song. */
+  'playlists:list': { request: FolderPlaylistListQuery.strict().default({}), response: FolderPlaylistList },
+  'playlists:get': { request: z.strictObject({ ...PlaylistRef, offset: z.number().int().min(0).max(PLAYLIST_FOLDER_ENTRY_CAP).default(0), limit: z.number().int().min(1).max(PLAYLIST_FOLDER_PAGE_MAX).default(100) }), response: Answer(FolderPlaylistPage) },
+  'playlists:create': { request: FolderPlaylistCreate, response: Answer(FolderPlaylistSummary) },
+  'playlists:update': { request: z.strictObject({ ...PlaylistRef, name: FolderPlaylistUpdate.shape.name, description: FolderPlaylistUpdate.shape.description }), response: Answer(FolderPlaylistSummary) },
+  'playlists:delete': { request: z.strictObject(PlaylistRef), response: z.object({ ok: z.boolean(), reason: z.string().max(600).nullable() }) },
+  'playlists:add': { request: z.strictObject({ ...PlaylistRef, tracks: FolderPlaylistAdd.shape.tracks, position: FolderPlaylistAdd.shape.position, allowDuplicates: FolderPlaylistAdd.shape.allowDuplicates }), response: Answer(FolderPlaylistAddResult) },
+  'playlists:remove': { request: z.strictObject({ ...PlaylistRef, entryIds: z.array(FolderPlaylistEntryId).min(1).max(PLAYLIST_ADD_MAX) }), response: Answer(FolderPlaylistSummary) },
+  'playlists:move': { request: z.strictObject({ ...PlaylistRef, entryId: FolderPlaylistMove.shape.entryId, to: FolderPlaylistMove.shape.to }), response: Answer(FolderPlaylistSummary) },
+  /** Asks where to save, then writes the playlist's .m3u8 there. */
+  'playlists:export': { request: z.strictObject(PlaylistRef), response: z.object({ path: z.string().nullable(), reason: z.string().max(600).nullable() }) },
+  'playlists:folder': { request: z.void(), response: PlaylistFolderInfo },
+  /** The system's folder picker for where playlists are kept: the only way that preference changes. With `move`, the playlists already kept go with it. */
+  'playlists:pick-dir': { request: z.strictObject({ move: z.boolean().default(true) }), response: z.object({ folder: PlaylistFolderInfo, moved: z.number().int().nonnegative(), failed: z.array(z.string()).max(50), reason: z.string().max(600).nullable() }) },
+  /** Opens the playlist folder in Explorer. Takes no path. */
+  'playlists:open-folder': { request: z.void(), response: z.object({ ok: z.boolean(), reason: z.string().nullable() }) },
 } as const satisfies Record<IpcChannel, { request: z.ZodType; response: z.ZodType }>;
 
 export type IpcRequest<C extends IpcChannel> = z.infer<(typeof IPC)[C]['request']>;
@@ -629,6 +668,8 @@ export const IPC_EVENTS = {
   'event:notice': z.object({ kind: z.enum(['info', 'warning', 'error']), message: z.string() }),
   /** One chunk of a running search, for the window that started it. */
   'event:catalog-chunk': z.object({ searchId: CatalogSearchId, chunk: CatalogSearchChunk }),
+  /** Something in the playlist folder changed on disk: read it again. */
+  'event:playlists-changed': z.object({ at: z.iso.datetime({ offset: true }) }),
 } as const satisfies Record<IpcEvent, z.ZodType>;
 
 export type IpcEventPayload<E extends IpcEvent> = z.infer<(typeof IPC_EVENTS)[E]>;

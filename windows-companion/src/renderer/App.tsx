@@ -24,6 +24,7 @@ import { FoldersView } from './views/Folders.js';
 import { HubView } from './views/Hub.js';
 import { LibraryView } from './views/Library.js';
 import { LiveTvView } from './views/LiveTv.js';
+import { PlaylistsView } from './views/Playlists.js';
 import { NoticeBar, useNotices } from './views/NoticeBar.js';
 import { needsAttention, SettingsView } from './views/Settings.js';
 import { SearchView } from './views/Search.js';
@@ -33,7 +34,7 @@ import { PRODUCT_NAME } from '../shared/identity.js';
 import type { AwspStatus, HelperStatus, HubConnection, TvLinks } from '../shared/ipc.js';
 
 /** The sections. Each is a screen in design/coverage.json; the tab it lives in is below. */
-export type ViewId = 'folders' | 'library' | 'search' | 'live-tv' | 'streaming' | 'hub' | 'transfers' | 'settings' | 'backup' | 'about';
+export type ViewId = 'folders' | 'library' | 'playlists' | 'search' | 'live-tv' | 'streaming' | 'hub' | 'transfers' | 'settings' | 'backup' | 'about';
 
 export type TabId = 'library' | 'search' | 'live-tv' | 'remote' | 'settings';
 
@@ -44,7 +45,7 @@ const TABS: ReadonlyArray<{ id: TabId; label: string; icon: () => ReactNode; sec
     id: 'library',
     label: 'Library',
     icon: LibraryToolIcon,
-    sections: ['folders', 'library'],
+    sections: ['folders', 'library', 'playlists'],
     lead: 'The folders on this PC that Airwave plays from. The companion watches them and, once sharing is on, passes what it finds to your Airwave Hub so every device sees the same library.',
   },
   {
@@ -81,6 +82,7 @@ const TABS: ReadonlyArray<{ id: TabId; label: string; icon: () => ReactNode; sec
 const SECTION_TITLES: Record<ViewId, string> = {
   folders: 'Folders',
   library: 'Music',
+  playlists: 'Playlists',
   search: 'Search',
   'live-tv': 'Live TV',
   streaming: 'Stream to your devices',
@@ -201,6 +203,8 @@ function Companion() {
         return <FoldersView folders={folders} />;
       case 'library':
         return <LibraryView helper={helper} hubConnected={hub?.connected ?? false} hasMusicFolder={items.some((f) => f.kind === 'music')} />;
+      case 'playlists':
+        return <PlaylistsView />;
       case 'search':
         return <SearchView />;
       case 'live-tv':

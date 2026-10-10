@@ -285,10 +285,10 @@ describe('starred albums and playlists (UX-SEARCH-005)', () => {
 
   it('keeps a starred list in the admin’s library, in the shared SavedCollection shape, and un-stars it', async () => {
     const headers = { cookie: admin.cookie, 'x-csrf-token': admin.csrfToken };
-    expect((await hub.app.inject({ method: 'GET', url: '/api/v1/catalog/saved', headers })).json()).toEqual({ items: [] });
+    expect((await hub.app.inject({ method: 'GET', url: '/api/v1/catalog/saved', headers })).json()).toEqual({ items: [], shared: [] });
     const put = await hub.app.inject({ method: 'PUT', url: '/api/v1/catalog/saved', headers, payload: saved });
     expect(put.statusCode, put.body).toBe(200);
-    expect(put.json()).toEqual({ items: [saved] });
+    expect(put.json()).toEqual({ items: [saved], shared: [] });
     // Starring it again refreshes it rather than adding a second.
     const again = await hub.app.inject({ method: 'PUT', url: '/api/v1/catalog/saved', headers, payload: { ...saved, trackCount: 43 } });
     expect((again.json() as { items: Array<{ trackCount: number }> }).items.map((i) => i.trackCount)).toEqual([43]);
@@ -296,12 +296,12 @@ describe('starred albums and playlists (UX-SEARCH-005)', () => {
     expect(SavedCollection.array().parse((list.json() as { items: unknown[] }).items)).toHaveLength(1);
     const removed = await hub.app.inject({ method: 'DELETE', url: '/api/v1/catalog/saved?platform=deezer&kind=playlist&id=908622995', headers });
     expect(removed.statusCode).toBe(200);
-    expect(removed.json()).toEqual({ items: [] });
+    expect(removed.json()).toEqual({ items: [], shared: [] });
   });
 
-  it('is the admin’s alone: no device, no anonymous caller, and a change needs the CSRF token', async () => {
-    expect((await get('/api/v1/catalog/saved')).statusCode).toBe(401);
-    expect((await hub.app.inject({ method: 'GET', url: '/api/v1/catalog/saved', headers: { authorization: device.authorization } })).statusCode).toBe(401);
+  it('needs the admin or a device with library:sync (DEC-041), never an anonymous caller, and a change needs the CSRF token', async () => {
+    expect((await get('/api/v1/catalog/saved', {})).statusCode).toBe(401);
+    expect((await hub.app.inject({ method: 'GET', url: '/api/v1/catalog/saved', headers: { authorization: device.authorization } })).statusCode).toBe(403);
     expect((await hub.app.inject({ method: 'PUT', url: '/api/v1/catalog/saved', headers: { cookie: admin.cookie }, payload: saved })).statusCode).toBe(403);
     const bad = await hub.app.inject({ method: 'PUT', url: '/api/v1/catalog/saved', headers: { cookie: admin.cookie, 'x-csrf-token': admin.csrfToken }, payload: { ...saved, ref: { ...ref, kind: 'radio' } } });
     expect(bad.statusCode).toBe(400);

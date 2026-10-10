@@ -762,6 +762,26 @@ a.push:active {
   min-height: 0;
 }
 
+/* a playlist's songs (UX-PL-007): dragged to a new place, the row it would land on is marked */
+.pl-rows li[draggable='true'] {
+  cursor: grab;
+}
+.pl-rows li.is-dragging {
+  opacity: 0.5;
+}
+.pl-rows li.is-over {
+  box-shadow: inset 0 2px 0 var(--link);
+}
+.pl-where--missing {
+  color: var(--danger-ink);
+}
+.mrows:focus li[aria-selected='true'] .pl-where--missing {
+  color: var(--sel-ink);
+}
+.pl-folder {
+  overflow-wrap: anywhere;
+}
+
 /* the head of an album, a playlist, an artist or a song */
 .mhead {
   display: flex;

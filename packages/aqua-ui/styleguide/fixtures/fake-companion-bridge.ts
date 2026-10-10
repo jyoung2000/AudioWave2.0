@@ -12,6 +12,7 @@
 import type { IpcChannel, IpcEvent, IpcEventPayload, IpcRequest, IpcResponse } from '../../../../windows-companion/src/shared/ipc.js';
 import recording from './companion-ipc.json';
 import catalog from './catalog-stock.json';
+import playlists from './playlists-stock.json';
 
 /**
  * The Search tool's channels (DEC-039) answer from the stock catalog the mockups and tests use
@@ -37,6 +38,10 @@ const CATALOG: Record<string, (request: Record<string, unknown>) => unknown> = {
   'catalog:filter': () => FILTER,
   // A song's Add to Up Next goes to a paired hub's group (UX-SEARCH-012): one, as the hub specimen has.
   'hub:groups': () => ({ items: [{ id: '01a10fe5-a06d-709d-9469-badda23fe07d', name: 'Kitchen' }], reason: null }),
+  // The playlist folder (DEC-041): three lists made from the stock's songs, in the companion's default folder.
+  'playlists:list': (request) => ({ folder: playlists.companion.folder, items: playlists.items.map((p) => ({ ...p, createdBy: p.createdBy ? 'companion' : null, hasTrack: request['catalogId'] ? p.id === playlists.hasTrack : null })) }),
+  'playlists:get': () => ({ result: playlists.page, reason: null }),
+  'playlists:folder': () => playlists.companion.folder,
 };
 
 const RECORDED = recording as { recordedAt: string; channels: Record<string, unknown> };

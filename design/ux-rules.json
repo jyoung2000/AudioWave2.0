@@ -98,6 +98,10 @@
     {
       "id": "np-discover",
       "title": "Player shell — Discover and the recommendation algorithm"
+    },
+    {
+      "id": "playlists",
+      "title": "Playlist folders in the hub and the companion"
     }
   ],
   "rules": [
@@ -3281,7 +3285,7 @@
         {
           "type": "test",
           "path": "docker-container/tests/integration/catalog.test.ts",
-          "name": "is the admin’s alone: no device, no anonymous caller, and a change needs the CSRF token"
+          "name": "needs the admin or a device with library:sync (DEC-041), never an anonymous caller, and a change needs the CSRF token"
         },
         {
           "type": "test",
@@ -3516,7 +3520,7 @@
       "id": "UX-SEARCH-012",
       "group": "search",
       "title": "A song from search goes to Up Next, a playlist or the library through the row’s menu",
-      "contract": "The owner’s words (2026-10-07): “ensure the user can add songs from search to their Now Playing queue, playlist, or music library.” Every song row — the overview, a type’s page, an album’s, a playlist’s or an artist’s songs — has a “…” at its end; a right-click, or Shift+F10 or the Menu key on the highlighted row, opens the same menu: the window kit’s contextual menu (`.menu` in airwave-window.css), keyboard-operable (the arrows, Home and End, Right and Left for a submenu, Enter and Space, Escape back to the list, Tab or a click away closes it; on a touch screen its commands are 44px tall). It offers Add to Up Next, Add to Playlist…, Add to Library…, Download…, Audition (Stop Audition while it plays; disabled, saying why, without a clip) and Open Details. Add to Up Next is a group’s queue — on the hub, `POST /api/v1/groups/:id/requests` with the song’s best fetchable link (YouTube Music, YouTube, SoundCloud, Bandcamp, spotDL), a submenu when there are several active groups; the companion has no queue of its own, so the paired hub’s groups it is in (`hub:groups`, `hub:request`), or a sentence saying queueing needs a group (no hub, no permission to join groups, not in one). A song only a store has says there is nothing to queue or fetch. Add to Library… is a download with a stated rights basis — on the hub into its download queue (`POST /api/v1/catalog/download`, Music ▸ Downloads, what the hub’s library is made of), on the companion through the helper’s own path into this PC’s library. Neither app keeps playlists of its own (the hub holds players’ shared copies; the companion holds synced copies it never changes), so Add to Playlist… says so in its sheet and adds the song to the library instead — no store is invented. Download… is the same with a choice of format. Every action confirms in the window’s status line, which is a live region.",
+      "contract": "The owner’s words (2026-10-07): “ensure the user can add songs from search to their Now Playing queue, playlist, or music library.” Every song row — the overview, a type’s page, an album’s, a playlist’s or an artist’s songs — has a “…” at its end; a right-click, or Shift+F10 or the Menu key on the highlighted row, opens the same menu: the window kit’s contextual menu (`.menu` in airwave-window.css), keyboard-operable (the arrows, Home and End, Right and Left for a submenu, Enter and Space, Escape back to the list, Tab or a click away closes it; on a touch screen its commands are 44px tall). It offers Add to Up Next, Add to Playlist ▸, Add to Library…, Download…, Audition (Stop Audition while it plays; disabled, saying why, without a clip) and Open Details. Add to Up Next is a group’s queue — on the hub, `POST /api/v1/groups/:id/requests` with the song’s best fetchable link (YouTube Music, YouTube, SoundCloud, Bandcamp, spotDL), a submenu when there are several active groups; the companion has no queue of its own, so the paired hub’s groups it is in (`hub:groups`, `hub:request`), or a sentence saying queueing needs a group (no hub, no permission to join groups, not in one). A song only a store has says there is nothing to queue or fetch. Add to Library… is a download with a stated rights basis — on the hub into its download queue (`POST /api/v1/catalog/download`, Music ▸ Downloads, what the hub’s library is made of), on the companion through the helper’s own path into this PC’s library. Add to Playlist ▸ writes (amended 2026-10-10, DEC-041): each app keeps a playlist folder, so the submenu lists its playlists, ticked where the song is already, and New Playlist…; filing keeps the song’s link, and “Also add to Library”, on by default, queues the download too (UX-PL-005, CMP-PL-004). The hub’s players’ shared copies stay read-only, shown apart. Download… is the same with a choice of format. Every action confirms in the window’s status line, which is a live region.",
       "example": "Hub: “Harbour Lights” ▸ … ▸ Add to Up Next ▸ Studio → POST /groups/…/requests {query: https://music.youtube.com/watch?v=…} → “Up Next in Studio: “Harbour Lights”, number 3.” Companion with no hub: “Queueing needs a group on a hub: this companion has no queue of its own. Pair a hub under Remote first.”",
       "authority": "adopted",
       "owners": [
@@ -3530,7 +3534,9 @@
         "packages/aqua-ui/scripts/make-window-css.py",
         "packages/aqua-ui/src/styles/airwave-window.css",
         "windows-companion/src/main/hub.ts",
-        "windows-companion/src/shared/ipc.ts"
+        "windows-companion/src/shared/ipc.ts",
+        "docker-container/src/web/lib/playlists.ts",
+        "windows-companion/src/renderer/playlists.ts"
       ],
       "evidence": [
         {
@@ -3546,7 +3552,7 @@
         {
           "type": "test",
           "path": "docker-container/tests/dom/search.dom.test.tsx",
-          "name": "Add to Library and Download… go to the hub’s queue with a rights basis; Add to Playlist says the hub keeps none"
+          "name": "Add to Library and Download… go to the hub’s queue with a rights basis"
         },
         {
           "type": "test",
@@ -3587,6 +3593,16 @@
           "type": "test",
           "path": "windows-companion/tests/integration/companion-and-hub.test.ts",
           "name": "says why there is no group to offer: no hub, or no permission to join groups"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "Add to Playlist ▸ lists the hub’s playlists, ticked where the song is, and files it — with the library too, by default (UX-PL-005)"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-search.dom.test.tsx",
+          "name": "Add to Playlist ▸ lists this PC’s playlists, ticked where the song is, and files it — with the library too, by default (CMP-PL-004)"
         }
       ]
     },
@@ -3865,6 +3881,497 @@
           "type": "test",
           "path": "music-player/tests/e2e/np/discover-online.spec.ts",
           "name": "asks for the next picks’ previews within its budget, one at a time, and the UI never waits on it"
+        }
+      ]
+    },
+    {
+      "id": "UX-PL-001",
+      "group": "playlists",
+      "title": "The hub keeps its playlists in a folder inside its data volume, which the admin can change",
+      "contract": "The owner’s words (2026-10-10): “Give the hub and companion app a folder to store or write playlists to.” The hub’s playlist folder is `<data>/playlists` by default (the data volume, `/data` in the container). Music ▸ Playlists ▸ Playlist folder shows it with Change…, a sheet with a path field: a folder under `playlists/` or `library/` in the data volume, typed relative (“library/Playlists”) or written out (“/data/library/Playlists”). The server decides (`PUT /api/v1/playlists/folder`, admin only): each segment is plain (letters, digits, spaces, dots, dashes, underscores, brackets), no drive, no root, no `..`, no reserved name, and once made its real path must still be inside the data volume, so a link inside the volume cannot lead out. When the folder holds playlists the sheet offers “Move the N playlists there too” (on): they are rewritten in the new folder, relative paths worked out again, and removed from the old one only once written; what could not be moved is named. A refused folder leaves the old one in place and says why under the field.",
+      "example": "“library/Playlists” with Move on → “Playlists are kept in /data/library/Playlists now. Moved 2 playlists there.” “../etc” → “Playlists can be kept in a folder inside the hub’s data volume, under /data/playlists or /data/library …”",
+      "authority": "adopted",
+      "owners": [
+        "docker-container/src/playlists/service.ts",
+        "docker-container/src/api/routes/playlists.ts",
+        "docker-container/src/web/views/Playlists.tsx",
+        "docker-container/src/web/lib/playlists.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "docker-container/tests/integration/playlists.test.ts",
+          "name": "moves the playlists to a new folder inside the data volume when asked"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/security/playlist-folder.test.ts",
+          "name": "refuses %j and keeps the folder it had"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/security/playlist-folder.test.ts",
+          "name": "refuses a symbolic link inside the volume that leads out of it"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/playlists.dom.test.tsx",
+          "name": "changes the folder inside the data volume and offers to move the playlists there"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/playlists.dom.test.tsx",
+          "name": "says why when the server refuses a folder"
+        }
+      ]
+    },
+    {
+      "id": "UX-PL-002",
+      "group": "playlists",
+      "title": "A playlist is an .m3u8 any player can open, with an .airwave.json sidecar beside it",
+      "contract": "One `<name>.m3u8` per playlist: `#EXTM3U`, `#PLAYLIST:<name>`, then for each song `#EXTINF:<seconds>,<artist> - <title>` (−1 when the length is unknown) and its location — a path relative to the folder, with forward slashes, when the library has the file (matched by ISRC, else by artist and title within 3 s), otherwise the song’s best source URL (the best fetchable one, else its first). Beside it `<name>.airwave.json` (format `airwave-playlist`, version 1) carries what M3U cannot: the playlist’s id, created and updated times, who made it, its description and its 2×2 cover mosaic, and each entry’s id, catalog id, ISRC, artists, album, artwork, platforms, sources, added time and who added it. The M3U decides which songs are in the list and in what order; the sidecar is matched back to it by location. File names are the playlist’s name made safe for Windows and Linux (`sanitizeFilename`: no separators, control characters, reserved names or trailing dots, 120 characters at most) and unique in the folder, case-insensitively (“Mix (2)”). Line breaks never reach a line. Every file is written to a temporary name beside it and renamed over the old one, sidecar first, one write at a time. Shared by the hub and the companion (`@now-playing/domain/playlist-folder`).",
+      "example": "#EXTM3U / #PLAYLIST:Road Trip / #EXTINF:215,Daft Punk - Digital Love / ../library/music/Daft Punk/Discovery/03 Digital Love.flac / #EXTINF:220,Röyksopp - Eple / https://www.deezer.com/track/3135556",
+      "authority": "adopted",
+      "owners": [
+        "packages/domain/src/playlist-folder/format.ts",
+        "packages/domain/src/playlist-folder/store.ts",
+        "packages/contracts/src/api/playlist-folder.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/playlist-folder.test.ts",
+          "name": "writes #EXTM3U, #PLAYLIST and #EXTINF:<secs>,<artist> - <title> before each location"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/playlist-folder.test.ts",
+          "name": "round-trips what it writes"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/playlist-folder.test.ts",
+          "name": "cannot be made to write an extra line: names, artists and titles lose their line breaks"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/playlist-folder.test.ts",
+          "name": "creates a playlist as an .m3u8 and a sidecar: a library song as a relative path, another by its source URL"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/playlist-folder.test.ts",
+          "name": "round-trips through a fresh store (nothing kept in memory)"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/playlist-folder.test.ts",
+          "name": "keeps names unique and safe, and never writes outside the folder"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/playlist-folder.test.ts",
+          "name": "writes atomically: a temporary file renamed over the old one, nothing left behind"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/integration/playlists.test.ts",
+          "name": "files a song the library has as a path relative to the folder, and a player can stream it by id"
+        }
+      ]
+    },
+    {
+      "id": "UX-PL-003",
+      "group": "playlists",
+      "title": "A list dropped into the folder by hand is shown, read-only until it is changed here; outside edits show up",
+      "contract": "Every read rescans the folder (a file is parsed again only when its size or time, or its sidecar’s, changed), so a list edited in another player, or an `.m3u`/`.m3u8` put there by hand, appears the next time anything is opened; the companion also watches the folder. A list without a sidecar is “made outside Airwave”: listed with “Hand-made”, opened with a note, and never rewritten by reading it. The first change made to it here adopts it — it is written as `.m3u8` with a sidecar, keeping its id — and the person’s own lines are kept as they wrote them. An absolute path in a hand-made list (`C:\\…`, `/…`, `file:`) is neither shown nor followed; a relative one is looked at only when it resolves inside the playlist folder or the library’s folders; a symbolic link in the folder is not followed. A list reordered or trimmed elsewhere keeps the metadata of the songs it still holds.",
+      "example": "“Old Favourites.m3u” → “Old Favourites · 1 song · made outside Airwave”; after Add to Playlist ▸ Old Favourites → “Old Favourites.m3u8” and “Old Favourites.airwave.json”.",
+      "authority": "adopted",
+      "owners": [
+        "packages/domain/src/playlist-folder/format.ts",
+        "packages/domain/src/playlist-folder/store.ts",
+        "packages/contracts/src/api/playlist-folder.ts",
+        "windows-companion/src/main/playlists.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/playlist-folder.test.ts",
+          "name": "reads a hand-made list: a BOM, CRLF, blank lines, no #EXTINF, comments"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/playlist-folder.test.ts",
+          "name": "matches the sidecar back by location after the list was reordered and trimmed elsewhere"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/playlist-folder.test.ts",
+          "name": "shows a hand-made .m3u read-only, adopts it on the first change, and keeps its id"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/playlist-folder.test.ts",
+          "name": "picks up a list edited outside Airwave the next time it is read"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/playlist-folder.test.ts",
+          "name": "does not follow a symbolic link in the folder"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/integration/playlists.test.ts",
+          "name": "shows a hand-made .m3u8 read-only, with its absolute paths hidden"
+        }
+      ]
+    },
+    {
+      "id": "UX-PL-004",
+      "group": "playlists",
+      "title": "The hub’s playlists are an API: the admin may do everything, a device with playlists:use files into any list and changes only its own",
+      "contract": "`/api/v1/playlists` lists (with `catalogId`/`isrc`, whether each list holds that song), creates, reads a page of songs (≤ 200), renames, deletes, adds (≤ 500 a request; a song already there is skipped), removes, moves and exports (`audio/x-mpegurl`, the file as it is). The admin session may do everything, with the CSRF token on every change; the folder itself is the admin’s alone. A paired device needs `playlists:use`: it reads every list, makes new ones and files songs into any — filing is additive and the hub is the household’s shelf — but renames, reorders and deletes only lists it made, and removes only songs it added or songs in a list it made. A playlist holds at most 10,000 songs and a folder 1,000 playlists; past either the hub says so in words. Ids are opaque (`[A-Za-z0-9_-]`), never paths. Every change is audited.",
+      "example": "A player: POST /api/v1/playlists/{id}/entries {tracks:[…]} → {added: 1, skipped: 0}; DELETE /api/v1/playlists/{admin’s id} → 403 “Only the hub admin, or the device that made it, may change …”.",
+      "authority": "adopted",
+      "owners": [
+        "docker-container/src/playlists/service.ts",
+        "docker-container/src/api/routes/playlists.ts",
+        "packages/contracts/src/api/routes.ts",
+        "packages/contracts/src/api/playlist-folder.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "docker-container/tests/integration/playlists.test.ts",
+          "name": "creates, files, ticks, pages, moves, removes, renames, exports and deletes"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/integration/playlists.test.ts",
+          "name": "lets a device read every list, make its own, and file into any"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/security/playlist-folder.test.ts",
+          "name": "needs a signed-in admin or a device with playlists:use"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/security/playlist-folder.test.ts",
+          "name": "asks the admin for the CSRF token on every change"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/security/playlist-folder.test.ts",
+          "name": "lets a device change only what it made, and remove only what it added"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/security/playlist-folder.test.ts",
+          "name": "holds a playlist to 10,000 songs"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/security/playlist-folder.test.ts",
+          "name": "holds a request to 500 songs and a folder to 1,000 playlists"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/security/playlist-folder.test.ts",
+          "name": "turns a name into a safe file inside the folder, whatever it says"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/security/playlist-folder.test.ts",
+          "name": "refuses an id that is a path"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/playlist-folder.test.ts",
+          "name": "enforces the caps: songs per playlist and playlists per folder"
+        }
+      ]
+    },
+    {
+      "id": "UX-PL-005",
+      "group": "playlists",
+      "title": "Add to Playlist ▸ in the hub’s Search lists the folder’s playlists, ticked where the song is, and writes",
+      "contract": "A song row’s menu (UX-SEARCH-012) has Add to Playlist ▸: the folder’s playlists, read again for each menu with the song, each a menu checkbox ticked when the song is already in it, then New Playlist…. A ticked one says the song is there already. Choosing one opens a sheet: the playlist keeps the song’s link, so it plays before it is in the library; “Also add to Library”, on by default, queues the download as well, with the rights basis every download states (DEC-036); a song only a store has is filed by its store link with nothing to fetch. New Playlist… asks for the name in the same sheet. The status line says what was written, and what the library did.",
+      "example": "“Harbour Lights” ▸ … ▸ Add to Playlist ▸ Road Trip ▸ Add to Playlist → “Harbour Lights” is in “Road Trip” now. It is joining the hub’s library too. Queued from YouTube Music. …",
+      "authority": "adopted",
+      "owners": [
+        "docker-container/src/web/views/Search.tsx",
+        "docker-container/src/web/lib/playlists.ts",
+        "docker-container/src/web/lib/menu.tsx"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "Add to Playlist ▸ lists the hub’s playlists, ticked where the song is, and files it — with the library too, by default (UX-PL-005)"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/e2e/search.spec.ts",
+          "name": "Add to Playlist ▸ New Playlist… files a song into the hub’s playlist folder, and Music ▸ Playlists opens it like an album (UX-PL-005, UX-PL-007)"
+        }
+      ]
+    },
+    {
+      "id": "UX-PL-006",
+      "group": "playlists",
+      "title": "Music ▸ Playlists lists the hub’s playlists with their mosaics, and the players’ copies apart",
+      "contract": "A list box (UX-KEY-001) of the folder’s playlists: the 2×2 mosaic of its first four songs’ artwork, its name, “N songs · length”, and “Hand-made” for a list made outside Airwave; Enter or a click opens it. New Playlist… asks for a name. The folder’s path is said in the group’s hint and in Playlist folder (UX-PL-001). The playlists paired players sync to the hub stay theirs, read-only, under “Shared from players”.",
+      "example": "Road Trip · 3 songs · 11 min; Old Favourites · 1 song · made outside Airwave · Hand-made. Shared from players: Kitchen Mix, 12 songs.",
+      "authority": "adopted",
+      "owners": [
+        "docker-container/src/web/views/Playlists.tsx",
+        "docker-container/src/web/lib/playlists.ts",
+        "packages/domain/src/catalog/folder-playlists.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/playlists.dom.test.tsx",
+          "name": "lists the folder’s playlists with their mosaics and lengths, a hand-made one marked, the folder and the players’ copies apart"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/playlists.dom.test.tsx",
+          "name": "makes a new playlist from New Playlist…"
+        }
+      ]
+    },
+    {
+      "id": "UX-PL-007",
+      "group": "playlists",
+      "title": "A playlist opens like an album, and its songs move, leave and export from the keyboard as from the pointer",
+      "contract": "Opened (UX-SEARCH-004 style): Back, its name as the page heading (focused), the big mosaic, “Playlist · N songs · length”, its file name, and Rename…, Export .m3u8 (the file, named as it is) and Delete… (asked in a sheet first, saying the songs stay in the library and at their sources). Its songs are a list box: number, cover, title, artist and album, where it plays from (“In the library”, “Plays from Deezer”, or “Not found”), and length. A song moves by dragging it, or with Alt+↑/↓ on the highlighted row; Delete or Backspace takes it out; its “…”, a right-click, Shift+F10 or the Menu key open its menu (Move Up, Move Down, Open Its Link, Remove from Playlist). More Songs reads the next 200.",
+      "example": "Alt+↓ on “Harbour Lights” → “Moved “Harbour Lights” to number 2.”",
+      "authority": "adopted",
+      "owners": [
+        "docker-container/src/web/views/Playlists.tsx",
+        "docker-container/src/web/lib/playlists.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/playlists.dom.test.tsx",
+          "name": "opens like an album: the mosaic, the name, the length, and where each song plays from"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/playlists.dom.test.tsx",
+          "name": "moves a song with Alt+↓, by drag, and takes one out with Delete"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/playlists.dom.test.tsx",
+          "name": "its menu moves, opens the link and removes; Shift+F10 opens it"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/playlists.dom.test.tsx",
+          "name": "renames, and deletes only once asked"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/e2e/search.spec.ts",
+          "name": "Add to Playlist ▸ New Playlist… files a song into the hub’s playlist folder, and Music ▸ Playlists opens it like an album (UX-PL-005, UX-PL-007)"
+        }
+      ]
+    },
+    {
+      "id": "UX-PL-008",
+      "group": "playlists",
+      "title": "A device syncs its starred albums and playlists with the hub through library:sync",
+      "contract": "`/api/v1/catalog/saved` answers the admin (its own starred lists) and a device with `library:sync`: the device’s own (read and written, kept apart from every other device’s) and the admin’s as `shared`, read-only. A device never writes or removes anyone else’s.",
+      "example": "GET /api/v1/catalog/saved (device) → {items: [its own], shared: [the admin’s]}.",
+      "authority": "adopted",
+      "owners": [
+        "docker-container/src/api/routes/catalog.ts",
+        "docker-container/src/db/repositories/saved-collections.ts",
+        "packages/contracts/src/api/routes.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "docker-container/tests/security/playlist-folder.test.ts",
+          "name": "needs library:sync, keeps each device’s own, and shows the admin’s as shared, read-only"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/integration/catalog.test.ts",
+          "name": "needs the admin or a device with library:sync (DEC-041), never an anonymous caller, and a change needs the CSRF token"
+        }
+      ]
+    },
+    {
+      "id": "CMP-PL-001",
+      "group": "playlists",
+      "title": "The companion keeps its playlists in Music\\Airwave Playlists, changed only through the system’s folder picker",
+      "contract": "The default is `%USERPROFILE%\\Music\\Airwave Playlists` — beside the library, not inside a library folder, which may be read-only or a network share and would be scanned (DEC-041). Settings ▸ Playlists shows it with Change… (the system’s folder picker: the window never names a path, and `playlistDir` is not a preference the window can set), Open Folder, and “Move my playlists when the folder changes” (on). Moving rewrites the lists in the new folder with their relative paths worked out again, and keeps the old folder when the new one cannot be written. Restore Defaults and restoring a backup leave the folder where it is.",
+      "example": "Change… ▸ D:\\Music\\Playlists → “Playlists are kept in D:\\Music\\Playlists now. Moved 1 playlist there.”",
+      "authority": "adopted",
+      "owners": [
+        "windows-companion/src/main/playlists.ts",
+        "windows-companion/src/shared/ipc.ts",
+        "windows-companion/src/main/index.ts",
+        "windows-companion/src/renderer/views/Playlists.tsx",
+        "windows-companion/src/renderer/views/Settings.tsx"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "windows-companion/tests/integration/playlist-folder.test.ts",
+          "name": "starts at Airwave Playlists in the Music folder, the default, and answers by the IPC contract"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/integration/playlist-folder.test.ts",
+          "name": "shows a hand-made list, adopts it on the first change, exports it, and moves everything to a newly chosen folder"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/contract/playlists-ipc.test.ts",
+          "name": "never take a folder from the window: the picker and Open Folder take no path, and preferences refuse one"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-playlists.dom.test.tsx",
+          "name": "shows the folder, changes it only through the system picker with the playlists moved along, and opens it"
+        }
+      ]
+    },
+    {
+      "id": "CMP-PL-002",
+      "group": "playlists",
+      "title": "The companion’s playlists are the same files and shapes as the hub’s, over playlists:* IPC",
+      "contract": "Twelve channels in `windows-companion/src/shared` (list, get, create, update, delete, add, remove, move, export, folder, pick-dir, open-folder), validated both ways, answering the shapes `/api/v1/playlists` serves; a change answers with its result or null and the reason in words. File access lives in the main process beside the library’s: a song a music folder has is filed as a path relative to the playlist folder (and played by the library’s id), any other by its source URL.",
+      "example": "playlists:get {playlistId: \"not-there\"} → {result: null, reason: \"That playlist isn’t in the playlist folder any more.\"}",
+      "authority": "adopted",
+      "owners": [
+        "windows-companion/src/main/playlists.ts",
+        "windows-companion/src/shared/ipc.ts",
+        "windows-companion/src/shared/channels.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "windows-companion/tests/contract/playlists-ipc.test.ts",
+          "name": "are all allowlisted and registered, with the change event"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/contract/playlists-ipc.test.ts",
+          "name": "take ids, not paths, and refuse what they do not know"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/contract/playlists-ipc.test.ts",
+          "name": "answer in the shapes the hub serves"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/integration/playlist-folder.test.ts",
+          "name": "files a library song as a relative path the library resolves, and any other song by its source"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/integration/playlist-folder.test.ts",
+          "name": "answers a failure with its reason instead of throwing"
+        }
+      ]
+    },
+    {
+      "id": "CMP-PL-003",
+      "group": "playlists",
+      "title": "A list changed in the companion’s folder by another player shows up without a click",
+      "contract": "The main process watches the playlist folder while the app runs and tells the window (`event:playlists-changed`, debounced); Library ▸ Playlists reads the folder again, and an open playlist reads itself again.",
+      "example": "A .m3u8 saved into the folder by another player appears in the list.",
+      "authority": "adopted",
+      "owners": [
+        "windows-companion/src/main/playlists.ts",
+        "windows-companion/src/renderer/views/Playlists.tsx"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "windows-companion/tests/integration/playlist-folder.test.ts",
+          "name": "notices a list changed on disk by another player"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-playlists.dom.test.tsx",
+          "name": "reads the folder again when it changes on disk"
+        }
+      ]
+    },
+    {
+      "id": "CMP-PL-004",
+      "group": "playlists",
+      "title": "Add to Playlist ▸ in the companion’s Search writes into this PC’s playlists",
+      "contract": "As UX-PL-005, through `playlists:list` (with the song, for the ticks), `playlists:add` and `playlists:create`; “Also add to Library” (on by default) takes the helper’s own download path into this PC’s library (`catalog:download`) with the rights basis.",
+      "example": "“Harbour Lights” is in “Road Trip” now. It is joining this PC’s library too. Downloading from YouTube Music.",
+      "authority": "adopted",
+      "owners": [
+        "windows-companion/src/renderer/views/Search.tsx",
+        "windows-companion/src/renderer/playlists.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-search.dom.test.tsx",
+          "name": "Add to Playlist ▸ lists this PC’s playlists, ticked where the song is, and files it — with the library too, by default (CMP-PL-004)"
+        }
+      ]
+    },
+    {
+      "id": "CMP-PL-005",
+      "group": "playlists",
+      "title": "Library ▸ Playlists in the companion: the mosaics, a list opened like an album, its songs moved and taken out",
+      "contract": "As UX-PL-006 and UX-PL-007, in the companion’s kit: the list box of playlists with their mosaics, opened with Rename…, Export… (the save dialog) and Delete… (asked first); songs moved by drag or Alt+↑/↓, taken out with Delete or from the row’s menu.",
+      "example": "Road Trip · 2 songs · 7 min.",
+      "authority": "adopted",
+      "owners": [
+        "windows-companion/src/renderer/views/Playlists.tsx",
+        "windows-companion/src/renderer/playlists.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-playlists.dom.test.tsx",
+          "name": "lists the folder’s playlists with their mosaics, and opens one like an album"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-playlists.dom.test.tsx",
+          "name": "moves a song with Alt+↓, takes one out with Delete, exports, and deletes once asked"
+        }
+      ]
+    },
+    {
+      "id": "CMP-PL-006",
+      "group": "playlists",
+      "title": "On touch, a long press on a search or playlist row opens the same menu as a right-click",
+      "contract": "A finger or pen held still on a row for 500 ms (moving more than 10 px first is a scroll, lifting early is a tap) opens the row’s menu where it was pressed; the click it leaves behind does not also open the row. A mouse is never timed. The rows do not start a text selection on a long press.",
+      "example": "Hold “Harbour Wall” half a second → its menu.",
+      "authority": "adopted",
+      "owners": [
+        "windows-companion/src/renderer/long-press.ts",
+        "windows-companion/src/renderer/views/Search.tsx",
+        "windows-companion/src/renderer/views/Playlists.tsx"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-search.dom.test.tsx",
+          "name": "on touch, a long press on a row opens the same menu; a short tap or a moved finger does not (CMP-PL-006)"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-playlists.dom.test.tsx",
+          "name": "opens a song’s menu with a long press on touch (CMP-PL-006)"
         }
       ]
     }

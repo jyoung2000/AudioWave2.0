@@ -95,11 +95,25 @@ export const IPC_CHANNELS = [
   'catalog:unsave',
   'catalog:filter',
   'catalog:filter:set',
+
+  // The playlist folder (DEC-041; CMP-PL-001…): .m3u8 files and their sidecars, read and written here.
+  'playlists:list',
+  'playlists:get',
+  'playlists:create',
+  'playlists:update',
+  'playlists:delete',
+  'playlists:add',
+  'playlists:remove',
+  'playlists:move',
+  'playlists:export',
+  'playlists:folder',
+  'playlists:pick-dir',
+  'playlists:open-folder',
 ] as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[number];
 
 /** Events the main process pushes to the renderer. Same rule: an event not listed does not exist. */
-export const IPC_EVENT_NAMES = ['event:scan-progress', 'event:hub-status', 'event:transfer-progress', 'event:backup-progress', 'event:awsp-status', 'event:tv-links', 'event:notice', 'event:catalog-chunk'] as const;
+export const IPC_EVENT_NAMES = ['event:scan-progress', 'event:hub-status', 'event:transfer-progress', 'event:backup-progress', 'event:awsp-status', 'event:tv-links', 'event:notice', 'event:catalog-chunk', 'event:playlists-changed'] as const;
 
 export type IpcEvent = (typeof IPC_EVENT_NAMES)[number];

@@ -21,7 +21,7 @@
  * is the hub's view with the companion's kit (`search-kit.tsx`, DEC-026) and transport.
  */
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
-import type { CatalogAlbum, CatalogAlbumDetail, CatalogArtist, CatalogArtistDetail, CatalogCollection, CatalogEnrichment, CatalogLyrics, CatalogPlaylist, CatalogResolveResult, CatalogSearchSection, CatalogSource, CatalogSourceStatus, CatalogTrack, DownloadAuthorizationBasis, OutputFormat, SavedCollection } from '@now-playing/contracts';
+import type { CatalogAlbum, CatalogAlbumDetail, CatalogArtist, CatalogArtistDetail, CatalogCollection, CatalogEnrichment, CatalogLyrics, CatalogPlaylist, CatalogResolveResult, CatalogSearchSection, CatalogSource, CatalogSourceStatus, CatalogTrack, DownloadAuthorizationBasis, FolderPlaylistSummary, OutputFormat, SavedCollection } from '@now-playing/contracts';
 import { CATALOG_COLLECTION_CAP, CATALOG_PROVIDERS } from '@now-playing/contracts';
 import {
   albumLine,
@@ -65,6 +65,8 @@ import {
 import { invoke } from '../bridge.js';
 import { ALL_SECTIONS, catalogError, companionCatalog, useCatalogFilter, useLiveSearch, usePreview, useSavedCollections, type CatalogClient, type CatalogFilter, type CatalogSearchParams, type LiveSearch, type Preview, type SavedCollections } from '../catalog.js';
 import { Menu, type MenuAt, type MenuEntry } from '../menu.js';
+import { useLongPress } from '../long-press.js';
+import { companionPlaylists } from '../playlists.js';
 import { ActionError, Check, errorSentence, Field, Group, Note, Pop, Push, Sdot, Sheet, SearchUiProvider, useNow, useSearchUi } from '../search-kit.js';
 import type { HubGroupChoice } from '../../shared/ipc.js';
 
@@ -1154,14 +1156,9 @@ function BasisAndFormat({ basis, setBasis, format, setFormat }: { basis: Downloa
 
 /* ------------------------------------------------------------------ a song row's menu (UX-SEARCH-012) */
 
-type AddWhy = 'library' | 'playlist' | 'download';
+type AddWhy = 'library' | 'download';
 
-/**
- * Add to the library, or Download…: a song through the helper's download path with its rights basis,
- * into this PC's library. The companion keeps no playlists of its own — the ones it holds are the
- * players' copies, synced through the hub, and it never changes them — so Add to Playlist asks the
- * same, saying so.
- */
+/** Add to the library, or Download…: a song through the helper's download path with its rights basis, into this PC's library. */
 function AddSheet({ track, why, onDone, onCancel }: { track: CatalogTrack; why: AddWhy; onDone: (text: string) => void; onCancel: () => void }) {
   const [basis, setBasis] = useState<DownloadAuthorizationBasis>('user-owned');
   const [format, setFormat] = useState<OutputFormat>('original');
@@ -1179,10 +1176,9 @@ function AddSheet({ track, why, onDone, onCancel }: { track: CatalogTrack; why: 
       setBusy(false);
     }
   };
-  const title = why === 'download' ? `Download “${track.title}”` : why === 'playlist' ? 'Add to a playlist' : `Add “${track.title}” to the library`;
+  const title = why === 'download' ? `Download “${track.title}”` : `Add “${track.title}” to the library`;
   return (
     <Sheet title={title} onCancel={onCancel}>
-      {why === 'playlist' ? <p>The companion keeps no playlists of its own: the ones it holds are the players’, synced through the hub. Add “{track.title}” to this PC’s library instead, and a player can put it in one of its playlists.</p> : null}
       <p>
         The helper fetches it{from ? ` from ${platformLabel(from.platform)}` : ''} with its tags and cover, into the folder Settings ▸ Downloads names.
       </p>
@@ -1192,6 +1188,68 @@ function AddSheet({ track, why, onDone, onCancel }: { track: CatalogTrack; why: 
         <Push onClick={onCancel}>Cancel</Push>
         <Push primary busy={busy} onClick={() => void go()}>
           {why === 'download' ? 'Download' : 'Add to Library'}
+        </Push>
+      </div>
+    </Sheet>
+  );
+}
+
+/**
+ * Filing a song into a playlist from Add to Playlist ▸ (UX-SEARCH-012, CMP-PL-004): into the one
+ * chosen, or a new one named here. The entry is written whatever happens next — a song the library
+ * has as its file, any other by its source — and "Also add to Library", on by default, queues the
+ * download too, with the rights basis every download states (DEC-036).
+ */
+function FileSheet({ track, playlist, onDone, onCancel }: { track: CatalogTrack; playlist: FolderPlaylistSummary | null; onDone: (text: string) => void; onCancel: () => void }) {
+  const fetchable = pickDownloadSource(track.sources) !== null;
+  const [name, setName] = useState('');
+  const [also, setAlso] = useState(fetchable);
+  const [basis, setBasis] = useState<DownloadAuthorizationBasis>('user-owned');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const nameId = useId();
+  const go = async (): Promise<void> => {
+    if (!playlist && !name.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const into = playlist ? (await companionPlaylists.add(playlist.id, [track])).playlist : await companionPlaylists.create(name.trim(), [track]);
+      let said = playlist ? `“${track.title}” is in “${into.name}” now.` : `Made “${into.name}” with “${track.title}” in it.`;
+      if (also && fetchable) {
+        try {
+          said += ` It is joining this PC’s library too. ${await downloadToPc(track, basis, 'original')}`;
+        } catch (err) {
+          said += ` It couldn’t join this PC’s library: ${errorSentence(catalogError(err))}`;
+        }
+      }
+      onDone(said);
+    } catch (err) {
+      setError(catalogError(err));
+      setBusy(false);
+    }
+  };
+  return (
+    <Sheet title={playlist ? `Add “${track.title}” to “${playlist.name}”` : 'New Playlist'} onCancel={onCancel}>
+      {playlist ? null : (
+        <div className="pref">
+          <label className="k" htmlFor={nameId}>
+            Name:
+          </label>
+          <div className="v">
+            <Field id={nameId} value={name} maxLength={120} onChange={(event) => setName(event.currentTarget.value)} onKeyDown={(event) => event.key === 'Enter' && void go()} />
+          </div>
+        </div>
+      )}
+      <p>{fetchable ? `The playlist keeps the song’s link, so it plays even before it is in the library.` : `“${track.title}” is only in a store, so the playlist keeps its store link; there is nothing to fetch.`}</p>
+      <Check checked={also && fetchable} disabled={!fetchable} onChange={setAlso}>
+        Also add to Library
+      </Check>
+      {also && fetchable ? <BasisAndFormat basis={basis} setBasis={setBasis} /> : null}
+      <ActionError error={error} />
+      <div className="sheet__acts">
+        <Push onClick={onCancel}>Cancel</Push>
+        <Push primary busy={busy} disabled={!playlist && !name.trim()} reason="Name the playlist first." onClick={() => void go()}>
+          {playlist ? 'Add to Playlist' : 'Create'}
         </Push>
       </div>
     </Sheet>
@@ -1209,6 +1267,7 @@ function useSongMenu({ preview, present, say, open }: { preview: Preview; presen
   const [groups, setGroups] = useState<HubGroupChoice[] | null>(null);
   const [groupsError, setGroupsError] = useState<string | null>(null);
   const asked = useRef(false);
+  const [playlists, setPlaylists] = useState<{ trackId: string; items: FolderPlaylistSummary[]; reason: string | null } | null>(null);
 
   // The groups are read once the tab opens, so the menu knows where Up Next goes when it opens;
   // a failed read is tried again on the next menu.
@@ -1234,6 +1293,12 @@ function useSongMenu({ preview, present, say, open }: { preview: Preview; presen
     (track, at, returnTo) => {
       setShown({ track, at, returnTo });
       loadGroups();
+      // Ticks need the song: the folder is read again for each menu (UX-SEARCH-012).
+      setPlaylists(null);
+      companionPlaylists
+        .list({ catalogId: track.id, ...(track.isrc ? { isrc: track.isrc } : {}) })
+        .then((answer) => setPlaylists({ trackId: track.id, items: answer.items, reason: answer.folder.available ? null : answer.folder.reason }))
+        .catch((err: unknown) => setPlaylists({ trackId: track.id, items: [], reason: errorSentence(catalogError(err)) }));
     },
     [loadGroups],
   );
@@ -1264,6 +1329,31 @@ function useSongMenu({ preview, present, say, open }: { preview: Preview; presen
     );
   };
 
+  const file = (track: CatalogTrack, playlist: FolderPlaylistSummary | null): void => {
+    if (playlist?.hasTrack) return say(`“${track.title}” is in “${playlist.name}” already.`);
+    present(
+      <FileSheet
+        track={track}
+        playlist={playlist}
+        onCancel={() => present(null)}
+        onDone={(text) => {
+          present(null);
+          say(text);
+        }}
+      />,
+    );
+  };
+
+  const toPlaylist = (track: CatalogTrack): MenuEntry => {
+    const known = playlists?.trackId === track.id ? playlists : null;
+    const chosen: MenuEntry[] = !known
+      ? [{ kind: 'item', label: 'Looking for playlists…', disabled: true, onSelect: () => undefined }]
+      : known.reason
+        ? [{ kind: 'item', label: 'The playlist folder can’t be read', disabled: true, note: known.reason, onSelect: () => undefined }]
+        : known.items.map((p) => ({ kind: 'item', label: p.name, checked: p.hasTrack === true, onSelect: () => file(track, p) }));
+    return { kind: 'sub', label: 'Add to Playlist', items: [...chosen, { kind: 'sep' }, { kind: 'item', label: 'New Playlist…', onSelect: () => file(track, null) }] };
+  };
+
   const entries = (track: CatalogTrack): MenuEntry[] => {
     const clip = previewOf(track.sources);
     const playing = clip !== null && preview.playing === clip.url;
@@ -1278,7 +1368,7 @@ function useSongMenu({ preview, present, say, open }: { preview: Preview; presen
             : { kind: 'sub', label: 'Add to Up Next', items: groups.map((g) => ({ kind: 'item', label: g.name, onSelect: () => void queue(track, g) })) };
     return [
       upNext,
-      { kind: 'item', label: 'Add to Playlist…', onSelect: () => add(track, 'playlist') },
+      toPlaylist(track),
       { kind: 'item', label: 'Add to Library…', onSelect: () => add(track, 'library') },
       { kind: 'sep' },
       { kind: 'item', label: 'Download…', onSelect: () => add(track, 'download') },
@@ -1357,13 +1447,23 @@ interface ListboxPaging {
  * A list box of music (UX-KEY-001, UX-SEARCH-008): one tab stop, the arrows, Home and End move the
  * highlight, Page Up/Down move eight rows (or turn a type page's pages), Enter opens, Space plays a
  * song's preview; a click opens (a click on ▶ plays). A song list's rows have a menu
- * (UX-SEARCH-012): their "…", a right-click, or Shift+F10 and the Menu key on the highlighted row.
+ * (UX-SEARCH-012): their "…", a right-click, Shift+F10 and the Menu key on the highlighted row, or
+ * (on touch) a long press (CMP-PL-006).
  */
 function Listbox<T>({ label, items, render, onOpen, onSpace, onMenu, empty, hint, pageSize, focusRequest, onPageKey, onActive }: { label: string; items: readonly T[]; render: (item: T, index: number) => ReactNode; onOpen: (item: T) => void; onSpace?: (item: T) => void; onMenu?: (item: T, at: MenuAt, list: HTMLElement) => void; empty: string; hint?: string } & ListboxPaging) {
   const [active, setActive] = useState(0);
   const id = useId();
   const list = useRef<HTMLUListElement>(null);
   const at = Math.min(active, Math.max(0, items.length - 1));
+
+  // On a touch screen a long press on a row opens its menu, as a right-click does (CMP-PL-006).
+  const press = useLongPress<HTMLUListElement>((target, point) => {
+    const row = target.closest<HTMLElement>('[data-index]');
+    if (!row || !onMenu || !list.current) return;
+    const index = Number(row.dataset['index']);
+    setActive(index);
+    onMenu(items[index]!, point, list.current);
+  });
 
   // A page turned from the footer or the keys: its first row takes the highlight and the keys.
   const request = focusRequest?.n;
@@ -1444,7 +1544,7 @@ function Listbox<T>({ label, items, render, onOpen, onSpace, onMenu, empty, hint
 
   return (
     <div className="well">
-      <ul ref={list} className="rows mrows" role="listbox" aria-label={label} tabIndex={0} aria-activedescendant={`${id}-${at}`} aria-describedby={hint ? `${id}-hint` : undefined} onKeyDown={onKeyDown} onClick={onClick} onContextMenu={onContextMenu}>
+      <ul ref={list} className="rows mrows" role="listbox" aria-label={label} tabIndex={0} aria-activedescendant={`${id}-${at}`} aria-describedby={hint ? `${id}-hint` : undefined} onKeyDown={onKeyDown} onClick={onClick} onContextMenu={onContextMenu} {...(onMenu ? press : {})}>
         {items.map((item, i) => (
           <li key={i} id={`${id}-${i}`} role="option" aria-selected={i === at} data-index={i} data-page={pageSize ? Math.floor(i / pageSize) + 1 : undefined}>
             {render(item, i)}

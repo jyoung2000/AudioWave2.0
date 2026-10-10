@@ -11,6 +11,7 @@
  */
 import recorded from '../../../packages/aqua-ui/styleguide/fixtures/companion-ipc.json' with { type: 'json' };
 import { CATALOG_STOCK } from '../lib/stock-catalog.mjs';
+import { PLAYLISTS_STOCK } from '../lib/stock-playlists.mjs';
 
 export const now = '2026-10-04T19:42:00.000Z';
 const at = (minutesAgo) => new Date(Date.parse(now) - minutesAgo * 60_000).toISOString();
@@ -154,4 +155,7 @@ export const answers = {
     ],
   },
   'backup:algorithms': { available: true, hubName: 'Airwave Hub', reason: null },
+  // The playlist folder (DEC-041), in this PC's default place; playlists:list is answered live by apps/companion.mjs.
+  'playlists:folder': { ...PLAYLISTS_STOCK.companion.folder, path: 'C:\\Users\\you\\Music\\Airwave Playlists' },
+  'playlists:get': { result: PLAYLISTS_STOCK.page, reason: null },
 };

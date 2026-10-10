@@ -1265,7 +1265,10 @@
       "authority": "adopted",
       "title": "Settings",
       "entry": "Settings tab → Settings",
-      "sourcePaths": ["windows-companion/src/renderer/views/Settings.tsx"],
+      "sourcePaths": [
+        "windows-companion/src/renderer/views/Settings.tsx",
+        "windows-companion/src/renderer/views/Playlists.tsx"
+      ],
       "components": [
         "Check",
         "LoadingRow",
@@ -1293,7 +1296,8 @@
         "Downloads: the folder from the system’s picker, format, how many at once and a speed limit",
         "new versions of the companion: checked by default, asked at once when switched on, said when one is out; Download opens the release page",
         "notifications when a download finishes: one preference with “When one finishes”",
-        "helper on your network: off by default; what it exposes said before it is switched on (DEC-032)"
+        "helper on your network: off by default; what it exposes said before it is switched on (DEC-032)",
+        "Playlists: the folder (Airwave Playlists in Music by default), Change… (the system picker), Open Folder, and “Move my playlists when the folder changes” (CMP-PL-001)"
       ],
       "rules": [
         "UX-PRIN-001",
@@ -1301,7 +1305,8 @@
         "UX-SETUP-001",
         "UX-SAFE-001",
         "UX-NET-001",
-        "UX-PRIV-001"
+        "UX-PRIV-001",
+        "CMP-PL-001"
       ],
       "mockup": "companion-settings",
       "decision": "DEC-018"
@@ -2343,7 +2348,8 @@
         "docker-container/src/web/lib/api.ts",
         "docker-container/src/web/styles.css",
         "packages/domain/src/catalog/view.ts",
-        "docker-container/src/web/lib/menu.tsx"
+        "docker-container/src/web/lib/menu.tsx",
+        "docker-container/src/web/lib/playlists.ts"
       ],
       "components": [
         "Group",
@@ -2375,10 +2381,11 @@
         "a type’s page footer: ‹ › and “Page N of M” (“M+” while more may exist), landing on a page’s first row, fetched first when needed",
         "another type chosen in the control, or the type’s field searched: that type alone, from the start",
         "Playlists: the starred ones first under “In your library”, then Deezer’s public playlists, twelve a page; one opened like an album (UX-SEARCH-010)",
-        "a song row’s menu (“…”, right-click, Shift+F10): Add to Up Next (▸ groups), Add to Playlist…, Add to Library…, Download…, Audition, Open Details (UX-SEARCH-012)",
+        "a song row’s menu (“…”, right-click, Shift+F10): Add to Up Next (▸ groups), Add to Playlist ▸, Add to Library…, Download…, Audition, Open Details (UX-SEARCH-012)",
         "Add to Up Next: queued in a group (“Up Next in Studio: …, number 3.”), the hub’s reason when it could not, “Queueing needs a group” with none",
-        "Add to Library… / Add to Playlist… / Download… (sheet): the rights basis (and format), into the hub’s download queue; Add to Playlist says the hub keeps no playlists of its own",
         "a song only a store has: nothing to queue or fetch, said in words",
+        "Add to Library… / Download… (sheet): the rights basis (and format), into the hub’s download queue",
+        "Add to Playlist ▸: the hub’s playlists, ticked where the song is, and New Playlist…; the sheet keeps the song’s link and “Also add to Library” (on) queues the download with its basis (UX-PL-005)",
         "a song: cover, platforms, preview, genre/label/year (looking it up…), synced or plain lyrics (or none, or instrumental), Download with the rights basis and what happened",
         "an album: cover, label, date, songs, the star",
         "an artist: picture, top songs, albums (more as you scroll)",
@@ -2405,7 +2412,8 @@
         "UX-SEARCH-010",
         "UX-SEARCH-011",
         "UX-SEARCH-012",
-        "UX-CAT-005"
+        "UX-CAT-005",
+        "UX-PL-005"
       ],
       "guideAnchor": "screens",
       "mockup": "hub-search",
@@ -2452,7 +2460,9 @@
         "windows-companion/src/main/catalog.ts",
         "windows-companion/src/shared/ipc.ts",
         "windows-companion/src/renderer/menu.tsx",
-        "windows-companion/src/main/hub.ts"
+        "windows-companion/src/main/hub.ts",
+        "windows-companion/src/renderer/playlists.ts",
+        "windows-companion/src/renderer/long-press.ts"
       ],
       "components": [
         "Group",
@@ -2484,10 +2494,11 @@
         "a type’s page footer: ‹ › and “Page N of M” (“M+” while more may exist), landing on a page’s first row, fetched first when needed",
         "another type chosen in the control, or the type’s field searched: that type alone, from the start",
         "Playlists: the starred ones first under “In your library”, then Deezer’s public playlists, twelve a page; one opened like an album (UX-SEARCH-010)",
-        "a song row’s menu (“…”, right-click, Shift+F10): Add to Up Next (▸ groups), Add to Playlist…, Add to Library…, Download…, Audition, Open Details (UX-SEARCH-012)",
+        "a song row’s menu (“…”, right-click, Shift+F10): Add to Up Next (▸ groups), Add to Playlist ▸, Add to Library…, Download…, Audition, Open Details (UX-SEARCH-012)",
         "Add to Up Next: the paired hub’s group (the companion has no queue), its reason when it could not, or why there is no group (no hub, no permission, not in one)",
-        "Add to Library… / Add to Playlist… / Download… (sheet): the rights basis (and format), through the helper into this PC’s library; Add to Playlist says the companion keeps no playlists of its own",
         "a song only a store has: nothing to queue or fetch, said in words",
+        "Add to Library… / Download… (sheet): the rights basis (and format), through the helper into this PC’s library",
+        "Add to Playlist ▸: this PC’s playlists, ticked where the song is, and New Playlist…; “Also add to Library” (on) takes the helper’s path (CMP-PL-004)",
         "a song: cover, platforms, preview, genre/label/year (looking it up…), synced or plain lyrics (or none, or instrumental), Download to this PC through the helper",
         "an album: cover, label, date, songs, the star",
         "an artist: picture, top songs, albums (more as you scroll)",
@@ -2495,7 +2506,8 @@
         "a link that cannot be read: the reason in words",
         "a failure: the reason in words under the field",
         "the helper not running: the reason in words",
-        "a row filled in by the engine’s last chunk: the credit line (“feat. …”), BPM, the explicit mark and a cover arrive after the row (UX-CAT-006)"
+        "a row filled in by the engine’s last chunk: the credit line (“feat. …”), BPM, the explicit mark and a cover arrive after the row (UX-CAT-006)",
+        "on touch: a long press (500 ms, within 10 px) on a row opens its menu (CMP-PL-006)"
       ],
       "rules": [
         "UX-SEARCH-001",
@@ -2515,12 +2527,127 @@
         "UX-SEARCH-010",
         "UX-SEARCH-011",
         "UX-SEARCH-012",
-        "UX-CAT-005"
+        "UX-CAT-005",
+        "CMP-PL-004",
+        "CMP-PL-006"
       ],
       "guideAnchor": "screens",
       "mockup": "companion-search",
       "authority": "adopted",
       "decision": "DEC-039"
+    },
+    {
+      "id": "hub-playlists",
+      "kind": "screen",
+      "product": "hub",
+      "platform": "web",
+      "title": "Playlists",
+      "entry": "Music tab → Playlists",
+      "sourcePaths": [
+        "docker-container/src/web/views/Playlists.tsx",
+        "docker-container/src/web/lib/playlists.ts",
+        "docker-container/src/web/styles.css",
+        "packages/domain/src/catalog/folder-playlists.ts",
+        "docker-container/src/web/lib/menu.tsx"
+      ],
+      "components": [
+        "Group",
+        "Field",
+        "Push",
+        "Check",
+        "Note",
+        "Sheet",
+        "confirmation sheet",
+        ".well of .rows list boxes",
+        ".art covers and 2×2 mosaic",
+        ".mhead",
+        ".menu contextual menu (window kit)"
+      ],
+      "states": [
+        "no playlists yet: the sentence says where they come from (here, or Search ▸ … ▸ Add to Playlist)",
+        "the folder’s playlists: mosaic, name, “N songs · length”; a hand-made one marked (UX-PL-006)",
+        "New Playlist… (sheet): the name",
+        "a playlist opened like an album: Back, heading, big mosaic, length, file name, Rename…, Export .m3u8, Delete… (UX-PL-007)",
+        "its songs: where each plays from (In the library, Plays from Deezer, Not found)",
+        "a song moved by drag or Alt+↑/↓; taken out with Delete or its menu (Move Up, Move Down, Open Its Link, Remove from Playlist)",
+        "More Songs past 200",
+        "a hand-made list: “made outside Airwave”, kept as it is until changed (UX-PL-003)",
+        "Rename… (sheet) and Delete… (confirmation sheet)",
+        "Playlist folder: the path in the data volume (the default), how many it holds, Change… (sheet: the path, “Move the N playlists there too”) (UX-PL-001)",
+        "a folder refused: the server’s reason under the field",
+        "the folder unreadable, or holding more than 1,000 playlists: said in words",
+        "Shared from players: the paired players’ synced copies, read-only, or the sentence saying none yet"
+      ],
+      "rules": [
+        "UX-PL-001",
+        "UX-PL-002",
+        "UX-PL-003",
+        "UX-PL-004",
+        "UX-PL-006",
+        "UX-PL-007",
+        "UX-KEY-001",
+        "UX-SAFE-001",
+        "UX-SEARCH-004"
+      ],
+      "guideAnchor": "screens",
+      "authority": "adopted",
+      "mockup": "hub-playlists",
+      "decision": "DEC-041"
+    },
+    {
+      "id": "companion-playlists",
+      "kind": "screen",
+      "product": "companion",
+      "platform": "windows",
+      "title": "Playlists",
+      "entry": "Library tool → Playlists",
+      "sourcePaths": [
+        "windows-companion/src/renderer/views/Playlists.tsx",
+        "windows-companion/src/renderer/playlists.ts",
+        "windows-companion/src/renderer/long-press.ts",
+        "windows-companion/src/renderer/styles.css",
+        "windows-companion/src/main/playlists.ts",
+        "windows-companion/src/shared/ipc.ts",
+        "windows-companion/src/renderer/menu.tsx"
+      ],
+      "components": [
+        "Group",
+        "Field",
+        "Push",
+        "Check",
+        "Note",
+        "Sheet (<dialog>)",
+        "confirmation sheet",
+        ".well of .rows list boxes",
+        ".art covers and 2×2 mosaic",
+        ".mhead",
+        ".menu contextual menu (window kit)"
+      ],
+      "states": [
+        "no playlists yet: the sentence says where they come from",
+        "the folder’s playlists with their mosaics; a hand-made one marked (CMP-PL-005)",
+        "New Playlist… (sheet)",
+        "a playlist opened like an album: Rename…, Export… (the save dialog), Delete… (asked first)",
+        "its songs: where each plays from; moved by drag or Alt+↑/↓; taken out with Delete or its menu",
+        "on touch: a long press on a song opens its menu (CMP-PL-006)",
+        "a list changed on disk by another player: read again by itself (CMP-PL-003)",
+        "the folder unreadable: the reason in words"
+      ],
+      "rules": [
+        "CMP-PL-001",
+        "CMP-PL-002",
+        "CMP-PL-003",
+        "CMP-PL-005",
+        "CMP-PL-006",
+        "UX-PL-002",
+        "UX-PL-003",
+        "UX-KEY-001",
+        "UX-SAFE-001"
+      ],
+      "guideAnchor": "screens",
+      "authority": "adopted",
+      "mockup": "companion-playlists",
+      "decision": "DEC-041"
     }
   ],
   "flows": [
@@ -2893,7 +3020,7 @@
         "A calm overview arrives as each service answers, in one column under the field: five songs, three artists, albums and playlists, each with “See all N”; the services’ line under them",
         "See all songs: the Songs page reads on as it scrolls; ‹ › or Page Up/Down move a page at a time; its own field searches songs alone; the control switches to Artists, Albums or Playlists",
         "Playlists: the starred ones first, then Deezer’s public ones; open one like an album",
-        "A song’s “…” (or right-click, Shift+F10): Add to Up Next (a group’s queue — on the companion, the paired hub’s), Add to Library… or Add to Playlist… (with the rights basis), Download…, Audition — the status line confirms",
+        "A song’s “…” (or right-click, Shift+F10): Add to Up Next (a group’s queue — on the companion, the paired hub’s), Add to Playlist ▸ (a playlist of the app’s own folder, or New Playlist…; Also add to Library on), Add to Library… (with the rights basis), Download…, Audition — the status line confirms",
         "Open a song: preview, genre, label, year, lyrics; download it (hub: into the queue with the rights basis; companion: through the helper)",
         "Or open an album or a pasted playlist and star it into the library"
       ],
@@ -2917,7 +3044,9 @@
         "UX-SEARCH-009",
         "UX-SEARCH-010",
         "UX-SEARCH-011",
-        "UX-SEARCH-012"
+        "UX-SEARCH-012",
+        "UX-PL-005",
+        "CMP-PL-004"
       ],
       "evidence": [
         "docker-container/tests/dom/search.dom.test.tsx",
@@ -2929,6 +3058,60 @@
         "packages/domain/tests/unit/catalog-paging.test.ts",
         "windows-companion/tests/integration/companion-and-hub.test.ts",
         "packages/domain/tests/unit/catalog-view.test.ts"
+      ]
+    },
+    {
+      "id": "flow-playlist-folder",
+      "title": "Keep playlists as files: file a song from search, open the playlist, move the folder (hub and companion)",
+      "preconditions": "The hub signed in, or the companion; no account or key anywhere.",
+      "steps": [
+        "Search ▸ a song’s … ▸ Add to Playlist ▸ New Playlist… ▸ a name ▸ Create (Also add to Library on: the download is queued with its basis)",
+        "The playlist is an .m3u8 and an .airwave.json in the playlist folder: a library song as a relative path, any other by its link",
+        "Hub: Music ▸ Playlists; companion: Library ▸ Playlists — open it like an album, move a song with Alt+↓ or by drag, take one out, rename, export",
+        "Add the same song again from search: the menu ticks the playlist, and says it is there already",
+        "Hub: Playlist folder ▸ Change… ▸ library/Playlists with Move on; companion: Settings ▸ Playlists ▸ Change… (the system picker) — the playlists go with it",
+        "A player (playlists:use) files into the hub’s playlists through /api/v1/playlists"
+      ],
+      "failures": [
+        "A folder outside the data volume (hub): refused, the old folder kept, the reason under the field",
+        "A folder the companion cannot write: the old one kept, the reason said",
+        "A playlist at 10,000 songs, or a folder at 1,000 playlists: said in words",
+        "A list made outside Airwave: shown read-only until it is changed here",
+        "A device changing a list it did not make: refused with the reason"
+      ],
+      "surfaces": [
+        "hub-search",
+        "hub-playlists",
+        "companion-search",
+        "companion-playlists",
+        "companion-settings"
+      ],
+      "rules": [
+        "UX-PL-001",
+        "UX-PL-002",
+        "UX-PL-003",
+        "UX-PL-004",
+        "UX-PL-005",
+        "UX-PL-006",
+        "UX-PL-007",
+        "CMP-PL-001",
+        "CMP-PL-002",
+        "CMP-PL-003",
+        "CMP-PL-004",
+        "CMP-PL-005",
+        "CMP-PL-006"
+      ],
+      "evidence": [
+        "packages/domain/tests/unit/playlist-folder.test.ts",
+        "docker-container/tests/integration/playlists.test.ts",
+        "docker-container/tests/security/playlist-folder.test.ts",
+        "docker-container/tests/dom/playlists.dom.test.tsx",
+        "docker-container/tests/dom/search.dom.test.tsx",
+        "docker-container/tests/e2e/search.spec.ts",
+        "windows-companion/tests/integration/playlist-folder.test.ts",
+        "windows-companion/tests/contract/playlists-ipc.test.ts",
+        "windows-companion/tests/dom/companion-playlists.dom.test.tsx",
+        "windows-companion/tests/dom/companion-search.dom.test.tsx"
       ]
     }
   ],

@@ -10,7 +10,8 @@
     ".": "./src/index.ts",
     "./radio-node": "./src/radio-node.ts",
     "./tool-install": "./src/tool-install/index.ts",
-    "./catalog": "./src/catalog/index.ts"
+    "./catalog": "./src/catalog/index.ts",
+    "./playlist-folder": "./src/playlist-folder/index.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit",

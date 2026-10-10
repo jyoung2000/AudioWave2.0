@@ -81,8 +81,13 @@ const BUNDLES: Bundle[] = [
      * bridge's playPreview (a clip through the same engine) and tools.keep (the hub's file indexed as a
      * copy) — measured, 259.0 KB (265,222 bytes: the entry 103,971, the shared chunk 154,951, the small
      * chunks 6,300). The catalog set, its look-ahead and the hub's download stay in the lazy search chunk.
+     *
+     * And to 263 for the playlist folders' contracts (DEC-041, 2026-10-10): the contracts barrel the
+     * entry imports now carries packages/contracts/src/api/playlist-folder.ts — the summary, entry,
+     * page, folder and sidecar schemas a player will use to file into hub playlists — measured, 4.7 KB
+     * minified (esbuild, zod external). The route table's new entries are not in the entry.
      */
-    entryBudgetKb: 260,
+    entryBudgetKb: 263,
     /*
      * The total rose from 1600 to 1900 when the hero gained the reference's jewel case.
      *
@@ -214,6 +219,10 @@ const BUNDLES: Bundle[] = [
      * online candidates, the look-ahead planner and runner, and the visit/fetch routes (now 144,493
      * bytes), and the shell's HTML the catalog set's heading, marks and toggle, the preview label and
      * the route-aware fetch sheet (now 948,028 bytes) — measured, 2609 KB in all, 34 KB more.
+     *
+     * Plus the playlist folders' contracts (DEC-041, 2026-10-10): the 5 KB in the entry above, and the
+     * folder-playlist words in @now-playing/domain/catalog that the lazy search chunk carries —
+     * measured on their own, under 1 KB (0.7 KB minified). The combined figure is measured below.
      */
     totalBudgetKb: 2615,
     // Three.js belongs to the constellation and the jewel case; the tag reader only to a scan.
@@ -230,7 +239,11 @@ const BUNDLES: Bundle[] = [
     // gzipped), which grew by about 14KB with a type's own page, Playlists and a song's menu. The
     // first load is unchanged and still under its 560KB budget; the total moves from 580KB to 600KB
     // for the chunk that loads only when Search is opened.
-    totalBudgetKb: 600,
+    // Measured 2026-10-10 (DEC-041, Music ▸ Playlists and Add to Playlist ▸): 614KB in all. Playlists is
+    // a second lazy chunk (14KB, with a 4KB client shared with Search), and the catalog code both
+    // share moved out of the entry into a shared lazy chunk (231KB), so the entry fell to 336KB
+    // (index JS 304KB, CSS 31KB, HTML 1KB); Search grew by under 1KB. The total moves to 615KB.
+    totalBudgetKb: 615,
     mustBeSplit: [],
   },
 ];

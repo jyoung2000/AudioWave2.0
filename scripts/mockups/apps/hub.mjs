@@ -11,11 +11,12 @@ import { ROOT, viteBuild } from '../lib/browser.mjs';
 import manifest from '../../../design/manifest.json' with { type: 'json' };
 import recording from '../fixtures/hub.json' with { type: 'json' };
 import { CATALOG_STOCK, hubCatalogAnswer } from '../lib/stock-catalog.mjs';
+import { hubPlaylistsAnswer } from '../lib/stock-playlists.mjs';
 
 const ORIGIN = recording.base;
 const TABS = ['overview', 'devices', 'music', 'search', 'groups', 'sharing', 'system'];
-const SEARCH = ['search-results', 'search-row-menu', 'search-filter', 'search-song', 'search-album', 'search-see-all', 'search-playlists', 'search-link', 'search-playlist'];
-const SIGNED_IN = [...TABS, 'groups-kitchen', 'devices-pairing', ...SEARCH];
+const SEARCH = ['search-results', 'search-row-menu', 'search-add-to-playlist', 'search-filter', 'search-song', 'search-album', 'search-see-all', 'search-playlists', 'search-link', 'search-playlist'];
+const SIGNED_IN = [...TABS, 'groups-kitchen', 'devices-pairing', 'music-playlist', 'music-playlist-folder', ...SEARCH];
 
 /** Which recorded phases answer, first match wins. */
 const PHASES = {
@@ -47,10 +48,16 @@ const LINKS = [
   { selector: 'button.push', text: 'Start Pairing', to: 'devices-pairing', in: ['devices'] },
   { selector: 'button[aria-label="Remove Live recordings"]', to: 'music-remove-folder', in: ['music'] },
   { selector: '.sheet__acts button', to: 'music', in: ['music-remove-folder'] },
+  // Music ▸ Playlists (DEC-041): a playlist opened like an album, and the folder's Change… sheet.
+  { selector: '#playlists [role="listbox"][aria-label="Playlists"] li', to: 'music-playlist', in: ['music'] },
+  { selector: '#playlists .srch__nav button', to: 'music', in: ['music-playlist'] },
+  { selector: '#playlists button.push', text: 'Change', to: 'music-playlist-folder', in: ['music'] },
+  { selector: '.sheet--form .sheet__acts button', to: 'music', in: ['music-playlist-folder'] },
   // Search (DEC-039, UX-SEARCH-007…012): the calm overview, a song row's menu, the filter sheet, a song, an
   // album, a type's own page (Songs) and the Playlists page, a pasted playlist and the list it opens.
   { selector: '.srch__bar button[type="submit"]', to: 'search-results', in: ['search'] },
   { selector: '[role="listbox"][aria-label="Songs"] [data-menu]', to: 'search-row-menu', in: ['search-results'] },
+  { selector: '.menu [aria-haspopup="menu"]', text: 'Add to Playlist', to: 'search-add-to-playlist', in: ['search-row-menu'] },
   { selector: '.srch__bar button.push', text: 'Filter', to: 'search-filter', in: ['search-results'] },
   { selector: '.sheet--form .sheet__acts button', to: 'search-results', in: ['search-filter'] },
   { selector: '[role="listbox"][aria-label="Songs"] li', to: 'search-song', in: ['search-results'] },
@@ -92,7 +99,8 @@ export default {
         if (url.origin !== ORIGIN || !url.pathname.startsWith('/api/')) return false;
         const method = route.request().method();
         // The catalog is answered from stock, not from the recording (scripts/mockups/lib/stock-catalog.mjs).
-        const catalog = hubCatalogAnswer(method, url.pathname, url.searchParams);
+        // So is the playlist folder (DEC-041): a recorded hub's folder would be empty.
+        const catalog = hubCatalogAnswer(method, url.pathname, url.searchParams) ?? hubPlaylistsAnswer(method, url.pathname, url.searchParams);
         if (catalog) {
           await route.fulfill({ status: catalog.status, headers: { 'content-type': catalog.contentType }, body: catalog.body });
           return true;
@@ -149,7 +157,7 @@ export default {
     const notes = {
       overview: 'The hub at a glance: tiles, what needs attention, provider health, this hub, and Sign Out.',
       devices: 'Pair a device (type and permissions), pairing codes, paired devices; and Profiles.',
-      music: 'Library folders (scan each), Providers, Music search (services, lyrics in downloads, the SongLink key), Downloads, Live TV from the companion, Recommendations.',
+      music: 'Library folders (scan each), Playlists (the folder’s lists with their mosaics, New Playlist…, the Playlist folder with Change…, and the players’ copies under Shared from players), Providers, Music search (services, lyrics in downloads, the SongLink key), Downloads, Live TV from the companion, Recommendations.',
       search: 'Search before anything is asked: the field, Track/Artist/Album, Filter….',
       groups: 'Listening together: groups, their invites and members.',
       sharing: 'Shared links (make one for a playlist or an album) and the Discord bot.',
@@ -171,7 +179,15 @@ export default {
     await click('[role="listbox"][aria-label="Songs"] [data-menu]', { ms: 800 });
     await until(() => Boolean(document.querySelector('.menu [aria-haspopup="menu"]')), undefined, { what: 'the row menu with the groups' });
     await click('.menu [aria-haspopup="menu"]', { ms: 600 });
-    await snap({ id: 'search-row-menu', title: 'Search ▸ A song’s menu', group: 'Search', note: 'A song row’s “…” (or a right-click, or Shift+F10): Add to Up Next ▸ a group’s queue, Add to Playlist… (the hub keeps none, so the library, said in its sheet), Add to Library…, Download…, Audition and Open Details.', dismiss: 'search-results', dismissOutside: '.menu' });
+    await snap({ id: 'search-row-menu', title: 'Search ▸ A song’s menu', group: 'Search', note: 'A song row’s “…” (or a right-click, or Shift+F10): Add to Up Next ▸ a group’s queue, Add to Playlist ▸ (the hub’s own playlists), Add to Library…, Download…, Audition and Open Details.', dismiss: 'search-results', dismissOutside: '.menu' });
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    await settle(400);
+    // Add to Playlist ▸ (UX-PL-005): the hub's own playlists, the one holding the song ticked, and New Playlist….
+    await click('[role="listbox"][aria-label="Songs"] [data-menu]', { ms: 800 });
+    await click('.menu [aria-haspopup="menu"]:has-text("Add to Playlist")', { ms: 600 });
+    await until(() => Boolean(document.querySelector('.menu--sub [role="menuitemcheckbox"]')), undefined, { what: 'the hub’s playlists in the submenu' });
+    await snap({ id: 'search-add-to-playlist', title: 'Search ▸ Add to Playlist ▸', group: 'Search', note: 'Add to Playlist ▸ lists the playlists in the hub’s folder — ticked where the song is already — and New Playlist…; choosing one asks whether to add the song to the library too (on), with the rights basis.', dismiss: 'search-results', dismissOutside: '.menu' });
     await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
     await settle(400);
@@ -211,6 +227,15 @@ export default {
     await snap({ id: 'music-remove-folder', title: 'Music ▸ Remove a folder (sheet)', group: 'Signed in', note: 'A confirmation sheet: it drops from under the toolbar and holds the keyboard until answered.', dismiss: 'music', dismissOutside: '.sheet' });
     await page.keyboard.press('Escape');
     await settle(400);
+    // Music ▸ Playlists (DEC-041): the folder's Change… sheet, then a playlist opened like an album.
+    await click('#playlists button.push:has-text("Change")', { ms: 600 });
+    await snap({ id: 'music-playlist-folder', title: 'Music ▸ Playlist folder (sheet)', group: 'Signed in', note: 'Change… asks for a folder inside the data volume, under playlists or library, and offers to move the playlists already kept there; the hub checks it.', dismiss: 'music', dismissOutside: '.sheet' });
+    await page.keyboard.press('Escape');
+    await settle(400);
+    await click('#playlists [role="listbox"][aria-label="Playlists"] li', { ms: 1500 });
+    await until(() => document.querySelectorAll('#playlists [role="listbox"][aria-label="Songs"] li').length > 1, undefined, { what: 'the playlist' });
+    await snap({ id: 'music-playlist', title: 'Music ▸ A playlist, opened', group: 'Signed in', note: 'Opened like an album: the mosaic, its length and file, Rename…, Export .m3u8 and Delete…; its songs, each saying where it plays from — the library, a link, or not found — moved by drag or Alt+↑/↓ and taken out with Delete or the row’s menu.' });
+    await click('#playlists .srch__nav button', { ms: 800 });
 
     phase('pairing');
     await tab('devices');
