@@ -18923,7 +18923,11 @@ var Scope = external_exports.enum([
   "shares:create",
   "profile:read",
   "profile:write",
-  "backup:read"
+  "backup:read",
+  /** Hub playlists (DEC-041): read every playlist in the hub's folder, make new ones, file songs into any, and change or delete only what it made or added. */
+  "playlists:use",
+  /** The caller's own starred albums and playlists, read and written, and the hub admin's, read (shared). */
+  "library:sync"
 ]);
 var DeviceKind = external_exports.enum(["player", "companion", "hub"]);
 var SyncedEntityBase = external_exports.object({
@@ -20715,6 +20719,7 @@ var SavedCollection = external_exports.object({
   covers: external_exports.array(external_exports.string().max(2048)).max(4).default([]),
   trackCount: external_exports.number().int().nonnegative().nullable().default(null)
 });
+var SavedCollectionList = external_exports.object({ items: external_exports.array(SavedCollection), shared: external_exports.array(SavedCollection).default([]) });
 var CatalogCollection = external_exports.object({
   ref: CatalogCollectionRef,
   /** The list's own cover, when the platform gives it one. */
@@ -20798,6 +20803,141 @@ var HELPER_CATALOG_ROUTES = {
   enrich: "/helper/v1/catalog/enrich"
 };
 var NDJSON_CONTENT_TYPE = "application/x-ndjson";
+
+// ../packages/contracts/src/api/playlist-folder.ts
+var PLAYLIST_FOLDER_ENTRY_CAP = 1e4;
+var PLAYLIST_FOLDER_PAGE_MAX = 200;
+var PLAYLIST_NAME_MAX = 120;
+var PLAYLIST_ADD_MAX = 500;
+var FolderPlaylistId = external_exports.string().regex(/^[A-Za-z0-9_-]{1,80}$/);
+var FolderPlaylistEntryId = external_exports.string().regex(/^[A-Za-z0-9_-]{1,80}$/);
+var PlaylistName = external_exports.string().trim().min(1, "A playlist needs a name.").max(PLAYLIST_NAME_MAX).refine((s) => !/[\u0000-\u001f\u007f]/.test(s), "A name cannot hold control characters.");
+var FolderPlaylistLocationKind = external_exports.enum(["library", "url", "missing"]);
+var FolderPlaylistEntry = external_exports.object({
+  id: FolderPlaylistEntryId,
+  title: external_exports.string().max(300),
+  /** The credited artist line. */
+  artist: external_exports.string().max(300),
+  artists: external_exports.array(external_exports.string().max(300)).max(20).default([]),
+  album: external_exports.string().max(300).nullable().default(null),
+  durationSec: external_exports.number().int().nonnegative().nullable().default(null),
+  /** What the M3U holds for it: a relative path or a URL. Never an absolute path. */
+  location: external_exports.string().max(4096).nullable(),
+  locationKind: FolderPlaylistLocationKind,
+  /** The library's id for the file, when the location is one: what a player streams. */
+  trackId: external_exports.string().max(80).nullable().default(null),
+  /** The catalog's `platform:id` for the song, when it came from search. */
+  catalogId: external_exports.string().max(260).nullable().default(null),
+  isrc: external_exports.string().max(20).nullable().default(null),
+  artworkUrl: external_exports.string().max(2048).nullable().default(null),
+  platforms: external_exports.array(CatalogPlatform).max(11).default([]),
+  sources: external_exports.array(CatalogSource).max(20).default([]),
+  addedAt: IsoDateTime.nullable().default(null),
+  /** Who added it: `admin`, a device id, or `companion`. Null in a hand-made list. */
+  addedBy: external_exports.string().max(80).nullable().default(null)
+});
+var FolderPlaylistSummary = external_exports.object({
+  id: FolderPlaylistId,
+  name: external_exports.string().max(PLAYLIST_NAME_MAX * 2),
+  /** The M3U's file name inside the folder (never a path). */
+  fileName: external_exports.string().max(260),
+  description: external_exports.string().max(2e3).nullable().default(null),
+  createdAt: IsoDateTime.nullable().default(null),
+  updatedAt: IsoDateTime,
+  entryCount: external_exports.number().int().nonnegative(),
+  durationSec: external_exports.number().int().nonnegative(),
+  /** The first four songs' artwork, in order: the 2×2 mosaic. */
+  covers: external_exports.array(external_exports.string().max(2048)).max(4).default([]),
+  origin: external_exports.enum(["airwave", "hand-made"]),
+  /** A hand-made list: Airwave shows it and leaves it alone until it is changed here. */
+  readOnly: external_exports.boolean(),
+  /** Who made it (`admin`, a device id, `companion`); null for a hand-made list. */
+  createdBy: external_exports.string().max(80).nullable().default(null),
+  /** Asked with a song (`catalogId`/`isrc`): whether that song is in it already. Null when not asked. */
+  hasTrack: external_exports.boolean().nullable().default(null)
+});
+var PlaylistFolderInfo = external_exports.object({
+  /** How the folder is shown: on the hub, inside the data volume (`/data/playlists`); on the companion, the folder itself. */
+  path: external_exports.string().max(4096),
+  /** On the hub, the folder relative to the data volume (`playlists`); null on the companion. */
+  relativePath: external_exports.string().max(500).nullable().default(null),
+  isDefault: external_exports.boolean(),
+  /** False when the folder cannot be read or written; `reason` says why. */
+  available: external_exports.boolean(),
+  reason: external_exports.string().max(600).nullable().default(null),
+  playlistCount: external_exports.number().int().nonnegative(),
+  /** More playlist files than `PLAYLIST_FOLDER_PLAYLIST_CAP`: the rest are not read. */
+  capped: external_exports.boolean().default(false)
+});
+var FolderPlaylistList = external_exports.object({ folder: PlaylistFolderInfo, items: external_exports.array(FolderPlaylistSummary) });
+var FolderPlaylistPage = external_exports.object({
+  playlist: FolderPlaylistSummary,
+  items: external_exports.array(FolderPlaylistEntry),
+  offset: external_exports.number().int().nonnegative(),
+  total: external_exports.number().int().nonnegative(),
+  hasMore: external_exports.boolean()
+});
+var FolderPlaylistListQuery = external_exports.object({
+  catalogId: external_exports.string().max(260).optional(),
+  isrc: external_exports.string().max(20).optional()
+});
+var FolderPlaylistPageQuery = external_exports.object({
+  offset: external_exports.coerce.number().int().min(0).max(PLAYLIST_FOLDER_ENTRY_CAP).default(0),
+  limit: external_exports.coerce.number().int().min(1).max(PLAYLIST_FOLDER_PAGE_MAX).default(100)
+});
+var FolderPlaylistCreate = external_exports.object({
+  name: PlaylistName,
+  description: external_exports.string().max(2e3).nullable().optional(),
+  /** Songs to start it with (from search). */
+  tracks: external_exports.array(CatalogTrack).max(PLAYLIST_ADD_MAX).default([])
+});
+var FolderPlaylistUpdate = external_exports.object({ name: PlaylistName.optional(), description: external_exports.string().max(2e3).nullable().optional() }).refine((v) => v.name !== void 0 || v.description !== void 0, "Nothing to change.");
+var FolderPlaylistAdd = external_exports.object({
+  tracks: external_exports.array(CatalogTrack).min(1).max(PLAYLIST_ADD_MAX),
+  /** Where to put them (0 = first); at the end when absent. */
+  position: external_exports.number().int().min(0).max(PLAYLIST_FOLDER_ENTRY_CAP).optional(),
+  /** Add a song even when it is in the list already. Off: a song already there is skipped. */
+  allowDuplicates: external_exports.boolean().default(false)
+});
+var FolderPlaylistAddResult = external_exports.object({ playlist: FolderPlaylistSummary, added: external_exports.number().int().nonnegative(), skipped: external_exports.number().int().nonnegative() });
+var FolderPlaylistRemove = external_exports.object({ entryIds: external_exports.array(FolderPlaylistEntryId).min(1).max(PLAYLIST_ADD_MAX) });
+var FolderPlaylistMove = external_exports.object({ entryId: FolderPlaylistEntryId, to: external_exports.number().int().min(0).max(PLAYLIST_FOLDER_ENTRY_CAP) });
+var PlaylistFolderChange = external_exports.object({
+  relativePath: external_exports.string().trim().min(1).max(500),
+  move: external_exports.boolean().default(true)
+});
+var PlaylistFolderChangeResult = external_exports.object({ folder: PlaylistFolderInfo, moved: external_exports.number().int().nonnegative(), failed: external_exports.array(external_exports.string().max(300)).max(50).default([]) });
+var PLAYLIST_SIDECAR_FORMAT = "airwave-playlist";
+var PlaylistSidecarEntry = external_exports.object({
+  id: FolderPlaylistEntryId,
+  /** The M3U line it belongs to: how a sidecar is matched back to a list edited elsewhere. */
+  location: external_exports.string().max(4096).nullable(),
+  title: external_exports.string().max(300),
+  artist: external_exports.string().max(300),
+  artists: external_exports.array(external_exports.string().max(300)).max(20).default([]),
+  album: external_exports.string().max(300).nullable().default(null),
+  durationSec: external_exports.number().int().nonnegative().nullable().default(null),
+  catalogId: external_exports.string().max(260).nullable().default(null),
+  isrc: external_exports.string().max(20).nullable().default(null),
+  artworkUrl: external_exports.string().max(2048).nullable().default(null),
+  platforms: external_exports.array(CatalogPlatform).max(11).default([]),
+  sources: external_exports.array(CatalogSource).max(20).default([]),
+  addedAt: IsoDateTime.nullable().default(null),
+  addedBy: external_exports.string().max(80).nullable().default(null)
+});
+var PlaylistSidecar = external_exports.object({
+  format: external_exports.literal(PLAYLIST_SIDECAR_FORMAT),
+  version: external_exports.literal(1),
+  id: FolderPlaylistId,
+  name: external_exports.string().max(PLAYLIST_NAME_MAX * 2),
+  description: external_exports.string().max(2e3).nullable().default(null),
+  createdAt: IsoDateTime,
+  updatedAt: IsoDateTime,
+  createdBy: external_exports.string().max(80).nullable().default(null),
+  /** The 2×2 mosaic: the first four songs' artwork. */
+  covers: external_exports.array(external_exports.string().max(2048)).max(4).default([]),
+  entries: external_exports.array(PlaylistSidecarEntry).max(PLAYLIST_FOLDER_ENTRY_CAP)
+});
 
 // ../packages/contracts/src/api/routes.ts
 function defineRoute(route) {
@@ -21126,10 +21266,30 @@ var routes = {
   catalogDownload: defineRoute({ method: "POST", path: "/catalog/download", operationId: "catalogDownload", summary: "Queue a catalog track through the download queue, from its best downloadable source, tagged with ISRC, genre, label, year and (setting) lyrics", tags: ["catalog", "downloads"], auth: "admin-or-device", scopes: ["downloads:request"], rateLimit: "write", body: external_exports.object({ track: CatalogTrack, authorization: DownloadAuthorizationInput, target: DownloadTargetInput }), response: external_exports.object({ job: DownloadJob, source: CatalogSource, embedded: external_exports.object({ isrc: external_exports.boolean(), genre: external_exports.boolean(), label: external_exports.boolean(), year: external_exports.boolean(), lyrics: external_exports.boolean() }) }), responseStatus: 201 }),
   catalogSettingsGet: defineRoute({ method: "GET", path: "/catalog/settings", operationId: "getCatalogSettings", summary: "Which catalog services are asked, lyrics embedding, and whether a SongLink key is set", tags: ["catalog"], auth: "admin", response: CatalogSettingsView }),
   catalogSettingsPut: defineRoute({ method: "PUT", path: "/catalog/settings", operationId: "putCatalogSettings", summary: "Change catalog services, lyrics embedding, or the (write-only) SongLink key", tags: ["catalog"], auth: "admin", rateLimit: "write", body: CatalogSettingsInput, response: CatalogSettingsView }),
-  /* starred albums and playlists in the admin's library (UX-SEARCH-005); the player syncs them later */
-  catalogSavedList: defineRoute({ method: "GET", path: "/catalog/saved", operationId: "listSavedCollections", summary: "The albums and playlists the admin starred, newest first", tags: ["catalog"], auth: "admin", response: external_exports.object({ items: external_exports.array(SavedCollection) }) }),
-  catalogSavedPut: defineRoute({ method: "PUT", path: "/catalog/saved", operationId: "saveCollection", summary: "Star an album or playlist (by its ref; saving it again refreshes it)", tags: ["catalog"], auth: "admin", rateLimit: "write", body: SavedCollection, response: external_exports.object({ items: external_exports.array(SavedCollection) }) }),
-  catalogSavedDelete: defineRoute({ method: "DELETE", path: "/catalog/saved", operationId: "unsaveCollection", summary: "Un-star an album or playlist", tags: ["catalog"], auth: "admin", rateLimit: "write", query: CatalogCollectionRef.pick({ platform: true, kind: true, id: true }), response: external_exports.object({ items: external_exports.array(SavedCollection) }) }),
+  /*
+   * Starred albums and playlists (UX-SEARCH-005). The admin's own; a device's own (`library:sync`),
+   * with the admin's starred lists as `shared`, so a player can sync stars (DEC-041).
+   */
+  catalogSavedList: defineRoute({ method: "GET", path: "/catalog/saved", operationId: "listSavedCollections", summary: "The albums and playlists the caller starred, newest first; for a device, the hub admin\u2019s starred lists as `shared`", tags: ["catalog"], auth: "admin-or-device", scopes: ["library:sync"], response: SavedCollectionList }),
+  catalogSavedPut: defineRoute({ method: "PUT", path: "/catalog/saved", operationId: "saveCollection", summary: "Star an album or playlist in the caller\u2019s own library (by its ref; saving it again refreshes it)", tags: ["catalog"], auth: "admin-or-device", scopes: ["library:sync"], rateLimit: "write", body: SavedCollection, response: SavedCollectionList }),
+  catalogSavedDelete: defineRoute({ method: "DELETE", path: "/catalog/saved", operationId: "unsaveCollection", summary: "Un-star an album or playlist in the caller\u2019s own library", tags: ["catalog"], auth: "admin-or-device", scopes: ["library:sync"], rateLimit: "write", query: CatalogCollectionRef.pick({ platform: true, kind: true, id: true }), response: SavedCollectionList }),
+  /*
+   * The hub's playlist folder (DEC-041; UX-PL-001…): one .m3u8 and one .airwave.json per playlist in
+   * `<data>/playlists` (Music ▸ Playlists). A device with `playlists:use` reads every list, makes new
+   * ones and files songs into any; it removes, moves, renames and deletes only in a list it made, or
+   * (removing) entries it added. The admin may do everything.
+   */
+  playlistsList: defineRoute({ method: "GET", path: "/playlists", operationId: "listFolderPlaylists", summary: "The playlists in the hub\u2019s playlist folder, rescanned (hand-made .m3u/.m3u8 files included); with catalogId/isrc, whether each holds that song", tags: ["playlists"], auth: "admin-or-device", scopes: ["playlists:use"], query: FolderPlaylistListQuery, response: FolderPlaylistList }),
+  playlistsCreate: defineRoute({ method: "POST", path: "/playlists", operationId: "createFolderPlaylist", summary: "A new playlist in the folder (a sanitised, unique file name), optionally with its first songs", tags: ["playlists"], auth: "admin-or-device", scopes: ["playlists:use"], rateLimit: "write", body: FolderPlaylistCreate, response: FolderPlaylistSummary, responseStatus: 201 }),
+  playlistsFolderGet: defineRoute({ method: "GET", path: "/playlists/folder", operationId: "getPlaylistFolder", summary: "Where the hub keeps playlists, inside the data volume", tags: ["playlists"], auth: "admin", response: PlaylistFolderInfo }),
+  playlistsFolderPut: defineRoute({ method: "PUT", path: "/playlists/folder", operationId: "putPlaylistFolder", summary: "Keep playlists in another folder inside the data volume (under playlists/ or library/), moving the ones already kept when asked", tags: ["playlists"], auth: "admin", rateLimit: "write", body: PlaylistFolderChange, response: PlaylistFolderChangeResult }),
+  playlistsGet: defineRoute({ method: "GET", path: "/playlists/:playlistId", operationId: "getFolderPlaylist", summary: "One playlist and a page of its songs", tags: ["playlists"], auth: "admin-or-device", scopes: ["playlists:use"], params: external_exports.object({ playlistId: FolderPlaylistId }), query: FolderPlaylistPageQuery, response: FolderPlaylistPage }),
+  playlistsUpdate: defineRoute({ method: "PATCH", path: "/playlists/:playlistId", operationId: "updateFolderPlaylist", summary: "Rename a playlist (its files follow) or change its description", tags: ["playlists"], auth: "admin-or-device", scopes: ["playlists:use"], rateLimit: "write", params: external_exports.object({ playlistId: FolderPlaylistId }), body: FolderPlaylistUpdate, response: FolderPlaylistSummary }),
+  playlistsDelete: defineRoute({ method: "DELETE", path: "/playlists/:playlistId", operationId: "deleteFolderPlaylist", summary: "Delete a playlist\u2019s .m3u8 and its sidecar (never the songs)", tags: ["playlists"], auth: "admin-or-device", scopes: ["playlists:use"], rateLimit: "write", params: external_exports.object({ playlistId: FolderPlaylistId }), response: Ok }),
+  playlistsAdd: defineRoute({ method: "POST", path: "/playlists/:playlistId/entries", operationId: "addFolderPlaylistEntries", summary: "File songs into a playlist: a relative path when the song is in the library, else its best source URL, with its catalog metadata in the sidecar", tags: ["playlists"], auth: "admin-or-device", scopes: ["playlists:use"], rateLimit: "write", params: external_exports.object({ playlistId: FolderPlaylistId }), body: FolderPlaylistAdd, response: FolderPlaylistAddResult }),
+  playlistsRemove: defineRoute({ method: "POST", path: "/playlists/:playlistId/entries/remove", operationId: "removeFolderPlaylistEntries", summary: "Take songs out of a playlist", tags: ["playlists"], auth: "admin-or-device", scopes: ["playlists:use"], rateLimit: "write", params: external_exports.object({ playlistId: FolderPlaylistId }), body: FolderPlaylistRemove, response: FolderPlaylistSummary }),
+  playlistsMove: defineRoute({ method: "POST", path: "/playlists/:playlistId/entries/move", operationId: "moveFolderPlaylistEntry", summary: "Move one song to another place in the playlist", tags: ["playlists"], auth: "admin-or-device", scopes: ["playlists:use"], rateLimit: "write", params: external_exports.object({ playlistId: FolderPlaylistId }), body: FolderPlaylistMove, response: FolderPlaylistSummary }),
+  playlistsExport: defineRoute({ method: "GET", path: "/playlists/:playlistId/export", operationId: "exportFolderPlaylist", summary: "The playlist as its .m3u8 file", tags: ["playlists"], auth: "admin-or-device", scopes: ["playlists:use"], params: external_exports.object({ playlistId: FolderPlaylistId }), response: external_exports.unknown(), responseContentType: "audio/x-mpegurl" }),
   artistReleases: defineRoute({ method: "GET", path: "/artists/releases", operationId: "latestReleases", summary: "Latest releases from MusicBrainz plus enabled playback providers", tags: ["discovery"], auth: "admin-or-device", scopes: ["search:use"], rateLimit: "search", query: external_exports.object({ mbid: external_exports.string().optional(), name: external_exports.string().optional(), refresh: external_exports.coerce.boolean().default(false) }), response: LatestReleasesResponse }),
   /* per-user provider accounts */
   accountsList: defineRoute({ method: "GET", path: "/accounts", operationId: "listAccounts", summary: "The caller's connected provider accounts", tags: ["accounts"], auth: "device", response: external_exports.object({ items: external_exports.array(ProviderAccount), available: external_exports.array(external_exports.object({ provider: ProviderId, configured: external_exports.boolean(), reason: external_exports.string().nullable() })) }) }),
