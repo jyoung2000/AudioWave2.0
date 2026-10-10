@@ -136,7 +136,8 @@ test('Add to Playlist ▸ New Playlist… files a song into the hub’s playlist
   const sheet = page.getByRole('dialog', { name: 'New Playlist' });
   await sheet.getByLabel('Name:').fill('E2E Harbour');
   // No download in a test run: the library is left out this time.
-  await sheet.getByRole('checkbox', { name: 'Also add to Library' }).uncheck();
+  await sheet.locator('label.chk', { hasText: 'Also add to Library' }).click();
+  await expect(sheet.getByRole('checkbox', { name: 'Also add to Library' })).not.toBeChecked();
   await sheet.getByRole('button', { name: 'Create' }).click();
   await expect(page.locator('.status')).toContainText('Made “E2E Harbour” with “Harbour Lights” in it.');
   // The menu now ticks it.
@@ -160,8 +161,9 @@ test('Add to Playlist ▸ New Playlist… files a song into the hub’s playlist
   await page.getByRole('button', { name: 'Delete…' }).click();
   const ask = page.getByRole('alertdialog', { name: 'Delete “E2E Harbour”?' });
   await ask.getByRole('button', { name: 'Delete' }).click();
-  await expect(lists).toBeVisible();
-  await expect(lists.getByRole('option', { name: /E2E Harbour/ })).toHaveCount(0);
+  // Back on the list, which no longer holds it (empty again on a fresh hub).
+  await expect(page.getByRole('heading', { name: 'Playlist folder', level: 2 })).toBeVisible();
+  await expect(page.locator('#playlists [role="option"]', { hasText: 'E2E Harbour' })).toHaveCount(0);
 });
 
 test('a pasted playlist shows its mosaic and platform, opens like an album, and the star keeps it in the hub', async ({ page }) => {

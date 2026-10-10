@@ -55,14 +55,14 @@ test('a permission can be ticked before the code is made, and the session shows 
   // Every permission is said in plain words, with its id as the small suffix beside it.
   const run = page.locator('label.chk', { hasText: 'Run groups' });
   await expect(run).toHaveText('Run groups group:admin');
-  await expect(page.getByRole('group', { name: 'What this device may do' }).getByRole('checkbox')).toHaveCount(16);
+  await expect(page.getByRole('group', { name: 'What this device may do' }).getByRole('checkbox')).toHaveCount(18);
   await run.click();
   await expect(page.getByLabel(/^Run groups/)).toBeChecked();
   await expect(page.getByText('This panel could not be displayed')).toHaveCount(0);
   await page.getByRole('button', { name: 'Start Pairing…' }).click();
   await expect(page.getByLabel('Pairing code')).toHaveText(/^[0-9A-Z]{5}-[0-9A-Z]{5}$/);
-  // The default set is eight permissions; with one more ticked the pending pairing carries nine.
-  await expect(page.getByRole('list', { name: 'Pending pairings' }).getByRole('listitem').filter({ hasText: '9 permissions' })).toHaveCount(1);
+  // The default set is ten permissions (eight, and playlists:use and library:sync, DEC-041); with one more ticked the pending pairing carries eleven.
+  await expect(page.getByRole('list', { name: 'Pending pairings' }).getByRole('listitem').filter({ hasText: '11 permissions' })).toHaveCount(1);
 });
 
 test('the interface loads nothing from outside the hub', async ({ page }) => {
