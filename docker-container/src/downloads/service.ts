@@ -27,7 +27,7 @@ import { DOWNLOAD_BATCH_CAP, type DownloadBatchResult, type DownloadJob, type Do
 import { DomainError, renderFilenameTemplate, sanitizeFilename, uuidv7 } from '@now-playing/domain';
 import { toolCommand } from '@now-playing/domain/tool-install';
 import { fromSpotdl, fromYtDlp, isCollectionUrl, mergeTags, titleFromUrl, type ProbedEntry } from '../media/media-metadata.js';
-import { FORMAT_ARGS, FORMAT_EXTENSIONS, planFinalise, readExisting } from './finalise.js';
+import { FORMAT_ARGS, FORMAT_EXTENSIONS, planFinalise, readExisting, writeId3Lyrics } from './finalise.js';
 import type { AuditService } from '../auth/audit.js';
 import type { HubConfig } from '../config.js';
 import type { DownloadRecord, DownloadsRepository } from '../db/repositories/downloads.js';
@@ -656,6 +656,9 @@ export class DownloadService {
       spawnError: (message) => new DomainError('unavailable', `FFmpeg could not be started: ${message}`),
       exitError: (code, stderr, timedOut) => new DomainError('unavailable', timedOut ? `FFmpeg did not finish within ${FFMPEG_TIMEOUT_MS / 60_000} minutes` : `FFmpeg failed (code ${code}): ${stderr.slice(-300)}`),
     });
+    // FFmpeg cannot write an MP3's USLT frame; the lyrics go in afterwards. Best effort: a tag this
+    // cannot rewrite keeps the file as FFmpeg made it, without lyrics.
+    if (plan.id3Lyrics && !writeId3Lyrics(plan.output, plan.id3Lyrics)) this.log.warn({ module: 'downloads', job: job.id }, 'lyrics not embedded: the MP3’s ID3 tag is not one the hub rewrites');
     return { output: plan.output, extension: plan.extension };
   }
 

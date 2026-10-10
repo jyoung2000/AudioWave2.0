@@ -13,7 +13,7 @@
  * and for Ogg/Opus, where FFmpeg cannot attach a picture stream, as the `METADATA_BLOCK_PICTURE`
  * comment that Opus players read.
  */
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseFile } from 'music-metadata';
 import type { DownloadJob, DownloadTags } from '@now-playing/contracts';
@@ -95,8 +95,8 @@ export function tagMap(tags: DownloadTags | null | undefined, existing: Existing
     set('disc', tags.discNumber);
     set('copyright', tags.license);
     // Catalog downloads (DEC-039). FFmpeg's generic names: `publisher` is ID3 TPUB and the Vorbis
-    // PUBLISHER comment; `lyrics` is M4A ©lyr and the Vorbis LYRICS comment (MP3 gets it as a
-    // TXXX frame); `isrc` is the Vorbis ISRC comment and ID3 TSRC where FFmpeg maps it.
+    // PUBLISHER comment; `lyrics` is M4A ©lyr and the Vorbis LYRICS comment; `isrc` is the Vorbis
+    // ISRC comment. MP3 is different (planFinalise): FFmpeg would write both as TXXX frames.
     set('isrc', tags.isrc);
     set('publisher', tags.label);
     set('lyrics', tags.lyrics);
@@ -117,11 +117,6 @@ export function ffmetadata(tags: Record<string, string>): string {
 export function pictureBlock(picture: { data: Uint8Array; mime: string }): string {
   const mime = Buffer.from(picture.mime, 'ascii');
   const description = Buffer.from('Cover (front)', 'utf8');
-  const u32 = (n: number): Buffer => {
-    const b = Buffer.alloc(4);
-    b.writeUInt32BE(n);
-    return b;
-  };
   const data = Buffer.from(picture.data);
   return Buffer.concat([u32(3), u32(mime.length), mime, u32(description.length), description, u32(0), u32(0), u32(0), u32(0), u32(data.length), data]).toString('base64');
 }
@@ -137,6 +132,85 @@ export interface FinalisePlan {
   args: string[];
   output: string;
   extension: string;
+  /** Lyrics for an MP3's USLT frame, written after FFmpeg's pass (`writeId3Lyrics`); FFmpeg cannot. */
+  id3Lyrics: string | null;
+}
+
+/**
+ * The ID3 frames FFmpeg writes for MP3, measured 2026-10-10 (FFmpeg 9.0; its ID3 writer has no
+ * USLT support in any release): a generic key it knows becomes its frame (`publisher` → TPUB), a
+ * raw frame id it knows is written as that frame (`TSRC`), and anything else — `lyrics` (which it
+ * renames USLT) and `isrc` included — becomes a TXXX frame that no player reads as lyrics or ISRC.
+ */
+function forId3(tags: Record<string, string>): { tags: Record<string, string>; lyrics: string | null } {
+  const { lyrics = null, isrc, ...rest } = tags;
+  return { tags: isrc ? { ...rest, TSRC: isrc } : rest, lyrics };
+}
+
+const u32 = (n: number): Buffer => {
+  const b = Buffer.alloc(4);
+  b.writeUInt32BE(n);
+  return b;
+};
+
+const syncsafe = (n: number): Buffer => Buffer.from([(n >>> 21) & 0x7f, (n >>> 14) & 0x7f, (n >>> 7) & 0x7f, n & 0x7f]);
+
+/** A TXXX frame's description, to recognise the lyrics FFmpeg filed there ("USLT", "lyrics…"). */
+function txxxDescription(body: Buffer): string {
+  if (body[0] === 1 || body[0] === 2) {
+    for (let i = 1; i + 1 < body.length; i += 2) if (body[i] === 0 && body[i + 1] === 0) return body.subarray(1, i).toString('utf16le').replace(/^﻿/, '');
+    return '';
+  }
+  const end = body.indexOf(0, 1);
+  return body.subarray(1, end === -1 ? body.length : end).toString('latin1');
+}
+
+/** An ID3v2.3 USLT frame: UTF-16 with a BOM, language "eng", no description. */
+export function usltFrame(lyrics: string): Buffer {
+  const bom = Buffer.from([0xff, 0xfe]);
+  const body = Buffer.concat([Buffer.from([1]), Buffer.from('eng', 'latin1'), bom, Buffer.from([0, 0]), bom, Buffer.from(lyrics, 'utf16le')]);
+  return Buffer.concat([Buffer.from('USLT', 'latin1'), u32(body.length), Buffer.from([0, 0]), body]);
+}
+
+/**
+ * The file with `lyrics` in a USLT frame of its ID3v2.3 tag (the version planFinalise asks FFmpeg
+ * for), any lyrics or USLT frame already there replaced. Null when the tag is not one this can
+ * rewrite safely (another version, unsynchronised, an extended header) — the file is then left as
+ * FFmpeg wrote it. A file with no tag gets one.
+ */
+export function withId3Lyrics(file: Buffer, lyrics: string): Buffer | null {
+  const text = lyrics.replace(/\r\n?/g, '\n').trim();
+  if (!text) return null;
+  if (file.subarray(0, 3).toString('latin1') !== 'ID3') {
+    const frame = usltFrame(text);
+    return Buffer.concat([Buffer.from('ID3', 'latin1'), Buffer.from([3, 0, 0]), syncsafe(frame.length), frame, file]);
+  }
+  if (file.length < 10 || file[3] !== 3 || (file[5]! & 0xc0) !== 0) return null;
+  const size = ((file[6]! & 0x7f) << 21) | ((file[7]! & 0x7f) << 14) | ((file[8]! & 0x7f) << 7) | (file[9]! & 0x7f);
+  const end = 10 + size;
+  if (end > file.length) return null;
+  const kept: Buffer[] = [];
+  let at = 10;
+  while (at + 10 <= end && file[at] !== 0) {
+    const id = file.subarray(at, at + 4).toString('latin1');
+    const length = file.readUInt32BE(at + 4);
+    if (!/^[A-Z0-9]{4}$/.test(id) || at + 10 + length > end) return null;
+    const body = file.subarray(at + 10, at + 10 + length);
+    const lyricsAlready = id === 'USLT' || (id === 'TXXX' && /^(uslt|lyrics)/i.test(txxxDescription(body)));
+    if (!lyricsAlready) kept.push(file.subarray(at, at + 10 + length));
+    at += 10 + length;
+  }
+  const padding = Buffer.alloc(end - at);
+  const frames = Buffer.concat([...kept, usltFrame(text), padding]);
+  return Buffer.concat([file.subarray(0, 6), syncsafe(frames.length), frames, file.subarray(end)]);
+}
+
+/** `withId3Lyrics` on a file in place; false when its tag could not be rewritten. */
+export function writeId3Lyrics(path: string, lyrics: string): boolean {
+  const next = withId3Lyrics(readFileSync(path), lyrics);
+  if (!next) return false;
+  writeFileSync(path, next);
+  return true;
 }
 
 /**
@@ -151,7 +225,8 @@ export function planFinalise(input: { file: string; inputExtension: string; work
   const codec = input.format === 'original' ? ['-c:a', 'copy'] : FORMAT_ARGS[input.format];
   if (!codec) return null;
   const ogg = OGG.has(extension);
-  const tags = tagMap(input.tags, input.existing, input.sourceUrl);
+  const mapped = tagMap(input.tags, input.existing, input.sourceUrl);
+  const { tags, lyrics: id3Lyrics } = extension === '.mp3' ? forId3(mapped) : { tags: mapped, lyrics: null };
   const picture = input.existing?.picture ?? null;
   if (ogg && picture) tags['METADATA_BLOCK_PICTURE'] = pictureBlock(picture);
   const metadataFile = join(input.workDir, 'tags.ffmeta');
@@ -173,5 +248,5 @@ export function planFinalise(input: { file: string; inputExtension: string; work
   else args.push('-map_metadata', '1:g', '-map_metadata:s:a:0', '-1');
   if (extension === '.mp3') args.push('-id3v2_version', '3');
   args.push(output);
-  return { args, output, extension };
+  return { args, output, extension, id3Lyrics };
 }
