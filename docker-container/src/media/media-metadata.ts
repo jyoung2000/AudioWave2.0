@@ -165,7 +165,11 @@ export function fromYtDlp(json: unknown, requested: string): MediaProbe | null {
     const entries: ProbedEntry[] = [];
     for (const raw of Array.isArray(json['entries']) ? json['entries'] : []) {
       if (!isObject(raw)) continue;
-      const entryUrl = https(raw['url']) ?? https(raw['webpage_url']);
+      // The page first. A flat listing's `url` is the page (or, for a SoundCloud search, an API
+      // address), but a full entry (`--playlist-items`) carries the stream it would play there: a
+      // signed, expiring CDN address (`…playlist.m3u8?Policy=…&Signature=…`, measured 2026-10-10)
+      // that must never become a row's link.
+      const entryUrl = https(raw['webpage_url']) ?? https(raw['url']);
       if (!entryUrl) continue;
       const nested = raw['_type'] === 'playlist' || (raw['ie_key'] === 'YoutubeTab' && raw['_type'] === 'url');
       const title = text(raw['title'], 300);
@@ -244,12 +248,17 @@ export function fromSpotdl(json: unknown, requested: string): MediaProbe | null 
   }
   const ordered = [...songs].sort((a, b) => order(a) - order(b));
   const first = ordered[0];
+  // An album's songs share its artist and cover (an artist link's, its artist). A playlist's do not,
+  // and the save file names neither the playlist's owner nor its picture (measured 2026-10-10): its
+  // first song's artist and cover are not the playlist's, so they stay unknown and the mosaic stands
+  // for the cover.
+  const shared = !/^\/(?:intl-[a-z-]+\/)?playlist\//i.test(path);
   return {
     kind: 'playlist',
     url: requested,
     title: first ? (text(first['list_name'], 300) ?? text(first['album_name'], 300)) : null,
-    owner: first ? (text(first['album_artist'], 300) ?? text(first['artist'], 300)) : null,
-    artworkUrl: first ? https(first['cover_url']) : null,
+    owner: first && shared ? (text(first['album_artist'], 300) ?? text(first['artist'], 300)) : null,
+    artworkUrl: first && shared ? https(first['cover_url']) : null,
     listed: first ? (int(first['list_length'], 100_000) ?? int(first['tracks_count'], 100_000) ?? ordered.length) : 0,
     entries: ordered.map((song) => ({ url: https(song['url']) ?? '', tags: tagsFromSpotdl(song), unavailable: null })).filter((e) => e.url),
   };

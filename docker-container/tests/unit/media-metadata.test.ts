@@ -45,6 +45,29 @@ describe('yt-dlp answers', () => {
     expect(probe.entries[0]).toEqual({ url: 'https://soundcloud.com/forss/city-ports', tags: null, unavailable: null });
   });
 
+  it('a set’s positions described in full (`--playlist-items`): each entry is its page, never the signed stream address', () => {
+    // Trimmed from yt-dlp 2026.08.19's real answer for two Soulhack positions (2026-10-10): a full
+    // entry's `url` is the HLS stream it would play, signed and expiring; the signature is cut here.
+    const stream = 'https://playback.media-streaming.soundcloud.cloud/LU6T6NMmvb6f/aac_160k/fdc9f69c/playlist.m3u8?expires=1791621810&Policy=REDACTED&Signature=REDACTED&Key-Pair-Id=REDACTED';
+    const probe = fromYtDlp(
+      {
+        _type: 'playlist',
+        id: '5181',
+        title: 'Soulhack',
+        uploader: 'Forss',
+        webpage_url: 'https://soundcloud.com/forss/sets/soulhack',
+        entries: [
+          { id: '296', title: 'Atomised', uploader: 'Forss', duration: 423.08, url: stream, webpage_url: 'https://soundcloud.com/forss/atomised', thumbnail: 'https://i1.sndcdn.com/artworks-000067273344-qyp37r-original.jpg', upload_date: '20030602', extractor_key: 'Soundcloud' },
+          { id: '297', title: 'Characteristics', uploader: 'Forss', duration: 399.2, url: stream.replace('fdc9f69c', 'aa11bb22'), webpage_url: 'https://soundcloud.com/forss/characteristics', extractor_key: 'Soundcloud' },
+        ],
+      },
+      'https://soundcloud.com/forss/sets/soulhack',
+    ) as ProbedPlaylist;
+    expect(probe.entries.map((e) => e.url)).toEqual(['https://soundcloud.com/forss/atomised', 'https://soundcloud.com/forss/characteristics']);
+    expect(JSON.stringify(probe)).not.toMatch(/Signature|playback\.media-streaming/);
+    expect(probe.entries[0]!.tags).toMatchObject({ title: 'Atomised', artist: 'Forss', durationMs: 423_080, date: '2003-06-02' });
+  });
+
   it('a YouTube playlist, flat: each entry with the title and length the listing gives', () => {
     const probe = fromYtDlp(fixture('youtube-playlist-flat.json'), 'https://www.youtube.com/playlist?list=PLa1F2ddGya_-Ymw4YlOjqrdQxiRMJql5x') as ProbedPlaylist;
     expect(probe).toMatchObject({ kind: 'playlist', title: 'Blender Conference 2024', owner: 'Blender', listed: 87 });
@@ -84,6 +107,17 @@ describe('spotDL answers', () => {
     expect(probe).toMatchObject({ kind: 'playlist', title: 'Whenever You Need Somebody', owner: 'Rick Astley', listed: 10 });
     expect(probe.entries.map((e) => e.tags?.trackNumber)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     expect(probe.entries[0]!.url).toBe('https://open.spotify.com/track/4PTG3Z6ehGkBFwjybzWkR8');
+  });
+
+  it('a playlist: its songs in list order, but neither its first song’s artist as its owner nor that song’s cover as its picture', () => {
+    // spotDL 4.5.2's save file for Spotify's own "Today's Top Hits" (2026-10-10, trimmed): it names the
+    // list and its length on every song, but not who made the list or its picture.
+    const song = (n: number, artist: string): Record<string, unknown> => ({ name: `Song ${n}`, artists: [artist], artist, album_name: `Album ${n}`, album_artist: artist, duration: 200, url: `https://open.spotify.com/track/${String(n).padStart(22, 'A')}`, cover_url: `https://i.scdn.co/image/${n}`, isrc: '', list_name: 'Today’s Top Hits', list_url: 'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M', list_position: n, list_length: 50 });
+    const probe = fromSpotdl([song(2, 'ADÉLA'), song(1, 'Ashe')], 'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M') as ProbedPlaylist;
+    expect(probe).toMatchObject({ kind: 'playlist', title: 'Today’s Top Hits', owner: null, artworkUrl: null, listed: 50 });
+    expect(probe.entries.map((e) => e.tags?.artist)).toEqual(['Ashe', 'ADÉLA']);
+    // An empty ISRC (Spotify no longer gives spotDL one) is no ISRC.
+    expect(probe.entries[0]!.tags?.isrc).toBeNull();
   });
 
   it('a second artist is a featured one', () => {

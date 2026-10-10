@@ -147,8 +147,11 @@ export const TOOL_PRESETS: Record<PresetTool, ToolPreset> = {
       '--save-file',
       join(outputDir, 'song.spotdl'),
     ],
-    // spotDL refuses to start at all without FFmpeg, even to read metadata.
-    metadata: ({ url, ffmpeg, saveFile, match }) => (ffmpeg ? ['save', spotdlUrl(url), '--no-cache', '--log-level', 'ERROR', '--ffmpeg', ffmpeg, ...(match ? ['--preload'] : []), '--save-file', saveFile] : null),
+    // spotDL refuses to start at all without FFmpeg, even to read metadata. `--lyrics` with no
+    // provider after it: `save` otherwise asks Genius, AzLyrics and MusixMatch for every song, which
+    // the catalog never reads (it has LRCLIB) — 32 s against 18 s for one song, measured 2026-10-10,
+    // and minutes for a playlist.
+    metadata: ({ url, ffmpeg, saveFile, match }) => (ffmpeg ? ['save', spotdlUrl(url), '--no-cache', '--log-level', 'ERROR', '--ffmpeg', ffmpeg, ...(match ? ['--preload'] : []), '--lyrics', '--save-file', saveFile] : null),
     infoFile: 'song.spotdl',
     needsHome: true,
   },

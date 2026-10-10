@@ -126,6 +126,16 @@ describe('the spotDL preset', () => {
     expect(save).not.toContain('--');
     expect(preset.metadata({ url, ffmpeg: null, node: null, saveFile: '/tmp/x/save.spotdl', listLimit: 201 })).toBeNull();
   });
+
+  it('reads no lyrics while reading a link (the catalog has LRCLIB), and asks for the YouTube Music match only when told to', () => {
+    const save = preset.metadata({ url, ffmpeg: '/usr/bin/ffmpeg', node: null, saveFile: '/tmp/x/save.spotdl', listLimit: 201 })!;
+    // `--lyrics` with no provider after it: the next argument is an option, so the list is empty.
+    expect(save[save.indexOf('--lyrics') + 1]).toBe('--save-file');
+    expect(save).not.toContain('--preload');
+    const matched = preset.metadata({ url, ffmpeg: '/usr/bin/ffmpeg', node: null, saveFile: '/tmp/x/save.spotdl', listLimit: 201, match: true })!;
+    expect(matched).toContain('--preload');
+    expect(matched.slice(0, 2)).toEqual(['save', url]);
+  });
 });
 
 describe('choosing a preset', () => {
