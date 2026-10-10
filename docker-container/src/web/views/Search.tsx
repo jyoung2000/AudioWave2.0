@@ -24,7 +24,7 @@
  * `@now-playing/domain/catalog` (view.ts). The window kit is this app's own (DEC-026).
  */
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
-import type { CatalogAlbum, CatalogAlbumDetail, CatalogArtist, CatalogArtistDetail, CatalogCollection, CatalogEnrichment, CatalogLyrics, CatalogPlaylist, CatalogResolveResult, CatalogSearchSection, CatalogSource, CatalogSourceStatus, CatalogTrack, DownloadAuthorizationBasis, GroupView, OutputFormat, SavedCollection } from '@now-playing/contracts';
+import type { CatalogAlbum, CatalogAlbumDetail, CatalogArtist, CatalogArtistDetail, CatalogCollection, CatalogEnrichment, CatalogLyrics, CatalogPlaylist, CatalogResolveResult, CatalogSearchSection, CatalogSource, CatalogSourceStatus, CatalogTrack, DownloadAuthorizationBasis, FolderPlaylistSummary, GroupView, OutputFormat, SavedCollection } from '@now-playing/contracts';
 import { CATALOG_COLLECTION_CAP, CATALOG_PROVIDERS } from '@now-playing/contracts';
 import {
   albumLine,
@@ -69,6 +69,7 @@ import {
 import { api, type ApiError } from '../lib/api.js';
 import { ALL_SECTIONS, catalogError, hubCatalog, useCatalogFilter, useLiveSearch, usePreview, useSavedCollections, type CatalogClient, type CatalogFilter, type CatalogSearchParams, type LiveSearch, type Preview, type SavedCollections } from '../lib/catalog.js';
 import { Menu, type MenuAt, type MenuEntry } from '../lib/menu.js';
+import { hubPlaylists } from '../lib/playlists.js';
 import { ActionError, Check, errorSentence, Field, Group, Note, Pop, Push, Sdot, Sheet, useHubUi, useNow } from '../ui.js';
 import { BASIS_LABELS } from './Downloads.js';
 
@@ -1139,13 +1140,9 @@ function BasisAndFormat({ basis, setBasis, format, setFormat }: { basis: Downloa
 
 /* ------------------------------------------------------------------ a song row's menu (UX-SEARCH-012) */
 
-type AddWhy = 'library' | 'playlist' | 'download';
+type AddWhy = 'library' | 'download';
 
-/**
- * Add to the library, or Download…: a song into the hub's download queue with its rights basis. The
- * hub keeps no playlists of its own — each player keeps its own, and the hub only holds their shared
- * copies — so Add to Playlist asks the same, saying so.
- */
+/** Add to the library, or Download…: a song into the hub's download queue with its rights basis. */
 function AddSheet({ track, why, onDone, onCancel }: { track: CatalogTrack; why: AddWhy; onDone: (text: string) => void; onCancel: () => void }) {
   const [basis, setBasis] = useState<DownloadAuthorizationBasis>('user-owned');
   const [format, setFormat] = useState<OutputFormat>('original');
@@ -1163,10 +1160,9 @@ function AddSheet({ track, why, onDone, onCancel }: { track: CatalogTrack; why: 
       setBusy(false);
     }
   };
-  const title = why === 'download' ? `Download “${track.title}”` : why === 'playlist' ? 'Add to a playlist' : `Add “${track.title}” to the library`;
+  const title = why === 'download' ? `Download “${track.title}”` : `Add “${track.title}” to the library`;
   return (
     <Sheet title={title} onCancel={onCancel}>
-      {why === 'playlist' ? <p>This hub keeps no playlists of its own: each player keeps its own. Add “{track.title}” to the hub’s library instead, and a player can put it in one of its playlists.</p> : null}
       <p>
         The hub fetches it{from ? ` from ${platformLabel(from.platform)}` : ''} and tags it; it joins the library in Music ▸ Downloads.
       </p>
@@ -1176,6 +1172,68 @@ function AddSheet({ track, why, onDone, onCancel }: { track: CatalogTrack; why: 
         <Push onClick={onCancel}>Cancel</Push>
         <Push primary busy={busy} onClick={() => void go()}>
           {why === 'download' ? 'Download' : 'Add to Library'}
+        </Push>
+      </div>
+    </Sheet>
+  );
+}
+
+/**
+ * Filing a song into a playlist from Add to Playlist ▸ (UX-SEARCH-012, UX-PL-005): into the one
+ * chosen, or a new one named here. The entry is written whatever happens next — a song the library
+ * has as its file, any other by its source — and "Also add to Library", on by default, queues the
+ * download too, with the rights basis every download states (DEC-036).
+ */
+function FileSheet({ track, playlist, onDone, onCancel }: { track: CatalogTrack; playlist: FolderPlaylistSummary | null; onDone: (text: string) => void; onCancel: () => void }) {
+  const fetchable = pickDownloadSource(track.sources) !== null;
+  const [name, setName] = useState('');
+  const [also, setAlso] = useState(fetchable);
+  const [basis, setBasis] = useState<DownloadAuthorizationBasis>('user-owned');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
+  const nameId = useId();
+  const go = async (): Promise<void> => {
+    if (!playlist && !name.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const into = playlist ? (await hubPlaylists.add(playlist.id, [track])).playlist : await hubPlaylists.create(name.trim(), [track]);
+      let said = playlist ? `“${track.title}” is in “${into.name}” now.` : `Made “${into.name}” with “${track.title}” in it.`;
+      if (also && fetchable) {
+        try {
+          said += ` It is joining the hub’s library too. ${await downloadToHub(track, basis, 'original')}`;
+        } catch (err) {
+          said += ` It couldn’t join the hub’s library: ${errorSentence(catalogError(err))}`;
+        }
+      }
+      onDone(said);
+    } catch (err) {
+      setError(catalogError(err));
+      setBusy(false);
+    }
+  };
+  return (
+    <Sheet title={playlist ? `Add “${track.title}” to “${playlist.name}”` : 'New Playlist'} onCancel={onCancel}>
+      {playlist ? null : (
+        <div className="pref">
+          <label className="k" htmlFor={nameId}>
+            Name:
+          </label>
+          <div className="v">
+            <Field id={nameId} value={name} maxLength={120} onChange={(event) => setName(event.currentTarget.value)} onKeyDown={(event) => event.key === 'Enter' && void go()} />
+          </div>
+        </div>
+      )}
+      <p>{fetchable ? `The playlist keeps the song’s link, so it plays even before it is in the library.` : `“${track.title}” is only in a store, so the playlist keeps its store link; there is nothing to fetch.`}</p>
+      <Check checked={also && fetchable} disabled={!fetchable} onChange={setAlso}>
+        Also add to Library
+      </Check>
+      {also && fetchable ? <BasisAndFormat basis={basis} setBasis={setBasis} /> : null}
+      <ActionError error={error} />
+      <div className="sheet__acts">
+        <Push onClick={onCancel}>Cancel</Push>
+        <Push primary busy={busy} disabled={!playlist && !name.trim()} reason="Name the playlist first." onClick={() => void go()}>
+          {playlist ? 'Add to Playlist' : 'Create'}
         </Push>
       </div>
     </Sheet>
@@ -1193,6 +1251,7 @@ function useSongMenu({ preview, present, say, open }: { preview: Preview; presen
   const [groups, setGroups] = useState<GroupView[] | null>(null);
   const [groupsError, setGroupsError] = useState<string | null>(null);
   const asked = useRef(false);
+  const [playlists, setPlaylists] = useState<{ trackId: string; items: FolderPlaylistSummary[]; reason: string | null } | null>(null);
 
   // The groups are read once the tab opens, so the menu knows where Up Next goes when it opens;
   // a failed read is tried again on the next menu.
@@ -1216,6 +1275,12 @@ function useSongMenu({ preview, present, say, open }: { preview: Preview; presen
     (track, at, returnTo) => {
       setShown({ track, at, returnTo });
       loadGroups();
+      // Ticks need the song: the folder is read again for each menu (UX-SEARCH-012).
+      setPlaylists(null);
+      hubPlaylists
+        .list({ catalogId: track.id, ...(track.isrc ? { isrc: track.isrc } : {}) })
+        .then((answer) => setPlaylists({ trackId: track.id, items: answer.items, reason: answer.folder.available ? null : answer.folder.reason }))
+        .catch((err: unknown) => setPlaylists({ trackId: track.id, items: [], reason: errorSentence(catalogError(err)) }));
     },
     [loadGroups],
   );
@@ -1246,6 +1311,31 @@ function useSongMenu({ preview, present, say, open }: { preview: Preview; presen
     );
   };
 
+  const file = (track: CatalogTrack, playlist: FolderPlaylistSummary | null): void => {
+    if (playlist?.hasTrack) return say(`“${track.title}” is in “${playlist.name}” already.`);
+    present(
+      <FileSheet
+        track={track}
+        playlist={playlist}
+        onCancel={() => present(null)}
+        onDone={(text) => {
+          present(null);
+          say(text);
+        }}
+      />,
+    );
+  };
+
+  const toPlaylist = (track: CatalogTrack): MenuEntry => {
+    const known = playlists?.trackId === track.id ? playlists : null;
+    const chosen: MenuEntry[] = !known
+      ? [{ kind: 'item', label: 'Looking for playlists…', disabled: true, onSelect: () => undefined }]
+      : known.reason
+        ? [{ kind: 'item', label: 'The playlist folder can’t be read', disabled: true, note: known.reason, onSelect: () => undefined }]
+        : known.items.map((p) => ({ kind: 'item', label: p.name, checked: p.hasTrack === true, onSelect: () => file(track, p) }));
+    return { kind: 'sub', label: 'Add to Playlist', items: [...chosen, { kind: 'sep' }, { kind: 'item', label: 'New Playlist…', onSelect: () => file(track, null) }] };
+  };
+
   const entries = (track: CatalogTrack): MenuEntry[] => {
     const clip = previewOf(track.sources);
     const playing = clip !== null && preview.playing === clip.url;
@@ -1260,7 +1350,7 @@ function useSongMenu({ preview, present, say, open }: { preview: Preview; presen
             : { kind: 'sub', label: 'Add to Up Next', items: groups.map((g) => ({ kind: 'item', label: g.name, onSelect: () => void queue(track, g) })) };
     return [
       upNext,
-      { kind: 'item', label: 'Add to Playlist…', onSelect: () => add(track, 'playlist') },
+      toPlaylist(track),
       { kind: 'item', label: 'Add to Library…', onSelect: () => add(track, 'library') },
       { kind: 'sep' },
       { kind: 'item', label: 'Download…', onSelect: () => add(track, 'download') },

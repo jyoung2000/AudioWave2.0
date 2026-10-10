@@ -30,6 +30,7 @@ import { DevicesView } from './views/Devices.js';
 import { GroupsView } from './views/Groups.js';
 import { ProvidersView } from './views/Providers.js';
 import { LibraryView } from './views/Library.js';
+import { PlaylistsView } from './views/Playlists.js';
 import { DownloadsView } from './views/Downloads.js';
 import { LiveTvView } from './views/LiveTv.js';
 import { ProfilesView } from './views/Profiles.js';
@@ -47,7 +48,7 @@ const SearchView = lazy(() => import('./views/Search.js').then((m) => ({ default
 const PRODUCT = BRANDING.products.hub;
 
 /** The sections. Each is a screen in design/coverage.json; the tab it lives in is below. */
-export type ViewId = 'overview' | 'devices' | 'groups' | 'profiles' | 'providers' | 'catalog' | 'library' | 'downloads' | 'search' | 'shares' | 'recommendations' | 'discord' | 'network' | 'diagnostics' | 'backup';
+export type ViewId = 'overview' | 'devices' | 'groups' | 'profiles' | 'providers' | 'catalog' | 'library' | 'playlists' | 'downloads' | 'search' | 'shares' | 'recommendations' | 'discord' | 'network' | 'diagnostics' | 'backup';
 
 export type TabId = 'overview' | 'devices' | 'music' | 'search' | 'groups' | 'sharing' | 'system';
 
@@ -83,7 +84,7 @@ const TABS: readonly TabSpec[] = [
     label: 'Music',
     icon: ICONS.music,
     lead: 'What the hub plays from, where it looks things up, and what it may save. Everything here is shared by every paired device.',
-    sections: ['library', 'providers', 'catalog', 'downloads', 'recommendations'],
+    sections: ['library', 'playlists', 'providers', 'catalog', 'downloads', 'recommendations'],
   },
   {
     // The music catalog (DEC-039): find songs, artists and albums, read a pasted link, star a list,
@@ -115,6 +116,7 @@ const SECTION_TITLES: Record<ViewId, string> = {
   devices: 'Devices',
   profiles: 'Profiles',
   library: 'Library',
+  playlists: 'Playlists',
   providers: 'Providers',
   catalog: 'Music search',
   search: 'Search',
@@ -434,6 +436,8 @@ function sectionBody(id: ViewId): ReactNode {
       );
     case 'library':
       return <LibraryView />;
+    case 'playlists':
+      return <PlaylistsView />;
     case 'downloads':
       // The design draws "Live TV from the companion" straight after Downloads, in the same tab. It
       // is part of this section (and its ledger entry) until the coverage ledger gives it its own.

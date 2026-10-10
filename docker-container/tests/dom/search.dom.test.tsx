@@ -345,7 +345,7 @@ describe('a song row’s menu (UX-SEARCH-012)', () => {
     await userEvent.click(lights.querySelector('[data-menu]')!);
     const menu = screen.getByRole('menu', { name: '“Harbour Lights”' });
     await waitFor(() => expect(within(menu).getByRole('menuitem', { name: 'Add to Up Next' }).getAttribute('aria-haspopup')).toBe('menu'));
-    expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent?.replace('▶', '').trim())).toEqual(['Add to Up Next', 'Add to Playlist…', 'Add to Library…', 'Download…', 'Audition', 'Open Details']);
+    expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent?.replace('▶', '').trim())).toEqual(['Add to Up Next', 'Add to Playlist', 'Add to Library…', 'Download…', 'Audition', 'Open Details']);
     await userEvent.click(within(menu).getByRole('menuitem', { name: 'Add to Up Next' }));
     const groups = screen.getByRole('menu', { name: 'Add to Up Next' });
     // Active groups only.
@@ -373,14 +373,58 @@ describe('a song row’s menu (UX-SEARCH-012)', () => {
     await waitFor(() => expect(within(menu).getByRole('menuitem', { name: 'Add to Up Next' }).getAttribute('aria-haspopup')).toBe('menu'));
     expect(document.activeElement).toBe(within(menu).getAllByRole('menuitem')[0]);
     await userEvent.keyboard('{ArrowDown}');
-    expect(document.activeElement?.textContent).toBe('Add to Playlist…');
+    expect(document.activeElement?.textContent?.replace('▶', '')).toBe('Add to Playlist');
     await userEvent.keyboard('{End}');
     expect(document.activeElement?.textContent).toBe('Open Details');
     await userEvent.keyboard('{Enter}');
     expect(await screen.findByRole('heading', { name: 'Harbour Wall', level: 2 })).toBeTruthy();
   });
 
-  it('Add to Library and Download… go to the hub’s queue with a rights basis; Add to Playlist says the hub keeps none', async () => {
+  it('Add to Playlist ▸ lists the hub’s playlists, ticked where the song is, and files it — with the library too, by default (UX-PL-005)', async () => {
+    const summary = (id: string, name: string, hasTrack: boolean) => ({ id, name, fileName: `${name}.m3u8`, description: null, createdAt: '2026-10-10T12:00:00.000Z', updatedAt: '2026-10-10T12:00:00.000Z', entryCount: 3, durationSec: 600, covers: [], origin: 'airwave', readOnly: false, createdBy: 'admin', hasTrack });
+    const folder = { path: '/data/playlists', relativePath: 'playlists', isDefault: true, available: true, reason: null, playlistCount: 2, capped: false };
+    const hub = fakeHub({
+      ...SAVED_EMPTY,
+      ...GROUPS,
+      'GET /playlists': { body: { folder, items: [summary('p1', 'Harbour Nights', true), summary('p2', 'Road Trip', false)] } },
+      'POST /playlists/p2/entries': { body: { playlist: summary('p2', 'Road Trip', true), added: 1, skipped: 0 } },
+      'POST /playlists': { status: 201, body: summary('p3', 'Fresh', true) },
+      'POST /catalog/download': { status: 201, body: { job: { id: 'j1' }, source: { platform: 'youtube-music', id: 'mockHL0001', url: 'https://music.youtube.com/watch?v=mockHL0001', previewUrl: null, matchedBy: 'search' }, embedded: { isrc: true, genre: true, label: false, year: true, lyrics: true } } },
+    });
+    renderSearch(stockClient().client);
+    const songs = await overviewSongs();
+    const lights = within(songs).getAllByRole('option')[0]!;
+    await userEvent.click(lights.querySelector('[data-menu]')!);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Add to Playlist' }));
+    const sub = screen.getByRole('menu', { name: 'Add to Playlist' });
+    await waitFor(() => expect(within(sub).getAllByRole('menuitemcheckbox').map((i) => [i.textContent, i.getAttribute('aria-checked')])).toEqual([['Harbour Nights', 'true'], ['Road Trip', 'false']]));
+    expect(hub.calls.find((c) => c.path === '/playlists')!.query).toContain('catalogId=deezer%3A9101');
+    // Already there: said, not added twice.
+    await userEvent.click(within(sub).getByRole('menuitemcheckbox', { name: 'Harbour Nights' }));
+    expect(screen.getByTestId('status-strip').textContent).toBe('“Harbour Lights” is in “Harbour Nights” already.');
+    await userEvent.click(lights.querySelector('[data-menu]')!);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Add to Playlist' }));
+    await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Road Trip' }));
+    let sheet = screen.getByRole('dialog', { name: 'Add “Harbour Lights” to “Road Trip”' });
+    expect((within(sheet).getByRole('checkbox', { name: 'Also add to Library' }) as HTMLInputElement).checked).toBe(true);
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Add to Playlist' }));
+    await waitFor(() => expect(screen.getByTestId('status-strip').textContent).toBe('“Harbour Lights” is in “Road Trip” now. It is joining the hub’s library too. Queued from YouTube Music. Tagged with ISRC, genre, year and lyrics.'));
+    expect(hub.sent('POST', '/playlists/p2/entries')[0]!.body).toMatchObject({ tracks: [{ id: 'deezer:9101', title: 'Harbour Lights' }] });
+    expect(hub.sent('POST', '/catalog/download')[0]!.body).toMatchObject({ authorization: { basis: 'user-owned' } });
+    // New Playlist…, with the library left out this time.
+    await userEvent.click(lights.querySelector('[data-menu]')!);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Add to Playlist' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'New Playlist…' }));
+    sheet = screen.getByRole('dialog', { name: 'New Playlist' });
+    await userEvent.type(within(sheet).getByLabelText('Name:'), 'Fresh');
+    await userEvent.click(within(sheet).getByRole('checkbox', { name: 'Also add to Library' }));
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Create' }));
+    await waitFor(() => expect(screen.getByTestId('status-strip').textContent).toBe('Made “Fresh” with “Harbour Lights” in it.'));
+    expect(hub.sent('POST', '/playlists')[0]!.body).toMatchObject({ name: 'Fresh', tracks: [{ id: 'deezer:9101' }] });
+    expect(hub.sent('POST', '/catalog/download')).toHaveLength(1);
+  });
+
+  it('Add to Library and Download… go to the hub’s queue with a rights basis', async () => {
     const hub = fakeHub({
       ...SAVED_EMPTY,
       ...GROUPS,
@@ -389,11 +433,7 @@ describe('a song row’s menu (UX-SEARCH-012)', () => {
     renderSearch(stockClient().client);
     const songs = await overviewSongs();
     const lights = within(songs).getAllByRole('option')[0]!;
-    await userEvent.click(lights.querySelector('[data-menu]')!);
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Add to Playlist…' }));
-    let sheet = screen.getByRole('dialog', { name: 'Add to a playlist' });
-    expect(sheet.textContent).toContain('This hub keeps no playlists of its own');
-    await userEvent.click(within(sheet).getByRole('button', { name: 'Cancel' }));
+    let sheet: HTMLElement;
     await userEvent.click(lights.querySelector('[data-menu]')!);
     await userEvent.click(screen.getByRole('menuitem', { name: 'Add to Library…' }));
     sheet = screen.getByRole('dialog', { name: 'Add “Harbour Lights” to the library' });
