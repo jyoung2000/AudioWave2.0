@@ -25611,6 +25611,12 @@ var CatalogEngine = class {
   lyricsCache;
   enrichCache;
   resolveCache;
+  /**
+   * A read list's rows, built once per read (the read itself is cached, so a list served page by page
+   * is the same object each time). Rebuilding every row for each page made reading a whole list grow
+   * with the square of its length: 10,050 songs in 51 pages took about 6 s (measured 2026-10-10).
+   */
+  listRows = /* @__PURE__ */ new WeakMap();
   searchCache;
   linksCache;
   applePageCache;
@@ -26137,20 +26143,31 @@ var CatalogEngine = class {
       const track = trackFromLink(read.track, { platform });
       return track ? answer({ kind: "track", track }) : answer({ kind: "unavailable", reason: `${label} described nothing playable at that address.` });
     }
-    const rows = [];
-    read.entries.slice(0, CATALOG_COLLECTION_CAP).forEach((e, i) => {
-      const track = trackFromLink(e, { platform, owner: link.kind === "album" ? read.owner : null, album: link.kind === "album" ? read.title : null });
-      if (track) rows.push({ track, bare: !e.title, position: i + 1 });
-    });
-    const all = rows.map((r) => r.track);
-    await this.fillCovers(all, reader, signal);
+    const listed = read;
+    let built = this.listRows.get(listed);
+    if (!built) {
+      built = (async () => {
+        const rows2 = [];
+        listed.entries.slice(0, CATALOG_COLLECTION_CAP).forEach((e, i) => {
+          const track = trackFromLink(e, { platform, owner: link.kind === "album" ? listed.owner : null, album: link.kind === "album" ? listed.title : null });
+          if (track) rows2.push({ track, bare: !e.title, position: i + 1 });
+        });
+        const all2 = rows2.map((r) => r.track);
+        await this.fillCovers(all2, reader, signal);
+        all2.forEach((t2, i) => rows2[i].track = t2);
+        return { rows: rows2, all: all2, covers: coversOf(all2) };
+      })();
+      this.listRows.set(listed, built);
+      built.catch(() => this.listRows.delete(listed));
+    }
+    const { rows, all, covers } = await built;
     const page = pageOf(all, offset, limit, read.total ?? read.entries.length, read.capped || read.entries.length > CATALOG_COLLECTION_CAP || (read.total ?? 0) > CATALOG_COLLECTION_CAP);
     page.tracks = await this.hydratePage(link, rows.slice(offset, offset + page.tracks.length), page.tracks, reader, signal);
     const kind = link.kind === "album" ? "album" : "playlist";
     const collection = {
       ref: collectionRef(link, kind, read.title, read.owner),
       artworkUrl: read.artworkUrl,
-      covers: coversOf(all),
+      covers,
       releaseDate: read.date && /^\d{4}(-\d{2}(-\d{2})?)?$/.test(read.date) ? read.date : null,
       page
     };

@@ -161,6 +161,12 @@ export class CatalogEngine {
   private readonly lyricsCache: TtlCache<CatalogLyrics>;
   private readonly enrichCache: TtlCache<CatalogEnrichment>;
   private readonly resolveCache: TtlCache<LinkRead>;
+  /**
+   * A read list's rows, built once per read (the read itself is cached, so a list served page by page
+   * is the same object each time). Rebuilding every row for each page made reading a whole list grow
+   * with the square of its length: 10,050 songs in 51 pages took about 6 s (measured 2026-10-10).
+   */
+  private readonly listRows = new WeakMap<LinkRead, Promise<{ rows: Array<{ track: CatalogTrack; bare: boolean; position: number }>; all: CatalogTrack[]; covers: string[] }>>();
   private readonly searchCache: TtlCache<ProviderResult>;
   private readonly linksCache: TtlCache<CatalogSource[]>;
   private readonly applePageCache: TtlCache<ApplePlaylistPage | null>;
@@ -763,21 +769,34 @@ export class CatalogEngine {
       const track = trackFromLink(read.track, { platform });
       return track ? answer({ kind: 'track', track }) : answer({ kind: 'unavailable', reason: `${label} described nothing playable at that address.` });
     }
-    // Every entry, in order, up to the bound (CATALOG_COLLECTION_CAP); past it the list says so.
-    const rows: Array<{ track: CatalogTrack; bare: boolean; position: number }> = [];
-    read.entries.slice(0, CATALOG_COLLECTION_CAP).forEach((e, i) => {
-      const track = trackFromLink(e, { platform, owner: link.kind === 'album' ? read.owner : null, album: link.kind === 'album' ? read.title : null });
-      if (track) rows.push({ track, bare: !e.title, position: i + 1 });
-    });
-    const all = rows.map((r) => r.track);
-    await this.fillCovers(all, reader, signal);
+    // Every entry, in order, up to the bound (CATALOG_COLLECTION_CAP); past it the list says so. Built
+    // once per read and kept with it, so each page only slices.
+    const listed = read;
+    let built = this.listRows.get(listed);
+    if (!built) {
+      built = (async () => {
+        const rows: Array<{ track: CatalogTrack; bare: boolean; position: number }> = [];
+        listed.entries.slice(0, CATALOG_COLLECTION_CAP).forEach((e, i) => {
+          const track = trackFromLink(e, { platform, owner: link.kind === 'album' ? listed.owner : null, album: link.kind === 'album' ? listed.title : null });
+          if (track) rows.push({ track, bare: !e.title, position: i + 1 });
+        });
+        const all = rows.map((r) => r.track);
+        await this.fillCovers(all, reader, signal);
+        // fillCovers may replace a row's track with its described copy: keep rows and all in step.
+        all.forEach((t, i) => (rows[i]!.track = t));
+        return { rows, all, covers: coversOf(all) };
+      })();
+      this.listRows.set(listed, built);
+      built.catch(() => this.listRows.delete(listed));
+    }
+    const { rows, all, covers } = await built;
     const page = pageOf(all, offset, limit, read.total ?? read.entries.length, read.capped || read.entries.length > CATALOG_COLLECTION_CAP || (read.total ?? 0) > CATALOG_COLLECTION_CAP);
     page.tracks = await this.hydratePage(link, rows.slice(offset, offset + page.tracks.length), page.tracks, reader, signal);
     const kind: 'album' | 'playlist' = link.kind === 'album' ? 'album' : 'playlist';
     const collection: CatalogCollection = {
       ref: collectionRef(link, kind, read.title, read.owner),
       artworkUrl: read.artworkUrl,
-      covers: coversOf(all),
+      covers,
       releaseDate: read.date && /^\d{4}(-\d{2}(-\d{2})?)?$/.test(read.date) ? read.date : null,
       page,
     };
