@@ -96,6 +96,10 @@ export const Scope = z.enum([
   'profile:read',
   'profile:write',
   'backup:read',
+  /** Hub playlists (DEC-041): read every playlist in the hub's folder, make new ones, file songs into any, and change or delete only what it made or added. */
+  'playlists:use',
+  /** The caller's own starred albums and playlists, read and written, and the hub admin's, read (shared). */
+  'library:sync',
 ]);
 export type Scope = z.infer<typeof Scope>;
 

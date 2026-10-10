@@ -9,6 +9,7 @@ const alias = {
   '@now-playing/domain/radio-node': path('./packages/domain/src/radio-node.ts'),
   '@now-playing/domain/tool-install': path('./packages/domain/src/tool-install/index.ts'),
   '@now-playing/domain/catalog': path('./packages/domain/src/catalog/index.ts'),
+  '@now-playing/domain/playlist-folder': path('./packages/domain/src/playlist-folder/index.ts'),
   '@now-playing/domain': path('./packages/domain/src/index.ts'),
   // Before the bare alias for the same prefix reason as the stylesheets below.
   '@now-playing/audio-core/tempo': path('./packages/audio-core/src/tempo.ts'),
