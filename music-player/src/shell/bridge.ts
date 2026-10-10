@@ -51,6 +51,7 @@ export type ShellSurface =
   | 'search-song'
   | 'search-filter'
   | 'search-collection-list'
+  | 'hub-playlist'
   | 'row-menu'
   | 'new-playlist-sheet'
   | 'fetch-sheet'

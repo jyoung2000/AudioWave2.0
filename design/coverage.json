@@ -1690,7 +1690,8 @@
       "sourcePaths": [
         "music-player/index.html",
         "music-player/scripts/make-shell.py",
-        "music-player/src/shell/bridge.ts"
+        "music-player/src/shell/bridge.ts",
+        "music-player/src/shell/search/hub-shelf.ts"
       ],
       "components": ["shell markup (design/frontends/origin/airwave-now-playing.html)"],
       "states": [
@@ -1698,9 +1699,12 @@
         "several rows (marquee)",
         "a station with a known song: the On air section (Up Next, Group Queue, Playlist)",
         "touch: a long press on a station opens the same menu",
-        "a visitor (catalog song not on this device): Add to Up Next, Add to Playlist ▸, Add to Library, Download…, Audition"
+        "a visitor (catalog song not on this device): Add to Up Next, Add to Playlist ▸, Add to Library, Download…, Audition",
+        "Add to Playlist ▸ On <hub>: the hub’s playlists, ticked from hasTrack, and New Playlist on <hub>…",
+        "paired without playlists:use: “Your hub hasn’t allowed this player to use its playlists”, and how to fix it",
+        "a song with neither a link nor an ISRC: “Can’t file this song on <hub>”, and why"
       ],
-      "rules": ["NP-MENU-001", "NP-RADIO-002", "NP-FIND-010", "NP-FIND-011"],
+      "rules": ["NP-MENU-001", "NP-RADIO-002", "NP-FIND-010", "NP-FIND-011", "NP-FIND-013"],
       "guideAnchor": "screens",
       "authority": "adopted"
     },
@@ -2188,7 +2192,8 @@
         "music-player/src/shell/bridge.ts",
         "music-player/src/shell/search/index.ts",
         "music-player/src/shell/search/view.ts",
-        "music-player/src/shell/search/client.ts"
+        "music-player/src/shell/search/client.ts",
+        "music-player/src/shell/search/hub-shelf.ts"
       ],
       "components": ["the shell’s contextual menu (#ctx)"],
       "states": [
@@ -2198,9 +2203,12 @@
         "Download… (disabled with the reason for a store-only song)",
         "Audition / Stop Audition (disabled with no clip)",
         "touch: 44 px commands, the submenu unfolding in place",
-        "the HUD confirming (NP-MENU-003)"
+        "the HUD confirming (NP-MENU-003)",
+        "Add to Playlist ▸ On <hub>: the hub’s playlists, ticked from hasTrack, and New Playlist on <hub>…",
+        "paired without playlists:use: “Your hub hasn’t allowed this player to use its playlists”, and how to fix it",
+        "a song with neither a link nor an ISRC: “Can’t file this song on <hub>”, and why"
       ],
-      "rules": ["NP-FIND-010", "NP-MENU-003"],
+      "rules": ["NP-FIND-010", "NP-MENU-003", "NP-FIND-013"],
       "guideAnchor": "screens",
       "authority": "adopted"
     },
@@ -2320,7 +2328,8 @@
         "music-player/src/shell/bridge.ts",
         "music-player/src/shell/search/index.ts",
         "music-player/src/shell/search/view.ts",
-        "music-player/src/shell/search/client.ts"
+        "music-player/src/shell/search/client.ts",
+        "music-player/src/shell/search/hub-shelf.ts"
       ],
       "components": ["shell markup (design/frontends/origin/airwave-now-playing.html)"],
       "states": [
@@ -2329,7 +2338,9 @@
         "a server that still caps it (the first N)",
         "stopped part way or could not be read (the reason)",
         "star off / on",
-        "a song played: its preview while the hub or the companion fetches it"
+        "a song played: its preview while the hub or the companion fetches it",
+        "star synced with the hub (library:sync)",
+        "shared by the hub admin: read-only, no star (“Shared on <hub> — read-only”)"
       ],
       "rules": ["NP-FIND-007", "NP-FIND-008", "NP-FIND-011"],
       "guideAnchor": "screens",
@@ -2648,6 +2659,34 @@
       "authority": "adopted",
       "mockup": "companion-playlists",
       "decision": "DEC-041"
+    },
+    {
+      "id": "player-shell-hub-playlist",
+      "kind": "screen",
+      "product": "player",
+      "platform": "web",
+      "title": "Music list ▸ a playlist on the hub",
+      "entry": "library menu ▸ Playlists ▸ On <hub>",
+      "sourcePaths": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts",
+        "music-player/src/shell/search/hub-shelf.ts"
+      ],
+      "components": ["shell markup (design/frontends/origin/airwave-now-playing.html)"],
+      "states": [
+        "the hub’s playlists listed / checking / none yet / not allowed (how to fix it)",
+        "opened: rows page by page, “Playlist · <hub> · N songs”",
+        "a song the hub’s library holds, streaming from the hub",
+        "a song kept by its link: a visitor (its preview, the fetch sheet)",
+        "a song the hub cannot place (“Not found”)",
+        "made here: “…” ▸ Rename…, Move Song Up/Down, Delete Playlist…; Alt+↑/↓",
+        "made on another device or by hand: read-only, said in the bar",
+        "Shared on <hub>: the admin’s starred lists, read-only"
+      ],
+      "rules": ["NP-FIND-014", "NP-FIND-007", "NP-FIND-011", "NP-FIND-008"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
     }
   ],
   "flows": [
@@ -3112,6 +3151,37 @@
         "windows-companion/tests/contract/playlists-ipc.test.ts",
         "windows-companion/tests/dom/companion-playlists.dom.test.tsx",
         "windows-companion/tests/dom/companion-search.dom.test.tsx"
+      ]
+    },
+    {
+      "id": "flow-player-hub-shelf",
+      "title": "File a song into the hub’s playlists, play one, and keep starred lists in step",
+      "preconditions": "The player paired with a hub that allows it “File into the hub’s playlists” (playlists:use) and “Sync starred albums and playlists” (library:sync).",
+      "steps": [
+        "A song’s “…” (or right-click, long-press) ▸ Add to Playlist: this player’s playlists under “On this player”, the hub’s under “On <hub>”, ticked where the song is",
+        "Choose one of the hub’s: the HUD says “Added … on <hub>”; or New Playlist on <hub>…, named in a sheet",
+        "Library ▸ Playlists ▸ On <hub> ▸ a playlist: it opens in the music list like an album",
+        "Play a song the hub’s library holds: it streams from the hub; a song kept by its link plays its preview",
+        "On a list this player made: “…” ▸ Rename…, Delete…, or Alt+↑/↓ to move a song",
+        "Star an album or playlist: the hub has it too; un-star it while the hub is away, and it is removed there once the hub is back",
+        "Library ▸ Playlists ▸ Shared on <hub>: the admin’s starred lists, read-only"
+      ],
+      "failures": [
+        "The hub has not allowed playlists: the group says so, and how to fix it (pair again with the permission)",
+        "A song with neither a link nor an ISRC: it stays in this player’s playlists, and the group says why",
+        "A list made on another device or by hand: read-only, said in the bar",
+        "The hub away: stars are kept here, tombstones remembered, and sent later, quietly"
+      ],
+      "surfaces": [
+        "player-shell-row-menu",
+        "player-shell-hub-playlist",
+        "player-shell-search-collection-list",
+        "player-shell-library"
+      ],
+      "rules": ["NP-FIND-008", "NP-FIND-013", "NP-FIND-014", "UX-PL-004", "UX-PL-008"],
+      "evidence": [
+        "music-player/tests/e2e/np/hub-shelf.spec.ts",
+        "music-player/tests/unit/hub-shelf.test.ts"
       ]
     }
   ],

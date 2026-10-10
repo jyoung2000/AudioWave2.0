@@ -59,6 +59,13 @@ NEW = [
     surface('search-filter', 'Search filter sheet', 'Filter in the search popover’s header', ['every section and service on', 'some switched off (the button says so)', 'nothing left on (refused, in words)'], ['NP-FIND-005'], SEARCH),
     surface('search-collection-list', 'Music list ▸ an album or playlist from the catalog', 'a pasted playlist or album, an album’s “Open in Music”, or the library menu’s kept lists', ['loading', 'rows page by page', 'capped (the first 200)', 'could not be read (the reason)', 'star off / on'], ['NP-FIND-007', 'NP-FIND-008'], SEARCH),
     surface('row-menu', 'Row menu', 'right-click or long-press a row', ['one row', 'several rows (marquee)'], ['NP-MENU-001']),
+    # The hub's playlist folder, from the player (DEC-041, NP-FIND-013/014, 2026-10-10).
+    surface('hub-playlist', 'Music list ▸ a playlist on the hub', 'library menu ▸ Playlists ▸ On <hub>',
+            ['the hub’s playlists listed / checking / none yet / not allowed (how to fix it)', 'opened: rows page by page, “Playlist · <hub> · N songs”',
+             'a song the hub’s library holds, streaming from the hub', 'a song kept by its link: a visitor (its preview, the fetch sheet)', 'a song the hub cannot place (“Not found”)',
+             'made here: “…” ▸ Rename…, Move Song Up/Down, Delete Playlist…; Alt+↑/↓', 'made on another device or by hand: read-only, said in the bar',
+             'Shared on <hub>: the admin’s starred lists, read-only'],
+            ['NP-FIND-014', 'NP-FIND-007', 'NP-FIND-011', 'NP-FIND-008'], ['music-player/src/shell/search/hub-shelf.ts']),
     surface('new-playlist-sheet', 'New playlist sheet', 'row menu ▸ Add to Playlist ▸ New Playlist…', ['empty name refused', 'created'], ['NP-MENU-002']),
     surface('fetch-sheet', 'Fetch sheet', 'transport ▸ Download, on a link row', ['no basis chosen (refused, said why)', 'helper found / not found', 'fetching', 'refused by the helper (its reason)', 'fetched and playing',
             'the hub fetches it: the source it chose and what it embedded, then “Fetching… N%”', 'opened over a visitor’s preview (“Its 30-second preview plays meanwhile.”)',

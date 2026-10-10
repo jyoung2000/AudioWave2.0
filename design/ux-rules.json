@@ -2425,15 +2425,16 @@
       "id": "NP-FIND-008",
       "group": "np-find",
       "title": "The silver bar’s star keeps an album or playlist in the library",
-      "contract": "While the music list shows an album or playlist from the catalog — from search, a pasted link, or reopened from the library — the silver bar has a star beside its name: pressing it saves the list to the library as a SavedCollection (the contract the hub's sync and the companion share: ref, savedAt, artworkUrl, covers, trackCount) in library:state, and pressing it again removes it; the star says which it would do. The library menu lists what is kept under Playlists (after the person's own) and Albums (after the library's), and choosing one reads it again through whichever server answers. Saved lists are this player's until the hub syncs library state (not yet: .agents/plans/2026-10-06-player-search-ui.md, follow-ups).",
+      "contract": "While the music list shows an album or playlist from the catalog — from search, a pasted link, or reopened from the library — the silver bar has a star beside its name: pressing it saves the list to the library as a SavedCollection (the contract the hub's sync and the companion share: ref, savedAt, artworkUrl, covers, trackCount) in library:state, and pressing it again removes it; the star says which it would do. The library menu lists what is kept under Playlists (after the person's own) and Albums (after the library's), and choosing one reads it again through whichever server answers. Paired with a hub that allows this device `library:sync` (DEC-041), the stars are kept in step with this device's own copy on the hub (`/api/v1/catalog/saved`): on start, GET and merge — a union by {platform, kind, id}, the later savedAt winning when both hold one — then PUT what only this player has (or has newer) and DELETE what it un-starred; every star and un-star is PUT or DELETEd as it happens. An un-star is kept as a tombstone with its time (`player:saved-sync`) until the hub has heard it, so one made while the hub was away wins over the hub's older copy, and a star made since wins over the tombstone. A hub that cannot be reached is asked again later, with backoff, and nothing is said. The hub admin's starred lists come back as `shared` and are listed under Playlists ▸ “Shared on <hub>”; one opens read-only — no star, and the bar says “Shared on <hub> — read-only”. Without the permission, or unpaired, the stars stay this player's alone.",
       "example": "",
       "authority": "adopted",
       "owners": [
-        "music-player/src/shell/search/index.ts",
-        "music-player/src/shell/search/view.ts",
-        "music-player/src/shell/search/client.ts",
+        "music-player/index.html",
         "music-player/scripts/make-shell.py",
-        "music-player/index.html"
+        "music-player/src/shell/search/client.ts",
+        "music-player/src/shell/search/hub-shelf.ts",
+        "music-player/src/shell/search/index.ts",
+        "music-player/src/shell/search/view.ts"
       ],
       "evidence": [
         {
@@ -2445,6 +2446,41 @@
           "type": "test",
           "path": "music-player/tests/e2e/np/collections.spec.ts",
           "name": "an album from search opens in the list too, and starred, it is kept under Albums"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/hub-shelf.spec.ts",
+          "name": "starred lists sync with the hub on start: a union, and an un-star made offline wins over the hub’s older copy (NP-FIND-008)"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/hub-shelf.spec.ts",
+          "name": "a star and an un-star go to the hub; one made while the hub is away is kept as a tombstone and sent once it is back"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/hub-shelf.spec.ts",
+          "name": "the hub admin’s shared lists open read-only under “Shared on TOWER”: no star, and the bar says so"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/hub-shelf.test.ts",
+          "name": "is a union by platform, kind and id: this player’s own first, then what only the hub had, oldest first"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/hub-shelf.test.ts",
+          "name": "keeps the later copy of a list both hold, and sends this player’s when it is the newer"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/hub-shelf.test.ts",
+          "name": "lets an un-star made here (offline) win over the hub’s older copy, and owes the hub a DELETE until it has heard it"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/hub-shelf.test.ts",
+          "name": "lets a star made after the un-star win, and drops the tombstone"
         }
       ]
     },
@@ -2486,7 +2522,7 @@
       "id": "NP-FIND-010",
       "group": "np-find",
       "title": "A song from search goes to Up Next, a playlist or the library through the row’s menu",
-      "contract": "Every song row in the search — the overview, a type page, an album's or artist's songs — has a “…” at its end, and right-click or a long press on the row does the same: the shell's contextual menu opens over the song with exactly Add to Up Next, Add to Playlist ▸ (the person's playlists, ticked where one holds the song, and New Playlist…), Add to Library (“In your library”, disabled, once it is), Download… (the fetch sheet: the hub when it may, else the helper, NP-FIND-012; disabled, saying why, for a store-only song) and Audition (disabled when the song has no clip; “Stop Audition” while it plays). Filing a song that is not in the library yet adds it first — quietly, over the library's own wall (library:add), kept in library:state so a playlist that holds it still finds it after a reload; nothing plays — and then queues or files it; the HUD confirms (NP-MENU-003) and the row's + reads ✓. The + badge stays the one-click Add to Library. From the field, Ctrl/Cmd+Enter adds the hot song and Shift+Enter queues it to Up Next. Escape closes the menu before it closes the popover; the menu's first enabled command takes the keys; on a touch screen the commands are 44 px tall and a submenu unfolds in place.",
+      "contract": "Every song row in the search — the overview, a type page, an album's or artist's songs — has a “…” at its end, and right-click or a long press on the row does the same: the shell's contextual menu opens over the song with exactly Add to Up Next, Add to Playlist ▸ (the person's playlists, ticked where one holds the song, and New Playlist…; paired, the hub's as well, NP-FIND-013), Add to Library (“In your library”, disabled, once it is), Download… (the fetch sheet: the hub when it may, else the helper, NP-FIND-012; disabled, saying why, for a store-only song) and Audition (disabled when the song has no clip; “Stop Audition” while it plays). Filing a song that is not in the library yet adds it first — quietly, over the library's own wall (library:add), kept in library:state so a playlist that holds it still finds it after a reload; nothing plays — and then queues or files it; the HUD confirms (NP-MENU-003) and the row's + reads ✓. The + badge stays the one-click Add to Library. From the field, Ctrl/Cmd+Enter adds the hot song and Shift+Enter queues it to Up Next. Escape closes the menu before it closes the popover; the menu's first enabled command takes the keys; on a touch screen the commands are 44 px tall and a submenu unfolds in place.",
       "example": "“One” ▸ … ▸ Add to Up Next → HUD “Up Next: “One””; Add to Playlist ▸ New Playlist… → the sheet → “Added to “Harbour Nights””.",
       "authority": "adopted",
       "owners": [
@@ -2574,6 +2610,74 @@
           "type": "test",
           "path": "music-player/tests/unit/visit.test.ts",
           "name": "names a link row’s platform for the hub, and refuses a link it does not know"
+        }
+      ]
+    },
+    {
+      "id": "NP-FIND-013",
+      "group": "np-find",
+      "title": "Add to Playlist ▸ files a song into the paired hub’s playlists, in a group of their own",
+      "contract": "A song row’s Add to Playlist ▸ — a catalog song in search, a type’s page or Discover’s catalog set, a song of a catalog list on show, or a song in this device’s library (the menu and the touch sheet) — keeps this player’s own playlists as they were, under “On this player”, and, when a hub is paired, gains a group “On <hub>” (DEC-041). With `playlists:use` it lists the hub’s folder playlists, read again for each menu with the song (`GET /api/v1/playlists?catalogId&isrc`), each a menu checkbox ticked from `hasTrack`, then “New Playlist on <hub>…”, which asks for the name in a sheet and makes the list with the song in it (`POST /api/v1/playlists`). Choosing an unticked list files the song (`POST /api/v1/playlists/:id/entries`); a ticked one says the song is there already and asks nothing. Filing is additive, so any of the hub’s lists may be chosen. A catalog song is sent as its `CatalogTrack`; a library song by its catalog identity — its source link, else its ISRC (as its MusicBrainz ISRC page, which the hub matches to its own library by ISRC). The contract keeps every entry’s link (a `CatalogTrack` has at least one source), so a song with neither cannot go to the hub: the group says “Can’t file this song on <hub>”, and choosing it says why. The HUD confirms (“Added “One” to “Road Songs” on TOWER”), and the toast is a live region. Without the permission the group says “Your hub hasn’t allowed this player to use its playlists”, and choosing it says how to fix it: pair again and tick “File into the hub’s playlists”. Those lines are marked disabled but reachable with the arrows, and Enter reads them; the hub’s lists take the keys like the menu’s other commands.",
+      "example": "“One” ▸ … ▸ Add to Playlist ▸ On TOWER ▸ ✓ Harbour Mix · Kitchen Radio · New Playlist on TOWER… → Kitchen Radio → HUD “Added “One” to “Kitchen Radio” on TOWER”.",
+      "authority": "adopted",
+      "owners": [
+        "music-player/src/shell/search/hub-shelf.ts",
+        "music-player/src/shell/search/index.ts",
+        "music-player/src/shell/bridge.ts",
+        "music-player/scripts/make-shell.py",
+        "music-player/index.html"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/hub-shelf.spec.ts",
+          "name": "Add to Playlist ▸ lists the hub’s playlists in a group of their own, ticked where the song is, and files the catalog song (NP-FIND-013)"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/hub-shelf.spec.ts",
+          "name": "New Playlist on TOWER… makes a playlist in the hub’s folder with the song in it"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/hub-shelf.spec.ts",
+          "name": "without playlists:use the group says the hub hasn’t allowed it, and how to fix it; a song with no link or ISRC says why it stays here"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/hub-shelf.test.ts",
+          "name": "sends a library song by its source link, with its ISRC"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/hub-shelf.test.ts",
+          "name": "sends a library song with only an ISRC as its MusicBrainz ISRC page, so the hub can match it by ISRC"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/unit/hub-shelf.test.ts",
+          "name": "says why a song with neither a link nor an ISRC cannot go to the hub (the contract keeps every entry’s link)"
+        }
+      ]
+    },
+    {
+      "id": "NP-FIND-014",
+      "group": "np-find",
+      "title": "The hub’s playlists open in the music list like an album; only the ones this player made change here",
+      "contract": "Paired with `playlists:use`, the library menu’s Playlists lists “On <hub>” after the person’s own and the starred lists: the hub’s folder playlists, read when the menu opens (“Checking <hub>…” meanwhile, “No playlists on <hub> yet”, or, without the permission, what is missing and how to fix it). Choosing one opens it in the music list the way an album opens (NP-FIND-007): the silver bar names it, “Playlist · <hub> · N songs”, and its songs are the rows, in its order, read a page of up to 200 at a time until the hub says there are no more. A song the hub’s library holds streams from the hub — a short-lived signed URL from `POST /api/v1/library/stream-urls`, through the same transport, a real play; a song kept by its link is a visitor (NP-FIND-011: its preview, the fetch sheet); one the hub cannot place says “Not found”. There is no star (a hub playlist is not a catalog list). A “…” beside the name opens Rename…, Move Song Up, Move Song Down and Delete Playlist… (asked first, saying the songs stay in the hub’s library and at their sources); Alt+↑/↓ moves the highlighted song. They are enabled only on a list this device made (`createdBy` is its device id) — the hub enforces the same (UX-PL-004) — and on any other the bar adds “Made on another device — read-only” (or “Made outside Airwave — read-only” for a hand-made list), the commands are disabled, and Alt+↑/↓ says why.",
+      "example": "Library ▸ Playlists ▸ On TOWER ▸ Harbour Mix → “Harbour Mix” · “Playlist · TOWER · 3 songs”; Quay Lights plays from the hub; Alt+↓ → “Moved “Quay Lights” down to 2 of 3”.",
+      "authority": "adopted",
+      "owners": [
+        "music-player/src/shell/search/hub-shelf.ts",
+        "music-player/src/shell/bridge.ts",
+        "music-player/scripts/make-shell.py",
+        "music-player/index.html"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/hub-shelf.spec.ts",
+          "name": "a hub playlist opens in the music list like an album; a library entry streams through the hub, and only a list this player made can change (NP-FIND-014)"
         }
       ]
     },
