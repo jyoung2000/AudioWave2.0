@@ -24351,6 +24351,7 @@ var ProviderResting = class extends Error {
 // ../packages/domain/src/catalog/providers/ytdlp.ts
 var PREFIX = { youtube: "ytsearch", soundcloud: "scsearch" };
 var TOOL_SEARCH_MAX = 100;
+var SOUNDCLOUD_PREVIEW_SECONDS = 30;
 function toolSearchTerm(text2) {
   const printable = text2.replace(/[\u0000-\u001f\u007f]/g, " ");
   return printable.replace(/\s+/g, " ").trim().slice(0, 200);
@@ -24417,6 +24418,7 @@ function toolSearchTrack(platform, row) {
       rank: 0
     };
   }
+  if (duration3 === SOUNDCLOUD_PREVIEW_SECONDS) return null;
   let path;
   try {
     path = new URL(url2).pathname.split("/").filter(Boolean);
@@ -24443,7 +24445,8 @@ function toolSearchTrack(platform, row) {
     discNumber: null,
     bpm: null,
     explicit: null,
-    genre: str2(row["genre"], 100),
+    // A search entry names its genres as a list (`genres: ["Electronic"]`); a track page as `genre`.
+    genre: str2(row["genre"], 100) ?? str2(Array.isArray(row["genres"]) ? row["genres"][0] : null, 100),
     label: null,
     sources: [{ platform: "soundcloud", id, url: url2.split("?")[0], previewUrl: null, matchedBy: "search" }],
     rank: 0
@@ -24471,7 +24474,8 @@ var ToolSearchProvider = class {
     if (!options.sections.includes("tracks") || options.offset >= TOOL_SEARCH_MAX) return out;
     const document = await this.run({ platform: this.id, args: toolSearchArgs(this.id, query.text, options.offset, options.limit), signal: options.signal });
     out.tracks = toolSearchTracks(this.id, document);
-    out.full.tracks = out.tracks.length >= options.limit && options.offset + options.limit < TOOL_SEARCH_MAX;
+    const listed = isObject2(document) ? arr(document["entries"]).length : 0;
+    out.full.tracks = listed >= options.limit && options.offset + options.limit < TOOL_SEARCH_MAX;
     return out;
   }
 };
@@ -25383,6 +25387,31 @@ var ALL_PROVIDERS = ["itunes", "deezer", "musicbrainz", "youtube", "soundcloud"]
 var PROVIDER_PLATFORMS = { itunes: ["apple-music"], deezer: ["deezer"], musicbrainz: ["musicbrainz"], youtube: ["youtube", "youtube-music"], soundcloud: ["soundcloud"] };
 var SESSION_TTL_MS = 15 * 6e4;
 var SESSION_MAX = 200;
+var MATCH_BUDGET_MS = 6e4;
+async function withBudget(parent, ms, run3) {
+  const controller = new AbortController();
+  const stop = () => controller.abort(parent?.reason);
+  if (parent?.aborted) stop();
+  parent?.addEventListener("abort", stop, { once: true });
+  const timer = setTimeout(() => controller.abort(new Error(`no answer within ${Math.round(ms / 1e3)} s`)), ms);
+  const ended = new Promise((_, reject) => {
+    if (controller.signal.aborted) reject(controller.signal.reason);
+    controller.signal.addEventListener("abort", () => reject(controller.signal.reason), { once: true });
+  });
+  try {
+    return await Promise.race([run3(controller.signal), ended]);
+  } finally {
+    clearTimeout(timer);
+    parent?.removeEventListener("abort", stop);
+  }
+}
+function describedSources(listed, described) {
+  const platforms = new Set(described.filter((s) => s.matchedBy === "link").map((s) => s.platform));
+  return mergeSources(
+    described,
+    listed.filter((s) => !platforms.has(s.platform))
+  );
+}
 var CatalogEngine = class {
   constructor(options) {
     this.options = options;
@@ -25934,9 +25963,14 @@ var CatalogEngine = class {
     const match = link.platform === "spotify" && link.kind === "track";
     let read;
     try {
-      read = await this.resolveCache.get(`${link.url}|${match ? "match" : ""}`, () => reader(link.url, { signal, match }));
+      read = await this.resolveCache.get(`${link.url}|${match ? "match" : ""}`, () => match ? withBudget(signal, this.options.matchBudgetMs ?? MATCH_BUDGET_MS, (budget) => reader(link.url, { signal: budget, match })) : reader(link.url, { signal, match }));
     } catch (error61) {
-      return answer({ kind: "unavailable", reason: this.unreadable(link, error61) });
+      if (!match || signal?.aborted || error61 instanceof LinkReadError && error61.code === "tool-missing") return answer({ kind: "unavailable", reason: this.unreadable(link, error61) });
+      try {
+        read = await this.resolveCache.get(`${link.url}|`, () => reader(link.url, { signal, match: false }));
+      } catch (again) {
+        return answer({ kind: "unavailable", reason: this.unreadable(link, again) });
+      }
     }
     const platform = link.platform;
     if (read.kind === "track") {
@@ -25981,7 +26015,7 @@ var CatalogEngine = class {
       const read = await this.resolveCache.get(`${url2}|`, () => reader(url2, { signal })).catch(() => null);
       if (read?.kind !== "track") return;
       const filled = trackFromLink(read.track, { platform: t2.sources[0].platform });
-      if (filled) tracks[i] = { ...filled, id: t2.id, album: t2.album ?? filled.album, sources: mergeSources(t2.sources, filled.sources) };
+      if (filled) tracks[i] = { ...filled, id: t2.id, album: t2.album ?? filled.album, sources: describedSources(t2.sources, filled.sources) };
     };
     for (let k = 0; k < missing.length; k += 2) await Promise.all(missing.slice(k, k + 2).map(one));
   }
@@ -26003,7 +26037,7 @@ var CatalogEngine = class {
       const entry = filled.get(t2.id);
       if (!entry?.title) return t2;
       const full = trackFromLink(entry, { platform: t2.sources[0].platform, album: t2.album });
-      return full ? { ...full, id: t2.id, trackNumber: t2.trackNumber, album: t2.album ?? full.album, sources: mergeSources(t2.sources, full.sources) } : t2;
+      return full ? { ...full, id: t2.id, trackNumber: t2.trackNumber, album: t2.album ?? full.album, sources: describedSources(t2.sources, full.sources) } : t2;
     });
   }
   /** An Apple Music playlist from its public page (DEC-039, owner decision 2026-10-06). */
