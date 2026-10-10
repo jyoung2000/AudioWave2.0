@@ -150,6 +150,8 @@ describe('lyrics and ISRC in an MP3 (FFmpeg writes neither as their own ID3 fram
       ['TIT2', text('Song')],
       ['TXXX', Buffer.concat([Buffer.from([0]), Buffer.from('USLT\0old words', 'latin1')])],
       ['TSRC', text('USQX91300108')],
+      // What FFmpeg makes of lyrics it read from a USLT frame (`lyrics-eng`), in UTF-16 with a BOM.
+      ['TXXX', Buffer.concat([Buffer.from([1, 0xff, 0xfe]), Buffer.from('lyrics-eng', 'utf16le'), Buffer.from([0, 0, 0xff, 0xfe]), Buffer.from('older words', 'utf16le')])],
     ]);
     const after = withId3Lyrics(before, 'Ünïcode line\r\nsecond')!;
     expect(frameIds(after)).toEqual(['TIT2', 'TSRC', 'USLT']);

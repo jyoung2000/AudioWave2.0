@@ -158,7 +158,11 @@ const syncsafe = (n: number): Buffer => Buffer.from([(n >>> 21) & 0x7f, (n >>> 1
 /** A TXXX frame's description, to recognise the lyrics FFmpeg filed there ("USLT", "lyrics…"). */
 function txxxDescription(body: Buffer): string {
   if (body[0] === 1 || body[0] === 2) {
-    for (let i = 1; i + 1 < body.length; i += 2) if (body[i] === 0 && body[i + 1] === 0) return body.subarray(1, i).toString('utf16le').replace(/^﻿/, '');
+    for (let i = 1; i + 1 < body.length; i += 2) {
+      if (body[i] !== 0 || body[i + 1] !== 0) continue;
+      const text = body.subarray(1, i).toString('utf16le');
+      return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text; // the byte-order mark
+    }
     return '';
   }
   const end = body.indexOf(0, 1);
