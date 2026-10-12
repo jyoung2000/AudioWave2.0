@@ -20793,7 +20793,7 @@ var CatalogSettingsInput = external_exports.object({
   /** Write-only. Empty string clears it. */
   odesliKey: external_exports.string().max(200).optional()
 });
-var CATALOG_API_HOSTS = ["itunes.apple.com", "api.deezer.com", "musicbrainz.org", "coverartarchive.org", "api.song.link", "lrclib.net", "music.apple.com"];
+var CATALOG_API_HOSTS = ["itunes.apple.com", "api.deezer.com", "musicbrainz.org", "coverartarchive.org", "api.song.link", "lrclib.net", "music.apple.com", "open.spotify.com"];
 var HELPER_CATALOG_ROUTES = {
   search: "/helper/v1/catalog/search",
   album: "/helper/v1/catalog/album",
@@ -22380,10 +22380,6 @@ import { homedir as homedir2, tmpdir as tmpdir2 } from "node:os";
 import { join as join7, extname as extname2 } from "node:path";
 import { randomUUID } from "node:crypto";
 
-// src/tools.ts
-import { existsSync as existsSync2 } from "node:fs";
-import { join as join6 } from "node:path";
-
 // ../packages/domain/src/tool-install/install.ts
 import { createHash } from "node:crypto";
 import { chmodSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, statSync as statSync3, writeFileSync } from "node:fs";
@@ -22811,7 +22807,28 @@ function isBinEntry(entryName, file2) {
   return parts.length >= 2 && parts.length <= 3 && parts[parts.length - 2].toLowerCase() === "bin" && parts[parts.length - 1].toLowerCase() === file2.toLowerCase();
 }
 
+// ../packages/domain/src/tool-install/yt-dlp-runtime.ts
+function checkedRuntimePath(runtimePath) {
+  if (!runtimePath.trim() || [...runtimePath].some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)) throw new Error("A valid Node runtime path is required.");
+  return runtimePath;
+}
+function withYtDlpJsRuntime(args, runtimePath) {
+  const separator = args.indexOf("--");
+  if (separator === args.length - 1) throw new Error("yt-dlp arguments must keep the URL after `--`.");
+  if (args.includes("--js-runtimes")) return [...args];
+  const runtime = checkedRuntimePath(runtimePath);
+  if (separator < 0) return [args[0], "--js-runtimes", `node:${runtime}`, ...args.slice(1)];
+  return [...args.slice(0, separator), "--js-runtimes", `node:${runtime}`, ...args.slice(separator)];
+}
+function spotdlYtDlpArgs(runtimePath, extraArgs = []) {
+  const runtime = checkedRuntimePath(runtimePath);
+  const args = [...extraArgs, "--js-runtimes", `node:${runtime}`];
+  return args.map((arg) => `"${arg.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`).join(" ");
+}
+
 // src/tools.ts
+import { existsSync as existsSync2 } from "node:fs";
+import { join as join6 } from "node:path";
 function installHint(id, installable) {
   if (installable) return `Not set up yet. The helper downloads ${id} from its project\u2019s GitHub release and checks it against the published SHA-256 before using it.`;
   if (id === "ffmpeg") return "Not installed. Without it nothing can be converted and yt-dlp takes whatever single audio stream a site offers. Install it with your package manager: brew install ffmpeg, apt install ffmpeg or dnf install ffmpeg.";
@@ -23208,7 +23225,7 @@ var MAX_INFO_BYTES = 256 * 1024 * 1024;
 var FFMPEG_MISSING_NOTE = "Saved as the site sent it: FFmpeg is not on this PC, so there is no cover art and the title, artist and date were not written into the file.";
 var PLAYLIST_CAP = 200;
 function ytDlpInfoArgs(job) {
-  return ["--ignore-config", "--no-colors", "--no-cache-dir", "--playlist-end", String(PLAYLIST_CAP), "--dump-single-json", "--", urlArgument(job.url)];
+  return withYtDlpJsRuntime(["--ignore-config", "--no-colors", "--no-cache-dir", "--playlist-end", String(PLAYLIST_CAP), "--dump-single-json", "--", urlArgument(job.url)], process.execPath);
 }
 function ytDlpArgs(job, directory, ffmpeg, limits = {}, source2 = {}) {
   const url2 = urlArgument(job.url);
@@ -23236,7 +23253,7 @@ function ytDlpArgs(job, directory, ffmpeg, limits = {}, source2 = {}) {
   if (rate !== null) args.push("--limit-rate", `${rate}K`);
   if (source2.infoFile) args.push("--no-clean-infojson", "--load-info-json", source2.infoFile);
   else args.push("--", url2);
-  return args;
+  return withYtDlpJsRuntime(args, process.execPath);
 }
 var UNUSED_INFO_FIELDS = ["automatic_captions", "subtitles", "heatmap", "requested_subtitles", "description"];
 var LOAD_TIME_FIELDS = /* @__PURE__ */ new Set(["requested_downloads", "requested_formats", "requested_entries", "filepath", "_filename", "filename", "_format_sort_fields"]);
@@ -23260,17 +23277,18 @@ function spotdlArgs(job, directory, ffmpeg, limits = {}) {
   const args = ["download", urlArgument(job.url), "--output", join7(directory, "{artists} - {title}.{output-ext}"), "--format", job.format === "original" ? "mp3" : job.format];
   if (ffmpeg.path) args.push("--ffmpeg", ffmpeg.path);
   const rate = rateLimitOf(limits.rateLimitKBps);
-  if (rate !== null) args.push("--yt-dlp-args", `--limit-rate ${rate}K`);
+  args.push("--yt-dlp-args", spotdlYtDlpArgs(process.execPath, rate !== null ? ["--limit-rate", `${rate}K`] : []));
   return args;
 }
 function spotdlSaveArgs(url2, saveFile, options = {}) {
-  return ["save", urlArgument(url2), "--save-file", saveFile, ...options.preload ? ["--preload"] : []];
+  return ["save", urlArgument(url2), "--save-file", saveFile, ...options.ffmpeg ? ["--ffmpeg", options.ffmpeg] : [], ...options.preload ? ["--preload"] : [], "--yt-dlp-args", spotdlYtDlpArgs(process.execPath)];
 }
 function childEnv(source2 = process.env, overrides = {}) {
   const keep = ["PATH", "Path", "SYSTEMROOT", "SystemRoot", "COMSPEC", "TEMP", "TMP", "TMPDIR", "LANG", "LC_ALL", "HOME", "USERPROFILE"];
   const env = {};
   for (const key of keep) if (source2[key]) env[key] = source2[key];
   env["PYTHONDONTWRITEBYTECODE"] = "1";
+  if (process.versions["electron"]) env["ELECTRON_RUN_AS_NODE"] = "1";
   return { ...env, ...overrides };
 }
 function killTree(child) {
@@ -23346,8 +23364,8 @@ function sourceOf(url2) {
 }
 function ytDlpResolveArgs(url2, options = {}) {
   if (!/^https?:\/\//i.test(url2)) throw new Error("Only http(s) addresses can be handed to a tool.");
-  if (options.items?.length) return ["--ignore-config", "--no-colors", "--no-cache-dir", "--no-warnings", "--skip-download", "--playlist-items", options.items.map((n) => String(Math.trunc(n))).join(","), "--dump-single-json", "--", url2];
-  return ["--ignore-config", "--no-colors", "--no-cache-dir", "--no-warnings", "--skip-download", "--flat-playlist", "--playlist-end", String(options.cap ?? HELPER_RESOLVE_CAP), "--dump-single-json", "--", url2];
+  if (options.items?.length) return withYtDlpJsRuntime(["--ignore-config", "--no-colors", "--no-cache-dir", "--no-warnings", "--skip-download", "--playlist-items", options.items.map((n) => String(Math.trunc(n))).join(","), "--dump-single-json", "--", url2], process.execPath);
+  return withYtDlpJsRuntime(["--ignore-config", "--no-colors", "--no-cache-dir", "--no-warnings", "--skip-download", "--flat-playlist", "--playlist-end", String(options.cap ?? HELPER_RESOLVE_CAP), "--dump-single-json", "--", url2], process.execPath);
 }
 function str(value, max = 300) {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : null;
@@ -23553,12 +23571,14 @@ function createResolver(options) {
     if (source2 === "spotify") {
       const spotdl = tools.spotdl;
       if (!spotdl.present || !spotdl.path) throw new ResolveError(spotdl.installHint ?? "spotDL is not set up on this PC yet.", "tool-missing");
+      const ffmpeg = tools.ffmpeg;
+      if (!ffmpeg.present || !ffmpeg.path) throw new ResolveError(ffmpeg.installHint ?? "spotDL needs FFmpeg, and there is none on this PC.", "tool-missing");
       return slot(async () => {
         const dir = join8(options.workDir, "resolve", randomUUID2());
         mkdirSync3(dir, { recursive: true });
         try {
           const file2 = join8(dir, "songs.spotdl");
-          await run2(spotdl.path, spotdlSaveArgs(url2.toString(), file2, { preload: match && /^\/(?:intl-[a-z-]+\/)?track\//i.test(url2.pathname) }), childEnv(process.env, { HOME: dir, USERPROFILE: dir }), Math.max(timeouts.spotdl, longer));
+          await run2(spotdl.path, spotdlSaveArgs(url2.toString(), file2, { preload: match && /^\/(?:intl-[a-z-]+\/)?track\//i.test(url2.pathname), ffmpeg: ffmpeg.path }), childEnv(process.env, { HOME: dir, USERPROFILE: dir }), Math.max(timeouts.spotdl, longer));
           let songs;
           try {
             songs = JSON.parse(readFileSync2(file2, "utf8"));
@@ -23594,7 +23614,7 @@ function createResolver(options) {
       const tools = await options.tools();
       const ytDlp = tools["yt-dlp"];
       if (!ytDlp.present || !ytDlp.path) throw new ResolveError(ytDlp.installHint ?? "yt-dlp is not set up on this PC yet.", "tool-missing");
-      const stdout = await slot(() => run2(ytDlp.path, [...args], childEnv(), timeouts.ytDlp, signal));
+      const stdout = await slot(() => run2(ytDlp.path, withYtDlpJsRuntime(args, process.execPath), childEnv(), timeouts.ytDlp, signal));
       try {
         return JSON.parse(stdout);
       } catch {
@@ -25541,6 +25561,113 @@ async function fetchApplePlaylistPage(fetchImpl, url2, playlistId, options) {
   }
 }
 
+// ../packages/domain/src/catalog/providers/spotify-embed.ts
+var SPOTIFY_ID = /^[A-Za-z0-9]{10,40}$/;
+var SPOTIFY_EMBED_TRACK_LIMIT = 100;
+function nextData(html) {
+  const scripts = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
+  for (let match = scripts.exec(html); match; match = scripts.exec(html)) {
+    if (!/\bid=["']__NEXT_DATA__["']/i.test(match[1] ?? "")) continue;
+    try {
+      const value = JSON.parse(match[2] ?? "");
+      return isObject2(value) ? value : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+function entityFrom(html) {
+  const root = nextData(html);
+  const props = root && isObject2(root["props"]) ? root["props"] : null;
+  const pageProps = props && isObject2(props["pageProps"]) ? props["pageProps"] : null;
+  const state = pageProps && isObject2(pageProps["state"]) ? pageProps["state"] : null;
+  const data = state && isObject2(state["data"]) ? state["data"] : null;
+  return data && isObject2(data["entity"]) ? data["entity"] : null;
+}
+function bestImage(value) {
+  if (!Array.isArray(value)) return null;
+  const images = value.filter(isObject2).filter((image) => webUrl2(image["url"]));
+  images.sort((a, b) => (num2(b["maxWidth"]) ?? num2(b["width"]) ?? 0) - (num2(a["maxWidth"]) ?? num2(a["width"]) ?? 0));
+  return images.length ? webUrl2(images[0]["url"]) : null;
+}
+function artworkOf2(entity) {
+  const visual = isObject2(entity["visualIdentity"]) ? entity["visualIdentity"] : null;
+  const cover = isObject2(entity["coverArt"]) ? entity["coverArt"] : null;
+  return bestImage(visual?.["image"]) ?? bestImage(cover?.["sources"]);
+}
+function artistsOf(value) {
+  if (Array.isArray(value)) return value.map((item) => isObject2(item) ? str2(item["name"]) : str2(item)).filter((name) => Boolean(name));
+  const joined = str2(value)?.replace(/\u00a0/g, " ");
+  return joined ? joined.split(/\s*,\s*/).filter(Boolean) : [];
+}
+function ownerOf(entity) {
+  const authors = artistsOf(entity["authors"]);
+  if (authors.length) return authors.join(", ");
+  const subtitle = str2(entity["subtitle"]);
+  return subtitle && !/^spotify$/i.test(subtitle) ? subtitle.replace(/\u00a0/g, " ") : null;
+}
+function dateOf(value) {
+  return calendarDate(isObject2(value) ? value["isoString"] : value);
+}
+function trackFrom(entity, fallbackArtwork, album, trackNumber) {
+  const uri = str2(entity["uri"], 100);
+  const uriId = uri ? /^spotify:track:([A-Za-z0-9]{10,40})$/.exec(uri)?.[1] : null;
+  const id = uriId ?? (SPOTIFY_ID.test(str2(entity["id"], 40) ?? "") ? str2(entity["id"], 40) : null);
+  const title = str2(entity["title"]) ?? str2(entity["name"]);
+  if (!id || !title) return null;
+  const artists = artistsOf(entity["artists"] ?? entity["subtitle"]);
+  const durationMs = num2(entity["duration"]);
+  const entityArtwork = artworkOf2(entity);
+  const albumValue = entity["album"];
+  const albumName = isObject2(albumValue) ? str2(albumValue["title"]) ?? str2(albumValue["name"]) : str2(albumValue);
+  return {
+    url: `https://open.spotify.com/track/${id}`,
+    title,
+    artist: artists[0] ?? null,
+    featured: artists.slice(1, 20),
+    album: albumName ?? album,
+    durationSec: durationMs === null || durationMs === 0 ? null : durationMs / 1e3,
+    date: dateOf(entity["releaseDate"]),
+    artworkUrl: entityArtwork ?? fallbackArtwork,
+    trackNumber,
+    explicit: typeof entity["isExplicit"] === "boolean" ? entity["isExplicit"] : null
+  };
+}
+function readSpotifyEmbed(html, url2) {
+  const link = parseMusicLink(url2);
+  if (!link || link.platform !== "spotify" || !link.id || !["track", "album", "playlist"].includes(link.kind)) return null;
+  const entity = entityFrom(html);
+  if (!entity || str2(entity["id"], 40) !== link.id || str2(entity["type"]) !== link.kind) return null;
+  if (!SPOTIFY_ID.test(link.id)) return null;
+  if (link.kind === "track") {
+    const track = trackFrom(entity, artworkOf2(entity), null, null);
+    return track ? { kind: "track", url: link.url, track } : null;
+  }
+  const trackList = entity["trackList"];
+  if (!Array.isArray(trackList)) return null;
+  const artworkUrl = artworkOf2(entity);
+  const title = str2(entity["title"]) ?? str2(entity["name"]) ?? (link.kind === "album" ? "Album" : "Playlist");
+  const tracks = trackList.filter(isObject2).map((track, index) => trackFrom(track, artworkUrl, link.kind === "album" ? title : null, link.kind === "album" ? index + 1 : null)).filter((track) => Boolean(track));
+  const declaredTotal = num2(entity["trackCount"]);
+  const knownTotal = declaredTotal !== null && Number.isInteger(declaredTotal) ? declaredTotal : null;
+  const limit = Math.min(CATALOG_COLLECTION_CAP, SPOTIFY_EMBED_TRACK_LIMIT, knownTotal ?? Number.POSITIVE_INFINITY);
+  const entries = tracks.slice(0, limit);
+  const responseCapped = knownTotal === null && trackList.length >= SPOTIFY_EMBED_TRACK_LIMIT;
+  const total = knownTotal ?? (responseCapped ? null : tracks.length);
+  return {
+    kind: "collection",
+    url: link.url,
+    title,
+    owner: ownerOf(entity),
+    artworkUrl,
+    date: dateOf(entity["releaseDate"]),
+    entries,
+    total,
+    capped: tracks.length > entries.length || responseCapped || total !== null && total > entries.length
+  };
+}
+
 // ../packages/domain/src/catalog/engine.ts
 var ALL_SECTIONS = ["tracks", "artists", "albums", "playlists"];
 var ALL_PROVIDERS = ["itunes", "deezer", "musicbrainz", "youtube", "soundcloud"];
@@ -25586,6 +25713,7 @@ var CatalogEngine = class {
     this.lyricsCache = new TtlCache(24 * 36e5, 500, this.now);
     this.enrichCache = new TtlCache(24 * 36e5, 1e3, this.now);
     this.resolveCache = new TtlCache(10 * 6e4, 100, this.now);
+    this.spotifyEmbedCache = new TtlCache(10 * 6e4, 100, this.now);
     this.searchCache = new TtlCache(5 * 6e4, 300, this.now);
     this.linksCache = new TtlCache(24 * 36e5, 1e3, this.now);
     this.applePageCache = new TtlCache(10 * 6e4, 50, this.now);
@@ -25611,6 +25739,8 @@ var CatalogEngine = class {
   lyricsCache;
   enrichCache;
   resolveCache;
+  /** Public Spotify embeds are the keyless playlist path and metadata fallback for other Spotify links. */
+  spotifyEmbedCache;
   /**
    * A read list's rows, built once per read (the read itself is cached, so a list served page by page
    * is the same object each time). Rebuilding every row for each page made reading a whole list grow
@@ -26125,18 +26255,35 @@ var CatalogEngine = class {
   async resolveWithTool(link, offset, limit, answer, signal) {
     const label = CATALOG_PLATFORM_LABELS[link.platform];
     const reader = this.options.linkReader;
-    if (!reader) return answer({ kind: "unsupported", reason: `${label} links are read by yt-dlp or spotDL, which are not available here.` });
     const match = link.platform === "spotify" && link.kind === "track";
-    let read;
-    try {
-      read = await this.resolveCache.get(`${link.url}|${match ? "match" : ""}`, () => match ? withBudget(signal, this.options.matchBudgetMs ?? MATCH_BUDGET_MS, (budget) => reader(link.url, { signal: budget, match })) : reader(link.url, { signal, match }));
-    } catch (error61) {
-      if (!match || signal?.aborted || error61 instanceof LinkReadError && error61.code === "tool-missing") return answer({ kind: "unavailable", reason: this.unreadable(link, error61) });
+    let read = null;
+    let failure = null;
+    if (link.platform === "spotify" && link.kind === "playlist" && link.id && !signal?.aborted) {
+      read = await this.spotifyEmbedCache.get(link.url, () => this.readSpotifyEmbedPage(link, signal)).catch(() => null);
+    }
+    if (reader && !read) {
       try {
-        read = await this.resolveCache.get(`${link.url}|`, () => reader(link.url, { signal, match: false }));
-      } catch (again) {
-        return answer({ kind: "unavailable", reason: this.unreadable(link, again) });
+        read = await this.resolveCache.get(`${link.url}|${match ? "match" : ""}`, () => match ? withBudget(signal, this.options.matchBudgetMs ?? MATCH_BUDGET_MS, (budget) => reader(link.url, { signal: budget, match })) : reader(link.url, { signal, match }));
+      } catch (error61) {
+        failure = error61;
+        if (match && !signal?.aborted && !(error61 instanceof LinkReadError && error61.code === "tool-missing")) {
+          try {
+            read = await this.resolveCache.get(`${link.url}|`, () => reader(link.url, { signal, match: false }));
+          } catch (again) {
+            failure = again;
+          }
+        }
       }
+    }
+    if (!read && link.platform === "spotify" && link.id && !signal?.aborted) {
+      read = await this.spotifyEmbedCache.get(link.url, () => this.readSpotifyEmbedPage(link, signal)).catch(() => null);
+    }
+    if (read?.kind === "collection" && link.platform === "spotify" && !read.entries.length && link.id && !signal?.aborted) {
+      read = await this.spotifyEmbedCache.get(link.url, () => this.readSpotifyEmbedPage(link, signal)).catch(() => read);
+    }
+    if (!read) {
+      if (!reader) return answer({ kind: "unsupported", reason: `${label} links are read by yt-dlp or spotDL, which are not available here.` });
+      return answer({ kind: "unavailable", reason: this.unreadable(link, failure ?? new Error("No public Spotify embed data was available.")) });
     }
     const platform = link.platform;
     if (read.kind === "track") {
@@ -26153,7 +26300,7 @@ var CatalogEngine = class {
           if (track) rows2.push({ track, bare: !e.title, position: i + 1 });
         });
         const all2 = rows2.map((r) => r.track);
-        await this.fillCovers(all2, reader, signal);
+        if (reader) await this.fillCovers(all2, reader, signal);
         all2.forEach((t2, i) => rows2[i].track = t2);
         return { rows: rows2, all: all2, covers: coversOf(all2) };
       })();
@@ -26162,7 +26309,7 @@ var CatalogEngine = class {
     }
     const { rows, all, covers } = await built;
     const page = pageOf(all, offset, limit, read.total ?? read.entries.length, read.capped || read.entries.length > CATALOG_COLLECTION_CAP || (read.total ?? 0) > CATALOG_COLLECTION_CAP);
-    page.tracks = await this.hydratePage(link, rows.slice(offset, offset + page.tracks.length), page.tracks, reader, signal);
+    if (reader) page.tracks = await this.hydratePage(link, rows.slice(offset, offset + page.tracks.length), page.tracks, reader, signal);
     const kind = link.kind === "album" ? "album" : "playlist";
     const collection = {
       ref: collectionRef(link, kind, read.title, read.owner),
@@ -26176,6 +26323,14 @@ var CatalogEngine = class {
       return answer({ kind: "artist", artist, collection });
     }
     return answer({ kind, collection });
+  }
+  /** Fetch metadata from Spotify's public embed page, under the catalog host allowlist. */
+  async readSpotifyEmbedPage(link, signal) {
+    if (!link.id || !["track", "album", "playlist"].includes(link.kind)) return null;
+    const url2 = `https://open.spotify.com/embed/${link.kind}/${encodeURIComponent(link.id)}`;
+    const { status, body } = await getText(this.options.fetch, url2, { timeoutMs: this.options.timeouts?.tools ?? 15e3, signal, accept: [403, 404] });
+    if (status === 403 || status === 404) return null;
+    return readSpotifyEmbed(body, link.url);
   }
   /**
    * A list whose entries came without artwork (a SoundCloud set lists addresses only) gets its first

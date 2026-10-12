@@ -2997,14 +2997,15 @@
       "id": "UX-CAT-003",
       "group": "catalog",
       "title": "Search finds music, never a “search on YouTube” offer, and every result says where it is",
-      "contract": "The catalog answers with songs, artists and albums only. It never returns an entry whose only purpose is to send the person to search another site; YouTube and SoundCloud are searched by the server (yt-dlp) and their results are songs like any other. Every track, artist and album carries at least one source naming its platform, and a song from Spotify that plays from YouTube Music carries both, the second marked as spotDL’s match. A pasted link is not searched: the search says to resolve it, and resolve says what it is or, for a link it cannot read (a private or Spotify-made playlist, a Tidal link without a SongLink key), why — in words. A row shows at most three platform badges and counts the rest (+N), so the title is never cut short by them; every platform is named in the row's tooltip and on the song's page. The facts a row carries beyond its platforms — cover, BPM, featured artists, explicit, date, ISRC, album — and where each comes from are UX-CAT-006.",
+      "contract": "The catalog answers with songs, artists and albums only. It never returns an entry whose only purpose is to send the person to search another site; YouTube and SoundCloud are searched by the server (yt-dlp) and their results are songs like any other. Every track, artist and album carries at least one source naming its platform, and a song from Spotify that plays from YouTube Music carries both, the second marked as spotDL’s match. A pasted link is not searched: the search says to resolve it, and resolve says what it is. A public Spotify playlist is read from the public embed page first to avoid a slow API crawl; tracks and albums use spotDL first and the embed page only as metadata fallback. Embed previews are never used as audio, and an inaccessible/private link still says why — in words. A Tidal link without a SongLink key also says why. A row shows at most three platform badges and counts the rest (+N), so the title is never cut short by them; every platform is named in the row's tooltip and on the song's page. The facts a row carries beyond its platforms — cover, BPM, featured artists, explicit, date, ISRC, album — and where each comes from are UX-CAT-006.",
       "example": "{\"sources\":[{\"platform\":\"spotify\",\"matchedBy\":\"link\"},{\"platform\":\"youtube-music\",\"matchedBy\":\"spotdl\"}]} — shown as “Spotify · plays from YouTube Music”.",
       "authority": "adopted",
       "owners": [
         "packages/contracts/src/api/catalog.ts",
         "packages/domain/src/catalog/engine.ts",
         "packages/domain/src/catalog/links.ts",
-        "packages/domain/src/catalog/providers/ytdlp.ts"
+        "packages/domain/src/catalog/providers/ytdlp.ts",
+        "packages/domain/src/catalog/providers/spotify-embed.ts"
       ],
       "evidence": [
         {
@@ -3039,6 +3040,16 @@
         },
         {
           "type": "test",
+          "path": "packages/domain/tests/unit/catalog-engine.test.ts",
+          "name": "resolves a public Spotify playlist from its embed page when spotDL cannot list it"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/unit/external-tool-runs.test.ts",
+          "name": "falls back to a public Spotify track embed when spotDL cannot read the track"
+        },
+        {
+          "type": "test",
           "path": "docker-container/tests/integration/catalog.test.ts",
           "name": "a Spotify song through spotDL, with its YouTube Music match"
         },
@@ -3053,14 +3064,17 @@
       "id": "UX-CAT-004",
       "group": "catalog",
       "title": "A loaded list loads every song, from any platform",
-      "contract": "An album or playlist opened from a link or a result lists every song it has, in order, page by page: `resolve` and `album` serve any `offset` (to 10,000) with a `limit` of at most 200, `total` is the platform’s own count, and `hasMore` holds until the end; `collectAllPages` reads a whole list. Spotify (spotDL), YouTube and YouTube Music playlists and Bandcamp albums (yt-dlp) are read once, whole; a SoundCloud set’s bare ids are described a page at a time; Deezer pages with its own index; Apple Music playlists are read from their public page. A list past 10,000 songs says so (`capped`); a page that carries fewer songs than the list holds says so in words. Nothing is cut silently.",
-      "example": "A 1,200-song Spotify playlist opens with its first page, and page 12 is songs 1,101–1,200 with `hasMore: false`.",
+      "contract": "An album or playlist opened from a link or a result lists every song it has, in order, page by page: `resolve` and `album` serve any `offset` (to 10,000) with a `limit` of at most 200, `total` is the platform’s own count when available (otherwise `null`), and `hasMore` holds until the end; `collectAllPages` reads a whole list. Spotify playlists use the public embed listing first and spotDL when the page is unavailable; the embed has no total and at most 100 tracks, so the 100-track ceiling is reported as capped. YouTube and YouTube Music playlists and Bandcamp albums (yt-dlp) are read once, whole; a SoundCloud set’s bare ids are described a page at a time; Deezer pages with its own index; Apple Music playlists are read from their public page. A list past 10,000 songs says so (`capped`); a page that carries fewer songs than the list holds says so in words. Nothing is cut silently.",
+      "example": "When spotDL can read a 1,200-song Spotify playlist, page 12 is songs 1,101–1,200 with `hasMore: false`; when only the public embed is available, its 100-track ceiling is marked capped.",
       "authority": "adopted",
       "owners": [
         "packages/domain/src/catalog/engine.ts",
         "packages/domain/src/catalog/links.ts",
         "packages/domain/src/catalog/providers/applemusic-page.ts",
+        "packages/domain/src/catalog/providers/spotify-embed.ts",
         "docker-container/src/catalog/service.ts",
+        "docker-container/src/providers/adapters/external-tool.ts",
+        "docker-container/src/downloads/service.ts",
         "local-helper/src/resolve.ts"
       ],
       "evidence": [
@@ -3073,6 +3087,16 @@
           "type": "test",
           "path": "packages/domain/tests/unit/catalog-paging.test.ts",
           "name": "Spotify through spotDL: all 1,200 songs of a playlist, read once and served page by page"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/spotify-embed.test.ts",
+          "name": "reports the embed page limit instead of claiming a 100-track playlist is complete"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/integration/downloads-external-tool.test.ts",
+          "name": "downloads each track from public Spotify playlist metadata without crawling it through spotDL"
         },
         {
           "type": "test",

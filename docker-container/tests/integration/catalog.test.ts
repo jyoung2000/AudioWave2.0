@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CatalogAlbumDetail, CatalogResolveResult, CatalogSearchAggregate, CatalogSearchChunk, CatalogSettingsView, SavedCollection, type CatalogTrack, type DownloadJob } from '@now-playing/contracts';
+import type { CatalogFetch } from '@now-playing/domain/catalog';
 import { hubCatalogFetch } from '../../src/catalog/service.js';
 import { toolEnvironment, toolScratchDir } from '../../src/media/tool-env.js';
 import { ExternalToolAdapter } from '../../src/providers/adapters/external-tool.js';
@@ -19,6 +20,10 @@ import { createTestHub, pairDevice, type TestHub } from '../helpers/hub.js';
 const catalogFixtures = join(import.meta.dirname, '..', '..', '..', 'packages', 'domain', 'tests', 'fixtures', 'catalog');
 const mediaFixtures = join(import.meta.dirname, '..', 'fixtures', 'media-metadata');
 const fx = (name: string): unknown => JSON.parse(readFileSync(join(catalogFixtures, `${name}.json`), 'utf8'));
+const spotifyPlaylistId = '37i9dQZF1DXcBWIGoYBM5M';
+const spotifyEmbedEntity = { type: 'playlist', id: spotifyPlaylistId, title: 'Today’s Top Hits', subtitle: 'Spotify', coverArt: { sources: [{ url: 'https://i.scdn.co/image/playlist-cover' }] }, trackList: [{ uri: 'spotify:track:4PTG3Z6ehGkBFwjybzWkR8', title: 'Never Gonna Give You Up', subtitle: 'Rick Astley', duration: 213573, audioPreview: { url: 'https://p.scdn.co/preview' } }] };
+const spotifyEmbed = `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify({ props: { pageProps: { state: { data: { entity: spotifyEmbedEntity } } } } })}</script>`;
+const spotifyEmbedFetch: CatalogFetch = async (url) => ({ status: url === `https://open.spotify.com/embed/playlist/${spotifyPlaylistId}` ? 200 : 404, headers: { get: () => null }, json: async () => ({}), text: async () => spotifyEmbed });
 
 let root: string;
 let hub: TestHub;
@@ -75,6 +80,7 @@ beforeAll(async () => {
     () => toolEnvironment(toolScratchDir(data), process.env),
     async () => ffmpeg,
     () => toolScratchDir(data),
+    spotifyEmbedFetch,
   );
   hub = await createTestHub({ ffmpeg: { available: true, path: ffmpeg, version: '7.1', encoders: [] }, deps: { replaceAdapters: { 'external-tool': adapter } } });
   const answer = (match: string, name: string) => hub.fetch.on(match, () => ({ body: fx(name) }));
@@ -132,6 +138,7 @@ describe('catalog search on the hub', () => {
     const calls = readFileSync(join(root, 'yt-dlp.calls'), 'utf8').trim().split('\n').map((l) => JSON.parse(l) as string[]);
     expect(calls.map((c) => c.at(-1))).toEqual(expect.arrayContaining(['ytsearch3:daft punk get lucky', 'scsearch3:daft punk get lucky']));
     expect(calls.every((c) => c[0] === '--ignore-config' && c.at(-2) === '--')).toBe(true);
+    expect(calls.every((c) => c.includes('--js-runtimes') && c.includes(`node:${process.execPath}`))).toBe(true);
   }, 30_000);
 
   it('a page’s rows carry bpm, contributors, ISRC and explicit after the hydration chunk, before done (UX-CAT-006)', async () => {
@@ -201,10 +208,9 @@ describe('details, resolve, lyrics and enrichment on the hub', () => {
     expect(spotdl.at(-1)).toContain('--preload');
   }, 30_000);
 
-  it('a Spotify playlist Spotify refuses: unavailable, with the reason', async () => {
-    const body = CatalogResolveResult.parse((await get(`/api/v1/catalog/resolve?url=${encodeURIComponent('https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M')}`)).json());
-    expect(body.kind).toBe('unavailable');
-    expect(body.reason).toMatch(/private, or one Spotify made itself/);
+  it('a Spotify playlist spotDL refuses resolves from its public embed metadata', async () => {
+    const body = CatalogResolveResult.parse((await get(`/api/v1/catalog/resolve?url=${encodeURIComponent(`https://open.spotify.com/playlist/${spotifyPlaylistId}`)}`)).json());
+    expect(body).toMatchObject({ kind: 'playlist', collection: { ref: { platform: 'spotify', kind: 'playlist', id: spotifyPlaylistId, title: 'Today’s Top Hits' }, page: { total: 1, tracks: [{ title: 'Never Gonna Give You Up', artist: 'Rick Astley' }] } } });
   }, 30_000);
 
   it('a Deezer playlist with its covers and ref', async () => {

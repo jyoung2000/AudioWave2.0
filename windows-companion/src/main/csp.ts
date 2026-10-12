@@ -11,7 +11,7 @@
  * (DEC-039): `img-src` and `media-src` also allow the music services' artwork and clip hosts —
  * `CATALOG_MEDIA_HOSTS` in the contracts, over https only; a test keeps the two lists equal.
  */
-export const CATALOG_MEDIA_SOURCES: readonly string[] = ['https://*.mzstatic.com', 'https://audio-ssl.itunes.apple.com', 'https://cdn-images.dzcdn.net', 'https://*.dzcdn.net', 'https://i.ytimg.com', 'https://*.sndcdn.com', 'https://archive.org', 'https://*.archive.org', 'https://i.scdn.co'];
+export const CATALOG_MEDIA_SOURCES: readonly string[] = ['https://*.mzstatic.com', 'https://audio-ssl.itunes.apple.com', 'https://cdn-images.dzcdn.net', 'https://*.dzcdn.net', 'https://i.ytimg.com', 'https://*.sndcdn.com', 'https://archive.org', 'https://*.archive.org', 'https://i.scdn.co', 'https://*.spotifycdn.com'];
 
 export function contentSecurityPolicy(devServerUrl: string | null): string {
   const dev = devServerUrl ? new URL(devServerUrl) : null;

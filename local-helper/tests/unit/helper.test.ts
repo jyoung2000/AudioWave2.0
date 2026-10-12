@@ -32,6 +32,11 @@ describe('the command line it builds', () => {
     expect(args.filter((a) => a.startsWith('--exec'))).toEqual([]);
   });
 
+  it('enables Node for YouTube JavaScript challenges', () => {
+    const args = ytDlpArgs(job(), '/tmp/j', { present: true });
+    expect(args[args.indexOf('--js-runtimes') + 1]).toBe(`node:${process.execPath}`);
+  });
+
   it('extracts audio when FFmpeg is there and asks for one audio stream when it is not', () => {
     expect(ytDlpArgs(job(), '/tmp/j', { present: true })).toContain('--extract-audio');
     const without = ytDlpArgs(job(), '/tmp/j', { present: false });

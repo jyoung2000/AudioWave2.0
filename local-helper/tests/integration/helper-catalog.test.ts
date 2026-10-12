@@ -37,7 +37,10 @@ let root: string;
 let stubDir: string;
 let base: string;
 
-const routes: Route[] = [[/api\.deezer\.com\/playlist\/908622995\/tracks/, 'deezer-playlist-tracks'], [/api\.deezer\.com\/playlist\/908622995/, 'deezer-playlist'], [/lrclib\.net\/api\/get/, 'lrclib-get'], ...STANDARD_ROUTES];
+const spotifyPlaylistId = '37i9dQZF1DXcBWIGoYBM5M';
+const spotifyEmbedEntity = { type: 'playlist', id: spotifyPlaylistId, title: 'Today’s Top Hits', subtitle: 'Spotify', trackList: [{ uri: 'spotify:track:4PTG3Z6ehGkBFwjybzWkR8', title: 'Never Gonna Give You Up', subtitle: 'Rick Astley', duration: 213573, audioPreview: { url: 'https://p.scdn.co/preview' } }] };
+const spotifyEmbed = `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify({ props: { pageProps: { state: { data: { entity: spotifyEmbedEntity } } } } })}</script>`;
+const routes: Route[] = [[/open\.spotify\.com\/embed\/playlist\//, { status: 200, body: spotifyEmbed }], [/api\.deezer\.com\/playlist\/908622995\/tracks/, 'deezer-playlist-tracks'], [/api\.deezer\.com\/playlist\/908622995/, 'deezer-playlist'], [/lrclib\.net\/api\/get/, 'lrclib-get'], ...STANDARD_ROUTES];
 
 const get = (path: string, headers: Record<string, string> = { origin: PAGE }): Promise<Response> => fetch(`${base}${path}`, { headers });
 
@@ -57,6 +60,7 @@ beforeAll(async () => {
   mkdirSync(stubDir, { recursive: true });
   writeFileSync(join(stubDir, 'yt-dlp.mjs'), STUB(stubDir));
   writeFileSync(join(stubDir, 'spotdl.mjs'), STUB(stubDir));
+  writeFileSync(join(stubDir, 'ffmpeg.mjs'), "if (process.argv.includes('-version')) process.stdout.write('ffmpeg version 7.1\\n');\n");
   helper = await startHelper({
     port: 0,
     version: '1.0.0-test',
@@ -67,7 +71,7 @@ beforeAll(async () => {
     allowedHosts: ['www.youtube.com', 'soundcloud.com', 'open.spotify.com'],
     allowedOrigins: [PAGE],
     app: null,
-    configured: { 'yt-dlp': join(stubDir, 'yt-dlp.mjs'), spotdl: join(stubDir, 'spotdl.mjs') },
+    configured: { 'yt-dlp': join(stubDir, 'yt-dlp.mjs'), spotdl: join(stubDir, 'spotdl.mjs'), ffmpeg: join(stubDir, 'ffmpeg.mjs') },
     log: () => {},
     catalogFetch: fixtureFetch(routes).fetch,
   });
@@ -93,6 +97,8 @@ describe('the catalog on this PC', () => {
     expect(done.status.map((s) => s.state)).toEqual(['ok', 'ok', 'ok', 'ok', 'ok']);
     expect(calls().map((c) => c.at(-1))).toEqual(expect.arrayContaining(['ytsearch3:daft punk get lucky', 'scsearch3:daft punk get lucky']));
     expect(calls().every((c) => c[0] === '--ignore-config')).toBe(true);
+    expect(calls().every((c) => c.includes('--js-runtimes') && c.includes(`node:${process.execPath}`))).toBe(true);
+    expect(calls().every((c) => c.includes('--js-runtimes') && c.includes(`node:${process.execPath}`))).toBe(true);
   }, 30_000);
 
   it('answers once with ?stream=0', async () => {
@@ -100,15 +106,16 @@ describe('the catalog on this PC', () => {
     expect(body.tracks.length).toBeGreaterThan(0);
   });
 
-  it('resolves a Spotify song through spotDL with its YouTube Music match, and says why a playlist cannot be read', async () => {
+  it('resolves Spotify tracks through spotDL and public playlists from embed metadata', async () => {
     const song = CatalogResolveResult.parse(await (await get(`${HELPER_CATALOG_ROUTES.resolve}?url=${encodeURIComponent('https://open.spotify.com/track/4PTG3Z6ehGkBFwjybzWkR8')}`)).json());
     expect(song.track!.sources.map((s) => [s.platform, s.matchedBy])).toEqual([
       ['spotify', 'link'],
       ['youtube-music', 'spotdl'],
     ]);
     expect(calls().some((c) => c[0] === 'save' && c.includes('--preload'))).toBe(true);
-    const list = CatalogResolveResult.parse(await (await get(`${HELPER_CATALOG_ROUTES.resolve}?url=${encodeURIComponent('https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M')}`)).json());
-    expect(list).toMatchObject({ kind: 'unavailable', reason: expect.stringMatching(/private, or one Spotify made itself/) });
+    const list = CatalogResolveResult.parse(await (await get(`${HELPER_CATALOG_ROUTES.resolve}?url=${encodeURIComponent(`https://open.spotify.com/playlist/${spotifyPlaylistId}`)}`)).json());
+    expect(list).toMatchObject({ kind: 'playlist', collection: { ref: { platform: 'spotify', kind: 'playlist', id: spotifyPlaylistId, title: 'Today’s Top Hits' }, page: { total: 1, tracks: [{ title: 'Never Gonna Give You Up', artist: 'Rick Astley' }] } } });
+    expect(calls().some((c) => c[0] === 'save' && c[1]?.includes('/playlist/'))).toBe(false);
   }, 30_000);
 
   it('a Deezer playlist, lyrics and enrichment', async () => {
@@ -144,5 +151,6 @@ describe('the guarded fetch', () => {
     await expect(guardedCatalogFetch(fake, publicName)('https://itunes.apple.com/search', init)).rejects.toThrow(/Blocked/);
     expect(seen).toEqual(['https://itunes.apple.com/search']);
     expect((await guardedCatalogFetch(fake, publicName)('https://api.deezer.com/x', init)).status).toBe(200);
+    expect((await guardedCatalogFetch(fake, publicName)('https://open.spotify.com/embed/playlist/x', init)).status).toBe(200);
   });
 });

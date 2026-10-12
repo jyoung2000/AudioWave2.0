@@ -324,6 +324,17 @@ describe('resolving a pasted link', () => {
     expect(reader.mock.calls.map(([, o]) => o.match)).toEqual([true, false]);
   });
 
+  it('resolves a public Spotify playlist from its embed page when spotDL cannot list it', async () => {
+    const id = '37i9dQZF1DXcBWIGoYBM5M';
+    const entity = { type: 'playlist', id, title: 'Today’s Top Hits', subtitle: 'Spotify', coverArt: { sources: [{ url: 'https://i.scdn.co/image/cover' }] }, trackList: [{ uri: 'spotify:track:4PTG3Z6ehGkBFwjybzWkR8', title: 'Never Gonna Give You Up', subtitle: 'Rick Astley', duration: 213573, audioPreview: { url: 'https://p.scdn.co/preview' } }] };
+    const html = `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify({ props: { pageProps: { state: { data: { entity } } } } })}</script>`;
+    const { engine: e, calls } = engine([[/open\.spotify\.com\/embed\/playlist\//, { status: 200, body: html }]], { linkReader: async () => { throw new LinkReadError('Spotify playlist returned 404', 'failed'); } });
+    const r = await e.resolve(`https://open.spotify.com/playlist/${id}`);
+    expect(r).toMatchObject({ kind: 'playlist', collection: { ref: { platform: 'spotify', kind: 'playlist', id, title: 'Today’s Top Hits' }, page: { total: 1, hasMore: false, tracks: [{ title: 'Never Gonna Give You Up', artist: 'Rick Astley', sources: [{ platform: 'spotify', matchedBy: 'link' }] }] } } });
+    expect(calls).toEqual([`https://open.spotify.com/embed/playlist/${id}`]);
+    expect(JSON.stringify(r)).not.toContain('p.scdn.co');
+  });
+
   it('a Spotify playlist Spotify will not list says so, with the reason', async () => {
     const { engine: e } = engine([], { linkReader: spotifyReader });
     const r = await e.resolve('https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M');

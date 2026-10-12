@@ -23,6 +23,7 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { CATALOG_COLLECTION_CAP, HELPER_RESOLVE_CAP, type HelperResolveSource, type HelperResolved, type HelperResolvedTrack } from '@now-playing/contracts';
 import { cleanTags, isoDate, type MediaInfo } from '@now-playing/domain';
+import { withYtDlpJsRuntime } from '@now-playing/domain/tool-install';
 import { childEnv, killTree, lastMeaningfulLine, spotdlSaveArgs } from './jobs.js';
 import { toolCommand, type ResolvedTool } from './tools.js';
 
@@ -50,8 +51,8 @@ export function sourceOf(url: URL): HelperResolveSource {
  */
 export function ytDlpResolveArgs(url: string, options: { cap?: number; items?: readonly number[] } = {}): string[] {
   if (!/^https?:\/\//i.test(url)) throw new Error('Only http(s) addresses can be handed to a tool.');
-  if (options.items?.length) return ['--ignore-config', '--no-colors', '--no-cache-dir', '--no-warnings', '--skip-download', '--playlist-items', options.items.map((n) => String(Math.trunc(n))).join(','), '--dump-single-json', '--', url];
-  return ['--ignore-config', '--no-colors', '--no-cache-dir', '--no-warnings', '--skip-download', '--flat-playlist', '--playlist-end', String(options.cap ?? HELPER_RESOLVE_CAP), '--dump-single-json', '--', url];
+  if (options.items?.length) return withYtDlpJsRuntime(['--ignore-config', '--no-colors', '--no-cache-dir', '--no-warnings', '--skip-download', '--playlist-items', options.items.map((n) => String(Math.trunc(n))).join(','), '--dump-single-json', '--', url], process.execPath);
+  return withYtDlpJsRuntime(['--ignore-config', '--no-colors', '--no-cache-dir', '--no-warnings', '--skip-download', '--flat-playlist', '--playlist-end', String(options.cap ?? HELPER_RESOLVE_CAP), '--dump-single-json', '--', url], process.execPath);
 }
 
 function str(value: unknown, max = 300): string | null {
@@ -306,13 +307,15 @@ export function createResolver(options: ResolverOptions): Resolver {
     if (source === 'spotify') {
       const spotdl = tools.spotdl;
       if (!spotdl.present || !spotdl.path) throw new ResolveError(spotdl.installHint ?? 'spotDL is not set up on this PC yet.', 'tool-missing');
+      const ffmpeg = tools.ffmpeg;
+      if (!ffmpeg.present || !ffmpeg.path) throw new ResolveError(ffmpeg.installHint ?? 'spotDL needs FFmpeg, and there is none on this PC.', 'tool-missing');
       return slot(async () => {
         const dir = join(options.workDir, 'resolve', randomUUID());
         mkdirSync(dir, { recursive: true });
         try {
           const file = join(dir, 'songs.spotdl');
           // An empty home of its own: spotDL reads a config file from the home directory otherwise.
-          await run(spotdl.path!, spotdlSaveArgs(url.toString(), file, { preload: match && /^\/(?:intl-[a-z-]+\/)?track\//i.test(url.pathname) }), childEnv(process.env, { HOME: dir, USERPROFILE: dir }), Math.max(timeouts.spotdl, longer));
+          await run(spotdl.path!, spotdlSaveArgs(url.toString(), file, { preload: match && /^\/(?:intl-[a-z-]+\/)?track\//i.test(url.pathname), ffmpeg: ffmpeg.path }), childEnv(process.env, { HOME: dir, USERPROFILE: dir }), Math.max(timeouts.spotdl, longer));
           let songs: unknown;
           try {
             songs = JSON.parse(readFileSync(file, 'utf8'));
@@ -351,7 +354,7 @@ export function createResolver(options: ResolverOptions): Resolver {
       const tools = await options.tools();
       const ytDlp = tools['yt-dlp'];
       if (!ytDlp.present || !ytDlp.path) throw new ResolveError(ytDlp.installHint ?? 'yt-dlp is not set up on this PC yet.', 'tool-missing');
-      const stdout = await slot(() => run(ytDlp.path!, [...args], childEnv(), timeouts.ytDlp, signal));
+      const stdout = await slot(() => run(ytDlp.path!, withYtDlpJsRuntime(args, process.execPath), childEnv(), timeouts.ytDlp, signal));
       try {
         return JSON.parse(stdout) as unknown;
       } catch {

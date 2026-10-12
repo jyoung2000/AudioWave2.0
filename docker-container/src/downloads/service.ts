@@ -189,6 +189,12 @@ export class DownloadService {
     const basis = input.authorization.basis;
     const listAuthorized = await adapter.getAuthorizedDownload(input.url, { actorId: input.ownerId, basis });
     if (!listAuthorized || listAuthorized.kind !== 'external-tool') this.refused('external-tool', input.ownerId, basis, meta, actorDisplayName);
+    const selectedPreset = adapter.presetFor(new URL(listAuthorized.url));
+    if (selectedPreset?.tool === 'spotdl') {
+      const ffmpeg = await this.ffmpeg();
+      // Validate both spotDL and FFmpeg before a playlist can create a queue full of jobs that cannot run.
+      adapter.downloadPlan(listAuthorized.url, { outputDir: this.partDir(), output: join(this.partDir(), 'spotdl-preflight'), ffmpeg: ffmpeg.available ? ffmpeg.path : null });
+    }
     const probe = await adapter.probe(listAuthorized.url);
     const base: CreateDownloadInput = { source: { provider: 'external-tool', providerTrackId: null, url: null, locator: null, title: null, artistName: null }, authorization: input.authorization, target: input.target, ownerId: input.ownerId };
     const existing = this.repo.activeSourceUrls(input.ownerId, input.target.format);
@@ -212,7 +218,7 @@ export class DownloadService {
     }
 
     const listed = Math.max(probe.listed ?? 0, probe.entries.length);
-    const capped = listed > DOWNLOAD_BATCH_CAP;
+    const capped = probe.capped === true || listed > DOWNLOAD_BATCH_CAP;
     const take: ProbedEntry[] = [];
     const seen = new Set<string>();
     for (const entry of probe.entries) {
@@ -246,7 +252,8 @@ export class DownloadService {
     this.metrics.increment('downloads.batches');
     this.kick();
     const parts = [`${probe.title ? `“${probe.title}”` : 'This list'}: ${items.length} download${items.length === 1 ? '' : 's'} made`];
-    if (capped) parts.push(`it lists ${listed} entries and one request takes at most ${DOWNLOAD_BATCH_CAP}`);
+    if (probe.capped) parts.push('the public listing may have more tracks than it exposed');
+    else if (capped) parts.push(`it lists ${listed} entries and one request takes at most ${DOWNLOAD_BATCH_CAP}`);
     if (skipped.length) parts.push(`${skipped.length} skipped`);
     return {
       batch: { id: items.length ? batchId : null, kind: 'playlist', title: probe.title, listed: probe.listed ?? probe.entries.length, created: items.length, cap: DOWNLOAD_BATCH_CAP, capped, skipped: skipped.slice(0, DOWNLOAD_BATCH_CAP) },

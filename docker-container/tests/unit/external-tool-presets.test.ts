@@ -113,6 +113,13 @@ describe('the spotDL preset', () => {
     expect(preset.infoFile).toBe('song.spotdl');
   });
 
+  it('passes the hub Node runtime to spotDL’s internal yt-dlp', () => {
+    const forwarded = args[args.indexOf('--yt-dlp-args') + 1]!;
+    expect(forwarded).toContain('node:/usr/local/bin/node');
+    const save = preset.metadata({ url, ffmpeg: '/usr/bin/ffmpeg', node: '/usr/local/bin/node', saveFile: '/tmp/x/save.spotdl', listLimit: 201 })!;
+    expect(save[save.indexOf('--yt-dlp-args') + 1]).toContain('node:/usr/local/bin/node');
+  });
+
   it('uses the hub’s FFmpeg, keeps no cache, and gets a home of its own every run', () => {
     expect(args[args.indexOf('--ffmpeg') + 1]).toBe('/usr/bin/ffmpeg');
     expect(args).toContain('--no-cache');

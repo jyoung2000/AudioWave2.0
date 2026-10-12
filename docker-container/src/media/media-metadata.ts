@@ -40,6 +40,8 @@ export interface ProbedPlaylist {
   artworkUrl: string | null;
   /** What the source says the list holds, which can be more than was listed. */
   listed: number | null;
+  /** True when the source itself returned only a bounded page and no exact total. */
+  capped?: boolean;
   entries: ProbedEntry[];
 }
 

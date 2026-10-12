@@ -20,6 +20,7 @@ import { join, extname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { HelperJob, HelperJobFile, HelperToolId, OutputFormat } from '@now-playing/contracts';
 import { cleanTags, sanitizeFilename, ytDlpMetaFields } from '@now-playing/domain';
+import { spotdlYtDlpArgs, withYtDlpJsRuntime } from '@now-playing/domain/tool-install';
 import { toolCommand, type ResolvedTool } from './tools.js';
 
 /** How long a killed tool gets to actually exit before its directory is removed anyway. */
@@ -475,7 +476,7 @@ export const PLAYLIST_CAP = 200;
  * last behind `--`.
  */
 export function ytDlpInfoArgs(job: Pick<HelperJob, 'url'>): string[] {
-  return ['--ignore-config', '--no-colors', '--no-cache-dir', '--playlist-end', String(PLAYLIST_CAP), '--dump-single-json', '--', urlArgument(job.url)];
+  return withYtDlpJsRuntime(['--ignore-config', '--no-colors', '--no-cache-dir', '--playlist-end', String(PLAYLIST_CAP), '--dump-single-json', '--', urlArgument(job.url)], process.execPath);
 }
 
 /**
@@ -516,7 +517,7 @@ export function ytDlpArgs(job: Pick<HelperJob, 'url' | 'format'>, directory: str
   // playlist empty, and fetches it all again from its URL — untagged (measured 2026-10-04).
   if (source.infoFile) args.push('--no-clean-infojson', '--load-info-json', source.infoFile);
   else args.push('--', url);
-  return args;
+  return withYtDlpJsRuntime(args, process.execPath);
 }
 
 /** Fields of a description the download never reads, and the bulk of a YouTube one. */
@@ -571,10 +572,9 @@ export function spotdlArgs(job: Pick<HelperJob, 'url' | 'format'>, directory: st
   // that starts with http(s)://, and it is one argument, never split.
   const args = ['download', urlArgument(job.url), '--output', join(directory, '{artists} - {title}.{output-ext}'), '--format', job.format === 'original' ? 'mp3' : job.format];
   if (ffmpeg.path) args.push('--ffmpeg', ffmpeg.path);
-  // spotDL fetches through yt-dlp and hands it whatever `--yt-dlp-args` holds. Only the limit, as a
-  // number this function formats, ever goes in there.
+  // spotDL fetches through yt-dlp; pass the app's JavaScript runtime as well as any numeric limit.
   const rate = rateLimitOf(limits.rateLimitKBps);
-  if (rate !== null) args.push('--yt-dlp-args', `--limit-rate ${rate}K`);
+  args.push('--yt-dlp-args', spotdlYtDlpArgs(process.execPath, rate !== null ? ['--limit-rate', `${rate}K`] : []));
   return args;
 }
 
@@ -584,8 +584,8 @@ export function spotdlArgs(job: Pick<HelperJob, 'url' | 'format'>, directory: st
  * YouTube Music recording it would download (its `download_url`), which the catalog shows as the
  * song's second source (DEC-039); it searches, so it is only asked for one song at a time.
  */
-export function spotdlSaveArgs(url: string, saveFile: string, options: { preload?: boolean } = {}): string[] {
-  return ['save', urlArgument(url), '--save-file', saveFile, ...(options.preload ? ['--preload'] : [])];
+export function spotdlSaveArgs(url: string, saveFile: string, options: { preload?: boolean; ffmpeg?: string | null } = {}): string[] {
+  return ['save', urlArgument(url), '--save-file', saveFile, ...(options.ffmpeg ? ['--ffmpeg', options.ffmpeg] : []), ...(options.preload ? ['--preload'] : []), '--yt-dlp-args', spotdlYtDlpArgs(process.execPath)];
 }
 
 /**
@@ -599,6 +599,8 @@ export function childEnv(source: NodeJS.ProcessEnv = process.env, overrides: Rec
   for (const key of keep) if (source[key]) env[key] = source[key];
   // Python writes .pyc files beside whatever it imports otherwise, including in a read-only place.
   env['PYTHONDONTWRITEBYTECODE'] = '1';
+  // The embedded helper runs inside Electron; expose its Node runtime to yt-dlp's EJS child process.
+  if (process.versions['electron']) env['ELECTRON_RUN_AS_NODE'] = '1';
   return { ...env, ...overrides };
 }
 

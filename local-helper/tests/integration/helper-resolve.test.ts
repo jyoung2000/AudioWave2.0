@@ -87,6 +87,7 @@ beforeAll(async () => {
   for (const name of readdirSync(FIXTURES)) copyFileSync(join(FIXTURES, name), join(stubDir, name));
   writeFileSync(join(stubDir, 'yt-dlp.mjs'), STUB);
   writeFileSync(join(stubDir, 'spotdl.mjs'), STUB);
+  writeFileSync(join(stubDir, 'ffmpeg.mjs'), "if (process.argv.includes('-version')) process.stdout.write('ffmpeg version 7.1\\n');\n");
   helper = await startHelper({
     port: 0,
     version: '1.0.0-test',
@@ -97,7 +98,7 @@ beforeAll(async () => {
     allowedHosts: ['www.youtube.com', 'soundcloud.com', 'open.spotify.com'],
     allowedOrigins: [PAGE],
     app: null,
-    configured: { 'yt-dlp': join(stubDir, 'yt-dlp.mjs'), spotdl: join(stubDir, 'spotdl.mjs') },
+    configured: { 'yt-dlp': join(stubDir, 'yt-dlp.mjs'), spotdl: join(stubDir, 'spotdl.mjs'), ffmpeg: join(stubDir, 'ffmpeg.mjs') },
     log: () => {},
   });
   const address = helper.server.address();
@@ -161,6 +162,8 @@ describe('what a pasted link is', () => {
     // spotDL refuses `--`; the URL sits straight after the operation, where it is still only a URL.
     expect(call.args.slice(0, 2)).toEqual(['save', 'https://open.spotify.com/track/4PTG3Z6ehGkBFwjybzWkR8']);
     expect(call.args).toContain('--save-file');
+    expect(call.args[call.args.indexOf('--ffmpeg') + 1]).toBe(join(stubDir, 'ffmpeg.mjs'));
+    expect(call.args).toContain('--yt-dlp-args');
     expect(call.home).toBeTruthy();
     expect(call.home!.startsWith(join(root, 'work'))).toBe(true);
     expect(existsSync(call.home!)).toBe(false);

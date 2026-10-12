@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DOWNLOAD_BATCH_CAP, type DownloadBatchResult, type DownloadJob } from '@now-playing/contracts';
+import type { CatalogFetch } from '@now-playing/domain/catalog';
 import { toolEnvironment, toolScratchDir } from '../../src/media/tool-env.js';
 import { ExternalToolAdapter } from '../../src/providers/adapters/external-tool.js';
 import { createTestHub, pairDevice, type TestHub } from '../helpers/hub.js';
@@ -85,6 +86,7 @@ const url = args[1];
 const album = ${JSON.stringify(fixture('spotdl-album.json'))};
 const track = ${JSON.stringify(fixture('spotdl-track.json'))};
 if (args.includes('save')) {
+  if (url.includes('/playlist/')) { process.stderr.write('Spotify playlist returned 404\\n'); process.exit(1); }
   writeFileSync(args[args.indexOf('--save-file') + 1], url.includes('/album/') ? album : track);
 } else {
   const out = dirname(args[args.indexOf('--output') + 1]);
@@ -122,18 +124,19 @@ const calls = <T>(file: string): T[] =>
         .map((l) => JSON.parse(l) as T)
     : [];
 
-async function startHub(answers: Record<string, string>, opts: { twoFiles?: boolean; spotdl?: boolean } = {}): Promise<void> {
+async function startHub(answers: Record<string, string>, opts: { twoFiles?: boolean; spotdl?: boolean; noFfmpeg?: boolean; spotifyEmbedFetch?: CatalogFetch } = {}): Promise<void> {
   const ytDlp = writeFakeYtDlp(root, answers, opts);
   const spotdl = opts.spotdl === false ? null : writeFakeSpotdl(root);
-  const ffmpeg = writeFakeFfmpeg(root);
+  const ffmpeg = opts.noFfmpeg ? null : writeFakeFfmpeg(root);
   const toolsData = join(root, 'data');
   const adapter = new ExternalToolAdapter(
     (id) => (id === 'yt-dlp' ? ytDlp : id === 'spotdl' ? spotdl : null),
     () => toolEnvironment(toolScratchDir(toolsData), process.env),
     async () => ffmpeg,
     () => toolScratchDir(toolsData),
+    opts.spotifyEmbedFetch,
   );
-  hub = await createTestHub({ ffmpeg: { available: true, path: ffmpeg, version: '7.1', encoders: ['libmp3lame', 'aac', 'libopus', 'flac'] }, deps: { replaceAdapters: { 'external-tool': adapter } } });
+  hub = await createTestHub({ ffmpeg: ffmpeg ? { available: true, path: ffmpeg, version: '7.1', encoders: ['libmp3lame', 'aac', 'libopus', 'flac'] } : { available: false, path: null, version: null, encoders: [] }, deps: { replaceAdapters: { 'external-tool': adapter } } });
   const admin = await hub.completeSetup();
   device = await pairDevice(hub, admin);
 }
@@ -235,6 +238,7 @@ describe('running a job through the tool', () => {
     expect(download[0]).toBe('--ignore-config');
     expect(download.slice(-2)).toEqual(['--', url]);
     expect(download).toEqual(expect.arrayContaining(['--extract-audio', '--embed-metadata', '--embed-thumbnail', '--write-info-json']));
+    expect(download).toEqual(expect.arrayContaining(['--js-runtimes', `node:${process.execPath}`]));
 
     const [ffmpeg] = calls<{ args: string[]; meta: string }>('ffmpeg.calls');
     expect(ffmpeg!.meta).toContain('title=Big Buck Bunny');
@@ -270,6 +274,49 @@ describe('running a job through the tool', () => {
     const job = hub.ctx.downloads.find(result.items[0]!.id);
     expect(job.state).toBe('failed');
     expect(job.error).toMatch(/produced 2 files/);
+  });
+
+  it('downloads each track from public Spotify playlist metadata without crawling it through spotDL', async () => {
+    const playlistId = '37i9dQZF1DXcBWIGoYBM5M';
+    const embedUrl = `https://open.spotify.com/embed/playlist/${playlistId}`;
+    const entity = {
+      type: 'playlist', id: playlistId, title: 'Today’s Top Hits', subtitle: 'Spotify',
+      coverArt: { sources: [{ url: 'https://i.scdn.co/image/playlist-cover' }] },
+      trackList: [
+        { uri: 'spotify:track:4PTG3Z6ehGkBFwjybzWkR8', title: 'Never Gonna Give You Up', subtitle: 'Rick Astley', duration: 213573 },
+        { uri: 'spotify:track:3X4r1d2VDYjgPYjAEjbEM7', title: 'Whenever You Need Somebody', subtitle: 'Rick Astley', duration: 233666 },
+      ],
+    };
+    const html = `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify({ props: { pageProps: { state: { data: { entity } } } } })}</script>`;
+    const spotifyEmbedFetch: CatalogFetch = async (url) => ({ status: url === embedUrl ? 200 : 404, headers: { get: () => null }, json: async () => ({}), text: async () => html });
+    await startHub({}, { spotifyEmbedFetch });
+
+    const response = await batch(`https://open.spotify.com/playlist/${playlistId}`);
+    expect(response.statusCode, response.body).toBe(201);
+    const result = response.json() as DownloadBatchResult;
+    expect(result.batch).toMatchObject({ kind: 'playlist', title: 'Today’s Top Hits', listed: 2, created: 2, capped: false });
+    expect(result.items.map((item) => item.source.url)).toEqual([
+      'https://open.spotify.com/track/4PTG3Z6ehGkBFwjybzWkR8',
+      'https://open.spotify.com/track/3X4r1d2VDYjgPYjAEjbEM7',
+    ]);
+    expect(result.items[0]!.source.tags).toMatchObject({ title: 'Never Gonna Give You Up', artist: 'Rick Astley', durationMs: 213573 });
+    await hub.ctx.downloads.idle();
+    expect(hub.ctx.downloads.list().filter((job) => job.state === 'completed')).toHaveLength(2);
+    expect(calls<{ args: string[] }>('spotdl.calls').filter((call) => call.args.includes('download'))).toHaveLength(2);
+    expect(calls<{ args: string[] }>('spotdl.calls').some((call) => call.args[0] === 'save' && call.args[1]?.includes('/playlist/'))).toBe(false);
+  });
+
+  it('refuses a Spotify playlist batch before queuing jobs when FFmpeg is unavailable', async () => {
+    const playlistId = '37i9dQZF1DXcBWIGoYBM5M';
+    const entity = { type: 'playlist', id: playlistId, title: 'Today’s Top Hits', trackList: [{ uri: 'spotify:track:4PTG3Z6ehGkBFwjybzWkR8', title: 'Never Gonna Give You Up', subtitle: 'Rick Astley' }] };
+    const html = `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify({ props: { pageProps: { state: { data: { entity } } } } })}</script>`;
+    const spotifyEmbedFetch: CatalogFetch = async () => ({ status: 200, headers: { get: () => null }, json: async () => ({}), text: async () => html });
+    await startHub({}, { noFfmpeg: true, spotifyEmbedFetch });
+
+    const response = await batch(`https://open.spotify.com/playlist/${playlistId}`);
+    expect(response.statusCode).not.toBe(201);
+    expect(response.body).toMatch(/spotDL needs FFmpeg/);
+    expect(hub.ctx.downloads.list()).toEqual([]);
   });
 
   it('a Spotify album: one job per track from spotDL’s data, and each job runs spotDL for its one track', async () => {

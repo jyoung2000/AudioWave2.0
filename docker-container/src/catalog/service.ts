@@ -79,7 +79,7 @@ function entryToLink(entry: ProbedEntry): LinkTrack {
 export function probeToLinkRead(probe: MediaProbe, url: string): LinkRead {
   if (probe.kind === 'track') return { kind: 'track', url: probe.url, track: { ...entryToLink({ url: probe.url, tags: probe.tags, unavailable: null }), matchUrl: probe.matchUrl ?? null } };
   const entries = probe.entries.filter((e) => !e.unavailable).map(entryToLink);
-  return { kind: 'collection', url: probe.url || url, title: probe.title ?? 'Playlist', owner: probe.owner, artworkUrl: probe.artworkUrl, date: null, entries, total: probe.listed, capped: probe.entries.length > CATALOG_COLLECTION_CAP || (probe.listed ?? 0) > CATALOG_COLLECTION_CAP };
+  return { kind: 'collection', url: probe.url || url, title: probe.title ?? 'Playlist', owner: probe.owner, artworkUrl: probe.artworkUrl, date: null, entries, total: probe.listed, capped: probe.capped ?? (probe.entries.length > CATALOG_COLLECTION_CAP || (probe.listed ?? 0) > CATALOG_COLLECTION_CAP) };
 }
 
 export class HubCatalogService {

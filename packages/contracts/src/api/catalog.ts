@@ -471,11 +471,11 @@ export const CatalogSettingsInput = z.object({
 export type CatalogSettingsInput = z.infer<typeof CatalogSettingsInput>;
 
 /** The hosts the catalog engine itself calls. Nothing else is reachable from it. */
-/** `music.apple.com`: an Apple Music playlist's public page, read for its songs (one GET, no token). */
-export const CATALOG_API_HOSTS: readonly string[] = ['itunes.apple.com', 'api.deezer.com', 'musicbrainz.org', 'coverartarchive.org', 'api.song.link', 'lrclib.net', 'music.apple.com'];
+/** `music.apple.com`: public playlist pages; `open.spotify.com`: metadata-only public embed pages. */
+export const CATALOG_API_HOSTS: readonly string[] = ['itunes.apple.com', 'api.deezer.com', 'musicbrainz.org', 'coverartarchive.org', 'api.song.link', 'lrclib.net', 'music.apple.com', 'open.spotify.com'];
 
 /** Where the services keep artwork and clips: what a page loads directly, never fetched by the engine. */
-export const CATALOG_MEDIA_HOSTS: readonly string[] = ['*.mzstatic.com', 'audio-ssl.itunes.apple.com', 'cdn-images.dzcdn.net', '*.dzcdn.net', 'i.ytimg.com', '*.sndcdn.com', 'archive.org', '*.archive.org', 'i.scdn.co'];
+export const CATALOG_MEDIA_HOSTS: readonly string[] = ['*.mzstatic.com', 'audio-ssl.itunes.apple.com', 'cdn-images.dzcdn.net', '*.dzcdn.net', 'i.ytimg.com', '*.sndcdn.com', 'archive.org', '*.archive.org', 'i.scdn.co', '*.spotifycdn.com'];
 
 /** Pages whose links `resolve` reads with the public APIs (the yt-dlp and spotDL hosts are the helper's and the tool preset's). */
 export const CATALOG_LINK_HOSTS: readonly string[] = ['music.apple.com', 'itunes.apple.com', 'www.deezer.com', 'deezer.com', 'link.deezer.com', 'deezer.page.link', 'tidal.com', 'listen.tidal.com', 'www.qobuz.com', 'open.qobuz.com', 'play.qobuz.com', 'music.amazon.com', 'www.amazon.com'];
