@@ -2407,7 +2407,7 @@
         {
           "type": "test",
           "path": "music-player/tests/e2e/np/collections.spec.ts",
-          "name": "a song on show plays its row and the Download key offers to fetch it through the helper"
+          "name": "a song on show does not play a short clip; Download offers to fetch the full song"
         },
         {
           "type": "test",
@@ -2543,9 +2543,9 @@
     {
       "id": "NP-FIND-011",
       "group": "np-find",
-      "title": "A song that is not on this device plays its preview, said as one, while the hub or the companion fetches it",
-      "contract": "A visitor — a song in the music list that is not on this device: a search result filed as a link row, a song of a catalog list on show, an online Discover pick — plays when chosen. Its 30-second preview (Apple Music's, then Deezer's; the look-ahead's copy when it has one) plays through the same transport, with \"Preview · 30 seconds — not the whole song\" under the title and the HUD saying the same; it is never logged as a play, never reported as heard, and when it ends it stops rather than running on into the next row (the list's own play-on skips visitors). When something can fetch the whole song, the fetch sheet opens over the preview: the paired hub when this device's credential may ask for downloads and receive files (downloads:request, transfers:receive), else the companion's helper. After the person says why they may have the file, the row and the preview label say \"Fetching… N%\", and when the song lands it joins the library as a kept copy and plays from this device. With nothing that can fetch it, the preview plays and the HUD says what the whole song needs; with no preview either, it says nothing can play it here, and why. A visitor's Download button and right-click are the catalog song's (NP-FIND-010).",
-      "example": "Choosing “Night Harbour” with a hub paired: “Preview — 30 seconds of “Night Harbour”; the whole song plays once the hub TOWER has fetched it.”, the sheet, then “Fetching… 40%” on the row.",
+      "title": "A catalog visitor is fetched, not previewed; short clips play only when auditioned from Search",
+      "contract": "A visitor — a catalog song in the music list that is not on this device: a search result filed as a link row, a song of a catalog list on show, or an online Discover pick — is metadata, not playable audio. Choosing it in the music list never starts a 30-second preview and never marks it playing or heard. If the person has a hub credential that may fetch downloads and receive files (downloads:request, transfers:receive), or a companion helper is available, it opens the fetch sheet; the person states why they may have the file, and the hub/helper fetches a full-length copy. Only after that copy is saved locally does it become the active track and play through the player transport at its full duration. With no route, the UI says what is missing and does not claim playback. 30-second previews are requested and played only by the explicit audition control on Search results; they are never part of Now Playing, Discover, a playlist/album list, or the fetch sheet. A visitor’s Download button and right-click remain catalog actions (NP-FIND-010).",
+      "example": "Choosing “Night Harbour” from the music list with a hub paired opens the fetch sheet without audio; after an authorized fetch, the kept local copy starts at its full duration. Clicking the Search result’s preview button still auditions its 30-second clip.",
       "authority": "adopted",
       "owners": [
         "music-player/src/shell/search/visit.ts",
@@ -2558,7 +2558,7 @@
         {
           "type": "test",
           "path": "music-player/tests/e2e/np/discover-online.spec.ts",
-          "name": "with nothing to fetch it, its preview plays, said as one, and nothing is logged as a play"
+          "name": "a visitor row does not play a preview; clips are auditioned in Search and full tracks must be fetched"
         },
         {
           "type": "test",
@@ -2568,17 +2568,17 @@
         {
           "type": "test",
           "path": "music-player/tests/e2e/np/discover-online.spec.ts",
-          "name": "with a hub, Play asks the hub to fetch it: the preview meanwhile, “Fetching… N%” on the row, then the song itself (NP-FIND-012)"
-        },
-        {
-          "type": "test",
-          "path": "music-player/tests/e2e/np/collections.spec.ts",
-          "name": "a song on show plays its row and the Download key offers to fetch it through the helper"
+          "name": "with a hub, a visitor fetches the full song without a preview, then plays the full local copy (NP-FIND-012)"
         },
         {
           "type": "test",
           "path": "music-player/tests/unit/visit.test.ts",
           "name": "reads what a fetched file is from its first bytes"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/collections.spec.ts",
+          "name": "a song on show does not play a short clip; Download offers to fetch the full song"
         }
       ]
     },
@@ -2599,7 +2599,7 @@
         {
           "type": "test",
           "path": "music-player/tests/e2e/np/discover-online.spec.ts",
-          "name": "with a hub, Play asks the hub to fetch it: the preview meanwhile, “Fetching… N%” on the row, then the song itself (NP-FIND-012)"
+          "name": "with a hub, a visitor fetches the full song without a preview, then plays the full local copy (NP-FIND-012)"
         },
         {
           "type": "test",
@@ -2829,10 +2829,14 @@
       "id": "NP-PREF-014",
       "group": "np-prefs",
       "title": "How the disc moves is the listener’s choice",
-      "contract": "Settings ▸ Player ▸ The disc sets whether the disc spins while a song plays (steady, with the song’s tempo, or not at all) and how fast (0.25× to 3×); whether it turns all the way round (steady, with the tempo, held at its angle, or left where it is put) and how fast; its angle (yaw, 0–355°, with presets: the label face on or at an angle, the edge, the playing side) — where it starts and where a held disc stays; and its tilt (pitch, −30° to 80° back). Reset Position puts the disc at that angle and tilt and drops any dragged pose. A live preview at the top shows the disc moving as the settings say, as if a song were playing, and says what it is showing (a song at 120 BPM when tempo is chosen and nothing with a known tempo plays); it draws only while it is on screen. Each choice is saved at once, applies to the playing disc immediately and survives a reload; only the controls that apply are shown. Tempo is the song’s BPM: at 120 BPM the disc moves at the chosen speed, faster songs faster, and one full turn takes 32 beats; a song with no known tempo, and the radio, move at the steady speed. Turn also governs the closed case while nothing plays. The defaults are the motion and pose the player always had, and Reduce animation still slows the spin and stops the turning.",
+      "contract": "Settings ▸ Player ▸ The disc sets whether the disc spins while a song plays (steady, with the song’s tempo, or not at all) and how fast (0.25× to 3×); whether it turns all the way round (steady, with the tempo, held at its angle, or left where it is put) and how fast; its angle (yaw, 0–355°, with presets: the label face on or at an angle, the edge, the playing side) — where it starts and where a held disc stays; and its tilt (pitch, −30° to 80° back). Reset Position puts the disc at that angle and tilt and drops any dragged pose. The jewel-case sleeve and CD label show the current track’s available artwork and update together when the track changes. A live preview at the top shows the disc moving as the settings say, as if a song were playing, and says what it is showing (a song at 120 BPM when tempo is chosen and nothing with a known tempo plays); it draws only while it is on screen. Each choice is saved at once, applies to the playing disc immediately and survives a reload; only the controls that apply are shown. Tempo is the song’s BPM: at 120 BPM the disc moves at the chosen speed, faster songs faster, and one full turn takes 32 beats; a song with no known tempo, and the radio, move at the steady speed. Turn also governs the closed case while nothing plays. The defaults are the motion and pose the player always had, and Reduce animation still slows the spin and stops the turning.",
       "example": "",
       "authority": "adopted",
-      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "owners": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts"
+      ],
       "evidence": [
         {
           "type": "test",
@@ -2863,6 +2867,11 @@
           "type": "test",
           "path": "music-player/tests/e2e/np/disc.spec.ts",
           "name": "the preview in Settings draws the disc, and says what it is showing"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/disc.spec.ts",
+          "name": "the case sleeve and CD label show the current track’s cover, and update when the track changes"
         }
       ]
     },
@@ -3873,8 +3882,8 @@
       "id": "NP-DISC-006",
       "group": "np-discover",
       "title": "From the catalog: songs this device does not have, ranked by the same algorithm",
-      "contract": "Under the library's ranked songs, Discover shows a set from the catalog, under a heading row \"From the catalog\". The queries come from the listener's own profile, as the ranker builds it from the play log: the artists played (most played first) and the genres played, a session lean's genre first; a mode that leaves out the artists you know (Deep cuts) asks for genres only, and one that leaves out your top artist does not ask for it. They are asked through whichever client answers the search — the paired hub, the companion on this PC, or, with neither, this browser's own engine against the keyless services (keyless-first) — two at a time. The answers are ranked by the same rankSongs, under the current algorithm, mode and lean, with the library supplying the taste and never offered again: what the device already has (the same recording, however spelled) and what this Discover session already showed are left out, and one recording is one pick. Twelve picks at most; each row carries its platforms as badges after the title, the catalog's artist credit, and why the ranker put it there (the strongest factor, or \"Picked to explore\") in its tooltip. The heading says how many, by which algorithm and mode, through whom, and that choosing one plays its preview (NP-FIND-011). Refresh asks the catalog again and shows what the session has not shown; a new algorithm or lean asks again from the top. Offline, with nothing played, with nothing answering, or with nothing new, the heading says which in a sentence. The rows' menu is the catalog song's (Add to Up Next, Add to Playlist ▸, Add to Library, Download…, Audition). The chip's menu has From the Catalog, a tick while it is on, kept in the player's settings; off, Discover shows only the library and asks nothing.",
-      "example": "Discover, Airwave default · For you: eight library songs, then “From the catalog — 2 songs ranked by “Airwave default” · For you, through the companion on this PC — not on this device yet: choosing one plays its preview”.",
+      "contract": "Under the library's ranked songs, Discover shows a set from the catalog, under a heading row \"From the catalog\". The queries come from the listener's own profile, as the ranker builds it from the play log: the artists played (most played first) and the genres played, a session lean's genre first; a mode that leaves out the artists you know (Deep cuts) asks for genres only, and one that leaves out your top artist does not ask for it. They are asked through whichever client answers the search — the paired hub, the companion on this PC, or, with neither, this browser's own engine against the keyless services (keyless-first) — two at a time. The answers are ranked by the same rankSongs, under the current algorithm, mode and lean, with the library supplying the taste and never offered again: what the device already has (the same recording, however spelled) and what this Discover session already showed are left out, and one recording is one pick. Twelve picks at most; each row carries its platforms as badges after the title, the catalog's artist credit, and why the ranker put it there (the strongest factor, or \"Picked to explore\") in its tooltip. The heading says how many, by which algorithm and mode, through whom, and that each pick is not on this device. Choosing one never starts a preview; it opens the authorized full-song fetch where a route exists, or says what is needed (NP-FIND-011). Refresh asks the catalog again and shows what the session has not shown; a new algorithm or lean asks again from the top. Offline, with nothing played, with nothing answering, or with nothing new, the heading says which in a sentence. The rows' menu is the catalog song's (Add to Up Next, Add to Playlist ▸, Add to Library, Download…); short auditions remain in Search results. The chip's menu has From the Catalog, a tick while it is on, kept in the player's settings; off, Discover shows only the library and asks nothing.",
+      "example": "Discover, Airwave default · For you: eight library songs, then two catalog picks ranked by the same algorithm; choosing a visitor opens a fetch sheet without a preview, and a saved full-length copy plays locally.",
       "authority": "adopted",
       "owners": [
         "music-player/src/shell/recommend/online.ts",
@@ -3945,9 +3954,9 @@
     {
       "id": "NP-DISC-007",
       "group": "np-discover",
-      "title": "The look-ahead: the next picks’ previews, within a stated budget, never in the way",
-      "contract": "When the catalog's picks land, the next two picks that have a 30-second preview have it asked for ahead, so choosing one starts at once. The budget is stated and kept: two clips ahead at most, 4 MB held at most (measured from what arrived), one request at a time, each started only while the page is idle; a clip that will not come (no CORS, too large to be a clip) is streamed when chosen instead and never asked for again. Clips are held in memory as blob: URLs and let go once played or no longer among the next two; nothing is fetched while the catalog set is off, the browser asks to save data, or the device is offline. Whole songs are never fetched ahead: a fetch needs the person's statement of why they may have the file, made per song (NP-FIND-011). The UI never waits on the catalog or the look-ahead: the library's rows, the chip and Refresh answer while either is still out.",
-      "example": "Five picks with previews: two clips asked for, “2 previews are ready ahead (1.0 MB of 4.0 MB)”; the first played, the third is asked for.",
+      "title": "Discover never preloads or plays preview clips",
+      "contract": "Discover’s From the catalog rows are metadata, not audio. When they land or a row is chosen, no short clip is prefetched or played; only an explicit Search result audition requests a 30-second preview. Choosing a visitor in Discover offers the authorized full-song fetch path; once its full copy is saved locally, the player plays that copy at full duration. The catalog rows and controls still answer while search is pending; the UI never suggests a clip is ready or playing in Discover.",
+      "example": "Five catalog picks include preview URLs; Discover requests none until the person explicitly auditions a result in Search.",
       "authority": "adopted",
       "owners": [
         "music-player/src/shell/recommend/prefetch.ts",
@@ -3984,7 +3993,7 @@
         {
           "type": "test",
           "path": "music-player/tests/e2e/np/discover-online.spec.ts",
-          "name": "asks for the next picks’ previews within its budget, one at a time, and the UI never waits on it"
+          "name": "catalog clips are neither fetched nor played here; only an explicit Search audition requests one"
         }
       ]
     },

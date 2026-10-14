@@ -3609,24 +3609,22 @@ replace('''      var catBack = ctxCat && ctxCat.back;
       else if (algoBack && document.contains(algoBack)) algoBack.focus({ preventScroll: true });
 ''')
 
-# ---- a visitor plays: its preview, labelled, while the hub or the companion fetches it (NP-FIND-011/012) ----------
-# A song shown in the music list that is not on this device — a search result, a song of a catalog list on show, an
-# online Discover pick — used to be chosen with no sound ("Only tracks on this device play here"). Play on one now
-# plays its 30-second preview, labelled "Preview" under the title, and opens the fetch sheet: the paired hub fetches it
-# (POST /api/v1/catalog/download with the device credential, when the device may ask for downloads and receive files),
-# else the companion's helper; the row says "Fetching… N%", and the song plays from this device when it lands. With
-# nothing that can fetch it, the preview plays and the HUD says what the whole song needs. A preview is never logged
-# as a play, never reported as heard, and never runs on into the next row. The sheet itself names who fetches, and
-# for the hub, the source it chose and what it embedded, in the hub UI's words (search/visit.ts).
+# ---- a catalog visitor fetches a full source; Search audition stays separate (NP-FIND-011/012) -----------------
+# A song shown in the music list that is not on this device is metadata, not playable audio. Choosing it never starts
+# a 30-second sample in Now Playing; when a route exists, the fetch sheet asks for the person's rights basis and the
+# hub or companion gets a full song. The saved local copy then becomes the active track and plays at full duration.
+# With no route, the HUD says what is missing and plays nothing. Short clips are requested only by explicit Search
+# audition controls; Discover and collection rows neither preload nor play them. Spotify links may resolve metadata or
+# match an external source, but do not provide Spotify audio (search/visit.ts).
 replace('''        <p class="player__where" id="playerWhere" hidden></p>
       </div>''', '''        <p class="player__where" id="playerWhere" hidden></p>
-        <!-- A visitor's 30-second preview is said as one, never as the song (NP-FIND-011). -->
+        <!-- Short auditions live in Search; a visitor row here never plays a 30-second clip. -->
         <p class="player__preview" id="playerPreview" hidden></p>
       </div>''')
 replace('''  .player__where[hidden] { display: none; }
 ''', '''  .player__where[hidden] { display: none; }
 
-  /* "Preview · 30 seconds — not the whole song": a visitor's clip, said as one (NP-FIND-011) */
+  /* Search audition timing is shown beside its result, never as Now Playing audio. */
   .player__preview {
     display: inline-block;
     margin: 6px 0 0;
@@ -3758,7 +3756,7 @@ replace_between('    var fetchSheet = null;', '      fetchSheet.showModal();\n  
       if (!fetchSheet.open) fetchSheet.showModal();
     }
 
-    /* ---- a visitor chosen (NP-FIND-011): its preview, said as one, and the fetch of the whole song ---- */
+    /* ---- a catalog visitor chosen: fetch its full song; no clip plays in Now Playing ---- */
     var visitSeq = 0;
     function paintPreview() {
       var el = document.getElementById('playerPreview');
@@ -4311,9 +4309,8 @@ replace('''local: !!sg.local, remote: !!sg.remote,
                          visiting:''')
 
 # ---- adding a song chooses it quietly: no preview, no fetch sheet (NP-FIND-011) ---------------------------------
-# library:add selects the new row and plays it, as it always has. A link row is a visitor now, and choosing a visitor
-# auditions its preview and opens the fetch sheet; adding a song is not asking to hear it or to fetch it, so the
-# choice it makes is quiet. Playing the row afterwards (Return, a double-click, the transport) visits it as usual.
+# library:add selects the row without starting audio or fetching. A visitor remains metadata until the person chooses
+# it in the music list, which opens the authorized full-song fetch route; Search results alone offer short auditions.
 replace("""    function play(id) {
       var sg = song(id);
       if (!sg) return;""", """    function play(id, opts) {
@@ -4326,6 +4323,23 @@ replace("""      render();
       var row = tbody.querySelector('tr[data-id="' + have.id + '"]');""", """      render();
       play(have.id, { quiet: true });
       var row = tbody.querySelector('tr[data-id="' + have.id + '"]');""")
+
+# ---- active-track artwork and search-only auditions (NP-FIND-011) --------------------------------
+replace("      nowPlaying: 'Choose a song from the library',\n      cover: {", "      nowPlaying: 'Choose a song from the library',\n      coverUrl: null,\n      cover: {")
+replace("      nowPlaying: 'Join a group in Settings ▸ Profile',\n      cover: {", "      nowPlaying: 'Join a group in Settings ▸ Profile',\n      coverUrl: null,\n      cover: {")
+replace('function makeCoverTexture(size, T) {', 'function drawCoverImage(ctx, image, size) {\n  const width = image.naturalWidth || image.width;\n  const height = image.naturalHeight || image.height;\n  if (!width || !height) return;\n  const scale = Math.max(size / width, size / height);\n  const sourceWidth = size / scale;\n  const sourceHeight = size / scale;\n  const sx = (width - sourceWidth) / 2;\n  const sy = (height - sourceHeight) / 2;\n  ctx.drawImage(image, sx, sy, sourceWidth, sourceHeight, 0, 0, size, size);\n}\nfunction makeCoverTexture(size, T, image = null) {')
+replace("  g.globalCompositeOperation = 'source-over';\n\n  const t = new THREE.CanvasTexture(c);", "  g.globalCompositeOperation = 'source-over';\n  if (image) drawCoverImage(g, image, size);\n\n  const t = new THREE.CanvasTexture(c);")
+replace_between('/* Swapping the sleeve, tray card and disc label together.', '/* ---------- playback state ---------- */', "/* Album changes remain held until the case is shut; a track’s cover can change in place. */\nlet liveTextures = null;\nlet artworkGeneration = 0;\nlet displayedArtworkUrl = null;\nlet displayedArtworkLoaded = false;\nlet previewArtworkActive = false;\nlet previewArtworkUrl = null;\n\nfunction loadCoverImage(url) {\n  return new Promise(resolve => {\n    const image = new Image();\n    if (/^https?:/i.test(url)) image.crossOrigin = 'anonymous';\n    image.onload = () => resolve(image);\n    image.onerror = () => resolve(null);\n    image.src = url;\n  });\n}\n\nfunction applyAlbum(name, overrideUrl) {\n  const A = window.ALBUMS[name];\n  const coverUrl = arguments.length > 1 ? overrideUrl : (previewArtworkActive ? previewArtworkUrl : (A.coverUrl || null));\n  const generation = ++artworkGeneration;\n  displayedArtworkUrl = null;\n  displayedArtworkLoaded = false;\n\n  function applyTextures(image, imageUrl) {\n    if (generation !== artworkGeneration) return;\n    const cover = makeCoverTexture(P.tex, A.cover, image);\n    const back = makeBackTexture(P.tex, A.back);\n    const label = makeLabelTexture(cover.image, P.tex);\n    art.material.map = cover;\n    backArt.material.map = back;\n    labelMat.map = label;\n    art.material.needsUpdate = true;\n    backArt.material.needsUpdate = true;\n    labelMat.needsUpdate = true;\n    if (liveTextures) for (const texture of liveTextures) texture.dispose();\n    liveTextures = [cover, back, label];\n    displayedArtworkUrl = image ? imageUrl : null;\n    displayedArtworkLoaded = Boolean(image);\n  }\n\n  applyTextures(null, null);\n  if (typeof coverUrl === 'string' && coverUrl) {\n    loadCoverImage(coverUrl).then(image => {\n      if (image) applyTextures(image, coverUrl);\n    }).catch(() => undefined);\n  }\n}\n\n/* ---------- playback state ---------- */\n")
+replace("applyAlbum(albumName);\n\ndocument.addEventListener('player:album', e => {", "applyAlbum(albumName);\n\ndocument.addEventListener('player:artwork', e => {\n  const d = e.detail || {};\n  const A = window.ALBUMS[d.mode];\n  if (!A) return;\n  A.coverUrl = typeof d.coverUrl === 'string' ? d.coverUrl : null;\n  if (d.mode === albumName && !previewArtworkActive) applyAlbum(albumName);\n});\ndocument.addEventListener('player:preview-art', e => {\n  const d = e.detail || {};\n  previewArtworkActive = true;\n  previewArtworkUrl = typeof d.coverUrl === 'string' ? d.coverUrl : null;\n  applyAlbum(albumName);\n});\ndocument.addEventListener('player:preview-end', () => {\n  if (!previewArtworkActive) return;\n  previewArtworkActive = false;\n  previewArtworkUrl = null;\n  applyAlbum(albumName);\n});\n\ndocument.addEventListener('player:album', e => {")
+replace('  motion: () => ({ spin: discSpinRate(), turn: discTurnRate(), angle: turn, tilt: discTilt, pitch: pitchRad(), out: lastDiscT, spinning: spinSpeed, bpm: songBpm, prefs: Object.assign({}, discPrefs), preview: discPreviewState() }),\n', '  motion: () => ({ spin: discSpinRate(), turn: discTurnRate(), angle: turn, tilt: discTilt, pitch: pitchRad(), out: lastDiscT, spinning: spinSpeed, bpm: songBpm, prefs: Object.assign({}, discPrefs), preview: discPreviewState() }),\n  artwork: () => ({ url: displayedArtworkUrl, loaded: displayedArtworkLoaded, caseUsesArtwork: Boolean(displayedArtworkUrl && liveTextures && art.material.map === liveTextures[0]), discUsesArtwork: Boolean(displayedArtworkUrl && liveTextures && labelMat.map === liveTextures[2]) }),\n')
+replace("    /* A row in the library was chosen. The song carries its own artist, so\n       the session follows it into the matching mode rather than showing one\n       artist's cover over another's title. */", "    var stageArtworkSeq = 0;\n    function stageArtwork(sg, target) {\n      var my = ++stageArtworkSeq;\n      var direct = sg && typeof sg.art === 'string' && /^(https?:|data:image\\/|blob:)/i.test(sg.art) ? sg.art : null;\n      function publish(url) {\n        if (my !== stageArtworkSeq) return;\n        var safe = typeof url === 'string' && /^(https?:|data:image\\/|blob:)/i.test(url) ? url : null;\n        if (window.ALBUMS && window.ALBUMS[target]) window.ALBUMS[target].coverUrl = safe;\n        document.dispatchEvent(new CustomEvent('player:artwork', { detail: { mode: target, coverUrl: safe } }));\n      }\n      if (sg && sg.local && window.NP_LIBRARY && window.NP_LIBRARY.artworkUrl) {\n        window.NP_LIBRARY.artworkUrl(sg.id).then(function (url) { publish(url || direct); }).catch(function () { publish(direct); });\n        return;\n      }\n      publish(direct);\n    }\n\n    /* A row in the library was chosen. The song carries its own artist, so\n       the session follows it into the matching mode rather than showing one\n       artist's cover over another's title. */")
+replace("                         visiting: !sg.local && !sg.remote && /^https?:/.test(sg.url || ''), preview: false };\n      heardSecs[target] = 0;", "                         visiting: !sg.local && !sg.remote && /^https?:/.test(sg.url || ''), preview: false };\n      stageArtwork(sg, target);\n      heardSecs[target] = 0;")
+replace("canAudition: /^https?:/.test(sg.preview || ''),", 'canAudition: false,')
+replace('          D.warm(a.rows);', '          /* Discover never preloads preview clips; audition is explicit in Search. */')
+replace("' — not on this device yet: choosing one plays its preview'", "' — not on this device yet: audition previews in Search; fetch a full song here'")
+replace_between('    function visit(sg, target, previewOnly) {', '    /* a preview ends where it ends: it does not run on into the next row */', "    function visit(sg, target, previewOnly) {\n      var c = chosen[target], my = ++visitSeq;\n      c.preview = false;\n      if (window.NP_PLAYER && window.NP_PLAYER.playing()) window.NP_PLAYER.pause();\n      setPlaying(false);\n      paintPreview();\n      if (previewOnly) { window.say('Audition previews from Search instead.'); return; }\n      if (window.NP_FETCHING[sg.id]) {\n        window.say('The full song is still being fetched: ' + window.NP_FETCHING[sg.id]);\n        return;\n      }\n      if (!window.NP_VISIT) { window.say('The full song needs fetching first; previews are auditioned in Search.'); return; }\n      window.NP_VISIT.route().then(function (route) {\n        if (my !== visitSeq || chosen[target] !== c) return;\n        if (route.kind === 'none') {\n          var hasSearchPreview = /^https?:/.test(sg.preview || '');\n          window.say(hasSearchPreview\n            ? 'Preview it from Search; the full song needs fetching, and ' + route.why\n            : 'Nothing can play “' + sg.title + '” here: it has no preview, and ' + route.why);\n          return;\n        }\n        window.say('No preview plays in the music player; the full song will play after ' + route.label + ' fetches it.');\n        openFetch(sg);\n      });\n    }\n    /* a preview ends where it ends: it does not run on into the next row */\n")
+
+replace('  artwork: () => ({ url: displayedArtworkUrl, loaded: displayedArtworkLoaded, caseUsesArtwork: Boolean(displayedArtworkUrl && liveTextures && art.material.map === liveTextures[0]), discUsesArtwork: Boolean(displayedArtworkUrl && liveTextures && labelMat.map === liveTextures[2]) }),\n', "  artwork: () => {\n    const pixel = texture => {\n      const canvas = texture && texture.image;\n      if (!canvas || !canvas.getContext) return null;\n      try { return Array.from(canvas.getContext('2d').getImageData(Math.floor(canvas.width / 2), Math.floor(canvas.height / 2), 1, 1).data); }\n      catch { return null; }\n    };\n    return { url: displayedArtworkUrl, loaded: displayedArtworkLoaded, caseUsesArtwork: Boolean(displayedArtworkUrl && liveTextures && art.material.map === liveTextures[0]), discUsesArtwork: Boolean(displayedArtworkUrl && liveTextures && labelMat.map === liveTextures[2]), caseCenter: pixel(liveTextures && liveTextures[0]), discCenter: pixel(liveTextures && liveTextures[2]) };\n  },\n")
 
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):

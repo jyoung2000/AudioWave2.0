@@ -26,9 +26,9 @@
  * the hint travels with them. That is something the query carried rather than a guess, and without it
  * `genreAffinity` could rarely fire for an online row.
  *
- * What this deliberately does not do: fetch, play or extract audio. A pick is a candidate; the
- * surface offers what it offers any song from the catalog — its 30-second preview, labelled as one,
- * and a fetch through the hub or the companion once the person says why they may have the file.
+ * What this deliberately does not do: fetch, play or extract audio. A Discover pick is metadata, not
+ * a player source; short clips are auditioned only from an explicit Search result control. A full song
+ * can enter the player only after an authorized fetch through the hub or companion.
  */
 import { normalizeArtist, normalizeText } from '@now-playing/domain';
 import {

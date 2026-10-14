@@ -12,6 +12,41 @@ import { boot, playRow, resetToLibrary, seed, watchErrors } from './_shell';
 type Motion = { spin: number; turn: number; angle: number; tilt: number; pitch: number; out: number; spinning: number; bpm: number | null; prefs: Record<string, unknown>; preview: { running: boolean; frames: number } };
 const motion = (page: Page) => page.evaluate(() => (window as unknown as { NP_DISC: { motion(): Motion } }).NP_DISC.motion());
 
+type Artwork = { url: string | null; loaded: boolean; caseUsesArtwork: boolean; discUsesArtwork: boolean; caseCenter: number[] | null; discCenter: number[] | null };
+const artwork = (page: Page) => page.evaluate(() => {
+  const disc = (window as unknown as { NP_DISC?: { artwork?: () => Artwork } }).NP_DISC;
+  return disc?.artwork?.() ?? null;
+});
+
+async function seedArtwork(page: Page, trackId: string, color: string): Promise<void> {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8" fill="${color}"/></svg>`;
+  await page.evaluate(async ({ trackId, svg }) => {
+    const request = indexedDB.open('now-playing');
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(['tracks', 'artwork'], 'readwrite');
+      const tracks = tx.objectStore('tracks');
+      const get = tracks.get(trackId);
+      get.onsuccess = () => {
+        const track = get.result as { artworkId?: string | null } | undefined;
+        if (!track) { tx.abort(); return; }
+        const id = `test-art-${trackId}`;
+        track.artworkId = id;
+        tracks.put(track);
+        const blob = new Blob([svg], { type: 'image/svg+xml' });
+        tx.objectStore('artwork').put({ id, blob, mime: blob.type });
+      };
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error ?? new Error('Could not store the artwork fixture'));
+      tx.onabort = () => reject(tx.error ?? new Error('Could not store the artwork fixture'));
+    });
+    db.close();
+  }, { trackId, svg });
+}
+
 let errors: string[];
 test.beforeEach(({ page }) => {
   errors = watchErrors(page);
@@ -55,6 +90,35 @@ async function playingWithSettings(page: Page): Promise<void> {
   });
   await expect(page.locator('#cfgDiscSpin')).toBeVisible();
 }
+
+test('the case sleeve and CD label show the current track’s cover, and update when the track changes', async ({ page }) => {
+  await boot(page);
+  const rows = await seed(page, [
+    { file: '01 Cover One.wav', title: 'Cover One', artist: 'Test Artist', album: 'Test Album' },
+    { file: '02 Cover Two.wav', title: 'Cover Two', artist: 'Test Artist', album: 'Test Album' },
+  ]);
+  await seedArtwork(page, rows.find((row) => row.title === 'Cover One')!.id, '#e53935');
+  await seedArtwork(page, rows.find((row) => row.title === 'Cover Two')!.id, '#1565c0');
+  await resetToLibrary(page);
+
+  await playRow(page, 'Cover One');
+  await expect.poll(async () => (await artwork(page))?.loaded ?? false, { message: 'the first embedded cover reaches the stage' }).toBe(true);
+  const first = await artwork(page);
+  expect(first).toMatchObject({ loaded: true, caseUsesArtwork: true, discUsesArtwork: true });
+  expect(first?.url).toMatch(/^data:image\//);
+  expect(first?.caseCenter, 'the sleeve canvas contains the first track’s red pixels').toEqual([229, 57, 53, 255]);
+  expect(first?.discCenter, 'the printed CD label contains the first track’s red pixels').toEqual([229, 57, 53, 255]);
+
+  await playRow(page, 'Cover Two');
+  await expect.poll(async () => {
+    const current = await artwork(page);
+    return !!current?.loaded && current.url !== first?.url;
+  }, { message: 'the sleeve and CD swap to the second track’s cover' }).toBe(true);
+  const second = await artwork(page);
+  expect(second).toMatchObject({ loaded: true, caseUsesArtwork: true, discUsesArtwork: true });
+  expect(second?.caseCenter, 'the sleeve changes to the second track’s blue pixels').toEqual([21, 101, 192, 255]);
+  expect(second?.discCenter, 'the CD label changes to the second track’s blue pixels').toEqual([21, 101, 192, 255]);
+});
 
 test('the controls start at today’s behaviour, show only what applies, and are kept across a reload', async ({ page }) => {
   await boot(page, '#settings/player');

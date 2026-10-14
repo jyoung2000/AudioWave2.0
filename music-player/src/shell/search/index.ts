@@ -246,7 +246,7 @@ export interface ListSong {
   platform: string;
   url: string;
   art: string | null;
-  /** Its 30-second preview (Apple Music's, then Deezer's): what a visitor plays while it is fetched. */
+  /** Its 30-second audition clip, played only from this Search result (Apple Music's, then Deezer's). */
   preview: string | null;
   /** The catalog's own song, for the hub's catalog/download (it picks the source and tags the file). */
   cat?: CatalogTrack;
@@ -2006,6 +2006,7 @@ export function installSearch(): SearchApi {
         el.style.removeProperty('--p');
         el.setAttribute('aria-pressed', 'false');
       }
+      document.dispatchEvent(new CustomEvent('player:preview-end'));
     }
     playing = null;
     if (resumeMain) {
@@ -2068,6 +2069,7 @@ export function installSearch(): SearchApi {
       });
     }
     playing = t;
+    document.dispatchEvent(new CustomEvent('player:preview-art', { detail: { coverUrl: t.artworkUrl || null } }));
     audio.src = src;
     audio.volume = typeof w.outputVolume === 'number' ? w.outputVolume : 1;
     el.classList.add('is-preview');

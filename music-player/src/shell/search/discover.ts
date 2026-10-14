@@ -9,10 +9,8 @@
  * use (`rankFound`). The answer says what happened in words when nothing came: offline, nothing
  * played yet, nothing answered, or nothing new.
  *
- * The look-ahead asks for the next picks' 30-second previews while the page is idle, one at a time,
- * within the budget `prefetch.ts` states, and keeps them as `blob:` URLs in memory so a chosen pick's
- * preview starts at once. Nothing is fetched while the catalog set is off, the browser asks to save
- * data, or the device is offline.
+ * Discover does not request or play preview clips. The cache methods remain for explicit consumers,
+ * but the player shell does not warm this set; 30-second auditions are requested only from Search.
  */
 import type { CatalogSourceStatus, CatalogTrack } from '@now-playing/contracts';
 import { CATALOG_PLATFORM_LABELS } from '@now-playing/contracts';

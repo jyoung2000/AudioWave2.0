@@ -158,16 +158,18 @@ test('an album from search opens in the list too, and starred, it is kept under 
   await expect(page.locator('#ipodMenu .ipod__item', { hasText: 'Night Ferries' })).toHaveCount(1);
 });
 
-test('a song on show plays its row and the Download key offers to fetch it through the helper', async ({ page }) => {
+test('a song on show does not play a short clip; Download offers to fetch the full song', async ({ page }) => {
   await withPlaylist(page);
   await paste(page, LIST);
   await page.locator('.srch__row--coll').click();
   await expect.poll(async () => (await titles(page)).length, { timeout: 30_000 }).toBe(TOTAL);
   await page.locator('#libraryRows tr:has(.lib-title:text-is("Track 0002"))').click();
-  await expect(page.locator('#libraryRows tr.is-playing .lib-title')).toHaveText('Track 0002');
+  await expect(page.locator('#playerPreview')).toBeHidden();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { NP_PLAYER: { playing(): boolean } }).NP_PLAYER.playing())).toBe(false);
   await page.click('#download');
   await expect(page.locator('#npFetch')).toBeVisible();
   await expect(page.locator('#npFetchMsg')).toContainText('“Track 0002” by Various Lanterns');
   await expect(page.locator('#npFetchMsg')).toContainText('open.spotify.com');
+  await expect(page.locator('#npFetchMsg')).not.toContainText('preview');
   await page.click('#npFetchCancel');
 });

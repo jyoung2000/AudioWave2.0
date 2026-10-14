@@ -2102,7 +2102,7 @@
 
   .player__where[hidden] { display: none; }
 
-  /* "Preview · 30 seconds — not the whole song": a visitor's clip, said as one (NP-FIND-011) */
+  /* Search audition timing is shown beside its result, never as Now Playing audio. */
   .player__preview {
     display: inline-block;
     margin: 6px 0 0;
@@ -7344,7 +7344,7 @@ window.AW.startStats = function () {
         <!-- Radio only: a track tells you its album, a broadcast tells you
              which station it is and where it is coming from. -->
         <p class="player__where" id="playerWhere" hidden></p>
-        <!-- A visitor's 30-second preview is said as one, never as the song (NP-FIND-011). -->
+        <!-- Short auditions live in Search; a visitor row here never plays a 30-second clip. -->
         <p class="player__preview" id="playerPreview" hidden></p>
       </div>
     </div>
@@ -8541,6 +8541,7 @@ window.AW.startStats = function () {
       total: 0,
       start: 0,
       nowPlaying: 'Choose a song from the library',
+      coverUrl: null,
       cover: {
         glowY: 0.78,
         stops: [[0, '#ffe07a'], [0.16, '#ffc63a'], [0.4, '#f9911a'],
@@ -8565,6 +8566,7 @@ window.AW.startStats = function () {
       total: 0,
       start: 0,
       nowPlaying: 'Join a group in Settings ▸ Profile',
+      coverUrl: null,
       cover: {
         glowY: 0.3,
         stops: [[0, '#e8fbff'], [0.14, '#7fd8f7'], [0.38, '#2f8fdc'],
@@ -10136,7 +10138,7 @@ window.AW.startStats = function () {
                 date: sg.date || null, platform: sg.platform, url: sg.url, art: sg.art || null, preview: sg.preview || null, cat: sg.cat || null },
         inLibrary: LIB.indexOf(sg) >= 0 || !!catRow(sg),
         canDownload: true,
-        canAudition: /^https?:/.test(sg.preview || ''),
+        canAudition: false,
         auditioning: false,
         touch: false,
         back: back,
@@ -10472,7 +10474,7 @@ window.AW.startStats = function () {
           o.said = a.said;
           o.via = a.via;
           a.rows.forEach(function (r) { o.shown[r.id] = 1; });
-          D.warm(a.rows);
+          /* Discover never preloads preview clips; audition is explicit in Search. */
           discLanded(my);
         });
       }).catch(function (err) {
@@ -10499,7 +10501,7 @@ window.AW.startStats = function () {
       var n = o.rows.length;
       var words = o.state === 'asking' ? 'Asking the catalog for songs that fit “' + algoCurrent().name + '”…'
         : n ? n + ' song' + (n === 1 ? '' : 's') + ' ranked by “' + algoCurrent().name + '” · ' + (MODE_NAME[cfg.algoMode] || cfg.algoMode) +
-              (o.via ? ', through ' + o.via : '') + ' — not on this device yet: choosing one plays its preview'
+              (o.via ? ', through ' + o.via : '') + ' — not on this device yet: audition previews in Search; fetch a full song here'
         : o.said;
       var head = document.createElement('tr');
       head.className = 'lib-group';
@@ -18055,7 +18057,7 @@ window.AW.startStats = function () {
       if (!fetchSheet.open) fetchSheet.showModal();
     }
 
-    /* ---- a visitor chosen (NP-FIND-011): its preview, said as one, and the fetch of the whole song ---- */
+    /* ---- a catalog visitor chosen: fetch its full song; no clip plays in Now Playing ---- */
     var visitSeq = 0;
     function paintPreview() {
       var el = document.getElementById('playerPreview');
@@ -18068,33 +18070,27 @@ window.AW.startStats = function () {
     document.addEventListener('library:fetching', paintPreview);
     function visit(sg, target, previewOnly) {
       var c = chosen[target], my = ++visitSeq;
-      var D = window.NP_DISC_ONLINE;
-      var clip = (D && D.clip(sg.id)) || (/^https?:/.test(sg.preview || '') ? sg.preview : null);
-      if (clip && window.NP_PLAYER && window.NP_PLAYER.playPreview) {
-        c.preview = true;
-        c.duration = 30;
-        window.NP_PLAYER.playPreview(sg.id, clip, { title: sg.title, artist: sg.artist }).then(function (r) {
-          if (r.ok || chosen[target] !== c) return;
-          c.preview = false; setPlaying(false); paintPreview();
-          window.say(r.reason || 'The preview could not be played');
-        });
-        if (D) D.played(sg.id);
-      } else {
-        setPlaying(false);
+      c.preview = false;
+      if (window.NP_PLAYER && window.NP_PLAYER.playing()) window.NP_PLAYER.pause();
+      setPlaying(false);
+      paintPreview();
+      if (previewOnly) { window.say('Audition previews from Search instead.'); return; }
+      if (window.NP_FETCHING[sg.id]) {
+        window.say('The full song is still being fetched: ' + window.NP_FETCHING[sg.id]);
+        return;
       }
-      var heard = clip ? 'Preview — 30 seconds of “' + sg.title + '”' : '“' + sg.title + '” has no preview';
-      if (previewOnly) { window.say(heard); return; }
-      if (window.NP_FETCHING[sg.id]) { window.say(heard + '; it is being fetched: ' + window.NP_FETCHING[sg.id]); return; }
-      if (!window.NP_VISIT) { window.say(heard + '. The whole song needs fetching first.'); return; }
+      if (!window.NP_VISIT) { window.say('The full song needs fetching first; previews are auditioned in Search.'); return; }
       window.NP_VISIT.route().then(function (route) {
         if (my !== visitSeq || chosen[target] !== c) return;
         if (route.kind === 'none') {
-          window.say(clip ? heard + '. The whole song needs fetching, and ' + route.why
-                          : 'Nothing can play “' + sg.title + '” here: it has no preview, and ' + route.why);
+          var hasSearchPreview = /^https?:/.test(sg.preview || '');
+          window.say(hasSearchPreview
+            ? 'Preview it from Search; the full song needs fetching, and ' + route.why
+            : 'Nothing can play “' + sg.title + '” here: it has no preview, and ' + route.why);
           return;
         }
-        window.say(heard + '; the whole song plays once ' + route.label + ' has fetched it.');
-        openFetch(sg, { previewing: !!clip });
+        window.say('No preview plays in the music player; the full song will play after ' + route.label + ' fetches it.');
+        openFetch(sg);
       });
     }
     /* a preview ends where it ends: it does not run on into the next row */
@@ -18113,6 +18109,23 @@ window.AW.startStats = function () {
       applyMode(e.detail.mode);
     });
 
+    var stageArtworkSeq = 0;
+    function stageArtwork(sg, target) {
+      var my = ++stageArtworkSeq;
+      var direct = sg && typeof sg.art === 'string' && /^(https?:|data:image\/|blob:)/i.test(sg.art) ? sg.art : null;
+      function publish(url) {
+        if (my !== stageArtworkSeq) return;
+        var safe = typeof url === 'string' && /^(https?:|data:image\/|blob:)/i.test(url) ? url : null;
+        if (window.ALBUMS && window.ALBUMS[target]) window.ALBUMS[target].coverUrl = safe;
+        document.dispatchEvent(new CustomEvent('player:artwork', { detail: { mode: target, coverUrl: safe } }));
+      }
+      if (sg && sg.local && window.NP_LIBRARY && window.NP_LIBRARY.artworkUrl) {
+        window.NP_LIBRARY.artworkUrl(sg.id).then(function (url) { publish(url || direct); }).catch(function () { publish(direct); });
+        return;
+      }
+      publish(direct);
+    }
+
     /* A row in the library was chosen. The song carries its own artist, so
        the session follows it into the matching mode rather than showing one
        artist's cover over another's title. */
@@ -18126,6 +18139,7 @@ window.AW.startStats = function () {
       if (target !== mode) reportHeard(target, false);
       chosen[target] = { id: sg.id, title: sg.title, artist: sg.artist, album: sg.album, duration: sg.duration, local: !!sg.local, remote: !!sg.remote, hub: !!sg.hub,
                          visiting: !sg.local && !sg.remote && /^https?:/.test(sg.url || ''), preview: false };
+      stageArtwork(sg, target);
       heardSecs[target] = 0;
       window.ALBUMS[target].nowPlaying = sg.title;
       pos[target] = 0;
@@ -18331,7 +18345,18 @@ if (window.NP_PREFS) applyStagePrefs(window.NP_PREFS);
 
 // Placeholder sleeve art. Swap for real artwork:
 //   new THREE.TextureLoader().load('cover.jpg', t => { t.colorSpace = THREE.SRGBColorSpace; })
-function makeCoverTexture(size, T) {
+function drawCoverImage(ctx, image, size) {
+  const width = image.naturalWidth || image.width;
+  const height = image.naturalHeight || image.height;
+  if (!width || !height) return;
+  const scale = Math.max(size / width, size / height);
+  const sourceWidth = size / scale;
+  const sourceHeight = size / scale;
+  const sx = (width - sourceWidth) / 2;
+  const sy = (height - sourceHeight) / 2;
+  ctx.drawImage(image, sx, sy, sourceWidth, sourceHeight, 0, 0, size, size);
+}
+function makeCoverTexture(size, T, image = null) {
   const c = document.createElement('canvas');
   c.width = c.height = size;
   const g = c.getContext('2d');
@@ -18384,6 +18409,7 @@ function makeCoverTexture(size, T) {
   g.drawImage(nc, 0, 0, size, size);
   g.globalAlpha = 1;
   g.globalCompositeOperation = 'source-over';
+  if (image) drawCoverImage(g, image, size);
 
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
@@ -19523,27 +19549,54 @@ function vizUpdate(dt, t) {
 
 /* ---------- artwork ---------- */
 
-/* Swapping the sleeve, tray card and disc label together. The swap is held
-   until the case is fully shut (see pendingAlbum in tick), so the change is
-   never seen mid-animation — the case closes on one album and opens on the
-   other. */
+/* Album changes remain held until the case is shut; a track’s cover can change in place. */
 let liveTextures = null;
+let artworkGeneration = 0;
+let displayedArtworkUrl = null;
+let displayedArtworkLoaded = false;
+let previewArtworkActive = false;
+let previewArtworkUrl = null;
 
-function applyAlbum(name) {
+function loadCoverImage(url) {
+  return new Promise(resolve => {
+    const image = new Image();
+    if (/^https?:/i.test(url)) image.crossOrigin = 'anonymous';
+    image.onload = () => resolve(image);
+    image.onerror = () => resolve(null);
+    image.src = url;
+  });
+}
+
+function applyAlbum(name, overrideUrl) {
   const A = window.ALBUMS[name];
-  const cover = makeCoverTexture(P.tex, A.cover);
-  const back = makeBackTexture(P.tex, A.back);
-  const label = makeLabelTexture(cover.image, P.tex);
+  const coverUrl = arguments.length > 1 ? overrideUrl : (previewArtworkActive ? previewArtworkUrl : (A.coverUrl || null));
+  const generation = ++artworkGeneration;
+  displayedArtworkUrl = null;
+  displayedArtworkLoaded = false;
 
-  art.material.map = cover;
-  backArt.material.map = back;
-  labelMat.map = label;
-  art.material.needsUpdate = true;
-  backArt.material.needsUpdate = true;
-  labelMat.needsUpdate = true;
+  function applyTextures(image, imageUrl) {
+    if (generation !== artworkGeneration) return;
+    const cover = makeCoverTexture(P.tex, A.cover, image);
+    const back = makeBackTexture(P.tex, A.back);
+    const label = makeLabelTexture(cover.image, P.tex);
+    art.material.map = cover;
+    backArt.material.map = back;
+    labelMat.map = label;
+    art.material.needsUpdate = true;
+    backArt.material.needsUpdate = true;
+    labelMat.needsUpdate = true;
+    if (liveTextures) for (const texture of liveTextures) texture.dispose();
+    liveTextures = [cover, back, label];
+    displayedArtworkUrl = image ? imageUrl : null;
+    displayedArtworkLoaded = Boolean(image);
+  }
 
-  if (liveTextures) for (const t of liveTextures) t.dispose();
-  liveTextures = [cover, back, label];
+  applyTextures(null, null);
+  if (typeof coverUrl === 'string' && coverUrl) {
+    loadCoverImage(coverUrl).then(image => {
+      if (image) applyTextures(image, coverUrl);
+    }).catch(() => undefined);
+  }
 }
 
 /* ---------- playback state ---------- */
@@ -19555,6 +19608,26 @@ document.addEventListener('player:state', e => { playing = e.detail.playing; });
 let albumName = section.dataset.mode || 'group';
 let pendingAlbum = null;
 applyAlbum(albumName);
+
+document.addEventListener('player:artwork', e => {
+  const d = e.detail || {};
+  const A = window.ALBUMS[d.mode];
+  if (!A) return;
+  A.coverUrl = typeof d.coverUrl === 'string' ? d.coverUrl : null;
+  if (d.mode === albumName && !previewArtworkActive) applyAlbum(albumName);
+});
+document.addEventListener('player:preview-art', e => {
+  const d = e.detail || {};
+  previewArtworkActive = true;
+  previewArtworkUrl = typeof d.coverUrl === 'string' ? d.coverUrl : null;
+  applyAlbum(albumName);
+});
+document.addEventListener('player:preview-end', () => {
+  if (!previewArtworkActive) return;
+  previewArtworkActive = false;
+  previewArtworkUrl = null;
+  applyAlbum(albumName);
+});
 
 document.addEventListener('player:album', e => {
   if (e.detail.mode === albumName) return;
@@ -20013,6 +20086,15 @@ let discPreviewState = () => ({ running: false, frames: 0 });
 })();
 window.NP_DISC = Object.freeze({
   motion: () => ({ spin: discSpinRate(), turn: discTurnRate(), angle: turn, tilt: discTilt, pitch: pitchRad(), out: lastDiscT, spinning: spinSpeed, bpm: songBpm, prefs: Object.assign({}, discPrefs), preview: discPreviewState() }),
+  artwork: () => {
+    const pixel = texture => {
+      const canvas = texture && texture.image;
+      if (!canvas || !canvas.getContext) return null;
+      try { return Array.from(canvas.getContext('2d').getImageData(Math.floor(canvas.width / 2), Math.floor(canvas.height / 2), 1, 1).data); }
+      catch { return null; }
+    };
+    return { url: displayedArtworkUrl, loaded: displayedArtworkLoaded, caseUsesArtwork: Boolean(displayedArtworkUrl && liveTextures && art.material.map === liveTextures[0]), discUsesArtwork: Boolean(displayedArtworkUrl && liveTextures && labelMat.map === liveTextures[2]), caseCenter: pixel(liveTextures && liveTextures[0]), discCenter: pixel(liveTextures && liveTextures[2]) };
+  },
 });
 
 /* ---------- context loss ----------

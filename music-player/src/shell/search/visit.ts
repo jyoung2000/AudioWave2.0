@@ -14,8 +14,9 @@
  * Every route needs the person's statement of why they may have the file (the sheet's rights basis),
  * because both the hub and the helper refuse without one.
  *
- * Until the whole song is here, a visitor plays its 30-second preview, labelled "Preview" — never as
- * the song. This module never claims a play it has not made.
+ * A visitor row is metadata, not playable audio. Short clips are auditioned explicitly from Search;
+ * choosing a visitor in the music list asks the person to fetch the full song, and the kept copy plays
+ * at its full duration. This module never claims a play it has not made.
  */
 import type { CatalogPlatform, CatalogTrack, DownloadAuthorizationBasis } from '@now-playing/contracts';
 import { CATALOG_PLATFORM_LABELS } from '@now-playing/contracts';
