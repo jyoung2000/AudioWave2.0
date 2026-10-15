@@ -374,12 +374,14 @@ replace("    /* switching modes by hand clears that mode's chosen track, which i
         "    /* The fetch sheet: why you may have this file, then the helper fetches it and it joins the\n"
         "       library as a real track. Built once, on first use. */\n"
         "    var BASES = [['user-owned', 'It is mine', 'Something you made or uploaded yourself.'],\n"
-        "      ['creator-download', 'The creator offers it', 'The uploader turned downloads on, or says it may be downloaded.'],\n"
+        "      ['creator-download', 'Creator-enabled (SoundCloud via Hub)', 'The Hub checks the creator’s downloadable flag; the PC helper cannot.'],\n"
         "      ['public-domain', 'Public domain', 'Old enough, or released deliberately into the public domain.'],\n"
         "      ['licensed', 'Licensed to me', 'A Creative Commons licence that permits it, or a licence you hold.'],\n"
         "      ['purchased-export', 'I bought it', 'You paid for this and are fetching your own copy.']];\n"
         "    var fetchSheet = null;\n"
         "    function openFetch(sg) {\n"
+        "      var fetchHost = ''; try { fetchHost = new URL(sg.url).hostname.toLowerCase().replace(/^www\\./, ''); } catch (e) {}\n"
+        "      if (fetchHost === 'soundcloud.com' || fetchHost.endsWith('.soundcloud.com')) { window.say('This PC helper cannot verify SoundCloud’s creator-enabled download flag; use the Hub’s SoundCloud catalog flow.'); return; }\n"
         "      if (!fetchSheet) {\n"
         "        fetchSheet = document.createElement('dialog');\n"
         "        fetchSheet.className = 'sheet'; fetchSheet.id = 'npFetch'; fetchSheet.setAttribute('aria-labelledby', 'npFetchTitle');\n"
@@ -388,7 +390,7 @@ replace("    /* switching modes by hand clears that mode's chosen track, which i
         "          '<p class=\"sheet__msg\" id=\"npFetchMsg\"></p>' +\n"
         "          '<fieldset class=\"np-fetch__bases\"><legend class=\"sheet__msg\">Why you may have it</legend>' +\n"
         "          BASES.map(function (b, i) { return '<label class=\"np-fetch__basis\"><input type=\"radio\" name=\"npBasis\" value=\"' + b[0] + '\"> <b>' + b[1] + '</b> — ' + b[2] + '</label>'; }).join('') +\n"
-        "          '</fieldset><p class=\"sheet__msg\" id=\"npFetchState\" role=\"status\"></p></div>' +\n"
+        "          '</fieldset><p class=\"sheet__msg\">Search results do not grant download permission. This PC helper cannot verify SoundCloud’s creator-enabled flag; use the Hub’s SoundCloud catalog flow.</p>' +\n"
         "          '<div class=\"sheet__actions\"><button class=\"sheet__btn\" type=\"button\" id=\"npFetchCancel\">Cancel</button>' +\n"
         "          '<button class=\"sheet__btn sheet__btn--default\" type=\"submit\" id=\"npFetchGo\" value=\"fetch\">Fetch</button></div></form>';\n"
         "        document.body.appendChild(fetchSheet);\n"
@@ -3681,6 +3683,7 @@ replace_between('    var fetchSheet = null;', '      fetchSheet.showModal();\n  
       document.dispatchEvent(new CustomEvent('library:fetching', { detail: { id: id, words: words || null } }));
     }
     function hostOf(u) { return String(u || '').replace(/^https?:\/\//, '').split('/')[0]; }
+    function isSoundCloudUrl(u) { try { var h = new URL(u).hostname.toLowerCase().replace(/^www\./, ''); return h === 'soundcloud.com' || h.endsWith('.soundcloud.com'); } catch (e) { return false; } }
     function openFetch(sg, opts) {
       opts = opts || {};
       if (!fetchSheet) {
@@ -3691,7 +3694,8 @@ replace_between('    var fetchSheet = null;', '      fetchSheet.showModal();\n  
           '<p class="sheet__msg" id="npFetchMsg"></p>' +
           '<fieldset class="np-fetch__bases"><legend class="sheet__msg">Why you may have it</legend>' +
           BASES.map(function (b) { return '<label class="np-fetch__basis"><input type="radio" name="npBasis" value="' + b[0] + '"> <b>' + b[1] + '</b> — ' + b[2] + '</label>'; }).join('') +
-          '</fieldset><p class="sheet__msg" id="npFetchState" role="status"></p></div>' +
+          '</fieldset><p class="sheet__msg">Search results are not download permission. Creator-enabled SoundCloud downloads are checked only by a Hub; the PC helper cannot verify the flag.</p>' +
+          '<p class="sheet__msg" id="npFetchState" role="status"></p></div>' +
           '<div class="sheet__actions"><button class="sheet__btn" type="button" id="npFetchCancel">Cancel</button>' +
           '<button class="sheet__btn sheet__btn--default" type="submit" id="npFetchGo" value="fetch">Fetch</button></div></form>';
         document.body.appendChild(fetchSheet);
@@ -3703,6 +3707,7 @@ replace_between('    var fetchSheet = null;', '      fetchSheet.showModal();\n  
           var route = fetchSheet._route;
           if (!window.NP_VISIT || !route) { st.textContent = 'Still finding what can fetch it…'; return; }
           if (route.kind === 'none') { st.textContent = 'Nothing can fetch it here: ' + route.why; return; }
+          if (pick.value === 'creator-download' && route.kind !== 'hub') { st.textContent = 'Creator-enabled downloads are verified only by a Hub for SoundCloud.'; return; }
           var target = fetchSheet._song, cancel = fetchSheet.querySelector('#npFetchCancel');
           go.disabled = true;
           window.NP_VISIT.fetch(target, pick.value, function (s) {
@@ -3739,9 +3744,14 @@ replace_between('    var fetchSheet = null;', '      fetchSheet.showModal();\n  
       fetchSheet.querySelector('#npFetchCancel').textContent = 'Cancel';
       fetchSheet.querySelector('#npFetchGo').disabled = false;
       [].forEach.call(fetchSheet.querySelectorAll('input[name="npBasis"]'), function (x) { x.checked = false; });
+      var creatorBasis = fetchSheet.querySelector('input[name="npBasis"][value="creator-download"]');
+      if (creatorBasis) creatorBasis.closest('label').hidden = true;
       (window.NP_VISIT ? window.NP_VISIT.route() : Promise.resolve({ kind: 'none', label: '', why: 'the search is still loading.' })).then(function (r) {
         if (fetchSheet._song !== sg) return;
+        if (r.kind === 'helper' && isSoundCloudUrl(sg.url)) r = { kind: 'none', label: '', why: 'the PC helper cannot verify SoundCloud creator-enabled downloads; use a Hub.' };
         fetchSheet._route = r;
+        var hasSoundCloud = isSoundCloudUrl(sg.url) || (sg.sources || []).some(function (source) { return source.platform === 'soundcloud'; });
+        if (creatorBasis) creatorBasis.closest('label').hidden = r.kind !== 'hub' || !hasSoundCloud;
         if (r.kind === 'hub') {
           msg.textContent = who + ' — fetched by ' + r.label + ' from the best source it has for it (YouTube Music, YouTube, SoundCloud, Bandcamp, then Spotify through spotDL), tagged, then played from this device.' + meanwhile;
           if (!st.textContent) st.textContent = 'Using ' + r.label + '.';
@@ -4345,5 +4355,6 @@ replace('  artwork: () => ({ url: displayedArtworkUrl, loaded: displayedArtworkL
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):
     assert bad not in text, f'left behind: {bad}'
 
+text = '\n'.join(line.rstrip() for line in text.splitlines()) + '\n'
 DST.write_text(text, encoding='utf-8')
 print(f'{DST.relative_to(ROOT)}: {edits} edits, {len(text.splitlines())} lines, {len(text.encode("utf-8")) // 1024} KB')

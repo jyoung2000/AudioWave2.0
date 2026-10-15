@@ -14,10 +14,11 @@
  *   (`POST /library/stream-urls`); a link entry is a catalog visitor (NP-FIND-011). Rename, delete and
  *   reorder only where this player made the list; otherwise it is read-only, and says so.
  * - **Starred sync (NP-FIND-008, `library:sync`).** On start, and on every star or un-star, this
- *   player's SavedCollections are merged with its own on the hub (`mergeSaved`): a union by
- *   `{platform, kind, id}`, the later `savedAt` winning, and an un-star made here — kept as a tombstone
- *   until the hub has heard it — winning over the hub's older copy. Failures retry with backoff, quietly.
- *   The admin's starred lists come back as `shared` and show, read-only, under "Shared on <hub>".
+ *   player's metadata-only song and collection bookmarks merge with the hub (`mergeSavedCatalog`):
+ *   recording identity for songs, `{platform, kind, id}` for collections, and the newer timestamp
+ *   wins. An un-star is kept as a durable tombstone so an older offline copy cannot resurrect it.
+ *   Every paired device with `library:sync` edits the same set; `shared` stays empty for older clients.
+ *   Failures retry with backoff, quietly. Starred metadata never copies audio or a local file path.
  */
 import type {
   CatalogCollectionRef,
@@ -26,9 +27,16 @@ import type {
   FolderPlaylistEntry,
   FolderPlaylistPage,
   FolderPlaylistSummary,
+  SavedCatalogItem,
+  SavedCatalogItemRef,
+  SavedCatalogTombstone as SavedCatalogTombstoneType,
   SavedCollection,
+  SavedTrack,
 } from '@now-playing/contracts';
-import { CATALOG_PLATFORM_LABELS, PLAYLIST_FOLDER_PAGE_MAX } from '@now-playing/contracts';
+import { CATALOG_PLATFORM_LABELS, PLAYLIST_FOLDER_PAGE_MAX, SavedCatalogItemList, SavedCatalogTombstone as SavedCatalogTombstoneSchema, SavedTrack as SavedTrackSchema } from '@now-playing/contracts';
+import { mergeSavedCatalog, savedCatalogKey, savedCatalogRefFromKey } from '@now-playing/domain/catalog';
+import { savedTrackFromCatalogTrack } from '../../lib/saved-catalog.js';
+export { savedTrackFromCatalogTrack, savedTrackFromLibraryTrack } from '../../lib/saved-catalog.js';
 import { hubAccount, webUrl } from './client.js';
 import { trackOf } from './visit.js';
 import type { ListedCollection, ListSong } from './index.js';
@@ -53,9 +61,9 @@ export interface Tombstone {
 
 type Keyed = Pick<CatalogCollectionRef, 'platform' | 'kind' | 'id'>;
 export const savedKey = (r: Keyed): string => `${r.platform}\u0000${r.kind}\u0000${r.id}`;
-const time = (iso: string | null | undefined): number => {
-  const t = Date.parse(iso ?? '');
-  return Number.isFinite(t) ? t : 0;
+const time = (iso: string): number => {
+  const n = Date.parse(iso);
+  return Number.isFinite(n) ? n : 0;
 };
 
 export interface MergeResult {
@@ -230,6 +238,12 @@ export interface HubShelf {
   /** The library menu: the hub's playlists (null while they are asked for) and the admin's shared lists. */
   playlists(): FolderPlaylistSummary[] | null;
   shared(): SavedCollection[];
+  /** The shared metadata-only song stars, local first while offline. */
+  savedTracks(): SavedTrack[];
+  canStarTrack(track: CatalogTrack | SavedTrack): boolean;
+  isTrackSaved(track: CatalogTrack | SavedTrack): boolean;
+  toggleTrack(track: CatalogTrack | SavedTrack): Promise<boolean>;
+  unstarTrack(identityKey: string): Promise<boolean>;
   refresh(): void;
   open(playlistId: string): Promise<void>;
   /** A hub library entry on show, by row id: what bridge.ts streams. */
@@ -241,6 +255,7 @@ export interface HubShelf {
 }
 
 const SYNC_KEY = 'player:saved-sync';
+const SAVED_TRACKS_KEY = 'player:saved-catalog-tracks';
 const RETRY_MIN = 5_000;
 const RETRY_MAX = 5 * 60_000;
 
@@ -266,10 +281,12 @@ export function installHubShelf(): HubShelf {
   let lists: FolderPlaylistSummary[] | null = null;
   let listsAt = 0;
   let shared: SavedCollection[] = [];
-  let tombs: Tombstone[] = [];
+  let savedTracks: SavedTrack[] = [];
+  let tombs: SavedCatalogTombstoneType[] = [];
   let retryMs = RETRY_MIN;
   let retryTimer = 0;
   let syncing: Promise<void> | null = null;
+  let syncAgain = false;
   /** Rows of hub lists on show, by row id. */
   const rows = new Map<string, { entry: FolderPlaylistEntry; playlistId: string }>();
   const changed = (): void => void document.dispatchEvent(new CustomEvent('hub-shelf:change'));
@@ -657,13 +674,44 @@ export function installHubShelf(): HubShelf {
     try {
       await w.kv.set(SYNC_KEY, { tombstones: tombs });
     } catch {
-      /* the next un-star tries again */
+      /* the next sync still sees the in-memory marker */
     }
   }
+  async function saveTracks(): Promise<void> {
+    try {
+      await w.kv.set(SAVED_TRACKS_KEY, { items: savedTracks });
+    } catch {
+      /* keep the in-memory list; the next interaction retries */
+    }
+  }
+  const savedTracksLoaded = Promise.resolve(w.kv.get(SAVED_TRACKS_KEY))
+    .then((value) => {
+      const raw = Array.isArray(value) ? value : (value as { items?: unknown } | null)?.items;
+      if (Array.isArray(raw)) savedTracks = raw.flatMap((item) => {
+        const parsed = SavedTrackSchema.safeParse(item);
+        return parsed.success ? [parsed.data] : [];
+      });
+    })
+    .catch(() => undefined);
   const tombsLoaded = Promise.resolve(w.kv.get(SYNC_KEY))
-    .then((v) => {
-      const list = (v as { tombstones?: unknown } | null)?.tombstones;
-      if (Array.isArray(list)) tombs = list.filter((t): t is Tombstone => !!t && typeof t === 'object' && typeof (t as Tombstone).id === 'string' && typeof (t as Tombstone).at === 'string');
+    .then((value) => {
+      const raw = (value as { tombstones?: unknown } | null)?.tombstones;
+      if (!Array.isArray(raw)) return;
+      const parsed = raw.flatMap((value) => {
+        const current = SavedCatalogTombstoneSchema.safeParse(value);
+        if (current.success) return [current.data];
+        // Migrate the old collection-only tombstones without losing an offline un-star.
+        if (!value || typeof value !== 'object') return [];
+        const legacy = value as Partial<Tombstone>;
+        if (!legacy.platform || !legacy.kind || !legacy.id || !legacy.at) return [];
+        return [{ key: `collection:${legacy.platform}:${legacy.kind}:${legacy.id}`, at: legacy.at }];
+      });
+      const latest = new Map<string, SavedCatalogTombstoneType>();
+      for (const marker of parsed) {
+        const prior = latest.get(marker.key);
+        if (!prior || Date.parse(marker.at) > Date.parse(prior.at)) latest.set(marker.key, marker);
+      }
+      tombs = [...latest.values()];
     })
     .catch(() => undefined);
 
@@ -673,33 +721,65 @@ export function installHubShelf(): HubShelf {
     retryMs = Math.min(RETRY_MAX, retryMs * 2);
   }
 
+  const isSavedTrack = (item: SavedCatalogItem): item is SavedTrack => 'identityKey' in item;
+  const isSavedCollection = (item: SavedCatalogItem): item is SavedCollection => 'ref' in item;
+  const deleteSavedUrl = (ref: SavedCatalogItemRef, at: string): string => {
+    const params = new URLSearchParams({ at });
+    if ('identityKey' in ref) {
+      params.set('kind', 'track');
+      params.set('identityKey', ref.identityKey);
+    } else {
+      params.set('platform', ref.platform);
+      params.set('kind', ref.kind);
+      params.set('id', ref.id);
+    }
+    return `/catalog/saved?${params}`;
+  };
+
   function sync(): Promise<void> {
-    syncing ??= (async () => {
-      await Promise.all([loaded, tombsLoaded]);
+    if (syncing) {
+      syncAgain = true;
+      return syncing;
+    }
+    syncing = (async () => {
+      await Promise.all([loaded, tombsLoaded, savedTracksLoaded]);
       const a = await reload();
       if (!a || !has('library:sync')) {
         if (shared.length) changed();
         shared = [];
         return;
       }
-      const list = w.NP_LIST;
-      if (!list) return;
       try {
-        const remote = await call<{ items: SavedCollection[]; shared?: SavedCollection[] }>('GET', '/catalog/saved');
-        const m = mergeSaved(list.saved(), remote.items, tombs);
-        const before = JSON.stringify(list.saved());
-        if (JSON.stringify(m.items) !== before) list.replaceSaved(m.items);
-        shared = remote.shared ?? [];
-        tombs = m.tombstones;
-        await saveTombs();
-        changed();
-        for (const s of m.put) await call('PUT', '/catalog/saved', s);
-        for (const t of m.del) {
-          await call('DELETE', `/catalog/saved?${new URLSearchParams({ platform: t.platform, kind: t.kind, id: t.id })}`);
-          tombs = tombs.filter((x) => savedKey(x) !== savedKey(t));
-          await saveTombs();
+        let remote = SavedCatalogItemList.parse(await call<SavedCatalogItemList>('GET', '/catalog/saved'));
+        const list = w.NP_LIST;
+        const localCollections = list?.saved?.() ?? [];
+        const merged = mergeSavedCatalog([...localCollections, ...savedTracks], remote.items, tombs, remote.tombstones);
+        const apply = async (items: SavedCatalogItem[], markers: SavedCatalogTombstoneType[]): Promise<void> => {
+          const collections = items.filter(isSavedCollection);
+          const tracks = items.filter(isSavedTrack);
+          if (list && JSON.stringify(list.saved()) !== JSON.stringify(collections)) list.replaceSaved(collections);
+          savedTracks = tracks;
+          tombs = markers;
+          await Promise.all([saveTracks(), saveTombs()]);
+          shared = remote.shared.filter(isSavedCollection);
+          changed();
+        };
+        await apply(merged.items, merged.tombstones);
+        for (const item of merged.put) {
+          remote = SavedCatalogItemList.parse(await call<SavedCatalogItemList>('PUT', '/catalog/saved', item));
         }
-        retryMs = RETRY_MIN;
+        for (const marker of merged.del) {
+          const ref = savedCatalogRefFromKey(marker.key);
+          if (ref) remote = SavedCatalogItemList.parse(await call<SavedCatalogItemList>('DELETE', deleteSavedUrl(ref, marker.at)));
+        }
+        const settled = mergeSavedCatalog(merged.items, remote.items, merged.tombstones, remote.tombstones);
+        await apply(settled.items, settled.tombstones);
+        if (settled.put.length || settled.del.length) retryLater();
+        else {
+          retryMs = RETRY_MIN;
+          clearTimeout(retryTimer);
+          retryTimer = 0;
+        }
       } catch (err) {
         // Quiet: a hub that is away is asked again later, with backoff; nothing is said.
         if (err instanceof Problem && !err.offline) return;
@@ -707,8 +787,53 @@ export function installHubShelf(): HubShelf {
       }
     })().finally(() => {
       syncing = null;
+      if (syncAgain) {
+        syncAgain = false;
+        void sync();
+      }
     });
     return syncing;
+  }
+
+  const trackCandidate = (track: CatalogTrack | SavedTrack): SavedTrack | null =>
+    'identityKey' in track ? SavedTrackSchema.safeParse(track).data ?? null : savedTrackFromCatalogTrack(track);
+  const canStarTrack = (track: CatalogTrack | SavedTrack): boolean => trackCandidate(track) !== null;
+  const isTrackSaved = (track: CatalogTrack | SavedTrack): boolean => {
+    const item = trackCandidate(track);
+    return item !== null && savedTracks.some((saved) => saved.identityKey === item.identityKey);
+  };
+  async function toggleTrack(track: CatalogTrack | SavedTrack): Promise<boolean> {
+    await Promise.all([tombsLoaded, savedTracksLoaded]);
+    const candidate = trackCandidate(track);
+    const item = candidate ? SavedTrackSchema.parse({ ...candidate, savedAt: new Date().toISOString() }) : null;
+    if (!item) {
+      say('This song has no safe recording identity to share; its title alone is not enough.');
+      return false;
+    }
+    const key = savedCatalogKey(item);
+    const found = savedTracks.some((saved) => saved.identityKey === item.identityKey);
+    if (found) {
+      savedTracks = savedTracks.filter((saved) => saved.identityKey !== item.identityKey);
+      tombs = [...tombs.filter((marker) => marker.key !== key), { key, at: new Date().toISOString() }];
+    } else {
+      const localCount = (w.NP_LIST?.saved?.().length ?? 0) + savedTracks.length;
+      if (localCount >= 2_000) {
+        say('The shared library is full. Un-star some songs or lists first.');
+        return false;
+      }
+      savedTracks = [item, ...savedTracks.filter((saved) => saved.identityKey !== item.identityKey)];
+      tombs = tombs.filter((marker) => marker.key !== key);
+    }
+    await Promise.all([saveTracks(), saveTombs()]);
+    changed();
+    void sync();
+    return true;
+  }
+
+  async function unstarTrack(identityKey: string): Promise<boolean> {
+    await savedTracksLoaded;
+    const item = savedTracks.find((saved) => saved.identityKey === identityKey);
+    return item ? toggleTrack(item) : false;
   }
 
   document.addEventListener('library:collections', (e) => {
@@ -716,25 +841,11 @@ export function installHubShelf(): HubShelf {
     if (!d?.ref) return;
     void (async () => {
       await tombsLoaded;
-      const k = savedKey(d.ref);
-      tombs = tombs.filter((t) => savedKey(t) !== k);
-      if (!d.saved) tombs.push({ platform: d.ref.platform, kind: d.ref.kind, id: d.ref.id, at: new Date().toISOString() });
-      await reload();
-      if (!has('library:sync')) {
-        tombs = [];
-        return;
-      }
+      const key = `collection:${d.ref.platform}:${d.ref.kind}:${d.ref.id}`;
+      tombs = tombs.filter((marker) => marker.key !== key);
+      if (!d.saved) tombs.push({ key, at: new Date().toISOString() });
       await saveTombs();
-      try {
-        if (d.saved) await call('PUT', '/catalog/saved', d.saved);
-        else {
-          await call('DELETE', `/catalog/saved?${new URLSearchParams({ platform: d.ref.platform, kind: d.ref.kind, id: d.ref.id })}`);
-          tombs = tombs.filter((t) => savedKey(t) !== k);
-          await saveTombs();
-        }
-      } catch (err) {
-        if (!(err instanceof Problem) || err.offline) retryLater();
-      }
+      void sync();
     })();
   });
   window.addEventListener('online', () => void sync());
@@ -758,6 +869,11 @@ export function installHubShelf(): HubShelf {
     listMenu,
     playlists: () => lists,
     shared: () => shared.slice(),
+    savedTracks: () => savedTracks.slice(),
+    canStarTrack,
+    isTrackSaved,
+    toggleTrack,
+    unstarTrack,
     refresh,
     open,
     streamable(id) {

@@ -10,12 +10,14 @@
  * empty state explains what "add a folder" actually does (index, not copy), because people are
  * reasonably wary of a web page asking for their music folder.
  */
-import { Suspense, lazy, useState } from 'react';
+import { Suspense, lazy, useMemo, useState } from 'react';
 import { Button, EmptyState, Panel, useToast } from '@now-playing/aqua-ui';
-import type { Track } from '@now-playing/contracts';
+import type { SavedTrack, Track } from '@now-playing/contracts';
 import { uuidv7 } from '@now-playing/domain';
 import type { ViewId } from '../App.js';
-import { useAppState, usePlayer } from '../state/context.js';
+import { useAppState, usePlayer, useSavedCatalogItems } from '../state/context.js';
+import { savedTrackFromLibraryTrack } from '../lib/saved-catalog.js';
+import { SharedSavedSongsPanel } from '../components/SharedSavedSongsPanel.js';
 import { toTrackRef } from '../state/store.js';
 import { supportsDirectoryHandles } from '../lib/library.js';
 import { MusicList } from '@now-playing/aqua-ui';
@@ -47,14 +49,31 @@ function MoreDestinations({ onOpenView }: { onOpenView: (view: ViewId) => void }
 }
 
 export function LibraryView({ onOpenView, onDownload }: { onOpenView: (view: ViewId) => void; onDownload: (track: Track) => void }) {
-  const { store } = usePlayer();
+  const { store, savedCatalog, hubStatus } = usePlayer();
   const state = useAppState();
+  const savedItems = useSavedCatalogItems();
   const toast = useToast();
   const [newList, setNewList] = useState<{ open: boolean; track: Track | null }>({ open: false, track: null });
   const [fetchOpen, setFetchOpen] = useState(false);
   // The button exists only while a helper is actually answering with a tool it can run. An action
   // that would fail is not an action worth drawing.
   const canFetch = Boolean(state.tools?.health.tools.some((tool) => tool.id !== 'ffmpeg' && tool.present));
+  const canShowShared = Boolean(savedCatalog?.canSync() && hubStatus.connected && hubStatus.hubName);
+  const sharedTracks = useMemo(() => savedItems.filter((item): item is SavedTrack => 'kind' in item && item.kind === 'track'), [savedItems]);
+  const sharedKeys = useMemo(() => new Set(sharedTracks.map((item) => item.identityKey)), [sharedTracks]);
+  const visibleTracks = useMemo(() => state.library.tracks.map((track) => {
+    const snapshot = savedTrackFromLibraryTrack(track);
+    return snapshot && sharedKeys.has(snapshot.identityKey) && !track.liked ? { ...track, liked: true } : track;
+  }), [state.library.tracks, sharedKeys]);
+  const toggleStar = (track: Track): void => {
+    const original = state.library.tracks.find((candidate) => candidate.id === track.id);
+    const snapshot = savedTrackFromLibraryTrack(track);
+    if (snapshot && sharedKeys.has(snapshot.identityKey) && !original?.liked) {
+      void savedCatalog?.unstarTrack(snapshot.identityKey).catch((error: unknown) => toast.show(error instanceof Error ? error.message : String(error), { kind: 'warning' }));
+      return;
+    }
+    void store.toggleLike(track.id);
+  };
 
   const playFrom = (track: Track, ordered: readonly Track[]): void => {
     if (track.unsupportedReason) {
@@ -69,6 +88,7 @@ export function LibraryView({ onOpenView, onDownload }: { onOpenView: (view: Vie
 
   if (!state.library.tracks.length) {
     return (
+      <>
       <Panel>
         <EmptyState
           title="No music yet"
@@ -98,6 +118,8 @@ export function LibraryView({ onOpenView, onDownload }: { onOpenView: (view: Vie
         <MoreDestinations onOpenView={onOpenView} />
         <Suspense fallback={null}>{fetchOpen ? <FetchSheet open onClose={() => setFetchOpen(false)} /> : null}</Suspense>
       </Panel>
+      {canShowShared && hubStatus.hubName ? <SharedSavedSongsPanel hubName={hubStatus.hubName} tracks={sharedTracks} onUnstar={(key) => void savedCatalog?.unstarTrack(key).catch((error: unknown) => toast.show(error instanceof Error ? error.message : String(error), { kind: 'warning' }))} /> : null}
+      </>
     );
   }
 
@@ -151,10 +173,10 @@ export function LibraryView({ onOpenView, onDownload }: { onOpenView: (view: Vie
 
       <MusicList
         label="Your music"
-        tracks={state.library.tracks}
+        tracks={visibleTracks}
         playingTrackId={state.queue[state.queueIndex]?.track.trackId ?? null}
         onPlay={playFrom}
-        onToggleStar={(track) => void store.toggleLike(track.id)}
+        onToggleStar={toggleStar}
         playlists={state.playlists}
         playlistItems={state.playlistItems}
         onTogglePlaylist={(track, playlistId) => {
@@ -179,6 +201,8 @@ export function LibraryView({ onOpenView, onDownload }: { onOpenView: (view: Vie
           })();
         }}
       />
+
+      {canShowShared && hubStatus.hubName ? <SharedSavedSongsPanel hubName={hubStatus.hubName} tracks={sharedTracks} onUnstar={(key) => void savedCatalog?.unstarTrack(key).catch((error: unknown) => toast.show(error instanceof Error ? error.message : String(error), { kind: 'warning' }))} /> : null}
 
       <Suspense fallback={null}>{fetchOpen ? <FetchSheet open onClose={() => setFetchOpen(false)} /> : null}</Suspense>
 

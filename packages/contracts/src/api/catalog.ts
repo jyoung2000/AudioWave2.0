@@ -352,17 +352,86 @@ export type CatalogArtistDetail = z.infer<typeof CatalogArtistDetail>;
 
 
 /** A starred album or playlist, in the one shape the player, the hub's sync and the companion share. */
+const SavedCatalogWebUrl = z.string().max(2048).url().refine((url) => /^https?:\/\//i.test(url), 'Expected an HTTP(S) URL');
+const SavedCatalogImageUrl = z.string().max(2048).refine(
+  (url) =>
+    SavedCatalogWebUrl.safeParse(url).success ||
+    /^data:image\/(?:svg\+xml|png|jpe?g|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/i.test(url),
+  'Expected an HTTP(S) URL or a small inline image',
+);
+const SavedCatalogSource = CatalogSource.extend({
+  url: SavedCatalogWebUrl,
+  previewUrl: SavedCatalogWebUrl.nullable().default(null),
+});
+
 export const SavedCollection = z.object({
-  ref: CatalogCollectionRef,
+  ref: CatalogCollectionRef.extend({ url: SavedCatalogWebUrl }),
   savedAt: IsoDateTime,
-  artworkUrl: z.string().max(2048).nullable().default(null),
+  artworkUrl: SavedCatalogImageUrl.nullable().default(null),
   /** The first four songs' artwork, in order: the 2×2 mosaic when the list has no cover of its own. */
-  covers: z.array(z.string().max(2048)).max(4).default([]),
+  covers: z.array(SavedCatalogImageUrl).max(4).default([]),
   trackCount: z.number().int().nonnegative().nullable().default(null),
 });
 export type SavedCollection = z.infer<typeof SavedCollection>;
 
-/** The caller's starred lists, and (for a device) the hub admin's, read-only, as `shared`. */
+const SavedTrackIdentity = z.string().min(8).max(320).regex(/^(?:isrc:[A-Z]{2}[A-Z0-9]{3}\d{7}|musicbrainz:[0-9a-f-]{36}|provider:[a-z][a-z0-9-]{0,39}:[^\s]{1,260}|sha256:[0-9a-f]{64})$/i);
+
+/** A deliberately small metadata snapshot; filesystem locators and audio bytes have no fields here. */
+export const SavedSongSnapshot = z.object({
+  id: z.string().min(1).max(260),
+  title: z.string().min(1).max(300),
+  artist: z.string().min(1).max(300),
+  artists: z.array(z.string().max(300)).max(20).default([]),
+  album: z.string().max(300).nullable().default(null),
+  albumArtist: z.string().max(300).nullable().default(null),
+  durationMs: z.number().int().nonnegative().nullable().default(null),
+  isrc: z.string().regex(/^[A-Z]{2}[A-Z0-9]{3}\d{7}$/i).nullable().default(null),
+  musicbrainzRecordingId: z.uuid().nullable().default(null),
+  contentHash: z.string().regex(/^[0-9a-f]{64}$/i).nullable().default(null),
+  providerIds: z.record(z.string().regex(/^[a-z][a-z0-9-]{1,31}$/), z.array(z.string().min(1).max(200)).max(20)).refine((ids) => Object.keys(ids).length <= 20, 'At most 20 provider IDs').default({}),
+  artworkUrl: SavedCatalogImageUrl.nullable().default(null),
+  releaseDate: z.string().regex(/^\d{4}(-\d{2}(-\d{2})?)?$/).nullable().default(null),
+  year: z.number().int().min(1000).max(3000).nullable().default(null),
+  genre: z.string().max(100).nullable().default(null),
+  label: z.string().max(300).nullable().default(null),
+  explicit: z.boolean().nullable().default(null),
+  sources: z.array(SavedCatalogSource).max(20).default([]),
+});
+export type SavedSongSnapshot = z.infer<typeof SavedSongSnapshot>;
+
+/** A metadata-only song bookmark. `track` cannot contain a local path or audio bytes. */
+export const SavedTrack = z.object({
+  kind: z.literal('track'),
+  identityKey: SavedTrackIdentity,
+  track: SavedSongSnapshot,
+  savedAt: IsoDateTime,
+}).strict();
+export type SavedTrack = z.infer<typeof SavedTrack>;
+export const SavedCatalogItem = z.union([SavedCollection, SavedTrack]);
+export type SavedCatalogItem = z.infer<typeof SavedCatalogItem>;
+
+export const SavedCatalogItemRef = z.union([
+  z.object({ kind: z.literal('track'), identityKey: SavedTrackIdentity }),
+  CatalogCollectionRef.pick({ platform: true, id: true }).extend({ kind: z.literal('album') }),
+  CatalogCollectionRef.pick({ platform: true, id: true }).extend({ kind: z.literal('playlist') }),
+]);
+export type SavedCatalogItemRef = z.infer<typeof SavedCatalogItemRef>;
+export const SavedCatalogDeleteRequest = SavedCatalogItemRef.and(z.object({ at: IsoDateTime.optional() }));
+export type SavedCatalogDeleteRequest = z.infer<typeof SavedCatalogDeleteRequest>;
+
+/** Durable Hub-side delete markers let clients reconcile an older offline snapshot without resurrecting it. */
+export const SavedCatalogTombstone = z.object({ key: z.string().min(1).max(320), at: IsoDateTime });
+export type SavedCatalogTombstone = z.infer<typeof SavedCatalogTombstone>;
+
+/** The single editable Hub-backed set. `shared` remains empty for older clients that read it. */
+export const SavedCatalogItemList = z.object({
+  items: z.array(SavedCatalogItem),
+  tombstones: z.array(SavedCatalogTombstone).default([]),
+  shared: z.array(SavedCatalogItem).default([]),
+});
+export type SavedCatalogItemList = z.infer<typeof SavedCatalogItemList>;
+
+/** Legacy collection-only shape retained for older local code and migration readers. */
 export const SavedCollectionList = z.object({ items: z.array(SavedCollection), shared: z.array(SavedCollection).default([]) });
 export type SavedCollectionList = z.infer<typeof SavedCollectionList>;
 
@@ -463,6 +532,8 @@ export type CatalogEnrichment = z.infer<typeof CatalogEnrichment>;
 export const CatalogSettingsView = z.object({
   /** Write synced or plain lyrics (LRCLIB) into a catalog download's tags. Default on. */
   embedLyrics: z.boolean(),
+  /** After starring a catalog item, ask for a rights basis before queuing its audio. Default off. */
+  autoDownloadStars: z.boolean(),
   providers: z.record(CatalogProviderId, z.boolean()),
   /** SongLink closed keyless access in 2026; with a key it adds Tidal, Qobuz and Amazon links. */
   odesliKeyConfigured: z.boolean(),
@@ -470,6 +541,7 @@ export const CatalogSettingsView = z.object({
 export type CatalogSettingsView = z.infer<typeof CatalogSettingsView>;
 export const CatalogSettingsInput = z.object({
   embedLyrics: z.boolean().optional(),
+  autoDownloadStars: z.boolean().optional(),
   providers: z.partialRecord(CatalogProviderId, z.boolean()).optional(),
   /** Write-only. Empty string clears it. */
   odesliKey: z.string().max(200).optional(),

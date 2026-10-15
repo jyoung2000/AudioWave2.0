@@ -16,6 +16,7 @@ import {
   type CatalogSourceStatus,
   type CatalogTrack,
   type SavedCollection,
+  type SavedTrack,
 } from '@now-playing/contracts';
 import { creditLine } from '@now-playing/domain/catalog';
 import { webUrl } from './client.js';
@@ -305,6 +306,35 @@ export function savedRowHTML(s: SavedCollection, i: number): string {
       '</span><span class="srch__open">Open in Music</span><span class="srch__go" aria-hidden="true">›</span>',
     `${s.ref.title}, in your library. ${words}. Opens in the music list`,
   );
+}
+
+/** A shared starred song: metadata and source links only; the star never implies an audio download. */
+export function savedTrackRowHTML(saved: SavedTrack, i: number): string {
+  const t = saved.track;
+  const facts = [
+    t.artist,
+    t.album,
+    t.year ?? (t.releaseDate ? t.releaseDate.slice(0, 4) : null),
+    t.durationMs ? fmtTime(t.durationMs / 1000) : null,
+  ].filter(Boolean).join(' · ');
+  const unstar = `<button class="srch__add" type="button" data-unsave="${i}" tabindex="-1" aria-label="Unstar ${esc(t.title)}">★</button>`;
+  return opt(
+    i,
+    ' srch__row--saved srch__row--track-saved',
+    `<span class="srch__art" aria-hidden="true">${img(t.artworkUrl)}${NOTE}</span>` +
+      '<span class="srch__meta">' +
+      `<span class="srch__line"><span class="srch__title">${esc(t.title)}</span>${explicitHTML(t)}${badgesHTML(t.sources)}</span>` +
+      `<span class="srch__sub">${esc(facts || 'Starred song')}</span>` +
+      '</span>' +
+      `<span class="srch__links">${unstar}</span>`,
+    `${t.title}, ${facts || 'song'}, starred. Metadata and links only; does not download audio.`,
+  );
+}
+
+/** A compact link from the overview to the complete shared star list. */
+export function savedMoreRowHTML(count: number, i: number): string {
+  const label = `See all ${count} starred songs`;
+  return opt(i, ' srch__more', `<span class="srch__morelabel">${esc(label)}</span><span class="srch__go" aria-hidden="true">›</span>`, `${label}: open the shared song stars`);
 }
 
 /** A 2×2 mosaic of the first four songs' covers; the list's own cover when fewer than four have one. */

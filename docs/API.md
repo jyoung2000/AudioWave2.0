@@ -31,7 +31,7 @@ The hub API is generated from `packages/contracts/src/api/routes.ts`. The commit
 | Live TV | `getLiveTv` GET /live-tv · `putLiveTv` PUT /live-tv · `deleteLiveTv` DELETE /live-tv · `getLiveTvSummary` GET /live-tv/summary |
 | Shares | `createShare` · `listShareSources` GET /shares/sources · `listShares` · `revokeShare` · `resolveShare` · `streamShared` · `sharePage` |
 | Playlists (DEC-041) | `listFolderPlaylists` GET /playlists · `createFolderPlaylist` POST /playlists · `getFolderPlaylist` GET /playlists/:playlistId · `updateFolderPlaylist` PATCH /playlists/:playlistId · `deleteFolderPlaylist` DELETE /playlists/:playlistId · `addFolderPlaylistEntries` POST /playlists/:playlistId/entries · `removeFolderPlaylistEntries` POST /playlists/:playlistId/entries/remove · `moveFolderPlaylistEntry` POST /playlists/:playlistId/entries/move · `exportFolderPlaylist` GET /playlists/:playlistId/export · `getPlaylistFolder`/`putPlaylistFolder` /playlists/folder |
-| Starred collections | `listSavedCollections` GET /catalog/saved · `saveCollection` PUT /catalog/saved · `unsaveCollection` DELETE /catalog/saved |
+| Shared catalog stars | `listSavedCatalogItems` GET /catalog/saved · `saveCatalogItem` PUT /catalog/saved · `unsaveCatalogItem` DELETE /catalog/saved · `preflightCatalogDownloadBatch` POST /catalog/download/preflight |
 
 ### Profiles
 Device-only, scopes `profile:read` / `profile:write`; nothing is anonymous and the first-run gate applies. A profile belongs to the HubUser behind the credential.
@@ -75,8 +75,12 @@ Who may: an admin session, everything. A device needs **`playlists:use`**: it re
 
 **For a player filing into hub playlists:** `GET /api/v1/playlists?catalogId=<CatalogTrack.id>&isrc=<isrc>` for the submenu (ticks), `POST /api/v1/playlists/:playlistId/entries` with `{ tracks: [catalogTrack] }` to file, `POST /api/v1/playlists` with `{ name, tracks: [catalogTrack] }` for New Playlist…, and `GET /api/v1/playlists/:playlistId` to read one; a `library` entry streams through `POST /library/stream-urls` with its `trackId`.
 
-### Starred collections for devices
-`GET /catalog/saved` → `{ items: SavedCollection[], shared: SavedCollection[] }`: an admin gets its own starred lists (`shared` empty); a device with **`library:sync`** gets its own as `items` and the admin's as `shared` (read-only). `PUT /catalog/saved` (a `SavedCollection`) stars into the caller's own; `DELETE /catalog/saved?platform=&kind=&id=` un-stars the caller's own; both answer the same shape. A player syncing stars reads `GET`, then `PUT`/`DELETE` its changes.
+### Shared catalog stars and star-triggered downloads
+`GET /catalog/saved` returns `SavedCatalogItemList`: `{ items: (SavedTrack | SavedCollection)[], tombstones: { key, at }[], shared: [] }`. The admin and each paired device with **`library:sync`** read and edit the same Hub-backed set; it is not a private per-device set plus a read-only admin shelf. `shared` is retained empty for older clients. `SavedTrack` is a bounded metadata snapshot (recording identity, title, artists, album, duration, identifiers, artwork and source links); `SavedCollection` stores its catalog reference, cover metadata and track count. Neither shape has audio bytes or filesystem paths.
+
+`PUT /catalog/saved` accepts one `SavedTrack` or `SavedCollection`. `DELETE /catalog/saved` accepts a track reference (`kind=track&identityKey=…`) or collection reference (`kind=album|playlist&platform=…&id=…`); `at` may carry the client's deletion timestamp. Both return the current list. Timestamped tombstones let offline clients reconcile deletions without restoring an older star. The Hub caps the set at 2,000 items.
+
+`GET`/`PUT /catalog/settings` are admin-only; `autoDownloadStars` defaults to `false`. When the preference is enabled, a Hub or Companion star action may offer a separate rights-basis confirmation. A song is checked on its own; an album or playlist is resolved and preflighted as a batch before any jobs are queued. `POST /catalog/download/preflight` checks every chosen source against that basis. Cancel or a failed preflight leaves the star but queues no audio. The PWA's star sync itself moves metadata only and never queues audio. See [DOWNLOADS_AND_LEGAL.md](DOWNLOADS_AND_LEGAL.md#automatic-download-prompts-after-starring).
 
 ### Live TV kept on the hub
 A paired companion keeps a copy of its Live TV on the hub, so players that cannot reach the companion's loopback helper get the same channels. Contract: `HubLiveTv = { channels: HubLiveTvChannel[], guide: HelperTvGuideEntry[], updatedAt: string | null, sourceDevice: { deviceId, name } | null }`, where `HubLiveTvChannel` is `HelperTvChannel` with `url` and `logo` held to http(s) links with no user name or password.

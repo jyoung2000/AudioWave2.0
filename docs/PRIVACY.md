@@ -7,6 +7,7 @@ Airwave is local-first. This page states what is stored where, what is shared, a
 | Data | Default location | Leaves the device? |
 |---|---|---|
 | Library index (titles, artists, albums, durations, content hashes), artwork thumbnails | Player: IndexedDB `now-playing-*`; Companion: SQLite in `%APPDATA%\now-playing-companion`; Hub: `/data/hub.sqlite` | Only through explicit sync/sharing scopes you grant a paired device |
+| Saved catalog stars (song/collection metadata, provider IDs, artwork/source link strings) | Player: IndexedDB; Companion: local store; Hub: `/data/hub.sqlite` | Shared with the Hub and paired devices that have `library:sync`; no audio bytes or local file paths |
 | Directory handles / file paths | Player: IndexedDB (serialized handles); Companion: local SQLite | Never. Other devices only see opaque locator ids |
 | Solo queue, Solo history | Player local storage | Never copied into a Group session or to friends |
 | Listening events (append-only) | Player local; Companion local; Hub only when the `history:events` scope is granted for hub-side personalisation | Only with explicit scope |
@@ -31,7 +32,7 @@ A profile — username, picture and the playlists its owner chose to share — i
 - Listening history retention window is user-configurable (default 365 days; events older than the window are compacted into aggregates and deleted).
 - "Export my data" produces JSON (events, playlists, presets, profile) from the player; the hub exports groups/history/playlists without secrets.
 - "Delete listening history", "Reset metrics", "Forget hub", and "Revoke device" are immediate and local; the hub removes the device's credentials, shared aggregates and (if requested) ingested events.
-- Tombstones for synced records are kept 30 days for convergence, then compacted.
+- Library-sync tombstones are kept 30 days for convergence, then compacted. Saved catalog un-star markers remain on the Hub so an offline device cannot resurrect an older star.
 
 ## Telemetry
 None is sent to the developer. Provider APIs receive only the requests needed for the feature you use (search terms, ids, OAuth flows) under their own privacy policies, which the About page links to.

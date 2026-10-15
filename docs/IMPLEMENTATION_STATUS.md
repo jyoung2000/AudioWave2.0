@@ -34,6 +34,7 @@ and reports platform-unavailable ones as skipped, never as passed.
 | Installable, offline, Media Session | **Done** | See [PWA_AND_CAR.md](PWA_AND_CAR.md) for what a PWA cannot do in a car |
 | A single-file build you open with no server | **Done** | Committed as `now-playing.html` at the repository root — 2.1 MB, nothing to build; a gate fails if it drifts from the source. [LOCAL_FILE.md](LOCAL_FILE.md) records what a `file://` origin allows, measured rather than assumed |
 | Hub client: pairing, search, shares, sync | **Done** |  |
+| Shared catalog stars for songs, albums and playlists | **Done** | One metadata-only Hub set, offline conflict merging and durable delete markers; paired devices need `library:sync` |
 | Shared listening: create or join a group, follow its queue over the realtime socket, propose changes | **Done** | The hub always had the group API; the player now uses it. Revisioned, idempotent commands — a refused skip is shown, not swallowed |
 | The 2010 page shell: status bar, section strip, hero, iTunes 10 list, dark scheme | **Done** | [UI_REDESIGN.md](UI_REDESIGN.md) maps every feature from the old window shell, and §6 records where each one is now |
 | A four-entry strip in solo — Music Library, Queue, Playlists, Listening history | **Done** | Shared mode adds Now playing and Constellation and drops them again on the way out; nothing became unreachable |
@@ -105,6 +106,7 @@ and reports platform-unavailable ones as skipped, never as passed.
 | Provider adapters: MusicBrainz, YouTube, SoundCloud, Spotify, Bandcamp, local, fixture, external tool | **Done** | Capability-driven; see [PROVIDER_CAPABILITIES.md](PROVIDER_CAPABILITIES.md) |
 | Discovery engine: canonical tracks, per-user OAuth, taste profile, job queue, rate-limit manager, seven modes | **Done** | End-to-end test through the API; incremental sync fixed (it had been re-importing everything on every run) |
 | Downloads, conversion with FFmpeg | **Done** | Capability reported; no FFmpeg means byte-for-byte copies only, and the API says so |
+| Shared catalog stars and opt-in downloads after starring | **Done** | One bounded metadata-only set; explicit rights confirmation and per-source preflight before any queue jobs |
 | Metrics, diagnostics, backup, releases | **Done** |  |
 | Admin GUI | **Done** | 13 views, error boundary per panel so one failure cannot blank the shell |
 | Discord bot, slash and prefix parity | **Done** | One command service; a test runs every command through both transports |
@@ -119,6 +121,7 @@ and reports platform-unavailable ones as skipped, never as passed.
 | Folder watching, indexing, quick and full hashing | **Done** | A chokidar watcher per enabled root, debounced 2 s, then the same incremental scan the Scan button runs; rescan skips unchanged files by size and mtime; deletions become tombstones |
 | Full-text search | **Done** | An FTS5 defect meant _nothing_ was ever indexed; found by the first test written against it |
 | Hub pairing, sync, chunked transfers | **Done** | Integration tests run the real client against the real hub |
+| Shared catalog stars and optional star-triggered downloads | **Done** | Metadata sync only; rights are confirmed per song or collection batch, and the local helper refuses unverified SoundCloud URLs |
 | Path containment | **Done** | Segment-wise; a `startsWith` check had accepted `C:\MusicSecret` as inside `C:\Music` |
 | Backup and playlist export | **Done** | Playlists, presets and folder _names_ — not music, not paths |
 | Electron hardening | **Done** | Context isolation, sandbox, CSP, navigation pinning, permissions denied, 26-channel allowlist |

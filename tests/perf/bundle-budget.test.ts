@@ -86,8 +86,13 @@ const BUNDLES: Bundle[] = [
      * entry imports now carries packages/contracts/src/api/playlist-folder.ts — the summary, entry,
      * page, folder and sidecar schemas a player will use to file into hub playlists — measured, 4.7 KB
      * minified (esbuild, zod external). The route table's new entries are not in the entry.
+     *
+     * And to 267 for the shared catalog stars (UX-SEARCH-013, 2026-10-15): the offline-first player
+     * validates the metadata-only saved set and its tombstones at startup so it can reconcile while
+     * offline — measured, about 4 KB in the first load. The media, catalog-search and download code
+     * remain split; this increase is the schemas and reconciliation path only.
      */
-    entryBudgetKb: 263,
+    entryBudgetKb: 267,
     /*
      * The total rose from 1600 to 1900 when the hero gained the reference's jewel case.
      *
@@ -230,8 +235,12 @@ const BUNDLES: Bundle[] = [
      * shell's HTML the "On this player" / "On <hub>" groups, the bar's "…", the library menu's hub
      * levels and the sync hooks (now 954,215 bytes, 6 KB more) — measured, 2635 KB in all. The entry
      * is unchanged.
+     *
+     * And to 2653 for shared metadata-only stars (UX-SEARCH-013, 2026-10-15): the saved set's local
+     * merge, durable delete markers and the PWA/companion star actions — measured, 3 KB more than
+     * the previous total. The entry stays at 267 KB; the full catalog remains on its lazy route.
      */
-    totalBudgetKb: 2650,
+    totalBudgetKb: 2653,
     // Three.js belongs to the constellation and the jewel case; the tag reader only to a scan.
     mustBeSplit: ['three', 'music-metadata'],
   },
@@ -250,7 +259,9 @@ const BUNDLES: Bundle[] = [
     // a second lazy chunk (14KB, with a 4KB client shared with Search), and the catalog code both
     // share moved out of the entry into a shared lazy chunk (231KB), so the entry fell to 336KB
     // (index JS 304KB, CSS 31KB, HTML 1KB); Search grew by under 1KB. The total moves to 615KB.
-    totalBudgetKb: 615,
+    // Measured 2026-10-15 (UX-SEARCH-013): 625KB total (+10KB) for the shared stars, tombstones and
+    // explicit download-rights flow. The 336KB entry is unchanged; the catalog remains lazy.
+    totalBudgetKb: 625,
     mustBeSplit: [],
   },
 ];

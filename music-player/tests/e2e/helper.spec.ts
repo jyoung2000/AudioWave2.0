@@ -66,7 +66,7 @@ test.beforeAll(async () => {
   const stub = writeStub(scratch);
   helper = spawn(
     process.execPath,
-    [join(REPO, 'local-helper/dist/now-playing-helper.mjs'), '--no-open', '--port', String(PORT), '--app', join(REPO, 'music-player/dist'), '--yt-dlp', stub, '--work-dir', join(scratch, 'work'), '--tools-dir', join(scratch, 'tools'), '--no-auto-tools'],
+    [join(REPO, 'local-helper/dist/now-playing-helper.mjs'), '--no-open', '--port', String(PORT), '--app', join(REPO, 'now-playing.html'), '--yt-dlp', stub, '--work-dir', join(scratch, 'work'), '--tools-dir', join(scratch, 'tools'), '--no-auto-tools'],
     { stdio: 'ignore' },
   );
   for (let attempt = 0; attempt < 100; attempt += 1) {
@@ -122,6 +122,17 @@ test('fetching a link puts a real track in the library, and it plays from this d
   await expect.poll(() => page.evaluate(() => window.LIBRARY!.filter((s) => s.local).length), { timeout: 10_000 }).toBe(1);
   expect(await page.evaluate(() => window.LIBRARY!.some((s) => s.title === 'A Link'))).toBe(false);
   await expect.poll(() => page.evaluate(() => window.NP_PLAYER!.playing()), { timeout: 10_000 }).toBe(true);
+});
+
+test('the PC helper does not offer creator-enabled permission for generic search results', async ({ page }) => {
+  await page.evaluate(() => document.dispatchEvent(new CustomEvent('library:add', { detail: { title: 'A Link', artist: 'Someone', url: 'https://www.youtube.com/watch?v=test', platform: 'YouTube' } })));
+  await page.click('#download');
+  const sheet = page.locator('#npFetch');
+  await expect(sheet).toBeVisible();
+  await expect(sheet.locator('#npFetchState')).toContainText('Using');
+  await expect(sheet.getByText(/Search results are not download permission/i)).toBeVisible();
+  await expect(sheet.locator('input[name="npBasis"][value="creator-download"]')).toBeHidden();
+  await page.click('#npFetchCancel');
 });
 
 test('a link the helper will not fetch from is refused, with the reason', async ({ page }) => {

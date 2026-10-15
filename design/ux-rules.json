@@ -3427,7 +3427,7 @@
         {
           "type": "test",
           "path": "docker-container/tests/integration/catalog.test.ts",
-          "name": "keeps a starred list in the admin’s library, in the shared SavedCollection shape, and un-stars it"
+          "name": "shows one shared, editable set to admin and paired clients, and applies timestamped tombstones"
         },
         {
           "type": "test",
@@ -3667,7 +3667,7 @@
       "id": "UX-SEARCH-012",
       "group": "search",
       "title": "A song from search goes to Up Next, a playlist or the library through the row’s menu",
-      "contract": "The owner’s words (2026-10-07): “ensure the user can add songs from search to their Now Playing queue, playlist, or music library.” Every song row — the overview, a type’s page, an album’s, a playlist’s or an artist’s songs — has a “…” at its end; a right-click, or Shift+F10 or the Menu key on the highlighted row, opens the same menu: the window kit’s contextual menu (`.menu` in airwave-window.css), keyboard-operable (the arrows, Home and End, Right and Left for a submenu, Enter and Space, Escape back to the list, Tab or a click away closes it; on a touch screen its commands are 44px tall). It offers Add to Up Next, Add to Playlist ▸, Add to Library…, Download…, Audition (Stop Audition while it plays; disabled, saying why, without a clip) and Open Details. Add to Up Next is a group’s queue — on the hub, `POST /api/v1/groups/:id/requests` with the song’s best fetchable link (YouTube Music, YouTube, SoundCloud, Bandcamp, spotDL), a submenu when there are several active groups; the companion has no queue of its own, so the paired hub’s groups it is in (`hub:groups`, `hub:request`), or a sentence saying queueing needs a group (no hub, no permission to join groups, not in one). A song only a store has says there is nothing to queue or fetch. Add to Library… is a download with a stated rights basis — on the hub into its download queue (`POST /api/v1/catalog/download`, Music ▸ Downloads, what the hub’s library is made of), on the companion through the helper’s own path into this PC’s library. Add to Playlist ▸ writes (amended 2026-10-10, DEC-041): each app keeps a playlist folder, so the submenu lists its playlists, ticked where the song is already, and New Playlist…; filing keeps the song’s link, and “Also add to Library”, on by default, queues the download too (UX-PL-005, CMP-PL-004). The hub’s players’ shared copies stay read-only, shown apart. Download… is the same with a choice of format. Every action confirms in the window’s status line, which is a live region.",
+      "contract": "The owner’s words (2026-10-07): “ensure the user can add songs from search to their Now Playing queue, playlist, or music library.” Every song row — the overview, a type’s page, an album’s, a playlist’s or an artist’s songs — has a “…” at its end; a right-click, or Shift+F10 or the Menu key on the highlighted row, opens the same menu: the window kit’s contextual menu (`.menu` in airwave-window.css), keyboard-operable (the arrows, Home and End, Right and Left for a submenu, Enter and Space, Escape back to the list, Tab or a click away closes it; on a touch screen its commands are 44px tall). It offers Add to Up Next, Add to Playlist ▸, Star/Unstar in the shared saved list, Add to Library…, Download…, Audition (Stop Audition while it plays; disabled, saying why, without a clip) and Open Details. Add to Up Next is a group’s queue — on the hub, `POST /api/v1/groups/:id/requests` with the song’s best fetchable link (YouTube Music, YouTube, SoundCloud, Bandcamp, spotDL), a submenu when there are several active groups; the companion has no queue of its own, so the paired hub’s groups it is in (`hub:groups`, `hub:request`), or a sentence saying queueing needs a group (no hub, no permission to join groups, not in one). A song only a store has says there is nothing to queue or fetch. Add to Library… is a download with a stated rights basis — on the hub into its download queue (`POST /api/v1/catalog/download`, Music ▸ Downloads, what the hub’s library is made of), on the companion through the helper’s own path into this PC’s library. Add to Playlist ▸ writes (amended 2026-10-10, DEC-041): each app keeps a playlist folder, so the submenu lists its playlists, ticked where the song is already, and New Playlist…; filing keeps the song’s link, and “Also add to Library”, on by default, queues the download too (UX-PL-005, CMP-PL-004). The hub’s players’ shared copies stay read-only, shown apart. Download… is the same with a choice of format. Every action confirms in the window’s status line, which is a live region.",
       "example": "Hub: “Harbour Lights” ▸ … ▸ Add to Up Next ▸ Studio → POST /groups/…/requests {query: https://music.youtube.com/watch?v=…} → “Up Next in Studio: “Harbour Lights”, number 3.” Companion with no hub: “Queueing needs a group on a hub: this companion has no queue of its own. Pair a hub under Remote first.”",
       "authority": "adopted",
       "owners": [
@@ -3689,7 +3689,7 @@
         {
           "type": "test",
           "path": "docker-container/tests/dom/search.dom.test.tsx",
-          "name": "“…” opens it; Add to Up Next ▸ a group queues the song’s fetchable source through the group’s requests, and says so"
+          "name": "“…” opens it with Star/Unstar; Add to Up Next ▸ a group queues the song’s fetchable source through the group’s requests, and says so"
         },
         {
           "type": "test",
@@ -3752,6 +3752,75 @@
           "name": "Add to Playlist ▸ lists this PC’s playlists, ticked where the song is, and files it — with the library too, by default (CMP-PL-004)"
         }
       ]
+    },
+    {
+      "id": "UX-SEARCH-013",
+      "group": "search",
+      "title": "Star-triggered downloads are opt-in, rights-gated and collection-wide",
+      "contract": "Automatic downloads are off by default in the hub and Companion. Starring does not copy audio: the PWA, hub and Companion share only track/collection metadata and public links. When auto-download is enabled, a song gets one separate explicit rights-basis confirmation; an album or playlist gets one confirmation covering every resolved item. Search results are not permission. Before creating any hub queue items, the hub checks every chosen source against the declared basis; cancellation or failed preflight leaves the star but queues no audio. The creator-enabled basis is SoundCloud-only and is verified by SoundCloud’s downloadable/downloads-left metadata; generic yt-dlp/spotDL links, including YouTube, cannot claim it. The local PC helper cannot verify SoundCloud’s flag, so it refuses SoundCloud URLs and excludes them from its download source selection.",
+      "authority": "adopted",
+      "owners": [
+        "packages/domain/src/catalog/auto-download.ts",
+        "docker-container/src/web/views/Search.tsx",
+        "docker-container/src/catalog/service.ts",
+        "docker-container/src/downloads/service.ts",
+        "docker-container/src/providers/adapters/soundcloud.ts",
+        "docker-container/src/providers/adapters/external-tool.ts",
+        "windows-companion/src/renderer/views/Search.tsx",
+        "windows-companion/src/main/catalog.ts",
+        "local-helper/src/server.ts",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/components/FetchSheet.tsx",
+        "music-player/src/shell/search/hub-shelf.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-auto-download.test.ts",
+          "name": "checks every source against the declared rights basis before queuing any track"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "keeps auto-download opt-in off: starring a song saves it without a rights prompt or audio job"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "queues every playlist song after one collection-wide rights confirmation"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/integration/catalog.test.ts",
+          "name": "preflights every collection source before queueing and refuses a generic YouTube creator-download claim"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/unit/soundcloud-download-authorization.test.ts",
+          "name": "refuses when the creator did not enable downloads or no download remains"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/unit/soundcloud-download-authorization.test.ts",
+          "name": "allows only a numeric track ID with an enabled download and a SoundCloud-compatible basis"
+        },
+        {
+          "type": "test",
+          "path": "local-helper/tests/integration/helper-server.test.ts",
+          "name": "refuses generic creator-download claims and SoundCloud streams without provider verification"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-search.dom.test.tsx",
+          "name": "asks once for the whole playlist and resolves every song before queuing"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/helper.spec.ts",
+          "name": "the PC helper does not offer creator-enabled permission for generic search results"
+        }
+      ],
+      "example": "Hub: a playlist with six rights-eligible tracks gets one confirmation; the Hub authorizes all six sources before creating six jobs. If any preflight is refused or the user cancels, the star remains and zero jobs are created. A SoundCloud creator-download basis is checked against the creator’s downloadable flag; the PC helper refuses it rather than guessing."
     },
     {
       "id": "NP-DISC-001",
@@ -4331,25 +4400,32 @@
     {
       "id": "UX-PL-008",
       "group": "playlists",
-      "title": "A device syncs its starred albums and playlists with the hub through library:sync",
-      "contract": "`/api/v1/catalog/saved` answers the admin (its own starred lists) and a device with `library:sync`: the device’s own (read and written, kept apart from every other device’s) and the admin’s as `shared`, read-only. A device never writes or removes anyone else’s.",
-      "example": "GET /api/v1/catalog/saved (device) → {items: [its own], shared: [the admin’s]}.",
+      "title": "Paired devices share one metadata-only catalog-star set through library:sync",
+      "contract": "`/api/v1/catalog/saved` is one metadata-only set (at most 2,000 active entries) for the admin and paired devices with `library:sync`. Every authorized client can add and remove song/collection stars; newer timestamps win, and durable tombstones stop an offline star from restoring an un-starred item. Provider and collection links are HTTP(S); artwork is HTTP(S) or a small inline image. No local paths or audio bytes are stored.",
+      "example": "Device A stars a song; device B sees the same metadata-only entry. When B un-stars it offline, the Hub keeps the tombstone and A cannot restore its older copy.",
       "authority": "adopted",
       "owners": [
         "docker-container/src/api/routes/catalog.ts",
-        "docker-container/src/db/repositories/saved-collections.ts",
+        "docker-container/src/db/repositories/saved-catalog.ts",
+        "music-player/src/shell/search/hub-shelf.ts",
+        "packages/domain/src/catalog/saved-sync.ts",
         "packages/contracts/src/api/routes.ts"
       ],
       "evidence": [
         {
           "type": "test",
           "path": "docker-container/tests/security/playlist-folder.test.ts",
-          "name": "needs library:sync, keeps each device’s own, and shows the admin’s as shared, read-only"
+          "name": "needs library:sync and lets every paired client edit the same shared set"
         },
         {
           "type": "test",
           "path": "docker-container/tests/integration/catalog.test.ts",
           "name": "needs the admin or a device with library:sync (DEC-041), never an anonymous caller, and a change needs the CSRF token"
+        },
+        {
+          "type": "test",
+          "path": "packages/contracts/tests/shared-saved-catalog.test.ts",
+          "name": "rejects filesystem URLs and oversized provider-ID arrays from shared metadata"
         }
       ]
     },

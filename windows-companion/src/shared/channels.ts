@@ -90,6 +90,7 @@ export const IPC_CHANNELS = [
   'catalog:lyrics',
   'catalog:enrich',
   'catalog:download',
+  'catalog:download-batch',
   'catalog:saved',
   'catalog:save',
   'catalog:unsave',

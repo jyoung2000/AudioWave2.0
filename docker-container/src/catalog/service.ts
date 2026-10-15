@@ -6,7 +6,7 @@
  * Nothing new reaches the network except through `SafeHttpClient` with `CATALOG_API_HOSTS`, and
  * nothing new runs a process except through the external tool adapter's existing slots.
  */
-import { CATALOG_API_HOSTS, CATALOG_COLLECTION_CAP, CATALOG_PROVIDERS, type CatalogProviderId, type CatalogSettingsInput, type CatalogSettingsView, type CatalogSource, type CatalogTrack, type DownloadJob, type DownloadTags } from '@now-playing/contracts';
+import { CATALOG_API_HOSTS, CATALOG_COLLECTION_CAP, CATALOG_PROVIDERS, type CatalogProviderId, type CatalogSettingsInput, type CatalogSettingsView, type CatalogSource, type CatalogTrack, type DownloadAuthorizationBasis, type DownloadJob, type DownloadSource, type DownloadTags } from '@now-playing/contracts';
 import { DomainError } from '@now-playing/domain';
 import { CatalogEngine, LinkReadError, normaliseIsrc, type CatalogFetch, type LinkRead, type LinkTrack } from '@now-playing/domain/catalog';
 import type { Logger } from 'pino';
@@ -24,6 +24,7 @@ const ODESLI_AAD = 'catalog.odesli';
 
 interface StoredSettings {
   embedLyrics?: boolean;
+  autoDownloadStars?: boolean;
   providers?: Partial<Record<CatalogProviderId, boolean>>;
   odesliKeySealed?: string | null;
 }
@@ -132,13 +133,14 @@ export class HubCatalogService {
   settingsView(): CatalogSettingsView {
     const stored = this.stored();
     const providers = Object.fromEntries(CATALOG_PROVIDERS.map((id) => [id, stored.providers?.[id] !== false])) as Record<CatalogProviderId, boolean>;
-    return { embedLyrics: stored.embedLyrics !== false, providers, odesliKeyConfigured: Boolean(stored.odesliKeySealed) };
+    return { embedLyrics: stored.embedLyrics !== false, autoDownloadStars: stored.autoDownloadStars === true, providers, odesliKeyConfigured: Boolean(stored.odesliKeySealed) };
   }
 
   putSettings(input: CatalogSettingsInput): CatalogSettingsView {
     const stored = this.stored();
     const next: StoredSettings = { ...stored };
     if (input.embedLyrics !== undefined) next.embedLyrics = input.embedLyrics;
+    if (input.autoDownloadStars !== undefined) next.autoDownloadStars = input.autoDownloadStars;
     if (input.providers) next.providers = { ...(stored.providers ?? {}), ...input.providers };
     if (input.odesliKey !== undefined) next.odesliKeySealed = input.odesliKey.trim() ? this.deps.sealer.seal(input.odesliKey.trim(), ODESLI_AAD) : null;
     this.deps.settings.set(CATALOG_SETTINGS_KEY, next, new Date(this.deps.clock.now()).toISOString());
@@ -183,18 +185,55 @@ export class HubCatalogService {
     return { tags, embedded: { isrc: Boolean(tags.isrc), genre: Boolean(tags.genre), label: Boolean(tags.label), year: Boolean(tags.date), lyrics: Boolean(tags.lyrics) } };
   }
 
-  /** A catalog song through the download queue, from its best downloadable source. */
+  /** Check a complete collection's selected sources against provider permission without queue side effects. */
+  async preflightDownloadBatch(input: { items: Array<{ track: CatalogTrack; source: CatalogSource }>; basis: DownloadAuthorizationBasis; ownerId: string }): Promise<{ authorized: true; checked: number }> {
+    const checked = await Promise.all(input.items.map(async ({ track, source }) => {
+      const belongs = track.sources.some((candidate) => candidate.platform === source.platform && candidate.id === source.id && candidate.url === source.url);
+      const downloadSource = belongs ? this.downloadSource(track, source) : null;
+      if (!downloadSource || (input.basis === 'creator-download' && source.platform !== 'soundcloud')) return track.title;
+      try {
+        return await this.deps.downloads.canAuthorize(downloadSource, input.basis, input.ownerId) ? null : track.title;
+      } catch {
+        return track.title;
+      }
+    }));
+    const blocked = [...new Set(checked.filter((title): title is string => title !== null))];
+    if (blocked.length) throw new DomainError('forbidden', `No audio was queued. These items have no source authorized by this rights basis: ${blocked.join(', ')}.`);
+    return { authorized: true, checked: input.items.length };
+  }
+
+  private downloadSource(track: CatalogTrack, source: CatalogSource): DownloadSource | null {
+    const soundcloud = source.platform === 'soundcloud';
+    if (soundcloud && (!source.id || !/^\d+$/.test(source.id))) return null;
+    return {
+      provider: soundcloud ? 'soundcloud' : 'external-tool',
+      providerTrackId: soundcloud ? source.id : null,
+      url: source.url,
+      locator: null,
+      title: track.title,
+      artistName: track.artists[0] ?? track.artist,
+      tags: null,
+    };
+  }
+
+  /** A catalog song through the download queue, after checking the selected provider's permission. */
   async download(
-    input: { track: CatalogTrack; authorization: CreateDownloadInput['authorization']; target: CreateDownloadInput['target']; ownerId: string },
+    input: { track: CatalogTrack; source?: CatalogSource; authorization: CreateDownloadInput['authorization']; target: CreateDownloadInput['target']; ownerId: string },
     meta: { ip: string | null; correlationId: string | null },
     actorDisplayName: string,
   ): Promise<{ job: DownloadJob; source: CatalogSource; embedded: { isrc: boolean; genre: boolean; label: boolean; year: boolean; lyrics: boolean } }> {
-    const source = await this.engine.findDownloadSource(input.track);
-    if (!source) throw new DomainError('not-found', `“${input.track.title}” is in a store, but nowhere this hub can download from (YouTube Music, YouTube, SoundCloud, Bandcamp or Spotify through spotDL).`);
+    const creatorSource = input.track.sources.find((candidate) => candidate.platform === 'soundcloud' && Boolean(candidate.id && /^\d+$/.test(candidate.id)));
+    const source = input.source ?? (input.authorization.basis === 'creator-download' ? creatorSource ?? null : await this.engine.findDownloadSource(input.track));
+    if (!source) throw new DomainError('not-found', input.authorization.basis === 'creator-download' ? `“${input.track.title}” has no SoundCloud source with a verifiable creator-enabled download.` : `“${input.track.title}” is in a store, but nowhere this hub can download from (YouTube Music, YouTube, SoundCloud, Bandcamp or Spotify through spotDL).`);
+    const belongs = input.track.sources.some((candidate) => candidate.platform === source.platform && candidate.id === source.id && candidate.url === source.url);
+    if (input.source && !belongs) throw new DomainError('validation', 'The selected source is not part of this catalog track.');
+    if (input.authorization.basis === 'creator-download' && source.platform !== 'soundcloud') throw new DomainError('forbidden', 'Creator-enabled download permission is only checked for SoundCloud sources.');
+    const downloadSource = this.downloadSource(input.track, source);
+    if (!downloadSource) throw new DomainError('forbidden', 'This SoundCloud source has no verifiable track ID.');
     const { tags, embedded } = await this.tagsFor(input.track);
     const job = await this.deps.downloads.create(
       {
-        source: { provider: 'external-tool', providerTrackId: null, url: source.url, locator: null, title: tags.title, artistName: tags.artist, tags },
+        source: { ...downloadSource, title: tags.title, artistName: tags.artist, tags },
         authorization: input.authorization,
         target: input.target,
         ownerId: input.ownerId,

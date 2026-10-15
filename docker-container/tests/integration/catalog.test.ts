@@ -10,7 +10,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { CatalogAlbumDetail, CatalogResolveResult, CatalogSearchAggregate, CatalogSearchChunk, CatalogSettingsView, SavedCollection, type CatalogTrack, type DownloadJob } from '@now-playing/contracts';
+import { CatalogAlbumDetail, CatalogResolveResult, CatalogSearchAggregate, CatalogSearchChunk, CatalogSettingsView, SavedCatalogItem, type CatalogTrack, type DownloadJob } from '@now-playing/contracts';
 import type { CatalogFetch } from '@now-playing/domain/catalog';
 import { hubCatalogFetch } from '../../src/catalog/service.js';
 import { toolEnvironment, toolScratchDir } from '../../src/media/tool-env.js';
@@ -232,7 +232,7 @@ describe('catalog settings and downloads', () => {
     const headers = { cookie: admin.cookie, 'x-csrf-token': admin.csrfToken };
     expect((await get('/api/v1/catalog/settings')).statusCode).toBe(401);
     const before = CatalogSettingsView.parse((await hub.app.inject({ method: 'GET', url: '/api/v1/catalog/settings', headers })).json());
-    expect(before).toEqual({ embedLyrics: true, providers: { itunes: true, deezer: true, musicbrainz: true, youtube: true, soundcloud: true }, odesliKeyConfigured: false });
+    expect(before).toEqual({ autoDownloadStars: false, embedLyrics: true, providers: { itunes: true, deezer: true, musicbrainz: true, youtube: true, soundcloud: true }, odesliKeyConfigured: false });
     const put = await hub.app.inject({ method: 'PUT', url: '/api/v1/catalog/settings', headers, payload: { providers: { soundcloud: false }, odesliKey: 'secret-key-1' } });
     expect(put.statusCode).toBe(200);
     expect(put.body).not.toContain('secret-key-1');
@@ -277,6 +277,28 @@ describe('catalog settings and downloads', () => {
     expect(body.embedded).toEqual({ isrc: true, genre: true, label: true, year: true, lyrics: true });
   }, 30_000);
 
+  it('preflights every collection source before queueing and refuses a generic YouTube creator-download claim', async () => {
+    const track: CatalogTrack = {
+      id: 'youtube-music:creator-check', title: 'Creator Check', artist: 'Example', artists: ['Example'], album: null, albumArtist: null,
+      durationMs: 180_000, isrc: null, artworkUrl: null, releaseDate: null, year: null, trackNumber: null, discNumber: null,
+      bpm: null, explicit: null, genre: null, label: null,
+      sources: [{ platform: 'youtube-music', id: 'creator-check', url: 'https://music.youtube.com/watch?v=creator-check', previewUrl: null, matchedBy: 'search' }], rank: 0,
+    };
+    const before = hub.ctx.downloads.list().length;
+    const preflight = await hub.app.inject({
+      method: 'POST', url: '/api/v1/catalog/download/preflight', headers: { authorization: device.authorization },
+      payload: { items: [{ track, source: track.sources[0] }], authorization: { basis: 'creator-download', acknowledged: true } },
+    });
+    expect(preflight.statusCode, preflight.body).toBe(403);
+    expect(preflight.json().detail).toMatch(/No audio was queued/);
+    const direct = await hub.app.inject({
+      method: 'POST', url: '/api/v1/catalog/download', headers: { authorization: device.authorization },
+      payload: { track, source: track.sources[0], authorization: { basis: 'creator-download', acknowledged: true }, target: { destination: 'hub' } },
+    });
+    expect(direct.statusCode, direct.body).toBe(403);
+    expect(hub.ctx.downloads.list()).toHaveLength(before);
+  }, 30_000);
+
   it('refuses a song that is only in a store, in words', async () => {
     const track = { id: 'apple-music:1', title: 'Nowhere Else', artist: 'Store Only', artists: [], album: null, albumArtist: null, durationMs: null, isrc: null, artworkUrl: null, releaseDate: null, year: null, trackNumber: null, discNumber: null, bpm: null, explicit: null, genre: null, label: null, sources: [{ platform: 'apple-music', id: '1', url: 'https://music.apple.com/us/song/1', previewUrl: null, matchedBy: 'search' }], rank: 0 };
     const response = await hub.app.inject({ method: 'POST', url: '/api/v1/catalog/download', headers: { authorization: device.authorization }, payload: { track, authorization: { basis: 'user-owned', acknowledged: true }, target: { destination: 'hub' } } });
@@ -285,24 +307,48 @@ describe('catalog settings and downloads', () => {
   }, 30_000);
 });
 
-describe('starred albums and playlists (UX-SEARCH-005)', () => {
+describe('shared starred songs, albums and playlists (UX-SEARCH-005)', () => {
   const ref = { platform: 'deezer' as const, kind: 'playlist' as const, id: '908622995', url: 'https://www.deezer.com/playlist/908622995', title: 'Harbour Mix', owner: 'Airwave' };
   const saved = { ref, savedAt: '2026-10-06T12:00:00.000Z', artworkUrl: null, covers: ['https://cdn-images.dzcdn.net/images/cover/a/250x250.jpg'], trackCount: 42 };
+  const song = SavedCatalogItem.parse({
+    kind: 'track',
+    identityKey: 'isrc:GBAAA1900001',
+    savedAt: '2026-10-06T12:01:00.000Z',
+    track: { id: 'deezer:42', title: 'Harbour Lights', artist: 'North Quay', sources: [{ platform: 'deezer', id: '42', url: 'https://www.deezer.com/track/42', previewUrl: null }] },
+  });
 
-  it('keeps a starred list in the admin’s library, in the shared SavedCollection shape, and un-stars it', async () => {
+  it('shows one shared, editable set to admin and paired clients, and applies timestamped tombstones', async () => {
     const headers = { cookie: admin.cookie, 'x-csrf-token': admin.csrfToken };
-    expect((await hub.app.inject({ method: 'GET', url: '/api/v1/catalog/saved', headers })).json()).toEqual({ items: [], shared: [] });
+    const paired = await pairDevice(hub, admin, { scopes: ['library:sync'] });
+    const deviceHeaders = { authorization: paired.authorization };
+    expect((await hub.app.inject({ method: 'GET', url: '/api/v1/catalog/saved', headers })).json()).toEqual({ items: [], tombstones: [], shared: [] });
     const put = await hub.app.inject({ method: 'PUT', url: '/api/v1/catalog/saved', headers, payload: saved });
     expect(put.statusCode, put.body).toBe(200);
-    expect(put.json()).toEqual({ items: [saved], shared: [] });
-    // Starring it again refreshes it rather than adding a second.
-    const again = await hub.app.inject({ method: 'PUT', url: '/api/v1/catalog/saved', headers, payload: { ...saved, trackCount: 43 } });
-    expect((again.json() as { items: Array<{ trackCount: number }> }).items.map((i) => i.trackCount)).toEqual([43]);
-    const list = await hub.app.inject({ method: 'GET', url: '/api/v1/catalog/saved', headers });
-    expect(SavedCollection.array().parse((list.json() as { items: unknown[] }).items)).toHaveLength(1);
-    const removed = await hub.app.inject({ method: 'DELETE', url: '/api/v1/catalog/saved?platform=deezer&kind=playlist&id=908622995', headers });
+    expect(put.json()).toMatchObject({ items: [saved], tombstones: [], shared: [] });
+    expect((await hub.app.inject({ method: 'GET', url: '/api/v1/catalog/saved', headers: deviceHeaders })).json()).toMatchObject({ items: [saved] });
+
+    const songPut = await hub.app.inject({ method: 'PUT', url: '/api/v1/catalog/saved', headers: deviceHeaders, payload: song });
+    expect(songPut.statusCode, songPut.body).toBe(200);
+    const shared = await hub.app.inject({ method: 'GET', url: '/api/v1/catalog/saved', headers });
+    expect((shared.json() as { items: unknown[] }).items).toHaveLength(2);
+    expect(SavedCatalogItem.array().parse((shared.json() as { items: unknown[] }).items)).toHaveLength(2);
+
+    // A stale offline DELETE cannot erase a newer star; a current tombstone does, and remains visible to peers.
+    const stale = await hub.app.inject({ method: 'DELETE', url: '/api/v1/catalog/saved?platform=deezer&kind=playlist&id=908622995&at=2026-10-06T11%3A59%3A00.000Z', headers: deviceHeaders });
+    expect((stale.json() as { items: unknown[] }).items).toHaveLength(2);
+    const removed = await hub.app.inject({ method: 'DELETE', url: '/api/v1/catalog/saved?platform=deezer&kind=playlist&id=908622995&at=2026-10-06T12%3A05%3A00.000Z', headers: deviceHeaders });
     expect(removed.statusCode).toBe(200);
-    expect(removed.json()).toEqual({ items: [], shared: [] });
+    expect((removed.json() as { items: unknown[]; tombstones: unknown[] }).items).toHaveLength(1);
+    expect((removed.json() as { tombstones: unknown[] }).tombstones).toHaveLength(1);
+    const oldResave = await hub.app.inject({ method: 'PUT', url: '/api/v1/catalog/saved', headers, payload: saved });
+    expect((oldResave.json() as { items: unknown[] }).items).toHaveLength(1);
+    const tiedResave = await hub.app.inject({
+      method: 'PUT',
+      url: '/api/v1/catalog/saved',
+      headers,
+      payload: { ...saved, savedAt: '2026-10-06T12:05:00.000Z' },
+    });
+    expect((tiedResave.json() as { items: unknown[] }).items).toHaveLength(1);
   });
 
   it('needs the admin or a device with library:sync (DEC-041), never an anonymous caller, and a change needs the CSRF token', async () => {

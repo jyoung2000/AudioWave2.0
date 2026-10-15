@@ -325,6 +325,10 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
       const checked = checkFetchUrl(parsed.data.url, options.allowedHosts);
       if (!checked.ok || !checked.url) return fail(response, 400, 'url', checked.reason ?? 'That address is not one this helper will fetch from.');
 
+      const host = checked.url.hostname.toLowerCase().replace(/^www\./, '');
+      if (host === 'soundcloud.com' || host.endsWith('.soundcloud.com')) return fail(response, 403, 'rights', 'This PC helper cannot verify SoundCloud’s creator-enabled download flag. Use the Hub, which checks the track’s download permission; no audio was queued.');
+      if (parsed.data.authorization.basis === 'creator-download') return fail(response, 403, 'rights', 'Creator-enabled downloads are only verified by the Hub for SoundCloud. A generic video or stream URL is not permission; no audio was queued.');
+
       const tool = pickTool(parsed.data.tool, checked.url);
       // Only the tool being set up is off limits: its file is about to be replaced.
       if (tools.installing() === tool) return fail(response, 409, 'busy', `${tool} is being set up. Try again in a moment.`);

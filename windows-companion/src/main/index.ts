@@ -12,7 +12,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { writeFile, readFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { format as formatLine } from 'node:util';
-import { CONTRACTS_VERSION, EqPreset, Playlist, WS_PROTOCOL_VERSION, type HelperJob, type SavedCollection } from '@now-playing/contracts';
+import { CONTRACTS_VERSION, EqPreset, Playlist, WS_PROTOCOL_VERSION, type HelperJob, type SavedCatalogItem, type SavedCatalogItemRef } from '@now-playing/contracts';
 import { uuidv7 } from '@now-playing/domain';
 import type { FinishedFile } from '@now-playing/local-helper';
 import { IPC, Preferences, type AppInfo, type CatalogFilter, type CatalogSearchIpc, type BackupSettingsPatch, type FolderKind, type IpcChannel, type LibraryFolder, type PreferencesPatch, type ScanProgress, type StorageReport, type TransferProgress, type TvLinkKind } from '../shared/ipc.js';
@@ -728,9 +728,10 @@ function registerHandlers(): void {
   handle('catalog:lyrics', (request) => catalog!.lyrics(request as { title: string; artist: string }));
   handle('catalog:enrich', (request) => catalog!.enrich(request as { isrc?: string }));
   handle('catalog:download', (request) => catalog!.download(request as Parameters<CompanionCatalog['download']>[0]));
+  handle('catalog:download-batch', (request) => catalog!.downloadBatch(request as Parameters<CompanionCatalog['downloadBatch']>[0]));
   handle('catalog:saved', () => catalog!.saved());
-  handle('catalog:save', (request) => catalog!.save(request as SavedCollection));
-  handle('catalog:unsave', (request) => catalog!.unsave(request as Pick<SavedCollection['ref'], 'platform' | 'kind' | 'id'>));
+  handle('catalog:save', (request) => catalog!.save(request as SavedCatalogItem));
+  handle('catalog:unsave', (request) => catalog!.unsave(request as SavedCatalogItemRef));
   handle('catalog:filter', () => catalog!.filter());
   handle('catalog:filter:set', (request) => catalog!.setFilter(request as CatalogFilter));
 
@@ -844,7 +845,10 @@ if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow())))
 
   void app.whenReady().then(() => {
     store = new CompanionStore(openCompanionDb(join(dataDir(), 'companion.sqlite')));
-    hub = new HubClient(store, `${process.env['COMPUTERNAME'] ?? 'Windows'} companion`, (status) => send('event:hub-status', status), {
+    hub = new HubClient(store, `${process.env['COMPUTERNAME'] ?? 'Windows'} companion`, (status) => {
+      send('event:hub-status', status);
+      if (status.connected && status.scopes.includes('library:sync')) void catalog?.saved();
+    }, {
       secretBox: safeStorage,
       appVersion: app.getVersion(),
       onNotice: (message) => notice('warning', message),
@@ -905,6 +909,12 @@ if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow())))
         return { origin: status.origin, token: status.running ? helper!.token() : null, reason: status.reason };
       },
       store: store!,
+      sharedCatalog: {
+        available: () => hub?.canSyncCatalogStars() ?? false,
+        list: () => hub!.catalogSaved(),
+        put: (item) => hub!.saveCatalogItem(item),
+        remove: (ref, at) => hub!.unsaveCatalogItem(ref, at),
+      },
       send: (payload) => send('event:catalog-chunk', payload),
     });
     playlists = new CompanionPlaylists({
@@ -970,7 +980,7 @@ if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow())))
     backups?.stop();
     liveTv?.stop();
     void helper?.stop();
-    void awsp?.stop();
+    void awsp?.dispose();
     void watcher?.close();
     watcher = null;
     playlists?.stop();

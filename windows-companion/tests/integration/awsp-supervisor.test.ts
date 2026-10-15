@@ -226,4 +226,33 @@ describe('which connections it streams on, and when a device was last seen', () 
     // Kept encrypted with the device, so it is there after a restart.
     expect(make().devices()[0]!.lastSeenAt).toBe('2026-10-03T12:35:00.000Z');
   });
+
+  it('does not read the store if a pending connection probe resolves after shutdown', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'np-awsp-shutdown-'));
+    store = new CompanionStore(openCompanionDb(join(dir, 'companion.sqlite')));
+    sidecars = [];
+    connection = 'unmetered';
+    clock = Date.parse('2026-10-03T12:00:00Z');
+    let finishProbe!: (kind: NetworkKind) => void;
+    const probe = new Promise<NetworkKind>((resolve) => { finishProbe = resolve; });
+    supervisor = new AwspSupervisor({
+      store,
+      secretBox,
+      binary: 'awsp-server.exe',
+      libraryDb: ':memory:',
+      cacheDir: join(dir, 'cache'),
+      serverName: 'Test companion',
+      onStatus: () => undefined,
+      log: () => undefined,
+      spawnImpl,
+      probeNetwork: () => probe,
+      now: () => clock,
+    });
+
+    const pending = supervisor.checkNetwork();
+    await supervisor.dispose();
+    store.close();
+    finishProbe('unmetered');
+    await expect(pending).resolves.toBeUndefined();
+  });
 });

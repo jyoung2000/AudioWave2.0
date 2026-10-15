@@ -1,5 +1,5 @@
 /**
- * The paired hub's shelf (DEC-041): its playlist folder and this player's starred lists.
+ * The paired hub's shelf (DEC-041): its playlist folder and shared metadata-only song/list stars.
  *
  * - Filing (NP-FIND-013): a song row's Add to Playlist ▸ keeps this player's playlists under "On this
  *   player" and gains "On TOWER" — the hub's folder playlists, ticked from `hasTrack`, and New Playlist
@@ -7,8 +7,8 @@
  * - Hub playlists (NP-FIND-014): the library menu's Playlists ▸ On TOWER opens one in the music list,
  *   a library entry streaming through the hub (`/library/stream-urls`); only a list this player made
  *   can be renamed, deleted or reordered.
- * - Starred sync (NP-FIND-008): on start and on each star, with an offline un-star's tombstone winning,
- *   and the admin's shared lists shown read-only.
+ * - Shared stars (NP-FIND-008): songs and collections sync on start and on each star; offline un-stars
+ *   keep a tombstone and cannot be resurrected by a stale client. Stars never copy audio.
  *
  * Every hub route is answered here with `page.route`; the songs and lists are invented.
  */
@@ -78,6 +78,7 @@ interface Hub {
   asked: Array<{ method: string; path: string; query: string; body: unknown }>;
   saved: Array<Record<string, unknown>>;
   shared: Array<Record<string, unknown>>;
+  tombstones: Array<Record<string, unknown>>;
   offline: boolean;
 }
 
@@ -92,7 +93,7 @@ const saved = (id: string, title: string, savedAt: string, over: Record<string, 
 
 /** The hub: its catalog (one song), its folder (two lists), its stream URLs and the starred lists. */
 async function withHub(page: Page, init: Partial<Hub> = {}): Promise<Hub> {
-  const hub: Hub = { asked: [], saved: [], shared: [], offline: false, ...init };
+  const hub: Hub = { asked: [], saved: [], shared: [], tombstones: [], offline: false, ...init };
   await page.route(`${HUB}/**`, async (route: Route) => {
     const req = route.request();
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
@@ -126,12 +127,27 @@ async function withHub(page: Page, init: Partial<Hub> = {}): Promise<Hub> {
     if (path === '/api/v1/library/stream-urls') return route.fulfill(json({ items: [{ trackId: 'trk-1', url: `${HUB}/api/v1/stream/trk-1?sig=abc` }], expiresAt: '2099-01-01T00:00:00.000Z' }));
     if (path === '/api/v1/stream/trk-1') return route.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'audio/wav' }, body: silentWav(30) });
     if (path === '/api/v1/catalog/saved') {
+      const keyOf = (item: Record<string, unknown>): string => {
+        if (typeof item['identityKey'] === 'string') return `track:${item['identityKey']}`;
+        const ref = item['ref'] as { platform: string; kind: string; id: string };
+        return `collection:${ref.platform}:${ref.kind}:${ref.id}`;
+      };
       if (req.method() === 'PUT') {
-        const s = body as { ref: { id: string } };
-        hub.saved = [...hub.saved.filter((x) => (x['ref'] as { id: string }).id !== s.ref.id), s as Record<string, unknown>];
+        const item = body as Record<string, unknown>;
+        const key = keyOf(item);
+        hub.saved = [...hub.saved.filter((existing) => keyOf(existing) !== key), item];
+        hub.tombstones = hub.tombstones.filter((marker) => marker['key'] !== key);
       }
-      if (req.method() === 'DELETE') hub.saved = hub.saved.filter((x) => (x['ref'] as { id: string }).id !== url.searchParams.get('id'));
-      return route.fulfill(json({ items: hub.saved, shared: hub.shared }));
+      if (req.method() === 'DELETE') {
+        const identityKey = url.searchParams.get('identityKey');
+        const key = identityKey
+          ? `track:${identityKey}`
+          : `collection:${url.searchParams.get('platform')}:${url.searchParams.get('kind')}:${url.searchParams.get('id')}`;
+        hub.saved = hub.saved.filter((item) => keyOf(item) !== key);
+        const marker = { key, at: url.searchParams.get('at') ?? AT };
+        hub.tombstones = [...hub.tombstones.filter((existing) => existing['key'] !== key), marker];
+      }
+      return route.fulfill(json({ items: hub.saved, tombstones: hub.tombstones, shared: hub.shared }));
     }
     return route.fulfill(json({ title: 'Not here' }, 404));
   });
@@ -304,6 +320,41 @@ test('a hub playlist opens in the music list like an album; a library entry stre
   expect(hub.asked.filter((a) => a.path.startsWith('/api/v1/playlists/pl-theirs/entries'))).toEqual([]);
 });
 
+test('PWA song stars sync metadata and links, display in the shared list, and an offline un-star survives a reload', async ({ page }) => {
+  const hub = await withHub(page);
+  await boot(page);
+  await pair(page, ['library:sync', 'search:use']);
+  await reload(page);
+  await searchFor(page, 'one');
+  await page.locator('#srchList .srch__row').filter({ hasText: 'One' }).first().click();
+  const star = page.locator('#srchBody').getByRole('button', { name: 'Star song' });
+  await expect(star).toHaveAttribute('aria-pressed', 'false');
+  await star.click();
+  await expect.poll(() => hub.saved.length).toBe(1);
+  const saved = hub.saved[0]!;
+  expect(saved).toMatchObject({ kind: 'track', identityKey: 'isrc:GBAAA1900001', track: { title: 'One' } });
+  expect((saved['track'] as { sources: unknown[] }).sources.length).toBeGreaterThan(0);
+  expect(JSON.stringify(saved)).not.toMatch(/file:\/\/|[A-Z]:\\|localPath|locators/);
+  await expect(page.locator('#srchBody').getByRole('button', { name: 'Unstar song' })).toHaveAttribute('aria-pressed', 'true');
+
+  await reload(page);
+  await searchFor(page, 'one');
+  await expect(page.locator('#srchList')).toContainText('Starred songs');
+  const starredRow = page.getByRole('option', { name: /One.*starred/ });
+  await expect(starredRow).toBeVisible();
+  hub.offline = true;
+  await starredRow.getByRole('button', { name: 'Unstar One' }).click();
+  await expect(starredRow).toHaveCount(0);
+  const localTombs = async () => ((await page.evaluate(() => (window as unknown as Win).kv.get('player:saved-sync'))) as { tombstones: Array<{ key: string }> } | null)?.tombstones.map((marker) => marker.key) ?? [];
+  await expect.poll(localTombs).toEqual(['track:isrc:GBAAA1900001']);
+
+  hub.offline = false;
+  await reload(page);
+  await expect.poll(() => hub.saved.length).toBe(0);
+  await expect.poll(() => hub.tombstones.map((marker) => marker['key'])).toEqual(['track:isrc:GBAAA1900001']);
+  await expect.poll(localTombs).toEqual([]);
+});
+
 test('starred lists sync with the hub on start: a union, and an un-star made offline wins over the hub’s older copy (NP-FIND-008)', async ({ page }) => {
   // On the hub: B (starred at 10:00, un-starred here at 11:00 while offline) and C (starred on this player before a reset).
   const hub = await withHub(page, {
@@ -315,7 +366,7 @@ test('starred lists sync with the hub on start: a union, and an un-star made off
     const w = window as unknown as Win;
     const state = ((await w.kv.get('library:state')) as Record<string, unknown> | null) ?? {};
     await w.kv.set('library:state', { ...state, collections: [local] });
-    await w.kv.set('player:saved-sync', { tombstones: [{ platform: 'deezer', kind: 'playlist', id: 'b', at: '2026-10-09T11:00:00.000Z' }] });
+    await w.kv.set('player:saved-sync', { tombstones: [{ key: 'collection:deezer:playlist:b', at: '2026-10-09T11:00:00.000Z' }] });
     await w.kv.set('player:hub', a);
   }, { a: { ...ACCT, scopes: ['library:sync'] }, local: saved('a', 'A List', '2026-10-09T09:00:00.000Z') });
   await reload(page);
@@ -325,7 +376,7 @@ test('starred lists sync with the hub on start: a union, and an un-star made off
   expect(hub.asked.filter((a) => a.method === 'DELETE').map((a) => new URLSearchParams(a.query).get('id'))).toEqual(['b']);
   const kept = async () => ((await page.evaluate(() => (window as unknown as Win).kv.get('library:state'))) as { collections: Array<{ ref: { id: string } }> }).collections.map((c) => c.ref.id);
   await expect.poll(kept).toEqual(['a', 'c']);
-  await expect.poll(async () => ((await page.evaluate(() => (window as unknown as Win).kv.get('player:saved-sync'))) as { tombstones: unknown[] }).tombstones).toEqual([]);
+  await expect.poll(async () => ((await page.evaluate(() => (window as unknown as Win).kv.get('player:saved-sync'))) as { tombstones: Array<{ key: string }> }).tombstones).toEqual([]);
   // The library menu lists C with this player's own, and the admin's under "Shared on TOWER".
   await page.click('#libMenuBtn');
   await page.locator('#ipodMenu .ipod__item', { hasText: 'Playlists' }).click();
@@ -351,8 +402,8 @@ test('a star and an un-star go to the hub; one made while the hub is away is kep
   await star.click();
   await expect(star).toHaveAttribute('aria-pressed', 'false');
   await expect(hud(page)).toHaveText('Removed “C List” from your library');
-  const tombs = async () => ((await page.evaluate(() => (window as unknown as Win).kv.get('player:saved-sync'))) as { tombstones: Array<{ id: string }> } | null)?.tombstones.map((t) => t.id) ?? [];
-  await expect.poll(tombs).toEqual(['c']);
+  const tombs = async () => ((await page.evaluate(() => (window as unknown as Win).kv.get('player:saved-sync'))) as { tombstones: Array<{ key: string }> } | null)?.tombstones.map((t) => t.key) ?? [];
+  await expect.poll(tombs).toEqual(['collection:deezer:playlist:c']);
   // Back, and started again: the tombstone wins over the hub's older copy, and is settled.
   hub.offline = false;
   await reload(page);

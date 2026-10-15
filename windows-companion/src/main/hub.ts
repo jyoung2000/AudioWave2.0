@@ -23,9 +23,14 @@ import {
   SyncChange,
   SyncDeltaResponse,
   SyncManifest,
+  SavedCatalogItem,
+  SavedCatalogItemList,
+  SavedCatalogItemRef,
   WS_PROTOCOL_VERSION,
   type HelperTvChannel,
   type HelperTvGuideEntry,
+  type SavedCatalogItemList as SavedCatalogItemListType,
+  type SavedCatalogItemRef as SavedCatalogItemRefType,
   type SyncCollection,
 } from '@now-playing/contracts';
 import { collectionsNeedingSync, summarize, uuidv7, type SyncRecord } from '@now-playing/domain';
@@ -726,6 +731,35 @@ export class HubClient {
 
   private authHeaders(): Record<string, string> {
     return this.credential ? { authorization: `Bearer ${this.credential.credentialId}.${this.credential.secret}` } : {};
+  }
+
+  canSyncCatalogStars(): boolean {
+    return this.credential?.scopes.includes('library:sync') ?? false;
+  }
+
+  async catalogSaved(): Promise<SavedCatalogItemListType> {
+    this.requireCatalogStarScope();
+    return SavedCatalogItemList.parse(await this.request<unknown>('GET', '/api/v1/catalog/saved'));
+  }
+
+  async saveCatalogItem(item: SavedCatalogItem): Promise<SavedCatalogItemListType> {
+    this.requireCatalogStarScope();
+    const safe = SavedCatalogItem.parse(item);
+    return SavedCatalogItemList.parse(await this.request<unknown>('PUT', '/api/v1/catalog/saved', { body: safe }));
+  }
+
+  async unsaveCatalogItem(ref: SavedCatalogItemRefType, at: string): Promise<SavedCatalogItemListType> {
+    this.requireCatalogStarScope();
+    const safe = SavedCatalogItemRef.parse(ref);
+    const params = new URLSearchParams({ kind: safe.kind, at });
+    if ('identityKey' in safe) params.set('identityKey', safe.identityKey);
+    else { params.set('platform', safe.platform); params.set('id', safe.id); }
+    return SavedCatalogItemList.parse(await this.request<unknown>('DELETE', `/api/v1/catalog/saved?${params}`));
+  }
+
+  private requireCatalogStarScope(): void {
+    if (!this.credential) throw new Error('No hub is paired.');
+    if (!this.credential.scopes.includes('library:sync')) throw new Error('This paired device needs the library:sync permission to share starred songs and lists.');
   }
 
   private async request<T>(method: string, path: string, options: { body?: unknown; authenticated?: boolean } = {}): Promise<T> {

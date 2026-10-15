@@ -381,6 +381,12 @@ export function SettingsView({ helper, prefs, say }: { helper: Resource<HelperSt
             <span className="sub">Used when the player doesn’t choose one. Anything but the original needs FFmpeg; without it the original is kept.</span>
           </div>
 
+          <span className="k top">When starring:</span>
+          <div className="v">
+            <Check checked={data?.autoDownloadStars ?? false} disabled={!data} onChange={(event) => setPref({ autoDownloadStars: event.currentTarget.checked }, event.currentTarget.checked ? 'Auto-download prompts enabled. Every download still needs your rights confirmation.' : 'Auto-download prompts disabled.')}>Offer to download songs, albums, and playlists when starring them</Check>
+            <span className="sub">Off by default. A song needs its own rights confirmation; an album or playlist asks once for all songs. Search results are not permission. Cancel keeps the star and queues no audio. This PC helper cannot verify SoundCloud creator downloads, so it refuses those URLs; use the Hub’s verified flow.</span>
+          </div>
+
           <label className="k" htmlFor="downloads-jobs">
             At the same time:
           </label>

@@ -94,6 +94,7 @@ export class AwspSupervisor {
   private connection: NetworkKind = 'unknown';
   private probing: Promise<void> | null = null;
   private lastProbeAt = 0;
+  private disposed = false;
 
   constructor(private readonly options: AwspSupervisorOptions) {
     const saved = this.readOptions();
@@ -215,11 +216,13 @@ export class AwspSupervisor {
 
   /** Asks Windows what the connection costs, then starts or pauses the sidecar to match. */
   async checkNetwork(): Promise<void> {
+    if (this.disposed) return;
     if (!this.options.probeNetwork) return this.applyNetwork();
     this.probing ??= this.options
       .probeNetwork()
       .catch((): NetworkKind => 'unknown')
       .then(async (kind) => {
+        if (this.disposed) return;
         this.lastProbeAt = this.options.now?.() ?? Date.now();
         if (kind !== this.connection) this.options.log(`awsp: this PC is on ${kind === 'metered' ? 'a metered connection' : kind === 'unmetered' ? 'Wi-Fi or Ethernet' : kind === 'offline' ? 'no connection' : 'a connection Windows could not rate'}`);
         this.connection = kind;
@@ -233,6 +236,7 @@ export class AwspSupervisor {
 
   /** Pauses the sidecar on a connection that is switched off, and starts it again when it is allowed. */
   private async applyNetwork(): Promise<void> {
+    if (this.disposed) return;
     const network = this.networkView();
     this.publish({ network });
     if (network.blocked) {
@@ -240,6 +244,7 @@ export class AwspSupervisor {
         this.options.log(`awsp: ${network.blocked}`);
         await this.stop(false);
       }
+      if (this.disposed) return;
       if (this.readOptions().enabled) this.publish({ running: false, reason: network.blocked });
       return;
     }
@@ -437,5 +442,11 @@ export class AwspSupervisor {
     await Promise.race([exited, timeout]);
     if (this.child === child) child.kill();
     this.child = null;
+  }
+
+  async dispose(): Promise<void> {
+    if (this.disposed) return;
+    this.disposed = true;
+    await this.stop();
   }
 }

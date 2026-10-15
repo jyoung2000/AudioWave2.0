@@ -6,9 +6,9 @@
  * with the answers is the domain's (`@now-playing/domain/catalog`, view.ts).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CatalogAlbumDetail, CatalogArtistDetail, CatalogEnrichment, CatalogLyrics, CatalogProviderId, CatalogResolveResult, CatalogSearchChunk, CatalogSearchSection, CatalogTrack, SavedCollection } from '@now-playing/contracts';
-import { CATALOG_PROVIDERS } from '@now-playing/contracts';
-import { collectionKey, EMPTY_RESULTS, foldCatalogChunk, type CatalogFields, type CatalogResults } from '@now-playing/domain/catalog';
+import type { CatalogAlbumDetail, CatalogArtistDetail, CatalogEnrichment, CatalogLyrics, CatalogProviderId, CatalogResolveResult, CatalogSearchChunk, CatalogSearchSection, CatalogTrack, SavedCatalogItem, SavedCollection, SavedTrack } from '@now-playing/contracts';
+import { CATALOG_PROVIDERS, SavedSongSnapshot, SavedTrack as SavedTrackSchema } from '@now-playing/contracts';
+import { collectionKey, EMPTY_RESULTS, foldCatalogChunk, savedTrackIdentity, type CatalogFields, type CatalogResults } from '@now-playing/domain/catalog';
 import { invoke, subscribe } from './bridge.js';
 
 /* ------------------------------------------------------------------ the client */
@@ -210,48 +210,88 @@ export function usePreview(): Preview {
 
 export interface SavedCollections {
   items: SavedCollection[];
+  tracks: SavedTrack[];
   isSaved: (ref: SavedCollection['ref']) => boolean;
+  isTrackSaved: (track: CatalogTrack) => boolean;
   busy: boolean;
   error: Error | null;
   toggle: (saved: SavedCollection) => Promise<boolean>;
+  toggleTrack: (track: CatalogTrack) => Promise<boolean>;
+  unstarTrack: (identityKey: string) => Promise<boolean>;
 }
 
-/** Starred albums and playlists, kept in this PC's library (the shared SavedCollection shape). */
+/** The shared Hub-backed set; local persistence is retained only as an offline outbox. */
 export function useSavedCollections(): SavedCollections {
   const [items, setItems] = useState<SavedCollection[]>([]);
+  const [tracks, setTracks] = useState<SavedTrack[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const apply = useCallback((answer: { items: SavedCatalogItem[] }) => {
+    setItems(answer.items.filter((item): item is SavedCollection => 'ref' in item));
+    setTracks(answer.items.filter((item): item is SavedTrack => 'kind' in item && item.kind === 'track'));
+  }, []);
   useEffect(() => {
     let live = true;
     invoke('catalog:saved', undefined)
-      .then((answer) => {
-        if (live) setItems(answer.items);
-      })
-      .catch((err: unknown) => {
-        if (live) setError(catalogError(err));
-      });
-    return () => {
-      live = false;
-    };
-  }, []);
+      .then((answer) => { if (live) apply(answer); })
+      .catch((err: unknown) => { if (live) setError(catalogError(err)); });
+    return () => { live = false; };
+  }, [apply]);
   const keys = useMemo(() => new Set(items.map((item) => collectionKey(item.ref))), [items]);
+  const trackKeys = useMemo(() => new Set(tracks.map((item) => item.identityKey)), [tracks]);
   const isSaved = useCallback((ref: SavedCollection['ref']) => keys.has(collectionKey(ref)), [keys]);
-  const toggle = useCallback(
-    async (saved: SavedCollection): Promise<boolean> => {
-      setBusy(true);
-      setError(null);
-      try {
-        const answer = keys.has(collectionKey(saved.ref)) ? await invoke('catalog:unsave', { platform: saved.ref.platform, kind: saved.ref.kind, id: saved.ref.id }) : await invoke('catalog:save', saved);
-        setItems(answer.items);
-        return true;
-      } catch (err) {
-        setError(catalogError(err));
-        return false;
-      } finally {
-        setBusy(false);
-      }
-    },
-    [keys],
-  );
-  return { items, isSaved, busy, error, toggle };
+  const isTrackSaved = useCallback((track: CatalogTrack) => {
+    const identity = savedTrackIdentity(track);
+    return identity !== null && trackKeys.has(identity);
+  }, [trackKeys]);
+  const toggle = useCallback(async (saved: SavedCollection): Promise<boolean> => {
+    setBusy(true);
+    setError(null);
+    try {
+      const answer = keys.has(collectionKey(saved.ref))
+        ? await invoke('catalog:unsave', { platform: saved.ref.platform, kind: saved.ref.kind, id: saved.ref.id })
+        : await invoke('catalog:save', saved);
+      apply(answer);
+      return true;
+    } catch (err) {
+      setError(catalogError(err));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, [apply, keys]);
+  const toggleTrack = useCallback(async (track: CatalogTrack): Promise<boolean> => {
+    setBusy(true);
+    setError(null);
+    try {
+      const snapshot = SavedSongSnapshot.parse(track);
+      const identityKey = savedTrackIdentity(snapshot);
+      if (!identityKey) throw new Error('This song has no safe recording identity to share.');
+      const saved = SavedTrackSchema.parse({ kind: 'track', identityKey, track: snapshot, savedAt: new Date().toISOString() });
+      const answer = trackKeys.has(identityKey)
+        ? await invoke('catalog:unsave', { kind: 'track', identityKey })
+        : await invoke('catalog:save', saved);
+      apply(answer);
+      return true;
+    } catch (err) {
+      setError(catalogError(err));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, [apply, trackKeys]);
+  const unstarTrack = useCallback(async (identityKey: string): Promise<boolean> => {
+    setBusy(true);
+    setError(null);
+    try {
+      apply(await invoke('catalog:unsave', { kind: 'track', identityKey }));
+      return true;
+    } catch (err) {
+      setError(catalogError(err));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, [apply]);
+  return { items, tracks, isSaved, isTrackSaved, busy, error, toggle, toggleTrack, unstarTrack };
 }

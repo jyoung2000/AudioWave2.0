@@ -23,7 +23,7 @@ import { spawn } from 'node:child_process';
 import { extname, join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { Readable } from 'node:stream';
-import { DOWNLOAD_BATCH_CAP, type DownloadBatchResult, type DownloadJob, type DownloadSource, type DownloadTags, type JobState } from '@now-playing/contracts';
+import { DOWNLOAD_BATCH_CAP, type DownloadAuthorizationBasis, type DownloadBatchResult, type DownloadJob, type DownloadSource, type DownloadTags, type JobState } from '@now-playing/contracts';
 import { DomainError, renderFilenameTemplate, sanitizeFilename, uuidv7 } from '@now-playing/domain';
 import { toolCommand } from '@now-playing/domain/tool-install';
 import { fromSpotdl, fromYtDlp, isCollectionUrl, mergeTags, titleFromUrl, type ProbedEntry } from '../media/media-metadata.js';
@@ -157,6 +157,14 @@ export class DownloadService {
     if (!job) throw new DomainError('not-found', 'Download job not found');
     const { outputPath: _p, ...rest } = job;
     return rest;
+  }
+
+  /** Check provider permission without creating a queue item; used to preflight complete catalog collections. */
+  async canAuthorize(source: DownloadSource, basis: DownloadAuthorizationBasis, ownerId: string): Promise<boolean> {
+    const id = source.providerTrackId ?? source.url;
+    if (!id || (source.provider === 'external-tool' && isCollectionUrl(id))) return false;
+    const adapter = this.adapterFor(source.provider);
+    return (await adapter.getAuthorizedDownload(id, { actorId: ownerId, basis })) !== null;
   }
 
   /** Ask the adapter whether this is permitted *before* creating the job, so a refusal is immediate. */

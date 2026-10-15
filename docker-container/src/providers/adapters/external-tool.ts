@@ -610,7 +610,12 @@ export class ExternalToolAdapter extends BaseAdapter {
   override async getAuthorizedDownload(id: string, context: DownloadContext): Promise<AuthorizedDownload | null> {
     const u = this.allowed(id);
     if (!u) return null;
-    if (!['user-owned', 'licensed', 'public-domain', 'purchased-export', 'creator-download'].includes(context.basis)) return null;
+    const host = u.hostname.toLowerCase().replace(/^www\./, '');
+    // Creator-enabled downloads are a SoundCloud-specific permission and must go through its
+    // provider adapter, which checks `downloadable` and remaining downloads. Generic yt-dlp/spotDL
+    // sources (notably YouTube) never prove that permission; SoundCloud URLs are refused here too.
+    if (context.basis === 'creator-download' || host === 'soundcloud.com' || host.endsWith('.soundcloud.com')) return null;
+    if (!['user-owned', 'licensed', 'public-domain', 'purchased-export'].includes(context.basis)) return null;
     const slug = decodeURIComponent(u.pathname.split('/').filter(Boolean).pop() ?? 'download');
     return { kind: 'external-tool', url: u.toString(), filename: slug || 'download', basis: context.basis };
   }

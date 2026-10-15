@@ -36,6 +36,7 @@ import type {
   CatalogTrack,
   CatalogTrackPage,
   SavedCollection,
+  SavedTrack,
 } from '@now-playing/contracts';
 import {
   CATALOG_MAX_LIMIT,
@@ -58,6 +59,7 @@ import {
 import * as V from './view.js';
 import { installDiscoverOnline, type DiscoverOnline } from './discover.js';
 import { installVisit, type ShellVisit, type VisitTools } from './visit.js';
+import { catalogTrackFromSavedTrack } from '../../lib/saved-catalog.js';
 import { installHubShelf } from './hub-shelf.js';
 
 /* ------------------------------------------------------------------ shapes */
@@ -70,6 +72,8 @@ type Opt =
   | { kind: 'album'; al: CatalogAlbum }
   | { kind: 'playlist'; p: CatalogPlaylist }
   | { kind: 'saved'; s: SavedCollection }
+  | { kind: 'saved-track'; s: SavedTrack }
+  | { kind: 'saved-more' }
   | { kind: 'more'; section: Section }
   | { kind: 'collection'; c: CatalogCollection };
 
@@ -222,6 +226,8 @@ type View =
   | {
       kind: 'song';
       t: CatalogTrack;
+      saved?: SavedTrack;
+      starTrack?: CatalogTrack;
       enrich: CatalogEnrichment | null;
       enrichSaid: string | null;
       lyrics: CatalogLyrics | null;
@@ -511,6 +517,10 @@ export function installSearch(): SearchApi {
         return V.playlistRowHTML(o.p, i);
       case 'saved':
         return V.savedRowHTML(o.s, i);
+      case 'saved-track':
+        return V.savedTrackRowHTML(o.s, i);
+      case 'saved-more':
+        return V.savedMoreRowHTML(hubShelf.savedTracks().length, i);
       case 'collection':
         return V.collectionRowHTML(o.c, i);
       case 'more':
@@ -588,9 +598,10 @@ export function installSearch(): SearchApi {
   /** The overview: a short group per type with "See all N", and no pager (NP-FIND-003). */
   function renderResults(): void {
     const r = res;
-    const n = wanted().reduce((sum, s) => sum + bagOf(r, s).size, 0);
+    const n = wanted().reduce((sum, section) => sum + bagOf(r, section).size, 0);
+    const starred = hubShelf.savedTracks();
     paintStatus(r.status, r.via, r.linkedOnly);
-    if (!n) {
+    if (!n && !starred.length) {
       options = [];
       if (!r.done) {
         count.innerHTML = 'Searching…';
@@ -605,11 +616,11 @@ export function installSearch(): SearchApi {
       } else {
         const said = V.statusWords(
           r.status.filter(
-            (s) => s.state === 'failed' || s.state === 'timeout' || s.state === 'cooling-down',
+            (status) => status.state === 'failed' || status.state === 'timeout' || status.state === 'cooling-down',
           ),
         );
         const failedAll =
-          r.status.length > 0 && r.status.every((s) => s.state !== 'ok' && s.state !== 'empty');
+          r.status.length > 0 && r.status.every((status) => status.state !== 'ok' && status.state !== 'empty');
         body.innerHTML = msg(
           failedAll
             ? `Couldn’t search just now — ${V.esc(said || 'no service answered')}.`
@@ -620,16 +631,25 @@ export function installSearch(): SearchApi {
       return;
     }
     const groups: Array<{ label: string | null; opts: Opt[] }> = [];
-    for (const s of wanted()) {
-      const bag = bagOf(r, s);
-      const opts = sectionRows(r, s, PREVIEW_N[s]);
-      if (opts.length && (bag.size > PREVIEW_N[s] || r.more[s])) opts.push({ kind: 'more', section: s });
-      groups.push({ label: V.SECTION_LABEL[s], opts });
+    if (starred.length) {
+      const starOptions: Opt[] = starred.slice(0, PREVIEW_N.tracks).map((item) => ({ kind: 'saved-track', s: item }));
+      if (starred.length > PREVIEW_N.tracks) starOptions.push({ kind: 'saved-more' });
+      groups.push({ label: 'Starred songs', opts: starOptions });
     }
-    count.innerHTML = `<b>Results:</b> ${totalsLine(r)}${r.done ? '' : ' …'}`;
-    body.innerHTML =
-      listbox(groups, 'Search results') + (r.error ? msg(V.esc(r.error)) : '');
-    live.textContent = `${totalsLine(r)}${r.done ? '' : ', still searching'}`;
+    for (const section of wanted()) {
+      const bag = bagOf(r, section);
+      const opts = sectionRows(r, section, PREVIEW_N[section]);
+      if (opts.length && (bag.size > PREVIEW_N[section] || r.more[section])) opts.push({ kind: 'more', section });
+      groups.push({ label: V.SECTION_LABEL[section], opts });
+    }
+    count.innerHTML = n
+      ? `<b>Results:</b> ${totalsLine(r)}${r.done ? '' : ' …'}`
+      : `<b>Starred songs:</b> ${starred.length}`;
+    const tail = r.error ? msg(V.esc(r.error)) : !r.done ? msg(`${V.spinner()}<span>Searching…</span>`) : '';
+    body.innerHTML = listbox(groups, 'Search results') + tail;
+    live.textContent = n
+      ? `${totalsLine(r)}${r.done ? '' : ', still searching'}`
+      : `${starred.length} starred songs`;
   }
 
   function renderLink(v: Extract<View, { kind: 'link' }>): void {
@@ -712,15 +732,19 @@ export function installSearch(): SearchApi {
     typeQ.setAttribute('aria-label', `Search ${V.SECTION_LABEL[s].toLowerCase()}`);
     typeQ.placeholder = `Search ${V.SECTION_LABEL[s].toLowerCase()}`;
     if (document.activeElement !== typeQ) typeQ.value = v.label;
-    count.innerHTML = `<b>${V.SECTION_LABEL[s]}:</b> ${bag.size}${r.more[s] ? '+' : ''} ${V.SECTION_NOUN[s][bag.size === 1 && !r.more[s] ? 0 : 1]} for “${V.esc(v.label)}”`;
+    const starred = s === 'tracks' ? hubShelf.savedTracks() : [];
+    const queryLabel = v.label ? ` for “${V.esc(v.label)}”` : '';
+    count.innerHTML = `<b>${V.SECTION_LABEL[s]}:</b> ${bag.size}${r.more[s] ? '+' : ''} ${V.SECTION_NOUN[s][bag.size === 1 && !r.more[s] ? 0 : 1]}${queryLabel}${starred.length ? ` · ${starred.length} starred` : ''}`;
     const groups: Array<{ label: string | null; opts: Opt[] }> = [];
     if (s === 'playlists') {
       const mine = savedOf('playlist');
       if (mine.length)
         groups.push({ label: 'In your library', opts: mine.map((x) => ({ kind: 'saved', s: x })) });
     }
+    if (starred.length)
+      groups.push({ label: 'Starred songs', opts: starred.map((item) => ({ kind: 'saved-track', s: item })) });
     const typeOpts = sectionRows(r, s, bag.size);
-    groups.push({ label: s === 'playlists' && groups.length ? 'From the catalog' : null, opts: typeOpts });
+    groups.push({ label: groups.length ? 'From the catalog' : null, opts: typeOpts });
     const tail = r.pending.has(s)
       ? msg(`${V.spinner()}<span>Loading more…</span>`)
       : r.error
@@ -728,7 +752,7 @@ export function installSearch(): SearchApi {
         : !r.more[s] && bag.size && r.done
           ? `<div class="srch__end">That’s all ${V.count(bag.size, s)}.</div>`
           : '';
-    const empty = !bag.size && r.done && !r.pending.has(s) && !r.error;
+    const empty = !bag.size && !starred.length && r.done && !r.pending.has(s) && !r.error;
     body.innerHTML =
       (groups.some((g) => g.opts.length)
         ? listbox(groups, `All ${V.SECTION_LABEL[s].toLowerCase()}`)
@@ -738,14 +762,14 @@ export function installSearch(): SearchApi {
     // Each of the type's rows knows its page, so the scroll and the arrows can find page N's first row.
     let k = 0;
     options.forEach((o, i) => {
-      if (o.kind !== 'more' && o.kind !== 'saved' && o.kind !== 'collection') {
+      if (o.kind !== 'more' && o.kind !== 'saved' && o.kind !== 'saved-track' && o.kind !== 'saved-more' && o.kind !== 'collection') {
         const el = body.querySelector<HTMLElement>(`.srch__row[data-i="${i}"]`);
         if (el) el.dataset['page'] = String(Math.floor(k / PAGE_ROWS[s]));
         k += 1;
       }
     });
     paintPager(v);
-    live.textContent = `${V.count(bag.size, s)}${r.more[s] ? ', more as you scroll' : ''}, page ${v.page + 1} of ${pageCount(v).known}${r.more[s] ? ' or more' : ''}`;
+    live.textContent = `${V.count(bag.size, s)}${r.more[s] ? ', more as you scroll' : ''}${starred.length ? `; ${starred.length} starred songs` : ''}, page ${v.page + 1} of ${pageCount(v).known}${r.more[s] ? ' or more' : ''}`;
   }
 
   /** The footer: ‹ › and "Page N of M" (M+ while more may exist). */
@@ -906,8 +930,14 @@ export function installSearch(): SearchApi {
           ...e.sources.filter((s) => !displayed.sources.some((x) => x.platform === s.platform)),
         ]
       : displayed.sources;
+    v.starTrack = { ...displayed, sources };
+    const starValue = v.saved ?? v.starTrack;
+    const starred = hubShelf.isTrackSaved(starValue);
+    const canStar = hubShelf.canStarTrack(starValue);
+    const star = `<button class="srch__btn" type="button" data-act="star-track" aria-pressed="${starred}"${canStar ? '' : ' disabled title="A safe song identity is required; title alone is not enough"'}>${starred ? 'Unstar song' : 'Star song'}</button>`;
     const dl = pickDownloadSource(sources);
     const actions =
+      star +
       (added.has(t.id)
         ? '<button class="srch__btn" type="button" disabled>In your library</button>'
         : '<button class="srch__btn" type="button" data-act="add">Add to Library</button>') +
@@ -1238,6 +1268,24 @@ export function installSearch(): SearchApi {
    * already has and reads on from its next offset; from the page's own field or the segmented
    * control it is a fresh search of that type alone (`sections=<type>`), a page at a time.
    */
+  /** The complete shared song-star list, independent of a catalog query. */
+  function openSavedTracks(): void {
+    stopPreview();
+    const r = freshResults();
+    r.done = true;
+    const v: Extract<View, { kind: 'type' }> = {
+      kind: 'type', section: 'tracks', res: r, ctl: new AbortController(), q: '', adv: null, label: '', page: 0,
+    };
+    const was = top();
+    if (was?.kind === 'type') {
+      was.ctl.abort();
+      stack[stack.length - 1] = v;
+      hot = -1;
+    } else push(v);
+    render();
+    body.scrollTop = 0;
+  }
+
   function openType(
     section: Section,
     source: { seed: true } | { seed: false; q: string; adv: AdvFields | null },
@@ -1453,11 +1501,12 @@ export function installSearch(): SearchApi {
   }
 
   /** Genre, label and year from enrichment; lyrics, synced or plain (NP-FIND-006). */
-  function openSong(t: CatalogTrack): void {
+  function openSong(t: CatalogTrack, saved?: SavedTrack): void {
     stopPreview();
     const v: Extract<View, { kind: 'song' }> = {
       kind: 'song',
       t,
+      ...(saved ? { saved } : {}),
       enrich: null,
       enrichSaid: null,
       lyrics: null,
@@ -1642,6 +1691,8 @@ export function installSearch(): SearchApi {
     } else if (o.kind === 'collection') showInList(o.c, o.c.page);
     else if (o.kind === 'playlist') openPlaylist(o.p);
     else if (o.kind === 'saved') api.openSaved(o.s);
+    else if (o.kind === 'saved-track') openSong(catalogTrackFromSavedTrack(o.s), o.s);
+    else if (o.kind === 'saved-more') openSavedTracks();
     else if (top()?.kind === 'song') {
       const el = body.querySelector<HTMLElement>(
         `.srch__row[data-i="${i}"] .srch__art[data-preview]`,
@@ -2439,6 +2490,19 @@ export function installSearch(): SearchApi {
 
   body.addEventListener('click', (e) => {
     const target = e.target as Element;
+    const unstar = target.closest<HTMLElement>('[data-unsave]');
+    if (unstar) {
+      e.preventDefault();
+      e.stopPropagation();
+      const option = options[Number(unstar.dataset['unsave'])];
+      if (option?.kind === 'saved-track') {
+        void hubShelf.unstarTrack(option.s.identityKey).then((ok) => {
+          if (ok) say(`Removed “${option.s.track.title}” from starred songs.`);
+          render();
+        });
+      }
+      return;
+    }
     const addBtn = target.closest<HTMLElement>('.srch__add[data-add]');
     if (addBtn) {
       e.preventDefault();
@@ -2467,6 +2531,16 @@ export function installSearch(): SearchApi {
     if (act) {
       e.preventDefault();
       const v = top();
+      if (act.dataset['act'] === 'star-track' && v?.kind === 'song') {
+        const candidate = v.saved ?? v.starTrack ?? v.t;
+        const wasStarred = hubShelf.isTrackSaved(candidate);
+        void hubShelf.toggleTrack(candidate).then((ok) => {
+          if (!ok) return;
+          say(wasStarred ? `Removed “${v.t.title}” from starred songs.` : `Starred “${v.t.title}” across your Hub, Companion and Player.`);
+          render();
+        });
+        return;
+      }
       if (act.dataset['act'] === 'list' && v?.kind === 'album' && v.detail)
         showInList(
           {
@@ -2530,8 +2604,12 @@ export function installSearch(): SearchApi {
   w.NP_DISC_ONLINE = installDiscoverOnline(findTracks, songFor);
   /* A visitor's Play and Download…: the hub's catalog/download, else the helper, else its preview (NP-FIND-011/012). */
   w.NP_VISIT = installVisit(() => w.NP_TOOLS);
-  /* The paired hub's playlist folder and this player's starred lists kept in step (NP-FIND-008/013/014, DEC-041). */
-  installHubShelf();
+  /* The paired hub's playlist folder and this player's shared stars stay editable offline. */
+  const hubShelf = installHubShelf();
+  document.addEventListener('hub-shelf:change', () => {
+    const current = top();
+    if (current?.kind === 'results' || current?.kind === 'type' || current?.kind === 'song') render();
+  });
 
   /** Kept for the shell's "keep this song" (the radio's on-air menu): songs for a query, in the old row shape. */
   w.NP_FIND = async (q: string) => {

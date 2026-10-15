@@ -60,9 +60,11 @@ This document is the threat model and the list of concrete mitigations for the A
 | `PATCH`/`DELETE /api/v1/playlists/:id`, `POST /api/v1/playlists/:id/entries/move` | yes (CSRF) | `playlists:use` — only a list the device created |
 | `POST /api/v1/playlists/:id/entries/remove` | yes (CSRF) | `playlists:use` — entries it added, or any in a list it created |
 | `GET`/`PUT /api/v1/playlists/folder` | yes (CSRF) | never |
-| `GET`/`PUT`/`DELETE /api/v1/catalog/saved` | its own | `library:sync` — its own; the admin's read-only as `shared` |
+| `GET`/`PUT`/`DELETE /api/v1/catalog/saved` | yes (CSRF on writes) | `library:sync` — reads and edits the same shared set |
 
 Every change is audited (`playlists.create`, `.update`, `.delete`, `.add`, `.remove`, `.folder`). Filing is additive and open to any device with the scope, because the hub is a shared shelf; anything that takes away from a list is kept to the admin and to the device that made the list or added the song. The playlist files hold relative paths inside the data volume and public source URLs only — never an absolute host path. Tests: `docker-container/tests/security/playlist-folder.test.ts` (traversal, symlinks, ids, CSRF, scopes, ownership, caps, starred collections), `docker-container/tests/integration/playlists.test.ts`.
+
+Catalog stars are a separate metadata-only set capped at 2,000 active entries. Saved provider/collection links must be HTTP(S); artwork accepts HTTP(S) or a size-limited inline image, and provider-ID arrays are bounded. These validated schemas contain no audio bytes or local filesystem paths. Admin sessions and devices with `library:sync` can read, add or remove entries; deletes leave timestamped tombstones so a stale offline client cannot restore the star. A star does not itself transfer audio. Optional Hub/Companion downloads require an explicit rights basis and per-source preflight before queueing; see `DOWNLOADS_AND_LEGAL.md`.
 
 ## Outbound hosts of the music catalog (DEC-039)
 

@@ -20,7 +20,8 @@ import { HubUiProvider } from '../../src/web/ui.js';
 import { MusicSearchSettingsView } from '../../src/web/views/CatalogSettings.js';
 import { SearchView } from '../../src/web/views/Search.js';
 
-type Answer = { status?: number; body: unknown };
+type HubRequest = { method: string; path: string; query: string; body: unknown };
+type Answer = { status?: number; body: unknown | ((request: HubRequest) => unknown) };
 
 function fakeHub(routes: Record<string, Answer>) {
   const calls: Array<{ method: string; path: string; query: string; body: unknown }> = [];
@@ -31,9 +32,11 @@ function fakeHub(routes: Record<string, Answer>) {
       const path = url.pathname.replace(/^\/api\/v1/, '');
       const method = init?.method ?? 'GET';
       calls.push({ method, path, query: url.search, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      const request = calls[calls.length - 1]!;
       const answer = routes[`${method} ${path}`] ?? { status: 404, body: { detail: 'Not found' } };
       const status = answer.status ?? 200;
-      return new Response(JSON.stringify(answer.body), { status, headers: { 'content-type': status >= 400 ? 'application/problem+json' : 'application/json' } });
+      const body = typeof answer.body === 'function' ? answer.body(request) : answer.body;
+      return new Response(JSON.stringify(body), { status, headers: { 'content-type': status >= 400 ? 'application/problem+json' : 'application/json' } });
     }),
   );
   return { calls, sent: (method: string, path: string) => calls.filter((c) => c.method === method && c.path === path) };
@@ -74,7 +77,24 @@ function renderSearch(client: CatalogClient) {
   );
 }
 
-const SAVED_EMPTY = { 'GET /catalog/saved': { body: { items: [] } } };
+const SAVED_EMPTY = { 'GET /catalog/saved': { body: { items: [], tombstones: [], shared: [] } } };
+
+function savedCatalogRoutes(autoDownloadStars = false) {
+  let items: unknown[] = [];
+  const list = () => ({ items, tombstones: [], shared: [] });
+  const keyOf = (item: Record<string, unknown>): string => {
+    if (typeof item['identityKey'] === 'string') return `track:${item['identityKey']}`;
+    const ref = item['ref'] as { platform: string; kind: string; id: string };
+    return `collection:${ref.platform}:${ref.kind}:${ref.id}`;
+  };
+  return {
+    'GET /catalog/saved': { body: () => list() },
+    'PUT /catalog/saved': { body: (request: HubRequest) => { const item = request.body as Record<string, unknown>; const key = keyOf(item); items = [...items.filter((old) => keyOf(old as Record<string, unknown>) !== key), item]; return list(); } },
+    'DELETE /catalog/saved': { body: (request: HubRequest) => { const query = new URLSearchParams(request.query); const key = query.get('identityKey') ? `track:${query.get('identityKey')}` : `collection:${query.get('platform')}:${query.get('kind')}:${query.get('id')}`; items = items.filter((old) => keyOf(old as Record<string, unknown>) !== key); return list(); } },
+    'GET /catalog/settings': { body: { ...stock.settings, autoDownloadStars } },
+    'POST /catalog/download/preflight': { body: (request: HubRequest) => ({ authorized: true, checked: ((request.body as { items: unknown[] }).items).length }) },
+  };
+}
 
 async function searchFor(text: string): Promise<void> {
   await userEvent.type(screen.getByRole('searchbox', { name: 'Search for music' }), text);
@@ -179,11 +199,11 @@ describe('what a row says (UX-SEARCH-003)', () => {
     await waitFor(() => expect(within(songs).getAllByRole('option')).toHaveLength(5));
     await userEvent.click(within(songs).getAllByRole('option')[0]!);
     await screen.findByRole('heading', { name: 'Download to this hub' });
-    await userEvent.selectOptions(screen.getByLabelText('Allowed because:'), 'creator-download');
+    await userEvent.selectOptions(screen.getByLabelText('Allowed because:'), 'user-owned');
     await userEvent.click(screen.getByRole('button', { name: 'Download' }));
     expect(await screen.findByText('Queued from YouTube Music. Tagged with ISRC, genre, year and lyrics.')).toBeTruthy();
     const [sent] = hub.sent('POST', '/catalog/download');
-    expect(sent!.body).toMatchObject({ track: { id: 'deezer:9101' }, authorization: { basis: 'creator-download', acknowledged: true }, target: { destination: 'hub', format: 'original' } });
+    expect(sent!.body).toMatchObject({ track: { id: 'deezer:9101' }, authorization: { basis: 'user-owned', acknowledged: true }, target: { destination: 'hub', format: 'original' } });
   });
 });
 
@@ -340,7 +360,7 @@ describe('a song row’s menu (UX-SEARCH-012)', () => {
     return songs;
   }
 
-  it('“…” opens it; Add to Up Next ▸ a group queues the song’s fetchable source through the group’s requests, and says so', async () => {
+  it('“…” opens it with Star/Unstar; Add to Up Next ▸ a group queues the song’s fetchable source through the group’s requests, and says so', async () => {
     const hub = fakeHub({ ...SAVED_EMPTY, ...GROUPS, 'POST /groups/0192f0c0-0000-7000-8000-000000000002/requests': { body: { queued: true, title: 'Harbour Lights', artistName: 'Cassette Bloom', position: 3, reason: null } } });
     renderSearch(stockClient().client);
     const songs = await overviewSongs();
@@ -348,7 +368,7 @@ describe('a song row’s menu (UX-SEARCH-012)', () => {
     await userEvent.click(lights.querySelector('[data-menu]')!);
     const menu = screen.getByRole('menu', { name: '“Harbour Lights”' });
     await waitFor(() => expect(within(menu).getByRole('menuitem', { name: 'Add to Up Next' }).getAttribute('aria-haspopup')).toBe('menu'));
-    expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent?.replace('▶', '').trim())).toEqual(['Add to Up Next', 'Add to Playlist', 'Add to Library…', 'Download…', 'Audition', 'Open Details']);
+    expect(within(menu).getAllByRole('menuitem').map((i) => i.textContent?.replace('▶', '').trim())).toEqual(['Add to Up Next', 'Add to Playlist', 'Star', 'Add to Library…', 'Download…', 'Audition', 'Open Details']);
     await userEvent.click(within(menu).getByRole('menuitem', { name: 'Add to Up Next' }));
     const groups = screen.getByRole('menu', { name: 'Add to Up Next' });
     // Active groups only.
@@ -440,10 +460,10 @@ describe('a song row’s menu (UX-SEARCH-012)', () => {
     await userEvent.click(lights.querySelector('[data-menu]')!);
     await userEvent.click(screen.getByRole('menuitem', { name: 'Add to Library…' }));
     sheet = screen.getByRole('dialog', { name: 'Add “Harbour Lights” to the library' });
-    await userEvent.selectOptions(within(sheet).getByLabelText('Allowed because:'), 'creator-download');
+    await userEvent.selectOptions(within(sheet).getByLabelText('Allowed because:'), 'user-owned');
     await userEvent.click(within(sheet).getByRole('button', { name: 'Add to Library' }));
     await waitFor(() => expect(screen.getByTestId('status-strip').textContent).toBe('“Harbour Lights” is joining the hub’s library. Queued from YouTube Music. Tagged with ISRC, genre, year and lyrics. It is in Music ▸ Downloads.'));
-    expect(hub.sent('POST', '/catalog/download')[0]!.body).toMatchObject({ track: { id: 'deezer:9101' }, authorization: { basis: 'creator-download', acknowledged: true }, target: { destination: 'hub', format: 'original' } });
+    expect(hub.sent('POST', '/catalog/download')[0]!.body).toMatchObject({ track: { id: 'deezer:9101' }, authorization: { basis: 'user-owned', acknowledged: true }, target: { destination: 'hub', format: 'original' } });
     await userEvent.click(lights.querySelector('[data-menu]')!);
     await userEvent.click(screen.getByRole('menuitem', { name: 'Download…' }));
     sheet = screen.getByRole('dialog', { name: 'Download “Harbour Lights”' });
@@ -591,21 +611,107 @@ describe('pasted links, albums and the star (UX-SEARCH-004, UX-SEARCH-005)', () 
 
 describe('Music search settings (UX-SEARCH-006)', () => {
   it('sends only what changed on Save, keeps the SongLink key write-only, and needs one service on', async () => {
-    const hub = fakeHub({ 'GET /catalog/settings': { body: stock.settings }, 'PUT /catalog/settings': { body: { ...stock.settings, providers: { ...stock.settings.providers, soundcloud: false }, odesliKeyConfigured: true } } });
+    let settingsState = { ...stock.settings, autoDownloadStars: false };
+    const hub = fakeHub({
+      'GET /catalog/settings': { body: () => settingsState },
+      'PUT /catalog/settings': { body: (request: HubRequest) => {
+        const input = request.body as { providers?: Record<string, boolean>; autoDownloadStars?: boolean; embedLyrics?: boolean; odesliKey?: string };
+        settingsState = { ...settingsState, ...(input.autoDownloadStars === undefined ? {} : { autoDownloadStars: input.autoDownloadStars }), ...(input.embedLyrics === undefined ? {} : { embedLyrics: input.embedLyrics }), providers: { ...settingsState.providers, ...(input.providers ?? {}) }, odesliKeyConfigured: input.odesliKey ? true : settingsState.odesliKeyConfigured };
+        return settingsState;
+      } },
+    });
     render(
       <HubUiProvider gated={false}>{() => <MusicSearchSettingsView />}</HubUiProvider>,
     );
     const save = await screen.findByRole('button', { name: 'Save' });
     expect((save as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByLabelText('Offer to download songs, albums, and playlists when starring them')).toBeTruthy();
+    expect(screen.getByText(/Off by default.*album or playlist/)).toBeTruthy();
     await userEvent.click(screen.getByLabelText(/^SoundCloud/));
+    await userEvent.click(screen.getByLabelText('Offer to download songs, albums, and playlists when starring them'));
     await userEvent.type(screen.getByLabelText('SongLink key:'), 'my-key-123');
     await userEvent.click(save);
     await waitFor(() => expect(hub.sent('PUT', '/catalog/settings')).toHaveLength(1));
-    expect(hub.sent('PUT', '/catalog/settings')[0]!.body).toEqual({ providers: { soundcloud: false }, odesliKey: 'my-key-123' });
+    expect(hub.sent('PUT', '/catalog/settings')[0]!.body).toEqual({ providers: { soundcloud: false }, autoDownloadStars: true, odesliKey: 'my-key-123' });
+    await waitFor(() => expect((screen.getByLabelText('Offer to download songs, albums, and playlists when starring them') as HTMLInputElement).checked).toBe(true));
     // The key is never shown back: the field is empty again and says one is set.
     await waitFor(() => expect((screen.getByLabelText('SongLink key:') as HTMLInputElement).value).toBe(''));
 
-    for (const label of ['iTunes', 'Deezer', 'MusicBrainz', 'YouTube', 'SoundCloud']) await userEvent.click(screen.getByLabelText(new RegExp(`^${label} `)));
+    for (const label of ['iTunes', 'Deezer', 'MusicBrainz', 'YouTube']) await userEvent.click(screen.getByLabelText(new RegExp(`^${label} `)));
     expect(screen.getByText('Leave at least one service on, or search finds nothing.')).toBeTruthy();
+  });
+});
+
+describe('auto-download offers from stars (NP-FIND-015)', () => {
+  it('keeps auto-download opt-in off: starring a song saves it without a rights prompt or audio job', async () => {
+    const hub = fakeHub(savedCatalogRoutes(false));
+    renderSearch(stockClient().client);
+    await searchFor('harbour');
+    const songs = await screen.findByRole('listbox', { name: 'Songs' });
+    const row = within(songs).getAllByRole('option')[0]!;
+    expect(row.querySelector('button')).toBeNull();
+    await userEvent.click(row.querySelector('[data-menu]')!);
+    const menu = await screen.findByRole('menu', { name: '“Harbour Lights”' });
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Star' }));
+    await waitFor(() => expect(hub.sent('PUT', '/catalog/saved')).toHaveLength(1));
+    expect(hub.sent('PUT', '/catalog/saved')[0]!.body).toMatchObject({ kind: 'track', identityKey: expect.stringMatching(/^(isrc:|recording:)/) });
+    expect(screen.queryByRole('dialog', { name: /Download after starring/ })).toBeNull();
+    expect(hub.sent('POST', '/catalog/download')).toHaveLength(0);
+  });
+
+  it('keeps the star on cancellation and queues no audio until the collection-wide rights box is confirmed', async () => {
+    const hub = fakeHub({
+      ...savedCatalogRoutes(true),
+      'POST /catalog/download': { status: 201, body: { job: { id: 'j1' }, source: { platform: 'youtube-music', id: 'mockHL0001', url: 'https://music.youtube.com/watch?v=mockHL0001', previewUrl: null, matchedBy: 'spotdl' }, embedded: { isrc: true, genre: true, label: false, year: true, lyrics: true } } },
+    });
+    renderSearch(stockClient().client);
+    await searchFor(stock.playlistUrl);
+    const link = await screen.findByRole('listbox', { name: 'The playlist' });
+    await userEvent.click(within(link).getByRole('option'));
+    await screen.findByRole('heading', { name: 'Harbour Mix', level: 2 });
+    const star = await screen.findByRole('button', { name: 'Star this playlist' });
+    await waitFor(() => expect((star as HTMLButtonElement).disabled).toBe(false));
+    await userEvent.click(star);
+    await waitFor(() => expect(hub.sent('PUT', '/catalog/saved')).toHaveLength(1));
+    const dialog = await screen.findByRole('dialog', { name: 'Download after starring “Harbour Mix”' });
+    expect(within(dialog).getByLabelText('I confirm I am allowed to download every song in this collection.')).toBeTruthy();
+    expect((within(dialog).getByRole('button', { name: 'Confirm and queue' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(within(dialog).getByText(/One rights-basis confirmation applies to the whole album or playlist/)).toBeTruthy();
+    expect(within(dialog).getByText(/Search results do not grant download permission/)).toBeTruthy();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByTestId('status-strip').textContent).toBe('The star stays in your library. No audio was queued.');
+    expect(hub.sent('PUT', '/catalog/saved')).toHaveLength(1);
+    expect(hub.sent('PUT', '/catalog/saved')[0]!.body).toMatchObject({ ref: { kind: 'playlist', title: 'Harbour Mix' } });
+    expect(hub.sent('POST', '/catalog/download')).toHaveLength(0);
+
+  });
+
+  it('queues every playlist song after one collection-wide rights confirmation', async () => {
+    const hub = fakeHub({
+      ...savedCatalogRoutes(true),
+      'POST /catalog/download': { status: 201, body: { job: { id: 'j1' }, source: { platform: 'youtube-music', id: 'mockHL0001', url: 'https://music.youtube.com/watch?v=mockHL0001', previewUrl: null, matchedBy: 'spotdl' }, embedded: { isrc: true, genre: true, label: false, year: true, lyrics: true } } },
+    });
+    renderSearch(stockClient().client);
+    await searchFor(stock.playlistUrl);
+    const link = await screen.findByRole('listbox', { name: 'The playlist' });
+    await userEvent.click(within(link).getByRole('option'));
+    await screen.findByRole('heading', { name: 'Harbour Mix', level: 2 });
+    const star = await screen.findByRole('button', { name: 'Star this playlist' });
+    await waitFor(() => expect((star as HTMLButtonElement).disabled).toBe(false));
+    await userEvent.click(star);
+    await waitFor(() => expect(hub.sent('PUT', '/catalog/saved')).toHaveLength(1));
+    const dialog = await screen.findByRole('dialog', { name: 'Download after starring “Harbour Mix”' });
+    await userEvent.selectOptions(within(dialog).getByLabelText('Allowed because:'), 'user-owned');
+    await userEvent.click(within(dialog).getByLabelText('I confirm I am allowed to download every song in this collection.'));
+    const confirm = within(dialog).getByRole('button', { name: 'Confirm and queue' });
+    expect((confirm as HTMLButtonElement).disabled).toBe(false);
+    await userEvent.click(confirm);
+    await waitFor(() => expect(hub.sent('POST', '/catalog/download')).toHaveLength(6));
+    expect(hub.sent('POST', '/catalog/download/preflight')).toHaveLength(1);
+    expect(hub.sent('POST', '/catalog/download/preflight')[0]!.body).toMatchObject({ authorization: { basis: 'user-owned', acknowledged: true }, items: expect.arrayContaining([expect.objectContaining({ track: expect.objectContaining({ title: expect.any(String) }) })]) });
+    for (const request of hub.sent('POST', '/catalog/download')) {
+      expect(request.body).toMatchObject({ authorization: { basis: 'user-owned', acknowledged: true }, target: { destination: 'hub' } });
+    }
+    expect(screen.getByTestId('status-strip').textContent).toBe('Queued 6 songs from “Harbour Mix” in Music ▸ Downloads.');
   });
 });

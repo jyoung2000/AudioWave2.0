@@ -22,3 +22,6 @@ export * from './view.js';
 export * from './providers/applemusic-page.js';
 export * from './providers/spotify-embed.js';
 export * from './folder-playlists.js';
+export * from './saved-identity.js';
+export * from './saved-sync.js';
+export * from './auto-download.js';

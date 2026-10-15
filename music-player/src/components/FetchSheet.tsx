@@ -18,7 +18,6 @@ import { useAppState, usePlayer } from '../state/context.js';
 /** The bases the helper accepts, in the words of the person who would be choosing one. */
 const BASES: Array<{ id: DownloadAuthorizationBasis; label: string; detail: string }> = [
   { id: 'user-owned', label: 'It is mine', detail: 'Something you made or uploaded yourself — your own channel, your own recordings.' },
-  { id: 'creator-download', label: 'The creator offers it', detail: 'The uploader turned downloads on, or says in plain words that it may be downloaded.' },
   { id: 'public-domain', label: 'Public domain', detail: 'Old enough, or released deliberately into the public domain.' },
   { id: 'licensed', label: 'Licensed to me', detail: 'A Creative Commons licence that permits it, or a licence you hold.' },
   { id: 'purchased-export', label: 'I bought it', detail: 'You paid for this and are fetching your own copy.' },
@@ -91,7 +90,7 @@ export function FetchSheet({ open, onClose }: { open: boolean; onClose: () => vo
         ))}
       </fieldset>
       <p className="player-hint">
-        This app cannot tell whether any of that is true — only you can. It is sent with the request and recorded, and nothing is fetched without one. If none of them fits, none of them fits.
+        Search results are not download permission. This app cannot verify the basis you choose; it is sent with the request, and nothing is fetched without it. The PC helper refuses SoundCloud links because it cannot check the creator-enabled flag — use the Hub’s SoundCloud catalog flow for that.
       </p>
 
       <fieldset className="player-fieldset">
@@ -124,5 +123,7 @@ function describeTarget(input: string): { valid: boolean; spotify: boolean; reas
     return { valid: false, spotify: false, reason: 'That is not a web address. Paste the whole link, starting with https://.' };
   }
   if (url.protocol !== 'https:') return { valid: false, spotify: false, reason: 'The helper only fetches over https.' };
-  return { valid: true, spotify: /(^|\.)spotify\.com$/.test(url.hostname), reason: '' };
+  const host = url.hostname.toLowerCase().replace(/^www\./, '');
+  if (host === 'soundcloud.com' || host.endsWith('.soundcloud.com')) return { valid: false, spotify: false, reason: 'This PC helper cannot verify SoundCloud’s creator-enabled download flag. Use the Hub’s SoundCloud catalog flow.' };
+  return { valid: true, spotify: /(^|\.)spotify\.com$/.test(host), reason: '' };
 }

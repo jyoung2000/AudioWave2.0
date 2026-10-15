@@ -9,8 +9,8 @@
  * as every download on this PC does, and land where Settings says. Starred albums and playlists
  * and the filter are kept in the companion's own store.
  */
-import { CatalogAlbumDetail, CatalogArtistDetail, CatalogEnrichment, CatalogLyrics, CatalogResolveResult, HELPER_CATALOG_ROUTES, HELPER_ROUTES, HelperJob, SavedCollection, type CatalogCollectionRef, type CatalogSearchChunk, type CatalogSource, type CatalogTrack, type DownloadAuthorizationBasis, type OutputFormat } from '@now-playing/contracts';
-import { collectionKey, pickDownloadSource, readCatalogStream } from '@now-playing/domain/catalog';
+import { CatalogAlbumDetail, CatalogArtistDetail, CatalogEnrichment, CatalogLyrics, CatalogResolveResult, HELPER_CATALOG_ROUTES, HELPER_ROUTES, HelperJob, SavedCatalogItem, SavedCatalogTombstone, type SavedCatalogItemList, type SavedCatalogItemRef, type CatalogSearchChunk, type CatalogSource, type CatalogTrack, type DownloadAuthorizationBasis, type OutputFormat } from '@now-playing/contracts';
+import { CatalogBatchQueueError, mergeSavedCatalog, pickDownloadSource, queueResolvedCatalogBatch, readCatalogStream, savedCatalogKey, savedCatalogRefFromKey } from '@now-playing/domain/catalog';
 import type { z } from 'zod';
 import { CatalogFilter, type CatalogSearchIpc } from '../shared/ipc.js';
 
@@ -19,10 +19,19 @@ export interface CatalogStore {
   set(key: string, value: unknown, now: string): void;
 }
 
+export interface SavedCatalogTransport {
+  available?(): boolean;
+  list(): Promise<SavedCatalogItemList>;
+  put(item: SavedCatalogItem): Promise<SavedCatalogItemList>;
+  remove(ref: SavedCatalogItemRef, at: string): Promise<SavedCatalogItemList>;
+}
+
 export interface CompanionCatalogOptions {
   /** Where the embedded helper listens and its token; null while it is not running. */
   helper: () => { origin: string | null; token: string | null; reason: string | null };
   store: CatalogStore;
+  /** Paired Hub's `library:sync` endpoints; absent when no authorized Hub is available. */
+  sharedCatalog?: SavedCatalogTransport;
   /** Push a chunk to the window. */
   send: (payload: { searchId: string; chunk: CatalogSearchChunk }) => void;
   fetchImpl?: typeof fetch;
@@ -30,6 +39,7 @@ export interface CompanionCatalogOptions {
 }
 
 const SAVED_KEY = 'catalog.saved';
+const SAVED_TOMBSTONES_KEY = 'catalog.savedTombstones';
 const FILTER_KEY = 'catalog.filter';
 const SAVED_CAP = 2000;
 const DEFAULT_FILTER: CatalogFilter = { sections: ['tracks', 'artists', 'albums', 'playlists'], providers: ['itunes', 'deezer', 'musicbrainz', 'youtube', 'soundcloud'] };
@@ -39,6 +49,9 @@ type Answer<T> = { result: T | null; reason: string | null };
 export class CompanionCatalog {
   private readonly running = new Map<string, AbortController>();
   private readonly fetchImpl: typeof fetch;
+  private savedSync: Promise<void> | null = null;
+  private savedRetry: ReturnType<typeof setTimeout> | null = null;
+  private savedRetryDelayMs = 1_000;
 
   constructor(private readonly options: CompanionCatalogOptions) {
     this.fetchImpl = options.fetchImpl ?? fetch;
@@ -135,12 +148,13 @@ export class CompanionCatalog {
    * person's rights basis. The file lands where Settings says, as every download on this PC does.
    */
   async download(input: { track: CatalogTrack; basis: DownloadAuthorizationBasis; format?: OutputFormat | undefined }): Promise<{ job: HelperJob | null; source: CatalogSource | null; reason: string | null }> {
-    let source = pickDownloadSource(input.track.sources);
+    const eligibleSources = input.track.sources.filter((candidate) => candidate.platform !== 'soundcloud');
+    let source = pickDownloadSource(eligibleSources);
     if (!source) {
       const more = await this.enrich({ isrc: input.track.isrc ?? undefined, title: input.track.title, artist: input.track.artists[0] ?? input.track.artist, durationSec: input.track.durationMs ? Math.round(input.track.durationMs / 1000) : undefined }, true);
-      source = pickDownloadSource(more.result?.sources ?? []);
+      source = pickDownloadSource((more.result?.sources ?? []).filter((candidate) => candidate.platform !== 'soundcloud'));
     }
-    if (!source) return { job: null, source: null, reason: `“${input.track.title}” is in a store, but nowhere this PC can download from (YouTube Music, YouTube, SoundCloud, Bandcamp or Spotify through spotDL).` };
+    if (!source) return { job: null, source: null, reason: `“${input.track.title}” is in a store, but nowhere this PC can download from. SoundCloud downloads must be checked by the Hub.` };
     const at = this.where();
     if (typeof at === 'string') return { job: null, source, reason: at };
     try {
@@ -157,26 +171,146 @@ export class CompanionCatalog {
     }
   }
 
-  saved(): { items: SavedCollection[] } {
+  /** Resolve every source first, then queue the complete collection with one explicit rights basis. */
+  async downloadBatch(input: { tracks: CatalogTrack[]; basis: DownloadAuthorizationBasis; format?: OutputFormat | undefined }): Promise<{ jobs: HelperJob[]; queued: number; reason: string | null }> {
+    const available = this.where();
+    if (typeof available === 'string') return { jobs: [], queued: 0, reason: available };
+    const jobs: HelperJob[] = [];
+    try {
+      const result = await queueResolvedCatalogBatch(
+        async () => ({ tracks: input.tracks, hasMore: false, capped: false }),
+        async (track) => {
+          let source = pickDownloadSource(track.sources.filter((candidate) => candidate.platform !== 'soundcloud'));
+          if (!source) {
+            const more = await this.enrich({ isrc: track.isrc ?? undefined, title: track.title, artist: track.artists[0] ?? track.artist, durationSec: track.durationMs ? Math.round(track.durationMs / 1000) : undefined }, true);
+            source = pickDownloadSource((more.result?.sources ?? []).filter((candidate) => candidate.platform !== 'soundcloud'));
+          }
+          return source;
+        },
+        async (track, source) => {
+          const queued = await this.queueDownloadSource(source, input.basis, input.format);
+          if (!queued.job) throw new Error(queued.reason ?? `“${track.title}” could not be queued.`);
+          jobs.push(queued.job);
+        },
+      );
+      return { jobs, queued: result.queued, reason: null };
+    } catch (error) {
+      const queued = error instanceof CatalogBatchQueueError ? error.queued : jobs.length;
+      return { jobs, queued, reason: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  private async queueDownloadSource(source: CatalogSource, basis: DownloadAuthorizationBasis, format?: OutputFormat): Promise<{ job: HelperJob | null; reason: string | null }> {
+    const at = this.where();
+    if (typeof at === 'string') return { job: null, reason: at };
+    try {
+      const response = await this.fetchImpl(new URL(HELPER_ROUTES.fetch, at.origin), {
+        method: 'POST',
+        headers: { 'x-helper-token': at.token, 'content-type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ url: source.url, tool: 'auto', ...(format ? { format } : {}), authorization: { basis, acknowledged: true } }),
+      });
+      if (!response.ok) return { job: null, reason: await this.refusal(response) };
+      const job = HelperJob.safeParse(await response.json());
+      return job.success ? { job: job.data, reason: null } : { job: null, reason: 'The helper answered with something this window does not understand.' };
+    } catch (error) {
+      return { job: null, reason: `The helper could not be reached: ${error instanceof Error ? error.message : String(error)}` };
+    }
+  }
+
+  private now(): string {
+    return (this.options.now?.() ?? new Date()).toISOString();
+  }
+
+  private localSaved(): SavedCatalogItem[] {
     const raw = this.options.store.get<unknown[]>(SAVED_KEY, []);
-    const items = (Array.isArray(raw) ? raw : []).flatMap((item) => {
-      const parsed = SavedCollection.safeParse(item);
+    return (Array.isArray(raw) ? raw : []).flatMap((item) => {
+      const parsed = SavedCatalogItem.safeParse(item);
+      return parsed.success ? [parsed.data] : [];
+    }).sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+  }
+
+  private localTombstones(): SavedCatalogTombstone[] {
+    const raw = this.options.store.get<unknown[]>(SAVED_TOMBSTONES_KEY, []);
+    return (Array.isArray(raw) ? raw : []).flatMap((item) => {
+      const parsed = SavedCatalogTombstone.safeParse(item);
       return parsed.success ? [parsed.data] : [];
     });
-    return { items: items.sort((a, b) => b.savedAt.localeCompare(a.savedAt)) };
   }
 
-  save(saved: SavedCollection): { items: SavedCollection[] } {
-    const key = collectionKey(saved.ref);
-    const rest = this.saved().items.filter((item) => collectionKey(item.ref) !== key);
-    this.options.store.set(SAVED_KEY, [saved, ...rest].slice(0, SAVED_CAP), (this.options.now?.() ?? new Date()).toISOString());
-    return this.saved();
+  private persistSaved(items: SavedCatalogItem[], tombstones: SavedCatalogTombstone[]): void {
+    const at = this.now();
+    this.options.store.set(SAVED_KEY, items.slice(0, SAVED_CAP), at);
+    this.options.store.set(SAVED_TOMBSTONES_KEY, tombstones, at);
   }
 
-  unsave(ref: Pick<CatalogCollectionRef, 'platform' | 'kind' | 'id'>): { items: SavedCollection[] } {
-    const key = collectionKey(ref);
-    this.options.store.set(SAVED_KEY, this.saved().items.filter((item) => collectionKey(item.ref) !== key), (this.options.now?.() ?? new Date()).toISOString());
-    return this.saved();
+  async saved(): Promise<{ items: SavedCatalogItem[] }> {
+    await this.syncSavedCatalog();
+    return { items: this.localSaved() };
+  }
+
+  async save(item: SavedCatalogItem): Promise<{ items: SavedCatalogItem[] }> {
+    const key = savedCatalogKey(item);
+    const current = this.localSaved();
+    if (!current.some((saved) => savedCatalogKey(saved) === key) && current.length >= SAVED_CAP) throw new Error(`The library already holds ${SAVED_CAP} starred items. Un-star some first.`);
+    const items = [item, ...current.filter((saved) => savedCatalogKey(saved) !== key)];
+    const tombstones = this.localTombstones().filter((marker) => marker.key !== key);
+    this.persistSaved(items, tombstones);
+    await this.syncSavedCatalog();
+    return { items: this.localSaved() };
+  }
+
+  async unsave(ref: SavedCatalogItemRef): Promise<{ items: SavedCatalogItem[] }> {
+    const key = savedCatalogKey(ref);
+    const at = this.now();
+    const items = this.localSaved().filter((item) => savedCatalogKey(item) !== key);
+    const tombstones = this.localTombstones().filter((marker) => marker.key !== key);
+    tombstones.push({ key, at });
+    this.persistSaved(items, tombstones);
+    await this.syncSavedCatalog();
+    return { items: this.localSaved() };
+  }
+
+  private async syncSavedCatalog(): Promise<void> {
+    const transport = this.options.sharedCatalog;
+    if (!transport || transport.available?.() === false) return;
+    if (this.savedSync) return this.savedSync;
+    this.savedSync = this.reconcileSavedCatalog(transport)
+      .then((pending) => {
+        if (pending) this.scheduleSavedRetry();
+        else {
+          this.savedRetryDelayMs = 1_000;
+          if (this.savedRetry) clearTimeout(this.savedRetry);
+          this.savedRetry = null;
+        }
+      })
+      .catch(() => this.scheduleSavedRetry())
+      .finally(() => { this.savedSync = null; });
+    return this.savedSync;
+  }
+
+  private async reconcileSavedCatalog(transport: SavedCatalogTransport): Promise<boolean> {
+    let remote = await transport.list();
+    const merged = mergeSavedCatalog(this.localSaved(), remote.items, this.localTombstones(), remote.tombstones);
+    this.persistSaved(merged.items, merged.tombstones);
+    for (const item of merged.put) remote = await transport.put(item);
+    for (const marker of merged.del) {
+      const ref = savedCatalogRefFromKey(marker.key);
+      if (ref) remote = await transport.remove(ref, marker.at);
+    }
+    const settled = mergeSavedCatalog(merged.items, remote.items, merged.tombstones, remote.tombstones);
+    this.persistSaved(settled.items, settled.tombstones);
+    return settled.put.length > 0 || settled.del.length > 0;
+  }
+
+  private scheduleSavedRetry(): void {
+    if (this.savedRetry) return;
+    const delay = this.savedRetryDelayMs;
+    this.savedRetryDelayMs = Math.min(this.savedRetryDelayMs * 2, 60_000);
+    this.savedRetry = setTimeout(() => {
+      this.savedRetry = null;
+      void this.syncSavedCatalog();
+    }, delay);
+    this.savedRetry.unref?.();
   }
 
   filter(): CatalogFilter {

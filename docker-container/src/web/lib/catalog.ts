@@ -6,9 +6,9 @@
  * the star — is the domain's (`@now-playing/domain/catalog`, view.ts), shared with the companion.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CatalogAlbumDetail, CatalogArtistDetail, CatalogEnrichment, CatalogLyrics, CatalogProviderId, CatalogResolveResult, CatalogSearchChunk, CatalogSearchSection, CatalogTrack, SavedCollection } from '@now-playing/contracts';
-import { CATALOG_PROVIDERS } from '@now-playing/contracts';
-import { collectionKey, EMPTY_RESULTS, foldCatalogChunk, readCatalogStream, type CatalogFields, type CatalogResults } from '@now-playing/domain/catalog';
+import type { CatalogAlbumDetail, CatalogArtistDetail, CatalogEnrichment, CatalogLyrics, CatalogProviderId, CatalogResolveResult, CatalogSearchChunk, CatalogSearchSection, CatalogTrack, SavedCatalogItem, SavedCollection, SavedTrack } from '@now-playing/contracts';
+import { CATALOG_PROVIDERS, SavedCatalogItemList, SavedSongSnapshot, SavedTrack as SavedTrackSchema } from '@now-playing/contracts';
+import { collectionKey, EMPTY_RESULTS, foldCatalogChunk, readCatalogStream, savedTrackIdentity, type CatalogFields, type CatalogResults } from '@now-playing/domain/catalog';
 import { api, ApiError, apiStream } from './api.js';
 import { useStoredState } from './hooks.js';
 
@@ -193,17 +193,22 @@ export function usePreview(): Preview {
 /* ------------------------------------------------------------------ starred albums and playlists */
 
 export interface SavedCollections {
-  items: SavedCollection[];
+  items: SavedCatalogItem[];
+  collections: SavedCollection[];
+  tracks: SavedTrack[];
   isSaved: (ref: SavedCollection['ref']) => boolean;
+  isTrackSaved: (track: CatalogTrack) => boolean;
   busy: boolean;
   error: ApiError | null;
   /** Star or un-star; resolves true when the hub kept the change. */
   toggle: (saved: SavedCollection) => Promise<boolean>;
+  toggleTrack: (track: CatalogTrack) => Promise<boolean>;
+  unstarTrack: (identityKey: string) => Promise<boolean>;
 }
 
-/** The admin's starred albums and playlists, kept by the hub (`/api/v1/catalog/saved`). */
+/** The admin's shared songs, albums and playlists, kept by the hub (`/api/v1/catalog/saved`). */
 export function useSavedCollections(): SavedCollections {
-  const [items, setItems] = useState<SavedCollection[]>([]);
+  const [items, setItems] = useState<SavedCatalogItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
 
@@ -211,7 +216,7 @@ export function useSavedCollections(): SavedCollections {
     let live = true;
     api('catalogSavedList')
       .then((answer) => {
-        if (live) setItems((answer as { items: SavedCollection[] }).items);
+        if (live) setItems(SavedCatalogItemList.parse(answer).items);
       })
       .catch((err: unknown) => {
         if (live) setError(catalogError(err));
@@ -221,8 +226,15 @@ export function useSavedCollections(): SavedCollections {
     };
   }, []);
 
-  const keys = useMemo(() => new Set(items.map((item) => collectionKey(item.ref))), [items]);
+  const collections = useMemo(() => items.filter((item): item is SavedCollection => 'ref' in item), [items]);
+  const tracks = useMemo(() => items.filter((item): item is SavedTrack => 'kind' in item && item.kind === 'track'), [items]);
+  const keys = useMemo(() => new Set(collections.map((item) => collectionKey(item.ref))), [collections]);
+  const trackKeys = useMemo(() => new Set(tracks.map((item) => item.identityKey)), [tracks]);
   const isSaved = useCallback((ref: SavedCollection['ref']) => keys.has(collectionKey(ref)), [keys]);
+  const isTrackSaved = useCallback((track: CatalogTrack) => {
+    const identityKey = savedTrackIdentity(track);
+    return identityKey !== null && trackKeys.has(identityKey);
+  }, [trackKeys]);
 
   const toggle = useCallback(
     async (saved: SavedCollection): Promise<boolean> => {
@@ -230,7 +242,7 @@ export function useSavedCollections(): SavedCollections {
       setError(null);
       try {
         const answer = keys.has(collectionKey(saved.ref)) ? await api('catalogSavedDelete', { query: { platform: saved.ref.platform, kind: saved.ref.kind, id: saved.ref.id } }) : await api('catalogSavedPut', { body: saved });
-        setItems((answer as { items: SavedCollection[] }).items);
+        setItems(SavedCatalogItemList.parse(answer).items);
         return true;
       } catch (err) {
         setError(catalogError(err));
@@ -242,5 +254,40 @@ export function useSavedCollections(): SavedCollections {
     [keys],
   );
 
-  return { items, isSaved, busy, error, toggle };
+  const toggleTrack = useCallback(async (track: CatalogTrack): Promise<boolean> => {
+    setBusy(true);
+    setError(null);
+    try {
+      const snapshot = SavedSongSnapshot.parse(track);
+      const identityKey = savedTrackIdentity(snapshot);
+      if (!identityKey) throw new Error('This song has no safe recording identity to share.');
+      const answer = trackKeys.has(identityKey)
+        ? await api('catalogSavedDelete', { query: { kind: 'track', identityKey } })
+        : await api('catalogSavedPut', { body: SavedTrackSchema.parse({ kind: 'track', identityKey, track: snapshot, savedAt: new Date().toISOString() }) });
+      setItems(SavedCatalogItemList.parse(answer).items);
+      return true;
+    } catch (err) {
+      setError(catalogError(err));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, [trackKeys]);
+
+  const unstarTrack = useCallback(async (identityKey: string): Promise<boolean> => {
+    setBusy(true);
+    setError(null);
+    try {
+      const answer = await api('catalogSavedDelete', { query: { kind: 'track', identityKey } });
+      setItems(SavedCatalogItemList.parse(answer).items);
+      return true;
+    } catch (err) {
+      setError(catalogError(err));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  return { items, collections, tracks, isSaved, isTrackSaved, busy, error, toggle, toggleTrack, unstarTrack };
 }

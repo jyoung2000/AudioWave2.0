@@ -24,19 +24,19 @@ let root: string;
 let hub: TestHub;
 let device: { authorization: string };
 
-/** A set of six entries: four distinct tracks, one twice, one off the allowlist and one private. */
+/** Six YouTube-list entries: three distinct, one duplicate, one off the allowlist and one private. */
 function setJson(count?: number): string {
   const entries = count
-    ? Array.from({ length: count }, (_, i) => ({ _type: 'url', url: `https://soundcloud.com/forss/track-${i}`, title: `Track ${i}`, uploader: 'Forss' }))
+    ? Array.from({ length: count }, (_, i) => ({ _type: 'url', url: `https://www.youtube.com/watch?v=track-${i}`, title: `Track ${i}`, channel: 'Test channel', duration: 200 }))
     : [
-        { _type: 'url_transparent', url: 'https://soundcloud.com/forss/city-ports', album: 'Soulhack' },
         { _type: 'url', url: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ', title: 'Big Buck Bunny 60fps 4K - Official Blender Foundation Short Film', channel: 'Blender', duration: 635 },
-        { _type: 'url_transparent', url: 'https://soundcloud.com/forss/city-ports', album: 'Soulhack' },
+        { _type: 'url', url: 'https://www.youtube.com/watch?v=track-two', title: 'Sample Track Two', channel: 'Forss', duration: 220 },
+        { _type: 'url', url: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ', title: 'Big Buck Bunny 60fps 4K - Official Blender Foundation Short Film', channel: 'Blender', duration: 635 },
         { _type: 'url', url: 'https://evil.example/not-on-the-list', title: 'Elsewhere' },
         { _type: 'url', url: 'https://www.youtube.com/watch?v=private1', title: '[Private video]' },
-        { _type: 'url_transparent', url: 'https://soundcloud.com/forss/flickermood', album: 'Soulhack' },
+        { _type: 'url', url: 'https://www.youtube.com/watch?v=track-three', title: 'Sample Track Three', channel: 'Forss', duration: 240 },
       ];
-  return JSON.stringify({ _type: 'playlist', title: 'Soulhack', uploader: 'Forss', playlist_count: count ?? entries.length, webpage_url: 'https://soundcloud.com/forss/sets/soulhack', entries });
+  return JSON.stringify({ _type: 'playlist', title: 'Sample playlist', uploader: 'Test channel', playlist_count: count ?? entries.length, webpage_url: count ? 'https://www.youtube.com/playlist?list=sample-long' : 'https://www.youtube.com/playlist?list=sample-soulhack', entries });
 }
 
 /**
@@ -141,7 +141,7 @@ async function startHub(answers: Record<string, string>, opts: { twoFiles?: bool
   device = await pairDevice(hub, admin);
 }
 
-const batch = (url: string, basis = 'public-domain', format = 'original') =>
+const batch = (url: string, basis = 'licensed', format = 'original') =>
   hub.app.inject({ method: 'POST', url: '/api/v1/downloads/batch', headers: { authorization: device.authorization }, payload: { url, authorization: { basis, acknowledged: true }, target: { destination: 'hub', format } } });
 
 beforeEach(() => {
@@ -155,19 +155,20 @@ afterEach(async () => {
 
 describe('a playlist link', () => {
   it('becomes one job per entry, each with its own tags and the request’s one rights basis; duplicates and the rest are named', async () => {
-    await startHub({ 'https://soundcloud.com/forss/sets/soulhack': setJson() });
-    const response = await batch('https://soundcloud.com/forss/sets/soulhack');
+    await startHub({ 'https://www.youtube.com/playlist?list=sample-soulhack': setJson() });
+    const response = await batch('https://www.youtube.com/playlist?list=sample-soulhack');
     expect(response.statusCode, response.body).toBe(201);
     const result = response.json() as DownloadBatchResult;
-    expect(result.batch).toMatchObject({ kind: 'playlist', title: 'Soulhack', listed: 6, created: 3, cap: DOWNLOAD_BATCH_CAP, capped: false });
-    expect(result.items.map((j) => j.source.url)).toEqual(['https://soundcloud.com/forss/city-ports', 'https://www.youtube.com/watch?v=aqz-KE-bpKQ', 'https://soundcloud.com/forss/flickermood']);
-    expect(result.items.every((j) => j.authorization.basis === 'public-domain')).toBe(true);
-    expect(result.items.map((j) => j.source.batch)).toEqual([0, 1, 2].map((index) => ({ id: result.batch.id, title: 'Soulhack', index, total: 3 })));
-    // The listing's own title for a video, cleaned; a set entry with no title is named from its link until it runs.
-    expect(result.items[1]!.source).toMatchObject({ title: 'Big Buck Bunny', artistName: 'Blender', tags: { title: 'Big Buck Bunny', durationMs: 635_000 } });
-    expect(result.items[0]!.source.title).toBe('City Ports');
+    expect(result.batch).toMatchObject({ kind: 'playlist', title: 'Sample playlist', listed: 6, created: 3, cap: DOWNLOAD_BATCH_CAP, capped: false });
+    expect(result.items.map((j) => j.source.url)).toEqual(['https://www.youtube.com/watch?v=aqz-KE-bpKQ', 'https://www.youtube.com/watch?v=track-two', 'https://www.youtube.com/watch?v=track-three']);
+    expect(result.items.every((j) => j.authorization.basis === 'licensed')).toBe(true);
+    expect(result.items.map((j) => j.source.batch)).toEqual([0, 1, 2].map((index) => ({ id: result.batch.id, title: 'Sample playlist', index, total: 3 })));
+    // The listing title is cleaned and the playlist's channel and duration become track tags.
+    expect(result.items[0]!.source).toMatchObject({ title: 'Big Buck Bunny', artistName: 'Blender', tags: { title: 'Big Buck Bunny', durationMs: 635_000 } });
+    expect(result.items[1]!.source.title).toBe('Sample Track Two');
+    expect(result.items[2]!.source.title).toBe('Sample Track Three');
     expect(result.batch.skipped).toEqual([
-      { url: 'https://soundcloud.com/forss/city-ports', title: 'City Ports', reason: 'duplicate' },
+      { url: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ', title: 'Big Buck Bunny', reason: 'duplicate' },
       { url: 'https://evil.example/not-on-the-list', title: 'Elsewhere', reason: 'not-allowed' },
       { url: 'https://www.youtube.com/watch?v=private1', title: '[Private video]', reason: 'unavailable' },
     ]);
@@ -175,19 +176,28 @@ describe('a playlist link', () => {
     await hub.ctx.downloads.idle();
   });
 
+  it('refuses a SoundCloud URL through the generic external tool without creating a job', async () => {
+    const url = 'https://soundcloud.com/forss/flickermood';
+    await startHub({ [url]: fixture('soundcloud-flickermood.json') });
+    const response = await batch(url, 'licensed');
+    expect(response.statusCode).toBe(403);
+    expect(hub.ctx.downloads.list()).toEqual([]);
+    expect(calls('yt-dlp.calls')).toEqual([]);
+  });
+
   it('needs a rights basis the tool accepts, for the list and so for every entry — and makes nothing otherwise', async () => {
-    await startHub({ 'https://soundcloud.com/forss/sets/soulhack': setJson() });
-    const refused = await batch('https://soundcloud.com/forss/sets/soulhack', 'hub-hosted');
+    await startHub({ 'https://www.youtube.com/playlist?list=sample-soulhack': setJson() });
+    const refused = await batch('https://www.youtube.com/playlist?list=sample-soulhack', 'hub-hosted');
     expect(refused.statusCode).toBe(403);
-    const missing = await hub.app.inject({ method: 'POST', url: '/api/v1/downloads/batch', headers: { authorization: device.authorization }, payload: { url: 'https://soundcloud.com/forss/sets/soulhack', target: { destination: 'hub' } } });
+    const missing = await hub.app.inject({ method: 'POST', url: '/api/v1/downloads/batch', headers: { authorization: device.authorization }, payload: { url: 'https://www.youtube.com/playlist?list=sample-soulhack', target: { destination: 'hub' } } });
     expect(missing.statusCode).toBe(400);
     expect(hub.ctx.downloads.list()).toEqual([]);
     expect(calls('yt-dlp.calls'), 'nothing ran for a refused request').toEqual([]);
   });
 
   it(`takes at most ${DOWNLOAD_BATCH_CAP} entries, and says the list was longer`, async () => {
-    await startHub({ 'https://soundcloud.com/forss/sets/long': setJson(DOWNLOAD_BATCH_CAP + 37) });
-    const result = (await batch('https://soundcloud.com/forss/sets/long')).json() as DownloadBatchResult;
+    await startHub({ 'https://www.youtube.com/playlist?list=sample-long': setJson(DOWNLOAD_BATCH_CAP + 37) });
+    const result = (await batch('https://www.youtube.com/playlist?list=sample-long')).json() as DownloadBatchResult;
     expect(result.batch).toMatchObject({ listed: DOWNLOAD_BATCH_CAP + 37, created: DOWNLOAD_BATCH_CAP, capped: true });
     expect(result.items).toHaveLength(DOWNLOAD_BATCH_CAP);
     expect(result.message).toMatch(new RegExp(`lists ${DOWNLOAD_BATCH_CAP + 37} entries and one request takes at most ${DOWNLOAD_BATCH_CAP}`));
@@ -197,15 +207,15 @@ describe('a playlist link', () => {
   });
 
   it('asked for again, makes nothing new for entries already downloading or downloaded', async () => {
-    await startHub({ 'https://soundcloud.com/forss/sets/soulhack': setJson() });
-    await batch('https://soundcloud.com/forss/sets/soulhack');
+    await startHub({ 'https://www.youtube.com/playlist?list=sample-soulhack': setJson() });
+    await batch('https://www.youtube.com/playlist?list=sample-soulhack');
     await hub.ctx.downloads.idle();
-    const again = (await batch('https://soundcloud.com/forss/sets/soulhack')).json() as DownloadBatchResult;
+    const again = (await batch('https://www.youtube.com/playlist?list=sample-soulhack')).json() as DownloadBatchResult;
     expect(again.batch.created).toBe(0);
     expect(again.batch.id).toBeNull();
     expect(again.batch.skipped.filter((s) => s.reason === 'duplicate')).toHaveLength(4);
     // The same tracks in another format are other files, so they are not duplicates.
-    const asMp3 = (await batch('https://soundcloud.com/forss/sets/soulhack', 'public-domain', 'mp3')).json() as DownloadBatchResult;
+    const asMp3 = (await batch('https://www.youtube.com/playlist?list=sample-soulhack', 'licensed', 'mp3')).json() as DownloadBatchResult;
     expect(asMp3.batch.created).toBe(3);
     await hub.ctx.downloads.idle();
   });
@@ -216,7 +226,7 @@ describe('a playlist link', () => {
       method: 'POST',
       url: '/api/v1/downloads',
       headers: { authorization: device.authorization },
-      payload: { source: { provider: 'external-tool', providerTrackId: null, url: 'https://soundcloud.com/forss/sets/soulhack', locator: null, title: null, artistName: null }, authorization: { basis: 'public-domain', acknowledged: true }, target: { destination: 'hub', format: 'original' } },
+      payload: { source: { provider: 'external-tool', providerTrackId: null, url: 'https://www.youtube.com/playlist?list=sample-soulhack', locator: null, title: null, artistName: null }, authorization: { basis: 'licensed', acknowledged: true }, target: { destination: 'hub', format: 'original' } },
     });
     expect(response.statusCode).toBe(400);
     expect(response.body).toMatch(/downloads\/batch/);
@@ -254,21 +264,21 @@ describe('running a job through the tool', () => {
   });
 
   it('converts when asked, with the tags in the same pass', async () => {
-    const url = 'https://soundcloud.com/forss/flickermood';
-    await startHub({ [url]: fixture('soundcloud-flickermood.json') });
-    const result = (await batch(url, 'public-domain', 'mp3')).json() as DownloadBatchResult;
+    const url = 'https://www.youtube.com/watch?v=aqz-KE-bpKQ';
+    await startHub({ [url]: fixture('youtube-big-buck-bunny.json') });
+    const result = (await batch(url, 'licensed', 'mp3')).json() as DownloadBatchResult;
     await hub.ctx.downloads.idle();
     const job = hub.ctx.downloads.find(result.items[0]!.id);
     expect(job.state, job.error ?? '').toBe('completed');
     const [ffmpeg] = calls<{ args: string[]; meta: string }>('ffmpeg.calls');
     expect(ffmpeg!.args).toEqual(expect.arrayContaining(['-c:a', 'libmp3lame', '-id3v2_version', '3']));
-    expect(ffmpeg!.meta).toContain('genre=Electronic');
+    expect(ffmpeg!.meta).toContain('copyright=Creative Commons Attribution license (reuse allowed)');
     expect((hub.ctx.repos.downloads.find(job.id) as { outputPath: string }).outputPath).toMatch(/\.mp3$/);
   });
 
   it('a tool that makes more than one file fails the job and says why', async () => {
-    const url = 'https://soundcloud.com/forss/flickermood';
-    await startHub({ [url]: fixture('soundcloud-flickermood.json') }, { twoFiles: true });
+    const url = 'https://www.youtube.com/watch?v=aqz-KE-bpKQ';
+    await startHub({ [url]: fixture('youtube-big-buck-bunny.json') }, { twoFiles: true });
     const result = (await batch(url)).json() as DownloadBatchResult;
     await hub.ctx.downloads.idle();
     const job = hub.ctx.downloads.find(result.items[0]!.id);

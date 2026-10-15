@@ -258,3 +258,12 @@ describe('what it reports', () => {
     expect(authorized).toBeNull();
   });
 });
+
+describe('external-tool download permission', () => {
+  it('does not treat a generic YouTube/SoundCloud URL as creator-enabled permission', async () => {
+    const tool = adapter({});
+    await expect(tool.getAuthorizedDownload('https://www.youtube.com/watch?v=abc', { actorId: 'device-1', basis: 'creator-download' })).resolves.toBeNull();
+    await expect(tool.getAuthorizedDownload('https://soundcloud.com/artist/track', { actorId: 'device-1', basis: 'licensed' })).resolves.toBeNull();
+    await expect(tool.getAuthorizedDownload('https://www.youtube.com/watch?v=abc', { actorId: 'device-1', basis: 'user-owned' })).resolves.toMatchObject({ kind: 'external-tool' });
+  });
+});

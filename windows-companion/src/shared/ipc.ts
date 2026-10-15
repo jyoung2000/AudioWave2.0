@@ -17,7 +17,6 @@ import {
   CATALOG_PAGE_MAX,
   CatalogAlbumDetail,
   CatalogArtistDetail,
-  CatalogCollectionRef,
   CatalogEnrichment,
   CatalogLyrics,
   CatalogProviderId,
@@ -46,7 +45,8 @@ import {
   PLAYLIST_FOLDER_PAGE_MAX,
   Playlist,
   PlaylistFolderInfo,
-  SavedCollection,
+  SavedCatalogItem,
+  SavedCatalogItemRef,
   Track,
 } from '@now-playing/contracts';
 import { IPC_CHANNELS, IPC_EVENT_NAMES, type IpcChannel, type IpcEvent } from './channels.js';
@@ -412,6 +412,8 @@ export const Preferences = z.object({
   autoUpdateTools: z.boolean().default(true),
   /** Ask GitHub once a day whether there is a newer companion. */
   checkForUpdates: z.boolean().default(true),
+  /** When enabled, starring a catalog song/list asks for a rights basis before downloads are queued. */
+  autoDownloadStars: z.boolean().default(false),
   /** Where finished downloads are saved. Null: the Downloads folder inside Music. Set only through the folder picker. */
   downloadDir: z.string().nullable().default(null),
   /** Where playlists are kept (DEC-041). Null: `Music\Airwave Playlists`. Set only through the folder picker (playlists:pick-dir). */
@@ -446,6 +448,7 @@ export const PreferencesPatch = z.strictObject({
   helperPort: z.number().int().min(1024).max(65535).optional(),
   autoUpdateTools: z.boolean().optional(),
   checkForUpdates: z.boolean().optional(),
+  autoDownloadStars: z.boolean().optional(),
   // No downloadDir or playlistDir: a folder is only ever chosen in the system's own picker (downloads:pick-dir, playlists:pick-dir).
   downloadFormat: OutputFormat.optional(),
   downloadConcurrency: z.number().int().min(1).max(4).optional(),
@@ -508,7 +511,7 @@ export type CatalogFilter = z.infer<typeof CatalogFilter>;
 
 const Answer = <T extends z.ZodType>(result: T) => z.object({ result: result.nullable(), reason: z.string().max(600).nullable() });
 const ListPage = { offset: z.number().int().min(0).max(CATALOG_COLLECTION_CAP).default(0), limit: z.number().int().min(1).max(CATALOG_PAGE_MAX).default(50) };
-const SavedList = z.object({ items: z.array(SavedCollection) });
+const SavedList = z.object({ items: z.array(SavedCatalogItem) });
 const PlaylistRef = { playlistId: FolderPlaylistId };
 
 /**
@@ -625,10 +628,12 @@ export const IPC = {
   'catalog:enrich': { request: z.strictObject({ isrc: z.string().max(20).optional(), title: z.string().max(300).optional(), artist: z.string().max(300).optional(), durationSec: z.number().int().min(1).max(7200).optional() }), response: Answer(CatalogEnrichment) },
   /** The helper's download path, as every download on this PC: from the song's best source, saved where Settings says. */
   'catalog:download': { request: z.strictObject({ track: CatalogTrack, basis: DownloadAuthorizationBasis, format: OutputFormat.optional() }), response: z.object({ job: HelperJob.nullable(), source: CatalogSource.nullable(), reason: z.string().max(600).nullable() }) },
-  /** Starred albums and playlists, kept in this PC's library (the shared SavedCollection shape). */
+  /** One explicit rights basis for every resolved track. Sources are preflighted before any helper jobs are created. */
+  'catalog:download-batch': { request: z.strictObject({ tracks: z.array(CatalogTrack).min(1).max(CATALOG_COLLECTION_CAP), basis: DownloadAuthorizationBasis, format: OutputFormat.optional() }), response: z.object({ jobs: z.array(HelperJob), queued: z.number().int().nonnegative(), reason: z.string().max(600).nullable() }) },
+  /** Shared songs, albums and playlists; mutations sync to the paired Hub when `library:sync` is granted. */
   'catalog:saved': { request: z.void(), response: SavedList },
-  'catalog:save': { request: SavedCollection, response: SavedList },
-  'catalog:unsave': { request: CatalogCollectionRef.pick({ platform: true, kind: true, id: true }), response: SavedList },
+  'catalog:save': { request: SavedCatalogItem, response: SavedList },
+  'catalog:unsave': { request: SavedCatalogItemRef, response: SavedList },
   'catalog:filter': { request: z.void(), response: CatalogFilter },
   'catalog:filter:set': { request: CatalogFilter, response: CatalogFilter },
 
