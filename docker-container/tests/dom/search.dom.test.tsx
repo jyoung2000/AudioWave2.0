@@ -144,7 +144,9 @@ describe('what a row says (UX-SEARCH-003)', () => {
 
   it('is a list box: one tab stop, arrows move, Enter opens the song with genre, label, year and synced lyrics', async () => {
     fakeHub(SAVED_EMPTY);
-    renderSearch(stockClient().client);
+    const { client } = stockClient();
+    client.enrich = async () => ({ ...stock.enrich, artist: 'Cassette Bloom', artists: ['Cassette Bloom', 'Ada Moss'], featured: ['Ada Moss'], album: 'Harbour Lights', albumArtist: 'Cassette Bloom' }) as never;
+    renderSearch(client);
     await searchFor('harbour');
     const songs = await screen.findByRole('listbox', { name: 'Songs' });
     await waitFor(() => expect(within(songs).getAllByRole('option')).toHaveLength(5));
@@ -157,6 +159,7 @@ describe('what a row says (UX-SEARCH-003)', () => {
     expect(document.activeElement).toBe(heading);
     expect(await screen.findByText('Indie Pop')).toBeTruthy();
     expect(screen.getByText('Pier Records')).toBeTruthy();
+    expect(screen.getByText('Cassette Bloom feat. Ada Moss')).toBeTruthy();
     expect(screen.getByText('2026')).toBeTruthy();
     const lyrics = await screen.findByRole('region', { name: 'Lyrics, timed' });
     expect(lyrics.textContent).toContain('0:12 The lamps come on along the quay');

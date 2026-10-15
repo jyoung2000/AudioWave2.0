@@ -12027,7 +12027,7 @@
     "/api/v1/catalog/enrich": {
       "get": {
         "operationId": "catalogEnrich",
-        "summary": "Genre, label and year from MusicBrainz by ISRC, and the song on other platforms",
+        "summary": "Credited artists, album, genre, label and release year from a matched MusicBrainz recording, and other platform links",
         "tags": [
           "catalog"
         ],
@@ -12123,6 +12123,60 @@
                         {
                           "type": "string",
                           "maxLength": 40
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "artist": {
+                      "default": null,
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 300
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "artists": {
+                      "default": [],
+                      "maxItems": 20,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "maxLength": 300
+                      }
+                    },
+                    "featured": {
+                      "default": [],
+                      "maxItems": 19,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "maxLength": 300
+                      }
+                    },
+                    "album": {
+                      "default": null,
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 300
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "albumArtist": {
+                      "default": null,
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 300
                         },
                         {
                           "type": "null"
@@ -12258,6 +12312,11 @@
                   "required": [
                     "isrc",
                     "musicbrainzRecordingId",
+                    "artist",
+                    "artists",
+                    "featured",
+                    "album",
+                    "albumArtist",
                     "genre",
                     "genres",
                     "label",

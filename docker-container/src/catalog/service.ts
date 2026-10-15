@@ -147,14 +147,16 @@ export class HubCatalogService {
 
   /**
    * The tags a catalog download carries: what the catalog knows of the song, then MusicBrainz's
-   * genre, label and year where the song lacks them, and LRCLIB's lyrics when the setting is on.
+   * credited artists, album, genre, label and year where the song lacks them, and LRCLIB lyrics when enabled.
    * Each lookup is best effort: a slow service costs a tag, never the download.
    */
   async tagsFor(track: CatalogTrack, signal?: AbortSignal): Promise<{ tags: DownloadTags; embedded: { isrc: boolean; genre: boolean; label: boolean; year: boolean; lyrics: boolean } }> {
     const isrc = normaliseIsrc(track.isrc);
     const enrichment = isrc || (track.title && track.artist) ? await this.engine.enrich({ isrc, title: track.title, artist: track.artists[0] ?? track.artist, durationMs: track.durationMs }, signal).catch(() => null) : null;
-    const primary = track.artists[0] ?? track.artist;
-    const featured = track.artists.slice(1).filter((a) => a && a !== primary);
+    const enrichedArtists = enrichment?.artists ?? [];
+    const credited = track.artists.length > 1 ? track.artists : enrichedArtists;
+    const primary = credited[0] ?? enrichment?.artist ?? track.artist;
+    const featured = (track.artists.length > 1 ? track.artists.slice(1) : (enrichment?.featured?.length ? enrichment.featured : credited.slice(1))).filter((a) => a && a !== primary);
     let lyrics: string | null = null;
     if (this.settingsView().embedLyrics) {
       const found = await this.engine.lyrics({ title: track.title, artist: primary, ...(track.album ? { album: track.album } : {}), ...(track.durationMs ? { durationSec: Math.round(track.durationMs / 1000) } : {}) }, signal).catch(() => null);
@@ -165,8 +167,8 @@ export class HubCatalogService {
       title: track.title.slice(0, 300),
       artist: primary.slice(0, 300) || null,
       featured: featured.slice(0, 20).map((f) => f.slice(0, 200)),
-      album: track.album,
-      albumArtist: track.albumArtist,
+      album: track.album ?? enrichment?.album ?? null,
+      albumArtist: track.albumArtist ?? enrichment?.albumArtist ?? null,
       date: date && /^\d{4}(-\d{2}(-\d{2})?)?$/.test(date) ? date : null,
       genre: (track.genre ?? enrichment?.genre ?? null)?.slice(0, 100) ?? null,
       trackNumber: track.trackNumber && track.trackNumber <= 9999 ? track.trackNumber : null,

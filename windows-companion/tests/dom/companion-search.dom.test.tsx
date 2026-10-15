@@ -280,13 +280,16 @@ describe('Search in the companion', () => {
   });
 
   it('opens a song with genre, label, year and lyrics, and downloads it through the helper’s path', async () => {
-    const bridge = installBridge();
+    const bridge = installBridge({
+      'catalog:enrich': () => ({ result: { ...stock.enrich, artist: 'Cassette Bloom', artists: ['Cassette Bloom', 'Ada Moss'], featured: ['Ada Moss'], album: 'Harbour Lights', albumArtist: 'Cassette Bloom' }, reason: null }),
+    });
     render(<SearchView />);
     await searchFor('harbour');
     const songs = await screen.findByRole('listbox', { name: 'Songs' });
     await waitFor(() => expect(within(songs).getAllByRole('option')).toHaveLength(5));
     await userEvent.click(within(songs).getAllByRole('option')[0]!);
     expect(await screen.findByText('Pier Records')).toBeTruthy();
+    expect(await screen.findByText('Cassette Bloom feat. Ada Moss')).toBeTruthy();
     expect((await screen.findByRole('region', { name: 'Lyrics, timed' })).textContent).toContain('The lamps come on along the quay');
     await userEvent.click(screen.getByRole('button', { name: 'Download' }));
     expect(await screen.findByText(/Downloading from YouTube Music\. It is saved where Settings ▸ Downloads says/)).toBeTruthy();

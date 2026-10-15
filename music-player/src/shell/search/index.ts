@@ -870,9 +870,22 @@ export function installSearch(): SearchApi {
     paintStatus([], '');
     count.innerHTML = `<b>Song:</b> ${V.esc(t.title)}`;
     const e = v.enrich;
-    const genre = e?.genre ?? t.genre;
-    const label = e?.label ?? t.label;
-    const year = e?.year ?? t.year ?? (t.releaseDate ? Number(t.releaseDate.slice(0, 4)) : null);
+    const displayed: CatalogTrack = e?.musicbrainzRecordingId
+      ? {
+          ...t,
+          artist: e.artist ?? t.artist,
+          artists: (e.artists ?? []).length > t.artists.length ? e.artists ?? t.artists : t.artists,
+          album: t.album ?? e.album,
+          albumArtist: t.albumArtist ?? e.albumArtist,
+          releaseDate: t.releaseDate ?? e.releaseDate,
+          year: t.year ?? e.year,
+          genre: t.genre ?? e.genre,
+          label: t.label ?? e.label,
+        }
+      : t;
+    const genre = e?.genre ?? displayed.genre;
+    const label = e?.label ?? displayed.label;
+    const year = e?.year ?? displayed.year ?? (displayed.releaseDate ? Number(displayed.releaseDate.slice(0, 4)) : null);
     const facts = [
       genre ? `<span class="srch__fact"><b>Genre</b> ${V.esc(genre)}</span>` : '',
       label ? `<span class="srch__fact"><b>Label</b> ${V.esc(label)}</span>` : '',
@@ -889,10 +902,10 @@ export function installSearch(): SearchApi {
       .join('');
     const sources = e
       ? [
-          ...t.sources,
-          ...e.sources.filter((s) => !t.sources.some((x) => x.platform === s.platform)),
+          ...displayed.sources,
+          ...e.sources.filter((s) => !displayed.sources.some((x) => x.platform === s.platform)),
         ]
-      : t.sources;
+      : displayed.sources;
     const dl = pickDownloadSource(sources);
     const actions =
       (added.has(t.id)
@@ -902,7 +915,7 @@ export function installSearch(): SearchApi {
     const head = V.detailHead({
       cover: V.coverHTML(t.artworkUrl),
       title: t.title,
-      sub: V.songSub(t),
+      sub: V.songSub(displayed),
       facts,
       badges: V.badgesHTML(sources),
       actions,
@@ -919,7 +932,7 @@ export function installSearch(): SearchApi {
         );
     body.innerHTML =
       head +
-      listbox([{ label: null, opts: [{ kind: 'track', t }] }], t.title) +
+      listbox([{ label: null, opts: [{ kind: 'track', t: displayed }] }], t.title) +
       `<div class="srch__cap srch__cap--lyrics">Lyrics${v.lyrics?.synced ? ' <span>(synced)</span>' : ''}</div>` +
       lyr;
     live.textContent = `${t.title}${genre ? `, ${genre}` : ''}${year ? `, ${year}` : ''}`;

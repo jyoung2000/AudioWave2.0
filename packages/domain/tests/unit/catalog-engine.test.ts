@@ -272,6 +272,76 @@ describe('resolving a pasted link', () => {
     throw new LinkReadError('HTTP Error for GET to https://api.spotify.com/v1/playlists/37i9dQZF1DXcBWIGoYBM5M with Params: {} returned 404 due to Resource not found.', 'failed');
   };
 
+  it('fills direct song links with credited artists and release facts only after a recording match', async () => {
+    const reader: LinkReader = async (url) => ({
+      kind: 'track',
+      url,
+      track: { url, title: 'Get Lucky', artist: 'Daft Punk', album: null, durationSec: 367, date: null, artworkUrl: null, trackNumber: null },
+    });
+    const routes: Route[] = [
+      [/api\.deezer\.com\/search\/track/, 'deezer-search-track'],
+      [/api\.deezer\.com\/track\/67238735$/, 'deezer-isrc'],
+      [/musicbrainz\.org\/ws\/2\/isrc\/USQX91300108\?/, 'musicbrainz-isrc'],
+      [/musicbrainz\.org\/ws\/2\/recording\/[0-9a-f-]+\?/, 'musicbrainz-recording'],
+      [/musicbrainz\.org\/ws\/2\/release\/[0-9a-f-]+\?inc=labels/, 'musicbrainz-release-labels'],
+    ];
+    const { engine: e } = engine(routes, { linkReader: reader });
+    const result = await e.resolve('https://www.youtube.com/watch?v=5NV6Rdv1a3I');
+    expect(result).toMatchObject({
+      kind: 'track',
+      track: {
+        title: 'Get Lucky',
+        artist: 'Daft Punk',
+        artists: ['Daft Punk', 'Pharrell Williams', 'Nile Rodgers'],
+        album: 'Random Access Memories',
+        year: 2013,
+        genre: 'disco',
+        label: 'Columbia',
+      },
+    });
+  });
+
+  it('does not attach music-release facts to an unmatched YouTube video', async () => {
+    const reader: LinkReader = async (url) => ({
+      kind: 'track',
+      url,
+      track: { url, title: 'Concept Art for Star Citizen', artist: 'Blender Conference 2024', album: null, durationSec: 1293, date: null, artworkUrl: 'https://i.ytimg.com/vi/example/hqdefault.jpg', trackNumber: null },
+    });
+    const { engine: e } = engine(STANDARD_ROUTES, { linkReader: reader });
+    const result = await e.resolve('https://www.youtube.com/watch?v=example12345');
+    expect(result).toMatchObject({
+      kind: 'track',
+      track: { title: 'Concept Art for Star Citizen', artist: 'Blender Conference 2024', album: null, year: null, genre: null, artists: ['Blender Conference 2024'] },
+    });
+  });
+
+  it('uses a duration-confirmed MusicBrainz match when a store cannot enrich a direct link', async () => {
+    const reader: LinkReader = async (url) => ({
+      kind: 'track',
+      url,
+      track: { url, title: 'Get Lucky', artist: 'Daft Punk', album: null, durationSec: 369, date: null, artworkUrl: null, trackNumber: null },
+    });
+    const full = { ...(fixture('musicbrainz-recording') as Record<string, unknown>), id: '0347d102-b653-4c6c-a0b2-cc9a58c5c585', length: 369000 };
+    const routes: Route[] = [
+      [/musicbrainz\.org\/ws\/2\/recording\?query=/, { status: 200, body: { recordings: [full] } }],
+      [/musicbrainz\.org\/ws\/2\/recording\/0347d102-b653-4c6c-a0b2-cc9a58c5c585\?/, { status: 200, body: full }],
+      [/musicbrainz\.org\/ws\/2\/release\/[0-9a-f-]+\?inc=labels/, 'musicbrainz-release-labels'],
+    ];
+    const { engine: e } = engine(routes, { linkReader: reader, enabled: () => ({ deezer: false }) });
+    const result = await e.resolve('https://www.youtube.com/watch?v=5NV6Rdv1a3I');
+    expect(result).toMatchObject({
+      kind: 'track',
+      track: {
+        artist: 'Daft Punk',
+        artists: ['Daft Punk', 'Pharrell Williams', 'Nile Rodgers'],
+        year: 2013,
+        genre: 'disco',
+        label: 'Columbia',
+      },
+    });
+    expect(result.track!.album).toBeTruthy();
+  });
+
   it('a Spotify song through spotDL, with spotDL’s YouTube Music match as a second source', async () => {
     const reader = vi.fn(spotifyReader);
     const { engine: e } = engine([], { linkReader: reader });
@@ -417,6 +487,9 @@ describe('lyrics and enrichment', () => {
     const { engine: e } = engine();
     const en = await e.enrich({ isrc: 'USQX91300108' });
     expect(en).toMatchObject({ isrc: 'USQX91300108', genre: 'disco', label: 'Columbia', year: 2013 });
+    expect(en.artists).toEqual(['Daft Punk', 'Pharrell Williams', 'Nile Rodgers']);
+    expect(en.featured).toEqual(['Pharrell Williams', 'Nile Rodgers']);
+    expect(en.album).toBeTruthy();
     expect(en.genres).toContain('dance');
     expect(en.sources.some((s) => s.platform === 'spotify' && s.matchedBy === 'musicbrainz')).toBe(true);
   });

@@ -5,7 +5,7 @@
  *              rows merged across services as they arrive, every service's state on every chunk.
  *   album / artist — details by `platform:id`.
  *   resolve  — what a pasted link is, with every song of an album or playlist.
- *   lyrics, enrich — LRCLIB; MusicBrainz genre, label, year and the song's other homes.
+ *   lyrics, enrich — LRCLIB; MusicBrainz credits, album, genre, label, year and the song's other homes.
  *
  * Nothing here throws past the fan-out: a service that fails is a status, not an error.
  */
@@ -645,6 +645,36 @@ export class CatalogEngine {
     return tracks.map((t) => byId.get(t.id) ?? t);
   }
 
+  /** A pasted track gets the same bounded store hydration as a page, then MusicBrainz facts only for a verified recording. */
+  private async withResolvedFacts(track: CatalogTrack, signal?: AbortSignal): Promise<CatalogTrack> {
+    const base = (await this.withFacts([track], signal))[0] ?? track;
+    if (this.options.enabled?.().musicbrainz === false || !base.title || !(base.artists[0] ?? base.artist).trim()) return base;
+    if (base.album && base.year && base.genre && base.label && base.artists.length > 1) return base;
+    let facts: CatalogEnrichment;
+    try {
+      facts = await this.enrich({
+        ...(base.isrc ? { isrc: base.isrc } : {}),
+        title: base.title,
+        artist: base.artists[0] ?? base.artist,
+        ...(base.durationMs !== null ? { durationMs: base.durationMs } : {}),
+      }, signal);
+    } catch {
+      return base;
+    }
+    if (!facts.musicbrainzRecordingId) return base;
+    const releaseDate = (base.releaseDate?.length ?? 0) >= (facts.releaseDate?.length ?? 0) ? base.releaseDate : facts.releaseDate;
+    return {
+      ...base,
+      artists: facts.artists.length > base.artists.length ? facts.artists : base.artists,
+      album: base.album ?? facts.album,
+      albumArtist: base.albumArtist ?? facts.albumArtist,
+      releaseDate,
+      year: base.year ?? facts.year ?? null,
+      genre: base.genre ?? facts.genre,
+      label: base.label ?? facts.label,
+    };
+  }
+
   async artist(id: string, input: { albumsOffset?: number; albumsLimit?: number; topLimit?: number } = {}, signal?: AbortSignal): Promise<CatalogArtistDetail> {
     const { platform, native } = this.split(id);
     const albumsOffset = input.albumsOffset ?? 0;
@@ -701,7 +731,7 @@ export class CatalogEngine {
     if (!link.id) return answer({ kind: 'unsupported', reason: 'A Deezer short link says nothing until it is opened. Open it, then paste the address it goes to.' });
     if (link.kind === 'track') {
       const track = await this.upstream(() => this.deezer.track(link.id!, signal), 'Deezer');
-      return track ? answer({ kind: 'track', track }) : answer({ kind: 'unavailable', reason: 'Deezer has no song at that address.' });
+      return track ? answer({ kind: 'track', track: await this.withResolvedFacts(track, signal) }) : answer({ kind: 'unavailable', reason: 'Deezer has no song at that address.' });
     }
     if (link.kind === 'album') {
       const detail = await this.album(`deezer:${link.id}`, offset, limit, signal);
@@ -733,7 +763,7 @@ export class CatalogEngine {
   private async resolveApple(link: MusicLink, offset: number, limit: number, answer: (p: Partial<CatalogResolveResult> & Pick<CatalogResolveResult, 'kind'>) => CatalogResolveResult, signal?: AbortSignal): Promise<CatalogResolveResult> {
     if (link.kind === 'track' && link.id) {
       const track = await this.upstream(() => this.itunes.track(link.id!, signal), 'Apple Music');
-      return track ? answer({ kind: 'track', track }) : answer({ kind: 'unavailable', reason: 'Apple Music has no song at that address in this storefront.' });
+      return track ? answer({ kind: 'track', track: await this.withResolvedFacts(track, signal) }) : answer({ kind: 'unavailable', reason: 'Apple Music has no song at that address in this storefront.' });
     }
     if (link.kind === 'album' && link.id) {
       const detail = await this.album(`apple-music:${link.id}`, offset, limit, signal);
@@ -788,7 +818,7 @@ export class CatalogEngine {
     const platform: CatalogPlatform = link.platform;
     if (read.kind === 'track') {
       const track = trackFromLink(read.track, { platform });
-      return track ? answer({ kind: 'track', track }) : answer({ kind: 'unavailable', reason: `${label} described nothing playable at that address.` });
+      return track ? answer({ kind: 'track', track: await this.withResolvedFacts(track, signal) }) : answer({ kind: 'unavailable', reason: `${label} described nothing playable at that address.` });
     }
     // Every entry, in order, up to the bound (CATALOG_COLLECTION_CAP); past it the list says so. Built
     // once per read and kept with it, so each page only slices.
@@ -937,7 +967,7 @@ export class CatalogEngine {
       return answer({ kind: 'album', collection: { ref: collectionRef(link, 'album', found.title, found.artist), artworkUrl: found.artworkUrl, covers: found.artworkUrl ? [found.artworkUrl] : [], releaseDate: null, page: { tracks: [], offset: 0, limit: 1, total: null, hasMore: false, capped: false } }, reason: `${label} albums list their songs only when the same album is on Deezer.` });
     }
     const track: CatalogTrack = { id: `${link.platform}:${link.id ?? link.url}`, title: found.title, artist: found.artist ?? '', artists: found.artist ? [found.artist] : [], album: null, albumArtist: null, durationMs: null, isrc: null, artworkUrl: found.artworkUrl, releaseDate: null, year: null, trackNumber: null, discNumber: null, bpm: null, explicit: null, genre: null, label: null, sources, rank: 0 };
-    return answer({ kind: 'track', track });
+    return answer({ kind: 'track', track: await this.withResolvedFacts(track, signal) });
   }
 
   /* ---------------------------------------------------- lyrics, enrichment */
@@ -947,7 +977,7 @@ export class CatalogEngine {
     return this.lyricsCache.get(key, () => this.upstream(() => this.lrclib.lyrics(input, signal), 'LRCLIB'));
   }
 
-  /** MusicBrainz's genre, label and year for a song, and its other homes. Cached for a day. */
+  /** MusicBrainz's credits, album, genre, label, year and other homes for a matched song. Cached for a day. */
   enrich(input: { isrc?: string | null | undefined; title?: string | null | undefined; artist?: string | null | undefined; durationMs?: number | null | undefined }, signal?: AbortSignal): Promise<CatalogEnrichment> {
     const key = input.isrc ? `isrc:${input.isrc}` : JSON.stringify([input.title?.toLowerCase(), input.artist?.toLowerCase(), input.durationMs ? Math.round(input.durationMs / 5000) : null]);
     return this.enrichCache.get(key, () => this.upstream(() => this.musicbrainz.enrich(input, signal), 'MusicBrainz'));

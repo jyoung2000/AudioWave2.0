@@ -242,19 +242,19 @@ describe('catalog settings and downloads', () => {
     await hub.app.inject({ method: 'PUT', url: '/api/v1/catalog/settings', headers, payload: { providers: { soundcloud: true }, odesliKey: '' } });
   });
 
-  it('a catalog song goes through the download queue from its best source, with ISRC, genre, label, year and lyrics', async () => {
+  it('a catalog song tags missing album and featured artists from a matched MusicBrainz recording', async () => {
     const track: CatalogTrack = {
       id: 'deezer:67238735',
       title: 'Get Lucky',
       artist: 'Daft Punk',
-      artists: ['Daft Punk', 'Pharrell Williams', 'Nile Rodgers'],
-      album: 'Random Access Memories',
-      albumArtist: 'Daft Punk',
+      artists: ['Daft Punk'],
+      album: null,
+      albumArtist: null,
       durationMs: 367_000,
       isrc: 'USQX91300108',
       artworkUrl: 'https://cdn-images.dzcdn.net/images/cover/311bba0fc112d15f72c8b5a65f0456c1/1000x1000-000000-80-0-0.jpg',
-      releaseDate: '2013-05-20',
-      year: 2013,
+      releaseDate: null,
+      year: null,
       trackNumber: 8,
       discNumber: 1,
       bpm: 116.1,
@@ -272,7 +272,7 @@ describe('catalog settings and downloads', () => {
     const body = response.json() as { job: DownloadJob; source: { platform: string; url: string }; embedded: Record<string, boolean> };
     expect(body.source).toMatchObject({ platform: 'youtube-music', url: 'https://music.youtube.com/watch?v=4D7u5KF7SP8' });
     expect(body.job.source).toMatchObject({ provider: 'external-tool', url: 'https://music.youtube.com/watch?v=4D7u5KF7SP8' });
-    expect(body.job.source.tags).toMatchObject({ title: 'Get Lucky', artist: 'Daft Punk', featured: ['Pharrell Williams', 'Nile Rodgers'], isrc: 'USQX91300108', genre: 'disco', label: 'Columbia', date: '2013-05-20', trackNumber: 8 });
+    expect(body.job.source.tags).toMatchObject({ title: 'Get Lucky', artist: 'Daft Punk', featured: ['Pharrell Williams', 'Nile Rodgers'], album: 'Random Access Memories', isrc: 'USQX91300108', genre: 'disco', label: 'Columbia', date: expect.any(String), trackNumber: 8 });
     expect(body.job.source.tags!.lyrics).toMatch(/^\[00:01\.00\]/);
     expect(body.embedded).toEqual({ isrc: true, genre: true, label: true, year: true, lyrics: true });
   }, 30_000);

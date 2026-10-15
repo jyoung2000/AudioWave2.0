@@ -2397,7 +2397,7 @@
         "a song only a store has: nothing to queue or fetch, said in words",
         "Add to Library… / Download… (sheet): the rights basis (and format), into the hub’s download queue",
         "Add to Playlist ▸: the hub’s playlists, ticked where the song is, and New Playlist…; the sheet keeps the song’s link and “Also add to Library” (on) queues the download with its basis (UX-PL-005)",
-        "a song: cover, platforms, preview, genre/label/year (looking it up…), synced or plain lyrics (or none, or instrumental), Download with the rights basis and what happened",
+        "a song: cover, credited artist/feat line, album, platforms, preview, genre/label/year (looking it up…), synced or plain lyrics (or none, or instrumental), Download with the rights basis and what happened",
         "an album: cover, label, date, songs, the star",
         "an artist: picture, top songs, albums (more as you scroll)",
         "a pasted playlist: its 2×2 mosaic, platform and length; opened like an album with every song; starred",

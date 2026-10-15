@@ -439,10 +439,16 @@ export const CatalogEnrichRequest = z
   })
   .refine((r) => Boolean(r.isrc || (r.title && r.artist)), { message: 'Give an isrc, or a title and an artist' });
 
-/** Genre, label and year from MusicBrainz, and the song's other homes. */
+/** Credited artist line and featured names, album, genre, label, release date/year, and other homes from a matched MusicBrainz recording. */
 export const CatalogEnrichment = z.object({
   isrc: z.string().max(12).nullable(),
   musicbrainzRecordingId: z.string().max(40).nullable(),
+  /** Credited artist line and ordered names when MusicBrainz found the same recording. */
+  artist: z.string().max(300).nullable().default(null),
+  artists: z.array(z.string().max(300)).max(20).default([]),
+  featured: z.array(z.string().max(300)).max(19).default([]),
+  album: z.string().max(300).nullable().default(null),
+  albumArtist: z.string().max(300).nullable().default(null),
   genre: z.string().max(100).nullable(),
   genres: z.array(z.string().max(100)).max(10),
   label: z.string().max(300).nullable(),

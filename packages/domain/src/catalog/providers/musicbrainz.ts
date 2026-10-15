@@ -1,5 +1,5 @@
 /**
- * MusicBrainz ws/2: recordings by text or ISRC, and the facts a store leaves out — genre, label,
+ * MusicBrainz ws/2: recordings by text or ISRC, and the facts a store leaves out — credited artists, album, genre, label,
  * first release year — plus the links editors keep on a recording (Spotify, YouTube Music, Deezer,
  * Apple Music, Tidal, Qobuz…), which is how the catalog finds a song's other homes without a key.
  *
@@ -9,6 +9,7 @@
 import type { CatalogEnrichment, CatalogPlatform, CatalogQuery, CatalogSearchSection, CatalogSource, CatalogTrack } from '@now-playing/contracts';
 import { arr, calendarDate, getJson, isObject, num, str, yearOf, type CatalogFetch, type Json } from '../http.js';
 import { Pacer, type Now, type Sleep } from '../limits.js';
+import { sameRecording } from '../merge.js';
 import { emptyResult, type CatalogProvider, type ProviderResult, type ProviderSearchOptions } from '../provider.js';
 import { parseMusicLink } from '../query.js';
 
@@ -169,28 +170,29 @@ export class MusicBrainzClient {
   }
 
   /**
-   * Genre, label and year for a recording (by ISRC, or by title and artist), and its links.
+   * Credited artists, album, genre, label and year for a confidently matched recording (by ISRC, or exact title, artist and duration), and its links.
    * Three paced calls at most: the lookup, the recording, its first official release's labels.
    */
   async enrich(input: { isrc?: string | null | undefined; title?: string | null | undefined; artist?: string | null | undefined; durationMs?: number | null | undefined }, signal?: AbortSignal): Promise<CatalogEnrichment> {
-    const empty: CatalogEnrichment = { isrc: input.isrc ?? null, musicbrainzRecordingId: null, genre: null, genres: [], label: null, releaseDate: null, year: null, sources: [] };
-    let candidates: Json[] = [];
-    if (input.isrc) candidates = await this.byIsrc(input.isrc, signal);
-    if (!candidates.length && input.title && input.artist) {
-      candidates = await this.searchRecordings(`recording:"${luceneEscape(input.title)}" AND artist:"${luceneEscape(input.artist)}"`, 0, 5, signal);
-      if (input.durationMs) {
-        const near = candidates.filter((c) => {
-          const length = num(c['length']);
-          return length === null || Math.abs(length - input.durationMs!) <= 5000;
-        });
-        if (near.length) candidates = near;
-      }
+    const empty: CatalogEnrichment = { isrc: input.isrc ?? null, musicbrainzRecordingId: null, artist: null, artists: [], featured: [], album: null, albumArtist: null, genre: null, genres: [], label: null, releaseDate: null, year: null, sources: [] };
+    let candidates: Json[] = input.isrc ? await this.byIsrc(input.isrc, signal) : [];
+    if (!candidates.length && input.title && input.artist && input.durationMs) {
+      const searched = await this.searchRecordings(`recording:"${luceneEscape(input.title)}" AND artist:"${luceneEscape(input.artist)}"`, 0, 5, signal);
+      // Without an ISRC, enrich only a same-version, same-artist, duration-confirmed recording.
+      // Do not choose an arbitrary remaster, radio edit, live take, or search result when lengths differ.
+      candidates = searched.filter((row) => {
+        const candidate = musicbrainzTrack(row);
+        return candidate !== null && sameRecording({ isrc: null, title: input.title!, artist: input.artist!, durationMs: input.durationMs! }, candidate);
+      });
     }
-    // The earliest-released recording is the one a store's ISRC most often means.
+    if (!candidates.length) return empty;
+    // The earliest-released recording is the one a store's ISRC most often means, after identity filtering.
     const pick = [...candidates].sort((a, b) => String(a['first-release-date'] || '9999').localeCompare(String(b['first-release-date'] || '9999')))[0];
     const id = str(pick?.['id'], 40);
     if (!id) return empty;
     const full = (await this.recording(id, signal)) ?? pick!;
+    const fullTrack = musicbrainzTrack(full);
+    if (!fullTrack) return empty;
     const release = firstRelease(full);
     let label: string | null = null;
     const releaseId = str(release?.['id'], 40);
@@ -200,16 +202,22 @@ export class MusicBrainzClient {
     }
     const genres = genresOf(full);
     const artistGenres = arr(full['artist-credit']).flatMap((c) => (isObject(c['artist']) ? genresOf(c['artist']) : []));
-    const releaseDate = calendarDate(full['first-release-date']) ?? calendarDate(release?.['date']);
+    const releaseDate = calendarDate(full['first-release-date']) ?? calendarDate(release?.['date']) ?? fullTrack.releaseDate;
+    const artists = fullTrack.artists.slice(0, 20);
     const isrcs = Array.isArray(full['isrcs']) ? (full['isrcs'] as unknown[]).filter((i): i is string => typeof i === 'string') : [];
     return {
       isrc: input.isrc ?? isrcs[0] ?? null,
       musicbrainzRecordingId: id,
-      genre: genres[0] ?? artistGenres[0] ?? null,
+      artist: fullTrack.artist,
+      artists,
+      featured: artists.slice(1, 20),
+      album: fullTrack.album,
+      albumArtist: null,
+      genre: genres[0] ?? artistGenres[0] ?? fullTrack.genre,
       genres: genres.length ? genres : artistGenres.slice(0, 10),
       label,
       releaseDate,
-      year: yearOf(releaseDate),
+      year: yearOf(releaseDate) ?? fullTrack.year,
       sources: [{ platform: 'musicbrainz', id, url: `https://musicbrainz.org/recording/${id}`, previewUrl: null, matchedBy: input.isrc ? 'isrc' : 'metadata' }, ...sourcesFromRelations(full)],
     };
   }

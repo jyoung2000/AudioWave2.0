@@ -978,7 +978,7 @@ function SongPage({ track, client, preview, say }: { track: CatalogTrack; client
   useEffect(() => {
     const controller = new AbortController();
     const load = async (): Promise<void> => {
-      // Genre, label and year are looked up for the song that is opened, never for every row.
+      // Full release credits and facts are looked up for the song that is opened, never for every row.
       const [enriched, words] = await Promise.allSettled([client.enrich(track, controller.signal), client.lyrics(track, controller.signal)]);
       if (controller.signal.aborted) return;
       if (enriched.status === 'fulfilled') setAbout(enriched.value);
@@ -991,15 +991,30 @@ function SongPage({ track, client, preview, say }: { track: CatalogTrack; client
   }, [client, track]);
 
   const clip = previewOf(track.sources);
-  const genre = about?.genre ?? track.genre;
-  const label = about?.label ?? track.label;
-  const year = about?.year ?? track.year;
+  // The opened row is already hydrated when possible; a later exact MusicBrainz match can fill
+  // missing album and featured-artist credits without replacing known provider metadata.
+  const displayed: CatalogTrack = about?.musicbrainzRecordingId
+    ? {
+        ...track,
+        artist: about.artist ?? track.artist,
+        artists: (about.artists ?? []).length > track.artists.length ? about.artists ?? track.artists : track.artists,
+        album: track.album ?? about.album,
+        albumArtist: track.albumArtist ?? about.albumArtist,
+        releaseDate: track.releaseDate ?? about.releaseDate,
+        year: track.year ?? about.year,
+        genre: track.genre ?? about.genre,
+        label: track.label ?? about.label,
+      }
+    : track;
+  const genre = about?.genre ?? displayed.genre;
+  const label = about?.label ?? displayed.label;
+  const year = about?.year ?? displayed.year;
   return (
     <>
       <DetailHead
         art={<Art url={track.artworkUrl} size="big" />}
         title={track.title}
-        lines={[creditLine(track), albumLine(track) || null, [formatDuration(track.durationMs), track.bpm ? `${Math.round(track.bpm)} BPM` : null, track.explicit ? 'Explicit' : null].filter(Boolean).join(' · ') || null]}
+        lines={[creditLine(displayed), albumLine(displayed) || null, [formatDuration(track.durationMs), track.bpm ? `${Math.round(track.bpm)} BPM` : null, track.explicit ? 'Explicit' : null].filter(Boolean).join(' · ') || null]}
         sources={track.sources}
         star={
           clip ? (
@@ -1030,7 +1045,7 @@ function SongPage({ track, client, preview, say }: { track: CatalogTrack; client
       <Group title="Lyrics">
         <Lyrics lyrics={lyrics} error={lyricsError} />
       </Group>
-      <DownloadGroup track={track} say={say} />
+      <DownloadGroup track={displayed} say={say} />
     </>
   );
 }
