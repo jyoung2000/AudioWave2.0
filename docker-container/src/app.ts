@@ -71,7 +71,7 @@ import { TransferService } from './sync/transfers.js';
 import { detectFfmpeg } from './media/ffmpeg.js';
 import { HubTools } from './media/tools.js';
 import { toolEnvironment, toolScratchDir } from './media/tool-env.js';
-import { HubCatalogService } from './catalog/service.js';
+import { HubCatalogService, hubCatalogFetch } from './catalog/service.js';
 import { HubPlaylists } from './playlists/service.js';
 
 const HUB_IDENTITY_KEY = 'hub.identity';
@@ -182,6 +182,7 @@ export async function buildApp(deps: HubDeps): Promise<HubApp> {
         return info.available ? info.path : null;
       },
       () => toolScratchDir(config.dataDir),
+      hubCatalogFetch(http),
     ),
   );
   providers.register(new DeezerAdapter(http));

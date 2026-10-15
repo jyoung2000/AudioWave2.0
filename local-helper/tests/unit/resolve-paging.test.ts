@@ -10,7 +10,9 @@ import { fromSpotdl, fromYtDlp, ytDlpResolveArgs } from '../../src/resolve.js';
 
 describe('reading a whole list', () => {
   it('yt-dlp: flat to the cap it is given; positions in full when asked; the URL always last, behind --', () => {
-    expect(ytDlpResolveArgs('https://www.youtube.com/playlist?list=PLx')).toContain(String(HELPER_RESOLVE_CAP));
+    const first = ytDlpResolveArgs('https://www.youtube.com/playlist?list=PLx');
+    expect(first).toContain(String(HELPER_RESOLVE_CAP));
+    expect(first).toEqual(expect.arrayContaining(['--js-runtimes', `node:${process.execPath}`]));
     const all = ytDlpResolveArgs('https://www.youtube.com/playlist?list=PLx', { cap: CATALOG_COLLECTION_CAP + 1 });
     expect(all[all.indexOf('--playlist-end') + 1]).toBe(String(CATALOG_COLLECTION_CAP + 1));
     expect(all).toContain('--flat-playlist');
@@ -18,6 +20,7 @@ describe('reading a whole list', () => {
     expect(page[page.indexOf('--playlist-items') + 1]).toBe('251,252,253');
     expect(page).not.toContain('--flat-playlist');
     expect(page.slice(-2)).toEqual(['--', 'https://soundcloud.com/band/sets/long']);
+    expect(page).toEqual(expect.arrayContaining(['--js-runtimes', `node:${process.execPath}`]));
   });
 
   it('keeps 1,500 entries of a playlist and 3,000 songs of a Spotify playlist when the cap allows', () => {

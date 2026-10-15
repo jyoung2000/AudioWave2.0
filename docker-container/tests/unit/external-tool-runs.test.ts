@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { resolveExecutable } from '../../src/media/run-tool.js';
 import { toolEnvironment, toolScratchDir } from '../../src/media/tool-env.js';
 import { ExternalToolAdapter } from '../../src/providers/adapters/external-tool.js';
+import type { CatalogFetch } from '@now-playing/domain/catalog';
 
 let root: string;
 beforeEach(() => {
@@ -136,13 +137,14 @@ writeFileSync(args[args.indexOf('--save-file') + 1], readFileSync(${JSON.stringi
     return { path, seen: () => JSON.parse(readFileSync(log, 'utf8')) as SpotdlSeen };
   }
 
-  function suite(tools: { 'yt-dlp'?: string; spotdl?: string }, ffmpeg: string | null = process.execPath): ExternalToolAdapter {
+  function suite(tools: { 'yt-dlp'?: string; spotdl?: string }, ffmpeg: string | null = process.execPath, spotifyEmbedFetch?: CatalogFetch): ExternalToolAdapter {
     const scratch = toolScratchDir(root)!;
     const instance = new ExternalToolAdapter(
       (id) => tools[id] ?? null,
       () => toolEnvironment(scratch, process.env),
       async () => ffmpeg,
       () => scratch,
+      spotifyEmbedFetch,
     );
     instance.configure({ enabled: true, clientId: null, clientSecret: null, apiKey: null, applicationId: null, redirectUri: null, contactEmail: null, extra: {} });
     return instance;
@@ -187,6 +189,55 @@ writeFileSync(args[args.indexOf('--save-file') + 1], readFileSync(${JSON.stringi
     expect(seen.userprofile).toBe(seen.home);
     expect(seen.home.startsWith(toolScratchDir(root)!)).toBe(true);
     expect(existsSync(seen.home), 'the home is removed after the run').toBe(false);
+  });
+
+  it('uses public Spotify playlist embed metadata before spotDL’s slow playlist crawl', async () => {
+    const id = '37i9dQZF1DXcBWIGoYBM5M';
+    const url = `https://open.spotify.com/playlist/${id}`;
+    const trackUrl = 'https://open.spotify.com/track/4PTG3Z6ehGkBFwjybzWkR8';
+    const entity = { type: 'playlist', id, title: 'Today’s Top Hits', subtitle: 'Spotify', trackList: [{ uri: 'spotify:track:4PTG3Z6ehGkBFwjybzWkR8', title: 'Never Gonna Give You Up', subtitle: 'Rick Astley', duration: 213573 }] };
+    const html = `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify({ props: { pageProps: { state: { data: { entity } } } } })}</script>`;
+    const broken = join(root, 'broken-spotdl.mjs');
+    writeFileSync(broken, "process.stderr.write('Spotify playlist returned 404\\n'); process.exit(1);\n");
+    const requested: string[] = [];
+    const fetch: CatalogFetch = async (embedUrl) => {
+      requested.push(embedUrl);
+      return { status: 200, headers: { get: () => null }, json: async () => ({}), text: async () => html };
+    };
+    const instance = suite({ spotdl: broken }, '/opt/ffmpeg', fetch);
+
+    const probe = await instance.probe(url);
+    expect(probe).toMatchObject({ kind: 'playlist', url, title: 'Today’s Top Hits', listed: 1, entries: [{ url: trackUrl, tags: { title: 'Never Gonna Give You Up', artist: 'Rick Astley', durationMs: 213573 } }] });
+    expect(requested).toEqual([`https://open.spotify.com/embed/playlist/${id}`]);
+  });
+
+  it('falls back to a public Spotify track embed when spotDL cannot read the track', async () => {
+    const id = '4PTG3Z6ehGkBFwjybzWkR8';
+    const url = `https://open.spotify.com/track/${id}`;
+    const entity = { type: 'track', id, title: 'Never Gonna Give You Up', artists: [{ name: 'Rick Astley' }], duration: 213573, releaseDate: { isoString: '1987-11-16T00:00:00Z' } };
+    const html = `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify({ props: { pageProps: { state: { data: { entity } } } } })}</script>`;
+    const broken = join(root, 'broken-spotdl-track.mjs');
+    writeFileSync(broken, "process.stderr.write('Spotify track lookup unavailable\\n'); process.exit(1);\n");
+    const requested: string[] = [];
+    const fetch: CatalogFetch = async (embedUrl) => {
+      requested.push(embedUrl);
+      return { status: 200, headers: { get: () => null }, json: async () => ({}), text: async () => html };
+    };
+    const instance = suite({ spotdl: broken }, '/opt/ffmpeg', fetch);
+
+    await expect(instance.probe(url)).resolves.toMatchObject({ kind: 'track', url, tags: { title: 'Never Gonna Give You Up', artist: 'Rick Astley', date: '1987-11-16', durationMs: 213573 } });
+    expect(requested).toEqual([`https://open.spotify.com/embed/track/${id}`]);
+  });
+
+  it('keeps Spotify embed page truncation explicit through the hub probe', async () => {
+    const id = '37i9dQZF1DXcBWIGoYBM5M';
+    const trackList = Array.from({ length: 100 }, (_, index) => ({ uri: `spotify:track:${String(index).padStart(22, 'A')}`, title: `Song ${index + 1}`, subtitle: 'Artist' }));
+    const entity = { type: 'playlist', id, title: 'Top 100', trackList };
+    const html = `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify({ props: { pageProps: { state: { data: { entity } } } } })}</script>`;
+    const fetch: CatalogFetch = async () => ({ status: 200, headers: { get: () => null }, json: async () => ({}), text: async () => html });
+    const probe = await suite({ spotdl: process.execPath }, '/opt/ffmpeg', fetch).probe(`https://open.spotify.com/playlist/${id}`);
+    expect(probe).toMatchObject({ kind: 'playlist', listed: null, capped: true });
+    expect(probe.kind === 'playlist' ? probe.entries : []).toHaveLength(100);
   });
 
   it('without spotDL a Spotify link is not something the hub can name', async () => {

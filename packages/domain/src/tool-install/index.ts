@@ -7,3 +7,4 @@ export * from './install.js';
 export * from './sources.js';
 export * from './zip.js';
 export * from './probe.js';
+export * from './yt-dlp-runtime.js';

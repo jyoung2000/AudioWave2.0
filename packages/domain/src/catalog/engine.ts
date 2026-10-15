@@ -5,7 +5,7 @@
  *              rows merged across services as they arrive, every service's state on every chunk.
  *   album / artist — details by `platform:id`.
  *   resolve  — what a pasted link is, with every song of an album or playlist.
- *   lyrics, enrich — LRCLIB; MusicBrainz genre, label, year and the song's other homes.
+ *   lyrics, enrich — LRCLIB; MusicBrainz credits, album, genre, label, year and the song's other homes.
  *
  * Nothing here throws past the fan-out: a service that fails is a status, not an error.
  */
@@ -32,13 +32,14 @@ import type {
 } from '@now-playing/contracts';
 import { CATALOG_COLLECTION_CAP, CATALOG_PAGE_MAX, CATALOG_PLATFORM_LABELS } from '@now-playing/contracts';
 import { DomainError } from '../errors.js';
-import { CatalogHttpError, type CatalogFetch } from './http.js';
+import { CatalogHttpError, getText, type CatalogFetch } from './http.js';
 import { ProviderHealth, TtlCache, describeError, statusFor, type Now, type Sleep } from './limits.js';
 import { CatalogMerger, mergeSources, mergeTrack, sameRecording } from './merge.js';
 import { HYDRATE_BUDGET_MS, HYDRATE_CONCURRENCY, HYDRATE_MAX_ROWS, fillTrack, needsFacts, runPool, trackChanged } from './hydrate.js';
 import { headLike } from './http.js';
 import { ProviderResting, type CatalogProvider, type ProviderResult } from './provider.js';
 import { ApplePageChanged, fetchApplePlaylistPage, type ApplePlaylistPage } from './providers/applemusic-page.js';
+import { readSpotifyEmbed as parseSpotifyEmbed } from './providers/spotify-embed.js';
 import { DeezerClient, DeezerProvider, deezerTrack } from './providers/deezer.js';
 import { ItunesClient, ItunesProvider } from './providers/itunes.js';
 import { MusicBrainzClient, MusicBrainzProvider, releaseOfRecording } from './providers/musicbrainz.js';
@@ -161,6 +162,8 @@ export class CatalogEngine {
   private readonly lyricsCache: TtlCache<CatalogLyrics>;
   private readonly enrichCache: TtlCache<CatalogEnrichment>;
   private readonly resolveCache: TtlCache<LinkRead>;
+  /** Public Spotify embeds are the keyless playlist path and metadata fallback for other Spotify links. */
+  private readonly spotifyEmbedCache: TtlCache<LinkRead | null>;
   /**
    * A read list's rows, built once per read (the read itself is cached, so a list served page by page
    * is the same object each time). Rebuilding every row for each page made reading a whole list grow
@@ -188,6 +191,7 @@ export class CatalogEngine {
     this.lyricsCache = new TtlCache(24 * 3600_000, 500, this.now);
     this.enrichCache = new TtlCache(24 * 3600_000, 1000, this.now);
     this.resolveCache = new TtlCache(10 * 60_000, 100, this.now);
+    this.spotifyEmbedCache = new TtlCache(10 * 60_000, 100, this.now);
     this.searchCache = new TtlCache(5 * 60_000, 300, this.now);
     this.linksCache = new TtlCache(24 * 3600_000, 1000, this.now);
     this.applePageCache = new TtlCache(10 * 60_000, 50, this.now);
@@ -641,6 +645,36 @@ export class CatalogEngine {
     return tracks.map((t) => byId.get(t.id) ?? t);
   }
 
+  /** A pasted track gets the same bounded store hydration as a page, then MusicBrainz facts only for a verified recording. */
+  private async withResolvedFacts(track: CatalogTrack, signal?: AbortSignal): Promise<CatalogTrack> {
+    const base = (await this.withFacts([track], signal))[0] ?? track;
+    if (this.options.enabled?.().musicbrainz === false || !base.title || !(base.artists[0] ?? base.artist).trim()) return base;
+    if (base.album && base.year && base.genre && base.label && base.artists.length > 1) return base;
+    let facts: CatalogEnrichment;
+    try {
+      facts = await this.enrich({
+        ...(base.isrc ? { isrc: base.isrc } : {}),
+        title: base.title,
+        artist: base.artists[0] ?? base.artist,
+        ...(base.durationMs !== null ? { durationMs: base.durationMs } : {}),
+      }, signal);
+    } catch {
+      return base;
+    }
+    if (!facts.musicbrainzRecordingId) return base;
+    const releaseDate = (base.releaseDate?.length ?? 0) >= (facts.releaseDate?.length ?? 0) ? base.releaseDate : facts.releaseDate;
+    return {
+      ...base,
+      artists: facts.artists.length > base.artists.length ? facts.artists : base.artists,
+      album: base.album ?? facts.album,
+      albumArtist: base.albumArtist ?? facts.albumArtist,
+      releaseDate,
+      year: base.year ?? facts.year ?? null,
+      genre: base.genre ?? facts.genre,
+      label: base.label ?? facts.label,
+    };
+  }
+
   async artist(id: string, input: { albumsOffset?: number; albumsLimit?: number; topLimit?: number } = {}, signal?: AbortSignal): Promise<CatalogArtistDetail> {
     const { platform, native } = this.split(id);
     const albumsOffset = input.albumsOffset ?? 0;
@@ -697,7 +731,7 @@ export class CatalogEngine {
     if (!link.id) return answer({ kind: 'unsupported', reason: 'A Deezer short link says nothing until it is opened. Open it, then paste the address it goes to.' });
     if (link.kind === 'track') {
       const track = await this.upstream(() => this.deezer.track(link.id!, signal), 'Deezer');
-      return track ? answer({ kind: 'track', track }) : answer({ kind: 'unavailable', reason: 'Deezer has no song at that address.' });
+      return track ? answer({ kind: 'track', track: await this.withResolvedFacts(track, signal) }) : answer({ kind: 'unavailable', reason: 'Deezer has no song at that address.' });
     }
     if (link.kind === 'album') {
       const detail = await this.album(`deezer:${link.id}`, offset, limit, signal);
@@ -729,7 +763,7 @@ export class CatalogEngine {
   private async resolveApple(link: MusicLink, offset: number, limit: number, answer: (p: Partial<CatalogResolveResult> & Pick<CatalogResolveResult, 'kind'>) => CatalogResolveResult, signal?: AbortSignal): Promise<CatalogResolveResult> {
     if (link.kind === 'track' && link.id) {
       const track = await this.upstream(() => this.itunes.track(link.id!, signal), 'Apple Music');
-      return track ? answer({ kind: 'track', track }) : answer({ kind: 'unavailable', reason: 'Apple Music has no song at that address in this storefront.' });
+      return track ? answer({ kind: 'track', track: await this.withResolvedFacts(track, signal) }) : answer({ kind: 'unavailable', reason: 'Apple Music has no song at that address in this storefront.' });
     }
     if (link.kind === 'album' && link.id) {
       const detail = await this.album(`apple-music:${link.id}`, offset, limit, signal);
@@ -747,27 +781,44 @@ export class CatalogEngine {
   private async resolveWithTool(link: MusicLink, offset: number, limit: number, answer: (p: Partial<CatalogResolveResult> & Pick<CatalogResolveResult, 'kind'>) => CatalogResolveResult, signal?: AbortSignal): Promise<CatalogResolveResult> {
     const label = CATALOG_PLATFORM_LABELS[link.platform];
     const reader = this.options.linkReader;
-    if (!reader) return answer({ kind: 'unsupported', reason: `${label} links are read by yt-dlp or spotDL, which are not available here.` });
     const match = link.platform === 'spotify' && link.kind === 'track';
-    let read: LinkRead;
-    try {
-      read = await this.resolveCache.get(`${link.url}|${match ? 'match' : ''}`, () => (match ? withBudget(signal, this.options.matchBudgetMs ?? MATCH_BUDGET_MS, (budget) => reader(link.url, { signal: budget, match })) : reader(link.url, { signal, match })));
-    } catch (error) {
-      // spotDL's `--preload` writes `null` for the song when its YouTube Music match fails (no
-      // "songs" result, or a video its yt-dlp cannot open — measured 2026-10-10), although Spotify's
-      // own data was read. The song is still worth showing: read it again without the match, and
-      // spotDL matches it again when it is downloaded. A missing tool is not retried.
-      if (!match || signal?.aborted || (error instanceof LinkReadError && error.code === 'tool-missing')) return answer({ kind: 'unavailable', reason: this.unreadable(link, error) });
+    let read: LinkRead | null = null;
+    let failure: unknown = null;
+    // Use Spotify's fast public embed listing before spotDL's per-track Spotify API crawl.
+    if (link.platform === 'spotify' && link.kind === 'playlist' && link.id && !signal?.aborted) {
+      read = await this.spotifyEmbedCache.get(link.url, () => this.readSpotifyEmbedPage(link, signal)).catch(() => null);
+    }
+    if (reader && !read) {
       try {
-        read = await this.resolveCache.get(`${link.url}|`, () => reader(link.url, { signal, match: false }));
-      } catch (again) {
-        return answer({ kind: 'unavailable', reason: this.unreadable(link, again) });
+        read = await this.resolveCache.get(`${link.url}|${match ? 'match' : ''}`, () => (match ? withBudget(signal, this.options.matchBudgetMs ?? MATCH_BUDGET_MS, (budget) => reader(link.url, { signal: budget, match })) : reader(link.url, { signal, match })));
+      } catch (error) {
+        failure = error;
+        // A failed YouTube Music preload may still leave Spotify's own track metadata readable.
+        if (match && !signal?.aborted && !(error instanceof LinkReadError && error.code === 'tool-missing')) {
+          try {
+            read = await this.resolveCache.get(`${link.url}|`, () => reader(link.url, { signal, match: false }));
+          } catch (again) {
+            failure = again;
+          }
+        }
       }
+    }
+    // After the fast playlist path and tool retries, the public embed can still provide metadata only.
+    // Its preview URLs are intentionally ignored; Spotify audio is never downloaded here.
+    if (!read && link.platform === 'spotify' && link.id && !signal?.aborted) {
+      read = await this.spotifyEmbedCache.get(link.url, () => this.readSpotifyEmbedPage(link, signal)).catch(() => null);
+    }
+    if (read?.kind === 'collection' && link.platform === 'spotify' && !read.entries.length && link.id && !signal?.aborted) {
+      read = await this.spotifyEmbedCache.get(link.url, () => this.readSpotifyEmbedPage(link, signal)).catch(() => read);
+    }
+    if (!read) {
+      if (!reader) return answer({ kind: 'unsupported', reason: `${label} links are read by yt-dlp or spotDL, which are not available here.` });
+      return answer({ kind: 'unavailable', reason: this.unreadable(link, failure ?? new Error('No public Spotify embed data was available.')) });
     }
     const platform: CatalogPlatform = link.platform;
     if (read.kind === 'track') {
       const track = trackFromLink(read.track, { platform });
-      return track ? answer({ kind: 'track', track }) : answer({ kind: 'unavailable', reason: `${label} described nothing playable at that address.` });
+      return track ? answer({ kind: 'track', track: await this.withResolvedFacts(track, signal) }) : answer({ kind: 'unavailable', reason: `${label} described nothing playable at that address.` });
     }
     // Every entry, in order, up to the bound (CATALOG_COLLECTION_CAP); past it the list says so. Built
     // once per read and kept with it, so each page only slices.
@@ -781,7 +832,7 @@ export class CatalogEngine {
           if (track) rows.push({ track, bare: !e.title, position: i + 1 });
         });
         const all = rows.map((r) => r.track);
-        await this.fillCovers(all, reader, signal);
+        if (reader) await this.fillCovers(all, reader, signal);
         // fillCovers may replace a row's track with its described copy: keep rows and all in step.
         all.forEach((t, i) => (rows[i]!.track = t));
         return { rows, all, covers: coversOf(all) };
@@ -791,7 +842,7 @@ export class CatalogEngine {
     }
     const { rows, all, covers } = await built;
     const page = pageOf(all, offset, limit, read.total ?? read.entries.length, read.capped || read.entries.length > CATALOG_COLLECTION_CAP || (read.total ?? 0) > CATALOG_COLLECTION_CAP);
-    page.tracks = await this.hydratePage(link, rows.slice(offset, offset + page.tracks.length), page.tracks, reader, signal);
+    if (reader) page.tracks = await this.hydratePage(link, rows.slice(offset, offset + page.tracks.length), page.tracks, reader, signal);
     const kind: 'album' | 'playlist' = link.kind === 'album' ? 'album' : 'playlist';
     const collection: CatalogCollection = {
       ref: collectionRef(link, kind, read.title, read.owner),
@@ -805,6 +856,15 @@ export class CatalogEngine {
       return answer({ kind: 'artist', artist, collection });
     }
     return answer({ kind, collection });
+  }
+
+  /** Fetch metadata from Spotify's public embed page, under the catalog host allowlist. */
+  private async readSpotifyEmbedPage(link: MusicLink, signal?: AbortSignal): Promise<LinkRead | null> {
+    if (!link.id || !['track', 'album', 'playlist'].includes(link.kind)) return null;
+    const url = `https://open.spotify.com/embed/${link.kind}/${encodeURIComponent(link.id)}`;
+    const { status, body } = await getText(this.options.fetch, url, { timeoutMs: this.options.timeouts?.tools ?? 15_000, signal, accept: [403, 404] });
+    if (status === 403 || status === 404) return null;
+    return parseSpotifyEmbed(body, link.url);
   }
 
   /**
@@ -907,7 +967,7 @@ export class CatalogEngine {
       return answer({ kind: 'album', collection: { ref: collectionRef(link, 'album', found.title, found.artist), artworkUrl: found.artworkUrl, covers: found.artworkUrl ? [found.artworkUrl] : [], releaseDate: null, page: { tracks: [], offset: 0, limit: 1, total: null, hasMore: false, capped: false } }, reason: `${label} albums list their songs only when the same album is on Deezer.` });
     }
     const track: CatalogTrack = { id: `${link.platform}:${link.id ?? link.url}`, title: found.title, artist: found.artist ?? '', artists: found.artist ? [found.artist] : [], album: null, albumArtist: null, durationMs: null, isrc: null, artworkUrl: found.artworkUrl, releaseDate: null, year: null, trackNumber: null, discNumber: null, bpm: null, explicit: null, genre: null, label: null, sources, rank: 0 };
-    return answer({ kind: 'track', track });
+    return answer({ kind: 'track', track: await this.withResolvedFacts(track, signal) });
   }
 
   /* ---------------------------------------------------- lyrics, enrichment */
@@ -917,7 +977,7 @@ export class CatalogEngine {
     return this.lyricsCache.get(key, () => this.upstream(() => this.lrclib.lyrics(input, signal), 'LRCLIB'));
   }
 
-  /** MusicBrainz's genre, label and year for a song, and its other homes. Cached for a day. */
+  /** MusicBrainz's credits, album, genre, label, year and other homes for a matched song. Cached for a day. */
   enrich(input: { isrc?: string | null | undefined; title?: string | null | undefined; artist?: string | null | undefined; durationMs?: number | null | undefined }, signal?: AbortSignal): Promise<CatalogEnrichment> {
     const key = input.isrc ? `isrc:${input.isrc}` : JSON.stringify([input.title?.toLowerCase(), input.artist?.toLowerCase(), input.durationMs ? Math.round(input.durationMs / 5000) : null]);
     return this.enrichCache.get(key, () => this.upstream(() => this.musicbrainz.enrich(input, signal), 'MusicBrainz'));

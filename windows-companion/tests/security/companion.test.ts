@@ -110,6 +110,7 @@ describe('the content security policy', () => {
     const { CATALOG_MEDIA_HOSTS } = await import('@now-playing/contracts');
     const { CATALOG_MEDIA_SOURCES } = await import('../../src/main/csp.js');
     expect(CATALOG_MEDIA_SOURCES).toEqual(CATALOG_MEDIA_HOSTS.map((host) => `https://${host}`));
+    expect(CATALOG_MEDIA_HOSTS).toContain('*.spotifycdn.com');
     const csp = contentSecurityPolicy(null);
     expect(csp).toContain(`img-src 'self' data: blob: ${CATALOG_MEDIA_SOURCES.join(' ')};`);
     expect(csp).toContain(`media-src 'self' blob: ${CATALOG_MEDIA_SOURCES.join(' ')};`);

@@ -14,15 +14,22 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import stock from '../../../packages/aqua-ui/styleguide/fixtures/catalog-stock.json';
+import { SavedTrack } from '@now-playing/contracts';
 import { SearchView } from '../../src/renderer/views/Search.js';
 import type { CompanionBridge } from '../../src/shared/ipc.js';
 
 type Call = { channel: string; request: Record<string, unknown> };
 
-function installBridge(extra: Record<string, (request: Record<string, unknown>) => unknown> = {}) {
+function savedKey(value: Record<string, unknown>): string {
+  if (value['kind'] === 'track') return `track:${String(value['identityKey'])}`;
+  const ref = value['ref'] as Record<string, unknown>;
+  return `collection:${String(ref['platform'])}:${String(ref['kind'])}:${String(ref['id'])}`;
+}
+
+function installBridge(extra: Record<string, (request: Record<string, unknown>) => unknown> = {}, initialSaved: unknown[] = stock.saved.items as unknown[]) {
   const calls: Call[] = [];
   const listeners = new Set<(payload: unknown) => void>();
-  let saved = stock.saved.items as unknown[];
+  let saved = initialSaved;
   let filter = { sections: ['tracks', 'artists', 'albums', 'playlists'], providers: ['itunes', 'deezer', 'musicbrainz', 'youtube', 'soundcloud'] };
   const answers: Record<string, (request: Record<string, unknown>) => unknown> = {
     'catalog:search': async (request) => {
@@ -41,12 +48,14 @@ function installBridge(extra: Record<string, (request: Record<string, unknown>) 
     'catalog:lyrics': () => ({ result: stock.lyrics, reason: null }),
     'catalog:enrich': () => ({ result: stock.enrich, reason: null }),
     'catalog:saved': () => ({ items: saved }),
-    'catalog:unsave': () => {
-      saved = [];
-      return { items: [] };
+    'catalog:unsave': (request) => {
+      const key = request['kind'] === 'track' ? `track:${String(request['identityKey'])}` : `collection:${String(request['platform'])}:${String(request['kind'])}:${String(request['id'])}`;
+      saved = saved.filter((item) => savedKey(item as Record<string, unknown>) !== key);
+      return { items: saved };
     },
     'catalog:save': (request) => {
-      saved = [request];
+      const key = savedKey(request);
+      saved = [...saved.filter((item) => savedKey(item as Record<string, unknown>) !== key), request];
       return { items: saved };
     },
     'catalog:filter': () => filter,
@@ -55,6 +64,8 @@ function installBridge(extra: Record<string, (request: Record<string, unknown>) 
       return filter;
     },
     'catalog:download': (request) => ({ job: { id: 'j1' }, source: (request['track'] as { sources: unknown[] }).sources.find((s) => (s as { platform: string }).platform === 'youtube-music'), reason: null }),
+    'catalog:download-batch': (request) => ({ jobs: (request['tracks'] as unknown[]).map((_, index) => ({ id: `batch-${index + 1}` })), queued: (request['tracks'] as unknown[]).length, reason: null }),
+    'app:preferences:get': () => ({ autoDownloadStars: false }),
     'hub:groups': () => ({ items: [{ id: '0192f0c0-0000-7000-8000-000000000001', name: 'Kitchen' }], reason: null }),
     'hub:request': () => ({ queued: true, title: 'Harbour Lights', position: 2, reason: null }),
     ...extra,
@@ -73,7 +84,7 @@ function installBridge(extra: Record<string, (request: Record<string, unknown>) 
     }) as CompanionBridge['on'],
   };
   (window as unknown as { companion?: CompanionBridge }).companion = bridge;
-  return { calls, sent: (channel: string) => calls.filter((c) => c.channel === channel) };
+  return { calls, sent: (channel: string) => calls.filter((c) => c.channel === channel), currentSaved: () => saved };
 }
 
 async function searchFor(text: string): Promise<void> {
@@ -87,6 +98,63 @@ afterEach(() => {
 });
 
 describe('Search in the companion', () => {
+  it('leaves auto-download off by default; when enabled, starring asks for an explicit rights basis and cancellation queues nothing', async () => {
+    const bridge = installBridge({ 'app:preferences:get': () => ({ autoDownloadStars: true }) });
+    render(<SearchView />);
+    await searchFor('harbour');
+    const songs = await screen.findByRole('listbox', { name: 'Songs' });
+    await userEvent.click(within(songs).getAllByRole('option')[0]!);
+    const star = await screen.findByRole('button', { name: 'Star this song' });
+    await userEvent.click(star);
+    const prompt = await screen.findByRole('dialog', { name: /confirm rights to auto-download “harbour lights”/i });
+    expect(within(prompt).getByText(/search results do not grant download permission/i)).toBeTruthy();
+    expect(within(prompt).getByRole('combobox', { name: /allowed because/i })).toBeTruthy();
+    const acknowledge = within(prompt).getByRole('checkbox', { name: /i confirm that this basis permits the download/i });
+    expect((acknowledge as HTMLInputElement).checked).toBe(false);
+    await userEvent.click(within(prompt).getByRole('button', { name: 'Cancel' }));
+    expect(bridge.sent('catalog:download-batch')).toEqual([]);
+    expect(bridge.currentSaved().some((item) => (item as { kind?: string }).kind === 'track')).toBe(true);
+  });
+
+  it('queues one starred song only after the rights checkbox is confirmed', async () => {
+    const bridge = installBridge({ 'app:preferences:get': () => ({ autoDownloadStars: true }) });
+    render(<SearchView />);
+    await searchFor('harbour');
+    const songs = await screen.findByRole('listbox', { name: 'Songs' });
+    await userEvent.click(within(songs).getAllByRole('option')[0]!);
+    await userEvent.click(await screen.findByRole('button', { name: 'Star this song' }));
+    const prompt = await screen.findByRole('dialog', { name: /confirm rights to auto-download “harbour lights”/i });
+    expect(within(prompt).queryByRole('option', { name: /creator-enabled download/i })).toBeNull();
+    expect(within(prompt).getByText(/this PC helper cannot verify SoundCloud’s creator-enabled flag/i)).toBeTruthy();
+    await userEvent.selectOptions(within(prompt).getByRole('combobox', { name: /allowed because/i }), 'user-owned');
+    await userEvent.click(within(prompt).getByRole('checkbox', { name: /i confirm that this basis permits the download/i }));
+    await userEvent.click(within(prompt).getByRole('button', { name: 'Confirm rights and download' }));
+    await waitFor(() => expect(bridge.sent('catalog:download-batch')).toHaveLength(1));
+    const request = bridge.sent('catalog:download-batch')[0]!.request;
+    expect(request['basis']).toBe('user-owned');
+    expect((request['tracks'] as unknown[])).toHaveLength(1);
+    expect(JSON.stringify(request)).not.toContain('locators');
+    expect(JSON.stringify(request)).not.toContain('localFile');
+  });
+
+  it('asks once for the whole playlist and resolves every song before queuing', async () => {
+    const savedWithoutPlaylist = (stock.saved.items as Record<string, unknown>[]).filter((item) => savedKey(item) !== 'collection:spotify:playlist:0MockHarbourMix0000001');
+    const bridge = installBridge({ 'app:preferences:get': () => ({ autoDownloadStars: true }) }, savedWithoutPlaylist);
+    render(<SearchView />);
+    await searchFor(stock.playlistUrl);
+    const list = await screen.findByRole('listbox', { name: 'The playlist' });
+    await userEvent.click(within(list).getByRole('option'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Star this playlist' }));
+    const prompt = await screen.findByRole('dialog', { name: /confirm rights to auto-download “harbour mix”/i });
+    expect(within(prompt).getByText(/applies 6 songs/i)).toBeTruthy();
+    await userEvent.click(within(prompt).getByRole('checkbox', { name: /i confirm that this basis permits the download/i }));
+    await userEvent.click(within(prompt).getByRole('button', { name: 'Confirm rights and download' }));
+    await waitFor(() => expect(bridge.sent('catalog:download-batch')).toHaveLength(1));
+    const request = bridge.sent('catalog:download-batch')[0]!.request;
+    expect(request['basis']).toBe('user-owned');
+    expect((request['tracks'] as unknown[])).toHaveLength(6);
+  });
+
   it('folds the chunks the main process passes on, says every service’s state, and shows rows that are music', async () => {
     const bridge = installBridge();
     render(<SearchView />);
@@ -279,15 +347,36 @@ describe('Search in the companion', () => {
     expect(await screen.findByRole('button', { name: /Star this playlist/ })).toBeTruthy();
   });
 
+  it('shows shared starred songs on the Songs page and preserves unrelated stars when unstarring', async () => {
+    const savedTrack = SavedTrack.parse({ kind: 'track', identityKey: 'isrc:GBUM71029604', savedAt: '2026-10-14T10:00:00.000Z', track: { id: 'local:harbour', title: 'Harbour Lights', artist: 'Cassette Bloom', isrc: 'GBUM71029604', sources: [] } });
+    const bridge = installBridge({}, [...stock.saved.items, savedTrack]);
+    render(<SearchView />);
+    await searchFor('harbour');
+    await userEvent.click(await screen.findByRole('button', { name: /See all \d+\+? songs/i }));
+    const shelf = await screen.findByRole('list', { name: 'Your starred songs' });
+    expect(within(shelf).getByText('Harbour Lights')).toBeTruthy();
+    await userEvent.click(within(shelf).getByRole('button', { name: 'Unstar Harbour Lights' }));
+    await waitFor(() => expect(bridge.sent('catalog:unsave')[0]!.request).toEqual({ kind: 'track', identityKey: 'isrc:GBUM71029604' }));
+    expect(bridge.currentSaved()).toHaveLength(1);
+    await waitFor(() => expect(screen.queryByRole('list', { name: 'Your starred songs' })).toBeNull());
+    expect(bridge.sent('catalog:saved')).toHaveLength(1);
+  });
+
   it('opens a song with genre, label, year and lyrics, and downloads it through the helper’s path', async () => {
-    const bridge = installBridge();
+    const bridge = installBridge({
+      'catalog:enrich': () => ({ result: { ...stock.enrich, artist: 'Cassette Bloom', artists: ['Cassette Bloom', 'Ada Moss'], featured: ['Ada Moss'], album: 'Harbour Lights', albumArtist: 'Cassette Bloom' }, reason: null }),
+    });
     render(<SearchView />);
     await searchFor('harbour');
     const songs = await screen.findByRole('listbox', { name: 'Songs' });
     await waitFor(() => expect(within(songs).getAllByRole('option')).toHaveLength(5));
     await userEvent.click(within(songs).getAllByRole('option')[0]!);
     expect(await screen.findByText('Pier Records')).toBeTruthy();
+    expect(await screen.findByText('Cassette Bloom feat. Ada Moss')).toBeTruthy();
     expect((await screen.findByRole('region', { name: 'Lyrics, timed' })).textContent).toContain('The lamps come on along the quay');
+    await userEvent.click(screen.getByRole('button', { name: 'Star this song' }));
+    await waitFor(() => expect(bridge.sent('catalog:save')[0]!.request).toMatchObject({ kind: 'track', identityKey: expect.stringMatching(/^(isrc|provider):/), track: { title: 'Harbour Lights' } }));
+    expect(await screen.findByRole('button', { name: 'Starred song' })).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Download' }));
     expect(await screen.findByText(/Downloading from YouTube Music\. It is saved where Settings ▸ Downloads says/)).toBeTruthy();
     expect(bridge.sent('catalog:download')[0]!.request).toMatchObject({ basis: 'user-owned', track: { id: 'deezer:9101' } });

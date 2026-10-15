@@ -1297,7 +1297,8 @@
         "new versions of the companion: checked by default, asked at once when switched on, said when one is out; Download opens the release page",
         "notifications when a download finishes: one preference with “When one finishes”",
         "helper on your network: off by default; what it exposes said before it is switched on (DEC-032)",
-        "Playlists: the folder (Airwave Playlists in Music by default), Change… (the system picker), Open Folder, and “Move my playlists when the folder changes” (CMP-PL-001)"
+        "Playlists: the folder (Airwave Playlists in Music by default), Change… (the system picker), Open Folder, and “Move my playlists when the folder changes” (CMP-PL-001)",
+        "Offer downloads after starring: off by default; a song needs its own rights confirmation, a collection confirms the resolved batch, and SoundCloud is refused by the local helper"
       ],
       "rules": [
         "UX-PRIN-001",
@@ -1306,7 +1307,9 @@
         "UX-SAFE-001",
         "UX-NET-001",
         "UX-PRIV-001",
-        "CMP-PL-001"
+        "CMP-PL-001",
+        "UX-SEARCH-013",
+        "UX-PL-008"
       ],
       "mockup": "companion-settings",
       "decision": "DEC-018"
@@ -1523,7 +1526,8 @@
         "filtered by the bar",
         "an album or playlist from the catalog (search-collection-list)",
         "Discover: ranked by the chosen algorithm, the chip and Refresh in the silver bar (player-shell-discover)",
-        "visitor rows: a catalog song not on this device (preview, fetch, the catalog song’s menu)"
+        "visitor rows: catalog metadata; no player preview, fetch the full song before it plays",
+        "metadata-only starred songs and collections from this player and the paired Hub; the star does not copy audio"
       ],
       "rules": [
         "NP-LIST-001",
@@ -1532,7 +1536,9 @@
         "NP-FIND-007",
         "NP-FIND-008",
         "NP-DISC-001",
-        "NP-FIND-011"
+        "NP-FIND-011",
+        "UX-SEARCH-013",
+        "UX-PL-008"
       ],
       "guideAnchor": "shell",
       "authority": "adopted"
@@ -1564,7 +1570,7 @@
         "From the catalog: asking (the heading says so; the library rows answer meanwhile)",
         "From the catalog: picks ranked by the same algorithm, each with its platforms and why, through the hub / the companion / this browser",
         "From the catalog: offline / nothing played / nothing answered / nothing new (a sentence in the heading)",
-        "From the catalog: the next two previews held ahead (2 clips, 4 MB)"
+        "From the catalog: no preview clips fetched or played; explicit auditions stay in Search"
       ],
       "rules": [
         "NP-DISC-001",
@@ -1618,12 +1624,12 @@
       "components": ["shell markup (design/frontends/origin/airwave-now-playing.html)"],
       "states": [
         "nothing playing",
-        "a track from this device playing (the bar follows the element)",
+        "a track from this device playing (the bar follows the element; case sleeve and CD label use its available cover art)",
         "paused",
         "a link row chosen (does not pretend to play)",
         "a station (LIVE)",
         "a channel (video bar, LIVE)",
-        "a visitor’s preview (“Preview · 30 seconds — not the whole song”), and “Fetching… N%” while it is fetched"
+        "a catalog visitor selected with no preview or playback; after fetch, its full local copy starts"
       ],
       "rules": ["NP-TRANS-001", "UX-KEY-002", "NP-FIND-011"],
       "guideAnchor": "shell",
@@ -1749,7 +1755,7 @@
         "fetched and playing",
         "the date beside the title, when the link row has one",
         "the hub fetches it: the source it chose and what it embedded, then “Fetching… N%”",
-        "opened over a visitor’s preview (“Its 30-second preview plays meanwhile.”)",
+        "opened for a visitor without audio; the kept full copy starts after fetch",
         "nothing can fetch it (the hub has not allowed downloads, no helper): said, and Fetch claims nothing"
       ],
       "rules": ["UX-SAFE-001", "UX-FEED-001", "NP-FIND-002", "NP-FIND-011", "NP-FIND-012"],
@@ -2284,9 +2290,10 @@
         "enriched",
         "lyrics synced / plain / none / instrumental",
         "Download… through the hub (its chosen source and tags)",
-        "Download… (the hub, else the helper) / only in stores (says so)"
+        "Download… (the hub, else the helper) / only in stores (says so)",
+        "Star song / Unstar song: saves only a metadata snapshot to this device and syncs with the paired Hub when library:sync is allowed; does not queue audio"
       ],
-      "rules": ["NP-FIND-006", "NP-FIND-001", "NP-FIND-012"],
+      "rules": ["NP-FIND-006", "NP-FIND-001", "NP-FIND-012", "UX-SEARCH-013", "UX-PL-008"],
       "guideAnchor": "screens",
       "authority": "adopted"
     },
@@ -2340,9 +2347,9 @@
         "star off / on",
         "a song played: its preview while the hub or the companion fetches it",
         "star synced with the hub (library:sync)",
-        "shared by the hub admin: read-only, no star (“Shared on <hub> — read-only”)"
+        "the same Hub-backed saved set on every paired client with library:sync; songs and collections can be starred or unstarred here, and offline deletions reconcile through timestamped tombstones"
       ],
-      "rules": ["NP-FIND-007", "NP-FIND-008", "NP-FIND-011"],
+      "rules": ["NP-FIND-007", "NP-FIND-008", "NP-FIND-011", "UX-SEARCH-013", "UX-PL-008"],
       "guideAnchor": "screens",
       "authority": "adopted"
     },
@@ -2397,13 +2404,15 @@
         "a song only a store has: nothing to queue or fetch, said in words",
         "Add to Library… / Download… (sheet): the rights basis (and format), into the hub’s download queue",
         "Add to Playlist ▸: the hub’s playlists, ticked where the song is, and New Playlist…; the sheet keeps the song’s link and “Also add to Library” (on) queues the download with its basis (UX-PL-005)",
-        "a song: cover, platforms, preview, genre/label/year (looking it up…), synced or plain lyrics (or none, or instrumental), Download with the rights basis and what happened",
+        "a song: cover, credited artist/feat line, album, platforms, preview, genre/label/year (looking it up…), synced or plain lyrics (or none, or instrumental), Download with the rights basis and what happened",
         "an album: cover, label, date, songs, the star",
         "an artist: picture, top songs, albums (more as you scroll)",
         "a pasted playlist: its 2×2 mosaic, platform and length; opened like an album with every song; starred",
         "a link that cannot be read: the reason in words",
         "a failure: the reason in words under the field",
-        "a row filled in by the engine’s last chunk: the credit line (“feat. …”), BPM, the explicit mark and a cover arrive after the row (UX-CAT-006)"
+        "a row filled in by the engine’s last chunk: the credit line (“feat. …”), BPM, the explicit mark and a cover arrive after the row (UX-CAT-006)",
+        "Star / Unstar writes only a metadata song or collection bookmark to the shared set; it does not copy audio",
+        "auto-download is off by default; if enabled, a separate rights confirmation follows the star and every selected source is preflighted before any job; cancel or refusal queues nothing"
       ],
       "rules": [
         "UX-SEARCH-001",
@@ -2424,7 +2433,9 @@
         "UX-SEARCH-011",
         "UX-SEARCH-012",
         "UX-CAT-005",
-        "UX-PL-005"
+        "UX-PL-005",
+        "UX-SEARCH-013",
+        "UX-PL-008"
       ],
       "guideAnchor": "screens",
       "mockup": "hub-search",
@@ -2448,9 +2459,10 @@
         "no SongLink key (optional)",
         "a key set (never shown; Clear Key)",
         "changed (Save, Revert)",
-        "refused by the hub (its sentence)"
+        "refused by the hub (its sentence)",
+        "Offer downloads after starring: off by default; enabling it still requires a separate rights confirmation and per-source preflight"
       ],
-      "rules": ["UX-SEARCH-006", "UX-FORM-001"],
+      "rules": ["UX-SEARCH-006", "UX-FORM-001", "UX-SEARCH-013", "UX-PL-008"],
       "guideAnchor": "screens",
       "mockup": "hub-catalog",
       "authority": "adopted",
@@ -2518,7 +2530,9 @@
         "a failure: the reason in words under the field",
         "the helper not running: the reason in words",
         "a row filled in by the engine’s last chunk: the credit line (“feat. …”), BPM, the explicit mark and a cover arrive after the row (UX-CAT-006)",
-        "on touch: a long press (500 ms, within 10 px) on a row opens its menu (CMP-PL-006)"
+        "on touch: a long press (500 ms, within 10 px) on a row opens its menu (CMP-PL-006)",
+        "Star / Unstar writes metadata only to the shared set; no audio is copied",
+        "auto-download is off by default; if enabled, a song needs a separate rights confirmation and a collection confirms its resolved batch; cancel queues nothing; SoundCloud is refused by this PC helper"
       ],
       "rules": [
         "UX-SEARCH-001",
@@ -2540,7 +2554,9 @@
         "UX-SEARCH-012",
         "UX-CAT-005",
         "CMP-PL-004",
-        "CMP-PL-006"
+        "CMP-PL-006",
+        "UX-SEARCH-013",
+        "UX-PL-008"
       ],
       "guideAnchor": "screens",
       "mockup": "companion-search",
@@ -2678,7 +2694,7 @@
         "the hub’s playlists listed / checking / none yet / not allowed (how to fix it)",
         "opened: rows page by page, “Playlist · <hub> · N songs”",
         "a song the hub’s library holds, streaming from the hub",
-        "a song kept by its link: a visitor (its preview, the fetch sheet)",
+        "a song kept by its link: a visitor (fetch sheet; no audio until its full copy is saved)",
         "a song the hub cannot place (“Not found”)",
         "made here: “…” ▸ Rename…, Move Song Up/Down, Delete Playlist…; Alt+↑/↓",
         "made on another device or by hand: read-only, said in the bar",

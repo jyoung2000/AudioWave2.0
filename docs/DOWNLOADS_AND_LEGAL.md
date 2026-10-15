@@ -27,6 +27,14 @@ written for the person reading it rather than as an error code.
 | Bandcamp | No, in the app | There is no public API. Bandcamp is a link out; what you buy there, Bandcamp gives you, and the player imports the `.zip` it arrives in directly. |
 | MusicBrainz | Not applicable | Metadata only. It is never an audio source. |
 
+## Automatic download prompts after starring
+
+The Hub and Windows Companion each have an **Offer to download songs, albums, and playlists when starring them** setting. It is off by default. Star sync—between the PWA and Hub, or between the Companion and Hub—stores only bounded catalog metadata and source/artwork link strings; it never sends audio or a local file path, and the PWA's sync never creates a download job.
+
+When the setting is on, a Hub or Companion star action still asks the person to affirm a rights basis before offering audio work. A song is checked separately; an album or playlist is resolved first and one confirmation covers the complete batch. The Hub checks every selected source against the stated basis before it creates any job. If the user cancels, a source fails preflight, or the full collection cannot be resolved, the star stays and no audio is queued. Search results, a provider link, and metadata are not permission.
+
+The creator-enabled basis is accepted only for a SoundCloud track whose provider metadata says downloads are enabled and remain available; the Hub verifies that before queueing. YouTube, Spotify/spotDL matches and generic yt-dlp results cannot use that basis. The Companion's local helper cannot independently verify SoundCloud's creator flag, so it excludes and refuses SoundCloud URLs rather than guessing. Use the Hub's verified flow instead.
+
 ## Saving a copy from the player
 
 The player can hand you your own music as a file. Which formats it offers depends on what it can

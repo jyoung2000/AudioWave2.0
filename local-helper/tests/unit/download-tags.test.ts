@@ -55,8 +55,16 @@ describe('the download’s command line', () => {
   });
 
   it('asks spotDL to save, not download, with the URL where spotDL takes it', () => {
-    expect(spotdlSaveArgs('https://open.spotify.com/track/x', '/tmp/s/songs.spotdl')).toEqual(['save', 'https://open.spotify.com/track/x', '--save-file', '/tmp/s/songs.spotdl']);
+    const args = spotdlSaveArgs('https://open.spotify.com/track/x', '/tmp/s/songs.spotdl');
+    expect(args.slice(0, 4)).toEqual(['save', 'https://open.spotify.com/track/x', '--save-file', '/tmp/s/songs.spotdl']);
+    expect(args).toContain('--yt-dlp-args');
     expect(() => spotdlSaveArgs('--config', '/tmp/s')).toThrow(/http/);
+  });
+
+  it('passes the helper’s resolved FFmpeg path to spotDL metadata reads', () => {
+    const args = spotdlSaveArgs('https://open.spotify.com/track/x', '/tmp/s/songs.spotdl', { ffmpeg: '/tools/ffmpeg.exe' });
+    expect(args[args.indexOf('--ffmpeg') + 1]).toBe('/tools/ffmpeg.exe');
+    expect(args).toContain('--yt-dlp-args');
   });
 });
 

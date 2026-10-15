@@ -9,7 +9,7 @@
  * localStorage is readable by any script that manages to run on the page.
  */
 import { ReleaseMetadata } from '@now-playing/contracts';
-import type { GroupPlaybackState, GroupView, HubIdentity, ProviderDescriptor, Queue, QueueCommand, SearchResponse, ShareLinkView, TrackRef } from '@now-playing/contracts';
+import type { GroupPlaybackState, GroupView, HubIdentity, ProviderDescriptor, Queue, QueueCommand, SavedCatalogItem, SavedCatalogItemList, SavedCatalogItemRef, SearchResponse, ShareLinkView, TrackRef } from '@now-playing/contracts';
 import { getSetting, putSetting, type PlayerDatabase } from './db.js';
 
 export interface HubCredential {
@@ -154,6 +154,26 @@ export class HubClient {
 
   async search(query: string, scope = 'all'): Promise<SearchResponse> {
     return this.request<SearchResponse>('GET', `/api/v1/search?q=${encodeURIComponent(query)}&scope=${encodeURIComponent(scope)}`);
+  }
+
+  /** The one library:sync-authorized set of songs, albums and playlists starred across clients. */
+  async savedCatalog(): Promise<SavedCatalogItemList> {
+    return this.request<SavedCatalogItemList>('GET', '/api/v1/catalog/saved');
+  }
+
+  async saveCatalogItem(item: SavedCatalogItem): Promise<SavedCatalogItemList> {
+    return this.request<SavedCatalogItemList>('PUT', '/api/v1/catalog/saved', { body: item });
+  }
+
+  async deleteCatalogItem(ref: SavedCatalogItemRef, at?: string): Promise<SavedCatalogItemList> {
+    const query = new URLSearchParams({ kind: ref.kind });
+    if (ref.kind === 'track') query.set('identityKey', ref.identityKey);
+    else {
+      query.set('platform', ref.platform);
+      query.set('id', ref.id);
+    }
+    if (at) query.set('at', at);
+    return this.request<SavedCatalogItemList>('DELETE', `/api/v1/catalog/saved?${query.toString()}`);
   }
 
   async createShare(input: { kind: 'track' | 'album' | 'playlist' | 'library'; targetId: string; title?: string; allowStream?: boolean; allowDownload?: boolean; expiresInSeconds?: number | null; maxAccesses?: number | null; items?: unknown[] }): Promise<{ share: ShareLinkView; token: string; url: string | null }> {

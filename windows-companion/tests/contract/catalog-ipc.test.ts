@@ -97,12 +97,12 @@ describe('the Search tool’s channels', () => {
     expect((await catalog.album('deezer:1', 0, 50)).reason).toBe('Port 17342 is already in use on this PC.');
   });
 
-  it('keeps starred albums and playlists and the filter in the companion’s store', () => {
+  it('keeps starred albums and playlists and the filter in the companion’s store', async () => {
     const { catalog } = standIn();
     const saved = stock.saved.items[0]!;
-    expect(IPC['catalog:save'].response.parse(catalog.save(saved as never)).items).toHaveLength(1);
-    expect(catalog.save({ ...saved, trackCount: 7 } as never).items.map((i) => i.trackCount)).toEqual([7]);
-    expect(IPC['catalog:unsave'].response.parse(catalog.unsave(saved.ref as never)).items).toEqual([]);
+    expect(IPC['catalog:save'].response.parse(await catalog.save(saved as never)).items).toHaveLength(1);
+    expect((await catalog.save({ ...saved, trackCount: 7 } as never)).items.map((i) => 'ref' in i ? i.trackCount : null)).toEqual([7]);
+    expect(IPC['catalog:unsave'].response.parse(await catalog.unsave(saved.ref as never)).items).toEqual([]);
     expect(catalog.filter()).toEqual({ sections: ['tracks', 'artists', 'albums', 'playlists'], providers: ['itunes', 'deezer', 'musicbrainz', 'youtube', 'soundcloud'] });
     expect(catalog.setFilter({ sections: ['tracks'], providers: ['deezer'] })).toEqual({ sections: ['tracks'], providers: ['deezer'] });
     // Playlists are a section of their own (UX-SEARCH-010), kept like the rest; a fifth kind is not.

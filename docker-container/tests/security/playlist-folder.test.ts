@@ -149,19 +149,20 @@ describe('starred collections for devices (library:sync)', () => {
     trackCount: 10,
   });
 
-  it('needs library:sync, keeps each device’s own, and shows the admin’s as shared, read-only', async () => {
+  it('needs library:sync and lets every paired client edit the same shared set', async () => {
     expect((await asAdmin('PUT', '/catalog/saved', star('1', 'Admin’s'))).statusCode).toBe(200);
     const without = await pairDevice(hub, admin, { name: 'No sync', scopes: ['search:use'] });
     expect((await asDevice(without, 'GET', '/catalog/saved')).statusCode).toBe(403);
 
     const player = await pairDevice(hub, admin, { name: 'Player', scopes: ['library:sync'] });
     const other = await pairDevice(hub, admin, { name: 'Other', scopes: ['library:sync'] });
-    expect((await asDevice(player, 'GET', '/catalog/saved')).json()).toMatchObject({ items: [], shared: [{ ref: { id: '1' } }] });
+    expect((await asDevice(player, 'GET', '/catalog/saved')).json()).toMatchObject({ items: [{ ref: { id: '1' } }], shared: [] });
     const put = (await asDevice(player, 'PUT', '/catalog/saved', star('2', 'Player’s'))).json() as { items: SavedCollection[] };
-    expect(put.items.map((s) => s.ref.id)).toEqual(['2']);
-    expect(((await asDevice(other, 'GET', '/catalog/saved')).json() as { items: SavedCollection[] }).items).toEqual([]);
-    // Un-starring the admin's from a device removes nothing of the admin's.
-    await asDevice(player, 'DELETE', '/catalog/saved?platform=deezer&kind=playlist&id=1');
-    expect(((await asAdmin('GET', '/catalog/saved')).json() as { items: SavedCollection[] }).items.map((s) => s.ref.id)).toEqual(['1']);
+    expect(put.items.map((s) => s.ref.id).sort()).toEqual(['1', '2']);
+    expect(((await asDevice(other, 'GET', '/catalog/saved')).json() as { items: SavedCollection[] }).items.map((s) => s.ref.id).sort()).toEqual(['1', '2']);
+    await asDevice(player, 'DELETE', '/catalog/saved?platform=deezer&kind=playlist&id=1&at=2026-10-10T12%3A00%3A01.000Z');
+    const adminList = (await asAdmin('GET', '/catalog/saved')).json() as { items: SavedCollection[]; tombstones: Array<{ key: string }> };
+    expect(adminList.items.map((s) => s.ref.id)).toEqual(['2']);
+    expect(adminList.tombstones.map((marker) => marker.key)).toContain('collection:deezer:playlist:1');
   });
 });

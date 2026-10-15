@@ -16,7 +16,7 @@ type Row = { id: string; title: string; artist: string; platforms: string[]; why
 type Online = { state: string; said: string; via: string | null; lookahead: { held: string; reason: string | null; bytes: number; entries: number } | null; rows: Row[] };
 type Win = {
   NP_DISCOVER: { ids(): string[] | null; online(): Online };
-  NP_PLAYER: { playing(): boolean; trackId(): string | null };
+  NP_PLAYER: { playing(): boolean; trackId(): string | null; duration(): number | null };
   LIBRARY: Array<{ id: string; title: string; local?: boolean }>;
   kv: { get(k: string): Promise<unknown>; set(k: string, v: unknown): Promise<void> | void };
 };
@@ -112,7 +112,7 @@ test.describe('From the catalog (NP-DISC-006)', () => {
     await useCompanion(page);
     await openDiscover(page);
     await expect(heading(page)).toContainText('From the catalog');
-    await expect(heading(page)).toContainText('2 songs ranked by “Airwave default” · For you, through the companion on this PC — not on this device yet: choosing one plays its preview');
+    await expect(heading(page)).toContainText('2 songs ranked by “Airwave default” · For you, through the companion on this PC — not on this device yet: audition previews in Search; fetch a full song here');
     expect([...asked].sort(), 'the queries come from the play log: the artist played and the genre played').toEqual(['alder quartet', 'jazz']);
     expect(await onlineTitles(page), 'the artist you play leads; what the device already has is not offered').toEqual(['Night Harbour', 'Far Signal']);
     expect((await page.evaluate(() => (window as unknown as Win).NP_DISCOVER.ids()))!.length, 'the library’s eight songs are still the ranked list above').toBe(8);
@@ -231,12 +231,11 @@ test.describe('From the catalog (NP-DISC-006)', () => {
   });
 });
 
-test.describe('the look-ahead (NP-DISC-007)', () => {
-  test('asks for the next picks’ previews within its budget, one at a time, and the UI never waits on it', async ({ page }) => {
+test.describe('Discover does not preload previews (NP-DISC-007)', () => {
+  test('catalog clips are neither fetched nor played here; only an explicit Search audition requests one', async ({ page }) => {
     const picks = Array.from({ length: 5 }, (_, i) =>
       track(`deezer:3${i}`, `Lamp ${i + 1}`, { artist: 'Alder Quartet', artists: ['Alder Quartet'], genre: 'Jazz', sources: [src('deezer', `3${i}`, { previewUrl: clip(`3${i}`) })] }),
     );
-    // The catalog is slow: Discover's own rows and its controls answer meanwhile.
     await page.route(`${COMPANION}/helper/v1/catalog/search?**`, catalog(() => picks, [], 2500));
     const got = await clips(page);
     await library(page);
@@ -249,24 +248,20 @@ test.describe('the look-ahead (NP-DISC-007)', () => {
     expect(Date.now() - t0, 'the chip’s menu opens while the catalog is still being asked').toBeLessThan(1500);
     await page.keyboard.press('Escape');
     await expect(heading(page)).toContainText('5 songs ranked by', { timeout: 15_000 });
-    await expect.poll(async () => (await online(page)).lookahead?.entries, { message: 'two previews held ahead' }).toBe(2);
     await page.waitForTimeout(1500);
-    const now = await online(page);
-    const la = now.lookahead!;
-    expect([...got].sort(), 'exactly the two best picks’ clips were asked for, and no more').toEqual(now.rows.slice(0, 2).map((r) => r.preview).sort());
-    expect(la.bytes).toBeLessThanOrEqual(4 * 1024 * 1024);
-    expect(la.held).toMatch(/^2 previews are ready ahead \(\d\.\d MB of 4\.0 MB\)\.$/);
-    expect(la.reason).toBe('2 previews are ready ahead');
-    // Played, the first leaves the ring and the next one is asked for.
+    expect(got, 'Discover does not download preview clips in the background').toEqual([]);
+    expect((await online(page)).lookahead?.entries).toBe(0);
     await page.locator('#libraryRows tr[data-online]').first().click();
-    await expect.poll(() => got.length).toBe(3);
+    await expect(page.locator('#playerPreview')).toBeHidden();
+    await expect.poll(() => page.evaluate(() => (window as unknown as Win).NP_PLAYER.playing())).toBe(false);
+    expect(got, 'selecting a catalog visitor does not audition a preview').toEqual([]);
   });
 });
 
 test.describe('a visitor plays (NP-FIND-011)', () => {
   // Real audio, a fetch that lands and a file indexed: more than the default minute on a busy machine.
   test.describe.configure({ timeout: 120_000 });
-  test('with nothing to fetch it, its preview plays, said as one, and nothing is logged as a play', async ({ page }) => {
+  test('a visitor row does not play a preview; clips are auditioned in Search and full tracks must be fetched', async ({ page }) => {
     await page.route(`${COMPANION}/helper/v1/catalog/search?**`, catalog(() => [HARBOUR], []));
     await clips(page);
     await library(page);
@@ -276,13 +271,12 @@ test.describe('a visitor plays (NP-FIND-011)', () => {
     await expect(pick).toBeVisible();
     const playsBefore = await page.evaluate(async () => (((await (window as unknown as Win).kv.get('library:state')) as { plays?: unknown[] }).plays ?? []).length);
     await pick.click();
-    await expect(page.locator('#playerPreview')).toBeVisible();
-    await expect(page.locator('#playerPreview')).toHaveText('Preview · 30 seconds — not the whole song');
-    await expect(hud(page)).toContainText('Preview — 30 seconds of “Night Harbour”. The whole song needs fetching, and fetching it needs the hub');
-    await expect.poll(() => page.evaluate(() => (window as unknown as Win).NP_PLAYER.playing())).toBe(true);
+    await expect(page.locator('#playerPreview')).toBeHidden();
+    await expect(hud(page)).toContainText('Preview it from Search; the full song needs fetching');
+    await expect.poll(() => page.evaluate(() => (window as unknown as Win).NP_PLAYER.playing())).toBe(false);
     await expect(page.locator('#npFetch')).toHaveCount(0);
     const playsAfter = await page.evaluate(async () => (((await (window as unknown as Win).kv.get('library:state')) as { plays?: unknown[] }).plays ?? []).length);
-    expect(playsAfter, 'a preview is not a play of the song').toBe(playsBefore);
+    expect(playsAfter, 'a catalog visitor without an audio file is not logged as a full play').toBe(playsBefore);
   });
 
   test('with no preview and nothing to fetch it, it says what is needed instead of pretending', async ({ page }) => {
@@ -297,7 +291,7 @@ test.describe('a visitor plays (NP-FIND-011)', () => {
     await expect.poll(() => page.evaluate(() => (window as unknown as Win).NP_PLAYER.playing())).toBe(false);
   });
 
-  test('with a hub, Play asks the hub to fetch it: the preview meanwhile, “Fetching… N%” on the row, then the song itself (NP-FIND-012)', async ({ page }) => {
+  test('with a hub, a visitor fetches the full song without a preview, then plays the full local copy (NP-FIND-012)', async ({ page }) => {
     const JOB = '00000000-0000-4000-8000-000000000123';
     const HASH = 'a'.repeat(64);
     const posted: Array<Record<string, unknown>> = [];
@@ -327,10 +321,10 @@ test.describe('a visitor plays (NP-FIND-011)', () => {
     await expect(heading(page)).toContainText('through the hub TOWER');
     const pick = page.locator('#libraryRows tr[data-online]').first();
     await pick.click();
-    await expect(page.locator('#playerPreview')).toBeVisible();
+    await expect(page.locator('#playerPreview')).toBeHidden();
     await expect(page.locator('#npFetch')).toBeVisible();
     await expect(page.locator('#npFetchMsg')).toContainText('“Night Harbour” by Alder Quartet (2019-05-03) — fetched by the hub TOWER from the best source it has for it');
-    await expect(page.locator('#npFetchMsg')).toContainText('Its 30-second preview plays meanwhile.');
+    await expect(page.locator('#npFetchMsg')).not.toContainText('preview');
     await page.click('#npFetchGo');
     await expect(page.locator('#npFetchState')).toHaveText('Say why you may have this file first.');
     await page.check('input[name="npBasis"][value="purchased-export"]');
@@ -342,12 +336,14 @@ test.describe('a visitor plays (NP-FIND-011)', () => {
     await expect(page.locator('#npFetchCancel')).toHaveText('Close');
     await page.click('#npFetchCancel');
     await expect(pick.locator('.lib-state')).toHaveText('Fetching… 40%');
-    await expect(page.locator('#playerPreview')).toContainText('Fetching… 40%');
+    await expect(page.locator('#playerPreview')).toBeHidden();
     landed = true;
-    // Landed: a real track in the library, playing, and no longer a preview.
+    // Landed: the kept copy is now the active full song, not the catalog preview.
     await expect.poll(() => page.evaluate(() => (window as unknown as Win).LIBRARY.some((r) => r.local && /Night Harbour/.test(r.title))), { timeout: 20_000 }).toBe(true);
     await expect(hud(page)).toContainText('Fetched — “Night Harbour” is in your library');
     await expect(page.locator('#playerPreview')).toBeHidden();
+    await expect.poll(() => page.evaluate(() => (window as unknown as Win).NP_PLAYER.duration())).toBe(20);
+    await expect.poll(() => page.evaluate(() => (window as unknown as Win).NP_PLAYER.playing())).toBe(true);
     await expect
       .poll(() => page.evaluate(() => { const w = window as unknown as Win; const id = w.NP_PLAYER.trackId(); return !!w.LIBRARY.find((r) => r.id === id && r.local); }))
       .toBe(true);

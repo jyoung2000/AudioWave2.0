@@ -747,10 +747,13 @@ test('an artist drills into an album; details stack, and Back walks them back', 
   await expect(page.locator('#srchBack')).toBeHidden();
 });
 
-test('a song’s details: genre, label and year from enrichment, and its lyrics, synced', async ({
+test('a song’s details: featured artist, album, genre, label and year from enrichment, and its lyrics, synced', async ({
   page,
 }) => {
   const song = track('deezer:1001', 'Harbour Lamps', {
+    artist: 'Lantern Choir',
+    artists: ['Lantern Choir'],
+    album: null,
     isrc: 'GBAYE1900001',
     genre: null,
     label: null,
@@ -766,6 +769,11 @@ test('a song’s details: genre, label and year from enrichment, and its lyrics,
         json({
           isrc: 'GBAYE1900001',
           musicbrainzRecordingId: 'mb-1',
+          artist: 'Lantern Choir feat. Guest Singer',
+          artists: ['Lantern Choir', 'Guest Singer'],
+          featured: ['Guest Singer'],
+          album: 'Night Ferries',
+          albumArtist: 'Lantern Choir',
           genre: 'Indie Folk',
           genres: ['indie folk'],
           label: 'Quay Records',
@@ -797,6 +805,8 @@ test('a song’s details: genre, label and year from enrichment, and its lyrics,
   await expect(facts).toContainText('Genre Indie Folk');
   await expect(facts).toContainText('Label Quay Records');
   await expect(facts).toContainText('Year 2019');
+  await expect(page.locator('body')).toContainText('Lantern Choir feat. Guest Singer');
+  await expect(page.locator('body')).toContainText('Night Ferries');
   await expect(facts).toContainText('ISRC GBAYE1900001');
   // MusicBrainz linked it on Spotify too: the details name every home.
   await expect(page.locator('.srch__dpfs .srch__badge')).toHaveText(['Deezer', 'Spotify']);

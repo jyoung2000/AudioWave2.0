@@ -21,7 +21,7 @@
  * is the hub's view with the companion's kit (`search-kit.tsx`, DEC-026) and transport.
  */
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
-import type { CatalogAlbum, CatalogAlbumDetail, CatalogArtist, CatalogArtistDetail, CatalogCollection, CatalogEnrichment, CatalogLyrics, CatalogPlaylist, CatalogResolveResult, CatalogSearchSection, CatalogSource, CatalogSourceStatus, CatalogTrack, DownloadAuthorizationBasis, FolderPlaylistSummary, OutputFormat, SavedCollection } from '@now-playing/contracts';
+import type { CatalogAlbum, CatalogAlbumDetail, CatalogArtist, CatalogArtistDetail, CatalogCollection, CatalogEnrichment, CatalogLyrics, CatalogPlaylist, CatalogResolveResult, CatalogSearchSection, CatalogSource, CatalogSourceStatus, CatalogTrack, DownloadAuthorizationBasis, FolderPlaylistSummary, OutputFormat, SavedCollection, SavedTrack } from '@now-playing/contracts';
 import { CATALOG_COLLECTION_CAP, CATALOG_PROVIDERS } from '@now-playing/contracts';
 import {
   albumLine,
@@ -48,8 +48,10 @@ import {
   PLAYS_FROM_SPOTDL,
   playsThroughSpotdl,
   previewOf,
+  resolveCatalogBatchTracks,
   savedCollectionOf,
   savedMatching,
+  savedTrackIdentity,
   SEARCH_TYPES,
   seeAllText,
   sectionPages,
@@ -73,7 +75,7 @@ import type { HubGroupChoice } from '../../shared/ipc.js';
 /** Why this download is allowed: the same bases the hub and the helper record (DownloadAuthorizationBasis). */
 const BASIS_LABELS: Record<string, string> = {
   'user-owned': 'I own it',
-  'creator-download': 'The artist allows downloads',
+  'creator-download': 'Creator-enabled download (SoundCloud only)',
   'purchased-export': 'Exported from a purchase',
   'public-domain': 'Public domain',
   licensed: 'Licensed',
@@ -85,6 +87,9 @@ const LIST_PAGE = 50;
 const OFFSET_MAX = 1000;
 
 type Row = CatalogTrack | CatalogArtist | CatalogAlbum | CatalogPlaylist;
+
+type AutoDownloadTarget = { kind: 'track'; track: CatalogTrack } | { kind: 'collection'; collection: CatalogCollection };
+const AutoDownloadRequestContext = createContext<(target: AutoDownloadTarget) => void>(() => undefined);
 
 type Page =
   | { kind: 'results' }
@@ -218,6 +223,12 @@ function SearchPane({ client, initialQuery }: { client: CatalogClient; initialQu
   };
 
   const songMenu = useSongMenu({ preview, present, say, open });
+  const requestAutoDownload = useCallback((target: AutoDownloadTarget): void => {
+    void invoke('app:preferences:get', undefined).then((preferences) => {
+      if (!preferences.autoDownloadStars) return;
+      present(<StarDownloadSheet target={target} client={client} say={say} onClose={() => present(null)} />);
+    }).catch((error: unknown) => say(`Could not check the auto-download setting: ${errorSentence(catalogError(error))}`));
+  }, [client, present, say]);
 
   const now = useNow(5_000);
   const { results } = live;
@@ -239,6 +250,7 @@ function SearchPane({ client, initialQuery }: { client: CatalogClient; initialQu
   };
 
   return (
+    <AutoDownloadRequestContext.Provider value={requestAutoDownload}>
     <SongMenuContext.Provider value={songMenu.open}>
       {/* Escape belongs to the column as a whole, the way it does to the player's card. */}
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
@@ -298,7 +310,7 @@ function SearchPane({ client, initialQuery }: { client: CatalogClient; initialQu
               {page.kind === 'type' ? <TypePage key={`type-${page.n}`} page={page} live={live} filter={filter} client={client} preview={preview} saved={saved} open={open} replace={replace} now={now} next={() => (pages.current += 1)} /> : null}
               {page.kind === 'album' ? <AlbumPage key={`album-${page.album.id}`} album={page.album} client={client} preview={preview} saved={saved} open={open} say={say} /> : null}
               {page.kind === 'artist' ? <ArtistPage key={`artist-${page.artist.id}`} artist={page.artist} client={client} preview={preview} open={open} /> : null}
-              {page.kind === 'song' ? <SongPage key={`song-${page.track.id}`} track={page.track} client={client} preview={preview} say={say} /> : null}
+              {page.kind === 'song' ? <SongPage key={`song-${page.track.id}`} track={page.track} client={client} preview={preview} saved={saved} say={say} /> : null}
               {page.kind === 'list' ? <ListPage key={`list-${page.url}`} url={page.url} first={page.first} client={client} preview={preview} saved={saved} open={open} say={say} /> : null}
             </div>
           </section>
@@ -306,6 +318,7 @@ function SearchPane({ client, initialQuery }: { client: CatalogClient; initialQu
         {songMenu.menu}
       </div>
     </SongMenuContext.Provider>
+    </AutoDownloadRequestContext.Provider>
   );
 }
 
@@ -667,7 +680,8 @@ function TypePage({ page, live, filter, client, preview, saved, open, replace, n
   const state = sectionPages(rows.length, size, shownPage, more);
   const tabId = useId();
   const panelId = useId();
-  const kept = section === 'playlists' ? savedMatching(saved.items, 'playlist', words) : [];
+  const kept = section === 'playlists' ? savedMatching(saved.items, 'playlist', words) : section === 'albums' ? savedMatching(saved.items, 'album', words) : [];
+  const keptTracks = section === 'tracks' ? saved.tracks.filter((item) => `${item.track.title} ${item.track.artist}`.toLocaleLowerCase().includes(words.toLocaleLowerCase())) : [];
 
   const switchTo = (to: CatalogSearchSection): void => {
     if (to !== section) replace({ kind: 'type', section: to, fields: { ...EMPTY_FIELDS, q: words }, seed: false, n: next(), focus: 'tab' });
@@ -721,10 +735,10 @@ function TypePage({ page, live, filter, client, preview, saved, open, replace, n
       </div>
       <div role="tabpanel" id={panelId} aria-labelledby={tabId}>
         <ServiceLine status={status} linkedOnly={linkedOnly} now={now} />
-        {kept.length ? (
+        {kept.length || keptTracks.length ? (
           <>
             <h3 className="srch__subh">In your library</h3>
-            <SavedList label="Your playlists" items={kept} onOpen={(s) => open({ kind: 'list', url: s.ref.url, first: null, title: s.ref.title })} />
+            {section === 'tracks' ? <SavedTracksList items={keptTracks} saved={saved} /> : <SavedList label={section === 'albums' ? 'Your albums' : 'Your playlists'} items={kept} onOpen={(s) => open({ kind: 'list', url: s.ref.url, first: null, title: s.ref.title })} />}
             <h3 className="srch__subh">From the catalog</h3>
           </>
         ) : null}
@@ -787,17 +801,18 @@ function DetailHead({ art, title, lines, sources, star }: { art: ReactNode; titl
 function Star({ collection, saved, say }: { collection: CatalogCollection; saved: SavedCollections; say: (text: string) => void }) {
   const on = saved.isSaved(collection.ref);
   const kind = collection.ref.kind === 'album' ? 'album' : 'playlist';
+  const requestAutoDownload = useContext(AutoDownloadRequestContext);
   return (
     <>
       <Push
         className="star"
         aria-pressed={on}
         busy={saved.busy}
-        onClick={() =>
-          void saved.toggle(savedCollectionOf(collection, new Date().toISOString())).then((ok) => {
-            if (ok) say(on ? `“${collection.ref.title}” is no longer in your library.` : `“${collection.ref.title}” is in your library.`);
-          })
-        }
+        onClick={() => void saved.toggle(savedCollectionOf(collection, new Date().toISOString())).then((ok) => {
+          if (!ok) return;
+          say(on ? `“${collection.ref.title}” is no longer in your library.` : `“${collection.ref.title}” is in your library.`);
+          if (!on) requestAutoDownload({ kind: 'collection', collection });
+        })}
       >
         <span aria-hidden="true">{on ? '★' : '☆'}</span> {on ? `Starred ${kind}` : `Star this ${kind}`}
       </Push>
@@ -982,9 +997,67 @@ const FORMATS: ReadonlyArray<{ value: OutputFormat; label: string }> = [
 ];
 
 /** The bases a person can state for a download from Search. */
-const SEARCH_BASES = Object.entries(BASIS_LABELS);
+const SEARCH_BASES = Object.entries(BASIS_LABELS).filter(([basis]) => basis !== 'creator-download');
 
-function SongPage({ track, client, preview, say }: { track: CatalogTrack; client: CatalogClient; preview: Preview; say: (text: string) => void }) {
+function StarDownloadSheet({ target, client, say, onClose }: { target: AutoDownloadTarget; client: CatalogClient; say: (text: string) => void; onClose: () => void }) {
+  const [basis, setBasis] = useState<DownloadAuthorizationBasis>('user-owned');
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [partial, setPartial] = useState(false);
+  const title = target.kind === 'track' ? target.track.title : target.collection.ref.title;
+  const expected = target.kind === 'track' ? '1 song' : target.collection.page.total === null ? 'the complete list' : `${target.collection.page.total} songs`;
+
+  const confirm = async (): Promise<void> => {
+    setBusy(true);
+    setError(null);
+    try {
+      const tracks = target.kind === 'track' ? [target.track] : await resolveCatalogBatchTracks(async (offset) => {
+        const resolved = await client.resolve(target.collection.ref.url, offset, LIST_PAGE);
+        if (!resolved.collection) throw new Error('This collection could not be resolved completely; nothing was queued.');
+        const page = resolved.collection.page;
+        return { tracks: page.tracks, hasMore: page.hasMore, capped: page.capped };
+      });
+      const result = await invoke('catalog:download-batch', { tracks, basis });
+      if (result.queued !== tracks.length) {
+        if (result.queued > 0) {
+          setPartial(true);
+          say(`Queued ${result.queued} of ${tracks.length} songs before the helper stopped.`);
+        }
+        setError(result.reason ?? `Only ${result.queued} of ${tracks.length} songs were queued.`);
+        return;
+      }
+      say(`Queued ${tracks.length} song${tracks.length === 1 ? '' : 's'} from “${title}”.`);
+      onClose();
+    } catch (caught) {
+      setError(errorSentence(catalogError(caught)));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Sheet title={`Confirm rights to auto-download “${title}”`} onCancel={onClose}>
+      <p className="hint">Search results do not grant download permission. Starring keeps this in your shared list; this separate confirmation applies {expected} only to the rights basis you choose here. This PC helper cannot verify SoundCloud’s creator-enabled flag, so it refuses SoundCloud URLs; use the Hub’s authorized download flow for those.</p>
+      <div className="pref">
+        <label className="k" htmlFor="star-download-basis">Allowed because:</label>
+        <div className="v">
+          <Pop id="star-download-basis" aria-label="Allowed because" value={basis} onChange={(event) => setBasis(event.currentTarget.value as DownloadAuthorizationBasis)}>
+            {SEARCH_BASES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </Pop>
+        </div>
+      </div>
+      <Check checked={acknowledged} onChange={setAcknowledged} disabled={busy || partial}>I confirm that this basis permits the download</Check>
+      {error ? <Note bad>{error}</Note> : null}
+      <div className="barrow">
+        <Push primary busy={busy} disabled={!acknowledged || partial} onClick={() => void confirm()}>{busy ? 'Checking every song…' : 'Confirm rights and download'}</Push>
+        <Push onClick={onClose}>Cancel</Push>
+      </div>
+    </Sheet>
+  );
+}
+
+function SongPage({ track, client, preview, saved, say }: { track: CatalogTrack; client: CatalogClient; preview: Preview; saved: SavedCollections; say: (text: string) => void }) {
   const [about, setAbout] = useState<CatalogEnrichment | null>(null);
   const [aboutError, setAboutError] = useState<Error | null>(null);
   const [lyrics, setLyrics] = useState<CatalogLyrics | null>(null);
@@ -993,7 +1066,7 @@ function SongPage({ track, client, preview, say }: { track: CatalogTrack; client
   useEffect(() => {
     const controller = new AbortController();
     const load = async (): Promise<void> => {
-      // Genre, label and year are looked up for the song that is opened, never for every row.
+      // Full release credits and facts are looked up for the song that is opened, never for every row.
       const [enriched, words] = await Promise.allSettled([client.enrich(track, controller.signal), client.lyrics(track, controller.signal)]);
       if (controller.signal.aborted) return;
       if (enriched.status === 'fulfilled') setAbout(enriched.value);
@@ -1006,24 +1079,48 @@ function SongPage({ track, client, preview, say }: { track: CatalogTrack; client
   }, [client, track]);
 
   const clip = previewOf(track.sources);
-  const genre = about?.genre ?? track.genre;
-  const label = about?.label ?? track.label;
-  const year = about?.year ?? track.year;
+  // The opened row is already hydrated when possible; a later exact MusicBrainz match can fill
+  // missing album and featured-artist credits without replacing known provider metadata.
+  const displayed: CatalogTrack = about?.musicbrainzRecordingId
+    ? {
+        ...track,
+        artist: about.artist ?? track.artist,
+        artists: (about.artists ?? []).length > track.artists.length ? about.artists ?? track.artists : track.artists,
+        album: track.album ?? about.album,
+        albumArtist: track.albumArtist ?? about.albumArtist,
+        releaseDate: track.releaseDate ?? about.releaseDate,
+        year: track.year ?? about.year,
+        genre: track.genre ?? about.genre,
+        label: track.label ?? about.label,
+      }
+    : track;
+  const genre = about?.genre ?? displayed.genre;
+  const label = about?.label ?? displayed.label;
+  const year = about?.year ?? displayed.year;
+  const on = saved.isTrackSaved(track);
+  const starIdentity = savedTrackIdentity(track);
+  const requestAutoDownload = useContext(AutoDownloadRequestContext);
   return (
     <>
       <DetailHead
         art={<Art url={track.artworkUrl} size="big" />}
         title={track.title}
-        lines={[creditLine(track), albumLine(track) || null, [formatDuration(track.durationMs), track.bpm ? `${Math.round(track.bpm)} BPM` : null, track.explicit ? 'Explicit' : null].filter(Boolean).join(' · ') || null]}
+        lines={[creditLine(displayed), albumLine(displayed) || null, [formatDuration(track.durationMs), track.bpm ? `${Math.round(track.bpm)} BPM` : null, track.explicit ? 'Explicit' : null].filter(Boolean).join(' · ') || null]}
         sources={track.sources}
         star={
-          clip ? (
-            <Push aria-pressed={preview.playing === clip.url} onClick={() => preview.toggle(clip.url)}>
-              {preview.playing === clip.url ? 'Stop Preview' : `Play Preview (${platformLabel(clip.platform)})`}
+          <div className="barrow">
+            <Push className="star" aria-pressed={on} busy={saved.busy} disabled={!starIdentity} reason="This song has no safe recording identity to share." onClick={() => void saved.toggleTrack(track).then((ok) => {
+              if (!ok) return;
+              say(on ? `“${track.title}” is no longer starred.` : `“${track.title}” is starred across your devices.`);
+              if (!on) requestAutoDownload({ kind: 'track', track });
+            })}>
+              <span aria-hidden="true">{on ? '★' : '☆'}</span> {on ? 'Starred song' : 'Star this song'}
             </Push>
-          ) : null
+            {clip ? <Push aria-pressed={preview.playing === clip.url} onClick={() => preview.toggle(clip.url)}>{preview.playing === clip.url ? 'Stop Preview' : `Play Preview (${platformLabel(clip.platform)})`}</Push> : null}
+          </div>
         }
       />
+      <ActionError error={saved.error} />
       {clip && preview.failed === clip.url ? <Note bad>This preview has expired. Search again for a fresh one.</Note> : null}
       <Group title="About this song">
         <dl className="kv">
@@ -1045,7 +1142,7 @@ function SongPage({ track, client, preview, say }: { track: CatalogTrack; client
       <Group title="Lyrics">
         <Lyrics lyrics={lyrics} error={lyricsError} />
       </Group>
-      <DownloadGroup track={track} say={say} />
+      <DownloadGroup track={displayed} say={say} />
     </>
   );
 }
@@ -1713,6 +1810,26 @@ function SavedList({ label, items, onOpen }: { label: string; items: readonly Sa
         </>
       )}
     />
+  );
+}
+
+function SavedTracksList({ items, saved }: { items: readonly SavedTrack[]; saved: SavedCollections }) {
+  return (
+    <>
+      <div className="mrows" role="list" aria-label="Your starred songs">
+        {items.map((item) => (
+          <div className="mrow" role="listitem" key={item.identityKey}>
+            <Art url={item.track.artworkUrl} />
+            <span className="mrow__main">
+              <span className="mrow__title">{item.track.title}</span>
+              <span className="mrow__sub">{item.track.artist}</span>
+            </span>
+            <Push className="star" aria-label={`Unstar ${item.track.title}`} busy={saved.busy} onClick={() => void saved.unstarTrack(item.identityKey)}><span aria-hidden="true">★</span></Push>
+          </div>
+        ))}
+      </div>
+      <ActionError error={saved.error} />
+    </>
   );
 }
 

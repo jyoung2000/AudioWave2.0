@@ -10,7 +10,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { CatalogAlbumDetail, CatalogResolveResult, CatalogSearchAggregate, CatalogSearchChunk, CatalogSettingsView, SavedCollection, type CatalogTrack, type DownloadJob } from '@now-playing/contracts';
+import { CatalogAlbumDetail, CatalogResolveResult, CatalogSearchAggregate, CatalogSearchChunk, CatalogSettingsView, SavedCatalogItem, type CatalogTrack, type DownloadJob } from '@now-playing/contracts';
+import type { CatalogFetch } from '@now-playing/domain/catalog';
 import { hubCatalogFetch } from '../../src/catalog/service.js';
 import { toolEnvironment, toolScratchDir } from '../../src/media/tool-env.js';
 import { ExternalToolAdapter } from '../../src/providers/adapters/external-tool.js';
@@ -19,6 +20,10 @@ import { createTestHub, pairDevice, type TestHub } from '../helpers/hub.js';
 const catalogFixtures = join(import.meta.dirname, '..', '..', '..', 'packages', 'domain', 'tests', 'fixtures', 'catalog');
 const mediaFixtures = join(import.meta.dirname, '..', 'fixtures', 'media-metadata');
 const fx = (name: string): unknown => JSON.parse(readFileSync(join(catalogFixtures, `${name}.json`), 'utf8'));
+const spotifyPlaylistId = '37i9dQZF1DXcBWIGoYBM5M';
+const spotifyEmbedEntity = { type: 'playlist', id: spotifyPlaylistId, title: 'Today’s Top Hits', subtitle: 'Spotify', coverArt: { sources: [{ url: 'https://i.scdn.co/image/playlist-cover' }] }, trackList: [{ uri: 'spotify:track:4PTG3Z6ehGkBFwjybzWkR8', title: 'Never Gonna Give You Up', subtitle: 'Rick Astley', duration: 213573, audioPreview: { url: 'https://p.scdn.co/preview' } }] };
+const spotifyEmbed = `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify({ props: { pageProps: { state: { data: { entity: spotifyEmbedEntity } } } } })}</script>`;
+const spotifyEmbedFetch: CatalogFetch = async (url) => ({ status: url === `https://open.spotify.com/embed/playlist/${spotifyPlaylistId}` ? 200 : 404, headers: { get: () => null }, json: async () => ({}), text: async () => spotifyEmbed });
 
 let root: string;
 let hub: TestHub;
@@ -75,6 +80,7 @@ beforeAll(async () => {
     () => toolEnvironment(toolScratchDir(data), process.env),
     async () => ffmpeg,
     () => toolScratchDir(data),
+    spotifyEmbedFetch,
   );
   hub = await createTestHub({ ffmpeg: { available: true, path: ffmpeg, version: '7.1', encoders: [] }, deps: { replaceAdapters: { 'external-tool': adapter } } });
   const answer = (match: string, name: string) => hub.fetch.on(match, () => ({ body: fx(name) }));
@@ -132,6 +138,7 @@ describe('catalog search on the hub', () => {
     const calls = readFileSync(join(root, 'yt-dlp.calls'), 'utf8').trim().split('\n').map((l) => JSON.parse(l) as string[]);
     expect(calls.map((c) => c.at(-1))).toEqual(expect.arrayContaining(['ytsearch3:daft punk get lucky', 'scsearch3:daft punk get lucky']));
     expect(calls.every((c) => c[0] === '--ignore-config' && c.at(-2) === '--')).toBe(true);
+    expect(calls.every((c) => c.includes('--js-runtimes') && c.includes(`node:${process.execPath}`))).toBe(true);
   }, 30_000);
 
   it('a page’s rows carry bpm, contributors, ISRC and explicit after the hydration chunk, before done (UX-CAT-006)', async () => {
@@ -201,10 +208,9 @@ describe('details, resolve, lyrics and enrichment on the hub', () => {
     expect(spotdl.at(-1)).toContain('--preload');
   }, 30_000);
 
-  it('a Spotify playlist Spotify refuses: unavailable, with the reason', async () => {
-    const body = CatalogResolveResult.parse((await get(`/api/v1/catalog/resolve?url=${encodeURIComponent('https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M')}`)).json());
-    expect(body.kind).toBe('unavailable');
-    expect(body.reason).toMatch(/private, or one Spotify made itself/);
+  it('a Spotify playlist spotDL refuses resolves from its public embed metadata', async () => {
+    const body = CatalogResolveResult.parse((await get(`/api/v1/catalog/resolve?url=${encodeURIComponent(`https://open.spotify.com/playlist/${spotifyPlaylistId}`)}`)).json());
+    expect(body).toMatchObject({ kind: 'playlist', collection: { ref: { platform: 'spotify', kind: 'playlist', id: spotifyPlaylistId, title: 'Today’s Top Hits' }, page: { total: 1, tracks: [{ title: 'Never Gonna Give You Up', artist: 'Rick Astley' }] } } });
   }, 30_000);
 
   it('a Deezer playlist with its covers and ref', async () => {
@@ -226,7 +232,7 @@ describe('catalog settings and downloads', () => {
     const headers = { cookie: admin.cookie, 'x-csrf-token': admin.csrfToken };
     expect((await get('/api/v1/catalog/settings')).statusCode).toBe(401);
     const before = CatalogSettingsView.parse((await hub.app.inject({ method: 'GET', url: '/api/v1/catalog/settings', headers })).json());
-    expect(before).toEqual({ embedLyrics: true, providers: { itunes: true, deezer: true, musicbrainz: true, youtube: true, soundcloud: true }, odesliKeyConfigured: false });
+    expect(before).toEqual({ autoDownloadStars: false, embedLyrics: true, providers: { itunes: true, deezer: true, musicbrainz: true, youtube: true, soundcloud: true }, odesliKeyConfigured: false });
     const put = await hub.app.inject({ method: 'PUT', url: '/api/v1/catalog/settings', headers, payload: { providers: { soundcloud: false }, odesliKey: 'secret-key-1' } });
     expect(put.statusCode).toBe(200);
     expect(put.body).not.toContain('secret-key-1');
@@ -236,19 +242,19 @@ describe('catalog settings and downloads', () => {
     await hub.app.inject({ method: 'PUT', url: '/api/v1/catalog/settings', headers, payload: { providers: { soundcloud: true }, odesliKey: '' } });
   });
 
-  it('a catalog song goes through the download queue from its best source, with ISRC, genre, label, year and lyrics', async () => {
+  it('a catalog song tags missing album and featured artists from a matched MusicBrainz recording', async () => {
     const track: CatalogTrack = {
       id: 'deezer:67238735',
       title: 'Get Lucky',
       artist: 'Daft Punk',
-      artists: ['Daft Punk', 'Pharrell Williams', 'Nile Rodgers'],
-      album: 'Random Access Memories',
-      albumArtist: 'Daft Punk',
+      artists: ['Daft Punk'],
+      album: null,
+      albumArtist: null,
       durationMs: 367_000,
       isrc: 'USQX91300108',
       artworkUrl: 'https://cdn-images.dzcdn.net/images/cover/311bba0fc112d15f72c8b5a65f0456c1/1000x1000-000000-80-0-0.jpg',
-      releaseDate: '2013-05-20',
-      year: 2013,
+      releaseDate: null,
+      year: null,
       trackNumber: 8,
       discNumber: 1,
       bpm: 116.1,
@@ -266,9 +272,31 @@ describe('catalog settings and downloads', () => {
     const body = response.json() as { job: DownloadJob; source: { platform: string; url: string }; embedded: Record<string, boolean> };
     expect(body.source).toMatchObject({ platform: 'youtube-music', url: 'https://music.youtube.com/watch?v=4D7u5KF7SP8' });
     expect(body.job.source).toMatchObject({ provider: 'external-tool', url: 'https://music.youtube.com/watch?v=4D7u5KF7SP8' });
-    expect(body.job.source.tags).toMatchObject({ title: 'Get Lucky', artist: 'Daft Punk', featured: ['Pharrell Williams', 'Nile Rodgers'], isrc: 'USQX91300108', genre: 'disco', label: 'Columbia', date: '2013-05-20', trackNumber: 8 });
+    expect(body.job.source.tags).toMatchObject({ title: 'Get Lucky', artist: 'Daft Punk', featured: ['Pharrell Williams', 'Nile Rodgers'], album: 'Random Access Memories', isrc: 'USQX91300108', genre: 'disco', label: 'Columbia', date: expect.any(String), trackNumber: 8 });
     expect(body.job.source.tags!.lyrics).toMatch(/^\[00:01\.00\]/);
     expect(body.embedded).toEqual({ isrc: true, genre: true, label: true, year: true, lyrics: true });
+  }, 30_000);
+
+  it('preflights every collection source before queueing and refuses a generic YouTube creator-download claim', async () => {
+    const track: CatalogTrack = {
+      id: 'youtube-music:creator-check', title: 'Creator Check', artist: 'Example', artists: ['Example'], album: null, albumArtist: null,
+      durationMs: 180_000, isrc: null, artworkUrl: null, releaseDate: null, year: null, trackNumber: null, discNumber: null,
+      bpm: null, explicit: null, genre: null, label: null,
+      sources: [{ platform: 'youtube-music', id: 'creator-check', url: 'https://music.youtube.com/watch?v=creator-check', previewUrl: null, matchedBy: 'search' }], rank: 0,
+    };
+    const before = hub.ctx.downloads.list().length;
+    const preflight = await hub.app.inject({
+      method: 'POST', url: '/api/v1/catalog/download/preflight', headers: { authorization: device.authorization },
+      payload: { items: [{ track, source: track.sources[0] }], authorization: { basis: 'creator-download', acknowledged: true } },
+    });
+    expect(preflight.statusCode, preflight.body).toBe(403);
+    expect(preflight.json().detail).toMatch(/No audio was queued/);
+    const direct = await hub.app.inject({
+      method: 'POST', url: '/api/v1/catalog/download', headers: { authorization: device.authorization },
+      payload: { track, source: track.sources[0], authorization: { basis: 'creator-download', acknowledged: true }, target: { destination: 'hub' } },
+    });
+    expect(direct.statusCode, direct.body).toBe(403);
+    expect(hub.ctx.downloads.list()).toHaveLength(before);
   }, 30_000);
 
   it('refuses a song that is only in a store, in words', async () => {
@@ -279,24 +307,48 @@ describe('catalog settings and downloads', () => {
   }, 30_000);
 });
 
-describe('starred albums and playlists (UX-SEARCH-005)', () => {
+describe('shared starred songs, albums and playlists (UX-SEARCH-005)', () => {
   const ref = { platform: 'deezer' as const, kind: 'playlist' as const, id: '908622995', url: 'https://www.deezer.com/playlist/908622995', title: 'Harbour Mix', owner: 'Airwave' };
   const saved = { ref, savedAt: '2026-10-06T12:00:00.000Z', artworkUrl: null, covers: ['https://cdn-images.dzcdn.net/images/cover/a/250x250.jpg'], trackCount: 42 };
+  const song = SavedCatalogItem.parse({
+    kind: 'track',
+    identityKey: 'isrc:GBAAA1900001',
+    savedAt: '2026-10-06T12:01:00.000Z',
+    track: { id: 'deezer:42', title: 'Harbour Lights', artist: 'North Quay', sources: [{ platform: 'deezer', id: '42', url: 'https://www.deezer.com/track/42', previewUrl: null }] },
+  });
 
-  it('keeps a starred list in the admin’s library, in the shared SavedCollection shape, and un-stars it', async () => {
+  it('shows one shared, editable set to admin and paired clients, and applies timestamped tombstones', async () => {
     const headers = { cookie: admin.cookie, 'x-csrf-token': admin.csrfToken };
-    expect((await hub.app.inject({ method: 'GET', url: '/api/v1/catalog/saved', headers })).json()).toEqual({ items: [], shared: [] });
+    const paired = await pairDevice(hub, admin, { scopes: ['library:sync'] });
+    const deviceHeaders = { authorization: paired.authorization };
+    expect((await hub.app.inject({ method: 'GET', url: '/api/v1/catalog/saved', headers })).json()).toEqual({ items: [], tombstones: [], shared: [] });
     const put = await hub.app.inject({ method: 'PUT', url: '/api/v1/catalog/saved', headers, payload: saved });
     expect(put.statusCode, put.body).toBe(200);
-    expect(put.json()).toEqual({ items: [saved], shared: [] });
-    // Starring it again refreshes it rather than adding a second.
-    const again = await hub.app.inject({ method: 'PUT', url: '/api/v1/catalog/saved', headers, payload: { ...saved, trackCount: 43 } });
-    expect((again.json() as { items: Array<{ trackCount: number }> }).items.map((i) => i.trackCount)).toEqual([43]);
-    const list = await hub.app.inject({ method: 'GET', url: '/api/v1/catalog/saved', headers });
-    expect(SavedCollection.array().parse((list.json() as { items: unknown[] }).items)).toHaveLength(1);
-    const removed = await hub.app.inject({ method: 'DELETE', url: '/api/v1/catalog/saved?platform=deezer&kind=playlist&id=908622995', headers });
+    expect(put.json()).toMatchObject({ items: [saved], tombstones: [], shared: [] });
+    expect((await hub.app.inject({ method: 'GET', url: '/api/v1/catalog/saved', headers: deviceHeaders })).json()).toMatchObject({ items: [saved] });
+
+    const songPut = await hub.app.inject({ method: 'PUT', url: '/api/v1/catalog/saved', headers: deviceHeaders, payload: song });
+    expect(songPut.statusCode, songPut.body).toBe(200);
+    const shared = await hub.app.inject({ method: 'GET', url: '/api/v1/catalog/saved', headers });
+    expect((shared.json() as { items: unknown[] }).items).toHaveLength(2);
+    expect(SavedCatalogItem.array().parse((shared.json() as { items: unknown[] }).items)).toHaveLength(2);
+
+    // A stale offline DELETE cannot erase a newer star; a current tombstone does, and remains visible to peers.
+    const stale = await hub.app.inject({ method: 'DELETE', url: '/api/v1/catalog/saved?platform=deezer&kind=playlist&id=908622995&at=2026-10-06T11%3A59%3A00.000Z', headers: deviceHeaders });
+    expect((stale.json() as { items: unknown[] }).items).toHaveLength(2);
+    const removed = await hub.app.inject({ method: 'DELETE', url: '/api/v1/catalog/saved?platform=deezer&kind=playlist&id=908622995&at=2026-10-06T12%3A05%3A00.000Z', headers: deviceHeaders });
     expect(removed.statusCode).toBe(200);
-    expect(removed.json()).toEqual({ items: [], shared: [] });
+    expect((removed.json() as { items: unknown[]; tombstones: unknown[] }).items).toHaveLength(1);
+    expect((removed.json() as { tombstones: unknown[] }).tombstones).toHaveLength(1);
+    const oldResave = await hub.app.inject({ method: 'PUT', url: '/api/v1/catalog/saved', headers, payload: saved });
+    expect((oldResave.json() as { items: unknown[] }).items).toHaveLength(1);
+    const tiedResave = await hub.app.inject({
+      method: 'PUT',
+      url: '/api/v1/catalog/saved',
+      headers,
+      payload: { ...saved, savedAt: '2026-10-06T12:05:00.000Z' },
+    });
+    expect((tiedResave.json() as { items: unknown[] }).items).toHaveLength(1);
   });
 
   it('needs the admin or a device with library:sync (DEC-041), never an anonymous caller, and a change needs the CSRF token', async () => {

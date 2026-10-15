@@ -14,8 +14,8 @@
  * that type alone, a segmented control to switch type, the services' line and the list, which
  * scrolls on by itself while ‹ › and "Page N of M" in a footer move it a page at a time
  * (UX-SEARCH-009). Playlists are a type: Deezer's public ones, the admin's starred ones first
- * (UX-SEARCH-010). Every song row has a "…" (and a right-click) menu: Add to Up Next (a group's
- * queue), Add to Playlist, Add to Library, Download…, Audition and Open Details (UX-SEARCH-012).
+ * (UX-SEARCH-010). Every song row has a “…” (and a right-click) menu: Add to Up Next (a group's
+ * queue), Add to Playlist, Star/Unstar, Add to Library, Download…, Audition and Open Details (UX-SEARCH-012).
  * Opening a row stacks a page with Back: an album or a playlist (its songs, paged, and a star that
  * keeps it in the admin's library), an artist (top songs and albums), a song (genre, label and
  * year, lyrics, and Download to the hub's queue).
@@ -24,8 +24,8 @@
  * `@now-playing/domain/catalog` (view.ts). The window kit is this app's own (DEC-026).
  */
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
-import type { CatalogAlbum, CatalogAlbumDetail, CatalogArtist, CatalogArtistDetail, CatalogCollection, CatalogEnrichment, CatalogLyrics, CatalogPlaylist, CatalogResolveResult, CatalogSearchSection, CatalogSource, CatalogSourceStatus, CatalogTrack, DownloadAuthorizationBasis, FolderPlaylistSummary, GroupView, OutputFormat, SavedCollection } from '@now-playing/contracts';
-import { CATALOG_COLLECTION_CAP, CATALOG_PROVIDERS } from '@now-playing/contracts';
+import type { CatalogAlbum, CatalogAlbumDetail, CatalogArtist, CatalogArtistDetail, CatalogCollection, CatalogCollectionRef, CatalogEnrichment, CatalogLyrics, CatalogPlaylist, CatalogResolveResult, CatalogSearchSection, CatalogSettingsView, CatalogSource, CatalogSourceStatus, CatalogTrack, DownloadAuthorizationBasis, FolderPlaylistSummary, GroupView, OutputFormat, SavedCollection, SavedTrack } from '@now-playing/contracts';
+import { CATALOG_COLLECTION_CAP, CATALOG_PAGE_MAX, CATALOG_PROVIDERS } from '@now-playing/contracts';
 import {
   albumLine,
   appendPage,
@@ -52,8 +52,10 @@ import {
   PLAYS_FROM_SPOTDL,
   playsThroughSpotdl,
   previewOf,
+  queueResolvedCatalogBatch,
   savedCollectionOf,
   savedMatching,
+  savedTrackIdentity,
   SEARCH_TYPES,
   seeAllText,
   sectionPages,
@@ -68,6 +70,7 @@ import {
 } from '@now-playing/domain/catalog';
 import { api, type ApiError } from '../lib/api.js';
 import { ALL_SECTIONS, catalogError, hubCatalog, useCatalogFilter, useLiveSearch, usePreview, useSavedCollections, type CatalogClient, type CatalogFilter, type CatalogSearchParams, type LiveSearch, type Preview, type SavedCollections } from '../lib/catalog.js';
+import { useResource } from '../lib/hooks.js';
 import { Menu, type MenuAt, type MenuEntry } from '../lib/menu.js';
 import { hubPlaylists } from '../lib/playlists.js';
 import { ActionError, Check, errorSentence, Field, Group, Note, Pop, Push, Sdot, Sheet, useHubUi, useNow } from '../ui.js';
@@ -128,6 +131,8 @@ function sameFields(a: CatalogFields, b: CatalogFields): boolean {
 /** Opens a song row's menu; given to every list of songs through context (UX-SEARCH-012). */
 type OpenSongMenu = (track: CatalogTrack, at: MenuAt, returnTo: HTMLElement | null) => void;
 const SongMenuContext = createContext<OpenSongMenu | null>(null);
+type AutoDownloadRequest = { kind: 'track'; track: CatalogTrack } | { kind: 'collection'; ref: CatalogCollectionRef };
+const AutoDownloadContext = createContext<{ request: (request: AutoDownloadRequest) => void } | null>(null);
 
 /* ------------------------------------------------------------------ the tab */
 
@@ -140,6 +145,8 @@ export function SearchView({ client = hubCatalog, initialQuery }: { client?: Cat
   const preview = usePreview();
   const saved = useSavedCollections();
   const { present, say } = useHubUi();
+  const settings = useResource('catalogSettingsGet');
+  const autoDownloadStars = (settings.data as CatalogSettingsView | null)?.autoDownloadStars ?? false;
   const [stack, setStack] = useState<Page[]>([{ kind: 'results' }]);
   const heading = useRef<HTMLHeadingElement>(null);
   const field = useRef<HTMLInputElement>(null);
@@ -150,6 +157,40 @@ export function SearchView({ client = hubCatalog, initialQuery }: { client?: Cat
   const replace = useCallback((next: Page) => setStack((s) => [...s.slice(0, -1), next]), []);
   const back = useCallback(() => setStack((s) => (s.length > 1 ? s.slice(0, -1) : s)), []);
   const seeAll = useCallback((section: CatalogSearchSection, words: CatalogFields) => open({ kind: 'type', section, fields: words, seed: true, n: (pages.current += 1) }), [open]);
+  const requestAutoDownload = useCallback((request: AutoDownloadRequest): void => {
+    void (async () => {
+      const title = request.kind === 'track' ? request.track.title : request.ref.title;
+      let enabled = autoDownloadStars;
+      if (settings.data === undefined || settings.data === null) {
+        try {
+          enabled = (await api('catalogSettingsGet')).autoDownloadStars;
+        } catch {
+          say(`“${title}” is starred. Could not check the auto-download setting; no audio was queued.`);
+          return;
+        }
+      }
+      if (!enabled) {
+        say(`“${title}” is in your library.`);
+        return;
+      }
+      const readPage = request.kind === 'track'
+        ? async () => ({ tracks: [request.track], hasMore: false, capped: false })
+        : async (offset: number) => {
+            const answer = await client.resolve(request.ref.url, offset, CATALOG_PAGE_MAX);
+            if (!answer.collection) throw new Error(answer.reason ?? `Could not resolve every song in “${request.ref.title}”.`);
+            return { tracks: answer.collection.page.tracks, hasMore: answer.collection.page.hasMore, capped: answer.collection.page.capped };
+          };
+      present(
+        <AutoDownloadSheet
+          title={title}
+          kind={request.kind}
+          readPage={readPage}
+          onCancel={() => { present(null); say(`The star stays in your library. No audio was queued.`); }}
+          onDone={(text) => { present(null); say(text); }}
+        />,
+      );
+    })();
+  }, [autoDownloadStars, client, present, say, settings.data]);
 
   // A page that opens takes the focus to its heading, so a screen reader hears where it is; a type
   // switched or searched from its own page keeps the keys where they were.
@@ -202,7 +243,7 @@ export function SearchView({ client = hubCatalog, initialQuery }: { client?: Cat
     );
   };
 
-  const songMenu = useSongMenu({ preview, present, say, open });
+  const songMenu = useSongMenu({ preview, present, say, open, saved, requestAutoDownload });
 
   const now = useNow(5_000);
   const { results } = live;
@@ -224,7 +265,8 @@ export function SearchView({ client = hubCatalog, initialQuery }: { client?: Cat
   };
 
   return (
-    <SongMenuContext.Provider value={songMenu.open}>
+    <AutoDownloadContext.Provider value={{ request: requestAutoDownload }}>
+      <SongMenuContext.Provider value={songMenu.open}>
       {/* Escape belongs to the column as a whole, the way it does to the player's card. */}
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
       <div className="srch" onKeyDown={onKeyDown}>
@@ -268,7 +310,7 @@ export function SearchView({ client = hubCatalog, initialQuery }: { client?: Cat
         </Group>
 
         {page.kind === 'results' ? (
-          <Overview results={results} running={live.running} asked={live.asked} filter={filter} client={client} preview={preview} open={open} seeAll={seeAll} now={now} />
+          <Overview results={results} running={live.running} asked={live.asked} filter={filter} client={client} preview={preview} saved={saved} open={open} seeAll={seeAll} now={now} />
         ) : (
           <section className="srch__page" aria-labelledby="srch-page-h">
             <div className="barrow barrow--above srch__nav">
@@ -283,14 +325,15 @@ export function SearchView({ client = hubCatalog, initialQuery }: { client?: Cat
               {page.kind === 'type' ? <TypePage key={`type-${page.n}`} page={page} live={live} filter={filter} client={client} preview={preview} saved={saved} open={open} replace={replace} now={now} next={() => (pages.current += 1)} /> : null}
               {page.kind === 'album' ? <AlbumPage key={`album-${page.album.id}`} album={page.album} client={client} preview={preview} saved={saved} open={open} say={say} /> : null}
               {page.kind === 'artist' ? <ArtistPage key={`artist-${page.artist.id}`} artist={page.artist} client={client} preview={preview} open={open} /> : null}
-              {page.kind === 'song' ? <SongPage key={`song-${page.track.id}`} track={page.track} client={client} preview={preview} say={say} /> : null}
+              {page.kind === 'song' ? <SongPage key={`song-${page.track.id}`} track={page.track} client={client} preview={preview} saved={saved} say={say} /> : null}
               {page.kind === 'list' ? <ListPage key={`list-${page.url}`} url={page.url} first={page.first} client={client} preview={preview} saved={saved} open={open} say={say} /> : null}
             </div>
           </section>
         )}
         {songMenu.menu}
       </div>
-    </SongMenuContext.Provider>
+      </SongMenuContext.Provider>
+    </AutoDownloadContext.Provider>
   );
 }
 
@@ -388,10 +431,10 @@ function ServiceLine({ status, linkedOnly, now }: { status: readonly CatalogSour
  * The calm overview (UX-SEARCH-007): a few of each kind, "See all N" into each type's own page, the
  * services' line under them, and no pager. Rows still fold in by id as each service answers.
  */
-function Overview({ results, running, asked, filter, client, preview, open, seeAll, now }: { results: CatalogResults; running: boolean; asked: CatalogSearchParams | null; filter: CatalogFilter; client: CatalogClient; preview: Preview; open: (page: Page) => void; seeAll: (section: CatalogSearchSection, fields: CatalogFields) => void; now: number }) {
+function Overview({ results, running, asked, filter, client, preview, saved, open, seeAll, now }: { results: CatalogResults; running: boolean; asked: CatalogSearchParams | null; filter: CatalogFilter; client: CatalogClient; preview: Preview; saved: SavedCollections; open: (page: Page) => void; seeAll: (section: CatalogSearchSection, fields: CatalogFields) => void; now: number }) {
   const link = results.done?.resolve ?? null;
   if (!asked) return null;
-  if (link) return <LinkResult key={link} url={link} client={client} preview={preview} open={open} />;
+  if (link) return <LinkResult key={link} url={link} client={client} preview={preview} saved={saved} open={open} />;
   const shown = filter.sections.filter((s) => results.done === null || results.done.page[s] !== null || results[s].length > 0);
   return (
     <>
@@ -403,7 +446,7 @@ function Overview({ results, running, asked, filter, client, preview, open, seeA
         const label = CATALOG_SEARCH_SECTION_LABELS[section];
         return (
           <Group key={section} title={label}>
-            <RowList section={section} label={label} rows={few} preview={preview} open={open} empty={empty} />
+            <RowList section={section} label={label} rows={few} preview={preview} saved={saved} open={open} empty={empty} />
             {rows.length ? (
               <div className="barrow srch__seeall">
                 <Push onClick={() => seeAll(section, asked.fields)}>{seeAllText(section, rows.length, more)}</Push>
@@ -418,16 +461,16 @@ function Overview({ results, running, asked, filter, client, preview, open, seeA
 }
 
 /** A list of one kind of row: songs, artists, albums or playlists. */
-function RowList({ section, label, rows, preview, open, empty, pageSize, focusRequest, onPageKey, onActive }: { section: CatalogSearchSection; label: string; rows: readonly Row[]; preview: Preview; open: (page: Page) => void; empty: string; pageSize?: number; focusRequest?: FocusRequest | null; onPageKey?: (step: 1 | -1, index: number) => void; onActive?: (index: number) => void }) {
+function RowList({ section, label, rows, preview, saved, open, empty, pageSize, focusRequest, onPageKey, onActive }: { section: CatalogSearchSection; label: string; rows: readonly Row[]; preview: Preview; saved?: SavedCollections; open: (page: Page) => void; empty: string; pageSize?: number; focusRequest?: FocusRequest | null; onPageKey?: (step: 1 | -1, index: number) => void; onActive?: (index: number) => void }) {
   const paging = { ...(pageSize ? { pageSize } : {}), ...(focusRequest ? { focusRequest } : {}), ...(onPageKey ? { onPageKey } : {}), ...(onActive ? { onActive } : {}) };
-  if (section === 'tracks') return <TrackList label={label} tracks={rows as CatalogTrack[]} preview={preview} onOpen={(t) => open({ kind: 'song', track: t })} empty={empty} {...paging} />;
+  if (section === 'tracks') return <TrackList label={label} tracks={rows as CatalogTrack[]} preview={preview} saved={saved} onOpen={(t) => open({ kind: 'song', track: t })} empty={empty} {...paging} />;
   if (section === 'artists') return <ArtistList label={label} artists={rows as CatalogArtist[]} onOpen={(a) => open({ kind: 'artist', artist: a })} empty={empty} {...paging} />;
   if (section === 'albums') return <AlbumList label={label} albums={rows as CatalogAlbum[]} onOpen={(a) => open(albumPage(a))} empty={empty} {...paging} />;
   return <PlaylistList label={label} playlists={rows as CatalogPlaylist[]} onOpen={(p) => open(playlistPage(p))} empty={empty} {...paging} />;
 }
 
 /** A pasted link: resolved, not searched (UX-CAT-003, UX-SEARCH-004). */
-function LinkResult({ url, client, preview, open }: { url: string; client: CatalogClient; preview: Preview; open: (page: Page) => void }) {
+function LinkResult({ url, client, preview, saved, open }: { url: string; client: CatalogClient; preview: Preview; saved: SavedCollections; open: (page: Page) => void }) {
   const [result, setResult] = useState<CatalogResolveResult | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   useEffect(() => {
@@ -447,7 +490,7 @@ function LinkResult({ url, client, preview, open }: { url: string; client: Catal
     <Group title="From the link" hint={<span className="path">{url}</span>}>
       {error ? <Note bad>{errorSentence(error)}</Note> : null}
       {!result && !error ? <Note>Reading the link…</Note> : null}
-      {result?.kind === 'track' && result.track ? <TrackList label="The song" tracks={[result.track]} preview={preview} onOpen={(t) => open({ kind: 'song', track: t })} empty="" /> : null}
+      {result?.kind === 'track' && result.track ? <TrackList label="The song" tracks={[result.track]} preview={preview} saved={saved} onOpen={(t) => open({ kind: 'song', track: t })} empty="" /> : null}
       {(result?.kind === 'album' || result?.kind === 'playlist' || result?.kind === 'artist') && result.collection ? (
         <CollectionList label={result.kind === 'artist' ? 'The artist' : `The ${result.kind}`} collections={[result.collection]} onOpen={(c) => open({ kind: 'list', url, first: result, title: result.artist?.name ?? c.ref.title })} />
       ) : null}
@@ -652,7 +695,8 @@ function TypePage({ page, live, filter, client, preview, saved, open, replace, n
   const state = sectionPages(rows.length, size, shownPage, more);
   const tabId = useId();
   const panelId = useId();
-  const kept = section === 'playlists' ? savedMatching(saved.items, 'playlist', words) : [];
+  const kept = section === 'playlists' ? savedMatching(saved.collections, 'playlist', words) : [];
+  const keptTracks = section === 'tracks' ? saved.tracks.filter((item) => `${item.track.title} ${item.track.artist}`.toLocaleLowerCase().includes(words.toLocaleLowerCase())) : [];
 
   const switchTo = (to: CatalogSearchSection): void => {
     if (to !== section) replace({ kind: 'type', section: to, fields: { ...EMPTY_FIELDS, q: words }, seed: false, n: next(), focus: 'tab' });
@@ -706,18 +750,20 @@ function TypePage({ page, live, filter, client, preview, saved, open, replace, n
       </div>
       <div role="tabpanel" id={panelId} aria-labelledby={tabId}>
         <ServiceLine status={status} linkedOnly={linkedOnly} now={now} />
-        {kept.length ? (
+        {kept.length || keptTracks.length ? (
           <>
             <h3 className="srch__subh">In your library</h3>
+            {keptTracks.length ? <SavedSongsList items={keptTracks} busy={saved.busy} onUnstar={saved.unstarTrack} /> : null}
             <SavedList label="Your playlists" items={kept} onOpen={(s) => open({ kind: 'list', url: s.ref.url, first: null, title: s.ref.title })} />
             <h3 className="srch__subh">From the catalog</h3>
           </>
         ) : null}
         <RowList
           section={section}
-          label={kept.length ? `${label} from the catalog` : `All ${noun}`}
+          label={kept.length || keptTracks.length ? `${label} from the catalog` : `All ${noun}`}
           rows={rows}
           preview={preview}
+          saved={saved}
           open={open}
           empty={running ? 'Asking…' : `No ${noun} for “${words}”.`}
           pageSize={size}
@@ -770,6 +816,7 @@ function DetailHead({ art, title, lines, sources, star }: { art: ReactNode; titl
 }
 
 function Star({ collection, saved, say }: { collection: CatalogCollection; saved: SavedCollections; say: (text: string) => void }) {
+  const autoDownload = useContext(AutoDownloadContext);
   const on = saved.isSaved(collection.ref);
   const kind = collection.ref.kind === 'album' ? 'album' : 'playlist';
   return (
@@ -780,7 +827,9 @@ function Star({ collection, saved, say }: { collection: CatalogCollection; saved
         busy={saved.busy}
         onClick={() =>
           void saved.toggle(savedCollectionOf(collection, new Date().toISOString())).then((ok) => {
-            if (ok) say(on ? `“${collection.ref.title}” is no longer in your library.` : `“${collection.ref.title}” is in your library.`);
+            if (!ok) return;
+            if (!on) autoDownload?.request({ kind: 'collection', ref: collection.ref });
+            else say(`“${collection.ref.title}” is no longer in your library.`);
           })
         }
       >
@@ -788,6 +837,51 @@ function Star({ collection, saved, say }: { collection: CatalogCollection; saved
       </Push>
       <ActionError error={saved.error} />
     </>
+  );
+}
+
+function TrackStar({ track, saved }: { track: CatalogTrack; saved: SavedCollections }) {
+  const autoDownload = useContext(AutoDownloadContext);
+  const { say } = useHubUi();
+  const identityKey = savedTrackIdentity(track);
+  const on = saved.isTrackSaved(track);
+  return (
+    <Push
+      className="star"
+      aria-label={on ? `Unstar “${track.title}”` : `Star “${track.title}”`}
+      aria-pressed={on}
+      disabled={!identityKey}
+      reason="This recording has no stable ID to share safely."
+      busy={saved.busy}
+      onClick={(event) => {
+        event.stopPropagation();
+        void saved.toggleTrack(track).then((ok) => {
+          if (!ok) return;
+          if (!on) autoDownload?.request({ kind: 'track', track });
+          else say(`“${track.title}” is no longer in your library.`);
+        });
+      }}
+    >
+      <span aria-hidden="true">{on ? '★' : '☆'}</span>
+    </Push>
+  );
+}
+
+function SavedSongsList({ items, busy, onUnstar }: { items: readonly SavedTrack[]; busy: boolean; onUnstar: (identityKey: string) => Promise<boolean> }) {
+  return (
+    <div className="mrows" role="list" aria-label="Your starred songs">
+      {items.map((item) => (
+        <div className="mrow" role="listitem" key={item.identityKey}>
+          <span className="mrow__main">
+            <span className="mrow__title"><span aria-hidden="true">★ </span>{item.track.title}</span>
+            <span className="mrow__sub">{[item.track.artist, item.track.album].filter(Boolean).join(' · ')}</span>
+          </span>
+          <Push className="star" busy={busy} aria-label={`Unstar “${item.track.title}”`} onClick={() => void onUnstar(item.identityKey)}>
+            Unstar
+          </Push>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -856,7 +950,7 @@ function AlbumPage({ album, client, preview, saved, open, say }: { album: Catalo
         star={detail?.collection ? <Star collection={detail.collection} saved={saved} say={say} /> : null}
       />
       {error ? <Note bad>{errorSentence(error)}</Note> : null}
-      {detail ? <TrackList label={`Songs on ${shown.title}`} tracks={detail.tracks} preview={preview} numbered onOpen={(t) => open({ kind: 'song', track: t })} empty="This album lists no songs." /> : !error ? <Note>Loading the songs…</Note> : null}
+      {detail ? <TrackList label={`Songs on ${shown.title}`} tracks={detail.tracks} preview={preview} saved={saved} numbered onOpen={(t) => open({ kind: 'song', track: t })} empty="This album lists no songs." /> : !error ? <Note>Loading the songs…</Note> : null}
       {detail?.hasMore ? <MoreRows label="More Songs" busy={busy} onMore={() => busyWhile(setBusy, load(detail.tracks.length))} /> : null}
       {detail?.capped ? <Note>Only the first {CATALOG_COLLECTION_CAP} songs of a list can be opened.</Note> : null}
     </>
@@ -904,7 +998,7 @@ function ListPage({ url, first, client, preview, saved, open, say }: { url: stri
         />
       ) : null}
       {error ? <Note bad>{errorSentence(error)}</Note> : null}
-      {collection ? <TrackList label={`Songs in ${collection.ref.title}`} tracks={tracks} preview={preview} numbered onOpen={(t) => open({ kind: 'song', track: t })} empty="This list holds no songs." /> : !error ? <Note>Reading the list…</Note> : null}
+      {collection ? <TrackList label={`Songs in ${collection.ref.title}`} tracks={tracks} preview={preview} saved={saved} numbered onOpen={(t) => open({ kind: 'song', track: t })} empty="This list holds no songs." /> : !error ? <Note>Reading the list…</Note> : null}
       {collection?.page.hasMore ? <MoreRows label="More Songs" busy={busy} onMore={() => busyWhile(setBusy, load(tracks.length))} /> : null}
       {collection?.page.capped ? <Note>Only the first {CATALOG_COLLECTION_CAP} songs of a list can be opened.</Note> : null}
     </>
@@ -969,7 +1063,7 @@ const FORMATS: ReadonlyArray<{ value: OutputFormat; label: string }> = [
 /** The bases a person can state for a download from Search: every one but a hub-hosted file's. */
 const SEARCH_BASES = Object.entries(BASIS_LABELS).filter(([value]) => value !== 'hub-hosted');
 
-function SongPage({ track, client, preview, say }: { track: CatalogTrack; client: CatalogClient; preview: Preview; say: (text: string) => void }) {
+function SongPage({ track, client, preview, saved, say }: { track: CatalogTrack; client: CatalogClient; preview: Preview; saved: SavedCollections; say: (text: string) => void }) {
   const [about, setAbout] = useState<CatalogEnrichment | null>(null);
   const [aboutError, setAboutError] = useState<ApiError | null>(null);
   const [lyrics, setLyrics] = useState<CatalogLyrics | null>(null);
@@ -978,7 +1072,7 @@ function SongPage({ track, client, preview, say }: { track: CatalogTrack; client
   useEffect(() => {
     const controller = new AbortController();
     const load = async (): Promise<void> => {
-      // Genre, label and year are looked up for the song that is opened, never for every row.
+      // Full release credits and facts are looked up for the song that is opened, never for every row.
       const [enriched, words] = await Promise.allSettled([client.enrich(track, controller.signal), client.lyrics(track, controller.signal)]);
       if (controller.signal.aborted) return;
       if (enriched.status === 'fulfilled') setAbout(enriched.value);
@@ -991,22 +1085,36 @@ function SongPage({ track, client, preview, say }: { track: CatalogTrack; client
   }, [client, track]);
 
   const clip = previewOf(track.sources);
-  const genre = about?.genre ?? track.genre;
-  const label = about?.label ?? track.label;
-  const year = about?.year ?? track.year;
+  // The opened row is already hydrated when possible; a later exact MusicBrainz match can fill
+  // missing album and featured-artist credits without replacing known provider metadata.
+  const displayed: CatalogTrack = about?.musicbrainzRecordingId
+    ? {
+        ...track,
+        artist: about.artist ?? track.artist,
+        artists: (about.artists ?? []).length > track.artists.length ? about.artists ?? track.artists : track.artists,
+        album: track.album ?? about.album,
+        albumArtist: track.albumArtist ?? about.albumArtist,
+        releaseDate: track.releaseDate ?? about.releaseDate,
+        year: track.year ?? about.year,
+        genre: track.genre ?? about.genre,
+        label: track.label ?? about.label,
+      }
+    : track;
+  const genre = about?.genre ?? displayed.genre;
+  const label = about?.label ?? displayed.label;
+  const year = about?.year ?? displayed.year;
   return (
     <>
       <DetailHead
         art={<Art url={track.artworkUrl} size="big" />}
         title={track.title}
-        lines={[creditLine(track), albumLine(track) || null, [formatDuration(track.durationMs), track.bpm ? `${Math.round(track.bpm)} BPM` : null, track.explicit ? 'Explicit' : null].filter(Boolean).join(' · ') || null]}
+        lines={[creditLine(displayed), albumLine(displayed) || null, [formatDuration(track.durationMs), track.bpm ? `${Math.round(track.bpm)} BPM` : null, track.explicit ? 'Explicit' : null].filter(Boolean).join(' · ') || null]}
         sources={track.sources}
         star={
-          clip ? (
-            <Push aria-pressed={preview.playing === clip.url} onClick={() => preview.toggle(clip.url)}>
-              {preview.playing === clip.url ? 'Stop Preview' : `Play Preview (${platformLabel(clip.platform)})`}
-            </Push>
-          ) : null
+          <>
+            <TrackStar track={track} saved={saved} />
+            {clip ? <Push aria-pressed={preview.playing === clip.url} onClick={() => preview.toggle(clip.url)}>{preview.playing === clip.url ? 'Stop Preview' : `Play Preview (${platformLabel(clip.platform)})`}</Push> : null}
+          </>
         }
       />
       {clip && preview.failed === clip.url ? <Note bad>This preview has expired. Search again for a fresh one.</Note> : null}
@@ -1030,7 +1138,7 @@ function SongPage({ track, client, preview, say }: { track: CatalogTrack; client
       <Group title="Lyrics">
         <Lyrics lyrics={lyrics} error={lyricsError} />
       </Group>
-      <DownloadGroup track={track} say={say} />
+      <DownloadGroup track={displayed} say={say} />
     </>
   );
 }
@@ -1062,9 +1170,53 @@ function Lyrics({ lyrics, error }: { lyrics: CatalogLyrics | null; error: ApiErr
 }
 
 /** A song into the hub's download queue (`POST /catalog/download`); what the library is made of. */
-async function downloadToHub(track: CatalogTrack, basis: DownloadAuthorizationBasis, format: OutputFormat): Promise<string> {
-  const answer = await api('catalogDownload', { body: { track, authorization: { basis, acknowledged: true }, target: { destination: 'hub', format } } });
+async function downloadToHub(track: CatalogTrack, basis: DownloadAuthorizationBasis, format: OutputFormat, source?: CatalogSource): Promise<string> {
+  const answer = await api('catalogDownload', { body: { track, ...(source ? { source } : {}), authorization: { basis, acknowledged: true }, target: { destination: 'hub', format } } });
   return `Queued from ${platformLabel(answer.source.platform)}${answer.source.matchedBy === 'spotdl' ? ' (spotDL’s match)' : ''}. Tagged with ${embeddedText(answer.embedded)}.`;
+}
+
+function AutoDownloadSheet({ title, kind, readPage, onDone, onCancel }: { title: string; kind: AutoDownloadRequest['kind']; readPage: (offset: number) => Promise<{ tracks: CatalogTrack[]; hasMore: boolean; capped: boolean }>; onDone: (text: string) => void; onCancel: () => void }) {
+  const [basis, setBasis] = useState<DownloadAuthorizationBasis>('user-owned');
+  const [format, setFormat] = useState<OutputFormat>('original');
+  const [busy, setBusy] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
+  const go = async (): Promise<void> => {
+    if (!confirmed) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await queueResolvedCatalogBatch(
+        readPage,
+        async (track) => pickDownloadSource(basis === 'creator-download'
+          ? track.sources.filter((source) => source.platform === 'soundcloud' && Boolean(source.id && /^\d+$/.test(source.id)))
+          : track.sources),
+        async (track, source) => { await downloadToHub(track, basis, format, source); },
+        async (items) => {
+          await api('catalogDownloadPreflight', { body: { items: items.map(({ track, source }) => ({ track, source })), authorization: { basis, acknowledged: true } } });
+        },
+      );
+      onDone(`Queued ${result.queued} song${result.queued === 1 ? '' : 's'} from “${title}” in Music ▸ Downloads.`);
+    } catch (err) {
+      const queued = typeof err === 'object' && err !== null && 'queued' in err && typeof err.queued === 'number' ? err.queued : 0;
+      setError(catalogError(err instanceof Error && queued > 0 ? new Error(`Queued ${queued} song${queued === 1 ? '' : 's'} before the next download failed: ${err.message}`) : err));
+      setBusy(false);
+    }
+  };
+  return (
+    <Sheet title={`Download after starring “${title}”`} onCancel={onCancel}>
+      <p>{kind === 'track' ? 'The star is already saved. Choose the rights basis to queue this song. Search results do not grant download permission.' : 'The star is already saved. One rights-basis confirmation applies to the whole album or playlist; every song will be resolved and checked for a source before any audio is queued. Search results do not grant download permission.'}</p>
+      <BasisAndFormat basis={basis} setBasis={setBasis} format={format} setFormat={setFormat} />
+      <Check checked={confirmed} onChange={setConfirmed}>
+        {kind === 'track' ? 'I confirm I am allowed to download this song.' : 'I confirm I am allowed to download every song in this collection.'}
+      </Check>
+      <ActionError error={error} />
+      <div className="sheet__acts">
+        <Push onClick={onCancel} disabled={busy}>Cancel</Push>
+        <Push primary busy={busy} disabled={!confirmed} onClick={() => void go()}>Confirm and queue</Push>
+      </div>
+    </Sheet>
+  );
 }
 
 function DownloadGroup({ track, say }: { track: CatalogTrack; say: (text: string) => void }) {
@@ -1242,11 +1394,11 @@ function FileSheet({ track, playlist, onDone, onCancel }: { track: CatalogTrack;
 
 /**
  * The menu a song row opens (UX-SEARCH-012): Add to Up Next (a group's queue through
- * `POST /groups/:id/requests`, a submenu when there are several groups), Add to Playlist, Add to
- * Library, Download…, Audition and Open Details. Every action says what happened in the status strip,
- * which is the window's live region.
+ * `POST /groups/:id/requests`, a submenu when there are several groups), Add to Playlist, Star/Unstar,
+ * Add to Library, Download…, Audition and Open Details. Every action says what happened in the status
+ * strip, which is the window's live region.
  */
-function useSongMenu({ preview, present, say, open }: { preview: Preview; present: (sheet: ReactNode | null) => void; say: (text: string) => void; open: (page: Page) => void }) {
+function useSongMenu({ preview, present, say, open, saved, requestAutoDownload }: { preview: Preview; present: (sheet: ReactNode | null) => void; say: (text: string) => void; open: (page: Page) => void; saved: SavedCollections; requestAutoDownload: (request: AutoDownloadRequest) => void }) {
   const [shown, setShown] = useState<{ track: CatalogTrack; at: MenuAt; returnTo: HTMLElement | null } | null>(null);
   const [groups, setGroups] = useState<GroupView[] | null>(null);
   const [groupsError, setGroupsError] = useState<string | null>(null);
@@ -1336,6 +1488,18 @@ function useSongMenu({ preview, present, say, open }: { preview: Preview; presen
     return { kind: 'sub', label: 'Add to Playlist', items: [...chosen, { kind: 'sep' }, { kind: 'item', label: 'New Playlist…', onSelect: () => file(track, null) }] };
   };
 
+  const toggleStar = (track: CatalogTrack): void => {
+    const wasSaved = saved.isTrackSaved(track);
+    void saved.toggleTrack(track).then((ok) => {
+      if (!ok) return;
+      if (wasSaved) say(`“${track.title}” is no longer in your library.`);
+      else {
+        say(`“${track.title}” is in your library.`);
+        requestAutoDownload({ kind: 'track', track });
+      }
+    });
+  };
+
   const entries = (track: CatalogTrack): MenuEntry[] => {
     const clip = previewOf(track.sources);
     const playing = clip !== null && preview.playing === clip.url;
@@ -1351,6 +1515,7 @@ function useSongMenu({ preview, present, say, open }: { preview: Preview; presen
     return [
       upNext,
       toPlaylist(track),
+      { kind: 'item', label: saved.isTrackSaved(track) ? 'Unstar' : 'Star', onSelect: () => toggleStar(track) },
       { kind: 'item', label: 'Add to Library…', onSelect: () => add(track, 'library') },
       { kind: 'sep' },
       { kind: 'item', label: 'Download…', onSelect: () => add(track, 'download') },
@@ -1538,7 +1703,7 @@ function Listbox<T>({ label, items, render, onOpen, onSpace, onMenu, empty, hint
   );
 }
 
-function TrackList({ label, tracks, preview, onOpen, empty, numbered, ...paging }: { label: string; tracks: readonly CatalogTrack[]; preview: Preview; onOpen: (track: CatalogTrack) => void; empty: string; numbered?: boolean } & ListboxPaging) {
+function TrackList({ label, tracks, preview, saved, onOpen, empty, numbered, ...paging }: { label: string; tracks: readonly CatalogTrack[]; preview: Preview; saved?: SavedCollections; onOpen: (track: CatalogTrack) => void; empty: string; numbered?: boolean } & ListboxPaging) {
   const openMenu = useContext(SongMenuContext);
   return (
     <Listbox
@@ -1551,7 +1716,7 @@ function TrackList({ label, tracks, preview, onOpen, empty, numbered, ...paging 
         if (clip) preview.toggle(clip.url);
       }}
       {...(openMenu ? { onMenu: (t: CatalogTrack, at: MenuAt, list: HTMLElement) => openMenu(t, at, list) } : {})}
-      hint={`Enter opens the song. Space plays its 30-second preview, where it has one.${openMenu ? ' Shift+F10 or the Menu key opens its menu: Up Next, a playlist, the library.' : ''}`}
+      hint={`Enter opens the song. Space plays its 30-second preview, where it has one.${openMenu ? ' Shift+F10 or the Menu key opens its menu: Up Next, a playlist, star/unstar, the library.' : ''}`}
       {...paging}
       render={(t, i) => {
         const clip = previewOf(t.sources);
@@ -1576,6 +1741,7 @@ function TrackList({ label, tracks, preview, onOpen, empty, numbered, ...paging 
             <span className="mrow__meta">
               {t.bpm ? <span className="mrow__bpm">{Math.round(t.bpm)} BPM</span> : null}
               <span className="mrow__time">{formatDuration(t.durationMs)}</span>
+              {saved?.isTrackSaved(t) ? <span className="mrow__star" title="In your library"><span aria-hidden="true">★</span><span className="sr"> Starred</span></span> : null}
             </span>
             {clip ? (
               <span className={`mrow__play${playing ? ' is-playing' : ''}`} data-preview title={playing ? 'Stop the preview' : 'Play the 30-second preview'}>

@@ -12,6 +12,7 @@ import type { spawn } from 'node:child_process';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { HelperToolId } from '@now-playing/contracts';
 import { Jobs, rateLimitOf, spotdlArgs, ytDlpArgs, type FinishedFile } from '../../src/jobs.js';
+import { spotdlYtDlpArgs } from '@now-playing/domain/tool-install';
 import type { ResolvedTool } from '../../src/tools.js';
 
 const job = { url: 'https://www.youtube.com/watch?v=abc', format: 'original' } as const;
@@ -27,14 +28,16 @@ describe('a speed limit', () => {
 
   it('reaches spotDL through its yt-dlp arguments, and only the limit goes there', () => {
     const args = spotdlArgs({ url: 'https://open.spotify.com/track/x', format: 'mp3' }, '/tmp/j', { present: true }, { rateLimitKBps: 2048 });
-    expect(args[args.indexOf('--yt-dlp-args') + 1]).toBe('--limit-rate 2048K');
+    expect(args[args.indexOf('--yt-dlp-args') + 1]).toBe(spotdlYtDlpArgs(process.execPath, ['--limit-rate', '2048K']));
     expect(args[1]).toBe('https://open.spotify.com/track/x');
   });
 
   it('is left out when there is none, or when it is not a sensible number', () => {
     for (const value of [null, undefined, 0, -5, Number.NaN, Number.POSITIVE_INFINITY, 2_000_000]) {
       expect(ytDlpArgs(job, '/tmp/j', { present: true }, { rateLimitKBps: value as number })).not.toContain('--limit-rate');
-      expect(spotdlArgs(job, '/tmp/j', { present: true }, { rateLimitKBps: value as number })).not.toContain('--yt-dlp-args');
+      const spotdl = spotdlArgs(job, '/tmp/j', { present: true }, { rateLimitKBps: value as number });
+      expect(spotdl).toContain('--yt-dlp-args');
+      expect(spotdl[spotdl.indexOf('--yt-dlp-args') + 1]).not.toContain('--limit-rate');
     }
     expect(rateLimitOf(499.6)).toBe(500);
   });

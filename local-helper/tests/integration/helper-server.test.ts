@@ -197,6 +197,17 @@ describe('what it refuses', () => {
     expect((await post(HELPER_ROUTES.fetch, { url: 'https://www.youtube.com/watch?v=abc', authorization: { basis: 'user-owned', acknowledged: false } })).status).toBe(400);
   });
 
+  it('refuses generic creator-download claims and SoundCloud streams without provider verification', async () => {
+    const youtube = await post(HELPER_ROUTES.fetch, { url: 'https://www.youtube.com/watch?v=abc', authorization: { basis: 'creator-download', acknowledged: true } });
+    expect(youtube.status).toBe(403);
+    expect(((await youtube.json()) as { message: string }).message).toMatch(/generic video or stream URL is not permission/i);
+
+    const soundcloud = await post(HELPER_ROUTES.fetch, { url: 'https://soundcloud.com/artist/track', authorization: { basis: 'user-owned', acknowledged: true } });
+    expect(soundcloud.status).toBeGreaterThanOrEqual(400);
+    const soundcloudMessage = ((await soundcloud.json()) as { message: string }).message;
+    expect(soundcloudMessage).toMatch(/cannot verify SoundCloud.*creator-enabled|not one this helper will fetch from|Host soundcloud.*is not on the allowlist/i);
+  });
+
   it('refuses a body that is not JSON, because that is what forces the preflight', async () => {
     const response = await call(HELPER_ROUTES.fetch, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: '{}' });
     expect(response.status).toBe(415);

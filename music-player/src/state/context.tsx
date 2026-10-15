@@ -14,6 +14,8 @@ import { workletAssetUrl } from 'virtual:np-worklet-url';
 import { installHandlers, publishMetadata, publishPlaybackState, publishPosition } from '../lib/media-session.js';
 import { registerServiceWorker } from '../lib/pwa.js';
 import { PlaybackEngine } from '../lib/playback.js';
+import { SavedCatalogSync } from '../lib/saved-catalog-sync.js';
+import type { SavedCatalogItem } from '@now-playing/contracts';
 import { PlayerStore, type AppState } from './store.js';
 
 export type ListeningMode = 'solo' | 'shared';
@@ -21,6 +23,7 @@ export type ListeningMode = 'solo' | 'shared';
 interface PlayerContextValue {
   store: PlayerStore;
   hub: HubClient | null;
+  savedCatalog: SavedCatalogSync | null;
   hubStatus: HubStatus;
   /** Null until the hub client exists; shared listening is a hub feature. */
   group: GroupClient | null;
@@ -33,6 +36,9 @@ interface PlayerContextValue {
 const IDLE_SHARED: SharedState = { unavailableReason: 'No hub is paired.', connection: 'idle', group: null, members: [], queue: null, playback: null, rejection: null, staleSince: null };
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
+const NO_SAVED_ITEMS: readonly SavedCatalogItem[] = [];
+const noSubscribe = (_listener: () => void): (() => void) => () => undefined;
+const noSnapshot = (): readonly SavedCatalogItem[] => NO_SAVED_ITEMS;
 
 /**
  * Where the pitch-shifter worklet comes from.
@@ -51,6 +57,7 @@ const WORKLET_URL = workletDataUrl() ?? workletAssetUrl;
 export function PlayerProvider({ children, store: injected }: { children: ReactNode; store?: PlayerStore }) {
   const [store] = useState(() => injected ?? new PlayerStore(new PlaybackEngine({ workletModuleUrl: WORKLET_URL })));
   const [hub, setHub] = useState<HubClient | null>(null);
+  const [savedCatalog, setSavedCatalog] = useState<SavedCatalogSync | null>(null);
   const [hubStatus, setHubStatus] = useState<HubStatus>({ connected: false, endpoint: null, hubName: null, reason: 'No hub is paired.', identity: null, scopes: [] });
   const [group, setGroup] = useState<GroupClient | null>(null);
   const [shared, setShared] = useState<SharedState>(IDLE_SHARED);
@@ -60,6 +67,7 @@ export function PlayerProvider({ children, store: injected }: { children: ReactN
 
   useEffect(() => {
     let cancelled = false;
+    let catalogSync: SavedCatalogSync | null = null;
     void (async () => {
       let db: Awaited<ReturnType<typeof openPlayerDb>>;
       try {
@@ -75,7 +83,11 @@ export function PlayerProvider({ children, store: injected }: { children: ReactN
       // Registered after the store is up so the "new version" notice has somewhere to go.
       void registerServiceWorker((update) => store.notice('info', 'A new version of Airwave is ready.', { label: 'Reload', run: update.reload }));
       const client = new HubClient(db);
+      const sync = new SavedCatalogSync(db, client, () => store.getSnapshot().library.tracks);
+      catalogSync = sync;
+      store.setLikeChangedListener((track) => sync.localLikeChanged(track));
       setHub(client);
+      setSavedCatalog(sync);
       client.subscribe(setHubStatus);
       store.setStreamUrlResolver((track) => client.streamUrl(track));
       const groups = new GroupClient(client, () => 'This device');
@@ -86,6 +98,7 @@ export function PlayerProvider({ children, store: injected }: { children: ReactN
       try {
         await client.load();
         if (cancelled) return;
+        await sync.start();
         groups.refreshAvailability(client.getStatus().connected, client.getStatus().reason);
         // The mode is remembered, but only honoured if it is still possible: coming back to a player
         // that was in a group, on a laptop that has since left the network, must land in solo rather
@@ -98,6 +111,8 @@ export function PlayerProvider({ children, store: injected }: { children: ReactN
     })();
     return () => {
       cancelled = true;
+      catalogSync?.dispose();
+      store.setLikeChangedListener(null);
     };
   }, [store]);
 
@@ -144,7 +159,7 @@ export function PlayerProvider({ children, store: injected }: { children: ReactN
     [group, shared.unavailableReason],
   );
 
-  const value = useMemo(() => ({ store, hub, hubStatus, group, shared, mode, setMode }), [store, hub, hubStatus, group, shared, mode, setMode]);
+  const value = useMemo(() => ({ store, hub, savedCatalog, hubStatus, group, shared, mode, setMode }), [store, hub, savedCatalog, hubStatus, group, shared, mode, setMode]);
   return (
     <PlayerContext.Provider value={value}>
       {children}
@@ -162,6 +177,12 @@ export function usePlayer(): PlayerContextValue {
 export function useAppState(): AppState {
   const { store } = usePlayer();
   return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+}
+
+/** Shared saved songs update independently of the lazy Search route. */
+export function useSavedCatalogItems(): readonly SavedCatalogItem[] {
+  const { savedCatalog } = usePlayer();
+  return useSyncExternalStore(savedCatalog?.subscribe ?? noSubscribe, savedCatalog?.getSnapshot ?? noSnapshot, savedCatalog?.getSnapshot ?? noSnapshot);
 }
 
 /** A convenience selector that avoids re-rendering on every unrelated state change. */

@@ -2811,6 +2811,7 @@
   },
   "settings": {
     "embedLyrics": true,
+    "autoDownloadStars": false,
     "providers": {
       "itunes": true,
       "deezer": true,

@@ -24,6 +24,7 @@ const ABOUT: Record<CatalogProviderId, string> = {
 
 interface Draft {
   embedLyrics: boolean;
+  autoDownloadStars: boolean;
   providers: Record<CatalogProviderId, boolean>;
   /** Typed but not sent; empty means "leave the key as it is". */
   key: string;
@@ -46,10 +47,10 @@ export function MusicSearchSettingsView() {
     );
   }
 
-  const base: Draft = { embedLyrics: stored.embedLyrics, providers: { ...stored.providers } as Record<CatalogProviderId, boolean>, key: '', clearKey: false };
+  const base: Draft = { embedLyrics: stored.embedLyrics, autoDownloadStars: stored.autoDownloadStars, providers: { ...stored.providers } as Record<CatalogProviderId, boolean>, key: '', clearKey: false };
   const value = draft ?? base;
   const changedProviders = CATALOG_PROVIDERS.filter((p) => value.providers[p] !== base.providers[p]);
-  const dirty = draft !== null && (value.embedLyrics !== base.embedLyrics || changedProviders.length > 0 || value.key.trim() !== '' || value.clearKey);
+  const dirty = draft !== null && (value.embedLyrics !== base.embedLyrics || value.autoDownloadStars !== base.autoDownloadStars || changedProviders.length > 0 || value.key.trim() !== '' || value.clearKey);
   const none = CATALOG_PROVIDERS.every((p) => !value.providers[p]);
   const edit = (patch: Partial<Draft>): void => {
     setDraft({ ...value, ...patch });
@@ -60,6 +61,7 @@ export function MusicSearchSettingsView() {
     if (!dirty || none) return;
     const body: CatalogSettingsInput = {};
     if (value.embedLyrics !== base.embedLyrics) body.embedLyrics = value.embedLyrics;
+    if (value.autoDownloadStars !== base.autoDownloadStars) body.autoDownloadStars = value.autoDownloadStars;
     if (changedProviders.length) body.providers = Object.fromEntries(changedProviders.map((p) => [p, value.providers[p]]));
     if (value.clearKey) body.odesliKey = '';
     else if (value.key.trim()) body.odesliKey = value.key.trim();
@@ -88,6 +90,10 @@ export function MusicSearchSettingsView() {
             Write lyrics into a song downloaded from Search
           </Check>
           <span className="sub">From LRCLIB, synced where it has them. ISRC, genre, label and year are always written.</span>
+          <Check checked={value.autoDownloadStars} onChange={(on) => edit({ autoDownloadStars: on })}>
+            Offer to download songs, albums, and playlists when starring them
+          </Check>
+          <span className="sub">Off by default. A song needs its own rights confirmation; an album or playlist gets one confirmation for all its songs. Cancelling or a missing authorized source leaves the star and queues no audio. Search results do not grant download permission.</span>
         </div>
         <label className="k top" htmlFor={keyId}>
           SongLink key:

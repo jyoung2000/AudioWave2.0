@@ -60,9 +60,11 @@ This document is the threat model and the list of concrete mitigations for the A
 | `PATCH`/`DELETE /api/v1/playlists/:id`, `POST /api/v1/playlists/:id/entries/move` | yes (CSRF) | `playlists:use` — only a list the device created |
 | `POST /api/v1/playlists/:id/entries/remove` | yes (CSRF) | `playlists:use` — entries it added, or any in a list it created |
 | `GET`/`PUT /api/v1/playlists/folder` | yes (CSRF) | never |
-| `GET`/`PUT`/`DELETE /api/v1/catalog/saved` | its own | `library:sync` — its own; the admin's read-only as `shared` |
+| `GET`/`PUT`/`DELETE /api/v1/catalog/saved` | yes (CSRF on writes) | `library:sync` — reads and edits the same shared set |
 
 Every change is audited (`playlists.create`, `.update`, `.delete`, `.add`, `.remove`, `.folder`). Filing is additive and open to any device with the scope, because the hub is a shared shelf; anything that takes away from a list is kept to the admin and to the device that made the list or added the song. The playlist files hold relative paths inside the data volume and public source URLs only — never an absolute host path. Tests: `docker-container/tests/security/playlist-folder.test.ts` (traversal, symlinks, ids, CSRF, scopes, ownership, caps, starred collections), `docker-container/tests/integration/playlists.test.ts`.
+
+Catalog stars are a separate metadata-only set capped at 2,000 active entries. Saved provider/collection links must be HTTP(S); artwork accepts HTTP(S) or a size-limited inline image, and provider-ID arrays are bounded. These validated schemas contain no audio bytes or local filesystem paths. Admin sessions and devices with `library:sync` can read, add or remove entries; deletes leave timestamped tombstones so a stale offline client cannot restore the star. A star does not itself transfer audio. Optional Hub/Companion downloads require an explicit rights basis and per-source preflight before queueing; see `DOWNLOADS_AND_LEGAL.md`.
 
 ## Outbound hosts of the music catalog (DEC-039)
 
@@ -77,17 +79,20 @@ The catalog engine (`packages/domain/src/catalog`) reaches only these hosts (`CA
 | `coverartarchive.org` | Cover art (reserved; redirects to `archive.org`) | — |
 | `lrclib.net` | Synced and plain lyrics | cached 24 h |
 | `music.apple.com` | An Apple Music playlist's public page, read for the songs it embeds (one GET of the page a browser opens; no token, no account) | cached 10 min |
+| `open.spotify.com` | Public playlist embed metadata (tried before spotDL's slower list crawl) and track/album metadata fallback; no preview audio | cached 10 min; at most 100 listed tracks, marked capped at the ceiling |
 | `api.song.link` | Cross-platform links, **only with an administrator's key** (keyless access was closed in 2026) | 10 a minute, cached |
 
 The hub sends these through `SafeHttpClient` with that list (`docker-container/src/catalog/service.ts`);
 the helper through `guardedCatalogFetch` (`local-helper/src/catalog.ts`): https only, the host checked on
 every redirect hop, every resolved address refused if private, loopback or link-local, 4 MB cap. Pages
 load artwork and previews directly from `*.mzstatic.com`, `audio-ssl.itunes.apple.com`, `*.dzcdn.net`,
-`i.ytimg.com`, `*.sndcdn.com` and `i.scdn.co` (`CATALOG_MEDIA_HOSTS`); the engine never fetches them.
-`HELPER_DEFAULT_HOSTS` lists the API hosts and the artwork/preview CDNs so the helper's (and Android's)
-list still says what it touches. YouTube and SoundCloud are searched by yt-dlp
+`i.ytimg.com`, `*.sndcdn.com`, `i.scdn.co` and `*.spotifycdn.com` (`CATALOG_MEDIA_HOSTS`); the engine never fetches them.
+`HELPER_DEFAULT_HOSTS` lists the API and tool hosts the helper may fetch; artwork and previews load
+from the CSP-listed media hosts directly in the browser, never through the helper. YouTube and SoundCloud are searched by yt-dlp
 (`toolSearchArgs`: `--ignore-config` first, the search string last behind `--`, control characters
-removed, 200 characters at most, 100 results deep at most), in the existing tool slots. The SongLink key
+removed, 200 characters at most, 100 results deep at most), in the existing tool slots. Every yt-dlp
+path explicitly enables the app's Node runtime for YouTube's JavaScript challenge solver; spotDL gets
+the same runtime forwarded to its internal yt-dlp process. The SongLink key
 is sealed with the installation key, write-only, and never logged or audited.
 
 Tests: `packages/domain/tests/unit/catalog-*.test.ts`, `docker-container/tests/integration/catalog.test.ts`

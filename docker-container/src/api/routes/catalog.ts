@@ -7,12 +7,12 @@
  */
 import { Readable } from 'node:stream';
 import type { FastifyInstance } from 'fastify';
-import { NDJSON_CONTENT_TYPE, routes, type SavedCollection } from '@now-playing/contracts';
+import { NDJSON_CONTENT_TYPE, routes } from '@now-playing/contracts';
 import { ndjsonLine } from '@now-playing/domain/catalog';
 import type { HubContext } from '../../context.js';
 import { DomainError } from '@now-playing/domain';
-import { actorDisplayName, actorId, type Principal } from '../../auth/principal.js';
-import { SAVED_COLLECTIONS_CAP } from '../../db/repositories/saved-collections.js';
+import { actorDisplayName, actorId } from '../../auth/principal.js';
+import { SAVED_CATALOG_ITEMS_CAP } from '../../db/repositories/saved-catalog.js';
 import { RAW, registerRoute, type RawResponse } from '../register.js';
 
 export function registerCatalogRoutes(app: FastifyInstance, ctx: HubContext): void {
@@ -62,6 +62,7 @@ export function registerCatalogRoutes(app: FastifyInstance, ctx: HubContext): vo
     const result = await ctx.catalog.download(
       {
         track: body.track,
+        ...(body.source ? { source: body.source } : {}),
         authorization: { basis: body.authorization.basis, evidence: body.authorization.evidence, acknowledged: true },
         target: { destination: body.target.destination, directoryId: body.target.directoryId, filenameTemplate: body.target.filenameTemplate, format: body.target.format, quality: body.target.quality },
         ownerId: actorId(principal),
@@ -73,32 +74,26 @@ export function registerCatalogRoutes(app: FastifyInstance, ctx: HubContext): vo
     return result;
   });
 
-  /*
-   * Starred albums and playlists (UX-SEARCH-005), in the SavedCollection shape the player and the
-   * companion share. One owner per admin user (`admin:<id>`) and one per device (`device:<id>`, with
-   * `library:sync`, DEC-041). A device reads and writes its own, and reads the admin's as `shared`;
-   * it never writes anyone else's.
-   */
-  const savedOwner = (principal: Principal): string => (principal.kind === 'admin' ? `admin:${principal.userId}` : `device:${actorId(principal)}`);
-  const savedLists = (principal: Principal): { items: SavedCollection[]; shared: SavedCollection[] } => {
-    const repo = ctx.repos.savedCollections;
-    return { items: repo.list(savedOwner(principal)), shared: principal.kind === 'device' ? repo.listShared('admin:') : [] };
-  };
+  /* One editable, shared set across admin and paired clients. These routes require `library:sync`. */
+  const savedList = () => ctx.repos.savedCatalog.list();
 
-  registerRoute(app, ctx, routes.catalogSavedList, ({ principal }) => savedLists(principal));
+  registerRoute(app, ctx, routes.catalogSavedList, () => savedList());
 
-  registerRoute(app, ctx, routes.catalogSavedPut, ({ body, principal }) => {
-    const owner = savedOwner(principal);
-    const repo = ctx.repos.savedCollections;
-    if (!repo.has(owner, body.ref) && repo.count(owner) >= SAVED_COLLECTIONS_CAP) throw new DomainError('conflict', `The library already holds ${SAVED_COLLECTIONS_CAP} starred albums and playlists. Un-star some first.`);
-    repo.put(owner, body);
-    return savedLists(principal);
+  registerRoute(app, ctx, routes.catalogSavedPut, ({ body }) => {
+    const repo = ctx.repos.savedCatalog;
+    if (!repo.has(body) && repo.count() >= SAVED_CATALOG_ITEMS_CAP) throw new DomainError('conflict', `The shared library already holds ${SAVED_CATALOG_ITEMS_CAP} starred items. Un-star some first.`);
+    repo.put(body);
+    return savedList();
   });
 
-  registerRoute(app, ctx, routes.catalogSavedDelete, ({ query, principal }) => {
-    ctx.repos.savedCollections.remove(savedOwner(principal), query);
-    return savedLists(principal);
+  registerRoute(app, ctx, routes.catalogSavedDelete, ({ query }) => {
+    ctx.repos.savedCatalog.remove(query, query.at ?? new Date(ctx.clock.now()).toISOString());
+    return savedList();
   });
+
+  registerRoute(app, ctx, routes.catalogDownloadPreflight, ({ body, principal }) =>
+    ctx.catalog.preflightDownloadBatch({ items: body.items, basis: body.authorization.basis, ownerId: actorId(principal) }),
+  );
 
   registerRoute(app, ctx, routes.catalogSettingsGet, () => ctx.catalog.settingsView());
 

@@ -7,19 +7,25 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { AquaTable, Button, EmptyState, LoadingState, Panel, PanelSection, SourceBadge, StatusDot, useToast } from '@now-playing/aqua-ui';
-import type { SearchResponse, SearchResult, Track } from '@now-playing/contracts';
+import type { SavedTrack, SearchResponse, SearchResult, Track } from '@now-playing/contracts';
 import { uuidv7 } from '@now-playing/domain';
-import { useAppState, usePlayer } from '../state/context.js';
+import { useAppState, usePlayer, useSavedCatalogItems } from '../state/context.js';
 import { toTrackRef } from '../state/store.js';
+import { savedTrackFromLibraryTrack, savedTrackFromSearchResult } from '../lib/saved-catalog.js';
+import { SharedSavedSongsPanel } from '../components/SharedSavedSongsPanel.js';
 import { formatDuration } from './Library.js';
 
 export function SearchView({ query, onQueryChange }: { query: string; onQueryChange: (value: string) => void }) {
-  const { store, hub, hubStatus } = usePlayer();
+  const { store, hub, savedCatalog, hubStatus } = usePlayer();
   const state = useAppState();
+  const savedItems = useSavedCatalogItems();
   const toast = useToast();
   const [hubResults, setHubResults] = useState<SearchResponse | null>(null);
   const [searching, setSearching] = useState(false);
   const [hubError, setHubError] = useState<string | null>(null);
+  const canSync = Boolean(savedCatalog?.canSync() && hubStatus.connected && hubStatus.hubName);
+  const savedTracks = useMemo(() => savedItems.filter((item): item is SavedTrack => 'kind' in item && item.kind === 'track'), [savedItems]);
+  const savedKeys = useMemo(() => new Set(savedTracks.map((item) => item.identityKey)), [savedTracks]);
 
   const local = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -51,9 +57,12 @@ export function SearchView({ query, onQueryChange }: { query: string; onQueryCha
 
   if (!query.trim()) {
     return (
-      <Panel>
-        <EmptyState title="Search your music" text={hubStatus.connected ? `Searches this device and ${hubStatus.hubName ?? 'your hub'}.` : 'Searches the music on this device. Pair a hub in Settings to search connected services too.'} />
-      </Panel>
+      <>
+        <Panel>
+          <EmptyState title="Search your music" text={hubStatus.connected ? `Searches this device and ${hubStatus.hubName ?? 'your hub'}.` : 'Searches the music on this device. Pair a hub in Settings to search connected services too.'} />
+        </Panel>
+        {canSync && hubStatus.hubName ? <SharedSavedSongsPanel hubName={hubStatus.hubName} tracks={savedTracks} onUnstar={(key) => void savedCatalog?.unstarTrack(key).catch((error: unknown) => toast.show(error instanceof Error ? error.message : String(error), { kind: 'warning' }))} /> : null}
+      </>
     );
   }
 
@@ -81,6 +90,23 @@ export function SearchView({ query, onQueryChange }: { query: string; onQueryCha
               { id: 'artist', header: 'Artist', cell: (row) => row.artistName },
               { id: 'album', header: 'Album', cell: (row) => row.albumName ?? '' },
               { id: 'time', header: 'Time', align: 'right', width: 56, cell: (row) => formatDuration(row.durationMs) },
+              {
+                id: 'star',
+                header: 'Star',
+                align: 'right',
+                cell: (row) => {
+                  const bookmark = savedTrackFromLibraryTrack(row);
+                  const shared = bookmark !== null && savedKeys.has(bookmark.identityKey);
+                  const starred = row.liked || shared;
+                  return <Button size="mini" aria-label={starred ? `Unstar “${row.title}”` : `Star “${row.title}”`} aria-pressed={starred} onClick={(event) => {
+                    event.stopPropagation();
+                    const original = state.library.tracks.find((track) => track.id === row.id);
+                    if (bookmark && shared && !original?.liked) {
+                      void savedCatalog?.unstarTrack(bookmark.identityKey).catch((error: unknown) => toast.show(error instanceof Error ? error.message : String(error), { kind: 'warning' }));
+                    } else void store.toggleLike(row.id);
+                  }}>{starred ? '★' : '☆'}</Button>;
+                },
+              },
             ]}
           />
         ) : (
@@ -140,6 +166,20 @@ export function SearchView({ query, onQueryChange }: { query: string; onQueryCha
                         </span>
                       ),
                   },
+                  {
+                    id: 'star',
+                    header: 'Star',
+                    align: 'right',
+                    cell: (row) => {
+                      const bookmark = savedTrackFromSearchResult(row);
+                      const starred = bookmark !== null && savedKeys.has(bookmark.identityKey);
+                      return <Button size="mini" disabled={!canSync || !bookmark} aria-label={starred ? `Unstar “${row.title}”` : `Star “${row.title}”`} aria-pressed={starred} onClick={(event) => {
+                        event.stopPropagation();
+                        if (!bookmark || !savedCatalog) return;
+                        void savedCatalog.toggleCatalogTrack(bookmark).then(() => toast.show(starred ? `Removed “${row.title}” from shared stars.` : `Starred “${row.title}” across devices.`)).catch((error: unknown) => toast.show(error instanceof Error ? error.message : String(error), { kind: 'warning' }));
+                      }}>{starred ? '★' : '☆'}</Button>;
+                    },
+                  },
                 ]}
               />
               <PanelSection>
@@ -163,6 +203,7 @@ export function SearchView({ query, onQueryChange }: { query: string; onQueryCha
           </PanelSection>
         </Panel>
       )}
+      {canSync && hubStatus.hubName ? <SharedSavedSongsPanel hubName={hubStatus.hubName} tracks={savedTracks} onUnstar={(key) => void savedCatalog?.unstarTrack(key).catch((error: unknown) => toast.show(error instanceof Error ? error.message : String(error), { kind: 'warning' }))} /> : null}
     </>
   );
 }

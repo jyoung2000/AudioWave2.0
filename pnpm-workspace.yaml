@@ -12,3 +12,4 @@ onlyBuiltDependencies:
   - ffmpeg-static
   - '@discordjs/opus'
   - sodium-native
+  - electron-winstaller

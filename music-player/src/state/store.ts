@@ -173,6 +173,7 @@ export class PlayerStore {
   private loadGeneration = 0;
   /** Where a hub-held track streams from; set once a hub client exists. */
   private streamUrl: ((track: TrackRef) => Promise<string | null> | string | null) | null = null;
+  private likeChanged: ((track: Track) => void | Promise<void>) | null = null;
 
   constructor(readonly playback: PlaybackEngine) {
     this.state = {
@@ -735,6 +736,11 @@ export class PlayerStore {
   /** Stream hub-held tracks from this hub. Null goes back to local files only. */
   setStreamUrlResolver(resolve: ((track: TrackRef) => Promise<string | null> | string | null) | null): void {
     this.streamUrl = resolve;
+  }
+
+  /** Subscribe a paired client to local like changes without tying the store to the lazy Search view. */
+  setLikeChangedListener(listener: ((track: Track) => void | Promise<void>) | null): void {
+    this.likeChanged = listener;
   }
 
   /**
@@ -1344,6 +1350,7 @@ export class PlayerStore {
     await db.put('tracks', updated);
     this.patch({ library: { ...this.state.library, tracks: this.state.library.tracks.map((t) => (t.id === trackId ? updated : t)) } });
     this.recordEvent(updated.liked ? 'liked' : 'unliked', toTrackRef(updated));
+    void Promise.resolve(this.likeChanged?.(updated)).catch(() => undefined);
   }
 
   /* ------------------------------------------------------------------ privacy */

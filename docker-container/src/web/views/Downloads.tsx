@@ -13,7 +13,7 @@ import { ActionError, EmptyCells, errorSentence, formatBytes, Group, listState, 
 
 export const BASIS_LABELS: Record<string, string> = {
   'user-owned': 'The requester owns it',
-  'creator-download': 'The artist allows downloads',
+  'creator-download': 'Creator-enabled download (SoundCloud only)',
   'purchased-export': 'Exported from a purchase',
   'public-domain': 'Public domain',
   licensed: 'Licensed',

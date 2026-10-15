@@ -113,6 +113,13 @@ describe('the spotDL preset', () => {
     expect(preset.infoFile).toBe('song.spotdl');
   });
 
+  it('passes the hub Node runtime to spotDL’s internal yt-dlp', () => {
+    const forwarded = args[args.indexOf('--yt-dlp-args') + 1]!;
+    expect(forwarded).toContain('node:/usr/local/bin/node');
+    const save = preset.metadata({ url, ffmpeg: '/usr/bin/ffmpeg', node: '/usr/local/bin/node', saveFile: '/tmp/x/save.spotdl', listLimit: 201 })!;
+    expect(save[save.indexOf('--yt-dlp-args') + 1]).toContain('node:/usr/local/bin/node');
+  });
+
   it('uses the hub’s FFmpeg, keeps no cache, and gets a home of its own every run', () => {
     expect(args[args.indexOf('--ffmpeg') + 1]).toBe('/usr/bin/ffmpeg');
     expect(args).toContain('--no-cache');
@@ -249,5 +256,14 @@ describe('what it reports', () => {
     const instance = adapter({ preset: 'yt-dlp' });
     const authorized = await instance.getAuthorizedDownload('https://music.youtube.com/watch?v=x', { basis: 'hub-hosted', actorId: 'device' });
     expect(authorized).toBeNull();
+  });
+});
+
+describe('external-tool download permission', () => {
+  it('does not treat a generic YouTube/SoundCloud URL as creator-enabled permission', async () => {
+    const tool = adapter({});
+    await expect(tool.getAuthorizedDownload('https://www.youtube.com/watch?v=abc', { actorId: 'device-1', basis: 'creator-download' })).resolves.toBeNull();
+    await expect(tool.getAuthorizedDownload('https://soundcloud.com/artist/track', { actorId: 'device-1', basis: 'licensed' })).resolves.toBeNull();
+    await expect(tool.getAuthorizedDownload('https://www.youtube.com/watch?v=abc', { actorId: 'device-1', basis: 'user-owned' })).resolves.toMatchObject({ kind: 'external-tool' });
   });
 });

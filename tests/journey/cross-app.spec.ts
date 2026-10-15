@@ -309,13 +309,12 @@ test('the whole pass: hub set up, player paired, group joined, invite declined, 
     await expect(player.locator('#pfvName'), 'their profile opens in a sheet with the name the hub holds').toHaveText('Second player');
   });
 
-  await test.step('08 — paired search reaches the real hub, and a public-domain clip audibly plays', async () => {
+  await test.step('08 — the paired player plays a public-domain file through the Hub’s real stream', async () => {
     // The hub materialised the repo's public-domain fixtures at startup (NP_PUBLIC_DOMAIN_DIR):
-    // a keyless, rights-clean library with real audio. The enriched *fields* are proven against a
-    // stubbed hub in np/preview.spec.ts — live MusicBrainz is not reachable here — but the paired
-    // leg itself, the auth header, loopback CORS and the signed stream are all real in this step.
-    // A registered root is not an indexed one: scanning is the operator's act, so the operator
-    // does it — and the hub is then asked, not believed, before the player goes looking.
+    // a keyless, rights-clean library with real audio. Search providers are live catalogue services,
+    // and an unrelated track can have the same words as a private fixture; use a real Hub playlist
+    // to select the scanned file deterministically, then let the player's normal transport request
+    // the signed stream URL.
     const scan = await request.post(`${HUB_URL}/api/v1/library/scan`, { headers: { 'x-csrf-token': csrf } });
     expect([200, 201, 202], `the scan was accepted (${scan.status()})`).toContain(scan.status());
     await expect
@@ -330,19 +329,55 @@ test('the whole pass: hub set up, player paired, group joined, invite declined, 
       )
       .toBeGreaterThan(0);
 
+    const listed = await request.get(`${HUB_URL}/api/v1/library/tracks`, { params: { limit: 50, q: 'Paper Harbour' }, headers: { 'x-csrf-token': csrf } });
+    expect(listed.status()).toBe(200);
+    const library = (await listed.json()) as { items: Array<{ id: string; title: string; artistName: string; albumName: string | null; albumArtistName: string | null; durationMs: number | null; identity?: { isrc?: string | null }; year: number | null; trackNumber: number | null; discNumber: number | null }> };
+    const fixture = library.items.find((item) => item.title === 'Paper Harbour' && item.artistName === 'Fennel Grove');
+    if (!fixture) throw new Error('The generated rights-clean audio fixture was not indexed.');
+    const made = await request.post(`${HUB_URL}/api/v1/playlists`, {
+      headers: { authorization: playerAuth },
+      data: {
+        name: 'Journey Public Domain',
+        tracks: [{
+          id: 'journey:paper-harbour',
+          title: fixture!.title,
+          artist: fixture!.artistName,
+          artists: [fixture!.artistName],
+          album: fixture!.albumName,
+          albumArtist: fixture!.albumArtistName,
+          durationMs: fixture!.durationMs,
+          isrc: fixture!.identity?.isrc ?? null,
+          artworkUrl: null,
+          releaseDate: null,
+          year: fixture!.year,
+          trackNumber: fixture!.trackNumber,
+          discNumber: fixture!.discNumber,
+          bpm: null,
+          explicit: null,
+          genre: null,
+          label: null,
+          sources: [{ platform: 'musicbrainz', id: null, url: 'https://musicbrainz.org/recording/journey-fixture', matchedBy: 'metadata' }],
+          rank: 0,
+        }],
+      },
+    });
+    const madeText = await made.text();
+    expect(made.status(), `the paired player can make a playlist for the fixture (${made.status()} ${madeText})`).toBe(201);
+    const playlist = JSON.parse(madeText) as { id: string; name: string };
+
     await player.goto(`${PLAYER_URL}/`);
     await player.waitForFunction(() => (window as unknown as { NP_READY?: unknown }).NP_READY, null, { timeout: 60_000 });
-    await player.fill('#q', 'Paper Harbour');
-    await player.press('#q', 'Enter');
-    const row = player.locator('.srch__row', { hasText: 'Paper Harbour' }).first();
-    await expect(row, 'the hub answered the paired search with its own library').toBeVisible({ timeout: 30_000 });
-    await expect(row.locator('.srch__sub')).toContainText('Fennel Grove');
-    const art = row.locator('button.srch__art');
-    await expect(art, 'a row with real audio offers the audition').toBeVisible();
-    await art.click();
-    await expect(player.locator('.srch__art.is-preview'), 'the clip is playing').toHaveCount(1, { timeout: 15_000 });
-    await art.click();
-    await expect(player.locator('.srch__art.is-preview')).toHaveCount(0);
+    await player.evaluate(async (id) => {
+      const shelf = (window as unknown as { NP_HUB_SHELF?: { open(playlistId: string): Promise<void> } }).NP_HUB_SHELF;
+      if (!shelf) throw new Error('The paired Hub shelf is not ready.');
+      await shelf.open(id);
+    }, playlist.id);
+    await expect(player.locator('#libScopeLabel')).toHaveText('Journey Public Domain');
+    const row = player.locator('#libraryRows tr:has(.lib-title:text-is("Paper Harbour"))');
+    await expect(row, 'the paired player opened the Hub’s playlist entry').toBeVisible();
+    await row.click();
+    await expect.poll(() => player.evaluate(() => (window as unknown as { NP_PLAYER: { playing(): boolean } }).NP_PLAYER.playing())).toBe(true);
+    await expect.poll(() => player.evaluate(() => (window as unknown as { NP_PLAYER: { position(): number } }).NP_PLAYER.position())).toBeGreaterThan(0);
     // Leave the page before the step ends: an audio element that streamed through the service
     // worker's range bridge keeps the context's teardown waiting otherwise (observed: a clean
     // 147-second run followed by browserContext.close hanging the full timeout).

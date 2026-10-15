@@ -20711,13 +20711,62 @@ var CatalogArtistDetail = external_exports.object({
   albums: external_exports.array(CatalogAlbum),
   albumsPage: CatalogPage
 });
+var SavedCatalogWebUrl = external_exports.string().max(2048).url().refine((url2) => /^https?:\/\//i.test(url2), "Expected an HTTP(S) URL");
+var SavedCatalogImageUrl = external_exports.string().max(2048).refine(
+  (url2) => SavedCatalogWebUrl.safeParse(url2).success || /^data:image\/(?:svg\+xml|png|jpe?g|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/i.test(url2),
+  "Expected an HTTP(S) URL or a small inline image"
+);
+var SavedCatalogSource = CatalogSource.extend({
+  url: SavedCatalogWebUrl,
+  previewUrl: SavedCatalogWebUrl.nullable().default(null)
+});
 var SavedCollection = external_exports.object({
-  ref: CatalogCollectionRef,
+  ref: CatalogCollectionRef.extend({ url: SavedCatalogWebUrl }),
   savedAt: IsoDateTime,
-  artworkUrl: external_exports.string().max(2048).nullable().default(null),
+  artworkUrl: SavedCatalogImageUrl.nullable().default(null),
   /** The first four songs' artwork, in order: the 2×2 mosaic when the list has no cover of its own. */
-  covers: external_exports.array(external_exports.string().max(2048)).max(4).default([]),
+  covers: external_exports.array(SavedCatalogImageUrl).max(4).default([]),
   trackCount: external_exports.number().int().nonnegative().nullable().default(null)
+});
+var SavedTrackIdentity = external_exports.string().min(8).max(320).regex(/^(?:isrc:[A-Z]{2}[A-Z0-9]{3}\d{7}|musicbrainz:[0-9a-f-]{36}|provider:[a-z][a-z0-9-]{0,39}:[^\s]{1,260}|sha256:[0-9a-f]{64})$/i);
+var SavedSongSnapshot = external_exports.object({
+  id: external_exports.string().min(1).max(260),
+  title: external_exports.string().min(1).max(300),
+  artist: external_exports.string().min(1).max(300),
+  artists: external_exports.array(external_exports.string().max(300)).max(20).default([]),
+  album: external_exports.string().max(300).nullable().default(null),
+  albumArtist: external_exports.string().max(300).nullable().default(null),
+  durationMs: external_exports.number().int().nonnegative().nullable().default(null),
+  isrc: external_exports.string().regex(/^[A-Z]{2}[A-Z0-9]{3}\d{7}$/i).nullable().default(null),
+  musicbrainzRecordingId: external_exports.uuid().nullable().default(null),
+  contentHash: external_exports.string().regex(/^[0-9a-f]{64}$/i).nullable().default(null),
+  providerIds: external_exports.record(external_exports.string().regex(/^[a-z][a-z0-9-]{1,31}$/), external_exports.array(external_exports.string().min(1).max(200)).max(20)).refine((ids) => Object.keys(ids).length <= 20, "At most 20 provider IDs").default({}),
+  artworkUrl: SavedCatalogImageUrl.nullable().default(null),
+  releaseDate: external_exports.string().regex(/^\d{4}(-\d{2}(-\d{2})?)?$/).nullable().default(null),
+  year: external_exports.number().int().min(1e3).max(3e3).nullable().default(null),
+  genre: external_exports.string().max(100).nullable().default(null),
+  label: external_exports.string().max(300).nullable().default(null),
+  explicit: external_exports.boolean().nullable().default(null),
+  sources: external_exports.array(SavedCatalogSource).max(20).default([])
+});
+var SavedTrack = external_exports.object({
+  kind: external_exports.literal("track"),
+  identityKey: SavedTrackIdentity,
+  track: SavedSongSnapshot,
+  savedAt: IsoDateTime
+}).strict();
+var SavedCatalogItem = external_exports.union([SavedCollection, SavedTrack]);
+var SavedCatalogItemRef = external_exports.union([
+  external_exports.object({ kind: external_exports.literal("track"), identityKey: SavedTrackIdentity }),
+  CatalogCollectionRef.pick({ platform: true, id: true }).extend({ kind: external_exports.literal("album") }),
+  CatalogCollectionRef.pick({ platform: true, id: true }).extend({ kind: external_exports.literal("playlist") })
+]);
+var SavedCatalogDeleteRequest = SavedCatalogItemRef.and(external_exports.object({ at: IsoDateTime.optional() }));
+var SavedCatalogTombstone = external_exports.object({ key: external_exports.string().min(1).max(320), at: IsoDateTime });
+var SavedCatalogItemList = external_exports.object({
+  items: external_exports.array(SavedCatalogItem),
+  tombstones: external_exports.array(SavedCatalogTombstone).default([]),
+  shared: external_exports.array(SavedCatalogItem).default([])
 });
 var SavedCollectionList = external_exports.object({ items: external_exports.array(SavedCollection), shared: external_exports.array(SavedCollection).default([]) });
 var CatalogCollection = external_exports.object({
@@ -20773,6 +20822,12 @@ var CatalogEnrichRequest = external_exports.object({
 var CatalogEnrichment = external_exports.object({
   isrc: external_exports.string().max(12).nullable(),
   musicbrainzRecordingId: external_exports.string().max(40).nullable(),
+  /** Credited artist line and ordered names when MusicBrainz found the same recording. */
+  artist: external_exports.string().max(300).nullable().default(null),
+  artists: external_exports.array(external_exports.string().max(300)).max(20).default([]),
+  featured: external_exports.array(external_exports.string().max(300)).max(19).default([]),
+  album: external_exports.string().max(300).nullable().default(null),
+  albumArtist: external_exports.string().max(300).nullable().default(null),
   genre: external_exports.string().max(100).nullable(),
   genres: external_exports.array(external_exports.string().max(100)).max(10),
   label: external_exports.string().max(300).nullable(),
@@ -20783,17 +20838,20 @@ var CatalogEnrichment = external_exports.object({
 var CatalogSettingsView = external_exports.object({
   /** Write synced or plain lyrics (LRCLIB) into a catalog download's tags. Default on. */
   embedLyrics: external_exports.boolean(),
+  /** After starring a catalog item, ask for a rights basis before queuing its audio. Default off. */
+  autoDownloadStars: external_exports.boolean(),
   providers: external_exports.record(CatalogProviderId, external_exports.boolean()),
   /** SongLink closed keyless access in 2026; with a key it adds Tidal, Qobuz and Amazon links. */
   odesliKeyConfigured: external_exports.boolean()
 });
 var CatalogSettingsInput = external_exports.object({
   embedLyrics: external_exports.boolean().optional(),
+  autoDownloadStars: external_exports.boolean().optional(),
   providers: external_exports.partialRecord(CatalogProviderId, external_exports.boolean()).optional(),
   /** Write-only. Empty string clears it. */
   odesliKey: external_exports.string().max(200).optional()
 });
-var CATALOG_API_HOSTS = ["itunes.apple.com", "api.deezer.com", "musicbrainz.org", "coverartarchive.org", "api.song.link", "lrclib.net", "music.apple.com"];
+var CATALOG_API_HOSTS = ["itunes.apple.com", "api.deezer.com", "musicbrainz.org", "coverartarchive.org", "api.song.link", "lrclib.net", "music.apple.com", "open.spotify.com"];
 var HELPER_CATALOG_ROUTES = {
   search: "/helper/v1/catalog/search",
   album: "/helper/v1/catalog/album",
@@ -21262,17 +21320,18 @@ var routes = {
   catalogArtist: defineRoute({ method: "GET", path: "/catalog/artist", operationId: "catalogArtist", summary: "An artist by platform:id: picture, top tracks and albums (paged)", tags: ["catalog"], auth: "admin-or-device", scopes: ["search:use"], rateLimit: "search", query: CatalogArtistRequest, response: CatalogArtistDetail }),
   catalogResolve: defineRoute({ method: "GET", path: "/catalog/resolve", operationId: "catalogResolve", summary: "What a pasted music link is: a track, or an album or playlist with every song (paged), read keylessly (public APIs, yt-dlp, spotDL)", tags: ["catalog"], auth: "admin-or-device", scopes: ["search:use"], rateLimit: "search", query: CatalogResolveRequest, response: CatalogResolveResult }),
   catalogLyrics: defineRoute({ method: "GET", path: "/catalog/lyrics", operationId: "catalogLyrics", summary: "Synced and plain lyrics from LRCLIB", tags: ["catalog"], auth: "admin-or-device", scopes: ["search:use"], rateLimit: "search", query: CatalogLyricsRequest, response: CatalogLyrics }),
-  catalogEnrich: defineRoute({ method: "GET", path: "/catalog/enrich", operationId: "catalogEnrich", summary: "Genre, label and year from MusicBrainz by ISRC, and the song on other platforms", tags: ["catalog"], auth: "admin-or-device", scopes: ["search:use"], rateLimit: "search", query: CatalogEnrichRequest, response: CatalogEnrichment }),
-  catalogDownload: defineRoute({ method: "POST", path: "/catalog/download", operationId: "catalogDownload", summary: "Queue a catalog track through the download queue, from its best downloadable source, tagged with ISRC, genre, label, year and (setting) lyrics", tags: ["catalog", "downloads"], auth: "admin-or-device", scopes: ["downloads:request"], rateLimit: "write", body: external_exports.object({ track: CatalogTrack, authorization: DownloadAuthorizationInput, target: DownloadTargetInput }), response: external_exports.object({ job: DownloadJob, source: CatalogSource, embedded: external_exports.object({ isrc: external_exports.boolean(), genre: external_exports.boolean(), label: external_exports.boolean(), year: external_exports.boolean(), lyrics: external_exports.boolean() }) }), responseStatus: 201 }),
-  catalogSettingsGet: defineRoute({ method: "GET", path: "/catalog/settings", operationId: "getCatalogSettings", summary: "Which catalog services are asked, lyrics embedding, and whether a SongLink key is set", tags: ["catalog"], auth: "admin", response: CatalogSettingsView }),
-  catalogSettingsPut: defineRoute({ method: "PUT", path: "/catalog/settings", operationId: "putCatalogSettings", summary: "Change catalog services, lyrics embedding, or the (write-only) SongLink key", tags: ["catalog"], auth: "admin", rateLimit: "write", body: CatalogSettingsInput, response: CatalogSettingsView }),
+  catalogEnrich: defineRoute({ method: "GET", path: "/catalog/enrich", operationId: "catalogEnrich", summary: "Credited artists, album, genre, label and release year from a matched MusicBrainz recording, and other platform links", tags: ["catalog"], auth: "admin-or-device", scopes: ["search:use"], rateLimit: "search", query: CatalogEnrichRequest, response: CatalogEnrichment }),
+  catalogDownload: defineRoute({ method: "POST", path: "/catalog/download", operationId: "catalogDownload", summary: "Queue a catalog track through the download queue from an authorized source, tagged with ISRC, genre, label, year and (setting) lyrics", tags: ["catalog", "downloads"], auth: "admin-or-device", scopes: ["downloads:request"], rateLimit: "write", body: external_exports.object({ track: CatalogTrack, source: CatalogSource.optional(), authorization: DownloadAuthorizationInput, target: DownloadTargetInput }), response: external_exports.object({ job: DownloadJob, source: CatalogSource, embedded: external_exports.object({ isrc: external_exports.boolean(), genre: external_exports.boolean(), label: external_exports.boolean(), year: external_exports.boolean(), lyrics: external_exports.boolean() }) }), responseStatus: 201 }),
+  catalogDownloadPreflight: defineRoute({ method: "POST", path: "/catalog/download/preflight", operationId: "preflightCatalogDownloadBatch", summary: `Check every selected catalog source against one rights basis before any collection download is queued (up to ${CATALOG_COLLECTION_CAP} tracks)`, tags: ["catalog", "downloads"], auth: "admin-or-device", scopes: ["downloads:request"], rateLimit: "write", body: external_exports.object({ items: external_exports.array(external_exports.object({ track: CatalogTrack, source: CatalogSource })).min(1).max(CATALOG_COLLECTION_CAP), authorization: DownloadAuthorizationInput }), response: external_exports.object({ authorized: external_exports.literal(true), checked: external_exports.number().int().positive() }) }),
+  catalogSettingsGet: defineRoute({ method: "GET", path: "/catalog/settings", operationId: "getCatalogSettings", summary: "Which catalog services are asked, lyrics embedding, auto-download after a confirmed star, and whether a SongLink key is set", tags: ["catalog"], auth: "admin", response: CatalogSettingsView }),
+  catalogSettingsPut: defineRoute({ method: "PUT", path: "/catalog/settings", operationId: "putCatalogSettings", summary: "Change catalog services, lyrics embedding, auto-download after a confirmed star, or the (write-only) SongLink key", tags: ["catalog"], auth: "admin", rateLimit: "write", body: CatalogSettingsInput, response: CatalogSettingsView }),
   /*
-   * Starred albums and playlists (UX-SEARCH-005). The admin's own; a device's own (`library:sync`),
-   * with the admin's starred lists as `shared`, so a player can sync stars (DEC-041).
+   * One editable shared catalog star set for all clients (UX-SEARCH-005). Devices and admins use
+   * the same `library:sync`-authorized endpoints; deletion timestamps prevent offline resurrection.
    */
-  catalogSavedList: defineRoute({ method: "GET", path: "/catalog/saved", operationId: "listSavedCollections", summary: "The albums and playlists the caller starred, newest first; for a device, the hub admin\u2019s starred lists as `shared`", tags: ["catalog"], auth: "admin-or-device", scopes: ["library:sync"], response: SavedCollectionList }),
-  catalogSavedPut: defineRoute({ method: "PUT", path: "/catalog/saved", operationId: "saveCollection", summary: "Star an album or playlist in the caller\u2019s own library (by its ref; saving it again refreshes it)", tags: ["catalog"], auth: "admin-or-device", scopes: ["library:sync"], rateLimit: "write", body: SavedCollection, response: SavedCollectionList }),
-  catalogSavedDelete: defineRoute({ method: "DELETE", path: "/catalog/saved", operationId: "unsaveCollection", summary: "Un-star an album or playlist in the caller\u2019s own library", tags: ["catalog"], auth: "admin-or-device", scopes: ["library:sync"], rateLimit: "write", query: CatalogCollectionRef.pick({ platform: true, kind: true, id: true }), response: SavedCollectionList }),
+  catalogSavedList: defineRoute({ method: "GET", path: "/catalog/saved", operationId: "listSavedCatalogItems", summary: "The shared songs, albums and playlists starred by every paired client, newest first, with deletion tombstones", tags: ["catalog"], auth: "admin-or-device", scopes: ["library:sync"], response: SavedCatalogItemList }),
+  catalogSavedPut: defineRoute({ method: "PUT", path: "/catalog/saved", operationId: "saveCatalogItem", summary: "Star a metadata-only song, album or playlist in the shared library", tags: ["catalog"], auth: "admin-or-device", scopes: ["library:sync"], rateLimit: "write", body: SavedCatalogItem, response: SavedCatalogItemList }),
+  catalogSavedDelete: defineRoute({ method: "DELETE", path: "/catalog/saved", operationId: "unsaveCatalogItem", summary: "Un-star a song, album or playlist from the shared library, respecting the tombstone timestamp", tags: ["catalog"], auth: "admin-or-device", scopes: ["library:sync"], rateLimit: "write", query: SavedCatalogDeleteRequest, response: SavedCatalogItemList }),
   /*
    * The hub's playlist folder (DEC-041; UX-PL-001…): one .m3u8 and one .airwave.json per playlist in
    * `<data>/playlists` (Music ▸ Playlists). A device with `playlists:use` reads every list, makes new
@@ -22380,10 +22439,6 @@ import { homedir as homedir2, tmpdir as tmpdir2 } from "node:os";
 import { join as join7, extname as extname2 } from "node:path";
 import { randomUUID } from "node:crypto";
 
-// src/tools.ts
-import { existsSync as existsSync2 } from "node:fs";
-import { join as join6 } from "node:path";
-
 // ../packages/domain/src/tool-install/install.ts
 import { createHash } from "node:crypto";
 import { chmodSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, statSync as statSync3, writeFileSync } from "node:fs";
@@ -22811,7 +22866,28 @@ function isBinEntry(entryName, file2) {
   return parts.length >= 2 && parts.length <= 3 && parts[parts.length - 2].toLowerCase() === "bin" && parts[parts.length - 1].toLowerCase() === file2.toLowerCase();
 }
 
+// ../packages/domain/src/tool-install/yt-dlp-runtime.ts
+function checkedRuntimePath(runtimePath) {
+  if (!runtimePath.trim() || [...runtimePath].some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)) throw new Error("A valid Node runtime path is required.");
+  return runtimePath;
+}
+function withYtDlpJsRuntime(args, runtimePath) {
+  const separator = args.indexOf("--");
+  if (separator === args.length - 1) throw new Error("yt-dlp arguments must keep the URL after `--`.");
+  if (args.includes("--js-runtimes")) return [...args];
+  const runtime = checkedRuntimePath(runtimePath);
+  if (separator < 0) return [args[0], "--js-runtimes", `node:${runtime}`, ...args.slice(1)];
+  return [...args.slice(0, separator), "--js-runtimes", `node:${runtime}`, ...args.slice(separator)];
+}
+function spotdlYtDlpArgs(runtimePath, extraArgs = []) {
+  const runtime = checkedRuntimePath(runtimePath);
+  const args = [...extraArgs, "--js-runtimes", `node:${runtime}`];
+  return args.map((arg) => `"${arg.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`).join(" ");
+}
+
 // src/tools.ts
+import { existsSync as existsSync2 } from "node:fs";
+import { join as join6 } from "node:path";
 function installHint(id, installable) {
   if (installable) return `Not set up yet. The helper downloads ${id} from its project\u2019s GitHub release and checks it against the published SHA-256 before using it.`;
   if (id === "ffmpeg") return "Not installed. Without it nothing can be converted and yt-dlp takes whatever single audio stream a site offers. Install it with your package manager: brew install ffmpeg, apt install ffmpeg or dnf install ffmpeg.";
@@ -23208,7 +23284,7 @@ var MAX_INFO_BYTES = 256 * 1024 * 1024;
 var FFMPEG_MISSING_NOTE = "Saved as the site sent it: FFmpeg is not on this PC, so there is no cover art and the title, artist and date were not written into the file.";
 var PLAYLIST_CAP = 200;
 function ytDlpInfoArgs(job) {
-  return ["--ignore-config", "--no-colors", "--no-cache-dir", "--playlist-end", String(PLAYLIST_CAP), "--dump-single-json", "--", urlArgument(job.url)];
+  return withYtDlpJsRuntime(["--ignore-config", "--no-colors", "--no-cache-dir", "--playlist-end", String(PLAYLIST_CAP), "--dump-single-json", "--", urlArgument(job.url)], process.execPath);
 }
 function ytDlpArgs(job, directory, ffmpeg, limits = {}, source2 = {}) {
   const url2 = urlArgument(job.url);
@@ -23236,7 +23312,7 @@ function ytDlpArgs(job, directory, ffmpeg, limits = {}, source2 = {}) {
   if (rate !== null) args.push("--limit-rate", `${rate}K`);
   if (source2.infoFile) args.push("--no-clean-infojson", "--load-info-json", source2.infoFile);
   else args.push("--", url2);
-  return args;
+  return withYtDlpJsRuntime(args, process.execPath);
 }
 var UNUSED_INFO_FIELDS = ["automatic_captions", "subtitles", "heatmap", "requested_subtitles", "description"];
 var LOAD_TIME_FIELDS = /* @__PURE__ */ new Set(["requested_downloads", "requested_formats", "requested_entries", "filepath", "_filename", "filename", "_format_sort_fields"]);
@@ -23260,17 +23336,18 @@ function spotdlArgs(job, directory, ffmpeg, limits = {}) {
   const args = ["download", urlArgument(job.url), "--output", join7(directory, "{artists} - {title}.{output-ext}"), "--format", job.format === "original" ? "mp3" : job.format];
   if (ffmpeg.path) args.push("--ffmpeg", ffmpeg.path);
   const rate = rateLimitOf(limits.rateLimitKBps);
-  if (rate !== null) args.push("--yt-dlp-args", `--limit-rate ${rate}K`);
+  args.push("--yt-dlp-args", spotdlYtDlpArgs(process.execPath, rate !== null ? ["--limit-rate", `${rate}K`] : []));
   return args;
 }
 function spotdlSaveArgs(url2, saveFile, options = {}) {
-  return ["save", urlArgument(url2), "--save-file", saveFile, ...options.preload ? ["--preload"] : []];
+  return ["save", urlArgument(url2), "--save-file", saveFile, ...options.ffmpeg ? ["--ffmpeg", options.ffmpeg] : [], ...options.preload ? ["--preload"] : [], "--yt-dlp-args", spotdlYtDlpArgs(process.execPath)];
 }
 function childEnv(source2 = process.env, overrides = {}) {
   const keep = ["PATH", "Path", "SYSTEMROOT", "SystemRoot", "COMSPEC", "TEMP", "TMP", "TMPDIR", "LANG", "LC_ALL", "HOME", "USERPROFILE"];
   const env = {};
   for (const key of keep) if (source2[key]) env[key] = source2[key];
   env["PYTHONDONTWRITEBYTECODE"] = "1";
+  if (process.versions["electron"]) env["ELECTRON_RUN_AS_NODE"] = "1";
   return { ...env, ...overrides };
 }
 function killTree(child) {
@@ -23346,8 +23423,8 @@ function sourceOf(url2) {
 }
 function ytDlpResolveArgs(url2, options = {}) {
   if (!/^https?:\/\//i.test(url2)) throw new Error("Only http(s) addresses can be handed to a tool.");
-  if (options.items?.length) return ["--ignore-config", "--no-colors", "--no-cache-dir", "--no-warnings", "--skip-download", "--playlist-items", options.items.map((n) => String(Math.trunc(n))).join(","), "--dump-single-json", "--", url2];
-  return ["--ignore-config", "--no-colors", "--no-cache-dir", "--no-warnings", "--skip-download", "--flat-playlist", "--playlist-end", String(options.cap ?? HELPER_RESOLVE_CAP), "--dump-single-json", "--", url2];
+  if (options.items?.length) return withYtDlpJsRuntime(["--ignore-config", "--no-colors", "--no-cache-dir", "--no-warnings", "--skip-download", "--playlist-items", options.items.map((n) => String(Math.trunc(n))).join(","), "--dump-single-json", "--", url2], process.execPath);
+  return withYtDlpJsRuntime(["--ignore-config", "--no-colors", "--no-cache-dir", "--no-warnings", "--skip-download", "--flat-playlist", "--playlist-end", String(options.cap ?? HELPER_RESOLVE_CAP), "--dump-single-json", "--", url2], process.execPath);
 }
 function str(value, max = 300) {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : null;
@@ -23553,12 +23630,14 @@ function createResolver(options) {
     if (source2 === "spotify") {
       const spotdl = tools.spotdl;
       if (!spotdl.present || !spotdl.path) throw new ResolveError(spotdl.installHint ?? "spotDL is not set up on this PC yet.", "tool-missing");
+      const ffmpeg = tools.ffmpeg;
+      if (!ffmpeg.present || !ffmpeg.path) throw new ResolveError(ffmpeg.installHint ?? "spotDL needs FFmpeg, and there is none on this PC.", "tool-missing");
       return slot(async () => {
         const dir = join8(options.workDir, "resolve", randomUUID2());
         mkdirSync3(dir, { recursive: true });
         try {
           const file2 = join8(dir, "songs.spotdl");
-          await run2(spotdl.path, spotdlSaveArgs(url2.toString(), file2, { preload: match && /^\/(?:intl-[a-z-]+\/)?track\//i.test(url2.pathname) }), childEnv(process.env, { HOME: dir, USERPROFILE: dir }), Math.max(timeouts.spotdl, longer));
+          await run2(spotdl.path, spotdlSaveArgs(url2.toString(), file2, { preload: match && /^\/(?:intl-[a-z-]+\/)?track\//i.test(url2.pathname), ffmpeg: ffmpeg.path }), childEnv(process.env, { HOME: dir, USERPROFILE: dir }), Math.max(timeouts.spotdl, longer));
           let songs;
           try {
             songs = JSON.parse(readFileSync2(file2, "utf8"));
@@ -23594,7 +23673,7 @@ function createResolver(options) {
       const tools = await options.tools();
       const ytDlp = tools["yt-dlp"];
       if (!ytDlp.present || !ytDlp.path) throw new ResolveError(ytDlp.installHint ?? "yt-dlp is not set up on this PC yet.", "tool-missing");
-      const stdout = await slot(() => run2(ytDlp.path, [...args], childEnv(), timeouts.ytDlp, signal));
+      const stdout = await slot(() => run2(ytDlp.path, withYtDlpJsRuntime(args, process.execPath), childEnv(), timeouts.ytDlp, signal));
       try {
         return JSON.parse(stdout);
       } catch {
@@ -25357,27 +25436,26 @@ var MusicBrainzClient = class {
     return full ? [{ platform: "musicbrainz", id, url: `https://musicbrainz.org/recording/${id}`, previewUrl: null, matchedBy: "isrc" }, ...sourcesFromRelations(full)] : [];
   }
   /**
-   * Genre, label and year for a recording (by ISRC, or by title and artist), and its links.
+   * Credited artists, album, genre, label and year for a confidently matched recording (by ISRC, or exact title, artist and duration), and its links.
    * Three paced calls at most: the lookup, the recording, its first official release's labels.
    */
   async enrich(input2, signal) {
-    const empty = { isrc: input2.isrc ?? null, musicbrainzRecordingId: null, genre: null, genres: [], label: null, releaseDate: null, year: null, sources: [] };
-    let candidates = [];
-    if (input2.isrc) candidates = await this.byIsrc(input2.isrc, signal);
-    if (!candidates.length && input2.title && input2.artist) {
-      candidates = await this.searchRecordings(`recording:"${luceneEscape(input2.title)}" AND artist:"${luceneEscape(input2.artist)}"`, 0, 5, signal);
-      if (input2.durationMs) {
-        const near = candidates.filter((c) => {
-          const length = num2(c["length"]);
-          return length === null || Math.abs(length - input2.durationMs) <= 5e3;
-        });
-        if (near.length) candidates = near;
-      }
+    const empty = { isrc: input2.isrc ?? null, musicbrainzRecordingId: null, artist: null, artists: [], featured: [], album: null, albumArtist: null, genre: null, genres: [], label: null, releaseDate: null, year: null, sources: [] };
+    let candidates = input2.isrc ? await this.byIsrc(input2.isrc, signal) : [];
+    if (!candidates.length && input2.title && input2.artist && input2.durationMs) {
+      const searched = await this.searchRecordings(`recording:"${luceneEscape(input2.title)}" AND artist:"${luceneEscape(input2.artist)}"`, 0, 5, signal);
+      candidates = searched.filter((row) => {
+        const candidate = musicbrainzTrack(row);
+        return candidate !== null && sameRecording({ isrc: null, title: input2.title, artist: input2.artist, durationMs: input2.durationMs }, candidate);
+      });
     }
+    if (!candidates.length) return empty;
     const pick2 = [...candidates].sort((a, b) => String(a["first-release-date"] || "9999").localeCompare(String(b["first-release-date"] || "9999")))[0];
     const id = str2(pick2?.["id"], 40);
     if (!id) return empty;
     const full = await this.recording(id, signal) ?? pick2;
+    const fullTrack = musicbrainzTrack(full);
+    if (!fullTrack) return empty;
     const release = firstRelease(full);
     let label = null;
     const releaseId = str2(release?.["id"], 40);
@@ -25387,16 +25465,22 @@ var MusicBrainzClient = class {
     }
     const genres = genresOf(full);
     const artistGenres = arr(full["artist-credit"]).flatMap((c) => isObject2(c["artist"]) ? genresOf(c["artist"]) : []);
-    const releaseDate = calendarDate(full["first-release-date"]) ?? calendarDate(release?.["date"]);
+    const releaseDate = calendarDate(full["first-release-date"]) ?? calendarDate(release?.["date"]) ?? fullTrack.releaseDate;
+    const artists = fullTrack.artists.slice(0, 20);
     const isrcs = Array.isArray(full["isrcs"]) ? full["isrcs"].filter((i) => typeof i === "string") : [];
     return {
       isrc: input2.isrc ?? isrcs[0] ?? null,
       musicbrainzRecordingId: id,
-      genre: genres[0] ?? artistGenres[0] ?? null,
+      artist: fullTrack.artist,
+      artists,
+      featured: artists.slice(1, 20),
+      album: fullTrack.album,
+      albumArtist: null,
+      genre: genres[0] ?? artistGenres[0] ?? fullTrack.genre,
       genres: genres.length ? genres : artistGenres.slice(0, 10),
       label,
       releaseDate,
-      year: yearOf(releaseDate),
+      year: yearOf(releaseDate) ?? fullTrack.year,
       sources: [{ platform: "musicbrainz", id, url: `https://musicbrainz.org/recording/${id}`, previewUrl: null, matchedBy: input2.isrc ? "isrc" : "metadata" }, ...sourcesFromRelations(full)]
     };
   }
@@ -25541,6 +25625,113 @@ async function fetchApplePlaylistPage(fetchImpl, url2, playlistId, options) {
   }
 }
 
+// ../packages/domain/src/catalog/providers/spotify-embed.ts
+var SPOTIFY_ID = /^[A-Za-z0-9]{10,40}$/;
+var SPOTIFY_EMBED_TRACK_LIMIT = 100;
+function nextData(html) {
+  const scripts = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
+  for (let match = scripts.exec(html); match; match = scripts.exec(html)) {
+    if (!/\bid=["']__NEXT_DATA__["']/i.test(match[1] ?? "")) continue;
+    try {
+      const value = JSON.parse(match[2] ?? "");
+      return isObject2(value) ? value : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+function entityFrom(html) {
+  const root = nextData(html);
+  const props = root && isObject2(root["props"]) ? root["props"] : null;
+  const pageProps = props && isObject2(props["pageProps"]) ? props["pageProps"] : null;
+  const state = pageProps && isObject2(pageProps["state"]) ? pageProps["state"] : null;
+  const data = state && isObject2(state["data"]) ? state["data"] : null;
+  return data && isObject2(data["entity"]) ? data["entity"] : null;
+}
+function bestImage(value) {
+  if (!Array.isArray(value)) return null;
+  const images = value.filter(isObject2).filter((image) => webUrl2(image["url"]));
+  images.sort((a, b) => (num2(b["maxWidth"]) ?? num2(b["width"]) ?? 0) - (num2(a["maxWidth"]) ?? num2(a["width"]) ?? 0));
+  return images.length ? webUrl2(images[0]["url"]) : null;
+}
+function artworkOf2(entity) {
+  const visual = isObject2(entity["visualIdentity"]) ? entity["visualIdentity"] : null;
+  const cover = isObject2(entity["coverArt"]) ? entity["coverArt"] : null;
+  return bestImage(visual?.["image"]) ?? bestImage(cover?.["sources"]);
+}
+function artistsOf(value) {
+  if (Array.isArray(value)) return value.map((item) => isObject2(item) ? str2(item["name"]) : str2(item)).filter((name) => Boolean(name));
+  const joined = str2(value)?.replace(/\u00a0/g, " ");
+  return joined ? joined.split(/\s*,\s*/).filter(Boolean) : [];
+}
+function ownerOf(entity) {
+  const authors = artistsOf(entity["authors"]);
+  if (authors.length) return authors.join(", ");
+  const subtitle = str2(entity["subtitle"]);
+  return subtitle && !/^spotify$/i.test(subtitle) ? subtitle.replace(/\u00a0/g, " ") : null;
+}
+function dateOf(value) {
+  return calendarDate(isObject2(value) ? value["isoString"] : value);
+}
+function trackFrom(entity, fallbackArtwork, album, trackNumber) {
+  const uri = str2(entity["uri"], 100);
+  const uriId = uri ? /^spotify:track:([A-Za-z0-9]{10,40})$/.exec(uri)?.[1] : null;
+  const id = uriId ?? (SPOTIFY_ID.test(str2(entity["id"], 40) ?? "") ? str2(entity["id"], 40) : null);
+  const title = str2(entity["title"]) ?? str2(entity["name"]);
+  if (!id || !title) return null;
+  const artists = artistsOf(entity["artists"] ?? entity["subtitle"]);
+  const durationMs = num2(entity["duration"]);
+  const entityArtwork = artworkOf2(entity);
+  const albumValue = entity["album"];
+  const albumName = isObject2(albumValue) ? str2(albumValue["title"]) ?? str2(albumValue["name"]) : str2(albumValue);
+  return {
+    url: `https://open.spotify.com/track/${id}`,
+    title,
+    artist: artists[0] ?? null,
+    featured: artists.slice(1, 20),
+    album: albumName ?? album,
+    durationSec: durationMs === null || durationMs === 0 ? null : durationMs / 1e3,
+    date: dateOf(entity["releaseDate"]),
+    artworkUrl: entityArtwork ?? fallbackArtwork,
+    trackNumber,
+    explicit: typeof entity["isExplicit"] === "boolean" ? entity["isExplicit"] : null
+  };
+}
+function readSpotifyEmbed(html, url2) {
+  const link = parseMusicLink(url2);
+  if (!link || link.platform !== "spotify" || !link.id || !["track", "album", "playlist"].includes(link.kind)) return null;
+  const entity = entityFrom(html);
+  if (!entity || str2(entity["id"], 40) !== link.id || str2(entity["type"]) !== link.kind) return null;
+  if (!SPOTIFY_ID.test(link.id)) return null;
+  if (link.kind === "track") {
+    const track = trackFrom(entity, artworkOf2(entity), null, null);
+    return track ? { kind: "track", url: link.url, track } : null;
+  }
+  const trackList = entity["trackList"];
+  if (!Array.isArray(trackList)) return null;
+  const artworkUrl = artworkOf2(entity);
+  const title = str2(entity["title"]) ?? str2(entity["name"]) ?? (link.kind === "album" ? "Album" : "Playlist");
+  const tracks = trackList.filter(isObject2).map((track, index) => trackFrom(track, artworkUrl, link.kind === "album" ? title : null, link.kind === "album" ? index + 1 : null)).filter((track) => Boolean(track));
+  const declaredTotal = num2(entity["trackCount"]);
+  const knownTotal = declaredTotal !== null && Number.isInteger(declaredTotal) ? declaredTotal : null;
+  const limit = Math.min(CATALOG_COLLECTION_CAP, SPOTIFY_EMBED_TRACK_LIMIT, knownTotal ?? Number.POSITIVE_INFINITY);
+  const entries = tracks.slice(0, limit);
+  const responseCapped = knownTotal === null && trackList.length >= SPOTIFY_EMBED_TRACK_LIMIT;
+  const total = knownTotal ?? (responseCapped ? null : tracks.length);
+  return {
+    kind: "collection",
+    url: link.url,
+    title,
+    owner: ownerOf(entity),
+    artworkUrl,
+    date: dateOf(entity["releaseDate"]),
+    entries,
+    total,
+    capped: tracks.length > entries.length || responseCapped || total !== null && total > entries.length
+  };
+}
+
 // ../packages/domain/src/catalog/engine.ts
 var ALL_SECTIONS = ["tracks", "artists", "albums", "playlists"];
 var ALL_PROVIDERS = ["itunes", "deezer", "musicbrainz", "youtube", "soundcloud"];
@@ -25586,6 +25777,7 @@ var CatalogEngine = class {
     this.lyricsCache = new TtlCache(24 * 36e5, 500, this.now);
     this.enrichCache = new TtlCache(24 * 36e5, 1e3, this.now);
     this.resolveCache = new TtlCache(10 * 6e4, 100, this.now);
+    this.spotifyEmbedCache = new TtlCache(10 * 6e4, 100, this.now);
     this.searchCache = new TtlCache(5 * 6e4, 300, this.now);
     this.linksCache = new TtlCache(24 * 36e5, 1e3, this.now);
     this.applePageCache = new TtlCache(10 * 6e4, 50, this.now);
@@ -25611,6 +25803,8 @@ var CatalogEngine = class {
   lyricsCache;
   enrichCache;
   resolveCache;
+  /** Public Spotify embeds are the keyless playlist path and metadata fallback for other Spotify links. */
+  spotifyEmbedCache;
   /**
    * A read list's rows, built once per read (the read itself is cached, so a list served page by page
    * is the same object each time). Rebuilding every row for each page made reading a whole list grow
@@ -26025,6 +26219,35 @@ var CatalogEngine = class {
     const byId = new Map(filled.map((t2) => [t2.id, t2]));
     return tracks.map((t2) => byId.get(t2.id) ?? t2);
   }
+  /** A pasted track gets the same bounded store hydration as a page, then MusicBrainz facts only for a verified recording. */
+  async withResolvedFacts(track, signal) {
+    const base = (await this.withFacts([track], signal))[0] ?? track;
+    if (this.options.enabled?.().musicbrainz === false || !base.title || !(base.artists[0] ?? base.artist).trim()) return base;
+    if (base.album && base.year && base.genre && base.label && base.artists.length > 1) return base;
+    let facts;
+    try {
+      facts = await this.enrich({
+        ...base.isrc ? { isrc: base.isrc } : {},
+        title: base.title,
+        artist: base.artists[0] ?? base.artist,
+        ...base.durationMs !== null ? { durationMs: base.durationMs } : {}
+      }, signal);
+    } catch {
+      return base;
+    }
+    if (!facts.musicbrainzRecordingId) return base;
+    const releaseDate = (base.releaseDate?.length ?? 0) >= (facts.releaseDate?.length ?? 0) ? base.releaseDate : facts.releaseDate;
+    return {
+      ...base,
+      artists: facts.artists.length > base.artists.length ? facts.artists : base.artists,
+      album: base.album ?? facts.album,
+      albumArtist: base.albumArtist ?? facts.albumArtist,
+      releaseDate,
+      year: base.year ?? facts.year ?? null,
+      genre: base.genre ?? facts.genre,
+      label: base.label ?? facts.label
+    };
+  }
   async artist(id, input2 = {}, signal) {
     const { platform, native } = this.split(id);
     const albumsOffset = input2.albumsOffset ?? 0;
@@ -26077,7 +26300,7 @@ var CatalogEngine = class {
     if (!link.id) return answer({ kind: "unsupported", reason: "A Deezer short link says nothing until it is opened. Open it, then paste the address it goes to." });
     if (link.kind === "track") {
       const track = await this.upstream(() => this.deezer.track(link.id, signal), "Deezer");
-      return track ? answer({ kind: "track", track }) : answer({ kind: "unavailable", reason: "Deezer has no song at that address." });
+      return track ? answer({ kind: "track", track: await this.withResolvedFacts(track, signal) }) : answer({ kind: "unavailable", reason: "Deezer has no song at that address." });
     }
     if (link.kind === "album") {
       const detail = await this.album(`deezer:${link.id}`, offset, limit, signal);
@@ -26108,7 +26331,7 @@ var CatalogEngine = class {
   async resolveApple(link, offset, limit, answer, signal) {
     if (link.kind === "track" && link.id) {
       const track = await this.upstream(() => this.itunes.track(link.id, signal), "Apple Music");
-      return track ? answer({ kind: "track", track }) : answer({ kind: "unavailable", reason: "Apple Music has no song at that address in this storefront." });
+      return track ? answer({ kind: "track", track: await this.withResolvedFacts(track, signal) }) : answer({ kind: "unavailable", reason: "Apple Music has no song at that address in this storefront." });
     }
     if (link.kind === "album" && link.id) {
       const detail = await this.album(`apple-music:${link.id}`, offset, limit, signal);
@@ -26125,23 +26348,40 @@ var CatalogEngine = class {
   async resolveWithTool(link, offset, limit, answer, signal) {
     const label = CATALOG_PLATFORM_LABELS[link.platform];
     const reader = this.options.linkReader;
-    if (!reader) return answer({ kind: "unsupported", reason: `${label} links are read by yt-dlp or spotDL, which are not available here.` });
     const match = link.platform === "spotify" && link.kind === "track";
-    let read;
-    try {
-      read = await this.resolveCache.get(`${link.url}|${match ? "match" : ""}`, () => match ? withBudget(signal, this.options.matchBudgetMs ?? MATCH_BUDGET_MS, (budget) => reader(link.url, { signal: budget, match })) : reader(link.url, { signal, match }));
-    } catch (error61) {
-      if (!match || signal?.aborted || error61 instanceof LinkReadError && error61.code === "tool-missing") return answer({ kind: "unavailable", reason: this.unreadable(link, error61) });
+    let read = null;
+    let failure = null;
+    if (link.platform === "spotify" && link.kind === "playlist" && link.id && !signal?.aborted) {
+      read = await this.spotifyEmbedCache.get(link.url, () => this.readSpotifyEmbedPage(link, signal)).catch(() => null);
+    }
+    if (reader && !read) {
       try {
-        read = await this.resolveCache.get(`${link.url}|`, () => reader(link.url, { signal, match: false }));
-      } catch (again) {
-        return answer({ kind: "unavailable", reason: this.unreadable(link, again) });
+        read = await this.resolveCache.get(`${link.url}|${match ? "match" : ""}`, () => match ? withBudget(signal, this.options.matchBudgetMs ?? MATCH_BUDGET_MS, (budget) => reader(link.url, { signal: budget, match })) : reader(link.url, { signal, match }));
+      } catch (error61) {
+        failure = error61;
+        if (match && !signal?.aborted && !(error61 instanceof LinkReadError && error61.code === "tool-missing")) {
+          try {
+            read = await this.resolveCache.get(`${link.url}|`, () => reader(link.url, { signal, match: false }));
+          } catch (again) {
+            failure = again;
+          }
+        }
       }
+    }
+    if (!read && link.platform === "spotify" && link.id && !signal?.aborted) {
+      read = await this.spotifyEmbedCache.get(link.url, () => this.readSpotifyEmbedPage(link, signal)).catch(() => null);
+    }
+    if (read?.kind === "collection" && link.platform === "spotify" && !read.entries.length && link.id && !signal?.aborted) {
+      read = await this.spotifyEmbedCache.get(link.url, () => this.readSpotifyEmbedPage(link, signal)).catch(() => read);
+    }
+    if (!read) {
+      if (!reader) return answer({ kind: "unsupported", reason: `${label} links are read by yt-dlp or spotDL, which are not available here.` });
+      return answer({ kind: "unavailable", reason: this.unreadable(link, failure ?? new Error("No public Spotify embed data was available.")) });
     }
     const platform = link.platform;
     if (read.kind === "track") {
       const track = trackFromLink(read.track, { platform });
-      return track ? answer({ kind: "track", track }) : answer({ kind: "unavailable", reason: `${label} described nothing playable at that address.` });
+      return track ? answer({ kind: "track", track: await this.withResolvedFacts(track, signal) }) : answer({ kind: "unavailable", reason: `${label} described nothing playable at that address.` });
     }
     const listed = read;
     let built = this.listRows.get(listed);
@@ -26153,7 +26393,7 @@ var CatalogEngine = class {
           if (track) rows2.push({ track, bare: !e.title, position: i + 1 });
         });
         const all2 = rows2.map((r) => r.track);
-        await this.fillCovers(all2, reader, signal);
+        if (reader) await this.fillCovers(all2, reader, signal);
         all2.forEach((t2, i) => rows2[i].track = t2);
         return { rows: rows2, all: all2, covers: coversOf(all2) };
       })();
@@ -26162,7 +26402,7 @@ var CatalogEngine = class {
     }
     const { rows, all, covers } = await built;
     const page = pageOf(all, offset, limit, read.total ?? read.entries.length, read.capped || read.entries.length > CATALOG_COLLECTION_CAP || (read.total ?? 0) > CATALOG_COLLECTION_CAP);
-    page.tracks = await this.hydratePage(link, rows.slice(offset, offset + page.tracks.length), page.tracks, reader, signal);
+    if (reader) page.tracks = await this.hydratePage(link, rows.slice(offset, offset + page.tracks.length), page.tracks, reader, signal);
     const kind = link.kind === "album" ? "album" : "playlist";
     const collection = {
       ref: collectionRef(link, kind, read.title, read.owner),
@@ -26176,6 +26416,14 @@ var CatalogEngine = class {
       return answer({ kind: "artist", artist, collection });
     }
     return answer({ kind, collection });
+  }
+  /** Fetch metadata from Spotify's public embed page, under the catalog host allowlist. */
+  async readSpotifyEmbedPage(link, signal) {
+    if (!link.id || !["track", "album", "playlist"].includes(link.kind)) return null;
+    const url2 = `https://open.spotify.com/embed/${link.kind}/${encodeURIComponent(link.id)}`;
+    const { status, body } = await getText(this.options.fetch, url2, { timeoutMs: this.options.timeouts?.tools ?? 15e3, signal, accept: [403, 404] });
+    if (status === 403 || status === 404) return null;
+    return readSpotifyEmbed(body, link.url);
   }
   /**
    * A list whose entries came without artwork (a SoundCloud set lists addresses only) gets its first
@@ -26270,14 +26518,14 @@ var CatalogEngine = class {
       return answer({ kind: "album", collection: { ref: collectionRef(link, "album", found.title, found.artist), artworkUrl: found.artworkUrl, covers: found.artworkUrl ? [found.artworkUrl] : [], releaseDate: null, page: { tracks: [], offset: 0, limit: 1, total: null, hasMore: false, capped: false } }, reason: `${label} albums list their songs only when the same album is on Deezer.` });
     }
     const track = { id: `${link.platform}:${link.id ?? link.url}`, title: found.title, artist: found.artist ?? "", artists: found.artist ? [found.artist] : [], album: null, albumArtist: null, durationMs: null, isrc: null, artworkUrl: found.artworkUrl, releaseDate: null, year: null, trackNumber: null, discNumber: null, bpm: null, explicit: null, genre: null, label: null, sources, rank: 0 };
-    return answer({ kind: "track", track });
+    return answer({ kind: "track", track: await this.withResolvedFacts(track, signal) });
   }
   /* ---------------------------------------------------- lyrics, enrichment */
   lyrics(input2, signal) {
     const key = JSON.stringify([input2.title.toLowerCase(), input2.artist.toLowerCase(), input2.album?.toLowerCase() ?? null, input2.durationSec ?? null]);
     return this.lyricsCache.get(key, () => this.upstream(() => this.lrclib.lyrics(input2, signal), "LRCLIB"));
   }
-  /** MusicBrainz's genre, label and year for a song, and its other homes. Cached for a day. */
+  /** MusicBrainz's credits, album, genre, label, year and other homes for a matched song. Cached for a day. */
   enrich(input2, signal) {
     const key = input2.isrc ? `isrc:${input2.isrc}` : JSON.stringify([input2.title?.toLowerCase(), input2.artist?.toLowerCase(), input2.durationMs ? Math.round(input2.durationMs / 5e3) : null]);
     return this.enrichCache.get(key, () => this.upstream(() => this.musicbrainz.enrich(input2, signal), "MusicBrainz"));
@@ -26785,6 +27033,9 @@ async function startHelper(options) {
       if (jobs.list().length >= MAX_JOBS && !await jobs.evictOldestFinished()) return fail(response, 429, "busy", "There are already too many jobs here. Clear some before starting another.");
       const checked = checkFetchUrl(parsed.data.url, options.allowedHosts);
       if (!checked.ok || !checked.url) return fail(response, 400, "url", checked.reason ?? "That address is not one this helper will fetch from.");
+      const host = checked.url.hostname.toLowerCase().replace(/^www\./, "");
+      if (host === "soundcloud.com" || host.endsWith(".soundcloud.com")) return fail(response, 403, "rights", "This PC helper cannot verify SoundCloud\u2019s creator-enabled download flag. Use the Hub, which checks the track\u2019s download permission; no audio was queued.");
+      if (parsed.data.authorization.basis === "creator-download") return fail(response, 403, "rights", "Creator-enabled downloads are only verified by the Hub for SoundCloud. A generic video or stream URL is not permission; no audio was queued.");
       const tool = pickTool(parsed.data.tool, checked.url);
       if (tools.installing() === tool) return fail(response, 409, "busy", `${tool} is being set up. Try again in a moment.`);
       const found = await resolve_();

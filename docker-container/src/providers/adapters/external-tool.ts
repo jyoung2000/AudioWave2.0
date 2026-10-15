@@ -1,10 +1,11 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { CATALOG_COLLECTION_CAP, DOWNLOAD_BATCH_CAP, type ProviderCapabilities, type ProviderDescriptor, type ProviderHealth, type SearchResult } from '@now-playing/contracts';
+import { CATALOG_COLLECTION_CAP, DOWNLOAD_BATCH_CAP, type DownloadTags, type ProviderCapabilities, type ProviderDescriptor, type ProviderHealth, type SearchResult } from '@now-playing/contracts';
 import { DomainError, hostMatches, validateOutboundUrl } from '@now-playing/domain';
-import { versionOf } from '@now-playing/domain/tool-install';
-import { fromSpotdl, fromYtDlp, type MediaProbe } from '../../media/media-metadata.js';
+import { spotdlYtDlpArgs, versionOf, withYtDlpJsRuntime } from '@now-playing/domain/tool-install';
+import { getText, parseMusicLink, readSpotifyEmbed, type CatalogFetch, type LinkRead, type LinkTrack } from '@now-playing/domain/catalog';
+import { fromSpotdl, fromYtDlp, type MediaProbe, type ProbedEntry } from '../../media/media-metadata.js';
 import { lastError, resolveExecutable, runTool, ToolRunError } from '../../media/run-tool.js';
 import type { AuthorizedDownload, DownloadContext, ProviderTestResult } from '../adapter.js';
 import { BaseAdapter, caps, healthy, REVIEWED_AT, result } from './base.js';
@@ -62,6 +63,29 @@ export interface ToolPreset {
 export function spotdlUrl(url: string): string {
   if (!/^https?:\/\//i.test(url)) throw new DomainError('validation', 'Only http(s) addresses can be handed to spotDL.');
   return url;
+}
+
+/** Convert metadata-only Spotify embed data into the probe shape used by download batches. */
+function spotifyEmbedProbe(read: LinkRead): MediaProbe {
+  const tags = (track: LinkTrack): DownloadTags => ({
+    title: track.title ?? 'Untitled',
+    artist: track.artist,
+    featured: [...(track.featured ?? [])],
+    album: track.album,
+    albumArtist: null,
+    date: track.date,
+    genre: track.genre ?? null,
+    trackNumber: track.trackNumber,
+    discNumber: track.discNumber ?? null,
+    durationMs: track.durationSec === null ? null : Math.round(track.durationSec * 1000),
+    artworkUrl: track.artworkUrl,
+    license: null,
+    ...(track.isrc ? { isrc: track.isrc } : {}),
+    ...(track.label ? { label: track.label } : {}),
+  });
+  if (read.kind === 'track') return { kind: 'track', url: read.url, tags: tags(read.track), matchUrl: read.track.matchUrl ?? null };
+  const entries = read.entries.flatMap((track): ProbedEntry[] => track.url && track.title ? [{ url: track.url, tags: tags(track), unavailable: null }] : []);
+  return { kind: 'playlist', url: read.url, title: read.title, owner: read.owner, artworkUrl: read.artworkUrl, listed: read.total, capped: read.capped, entries };
 }
 
 /**
@@ -128,7 +152,7 @@ export const TOOL_PRESETS: Record<PresetTool, ToolPreset> = {
     // 2026-10-04 by the local helper, local-helper/src/jobs.ts `spotdlArgs`) refuses `--`
     // ("unrecognized arguments: -- https://…") and the query anywhere but there; the image runs the
     // same release's build (scripts/fetch-spotdl.ts), so `… download -- <url>` never ran here.
-    download: ({ url, outputDir, ffmpeg }) => [
+    download: ({ url, outputDir, ffmpeg, node }) => [
       'download',
       spotdlUrl(url),
       '--no-cache',
@@ -142,6 +166,8 @@ export const TOOL_PRESETS: Record<PresetTool, ToolPreset> = {
       'opus',
       '--bitrate',
       'disable',
+      '--yt-dlp-args',
+      spotdlYtDlpArgs(node ?? process.execPath),
       '--output',
       join(outputDir, '{track-id}.{output-ext}'),
       '--save-file',
@@ -151,7 +177,7 @@ export const TOOL_PRESETS: Record<PresetTool, ToolPreset> = {
     // provider after it: `save` otherwise asks Genius, AzLyrics and MusixMatch for every song, which
     // the catalog never reads (it has LRCLIB) — 32 s against 18 s for one song, measured 2026-10-10,
     // and minutes for a playlist.
-    metadata: ({ url, ffmpeg, saveFile, match }) => (ffmpeg ? ['save', spotdlUrl(url), '--no-cache', '--log-level', 'ERROR', '--ffmpeg', ffmpeg, ...(match ? ['--preload'] : []), '--lyrics', '--save-file', saveFile] : null),
+    metadata: ({ url, ffmpeg, saveFile, match, node }) => (ffmpeg ? ['save', spotdlUrl(url), '--no-cache', '--log-level', 'ERROR', '--ffmpeg', ffmpeg, ...(match ? ['--preload'] : []), '--yt-dlp-args', spotdlYtDlpArgs(node ?? process.execPath), '--lyrics', '--save-file', saveFile] : null),
     infoFile: 'song.spotdl',
     needsHome: true,
   },
@@ -216,6 +242,7 @@ export class ExternalToolAdapter extends BaseAdapter {
     private readonly environment: () => NodeJS.ProcessEnv | undefined = () => undefined,
     private readonly ffmpeg: () => Promise<string | null> = async () => null,
     private readonly scratch: () => string | null = () => null,
+    private readonly catalogFetch?: CatalogFetch,
   ) {
     super();
   }
@@ -411,9 +438,9 @@ export class ExternalToolAdapter extends BaseAdapter {
   }
 
   /**
-   * What a link is, from the tool that would download it. Cached for a few minutes (a pasted link is
-   * usually resolved and then downloaded), at most two at a time (each run unpacks a runtime), and a
-   * failure is not cached, so the next attempt asks again.
+   * What a link is, from the tool that would download it, or Spotify's public embed metadata for a
+   * playlist when that page is available. Cached for a few minutes, at most two tool runs at a time,
+   * and a failure is not cached, so the next attempt asks again.
    */
   probe(input: string, signal?: AbortSignal, options: { match?: boolean; all?: boolean; items?: readonly number[] } = {}): Promise<MediaProbe> {
     const url = this.allowed(input);
@@ -429,7 +456,14 @@ export class ExternalToolAdapter extends BaseAdapter {
     for (const [k, entry] of this.metadataCache) if (now - entry.at > METADATA_CACHE_TTL_MS) this.metadataCache.delete(k);
     const hit = this.metadataCache.get(key);
     if (hit) return hit.value;
-    const value = this.withSlot(() => this.readMetadata(preset, url.toString(), signal, match, all, items));
+    const value = this.withSlot(async () => {
+      // The embed gives public playlist metadata immediately; spotDL's per-track Spotify crawl can take minutes.
+      if (preset.tool === 'spotdl' && parseMusicLink(url.toString())?.kind === 'playlist') {
+        const embed = await this.readSpotifyEmbed(url.toString(), signal).catch(() => null);
+        if (embed) return embed;
+      }
+      return this.readMetadata(preset, url.toString(), signal, match, all, items);
+    });
     this.metadataCache.set(key, { at: now, value });
     while (this.metadataCache.size > METADATA_CACHE_MAX) this.metadataCache.delete(this.metadataCache.keys().next().value!);
     value.catch(() => {
@@ -453,7 +487,7 @@ export class ExternalToolAdapter extends BaseAdapter {
     return this.withSlot(async () => {
       let stdout: string;
       try {
-        ({ stdout } = await runTool(binary, args, { env: this.toolEnvironment(null), timeoutMs: 30_000, maxStdoutBytes: 8 * 1024 * 1024, ...(signal ? { signal } : {}) }));
+        ({ stdout } = await runTool(binary, withYtDlpJsRuntime(args, process.execPath), { env: this.toolEnvironment(null), timeoutMs: 30_000, maxStdoutBytes: 8 * 1024 * 1024, ...(signal ? { signal } : {}) }));
       } catch (error) {
         if (error instanceof ToolRunError) throw new DomainError('unavailable', `yt-dlp could not search: ${lastError(error.stderr) || error.message}`);
         throw error;
@@ -464,6 +498,18 @@ export class ExternalToolAdapter extends BaseAdapter {
         throw new DomainError('unavailable', 'yt-dlp gave an answer the hub could not read');
       }
     });
+  }
+
+  /** Public Spotify embed pages are a metadata-only fallback for playlists spotDL's API refuses. */
+  private async readSpotifyEmbed(input: string, signal?: AbortSignal): Promise<MediaProbe | null> {
+    if (!this.catalogFetch) return null;
+    const link = parseMusicLink(input);
+    if (!link || link.platform !== 'spotify' || !link.id || !['track', 'album', 'playlist'].includes(link.kind)) return null;
+    const url = `https://open.spotify.com/embed/${link.kind}/${encodeURIComponent(link.id)}`;
+    const { status, body } = await getText(this.catalogFetch, url, { timeoutMs: 15_000, signal, accept: [403, 404] });
+    if (status === 403 || status === 404) return null;
+    const read = readSpotifyEmbed(body, link.url);
+    return read ? spotifyEmbedProbe(read) : null;
   }
 
   private async withSlot<T>(run: () => Promise<T>): Promise<T> {
@@ -490,16 +536,30 @@ export class ExternalToolAdapter extends BaseAdapter {
       try {
         ({ stdout } = await runTool(binary, args, { env: this.toolEnvironment(runDir), timeoutMs: all ? METADATA_ALL_TIMEOUT_MS : METADATA_TIMEOUT_MS[preset.tool], ...(signal ? { signal } : {}), ...(runDir ? { cwd: runDir } : {}) }));
       } catch (error) {
-        if (error instanceof ToolRunError) throw new DomainError('unavailable', `${preset.displayName} could not read that link: ${lastError(error.stderr) || error.message}`);
+        if (error instanceof ToolRunError) {
+          if (preset.tool === 'spotdl') {
+            const fallback = await this.readSpotifyEmbed(url, signal).catch(() => null);
+            if (fallback) return fallback;
+          }
+          throw new DomainError('unavailable', `${preset.displayName} could not read that link: ${lastError(error.stderr) || error.message}`);
+        }
         throw error;
       }
       let parsed: unknown;
       try {
         parsed = JSON.parse(preset.tool === 'spotdl' ? readFileSync(saveFile, 'utf8') : stdout);
       } catch {
+        if (preset.tool === 'spotdl') {
+          const fallback = await this.readSpotifyEmbed(url, signal).catch(() => null);
+          if (fallback) return fallback;
+        }
         throw new DomainError('unavailable', `${preset.displayName} gave an answer the hub could not read`);
       }
       const probe = preset.tool === 'spotdl' ? fromSpotdl(parsed, url) : fromYtDlp(parsed, url);
+      if (preset.tool === 'spotdl' && (!probe || (probe.kind === 'playlist' && !probe.entries.length))) {
+        const fallback = await this.readSpotifyEmbed(url, signal).catch(() => null);
+        if (fallback) return fallback;
+      }
       if (!probe) throw new DomainError('not-found', `${preset.displayName} found nothing at that link`);
       return probe;
     } finally {
@@ -550,7 +610,12 @@ export class ExternalToolAdapter extends BaseAdapter {
   override async getAuthorizedDownload(id: string, context: DownloadContext): Promise<AuthorizedDownload | null> {
     const u = this.allowed(id);
     if (!u) return null;
-    if (!['user-owned', 'licensed', 'public-domain', 'purchased-export', 'creator-download'].includes(context.basis)) return null;
+    const host = u.hostname.toLowerCase().replace(/^www\./, '');
+    // Creator-enabled downloads are a SoundCloud-specific permission and must go through its
+    // provider adapter, which checks `downloadable` and remaining downloads. Generic yt-dlp/spotDL
+    // sources (notably YouTube) never prove that permission; SoundCloud URLs are refused here too.
+    if (context.basis === 'creator-download' || host === 'soundcloud.com' || host.endsWith('.soundcloud.com')) return null;
+    if (!['user-owned', 'licensed', 'public-domain', 'purchased-export'].includes(context.basis)) return null;
     const slug = decodeURIComponent(u.pathname.split('/').filter(Boolean).pop() ?? 'download');
     return { kind: 'external-tool', url: u.toString(), filename: slug || 'download', basis: context.basis };
   }

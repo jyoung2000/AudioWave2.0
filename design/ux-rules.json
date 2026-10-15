@@ -2341,7 +2341,7 @@
       "id": "NP-FIND-006",
       "group": "np-find",
       "title": "One card, centred under the field: album, artist and song details stack inside it, and go back",
-      "contract": "The popover is one card that hangs centred under the header's search field at every width — the same centre x as the field, min(560px, 100vw − 20px) wide, moved only as far as it must to stay on screen, with a small caret at the field's centre keeping the joint between the two (the Aqua skin's rounded card); on a phone it spans the width. Everything the search shows opens inside that card, with Back: the overview, a type's page, and the details. An album row opens its details (catalog/album): cover, title, artist, year · label · genre · song count, its platforms, \"Open in Music\" (NP-FIND-007) and its songs, each auditionable and addable. An artist row opens theirs (catalog/artist): picture (an album cover when the platform has none), genre, fans, top songs and albums; an album there drills into that album. A song row opens the song: its cover, platforms (with any other homes enrichment found), genre, label and year from catalog/enrich (\"Looking up…\" while MusicBrainz is asked, a sentence if it cannot be), its ISRC, Add to Library, Download… (the fetch sheet with a stated basis, as the Download key: the hub when it may, else the helper, NP-FIND-012; a store-only song says there is nothing the helper can fetch), and its lyrics from catalog/lyrics — synced lines with their times, or plain, or \"No lyrics found\", or an instrumental said as one. Details stack; Back and Escape walk them back, and the keys come back to the row they left.",
+      "contract": "The popover is one card that hangs centred under the header's search field at every width — the same centre x as the field, min(560px, 100vw − 20px) wide, moved only as far as it must to stay on screen, with a small caret at the field's centre keeping the joint between the two (the Aqua skin's rounded card); on a phone it spans the width. Everything the search shows opens inside that card, with Back: the overview, a type's page, and the details. An album row opens its details (catalog/album): cover, title, artist, year · label · genre · song count, its platforms, \"Open in Music\" (NP-FIND-007) and its songs, each auditionable and addable. An artist row opens theirs (catalog/artist): picture (an album cover when the platform has none), genre, fans, top songs and albums; an album there drills into that album. A song row opens the song: its cover, credited artist line (including featured artists), album and platforms; catalog/enrich fills artist credits, album, genre, label and year (\"Looking up…\" while MusicBrainz is asked, a sentence if it cannot be), its ISRC, Add to Library, Download… (the fetch sheet with a stated basis, as the Download key: the hub when it may, else the helper, NP-FIND-012; a store-only song says there is nothing the helper can fetch), and its lyrics from catalog/lyrics — synced lines with their times, or plain, or \"No lyrics found\", or an instrumental said as one. Details stack; Back and Escape walk them back, and the keys come back to the row they left.",
       "example": "At 1280 px the card is 560 wide under the pill's centre; at 390 px it is 370 wide, 10 px from each edge; an album opened inside it is the same card, with Back.",
       "authority": "adopted",
       "owners": [
@@ -2360,7 +2360,7 @@
         {
           "type": "test",
           "path": "music-player/tests/e2e/np/catalog-search.spec.ts",
-          "name": "a song’s details: genre, label and year from enrichment, and its lyrics, synced"
+          "name": "a song’s details: featured artist, album, genre, label and year from enrichment, and its lyrics, synced"
         },
         {
           "type": "test",
@@ -2407,7 +2407,7 @@
         {
           "type": "test",
           "path": "music-player/tests/e2e/np/collections.spec.ts",
-          "name": "a song on show plays its row and the Download key offers to fetch it through the helper"
+          "name": "a song on show does not play a short clip; Download offers to fetch the full song"
         },
         {
           "type": "test",
@@ -2543,9 +2543,9 @@
     {
       "id": "NP-FIND-011",
       "group": "np-find",
-      "title": "A song that is not on this device plays its preview, said as one, while the hub or the companion fetches it",
-      "contract": "A visitor — a song in the music list that is not on this device: a search result filed as a link row, a song of a catalog list on show, an online Discover pick — plays when chosen. Its 30-second preview (Apple Music's, then Deezer's; the look-ahead's copy when it has one) plays through the same transport, with \"Preview · 30 seconds — not the whole song\" under the title and the HUD saying the same; it is never logged as a play, never reported as heard, and when it ends it stops rather than running on into the next row (the list's own play-on skips visitors). When something can fetch the whole song, the fetch sheet opens over the preview: the paired hub when this device's credential may ask for downloads and receive files (downloads:request, transfers:receive), else the companion's helper. After the person says why they may have the file, the row and the preview label say \"Fetching… N%\", and when the song lands it joins the library as a kept copy and plays from this device. With nothing that can fetch it, the preview plays and the HUD says what the whole song needs; with no preview either, it says nothing can play it here, and why. A visitor's Download button and right-click are the catalog song's (NP-FIND-010).",
-      "example": "Choosing “Night Harbour” with a hub paired: “Preview — 30 seconds of “Night Harbour”; the whole song plays once the hub TOWER has fetched it.”, the sheet, then “Fetching… 40%” on the row.",
+      "title": "A catalog visitor is fetched, not previewed; short clips play only when auditioned from Search",
+      "contract": "A visitor — a catalog song in the music list that is not on this device: a search result filed as a link row, a song of a catalog list on show, or an online Discover pick — is metadata, not playable audio. Choosing it in the music list never starts a 30-second preview and never marks it playing or heard. If the person has a hub credential that may fetch downloads and receive files (downloads:request, transfers:receive), or a companion helper is available, it opens the fetch sheet; the person states why they may have the file, and the hub/helper fetches a full-length copy. Only after that copy is saved locally does it become the active track and play through the player transport at its full duration. With no route, the UI says what is missing and does not claim playback. 30-second previews are requested and played only by the explicit audition control on Search results; they are never part of Now Playing, Discover, a playlist/album list, or the fetch sheet. A visitor’s Download button and right-click remain catalog actions (NP-FIND-010).",
+      "example": "Choosing “Night Harbour” from the music list with a hub paired opens the fetch sheet without audio; after an authorized fetch, the kept local copy starts at its full duration. Clicking the Search result’s preview button still auditions its 30-second clip.",
       "authority": "adopted",
       "owners": [
         "music-player/src/shell/search/visit.ts",
@@ -2558,7 +2558,7 @@
         {
           "type": "test",
           "path": "music-player/tests/e2e/np/discover-online.spec.ts",
-          "name": "with nothing to fetch it, its preview plays, said as one, and nothing is logged as a play"
+          "name": "a visitor row does not play a preview; clips are auditioned in Search and full tracks must be fetched"
         },
         {
           "type": "test",
@@ -2568,17 +2568,17 @@
         {
           "type": "test",
           "path": "music-player/tests/e2e/np/discover-online.spec.ts",
-          "name": "with a hub, Play asks the hub to fetch it: the preview meanwhile, “Fetching… N%” on the row, then the song itself (NP-FIND-012)"
-        },
-        {
-          "type": "test",
-          "path": "music-player/tests/e2e/np/collections.spec.ts",
-          "name": "a song on show plays its row and the Download key offers to fetch it through the helper"
+          "name": "with a hub, a visitor fetches the full song without a preview, then plays the full local copy (NP-FIND-012)"
         },
         {
           "type": "test",
           "path": "music-player/tests/unit/visit.test.ts",
           "name": "reads what a fetched file is from its first bytes"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/collections.spec.ts",
+          "name": "a song on show does not play a short clip; Download offers to fetch the full song"
         }
       ]
     },
@@ -2599,7 +2599,7 @@
         {
           "type": "test",
           "path": "music-player/tests/e2e/np/discover-online.spec.ts",
-          "name": "with a hub, Play asks the hub to fetch it: the preview meanwhile, “Fetching… N%” on the row, then the song itself (NP-FIND-012)"
+          "name": "with a hub, a visitor fetches the full song without a preview, then plays the full local copy (NP-FIND-012)"
         },
         {
           "type": "test",
@@ -2829,10 +2829,14 @@
       "id": "NP-PREF-014",
       "group": "np-prefs",
       "title": "How the disc moves is the listener’s choice",
-      "contract": "Settings ▸ Player ▸ The disc sets whether the disc spins while a song plays (steady, with the song’s tempo, or not at all) and how fast (0.25× to 3×); whether it turns all the way round (steady, with the tempo, held at its angle, or left where it is put) and how fast; its angle (yaw, 0–355°, with presets: the label face on or at an angle, the edge, the playing side) — where it starts and where a held disc stays; and its tilt (pitch, −30° to 80° back). Reset Position puts the disc at that angle and tilt and drops any dragged pose. A live preview at the top shows the disc moving as the settings say, as if a song were playing, and says what it is showing (a song at 120 BPM when tempo is chosen and nothing with a known tempo plays); it draws only while it is on screen. Each choice is saved at once, applies to the playing disc immediately and survives a reload; only the controls that apply are shown. Tempo is the song’s BPM: at 120 BPM the disc moves at the chosen speed, faster songs faster, and one full turn takes 32 beats; a song with no known tempo, and the radio, move at the steady speed. Turn also governs the closed case while nothing plays. The defaults are the motion and pose the player always had, and Reduce animation still slows the spin and stops the turning.",
+      "contract": "Settings ▸ Player ▸ The disc sets whether the disc spins while a song plays (steady, with the song’s tempo, or not at all) and how fast (0.25× to 3×); whether it turns all the way round (steady, with the tempo, held at its angle, or left where it is put) and how fast; its angle (yaw, 0–355°, with presets: the label face on or at an angle, the edge, the playing side) — where it starts and where a held disc stays; and its tilt (pitch, −30° to 80° back). Reset Position puts the disc at that angle and tilt and drops any dragged pose. The jewel-case sleeve and CD label show the current track’s available artwork and update together when the track changes. A live preview at the top shows the disc moving as the settings say, as if a song were playing, and says what it is showing (a song at 120 BPM when tempo is chosen and nothing with a known tempo plays); it draws only while it is on screen. Each choice is saved at once, applies to the playing disc immediately and survives a reload; only the controls that apply are shown. Tempo is the song’s BPM: at 120 BPM the disc moves at the chosen speed, faster songs faster, and one full turn takes 32 beats; a song with no known tempo, and the radio, move at the steady speed. Turn also governs the closed case while nothing plays. The defaults are the motion and pose the player always had, and Reduce animation still slows the spin and stops the turning.",
       "example": "",
       "authority": "adopted",
-      "owners": ["music-player/index.html", "music-player/scripts/make-shell.py"],
+      "owners": [
+        "music-player/index.html",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/shell/bridge.ts"
+      ],
       "evidence": [
         {
           "type": "test",
@@ -2863,6 +2867,11 @@
           "type": "test",
           "path": "music-player/tests/e2e/np/disc.spec.ts",
           "name": "the preview in Settings draws the disc, and says what it is showing"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/np/disc.spec.ts",
+          "name": "the case sleeve and CD label show the current track’s cover, and update when the track changes"
         }
       ]
     },
@@ -2988,14 +2997,15 @@
       "id": "UX-CAT-003",
       "group": "catalog",
       "title": "Search finds music, never a “search on YouTube” offer, and every result says where it is",
-      "contract": "The catalog answers with songs, artists and albums only. It never returns an entry whose only purpose is to send the person to search another site; YouTube and SoundCloud are searched by the server (yt-dlp) and their results are songs like any other. Every track, artist and album carries at least one source naming its platform, and a song from Spotify that plays from YouTube Music carries both, the second marked as spotDL’s match. A pasted link is not searched: the search says to resolve it, and resolve says what it is or, for a link it cannot read (a private or Spotify-made playlist, a Tidal link without a SongLink key), why — in words. A row shows at most three platform badges and counts the rest (+N), so the title is never cut short by them; every platform is named in the row's tooltip and on the song's page. The facts a row carries beyond its platforms — cover, BPM, featured artists, explicit, date, ISRC, album — and where each comes from are UX-CAT-006.",
+      "contract": "The catalog answers with songs, artists and albums only. It never returns an entry whose only purpose is to send the person to search another site; YouTube and SoundCloud are searched by the server (yt-dlp) and their results are songs like any other. Every track, artist and album carries at least one source naming its platform, and a song from Spotify that plays from YouTube Music carries both, the second marked as spotDL’s match. A pasted link is not searched: the search says to resolve it, and resolve says what it is. A public Spotify playlist is read from the public embed page first to avoid a slow API crawl; tracks and albums use spotDL first and the embed page only as metadata fallback. Embed previews are never used as audio, and an inaccessible/private link still says why — in words. A Tidal link without a SongLink key also says why. A row shows at most three platform badges and counts the rest (+N), so the title is never cut short by them; every platform is named in the row's tooltip and on the song's page. The facts a row carries beyond its platforms — cover, BPM, featured artists, explicit, date, ISRC, album — and where each comes from are UX-CAT-006.",
       "example": "{\"sources\":[{\"platform\":\"spotify\",\"matchedBy\":\"link\"},{\"platform\":\"youtube-music\",\"matchedBy\":\"spotdl\"}]} — shown as “Spotify · plays from YouTube Music”.",
       "authority": "adopted",
       "owners": [
         "packages/contracts/src/api/catalog.ts",
         "packages/domain/src/catalog/engine.ts",
         "packages/domain/src/catalog/links.ts",
-        "packages/domain/src/catalog/providers/ytdlp.ts"
+        "packages/domain/src/catalog/providers/ytdlp.ts",
+        "packages/domain/src/catalog/providers/spotify-embed.ts"
       ],
       "evidence": [
         {
@@ -3030,6 +3040,16 @@
         },
         {
           "type": "test",
+          "path": "packages/domain/tests/unit/catalog-engine.test.ts",
+          "name": "resolves a public Spotify playlist from its embed page when spotDL cannot list it"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/unit/external-tool-runs.test.ts",
+          "name": "falls back to a public Spotify track embed when spotDL cannot read the track"
+        },
+        {
+          "type": "test",
           "path": "docker-container/tests/integration/catalog.test.ts",
           "name": "a Spotify song through spotDL, with its YouTube Music match"
         },
@@ -3044,14 +3064,17 @@
       "id": "UX-CAT-004",
       "group": "catalog",
       "title": "A loaded list loads every song, from any platform",
-      "contract": "An album or playlist opened from a link or a result lists every song it has, in order, page by page: `resolve` and `album` serve any `offset` (to 10,000) with a `limit` of at most 200, `total` is the platform’s own count, and `hasMore` holds until the end; `collectAllPages` reads a whole list. Spotify (spotDL), YouTube and YouTube Music playlists and Bandcamp albums (yt-dlp) are read once, whole; a SoundCloud set’s bare ids are described a page at a time; Deezer pages with its own index; Apple Music playlists are read from their public page. A list past 10,000 songs says so (`capped`); a page that carries fewer songs than the list holds says so in words. Nothing is cut silently.",
-      "example": "A 1,200-song Spotify playlist opens with its first page, and page 12 is songs 1,101–1,200 with `hasMore: false`.",
+      "contract": "An album or playlist opened from a link or a result lists every song it has, in order, page by page: `resolve` and `album` serve any `offset` (to 10,000) with a `limit` of at most 200, `total` is the platform’s own count when available (otherwise `null`), and `hasMore` holds until the end; `collectAllPages` reads a whole list. Spotify playlists use the public embed listing first and spotDL when the page is unavailable; the embed has no total and at most 100 tracks, so the 100-track ceiling is reported as capped. YouTube and YouTube Music playlists and Bandcamp albums (yt-dlp) are read once, whole; a SoundCloud set’s bare ids are described a page at a time; Deezer pages with its own index; Apple Music playlists are read from their public page. A list past 10,000 songs says so (`capped`); a page that carries fewer songs than the list holds says so in words. Nothing is cut silently.",
+      "example": "When spotDL can read a 1,200-song Spotify playlist, page 12 is songs 1,101–1,200 with `hasMore: false`; when only the public embed is available, its 100-track ceiling is marked capped.",
       "authority": "adopted",
       "owners": [
         "packages/domain/src/catalog/engine.ts",
         "packages/domain/src/catalog/links.ts",
         "packages/domain/src/catalog/providers/applemusic-page.ts",
+        "packages/domain/src/catalog/providers/spotify-embed.ts",
         "docker-container/src/catalog/service.ts",
+        "docker-container/src/providers/adapters/external-tool.ts",
+        "docker-container/src/downloads/service.ts",
         "local-helper/src/resolve.ts"
       ],
       "evidence": [
@@ -3064,6 +3087,16 @@
           "type": "test",
           "path": "packages/domain/tests/unit/catalog-paging.test.ts",
           "name": "Spotify through spotDL: all 1,200 songs of a playlist, read once and served page by page"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/spotify-embed.test.ts",
+          "name": "reports the embed page limit instead of claiming a 100-track playlist is complete"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/integration/downloads-external-tool.test.ts",
+          "name": "downloads each track from public Spotify playlist metadata without crawling it through spotDL"
         },
         {
           "type": "test",
@@ -3124,7 +3157,7 @@
       "id": "UX-CAT-006",
       "group": "catalog",
       "title": "Every result carries its facts",
-      "contract": "Every song a search page, an album page or an artist’s top songs list carries, on all three apps, has its cover, title, duration, BPM, featured artists, explicit mark, release date and year, ISRC and album when any keyless service knows them — not only the stores’ search rows, which carry no tempo and no contributors. After a page is assembled (every service’s chunk and the cross-links) the engine fills each row with a bounded, concurrent, cached lookup: a Deezer source → `/track/{id}` (bpm, contributors → `artists`, isrc, explicit_lyrics, release_date, cover_xl, track_position, disk_number, the album’s title); else an ISRC → `/track/isrc:{isrc}`; else one exact “artist title” Deezer search, taken only when it is the same recording (`sameRecording`); a MusicBrainz-only row still without a cover takes the Cover Art Archive’s front image for the recording’s first release (`/release/{mbid}/front-500` answers 307 when it exists, 404 when not; asked with redirects unfollowed). Nothing known is overwritten — only nulls are filled, the fuller date wins, an iTunes row keeps its 600 px artwork — and a video thumbnail gives way to a store’s square cover as the merger’s rule has it. Budget: at most 8 lookups in flight, 6 s a page (4 s for a detail page), the first chunk never waits; the filled rows are one last `results` chunk with `provider: null` before `done`, upserted by id like the cross-link chunks, and `?stream=0` folds them in. Answers are cached a day by Deezer id, by ISRC and by the name they were found by; Deezer’s quota (error code 4) ends the page’s lookups and rests the service, and a service switched off, resting or left out of the search is not asked. A row’s credit line (`creditLine`) is the main artist, then “feat. A & B” from the other credited names when the artist line does not already name them — repeats dropped, order kept, four at most then “& others” — on the row and the song page of the player, the hub and the companion; a song the store marks explicit shows a small “E” beside its title, read as “explicit”. The player’s own Deezer tempo lookup is a fallback for rows still without a BPM once the search is done (an older hub’s rows), never a race with the engine.",
+      "contract": "Every song a search page, an album page or an artist’s top songs list carries, on all three apps, has its cover, title, duration, BPM, featured artists, explicit mark, release date and year, ISRC and album when any keyless service knows them — not only the stores’ search rows, which carry no tempo and no contributors. After a page is assembled (every service’s chunk and the cross-links) the engine fills each row with a bounded, concurrent, cached lookup: a Deezer source → `/track/{id}` (bpm, contributors → `artists`, isrc, explicit_lyrics, release_date, cover_xl, track_position, disk_number, the album’s title); else an ISRC → `/track/isrc:{isrc}`; else one exact “artist title” Deezer search, taken only when it is the same recording (`sameRecording`); a MusicBrainz-only row still without a cover takes the Cover Art Archive’s front image for the recording’s first release (`/release/{mbid}/front-500` answers 307 when it exists, 404 when not; asked with redirects unfollowed). Nothing known is overwritten — only nulls are filled, the fuller date wins, an iTunes row keeps its 600 px artwork — and a video thumbnail gives way to a store’s square cover as the merger’s rule has it. Budget: at most 8 lookups in flight, 6 s a page (4 s for a detail page), the first chunk never waits; the filled rows are one last `results` chunk with `provider: null` before `done`, upserted by id like the cross-link chunks, and `?stream=0` folds them in. Answers are cached a day by Deezer id, by ISRC and by the name they were found by; Deezer’s quota (error code 4) ends the page’s lookups and rests the service, and a service switched off, resting or left out of the search is not asked. A direct track link uses the same confidence-checked matching: only a MusicBrainz or store match to the same recording fills credited artists, album, genre, release date/year and label; unmatched videos keep their source words without guessed music facts. A row’s credit line (`creditLine`) is the main artist, then “feat. A & B” from the other credited names when the artist line does not already name them — repeats dropped, order kept, four at most then “& others” — on the row and the song page of the player, the hub and the companion; a song the store marks explicit shows a small “E” beside its title, read as “explicit”. The player’s own Deezer tempo lookup is a fallback for rows still without a BPM once the search is done (an older hub’s rows), never a race with the engine.",
       "example": "Deezer’s search row “Get Lucky (feat. Pharrell Williams and Nile Rodgers)” by Daft Punk arrives with bpm: null and artists: [“Daft Punk”]; the last chunk before done carries the same id with bpm: 116.1, artists: [“Daft Punk”, “Pharrell Williams”, “Nile Rodgers”], isrc: “USQX91300108”, explicit: false, releaseDate: “2013-05-20”, trackNumber: 8 — the row reads “Daft Punk feat. Pharrell Williams & Nile Rodgers — Random Access Memories · 2013 · 116 bpm”.",
       "authority": "adopted",
       "owners": [
@@ -3202,6 +3235,16 @@
           "type": "test",
           "path": "windows-companion/tests/dom/companion-search.dom.test.tsx",
           "name": "folds the chunks the main process passes on, says every service’s state, and shows rows that are music"
+        },
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-engine.test.ts",
+          "name": "fills direct song links with credited artists and release facts only after a recording match"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/integration/catalog.test.ts",
+          "name": "a catalog song tags missing album and featured artists from a matched MusicBrainz recording"
         }
       ]
     },
@@ -3384,7 +3427,7 @@
         {
           "type": "test",
           "path": "docker-container/tests/integration/catalog.test.ts",
-          "name": "keeps a starred list in the admin’s library, in the shared SavedCollection shape, and un-stars it"
+          "name": "shows one shared, editable set to admin and paired clients, and applies timestamped tombstones"
         },
         {
           "type": "test",
@@ -3624,7 +3667,7 @@
       "id": "UX-SEARCH-012",
       "group": "search",
       "title": "A song from search goes to Up Next, a playlist or the library through the row’s menu",
-      "contract": "The owner’s words (2026-10-07): “ensure the user can add songs from search to their Now Playing queue, playlist, or music library.” Every song row — the overview, a type’s page, an album’s, a playlist’s or an artist’s songs — has a “…” at its end; a right-click, or Shift+F10 or the Menu key on the highlighted row, opens the same menu: the window kit’s contextual menu (`.menu` in airwave-window.css), keyboard-operable (the arrows, Home and End, Right and Left for a submenu, Enter and Space, Escape back to the list, Tab or a click away closes it; on a touch screen its commands are 44px tall). It offers Add to Up Next, Add to Playlist ▸, Add to Library…, Download…, Audition (Stop Audition while it plays; disabled, saying why, without a clip) and Open Details. Add to Up Next is a group’s queue — on the hub, `POST /api/v1/groups/:id/requests` with the song’s best fetchable link (YouTube Music, YouTube, SoundCloud, Bandcamp, spotDL), a submenu when there are several active groups; the companion has no queue of its own, so the paired hub’s groups it is in (`hub:groups`, `hub:request`), or a sentence saying queueing needs a group (no hub, no permission to join groups, not in one). A song only a store has says there is nothing to queue or fetch. Add to Library… is a download with a stated rights basis — on the hub into its download queue (`POST /api/v1/catalog/download`, Music ▸ Downloads, what the hub’s library is made of), on the companion through the helper’s own path into this PC’s library. Add to Playlist ▸ writes (amended 2026-10-10, DEC-041): each app keeps a playlist folder, so the submenu lists its playlists, ticked where the song is already, and New Playlist…; filing keeps the song’s link, and “Also add to Library”, on by default, queues the download too (UX-PL-005, CMP-PL-004). The hub’s players’ shared copies stay read-only, shown apart. Download… is the same with a choice of format. Every action confirms in the window’s status line, which is a live region.",
+      "contract": "The owner’s words (2026-10-07): “ensure the user can add songs from search to their Now Playing queue, playlist, or music library.” Every song row — the overview, a type’s page, an album’s, a playlist’s or an artist’s songs — has a “…” at its end; a right-click, or Shift+F10 or the Menu key on the highlighted row, opens the same menu: the window kit’s contextual menu (`.menu` in airwave-window.css), keyboard-operable (the arrows, Home and End, Right and Left for a submenu, Enter and Space, Escape back to the list, Tab or a click away closes it; on a touch screen its commands are 44px tall). It offers Add to Up Next, Add to Playlist ▸, Star/Unstar in the shared saved list, Add to Library…, Download…, Audition (Stop Audition while it plays; disabled, saying why, without a clip) and Open Details. Add to Up Next is a group’s queue — on the hub, `POST /api/v1/groups/:id/requests` with the song’s best fetchable link (YouTube Music, YouTube, SoundCloud, Bandcamp, spotDL), a submenu when there are several active groups; the companion has no queue of its own, so the paired hub’s groups it is in (`hub:groups`, `hub:request`), or a sentence saying queueing needs a group (no hub, no permission to join groups, not in one). A song only a store has says there is nothing to queue or fetch. Add to Library… is a download with a stated rights basis — on the hub into its download queue (`POST /api/v1/catalog/download`, Music ▸ Downloads, what the hub’s library is made of), on the companion through the helper’s own path into this PC’s library. Add to Playlist ▸ writes (amended 2026-10-10, DEC-041): each app keeps a playlist folder, so the submenu lists its playlists, ticked where the song is already, and New Playlist…; filing keeps the song’s link, and “Also add to Library”, on by default, queues the download too (UX-PL-005, CMP-PL-004). The hub’s players’ shared copies stay read-only, shown apart. Download… is the same with a choice of format. Every action confirms in the window’s status line, which is a live region.",
       "example": "Hub: “Harbour Lights” ▸ … ▸ Add to Up Next ▸ Studio → POST /groups/…/requests {query: https://music.youtube.com/watch?v=…} → “Up Next in Studio: “Harbour Lights”, number 3.” Companion with no hub: “Queueing needs a group on a hub: this companion has no queue of its own. Pair a hub under Remote first.”",
       "authority": "adopted",
       "owners": [
@@ -3646,7 +3689,7 @@
         {
           "type": "test",
           "path": "docker-container/tests/dom/search.dom.test.tsx",
-          "name": "“…” opens it; Add to Up Next ▸ a group queues the song’s fetchable source through the group’s requests, and says so"
+          "name": "“…” opens it with Star/Unstar; Add to Up Next ▸ a group queues the song’s fetchable source through the group’s requests, and says so"
         },
         {
           "type": "test",
@@ -3709,6 +3752,75 @@
           "name": "Add to Playlist ▸ lists this PC’s playlists, ticked where the song is, and files it — with the library too, by default (CMP-PL-004)"
         }
       ]
+    },
+    {
+      "id": "UX-SEARCH-013",
+      "group": "search",
+      "title": "Star-triggered downloads are opt-in, rights-gated and collection-wide",
+      "contract": "Automatic downloads are off by default in the hub and Companion. Starring does not copy audio: the PWA, hub and Companion share only track/collection metadata and public links. When auto-download is enabled, a song gets one separate explicit rights-basis confirmation; an album or playlist gets one confirmation covering every resolved item. Search results are not permission. Before creating any hub queue items, the hub checks every chosen source against the declared basis; cancellation or failed preflight leaves the star but queues no audio. The creator-enabled basis is SoundCloud-only and is verified by SoundCloud’s downloadable/downloads-left metadata; generic yt-dlp/spotDL links, including YouTube, cannot claim it. The local PC helper cannot verify SoundCloud’s flag, so it refuses SoundCloud URLs and excludes them from its download source selection.",
+      "authority": "adopted",
+      "owners": [
+        "packages/domain/src/catalog/auto-download.ts",
+        "docker-container/src/web/views/Search.tsx",
+        "docker-container/src/catalog/service.ts",
+        "docker-container/src/downloads/service.ts",
+        "docker-container/src/providers/adapters/soundcloud.ts",
+        "docker-container/src/providers/adapters/external-tool.ts",
+        "windows-companion/src/renderer/views/Search.tsx",
+        "windows-companion/src/main/catalog.ts",
+        "local-helper/src/server.ts",
+        "music-player/scripts/make-shell.py",
+        "music-player/src/components/FetchSheet.tsx",
+        "music-player/src/shell/search/hub-shelf.ts"
+      ],
+      "evidence": [
+        {
+          "type": "test",
+          "path": "packages/domain/tests/unit/catalog-auto-download.test.ts",
+          "name": "checks every source against the declared rights basis before queuing any track"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "keeps auto-download opt-in off: starring a song saves it without a rights prompt or audio job"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/search.dom.test.tsx",
+          "name": "queues every playlist song after one collection-wide rights confirmation"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/integration/catalog.test.ts",
+          "name": "preflights every collection source before queueing and refuses a generic YouTube creator-download claim"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/unit/soundcloud-download-authorization.test.ts",
+          "name": "refuses when the creator did not enable downloads or no download remains"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/unit/soundcloud-download-authorization.test.ts",
+          "name": "allows only a numeric track ID with an enabled download and a SoundCloud-compatible basis"
+        },
+        {
+          "type": "test",
+          "path": "local-helper/tests/integration/helper-server.test.ts",
+          "name": "refuses generic creator-download claims and SoundCloud streams without provider verification"
+        },
+        {
+          "type": "test",
+          "path": "windows-companion/tests/dom/companion-search.dom.test.tsx",
+          "name": "asks once for the whole playlist and resolves every song before queuing"
+        },
+        {
+          "type": "test",
+          "path": "music-player/tests/e2e/helper.spec.ts",
+          "name": "the PC helper does not offer creator-enabled permission for generic search results"
+        }
+      ],
+      "example": "Hub: a playlist with six rights-eligible tracks gets one confirmation; the Hub authorizes all six sources before creating six jobs. If any preflight is refused or the user cancels, the star remains and zero jobs are created. A SoundCloud creator-download basis is checked against the creator’s downloadable flag; the PC helper refuses it rather than guessing."
     },
     {
       "id": "NP-DISC-001",
@@ -3873,8 +3985,8 @@
       "id": "NP-DISC-006",
       "group": "np-discover",
       "title": "From the catalog: songs this device does not have, ranked by the same algorithm",
-      "contract": "Under the library's ranked songs, Discover shows a set from the catalog, under a heading row \"From the catalog\". The queries come from the listener's own profile, as the ranker builds it from the play log: the artists played (most played first) and the genres played, a session lean's genre first; a mode that leaves out the artists you know (Deep cuts) asks for genres only, and one that leaves out your top artist does not ask for it. They are asked through whichever client answers the search — the paired hub, the companion on this PC, or, with neither, this browser's own engine against the keyless services (keyless-first) — two at a time. The answers are ranked by the same rankSongs, under the current algorithm, mode and lean, with the library supplying the taste and never offered again: what the device already has (the same recording, however spelled) and what this Discover session already showed are left out, and one recording is one pick. Twelve picks at most; each row carries its platforms as badges after the title, the catalog's artist credit, and why the ranker put it there (the strongest factor, or \"Picked to explore\") in its tooltip. The heading says how many, by which algorithm and mode, through whom, and that choosing one plays its preview (NP-FIND-011). Refresh asks the catalog again and shows what the session has not shown; a new algorithm or lean asks again from the top. Offline, with nothing played, with nothing answering, or with nothing new, the heading says which in a sentence. The rows' menu is the catalog song's (Add to Up Next, Add to Playlist ▸, Add to Library, Download…, Audition). The chip's menu has From the Catalog, a tick while it is on, kept in the player's settings; off, Discover shows only the library and asks nothing.",
-      "example": "Discover, Airwave default · For you: eight library songs, then “From the catalog — 2 songs ranked by “Airwave default” · For you, through the companion on this PC — not on this device yet: choosing one plays its preview”.",
+      "contract": "Under the library's ranked songs, Discover shows a set from the catalog, under a heading row \"From the catalog\". The queries come from the listener's own profile, as the ranker builds it from the play log: the artists played (most played first) and the genres played, a session lean's genre first; a mode that leaves out the artists you know (Deep cuts) asks for genres only, and one that leaves out your top artist does not ask for it. They are asked through whichever client answers the search — the paired hub, the companion on this PC, or, with neither, this browser's own engine against the keyless services (keyless-first) — two at a time. The answers are ranked by the same rankSongs, under the current algorithm, mode and lean, with the library supplying the taste and never offered again: what the device already has (the same recording, however spelled) and what this Discover session already showed are left out, and one recording is one pick. Twelve picks at most; each row carries its platforms as badges after the title, the catalog's artist credit, and why the ranker put it there (the strongest factor, or \"Picked to explore\") in its tooltip. The heading says how many, by which algorithm and mode, through whom, and that each pick is not on this device. Choosing one never starts a preview; it opens the authorized full-song fetch where a route exists, or says what is needed (NP-FIND-011). Refresh asks the catalog again and shows what the session has not shown; a new algorithm or lean asks again from the top. Offline, with nothing played, with nothing answering, or with nothing new, the heading says which in a sentence. The rows' menu is the catalog song's (Add to Up Next, Add to Playlist ▸, Add to Library, Download…); short auditions remain in Search results. The chip's menu has From the Catalog, a tick while it is on, kept in the player's settings; off, Discover shows only the library and asks nothing.",
+      "example": "Discover, Airwave default · For you: eight library songs, then two catalog picks ranked by the same algorithm; choosing a visitor opens a fetch sheet without a preview, and a saved full-length copy plays locally.",
       "authority": "adopted",
       "owners": [
         "music-player/src/shell/recommend/online.ts",
@@ -3945,9 +4057,9 @@
     {
       "id": "NP-DISC-007",
       "group": "np-discover",
-      "title": "The look-ahead: the next picks’ previews, within a stated budget, never in the way",
-      "contract": "When the catalog's picks land, the next two picks that have a 30-second preview have it asked for ahead, so choosing one starts at once. The budget is stated and kept: two clips ahead at most, 4 MB held at most (measured from what arrived), one request at a time, each started only while the page is idle; a clip that will not come (no CORS, too large to be a clip) is streamed when chosen instead and never asked for again. Clips are held in memory as blob: URLs and let go once played or no longer among the next two; nothing is fetched while the catalog set is off, the browser asks to save data, or the device is offline. Whole songs are never fetched ahead: a fetch needs the person's statement of why they may have the file, made per song (NP-FIND-011). The UI never waits on the catalog or the look-ahead: the library's rows, the chip and Refresh answer while either is still out.",
-      "example": "Five picks with previews: two clips asked for, “2 previews are ready ahead (1.0 MB of 4.0 MB)”; the first played, the third is asked for.",
+      "title": "Discover never preloads or plays preview clips",
+      "contract": "Discover’s From the catalog rows are metadata, not audio. When they land or a row is chosen, no short clip is prefetched or played; only an explicit Search result audition requests a 30-second preview. Choosing a visitor in Discover offers the authorized full-song fetch path; once its full copy is saved locally, the player plays that copy at full duration. The catalog rows and controls still answer while search is pending; the UI never suggests a clip is ready or playing in Discover.",
+      "example": "Five catalog picks include preview URLs; Discover requests none until the person explicitly auditions a result in Search.",
       "authority": "adopted",
       "owners": [
         "music-player/src/shell/recommend/prefetch.ts",
@@ -3984,7 +4096,7 @@
         {
           "type": "test",
           "path": "music-player/tests/e2e/np/discover-online.spec.ts",
-          "name": "asks for the next picks’ previews within its budget, one at a time, and the UI never waits on it"
+          "name": "catalog clips are neither fetched nor played here; only an explicit Search audition requests one"
         }
       ]
     },
@@ -4288,25 +4400,32 @@
     {
       "id": "UX-PL-008",
       "group": "playlists",
-      "title": "A device syncs its starred albums and playlists with the hub through library:sync",
-      "contract": "`/api/v1/catalog/saved` answers the admin (its own starred lists) and a device with `library:sync`: the device’s own (read and written, kept apart from every other device’s) and the admin’s as `shared`, read-only. A device never writes or removes anyone else’s.",
-      "example": "GET /api/v1/catalog/saved (device) → {items: [its own], shared: [the admin’s]}.",
+      "title": "Paired devices share one metadata-only catalog-star set through library:sync",
+      "contract": "`/api/v1/catalog/saved` is one metadata-only set (at most 2,000 active entries) for the admin and paired devices with `library:sync`. Every authorized client can add and remove song/collection stars; newer timestamps win, and durable tombstones stop an offline star from restoring an un-starred item. Provider and collection links are HTTP(S); artwork is HTTP(S) or a small inline image. No local paths or audio bytes are stored.",
+      "example": "Device A stars a song; device B sees the same metadata-only entry. When B un-stars it offline, the Hub keeps the tombstone and A cannot restore its older copy.",
       "authority": "adopted",
       "owners": [
         "docker-container/src/api/routes/catalog.ts",
-        "docker-container/src/db/repositories/saved-collections.ts",
+        "docker-container/src/db/repositories/saved-catalog.ts",
+        "music-player/src/shell/search/hub-shelf.ts",
+        "packages/domain/src/catalog/saved-sync.ts",
         "packages/contracts/src/api/routes.ts"
       ],
       "evidence": [
         {
           "type": "test",
           "path": "docker-container/tests/security/playlist-folder.test.ts",
-          "name": "needs library:sync, keeps each device’s own, and shows the admin’s as shared, read-only"
+          "name": "needs library:sync and lets every paired client edit the same shared set"
         },
         {
           "type": "test",
           "path": "docker-container/tests/integration/catalog.test.ts",
           "name": "needs the admin or a device with library:sync (DEC-041), never an anonymous caller, and a change needs the CSRF token"
+        },
+        {
+          "type": "test",
+          "path": "packages/contracts/tests/shared-saved-catalog.test.ts",
+          "name": "rejects filesystem URLs and oversized provider-ID arrays from shared metadata"
         }
       ]
     },

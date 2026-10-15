@@ -120,6 +120,8 @@ export interface ShellLibrary {
   rescan(): Promise<{ added: number; removed: number; reason: string | null }>;
   roots(): Promise<Array<{ id: string; displayName: string; trackCount: number; lastScanAt: string | null; lastScanError: string | null }>>;
   forgetRoot(id: string): Promise<void>;
+  /** A data URL for a local track's embedded cover, or null when the file has none. */
+  artworkUrl(trackId: string): Promise<string | null>;
   count(): number;
 }
 
@@ -352,6 +354,18 @@ function installLibrary(db: PlayerDatabase): ShellLibrary {
       await tx.objectStore('roots').delete(id);
       await tx.done;
       await refreshRows(db);
+    },
+    async artworkUrl(trackId) {
+      const track = await db.get('tracks', trackId);
+      if (!track?.artworkId) return null;
+      const cover = await db.get('artwork', track.artworkId);
+      if (!cover) return null;
+      return new Promise<string | null>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(cover.blob);
+      });
     },
     count: () => window.LIBRARY?.length ?? 0,
   };
