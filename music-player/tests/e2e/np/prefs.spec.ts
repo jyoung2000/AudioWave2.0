@@ -180,6 +180,7 @@ test('sources: the note is honest, a playlist loads, and the paths survive a rel
   await page.click('.tb__btn[data-view="music"]'); await page.waitForTimeout(300);
   await page.click('#profile'); await page.waitForTimeout(400);
   await page.click('#pt-src'); await page.waitForTimeout(300);
+  await page.locator('#cfgLegacyHelper summary').click();
   await page.fill('#cfgCompanion', 'http://127.0.0.1:65535');
   await page.click('#cfgConnect');
   await expect(page.locator('#cfgConnMsg'), 'a companion that is not there says so').toContainText(/No answer|not the companion/, { timeout: 10_000 });
@@ -191,7 +192,7 @@ test('sources: the note is honest, a playlist loads, and the paths survive a rel
   expect(await page.inputValue('#srcMusic'), 'the source paths come back after a reload').toBe('C:\\Music');
 });
 
-test('player preferences, the equalizer and group mode; the equalizer survives a reload', async ({ page }) => {
+test('player preferences, Solo-by-default group gating and the equalizer survive reload', async ({ page }) => {
   await boot(page);
   await page.click('#profile'); await page.waitForTimeout(400);
   await page.click('#pt-player'); await page.waitForTimeout(300);
@@ -229,17 +230,10 @@ test('player preferences, the equalizer and group mode; the equalizer survives a
   await expect(page.locator('#eqNote'), 'the note is honest about the streams it cannot touch').toContainText('would silence it');
 
   await page.click('#pt-player'); await page.waitForTimeout(300);
-  expect(await page.isChecked('#cfgGroup'), 'group listening is on to start with').toBe(true);
-  await page.uncheck('#cfgGroup'); await page.waitForTimeout(350);
-  expect(await page.getAttribute('.segmented__item[data-mode="solo"]', 'aria-checked'), 'turning it off moves the pills too').toBe('true');
-  await page.check('#cfgGroup'); await page.waitForTimeout(350);
-  expect(await page.getAttribute('.segmented__item[data-mode="group"]', 'aria-checked'), 'and back').toBe('true');
-  await leavePrefs(page);
-  await page.click('.segmented__item[data-mode="solo"]'); await page.waitForTimeout(300);
-  await page.click('#profile'); await page.waitForTimeout(400);
-  await page.click('#pt-player'); await page.waitForTimeout(300);
-  expect(await page.isChecked('#cfgGroup'), 'the pills move the checkbox: the two never disagree').toBe(false);
-  await page.check('#cfgGroup'); await page.waitForTimeout(300);
+  await expect(page.locator('#cfgGroup'), 'Group listening is off by default').not.toBeChecked();
+  await expect(page.locator('#cfgGroup'), 'and unavailable without a paired Hub').toBeDisabled();
+  await expect(page.locator('.segmented__item[data-mode="solo"]')).toHaveAttribute('aria-checked', 'true');
+  await expect(page.locator('.segmented__item[data-mode="group"]')).toBeDisabled();
 
   await leavePrefs(page);
   await reload(page);

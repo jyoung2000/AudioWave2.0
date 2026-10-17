@@ -235,6 +235,31 @@ Built and tested end to end (`music-player/tests/e2e/awsp.spec.ts`, §8). Four p
   and the six-digit code and shows the PC's name, the connection type and the track count; while a
   PC track plays, the indicator beside the transport reads **relay-carried** (or direct, bridge).
   Not in the single-file build: a `file://` page has no service worker to be the bridge.
+
+### Paired Companion tools and downloads
+
+The same paired control stream exposes a fixed operation allowlist: `tools.status`, `downloads.start`,
+`downloads.status`, `downloads.forget`, and `downloads.fileChunk`, alongside radio, catalog, TV-channel
+and guide operations. `tools.status` returns the Companion helper's health record, so the Player shows
+**yt-dlp, spotDL and FFmpeg** as soon as pairing succeeds; it rechecks every 3 s
+for up to a minute while automatic setup reports that a tool is still installing. The Player prefers
+this AWSP backend to a separately saved loopback helper credential.
+
+`catalog.search` remains a fixed metadata-only operation. The MusicSearch provider is disabled in the
+Player UI and its runtime is not included in this public source pending upstream license clarification;
+search tests use fixtures and do not establish a live provider.
+
+Download requests carry only a validated URL, supported downloader/format and explicit rights-basis
+acknowledgement. The bridge accepts no command, executable, helper URL, output path or arbitrary helper
+route. A job is accessible only to the AWSP peer that started it, with grants capped at 64 jobs per peer,
+1,024 globally and 24 hours. File bytes are returned as base64 JSON chunks capped at 180 KiB (below the
+256 KiB AWSP control-frame ceiling); filenames/content types are metadata, and no Companion filesystem
+path is returned. The Player deletes the temporary helper job after import or failed transfer.
+
+The paired downloader E2E uses the real Rust sidecar, browser and local relay with a controlled helper
+fixture. It verifies all three tool statuses and the authorized download/job/chunk/import flow; it does
+**not** prove a live installed Companion's provisioner or a real third-party download. Backups, restore
+and TV/movie inventory/playback remain outside this implemented slice.
 - **Safari's HLS path is not implemented.** `/awsp/hls/<id>/index.m3u8` (FLAC-in-fMP4 segmented by
   the server with `ffmpeg -c:a flac -f hls -hls_segment_type fmp4 -hls_fmp4_init_filename
   init.mp4`) does not exist in the sidecar or the service worker, and nothing here has run in

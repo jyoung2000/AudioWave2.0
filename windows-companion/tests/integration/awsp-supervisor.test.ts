@@ -104,11 +104,15 @@ describe.skipIf(!built)(`the streaming server, supervised${built ? '' : ' (skipp
 class FakeSidecar extends EventEmitter {
   stdout = new PassThrough();
   stderr = new PassThrough();
+  configuration: Record<string, unknown> | null = null;
   stdin = new Writable({
     write: (chunk: Buffer, _encoding, done) => {
       for (const line of chunk.toString().split('\n').filter(Boolean)) {
-        const message = JSON.parse(line) as { cmd?: string };
-        if (!message.cmd) this.say({ event: 'ready', endpoint_id: 'e'.repeat(64), ticket: 'endpointabc', relay_url: null });
+        const message = JSON.parse(line) as { cmd?: string } & Record<string, unknown>;
+        if (!message.cmd) {
+          this.configuration = message;
+          this.say({ event: 'ready', endpoint_id: 'e'.repeat(64), ticket: 'endpointabc', relay_url: null });
+        }
         if (message.cmd === 'shutdown') setTimeout(() => this.exit(), 1);
       }
       done();
@@ -137,7 +141,10 @@ describe('which connections it streams on, and when a device was last seen', () 
     return child;
   }) as unknown as typeof spawn;
 
-  const make = () =>
+  const make = (
+    helperBridge?: () => { port: number; token: string } | null,
+    log: (line: string) => void = () => undefined,
+  ) =>
     new AwspSupervisor({
       store,
       secretBox,
@@ -146,13 +153,33 @@ describe('which connections it streams on, and when a device was last seen', () 
       cacheDir: join(dir, 'cache'),
       serverName: 'Test companion',
       onStatus: () => undefined,
-      log: () => undefined,
+      log,
+      ...(helperBridge ? { helperBridge } : {}),
       spawnImpl,
       probeNetwork: async () => connection,
       now: () => clock,
     });
 
   afterEach(() => store?.close());
+
+  it('passes the internal helper token only to the sidecar config, never status or logs', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'np-awsp-helper-'));
+    store = new CompanionStore(openCompanionDb(join(dir, 'companion.sqlite')));
+    sidecars = [];
+    connection = 'unmetered';
+    clock = Date.parse('2026-10-03T12:00:00Z');
+    const secret = 'unit-only-helper-secret';
+    const logs: string[] = [];
+    supervisor = make(() => ({ port: 17342, token: secret }), (line) => logs.push(line));
+
+    await supervisor.setEnabled(true);
+    await supervisor.checkNetwork();
+    await until(() => supervisor!.getStatus(), (s) => s.running);
+
+    expect(sidecars[0]?.configuration).toMatchObject({ helper_port: 17342, helper_token: secret });
+    expect(JSON.stringify(supervisor.getStatus())).not.toContain(secret);
+    expect(logs.join('\n')).not.toContain(secret);
+  });
 
   it('pauses on a metered connection when that is switched off, says why, and starts again when allowed', async () => {
     dir = mkdtempSync(join(tmpdir(), 'np-awsp-net-'));

@@ -29,6 +29,8 @@ const dialogPick: { path: string | null } = { path: null };
 
 /** The page the packaged app loads; the main process answers IPC only from this URL. */
 const APP_PAGE = pathToFileURL(fileURLToPath(new URL('../../src/renderer/index.html', import.meta.url))).href;
+// Never bind the test helper to the user's default Companion port; a real Companion may be running.
+const TEST_HELPER_PORT = 17348;
 
 vi.mock('electron', () => {
   class FakeWindow {
@@ -120,6 +122,25 @@ async function call(channel: string, request: unknown, senderUrl: string | null 
   return handler({ senderFrame: senderUrl === null ? null : { url: senderUrl } }, request);
 }
 
+async function setTestHelperPort(): Promise<void> {
+  // Let any previous start/restart settle before changing the port again. The embedded helper
+  // serializes starts; a settings change during startup intentionally coalesces with that start.
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const status = (await call('helper:status', undefined)) as { running: boolean; reason: string | null };
+    if (status.running || status.reason) { await new Promise((resolve) => setTimeout(resolve, 300)); break; }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  await call('app:preferences:set', { helperPort: TEST_HELPER_PORT });
+  let lastReason: string | null = null;
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const status = (await call('helper:status', undefined)) as { running: boolean; reason: string | null };
+    if (status.running) return;
+    lastReason = status.reason;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`The test helper did not start on port ${TEST_HELPER_PORT}: ${lastReason ?? 'no status reason'}.`);
+}
+
 function emitApp(event: string): void {
   for (const fn of appEvents.get(event) ?? []) fn({ preventDefault: () => undefined });
 }
@@ -144,6 +165,7 @@ beforeAll(async () => {
   await import('../../src/main/index.js');
   // The bootstrap runs inside `app.whenReady().then(...)`; let that microtask settle.
   await new Promise((resolve) => setTimeout(resolve, 50));
+  await setTestHelperPort();
 });
 
 afterAll(() => {
@@ -279,7 +301,11 @@ describe('transfers', () => {
 });
 
 describe('the embedded helper and the backup channels', () => {
-  it('starts the helper on the preferred port and answers its health route', async () => {
+  // The preferences reset test above deliberately restores 17342; move the helper back to this
+  // isolated port before exercising the real HTTP server so a running desktop Companion is untouched.
+  beforeAll(setTestHelperPort);
+
+  it('starts the helper on the configured test port and answers its health route', async () => {
     const status = (await call('helper:status', undefined)) as { running: boolean; origin: string | null; reason: string | null; tools: Array<{ id: string; present: boolean }> };
     expect(status.running, status.reason ?? '').toBe(true);
     const health = await fetch(`${status.origin}/helper/v1/health`);

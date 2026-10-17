@@ -31,7 +31,7 @@ import { SearchView } from './views/Search.js';
 import { StreamingView } from './views/Streaming.js';
 import { TransfersView } from './views/Transfers.js';
 import { PRODUCT_NAME } from '../shared/identity.js';
-import type { AwspStatus, HelperStatus, HubConnection, TvLinks } from '../shared/ipc.js';
+import type { AwspStatus, HelperStatus, HubConnection, Preferences, TvLinks } from '../shared/ipc.js';
 
 /** The sections. Each is a screen in design/coverage.json; the tab it lives in is below. */
 export type ViewId = 'folders' | 'library' | 'playlists' | 'search' | 'live-tv' | 'streaming' | 'hub' | 'transfers' | 'settings' | 'backup' | 'about';
@@ -68,7 +68,7 @@ const TABS: ReadonlyArray<{ id: TabId; label: string; icon: () => ReactNode; sec
     label: 'Remote',
     icon: RemoteToolIcon,
     sections: ['streaming', 'hub', 'transfers'],
-    lead: 'Reach this PC from the Airwave player wherever you are. Every connection is encrypted, and only devices you pair here can connect.',
+    lead: 'Pair the Music Player on this PC with the local Companion helper, or create a separate streaming ticket for a remote player. The two connections use different credentials.',
   },
   {
     id: 'settings',
@@ -85,7 +85,7 @@ const SECTION_TITLES: Record<ViewId, string> = {
   playlists: 'Playlists',
   search: 'Search',
   'live-tv': 'Live TV',
-  streaming: 'Stream to your devices',
+  streaming: 'Music Player pairing and remote streaming',
   hub: 'Hub connection',
   transfers: 'Transfers',
   settings: 'Settings',
@@ -210,7 +210,7 @@ function Companion() {
       case 'live-tv':
         return <LiveTvView links={tv} onChanged={setPushedTv} />;
       case 'streaming':
-        return <StreamingView status={awsp} onChanged={setPushedAwsp} />;
+        return <StreamingView status={awsp} onChanged={setPushedAwsp} helper={helper.data ?? null} preferences={prefs.data ?? null} />;
       case 'hub':
         return <HubView status={hub} onChanged={refreshHub} />;
       case 'transfers':

@@ -55,11 +55,20 @@ pub struct Frame {
 
 impl Frame {
     pub fn new(kind: &str, payload: Value) -> Self {
-        Frame { id: 0, kind: kind.to_string(), seq: 0, payload, re: None }
+        Frame {
+            id: 0,
+            kind: kind.to_string(),
+            seq: 0,
+            payload,
+            re: None,
+        }
     }
 
     pub fn reply(kind: &str, payload: Value, re: u64) -> Self {
-        Frame { re: Some(re), ..Frame::new(kind, payload) }
+        Frame {
+            re: Some(re),
+            ..Frame::new(kind, payload)
+        }
     }
 }
 
@@ -76,13 +85,19 @@ pub enum FrameError {
 }
 
 /// Read one frame's JSON bytes. `Ok(None)` is a clean end of stream at a frame boundary.
-pub async fn read_frame_bytes<R: AsyncRead + Unpin>(r: &mut R) -> Result<Option<Vec<u8>>, FrameError> {
+pub async fn read_frame_bytes<R: AsyncRead + Unpin>(
+    r: &mut R,
+) -> Result<Option<Vec<u8>>, FrameError> {
     let mut len = [0u8; 4];
     let mut got = 0;
     while got < 4 {
         let n = r.read(&mut len[got..]).await?;
         if n == 0 {
-            return if got == 0 { Ok(None) } else { Err(FrameError::Truncated) };
+            return if got == 0 {
+                Ok(None)
+            } else {
+                Err(FrameError::Truncated)
+            };
         }
         got += n;
     }
@@ -92,7 +107,11 @@ pub async fn read_frame_bytes<R: AsyncRead + Unpin>(r: &mut R) -> Result<Option<
     }
     let mut buf = vec![0u8; len];
     r.read_exact(&mut buf).await.map_err(|e| {
-        if e.kind() == std::io::ErrorKind::UnexpectedEof { FrameError::Truncated } else { FrameError::Io(e) }
+        if e.kind() == std::io::ErrorKind::UnexpectedEof {
+            FrameError::Truncated
+        } else {
+            FrameError::Io(e)
+        }
     })?;
     Ok(Some(buf))
 }
@@ -104,7 +123,10 @@ pub async fn read_frame<R: AsyncRead + Unpin>(r: &mut R) -> Result<Option<Frame>
     }
 }
 
-pub async fn write_json<W: AsyncWrite + Unpin, T: Serialize>(w: &mut W, value: &T) -> Result<(), FrameError> {
+pub async fn write_json<W: AsyncWrite + Unpin, T: Serialize>(
+    w: &mut W,
+    value: &T,
+) -> Result<(), FrameError> {
     let body = serde_json::to_vec(value)?;
     if body.len() > MAX_FRAME {
         return Err(FrameError::TooLarge(body.len()));
@@ -202,7 +224,12 @@ pub fn resolve_range(total_len: u64, start: u64, end: Option<u64>) -> Option<(u6
 /// Write the inclusive byte range `[start, end]` of `file` to `w` in 64 KiB chunks, awaiting each
 /// write (so QUIC flow control paces the read — never the whole file in memory). Returns the
 /// number of bytes written.
-pub async fn copy_range<W: AsyncWrite + Unpin>(w: &mut W, file: &Path, start: u64, end: u64) -> std::io::Result<u64> {
+pub async fn copy_range<W: AsyncWrite + Unpin>(
+    w: &mut W,
+    file: &Path,
+    start: u64,
+    end: u64,
+) -> std::io::Result<u64> {
     let mut f = tokio::fs::File::open(file).await?;
     f.seek(std::io::SeekFrom::Start(start)).await?;
     let mut remaining = end - start + 1;
@@ -212,7 +239,10 @@ pub async fn copy_range<W: AsyncWrite + Unpin>(w: &mut W, file: &Path, start: u6
         let want = remaining.min(CHUNK as u64) as usize;
         let n = f.read(&mut buf[..want]).await?;
         if n == 0 {
-            return Err(std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "file shrank while streaming"));
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "file shrank while streaming",
+            ));
         }
         w.write_all(&buf[..n]).await?;
         remaining -= n as u64;
@@ -248,10 +278,17 @@ mod tests {
     #[tokio::test]
     async fn frames_round_trip_and_reject_oversize() {
         let (mut a, mut b) = tokio::io::duplex(1 << 20);
-        write_json(&mut a, &Frame::new("ping", serde_json::json!({}))).await.unwrap();
-        a.write_all(&((MAX_FRAME as u32) + 1).to_be_bytes()).await.unwrap();
+        write_json(&mut a, &Frame::new("ping", serde_json::json!({})))
+            .await
+            .unwrap();
+        a.write_all(&((MAX_FRAME as u32) + 1).to_be_bytes())
+            .await
+            .unwrap();
         drop(a);
         assert_eq!(read_frame(&mut b).await.unwrap().unwrap().kind, "ping");
-        assert!(matches!(read_frame(&mut b).await, Err(FrameError::TooLarge(_))));
+        assert!(matches!(
+            read_frame(&mut b).await,
+            Err(FrameError::TooLarge(_))
+        ));
     }
 }

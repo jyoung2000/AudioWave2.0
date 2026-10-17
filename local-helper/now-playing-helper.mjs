@@ -20408,6 +20408,12 @@ var HelperResolved = external_exports.object({
   }).nullable(),
   resolvedAt: IsoDateTime
 });
+var HELPER_FILE_CHUNK_BYTES = 180 * 1024;
+var HelperFileChunk = external_exports.object({
+  offset: external_exports.number().int().nonnegative(),
+  totalBytes: external_exports.number().int().nonnegative(),
+  dataBase64: external_exports.string().max(Math.ceil(HELPER_FILE_CHUNK_BYTES / 3) * 4)
+});
 var HELPER_ROUTES = {
   health: "/helper/v1/health",
   /**
@@ -20425,7 +20431,8 @@ var HELPER_ROUTES = {
   radioNowPlaying: "/helper/v1/radio/now-playing",
   install: (tool) => `/helper/v1/tools/${tool}/install`,
   job: (id) => `/helper/v1/jobs/${encodeURIComponent(id)}`,
-  file: (jobId, fileId) => `/helper/v1/jobs/${encodeURIComponent(jobId)}/files/${encodeURIComponent(fileId)}`
+  file: (jobId, fileId) => `/helper/v1/jobs/${encodeURIComponent(jobId)}/files/${encodeURIComponent(fileId)}`,
+  fileChunk: (jobId, fileId, offset, length) => `/helper/v1/jobs/${encodeURIComponent(jobId)}/files/${encodeURIComponent(fileId)}/chunk?offset=${offset}&length=${length}`
 };
 var HELPER_DEFAULT_HOSTS = [
   "youtube.com",
@@ -22276,6 +22283,7 @@ function checkFetchUrl(input2, allowedHosts) {
 
 // src/server.ts
 import { createReadStream as createReadStream2, statSync as statSync5 } from "node:fs";
+import { open as open3 } from "node:fs/promises";
 import { createServer } from "node:http";
 import { networkInterfaces } from "node:os";
 
@@ -26965,6 +26973,35 @@ async function startHelper(options) {
       resolver.invalidate();
       const result = { tool: id, installed: outcome.installed, version: outcome.version, reason: outcome.reason };
       return send(response, result.installed ? 200 : 409, result);
+    }
+    const chunk = /^\/helper\/v1\/jobs\/([^/]+)\/files\/([^/]+)\/chunk$/.exec(path);
+    if (chunk && request.method === "GET") {
+      const jobId = safeDecode3(chunk[1]);
+      const fileId = safeDecode3(chunk[2]);
+      if (jobId === null || fileId === null) return fail(response, 400, "validation", "That address is not encoded properly.");
+      const rawOffset = url2.searchParams.get("offset");
+      const rawLength = url2.searchParams.get("length");
+      if (!rawOffset || !rawLength || !/^(0|[1-9]\d*)$/.test(rawOffset) || !/^[1-9]\d*$/.test(rawLength))
+        return fail(response, 400, "validation", "A non-negative offset and positive length are required.");
+      const offset = Number(rawOffset);
+      const length = Number(rawLength);
+      if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(length) || length > HELPER_FILE_CHUNK_BYTES)
+        return fail(response, 400, "validation", `The chunk length cannot exceed ${HELPER_FILE_CHUNK_BYTES} bytes.`);
+      const found = jobs.filePath(jobId, fileId);
+      if (!found) return fail(response, 404, "not-found", "That file is not here any more.");
+      let handle2 = null;
+      try {
+        handle2 = await open3(found.path, "r");
+        const { size } = await handle2.stat();
+        if (offset > size) return fail(response, 416, "range", "The requested chunk starts beyond the end of the file.");
+        const buffer = Buffer.alloc(Math.min(length, size - offset));
+        const { bytesRead } = buffer.length ? await handle2.read(buffer, 0, buffer.length, offset) : { bytesRead: 0 };
+        return send(response, 200, { offset, totalBytes: size, dataBase64: buffer.subarray(0, bytesRead).toString("base64") });
+      } catch {
+        return fail(response, 404, "not-found", "That file is not here any more.");
+      } finally {
+        await handle2?.close().catch(() => void 0);
+      }
     }
     const file2 = /^\/helper\/v1\/jobs\/([^/]+)\/files\/([^/]+)$/.exec(path);
     if (file2 && request.method === "GET") {

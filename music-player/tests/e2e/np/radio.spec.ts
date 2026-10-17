@@ -31,6 +31,28 @@ test.beforeEach(async ({ page }) => {
 });
 test.afterEach(() => { expect(errors, 'JS errors').toEqual([]); });
 
+test('radio now-playing metadata uses the paired Companion channel before local helper access', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const w = window as unknown as {
+      NP_AWSP_READY: Promise<unknown>;
+      radioMeta: (url: string, tuned: boolean) => Promise<{ title: string; artist: string } | null>;
+      __awspCalls: Array<{ operation: string; args: Record<string, unknown> }>;
+    };
+    w.__awspCalls = [];
+    w.NP_AWSP_READY = Promise.resolve({
+      status: async () => ({ paired: true, serverName: 'Living room PC' }),
+      companion: async (operation: string, args: Record<string, unknown>) => {
+        w.__awspCalls.push({ operation, args });
+        return { title: 'Night Broadcast', artist: 'Companion Radio' };
+      },
+    });
+    const metadata = await w.radioMeta('https://metadata.example/stream', true);
+    return { metadata, calls: w.__awspCalls };
+  });
+  expect(result.metadata).toEqual({ title: 'Night Broadcast', artist: 'Companion Radio' });
+  expect(result.calls).toEqual([{ operation: 'radio.nowPlaying', args: { url: 'https://metadata.example/stream' } }]);
+});
+
 async function openRadio(page: Page): Promise<void> {
   await page.click('.tb__btn[data-view="radio"]');
   await settle(page, 'Chicago');

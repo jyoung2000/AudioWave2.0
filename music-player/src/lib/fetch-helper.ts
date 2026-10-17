@@ -24,32 +24,79 @@ export interface SavedHelper {
 }
 
 const PROBE_TIMEOUT_MS = 2500;
+const TOKEN_PROBE_JOB_ID = '00000000-0000-4000-8000-000000000001';
 
 /** The helper puts it there on the way out; see `local-helper/src/app.ts`. */
 export function tokenInDocument(doc: Document = document): string | null {
   return doc.querySelector<HTMLMetaElement>(`meta[name="${HELPER_TOKEN_META}"]`)?.content?.trim() || null;
 }
 
+/** Normalize a helper URL without allowing credentials or a path to receive the saved token. */
+function originOnly(value: string): string | null {
+  try {
+    const raw = value.trim();
+    const url = new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(raw) ? raw : `http://${raw}`);
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.pathname !== '/' || url.search || url.hash) return null;
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
+/** A standalone player may pair directly only with the Companion on this PC. */
+export function loopbackHelperOrigin(value: string): string | null {
+  const origin = originOnly(value);
+  if (!origin) return null;
+  const hostname = new URL(origin).hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  return ['localhost', '127.0.0.1', '::1'].includes(hostname) ? origin : null;
+}
+
+export interface ConnectedHelper {
+  origin: string;
+  token: string;
+  health: HelperHealth;
+}
+
+/** Validate the protected route before persisting a token from the player’s Settings. */
+export async function connectHelper(value: string, valueToken: string): Promise<ConnectedHelper | null> {
+  const origin = loopbackHelperOrigin(value);
+  const token = valueToken.trim();
+  if (!origin || !token) return null;
+  const health = await ask(origin, token);
+  return health ? { origin, token, health } : null;
+}
+
 export async function helperBackend(saved: SavedHelper | null, doc: Document = document): Promise<ToolBackend | null> {
   const local = tokenInDocument(doc);
   if (local) {
-    const here = await ask(window.location.origin, local);
-    if (here) return backend(window.location.origin, local, here, true);
+    const origin = originOnly(window.location.origin);
+    const here = origin ? await ask(origin, local) : null;
+    if (here && origin) return backend(origin, local, here, true);
   }
   if (saved) {
-    const there = await ask(saved.origin, saved.token);
-    if (there) return backend(saved.origin, saved.token, there, false);
+    const origin = originOnly(saved.origin);
+    const token = saved.token.trim();
+    const there = origin && token ? await ask(origin, token) : null;
+    if (there && origin) return backend(origin, token, there, false);
   }
   return null;
 }
 
+/** Public health describes the helper; a protected, nonexistent job proves this token is accepted. */
 async function ask(origin: string, token: string): Promise<HelperHealth | null> {
   try {
-    const response = await fetch(`${origin}${HELPER_ROUTES.health}`, { headers: { 'x-helper-token': token }, signal: AbortSignal.timeout(PROBE_TIMEOUT_MS), cache: 'no-store' });
+    const response = await fetch(`${origin}${HELPER_ROUTES.health}`, { signal: AbortSignal.timeout(PROBE_TIMEOUT_MS), cache: 'no-store', credentials: 'omit' });
     if (!response.ok) return null;
     const parsed = HelperHealth.safeParse(await response.json());
     if (!parsed.success || !protocolMatches(parsed.data)) return null;
-    return parsed.data;
+    const probe = await fetch(`${origin}${HELPER_ROUTES.job(TOKEN_PROBE_JOB_ID)}`, {
+      headers: { 'x-helper-token': token },
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+      cache: 'no-store',
+      credentials: 'omit',
+    });
+    // The job does not exist. A 404 is the expected authenticated answer; 401/403 must never unlock tools.
+    return probe.status === 404 || probe.ok ? parsed.data : null;
   } catch {
     // Nothing listening, a refused origin, a timeout. All the same answer.
     return null;

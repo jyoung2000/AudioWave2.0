@@ -36,7 +36,10 @@ pub const T: Duration = Duration::from_secs(20);
 
 pub fn init_tracing() {
     let _ = tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::try_from_env("AWSP_LOG").unwrap_or_else(|_| "awsp_server=info".into()))
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_env("AWSP_LOG")
+                .unwrap_or_else(|_| "awsp_server=info".into()),
+        )
         .with_test_writer()
         .try_init();
 }
@@ -60,7 +63,11 @@ pub fn make_library(db: &Path, tracks: &[(&str, &Path, u64)]) {
             rusqlite::params![folder_id, folder],
         )
         .unwrap();
-        let folder_id: String = c.query_row("SELECT id FROM folders WHERE path = ?1", [&folder], |r| r.get(0)).unwrap();
+        let folder_id: String = c
+            .query_row("SELECT id FROM folders WHERE path = ?1", [&folder], |r| {
+                r.get(0)
+            })
+            .unwrap();
         let name = file.file_name().unwrap().to_string_lossy().to_string();
         let track = json!({ "id": id, "title": format!("Track {id}"), "artistName": "Test Artist", "albumName": "Test Album", "durationMs": duration_ms });
         let size = std::fs::metadata(file).map(|m| m.len()).unwrap_or(0) as i64;
@@ -82,7 +89,12 @@ pub fn secret_hex(key: &SecretKey) -> String {
 }
 
 pub fn allow(key: &SecretKey, tier_cap: Tier) -> AllowEntry {
-    AllowEntry { id: key.public().to_string(), name: "test device".into(), tier_cap, paired_at: "2026-01-01T00:00:00Z".into() }
+    AllowEntry {
+        id: key.public().to_string(),
+        name: "test device".into(),
+        tier_cap,
+        paired_at: "2026-01-01T00:00:00Z".into(),
+    }
 }
 
 pub struct Harness {
@@ -114,6 +126,8 @@ pub fn base_config(dir: &Path) -> Config {
         library_db: dir.join("companion.sqlite"),
         cache_dir: dir.join("cache"),
         server_name: "Test Companion".into(),
+        helper_port: None,
+        helper_token: None,
         allowlist: vec![],
         relay_mode: RelayModeConfig::Disabled,
         relay_urls: vec![],
@@ -135,20 +149,40 @@ pub async fn start(cfg: Config, dir: TempDir) -> Harness {
             library_db: cfg.library_db.clone(),
             cache_dir: cfg.cache_dir.clone(),
             allowlist: cfg.allowlist.clone(),
+            helper_port: cfg.helper_port,
+            helper_token: cfg.helper_token.clone(),
             ffmpeg: None,
         },
         tx,
     );
     let ep = server.endpoint();
     let addr = if cfg.relay_only {
-        timeout(T, ep.online()).await.expect("server reached the relay");
+        timeout(T, ep.online())
+            .await
+            .expect("server reached the relay");
         let url: RelayUrl = cfg.relay_urls[0].parse().unwrap();
         EndpointAddr::from_parts(ep.id(), [TransportAddr::Relay(url)])
     } else {
-        let port = ep.bound_sockets().into_iter().find(SocketAddr::is_ipv4).expect("an IPv4 socket").port();
-        EndpointAddr::from_parts(ep.id(), [TransportAddr::Ip(SocketAddr::from((Ipv4Addr::LOCALHOST, port)))])
+        let port = ep
+            .bound_sockets()
+            .into_iter()
+            .find(SocketAddr::is_ipv4)
+            .expect("an IPv4 socket")
+            .port();
+        EndpointAddr::from_parts(
+            ep.id(),
+            [TransportAddr::Ip(SocketAddr::from((
+                Ipv4Addr::LOCALHOST,
+                port,
+            )))],
+        )
     };
-    Harness { server, events, addr, dir }
+    Harness {
+        server,
+        events,
+        addr,
+        dir,
+    }
 }
 
 pub async fn direct_client(key: SecretKey) -> Endpoint {
@@ -171,12 +205,17 @@ pub async fn relay_only_client(key: SecretKey, relay: RelayUrl) -> Endpoint {
         .bind()
         .await
         .expect("bind relay-only client");
-    timeout(T, ep.online()).await.expect("client reached the relay");
+    timeout(T, ep.online())
+        .await
+        .expect("client reached the relay");
     ep
 }
 
 pub async fn connect(client: &Endpoint, addr: &EndpointAddr) -> Connection {
-    timeout(T, client.connect(addr.clone(), ALPN)).await.expect("connect timed out").expect("connect")
+    timeout(T, client.connect(addr.clone(), ALPN))
+        .await
+        .expect("connect timed out")
+        .expect("connect")
 }
 
 /// The client's control stream.
@@ -189,12 +228,22 @@ pub struct Control {
 impl Control {
     pub async fn open(conn: &Connection) -> Control {
         let (send, recv) = conn.open_bi().await.expect("open control stream");
-        Control { send, recv, next_id: 0 }
+        Control {
+            send,
+            recv,
+            next_id: 0,
+        }
     }
 
     pub async fn send(&mut self, kind: &str, payload: Value) -> u64 {
         self.next_id += 1;
-        let f = Frame { id: self.next_id, kind: kind.into(), seq: 0, payload, re: None };
+        let f = Frame {
+            id: self.next_id,
+            kind: kind.into(),
+            seq: 0,
+            payload,
+            re: None,
+        };
         write_json(&mut self.send, &f).await.expect("send frame");
         self.next_id
     }
@@ -203,7 +252,10 @@ impl Control {
     pub async fn expect(&mut self, kind: &str) -> Frame {
         timeout(T, async {
             loop {
-                let f = read_frame(&mut self.recv).await.expect("read frame").expect("control stream open");
+                let f = read_frame(&mut self.recv)
+                    .await
+                    .expect("read frame")
+                    .expect("control stream open");
                 if f.kind == kind {
                     return f;
                 }
@@ -214,7 +266,11 @@ impl Control {
     }
 
     pub async fn hello(&mut self) -> Frame {
-        self.send("hello", json!({ "device_name": "test", "client_kind": "android", "protocol_version": 1 })).await;
+        self.send(
+            "hello",
+            json!({ "device_name": "test", "client_kind": "android", "protocol_version": 1 }),
+        )
+        .await;
         self.expect("welcome").await
     }
 }
@@ -231,7 +287,9 @@ pub async fn fetch(conn: &Connection, req: Value) -> Result<(AudioHeader, Vec<u8
         Err(_) => return Err(u64::MAX),
     }
     let mut body = Vec::new();
-    AsyncReadExt::read_to_end(&mut recv, &mut body).await.map_err(|_| u64::MAX)?;
+    AsyncReadExt::read_to_end(&mut recv, &mut body)
+        .await
+        .map_err(|_| u64::MAX)?;
     Ok((parse_audio_header(&h), body))
 }
 
@@ -258,7 +316,23 @@ pub async fn hires_flac(dir: &Path, seconds: u32) -> Option<PathBuf> {
         "anoisesrc=r=96000:d={seconds}:c=pink:a=0.25:seed=1[l];anoisesrc=r=96000:d={seconds}:c=pink:a=0.25:seed=2[r];[l][r]amerge=inputs=2[out]"
     );
     let status = tokio::process::Command::new("ffmpeg")
-        .args(["-v", "error", "-y", "-filter_complex", &graph, "-map", "[out]", "-ac", "2", "-sample_fmt", "s32", "-bits_per_raw_sample", "24", "-c:a", "flac"])
+        .args([
+            "-v",
+            "error",
+            "-y",
+            "-filter_complex",
+            &graph,
+            "-map",
+            "[out]",
+            "-ac",
+            "2",
+            "-sample_fmt",
+            "s32",
+            "-bits_per_raw_sample",
+            "24",
+            "-c:a",
+            "flac",
+        ])
         .arg(&out)
         .status()
         .await
@@ -281,7 +355,9 @@ pub async fn stallable_proxy(target: SocketAddr, stall: Arc<AtomicBool>) -> Sock
         while let Ok((inbound, _)) = listener.accept().await {
             let stall = stall.clone();
             tokio::spawn(async move {
-                let Ok(outbound) = TcpStream::connect(target).await else { return };
+                let Ok(outbound) = TcpStream::connect(target).await else {
+                    return;
+                };
                 let _ = inbound.set_nodelay(true);
                 let _ = outbound.set_nodelay(true);
                 let (ri, wi) = inbound.into_split();
@@ -294,7 +370,11 @@ pub async fn stallable_proxy(target: SocketAddr, stall: Arc<AtomicBool>) -> Sock
     addr
 }
 
-async fn pump(mut from: tokio::net::tcp::OwnedReadHalf, mut to: tokio::net::tcp::OwnedWriteHalf, stall: Arc<AtomicBool>) {
+async fn pump(
+    mut from: tokio::net::tcp::OwnedReadHalf,
+    mut to: tokio::net::tcp::OwnedWriteHalf,
+    stall: Arc<AtomicBool>,
+) {
     let mut buf = vec![0u8; 16 * 1024];
     loop {
         let n = match from.read(&mut buf).await {

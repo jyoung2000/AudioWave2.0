@@ -1,15 +1,13 @@
 /**
- * Stream to your devices (docs/AWSP.md): the Remote tab's “Pair a device”, as the design drew it —
- * the code on its LCD, New Code, three steps — with what makes it real beside it.
- *
- * Streaming is off until it is turned on here. When it is on, a one-time code pairs a device and
- * the ticket — this PC's address on the streaming network — is shown as a QR code and can be
- * copied; paired devices are listed with the most they may ask for and whether each is connected
- * directly or carried by a relay. Everything is the main process's; this view only asks.
+ * The Remote tab presents one Player pairing address and one single-use code. That pairing creates
+ * the per-device AWSP identity used for encrypted streaming and the allowlisted Companion bridge;
+ * the helper token remains inside Companion for local server-side calls. Older direct-helper
+ * credentials stay available under Advanced for backwards-compatible local workflows.
  */
 import { useEffect, useState } from 'react';
-import type { AwspDevice, AwspStatus, AwspTier } from '../../shared/ipc.js';
+import type { AwspDevice, AwspStatus, AwspTier, HelperStatus, Preferences } from '../../shared/ipc.js';
 import { invoke } from '../bridge.js';
+import { PlayerPairing } from './PlayerPairing.js';
 import { ago, countdown } from '../format.js';
 import { useAction } from '../hooks.js';
 import { DeviceIcon } from '../icons.js';
@@ -51,7 +49,7 @@ const CONNECTION_WORDS: Record<AwspStatus['network']['connection'], string> = {
   unknown: 'Windows hasn’t said what this connection costs; it is treated as Wi-Fi or Ethernet.',
 };
 
-export function StreamingView({ status, onChanged }: { status: AwspStatus | null; onChanged: (status: AwspStatus) => void }) {
+export function StreamingView({ status, onChanged, helper = null, preferences = null }: { status: AwspStatus | null; onChanged: (status: AwspStatus) => void; helper?: HelperStatus | null; preferences?: Preferences | null }) {
   const confirm = useConfirm();
   const [port, setPort] = useState<string | null>(null);
   const [said, setSaid] = useState<string | null>(null);
@@ -89,10 +87,10 @@ export function StreamingView({ status, onChanged }: { status: AwspStatus | null
           : status.pairingCode
             ? 'That code has expired'
             : 'Choose New Code to pair a device';
-  const codeReason = !status?.enabled ? 'Turn on streaming first.' : !running ? 'Streaming is still starting.' : null;
+  const codeReason = !status?.enabled ? 'Allow Player access first.' : !running ? 'The Companion connection is still starting.' : null;
 
   const ask = async (device: AwspDevice) => {
-    const yes = await confirm({ title: `Stop “${device.name}” streaming from this PC?`, detail: 'It is disconnected now, and has to be paired again before it can connect.', action: 'Revoke', destructive: true });
+    const yes = await confirm({ title: `Revoke “${device.name}” Companion access?`, detail: 'This disconnects the device and revokes its per-device identity. It must be paired again before reconnecting.', action: 'Revoke access', destructive: true });
     if (yes) apply(await revoke.run(device.id));
   };
 
@@ -100,9 +98,9 @@ export function StreamingView({ status, onChanged }: { status: AwspStatus | null
     if (!status?.ticket) return;
     try {
       await navigator.clipboard.writeText(status.ticket);
-      setSaid('Ticket copied.');
+      setSaid('Companion pairing address copied.');
     } catch {
-      setSaid('The ticket couldn’t be copied. Scan the QR code instead.');
+      setSaid('The pairing address couldn’t be copied. Scan the QR code instead.');
     }
   };
 
@@ -110,7 +108,8 @@ export function StreamingView({ status, onChanged }: { status: AwspStatus | null
     <>
       <div className="remote-grid">
         <fieldset style={{ margin: 0 }}>
-          <legend>Pair a device</legend>
+          <legend>Pair Music Player with this Companion</legend>
+          <p className="note">Use this single address and one-time code in the Player. It creates a per-device encrypted connection for music streaming and supported Companion features; no helper token is entered in the Player.</p>
           <div className="lcd" role="status">
             <span className="lcd__code" aria-label={left && status?.pairingCode ? `Pairing code ${status.pairingCode.code.split('').join(' ')}` : 'No pairing code'}>
               {lcdCode}
@@ -121,8 +120,8 @@ export function StreamingView({ status, onChanged }: { status: AwspStatus | null
             <Push busy={code.busy} disabled={Boolean(codeReason)} reason={codeReason} onClick={() => void code.run().then(apply)}>
               New Code
             </Push>
-            <Push disabled={!status?.ticket} reason={status?.ticket ? null : 'The ticket appears once streaming is on.'} onClick={() => void copyTicket()}>
-              Copy Ticket
+            <Push disabled={!status?.ticket} reason={status?.ticket ? null : 'The pairing address appears once the connection is on.'} onClick={() => void copyTicket()}>
+              Copy address
             </Push>
           </div>
           {said ? (
@@ -131,13 +130,13 @@ export function StreamingView({ status, onChanged }: { status: AwspStatus | null
             </p>
           ) : null}
           <div className="pairhow">
-            {running && status?.ticketQrSvg ? <div className="pairhow__qr" role="img" aria-label="QR code of this PC’s ticket" dangerouslySetInnerHTML={{ __html: status.ticketQrSvg }} /> : null}
+            {running && status?.ticketQrSvg ? <div className="pairhow__qr" role="img" aria-label="QR code of this Companion’s pairing address" dangerouslySetInnerHTML={{ __html: status.ticketQrSvg }} /> : null}
             <ol className="steps">
               <li>
-                Open the player and choose <b>Settings&nbsp;▸ Sources&nbsp;▸ Connections</b>.
+                Open Music Player and choose <b>Settings&nbsp;▸ Sources&nbsp;▸ Pair Companion</b>.
               </li>
-              <li>Scan the QR code or paste the ticket, then enter this code.</li>
-              <li>The device appears below — that’s it.</li>
+              <li>Scan the QR code or paste this address, then enter the one-time code.</li>
+              <li>The paired device appears below. It uses one revocable identity for streaming and Companion access.</li>
             </ol>
           </div>
         </fieldset>
@@ -145,8 +144,8 @@ export function StreamingView({ status, onChanged }: { status: AwspStatus | null
         <fieldset style={{ margin: 0 }}>
           <legend>How devices may connect</legend>
           <div className="opts">
-            <Option title="Let paired devices stream from this PC" checked={status?.enabled ?? false} disabled={!status || enable.busy} onChange={(event) => void enable.run(event.currentTarget.checked).then(apply)}>
-              On your home network they connect directly. Away from home they connect directly where the network allows, or through an encrypted relay where it doesn’t.
+            <Option title="Allow paired Player devices to connect" checked={status?.enabled ?? false} disabled={!status || enable.busy} onChange={(event) => void enable.run(event.currentTarget.checked).then(apply)}>
+              Enables the shared encrypted Companion connection and music streaming. Devices connect directly where possible, or through an encrypted relay when needed.
             </Option>
             <Option title="On Wi-Fi and Ethernet" checked={status?.network.unmetered ?? true} disabled={!status?.enabled || networks.busy} onChange={(event) => void networks.run({ unmetered: event.currentTarget.checked }).then(apply)}>
               Stream while this PC is on Wi-Fi or a cable.
@@ -156,7 +155,7 @@ export function StreamingView({ status, onChanged }: { status: AwspStatus | null
             </Option>
           </div>
           <p className="note" role="status">
-            {status ? <Status kind={running ? 'ok' : status.enabled ? (status.reason ? 'warn' : 'busy') : 'off'}>{running ? 'Streaming is on' : status.enabled ? (status.reason ?? 'Starting…') : 'Streaming is off'}</Status> : ' '}
+            {status ? <Status kind={running ? 'ok' : status.enabled ? (status.reason ? 'warn' : 'busy') : 'off'}>{running ? 'Player access is on' : status.enabled ? (status.reason ?? 'Starting…') : 'Player access is off'}</Status> : ' '}
           </p>
           {status?.enabled ? <p className="note">{CONNECTION_WORDS[status.network.connection]}</p> : null}
           {enable.error ? <p className="note note--bad">{enable.error}</p> : null}
@@ -164,6 +163,13 @@ export function StreamingView({ status, onChanged }: { status: AwspStatus | null
           <p className="note">Every connection is encrypted. A pairing code works once, and only devices paired here can connect.</p>
         </fieldset>
       </div>
+
+      <details className="legacy-player-pairing" style={{ marginTop: 16 }}>
+        <summary>Advanced — legacy local helper credentials</summary>
+        <div style={{ marginTop: 12 }}>
+          <PlayerPairing helper={helper} preferences={preferences} />
+        </div>
+      </details>
 
       <fieldset style={{ marginTop: 16 }}>
         <legend>Paired devices</legend>

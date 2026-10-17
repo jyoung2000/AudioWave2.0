@@ -65,6 +65,8 @@ export interface AwspSupervisorOptions {
   relayMode?: 'default' | 'disabled';
   /** The FFmpeg the helper resolved (possibly one it set up itself), passed as AWSP_FFMPEG. */
   ffmpegPath?: () => string | null;
+  /** Internal loopback bridge to the helper. The token is sent only to the sidecar over stdin. */
+  helperBridge?: () => { port: number; token: string } | null;
   /** Asks what this PC's connection costs (`network.ts`). Absent: never asked, treated as Wi-Fi or Ethernet. */
   probeNetwork?: () => Promise<NetworkKind>;
   /** Tests start a stand-in for the sidecar. */
@@ -279,6 +281,11 @@ export class AwspSupervisor {
     if (this.child && !this.status.connections.length) void this.restart();
   }
 
+  /** A helper port change must refresh the loopback bridge configuration sent to the sidecar. */
+  helperChanged(): void {
+    if (this.child) void this.restart();
+  }
+
   /** From Electron's powerMonitor: a machine that slept has new sockets to make. */
   onResume(): void {
     if (this.child) void this.restart();
@@ -308,6 +315,7 @@ export class AwspSupervisor {
     // The sidecar transcodes with `AWSP_FFMPEG`, else whatever `ffmpeg` is on PATH. A copy the helper
     // set up itself is not on PATH, so it is named here.
     const ffmpeg = this.options.ffmpegPath?.() ?? null;
+    const helperBridge = this.options.helperBridge?.() ?? null;
     const child = (this.options.spawnImpl ?? spawn)(this.options.binary, [], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, env: { ...process.env, ...(ffmpeg ? { AWSP_FFMPEG: ffmpeg } : {}) } });
     this.child = child;
     const config = {
@@ -315,6 +323,8 @@ export class AwspSupervisor {
       library_db: this.options.libraryDb,
       cache_dir: this.options.cacheDir,
       server_name: this.options.serverName,
+      helper_port: helperBridge?.port ?? null,
+      helper_token: helperBridge?.token ?? null,
       allowlist: this.devices().map((d) => ({ id: d.id, name: d.name, tier_cap: d.tierCap, paired_at: d.pairedAt })),
       relay_mode: this.options.relayMode ?? 'default',
       relay_urls: [],

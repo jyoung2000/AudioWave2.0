@@ -492,7 +492,7 @@ export function SettingsView({ helper, prefs, say }: { helper: Resource<HelperSt
             {token ? <span className="path token">{token}</span> : null}
             <Push onClick={() => void showToken()}>{token ? 'Hide' : 'Show'}</Push>
             {token ? <Push onClick={() => void copyToken()}>Copy</Push> : null}
-            <span className="sub">{tokenNote ?? 'For a player this PC doesn’t serve. It is shown here only, and never written to a log.'}</span>
+            <span className="sub">{tokenNote ?? 'For Music Player pairing, use Remote → Music Player pairing. Both places show the same protected token; it is never written to a log.'}</span>
           </div>
         </div>
         <p className="note">{lanOn ? (helper.data?.lan ? 'The helper is answering this network for the read-only routes above, and this PC for everything.' : 'The helper starts answering this network when it next starts.') : 'The helper listens on this PC only. Other devices reach this PC through Remote.'}</p>

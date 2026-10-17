@@ -9,9 +9,9 @@
  * log entry to carry the result “measured only”. Everything else is the original's.
  */
 import { expect, test, type Page } from '@playwright/test';
-import { boot, watchErrors } from './_shell';
+import { boot, reload, watchErrors } from './_shell';
 
-const CORS = { 'access-control-allow-origin': '*', 'content-type': 'application/json' };
+const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'GET,POST,DELETE,OPTIONS', 'content-type': 'application/json' };
 const HELPER = {
   helper: 'now-playing-local-helper', protocol: 1, version: '0.9.2', servesApp: false,
   tools: [{ id: 'yt-dlp', present: true, version: '2026.09.14', origin: 'installed', installHint: null, installable: true },
@@ -34,8 +34,17 @@ test.describe('desktop', () => {
   test('the companion, the container and backup', async ({ page }) => {
     // 17342 is taken by something else; the helper answers on the next port up
     await page.route('http://127.0.0.1:17342/**', (r) => r.fulfill({ status: 404, headers: CORS, body: '{"error":"nope"}' }));
-    await page.route('http://127.0.0.1:17343/helper/v1/health', (r) => r.fulfill({ status: 200, headers: CORS, body: JSON.stringify(HELPER) }));
-    await page.route('http://127.0.0.1:17343/helper/v1/backup/estimate**', (r) => r.fulfill({ status: 200, headers: CORS, body: JSON.stringify(EST) }));
+    await page.route('http://127.0.0.1:17343/helper/v1/**', async (r) => {
+      if (r.request().method() === 'OPTIONS') return r.fulfill({ status: 204, headers: CORS });
+      const path = new URL(r.request().url()).pathname;
+      if (path.endsWith('/health')) return r.fulfill({ status: 200, headers: CORS, body: JSON.stringify(HELPER) });
+      if (path.includes('/jobs/')) {
+        const accepted = r.request().headers()['x-helper-token'] === 'test-token';
+        return r.fulfill({ status: accepted ? 404 : 401, headers: CORS, body: JSON.stringify({ error: accepted ? 'not-found' : 'auth' }) });
+      }
+      if (path.endsWith('/backup/estimate')) return r.fulfill({ status: 200, headers: CORS, body: JSON.stringify(EST) });
+      return r.fulfill({ status: 404, headers: CORS, body: '{"error":"no route"}' });
+    });
     await page.route(/^http:\/\/127\.0\.0\.1:1734[45]\//, (r) => r.abort('connectionrefused'));
     await page.route('http://192.168.1.20:4546/healthz', (r) => r.fulfill({ status: 200, headers: CORS, body: '{"status":"ok","version":"2.3.0"}' }));
     await page.route('http://192.168.1.20:4546/readyz', (r) => r.fulfill({ status: 200, headers: CORS, body: '{"status":"ok","checks":{"database":"ok","migrations":"ok","identity":"ok","setup":"skipped"}}' }));
@@ -43,20 +52,36 @@ test.describe('desktop', () => {
     await page.route('http://192.168.1.99:4546/**', (r) => r.fulfill({ status: 200, headers: CORS, body: '<html>router</html>' }));
 
     await boot(page, '#settings/src');
-    expect(await page.isVisible('#connGroup') && await page.isVisible('#cfgCompanion') && await page.isVisible('#cfgHub'), 'Sources has both connections: the companion app and the Docker container').toBe(true);
-    expect(await page.$('#pp-player #cfgCompanion'), 'and the companion address no longer sits under Player').toBeNull();
+    expect(await page.isVisible('#connGroup') && await page.isVisible('#pcTicket') && await page.isVisible('#pcCode') && await page.isVisible('#cfgLegacyHelper') && !(await page.isVisible('#cfgCompanionToken')) && await page.isVisible('#cfgHub'), 'Sources presents one Companion address+code flow and keeps legacy helper credentials advanced').toBe(true);
+    expect(await page.$('#pp-player #cfgCompanion'), 'and the legacy helper address no longer sits under Player').toBeNull();
+    await page.locator('#cfgLegacyHelper summary').click();
+    await expect(page.locator('#cfgCompanionToken')).toBeVisible();
     const before = await passed(page);
     expect(before.length >= 8 && before.every((r) => r[3] === '—' || /Waiting/.test(r[3]!)), 'before any test nothing claims to be connected: ' + JSON.stringify(before)).toBe(true);
 
-    // the companion app, found by scanning its ports
+    // public health locates it; the protected request pairs it only with the supplied token
+    await page.fill('#cfgCompanionToken', 'test-token');
     await page.click('#cfgConnect');
-    await expect(page.locator('#cfgConnMsg'), 'an empty address scans the helper ports and finds the app').toContainText(/Connected, but 1 downloader is missing/);
+    await expect(page.locator('#cfgConnMsg'), 'it authenticates the helper before reporting its tools').toContainText(/Connected, but 1 downloader is missing/);
     const facts = (await page.textContent('#connAppFacts')) ?? '';
     expect(facts.includes('v0.9.2') && facts.includes('yt-dlp 2026.09.14') && facts.includes('ffmpeg missing') && facts.includes('youtube.com'), 'and shows what it answered: ' + facts).toBe(true);
     expect(await page.getAttribute('#connAppDot', 'data-state'), 'a missing downloader turns its light amber').toBe('warn');
     const log1 = await page.$$eval('#connLog li', (ls) => ls.map((l) => l.textContent ?? ''));
     expect(log1.some((l) => l.includes('127.0.0.1:17342/helper/v1/health') && l.includes('404')) && log1.some((l) => l.includes(':17343/') && l.includes('200')), 'the log shows each request and what came back').toBe(true);
     expect(await page.evaluate(() => (window as unknown as { COMPANION?: string }).COMPANION), 'and the player uses the address it found').toBe('http://127.0.0.1:17343');
+    await expect(page.locator('#cfgCompanionToken')).toHaveValue('test-token');
+    await expect(page.locator('#cfgForgetToken')).toBeVisible();
+    await expect(page.locator('#cfgTokenSaved')).toBeVisible();
+    expect(await page.evaluate(async () => await window.NP_TOOLS?.hasSaved()), 'the accepted token is saved for this browser').toBe(true);
+    expect(await page.evaluate(() => Array.from({ length: localStorage.length }, (_, i) => localStorage.getItem(localStorage.key(i) ?? '')).some((value) => value?.includes('test-token'))), 'the token is not stored in localStorage').toBe(false);
+
+    await reload(page);
+    await expect(page.locator('#cfgConnMsg'), 'the accepted token reconnects automatically after reload').toContainText('Connected, but 1 downloader is missing.');
+    await page.locator('#cfgLegacyHelper summary').click();
+    await expect(page.locator('#cfgTokenSaved'), 'the UI confirms the token remains saved after reload').toBeVisible();
+    await expect(page.locator('#cfgCompanionToken'), 'the masked field is restored from persistent storage').toHaveValue('test-token');
+    const reconnected = await page.evaluate(async () => await window.NP_TOOLS?.detect());
+    expect(reconnected?.kind === 'helper' && reconnected.saved && reconnected.origin === 'http://127.0.0.1:17343').toBe(true);
 
     // fill a folder and see where it goes
     await page.fill('#srcMusic', 'C:\\Users\\jalon\\Music'); await page.dispatchEvent('#srcMusic', 'change');
@@ -112,6 +137,43 @@ test.describe('desktop', () => {
     await page.fill('#cfgHub', 'http://10.9.9.9:4546'); await page.click('#hubTest');
     await expect(page.locator('#hubMsg'), 'a container that is not there says so').toContainText(/No answer from http:\/\/10\.9\.9\.9:4546/);
     expect(await page.getAttribute('#connHubDot', 'data-state'), 'with a red light').toBe('bad');
+
+    await page.click('#cfgForgetToken');
+    await expect(page.locator('#cfgConnMsg')).toContainText('Saved token forgotten.');
+    await expect(page.locator('#cfgForgetToken')).toBeHidden();
+    await expect(page.locator('#cfgTokenSaved')).toBeHidden();
+    await expect(page.locator('#cfgCompanionToken')).toHaveValue('');
+    expect(await page.evaluate(async () => await window.NP_TOOLS?.hasSaved())).toBe(false);
+    expect(await page.evaluate(() => (window as unknown as { COMPANION?: string }).COMPANION)).toBeUndefined();
+  });
+
+  test('public health is not pairing, a wrong token is refused, and remote token targets are blocked', async ({ page }) => {
+    const probeTokens: string[] = [];
+    const externalRequests: string[] = [];
+    page.on('request', (request) => { if (request.url().includes('attacker.example')) externalRequests.push(request.url()); });
+    await page.route('https://attacker.example/**', (r) => r.abort());
+    await page.route('http://127.0.0.1:17343/helper/v1/**', async (r) => {
+      if (r.request().method() === 'OPTIONS') return r.fulfill({ status: 204, headers: CORS });
+      const path = new URL(r.request().url()).pathname;
+      if (path.endsWith('/health')) return r.fulfill({ status: 200, headers: CORS, body: JSON.stringify(HELPER) });
+      if (path.includes('/jobs/')) { probeTokens.push(r.request().headers()['x-helper-token'] ?? ''); return r.fulfill({ status: 401, headers: CORS, body: '{"error":"auth"}' }); }
+      return r.fulfill({ status: 404, headers: CORS, body: '{"error":"no route"}' });
+    });
+    await boot(page, '#settings/src');
+    await page.locator('#cfgLegacyHelper summary').click();
+    await page.fill('#cfgCompanion', '127.0.0.1:17343');
+    await page.fill('#cfgCompanionToken', 'wrong-token');
+    await page.click('#cfgConnect');
+    await expect(page.locator('#cfgConnMsg')).toContainText('did not accept that token');
+    expect(probeTokens).toEqual(['wrong-token']);
+    expect(await page.evaluate(async () => await window.NP_TOOLS?.hasSaved())).toBe(false);
+    expect(await page.evaluate(() => (window as unknown as { COMPANION?: string }).COMPANION)).toBeUndefined();
+
+    await page.fill('#cfgCompanion', 'https://attacker.example');
+    await page.fill('#cfgCompanionToken', 'never-send-this');
+    await page.click('#cfgConnect');
+    await expect(page.locator('#cfgConnMsg')).toContainText('Use localhost');
+    expect(externalRequests).toEqual([]);
   });
 });
 

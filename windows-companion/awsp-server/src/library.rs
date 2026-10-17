@@ -38,7 +38,10 @@ pub struct Library {
 
 impl Library {
     pub fn new(path: impl Into<PathBuf>) -> Self {
-        Library { path: path.into(), conn: Mutex::new(None) }
+        Library {
+            path: path.into(),
+            conn: Mutex::new(None),
+        }
     }
 
     /// Run `f` against the (lazily opened, read-only) connection. A failed query drops the
@@ -48,7 +51,9 @@ impl Library {
         if guard.is_none() {
             let conn = Connection::open_with_flags(
                 &self.path,
-                OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX | OpenFlags::SQLITE_OPEN_URI,
+                OpenFlags::SQLITE_OPEN_READ_ONLY
+                    | OpenFlags::SQLITE_OPEN_NO_MUTEX
+                    | OpenFlags::SQLITE_OPEN_URI,
             )
             .with_context(|| format!("opening library {}", self.path.display()))?;
             conn.busy_timeout(Duration::from_secs(5))?;
@@ -72,8 +77,12 @@ impl Library {
             )
             .optional()
         })?;
-        let Some((folder, relative, mtime_ms, track)) = row else { return Ok(None) };
-        let Some(path) = join_inside(Path::new(&folder), &relative) else { return Ok(None) };
+        let Some((folder, relative, mtime_ms, track)) = row else {
+            return Ok(None);
+        };
+        let Some(path) = join_inside(Path::new(&folder), &relative) else {
+            return Ok(None);
+        };
         Ok(Some(TrackFile {
             id: track_id.to_string(),
             path,
@@ -84,10 +93,18 @@ impl Library {
 
     /// One page of the library: an FTS query (as `CompanionStore.searchTracks`), optionally
     /// restricted to a relative-path prefix.
-    pub fn browse(&self, path: Option<&str>, query: Option<&str>, page: u32) -> anyhow::Result<Value> {
+    pub fn browse(
+        &self,
+        path: Option<&str>,
+        query: Option<&str>,
+        page: u32,
+    ) -> anyhow::Result<Value> {
         let offset = i64::from(page) * i64::from(PAGE_SIZE);
         let prefix = path.map(|p| format!("{}%", escape_like(p.trim_start_matches('/'))));
-        let terms = query.map(str::trim).filter(|q| !q.is_empty()).map(fts_terms);
+        let terms = query
+            .map(str::trim)
+            .filter(|q| !q.is_empty())
+            .map(fts_terms);
         let (items, total) = self.with(|c| {
             let (sql_from, mut args): (&str, Vec<Box<dyn rusqlite::ToSql>>) = match &terms {
                 Some(t) => (
@@ -124,7 +141,11 @@ impl Library {
 
     /// The newest `updated_at`, a cheap change marker.
     pub fn max_updated_at(&self) -> anyhow::Result<Option<String>> {
-        self.with(|c| c.query_row("SELECT MAX(updated_at) FROM tracks", [], |r| r.get::<_, Option<String>>(0)))
+        self.with(|c| {
+            c.query_row("SELECT MAX(updated_at) FROM tracks", [], |r| {
+                r.get::<_, Option<String>>(0)
+            })
+        })
     }
 
     /// Tracks changed after `since`: live ones as items, tombstoned ones as removed ids.
@@ -141,7 +162,10 @@ impl Library {
                 .collect::<Vec<_>>();
             Ok(rows)
         })?;
-        let until = rows.last().map(|r| r.3.clone()).unwrap_or_else(|| since.to_string());
+        let until = rows
+            .last()
+            .map(|r| r.3.clone())
+            .unwrap_or_else(|| since.to_string());
         let mut items = Vec::new();
         let mut removed = Vec::new();
         for (id, track, deleted, _) in rows {
@@ -159,19 +183,27 @@ impl Library {
 /// escape the folder.
 fn join_inside(folder: &Path, relative: &str) -> Option<PathBuf> {
     let rel = Path::new(relative);
-    if rel.components().any(|c| !matches!(c, Component::Normal(_) | Component::CurDir)) {
+    if rel
+        .components()
+        .any(|c| !matches!(c, Component::Normal(_) | Component::CurDir))
+    {
         return None;
     }
     Some(folder.join(rel))
 }
 
 fn escape_like(s: &str) -> String {
-    s.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_")
+    s.replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
 }
 
 /// Quoted prefix terms, as the companion builds them: a bare quote or hyphen is not a syntax error.
 fn fts_terms(q: &str) -> String {
-    q.split_whitespace().map(|t| format!("\"{}\"*", t.replace('"', "\"\""))).collect::<Vec<_>>().join(" ")
+    q.split_whitespace()
+        .map(|t| format!("\"{}\"*", t.replace('"', "\"\"")))
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 #[cfg(test)]

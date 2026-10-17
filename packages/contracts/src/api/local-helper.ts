@@ -265,6 +265,15 @@ export const HelperResolved = z.object({
 });
 export type HelperResolved = z.infer<typeof HelperResolved>;
 
+export const HELPER_FILE_CHUNK_BYTES = 180 * 1024;
+
+export const HelperFileChunk = z.object({
+  offset: z.number().int().nonnegative(),
+  totalBytes: z.number().int().nonnegative(),
+  dataBase64: z.string().max(Math.ceil(HELPER_FILE_CHUNK_BYTES / 3) * 4),
+});
+export type HelperFileChunk = z.infer<typeof HelperFileChunk>;
+
 export const HELPER_ROUTES = {
   health: '/helper/v1/health',
   /**
@@ -283,6 +292,8 @@ export const HELPER_ROUTES = {
   install: (tool: HelperToolId): string => `/helper/v1/tools/${tool}/install`,
   job: (id: string): string => `/helper/v1/jobs/${encodeURIComponent(id)}`,
   file: (jobId: string, fileId: string): string => `/helper/v1/jobs/${encodeURIComponent(jobId)}/files/${encodeURIComponent(fileId)}`,
+  fileChunk: (jobId: string, fileId: string, offset: number, length: number): string =>
+    `/helper/v1/jobs/${encodeURIComponent(jobId)}/files/${encodeURIComponent(fileId)}/chunk?offset=${offset}&length=${length}`,
 } as const;
 
 /**

@@ -496,14 +496,14 @@ export const CatalogSearchIpc = z.strictObject({
   artist: z.string().max(200).optional(),
   album: z.string().max(200).optional(),
   sections: z.array(CatalogSearchSection).min(1).max(4),
-  providers: z.array(CatalogProviderId).min(1).max(5),
+  providers: z.array(CatalogProviderId).min(1).max(6),
   offset: z.number().int().min(0).max(1000).default(0),
   limit: z.number().int().min(1).max(CATALOG_MAX_LIMIT).default(25),
 });
 export type CatalogSearchIpc = z.infer<typeof CatalogSearchIpc>;
 
 /** Which sections the Search tool shows (Songs, Artists, Albums and Playlists, UX-SEARCH-010) and which services it asks, kept on this PC. */
-export const CatalogFilter = z.object({ sections: z.array(CatalogSearchSection).min(1).max(4), providers: z.array(CatalogProviderId).min(1).max(5) });
+export const CatalogFilter = z.object({ sections: z.array(CatalogSearchSection).min(1).max(4), providers: z.array(CatalogProviderId).min(1).max(6) });
 export type CatalogFilter = z.infer<typeof CatalogFilter>;
 
 const Answer = <T extends z.ZodType>(result: T) => z.object({ result: result.nullable(), reason: z.string().max(600).nullable() });

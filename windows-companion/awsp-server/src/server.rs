@@ -27,13 +27,14 @@ use tracing::{debug, info, warn};
 
 use crate::{
     config::{AllowEntry, Command, Event, Tier, iso, now_iso},
+    helper::{HelperBridge, HelperError},
     library::{Library, TrackFile},
     media::{Media, codec_for},
     pairing::{PairOutcome, Pairing},
     player::PlayerState,
     protocol::{
-        AudioRequest, Frame, FrameError, MAX_FRAME, PROTOCOL_VERSION, audio_header, codec, codes, copy_range,
-        read_frame, read_frame_bytes, resolve_range, write_json,
+        AudioRequest, Frame, FrameError, MAX_FRAME, PROTOCOL_VERSION, audio_header, codec, codes,
+        copy_range, read_frame, read_frame_bytes, resolve_range, write_json,
     },
 };
 
@@ -51,6 +52,9 @@ pub struct ServerOptions {
     pub library_db: PathBuf,
     pub cache_dir: PathBuf,
     pub allowlist: Vec<AllowEntry>,
+    /// Loopback helper port and internal credential; the remote client never receives either.
+    pub helper_port: Option<u16>,
+    pub helper_token: Option<String>,
     /// The ffmpeg executable; `None` means `AWSP_FFMPEG` or `ffmpeg` on PATH.
     pub ffmpeg: Option<String>,
 }
@@ -66,6 +70,7 @@ struct Shared {
     deltas: broadcast::Sender<Value>,
     library: Arc<Library>,
     media: Media,
+    helper: Option<HelperBridge>,
     events: mpsc::UnboundedSender<Event>,
 }
 
@@ -79,7 +84,11 @@ impl Shared {
     }
 
     fn tier_cap(&self, peer: &EndpointId) -> Tier {
-        self.allow.read().expect("allow lock").get(peer).map_or(Tier::Lossless, |e| e.tier_cap)
+        self.allow
+            .read()
+            .expect("allow lock")
+            .get(peer)
+            .map_or(Tier::Lossless, |e| e.tier_cap)
     }
 
     fn modify(&self, f: impl FnOnce(&mut PlayerState)) {
@@ -145,7 +154,12 @@ impl Shared {
     }
 
     fn register(&self, peer: EndpointId, conn: &Connection) {
-        self.live.lock().expect("live lock").entry(peer).or_default().push(conn.clone());
+        self.live
+            .lock()
+            .expect("live lock")
+            .entry(peer)
+            .or_default()
+            .push(conn.clone());
     }
 
     fn unregister(&self, peer: EndpointId, conn: &Connection) {
@@ -181,7 +195,15 @@ pub struct Server {
 
 impl Server {
     /// Start serving on an already bound endpoint (its ALPNs must include `awsp/1`).
-    pub fn start(endpoint: Endpoint, opts: ServerOptions, events: mpsc::UnboundedSender<Event>) -> Server {
+    pub fn start(
+        endpoint: Endpoint,
+        opts: ServerOptions,
+        events: mpsc::UnboundedSender<Event>,
+    ) -> Server {
+        let helper = match (opts.helper_port, opts.helper_token) {
+            (Some(port), Some(token)) => HelperBridge::new(port, token),
+            _ => None,
+        };
         let mut allow = HashMap::new();
         for entry in opts.allowlist {
             match EndpointId::from_str(&entry.id) {
@@ -189,7 +211,12 @@ impl Server {
                     allow.insert(id, entry);
                 }
                 Err(e) => {
-                    let _ = events.send(Event::Error { message: format!("allowlist entry {:?} is not an endpoint id: {e}", entry.id) });
+                    let _ = events.send(Event::Error {
+                        message: format!(
+                            "allowlist entry {:?} is not an endpoint id: {e}",
+                            entry.id
+                        ),
+                    });
                 }
             }
         }
@@ -204,11 +231,15 @@ impl Server {
             deltas: broadcast::channel(16).0,
             library: Arc::new(Library::new(opts.library_db)),
             media: Media::new(opts.cache_dir, opts.ffmpeg),
+            helper,
             events,
         });
         let accept = tokio::spawn(accept_loop(shared.clone()));
         let ticker = tokio::spawn(ticker(shared.clone()));
-        Server { shared, tasks: vec![accept, ticker] }
+        Server {
+            shared,
+            tasks: vec![accept, ticker],
+        }
     }
 
     pub fn endpoint(&self) -> &Endpoint {
@@ -219,12 +250,19 @@ impl Server {
     pub async fn ready_event(&self, online_timeout: Option<Duration>) -> Event {
         let ep = &self.shared.endpoint;
         if let Some(t) = online_timeout
-            && timeout(t, ep.online()).await.is_err() {
-                self.shared.emit(Event::Error { message: "no home relay yet; the ticket has no relay URL".into() });
-            }
+            && timeout(t, ep.online()).await.is_err()
+        {
+            self.shared.emit(Event::Error {
+                message: "no home relay yet; the ticket has no relay URL".into(),
+            });
+        }
         let addr = ep.addr();
         let relay_url = addr.relay_urls().next().map(ToString::to_string);
-        Event::Ready { endpoint_id: ep.id().to_string(), ticket: EndpointTicket::new(addr).encode_string(), relay_url }
+        Event::Ready {
+            endpoint_id: ep.id().to_string(),
+            ticket: EndpointTicket::new(addr).encode_string(),
+            relay_url,
+        }
     }
 
     /// Apply a main-process command. Returns `false` for `shutdown`.
@@ -234,27 +272,48 @@ impl Server {
             Command::NewPairingCode => {
                 let (code, ttl) = sh.pairing.lock().expect("pairing lock").issue();
                 let expires = time::OffsetDateTime::now_utc() + ttl;
-                sh.emit(Event::PairingCode { code, expires_at: iso(expires) });
+                sh.emit(Event::PairingCode {
+                    code,
+                    expires_at: iso(expires),
+                });
             }
             Command::Revoke { id } => match EndpointId::from_str(&id) {
                 Ok(peer) => {
                     sh.allow.write().expect("allow lock").remove(&peer);
-                    sh.resume.lock().expect("resume lock").retain(|_, (owner, _)| *owner != peer);
-                    let conns = sh.live.lock().expect("live lock").remove(&peer).unwrap_or_default();
+                    sh.resume
+                        .lock()
+                        .expect("resume lock")
+                        .retain(|_, (owner, _)| *owner != peer);
+                    let conns = sh
+                        .live
+                        .lock()
+                        .expect("live lock")
+                        .remove(&peer)
+                        .unwrap_or_default();
                     for c in conns {
                         c.close(VarInt::from_u32(codes::UNKNOWN_DEVICE), b"revoked");
                     }
                     info!("revoked {peer}");
                 }
-                Err(e) => sh.emit(Event::Error { message: format!("revoke: bad id {id:?}: {e}") }),
+                Err(e) => sh.emit(Event::Error {
+                    message: format!("revoke: bad id {id:?}: {e}"),
+                }),
             },
             Command::SetTierCap { id, tier } => {
                 let found = EndpointId::from_str(&id)
                     .ok()
-                    .and_then(|peer| sh.allow.write().expect("allow lock").get_mut(&peer).map(|e| e.tier_cap = tier))
+                    .and_then(|peer| {
+                        sh.allow
+                            .write()
+                            .expect("allow lock")
+                            .get_mut(&peer)
+                            .map(|e| e.tier_cap = tier)
+                    })
                     .is_some();
                 if !found {
-                    sh.emit(Event::Error { message: format!("set_tier_cap: {id:?} is not paired") });
+                    sh.emit(Event::Error {
+                        message: format!("set_tier_cap: {id:?} is not paired"),
+                    });
                 }
             }
             Command::Shutdown => return false,
@@ -284,7 +343,10 @@ async fn accept_loop(sh: Arc<Shared>) {
 /// Auto-advance at the end of a track, and publish library changes.
 async fn ticker(sh: Arc<Shared>) {
     let lib = sh.library.clone();
-    let mut marker = tokio::task::spawn_blocking(move || lib.max_updated_at().ok().flatten()).await.ok().flatten();
+    let mut marker = tokio::task::spawn_blocking(move || lib.max_updated_at().ok().flatten())
+        .await
+        .ok()
+        .flatten();
     let mut tick = tokio::time::interval(Duration::from_millis(500));
     let mut n: u64 = 0;
     loop {
@@ -357,7 +419,9 @@ async fn handle_connection(sh: Arc<Shared>, incoming: Incoming) -> anyhow::Resul
             audio.abort();
             sh.unregister(peer, &conn);
             info!("awsp disconnected {peer}");
-            sh.emit(Event::Disconnected { peer: peer.to_string() });
+            sh.emit(Event::Disconnected {
+                peer: peer.to_string(),
+            });
         });
     }
 
@@ -371,11 +435,16 @@ async fn watch_paths(sh: Arc<Shared>, conn: Connection, peer: EndpointId) {
     let mut stream = conn.paths_stream();
     while let Some(list) = stream.next().await {
         if let Some((kind, rtt)) = path_kind(&list)
-            && last != Some(kind) {
-                last = Some(kind);
-                info!("awsp connection {peer} type={kind} rtt={rtt}");
-                sh.emit(Event::Connection { peer: peer.to_string(), kind: kind.to_string(), rtt_ms: rtt });
-            }
+            && last != Some(kind)
+        {
+            last = Some(kind);
+            info!("awsp connection {peer} type={kind} rtt={rtt}");
+            sh.emit(Event::Connection {
+                peer: peer.to_string(),
+                kind: kind.to_string(),
+                rtt_ms: rtt,
+            });
+        }
     }
 }
 
@@ -391,7 +460,12 @@ async fn accept_audio(sh: Arc<Shared>, conn: Connection, peer: EndpointId) {
 
 /// One audio fetch (§3.2): request → 16-byte header → exactly the range → `finish()`; or a reset
 /// with an error code before the header.
-async fn serve_audio(sh: Arc<Shared>, peer: EndpointId, mut send: SendStream, mut recv: RecvStream) {
+async fn serve_audio(
+    sh: Arc<Shared>,
+    peer: EndpointId,
+    mut send: SendStream,
+    mut recv: RecvStream,
+) {
     let reset = |send: &mut SendStream, code: u32| {
         let _ = send.reset(VarInt::from_u32(code));
     };
@@ -402,15 +476,23 @@ async fn serve_audio(sh: Arc<Shared>, peer: EndpointId, mut send: SendStream, mu
         },
         _ => return reset(&mut send, codes::BAD_REQUEST),
     };
-    let Some(asked) = req.tier() else { return reset(&mut send, codes::TIER) };
+    let Some(asked) = req.tier() else {
+        return reset(&mut send, codes::TIER);
+    };
     let tier = asked.clamp_to(sh.tier_cap(&peer));
-    let Some(track) = sh.lookup(&req.track_id).await else { return reset(&mut send, codes::NOT_FOUND) };
+    let Some(track) = sh.lookup(&req.track_id).await else {
+        return reset(&mut send, codes::NOT_FOUND);
+    };
 
     let (file, codec) = if tier == Tier::Lossless {
         let codec = codec_for(&track.path, &track.track);
         (track.path.clone(), codec)
     } else {
-        match sh.media.transcoded(&track.id, tier, &track.path, track.mtime_ms).await {
+        match sh
+            .media
+            .transcoded(&track.id, tier, &track.path, track.mtime_ms)
+            .await
+        {
             Ok(p) => (p, codec::OPUS),
             Err(e) => {
                 warn!("tier {} of {} failed: {e:#}", tier.name(), track.id);
@@ -418,7 +500,9 @@ async fn serve_audio(sh: Arc<Shared>, peer: EndpointId, mut send: SendStream, mu
             }
         }
     };
-    let Ok(meta) = tokio::fs::metadata(&file).await else { return reset(&mut send, codes::NOT_FOUND) };
+    let Ok(meta) = tokio::fs::metadata(&file).await else {
+        return reset(&mut send, codes::NOT_FOUND);
+    };
     let total = meta.len();
     let Some((start, end)) = resolve_range(total, req.byte_start, req.byte_end) else {
         return reset(&mut send, codes::RANGE);
@@ -429,7 +513,11 @@ async fn serve_audio(sh: Arc<Shared>, peer: EndpointId, mut send: SendStream, mu
     }
     match copy_range(&mut send, &file, start, end).await {
         Ok(n) => {
-            debug!("served {} [{start}..={end}] {n} bytes tier={}", req.track_id, tier.name());
+            debug!(
+                "served {} [{start}..={end}] {n} bytes tier={}",
+                req.track_id,
+                tier.name()
+            );
             let _ = send.finish();
         }
         // STOP_SENDING from the client (a seek) or a lost connection: nothing more to say.
@@ -459,7 +547,15 @@ struct Session {
 
 impl Session {
     fn new(sh: Arc<Shared>, conn: Connection, peer: EndpointId) -> Self {
-        Session { sh, conn, peer, out: None, greeted: false, frames_seen: 0, pusher: None }
+        Session {
+            sh,
+            conn,
+            peer,
+            out: None,
+            greeted: false,
+            frames_seen: 0,
+            pusher: None,
+        }
     }
 
     async fn run(mut self, mut send: SendStream, mut recv: RecvStream, first: Option<Frame>) {
@@ -551,9 +647,19 @@ impl Session {
         match f.kind.as_str() {
             "ping" => self.reply("pong", json!({}), re).await,
             "pair" if self.frames_seen == 1 => return self.pair(p, re).await,
-            "pair" => self.error(Some(re), "unexpected", "pair is only valid as the first frame").await,
+            "pair" => {
+                self.error(
+                    Some(re),
+                    "unexpected",
+                    "pair is only valid as the first frame",
+                )
+                .await
+            }
             "hello" => return self.hello(p, re).await,
-            _ if !self.greeted => self.error(Some(re), "hello-required", "send hello first").await,
+            _ if !self.greeted => {
+                self.error(Some(re), "hello-required", "send hello first")
+                    .await
+            }
             "play" => match p.get("track_id").and_then(Value::as_str) {
                 Some(id) => match self.sh.lookup(id).await {
                     Some(t) => {
@@ -573,30 +679,46 @@ impl Session {
             "next" => self.sh.step(true).await,
             "prev" => self.sh.step(false).await,
             "set_queue" => {
-                let ids = p
-                    .get("track_ids")
-                    .and_then(Value::as_array)
-                    .map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect::<Vec<_>>());
+                let ids = p.get("track_ids").and_then(Value::as_array).map(|a| {
+                    a.iter()
+                        .filter_map(|v| v.as_str().map(str::to_string))
+                        .collect::<Vec<_>>()
+                });
                 match ids {
                     Some(ids) => self.sh.modify(|s| s.set_queue(ids)),
-                    None => self.error(Some(re), "bad-request", "track_ids must be an array of ids").await,
+                    None => {
+                        self.error(Some(re), "bad-request", "track_ids must be an array of ids")
+                            .await
+                    }
                 }
             }
             "browse" => {
                 let lib = self.sh.library.clone();
                 let path = p.get("path").and_then(Value::as_str).map(str::to_string);
                 let query = p.get("query").and_then(Value::as_str).map(str::to_string);
-                let page = p.get("page").and_then(Value::as_u64).unwrap_or(0).min(u64::from(u32::MAX)) as u32;
-                match tokio::task::spawn_blocking(move || lib.browse(path.as_deref(), query.as_deref(), page)).await {
+                let page = p
+                    .get("page")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(0)
+                    .min(u64::from(u32::MAX)) as u32;
+                match tokio::task::spawn_blocking(move || {
+                    lib.browse(path.as_deref(), query.as_deref(), page)
+                })
+                .await
+                {
                     Ok(Ok(v)) => self.reply("library_page", v, re).await,
                     Ok(Err(e)) => self.error(Some(re), "library", &format!("{e:#}")).await,
                     Err(e) => self.error(Some(re), "library", &e.to_string()).await,
                 }
             }
             "get_artwork" => self.artwork(p, re).await,
+            "companion" => self.companion_rpc(p, re).await,
             "prefetch" => {
                 let tier = self.sh.tier_cap(&self.peer);
-                if let (Some(id), true) = (p.get("track_id").and_then(Value::as_str), tier != Tier::Lossless) {
+                if let (Some(id), true) = (
+                    p.get("track_id").and_then(Value::as_str),
+                    tier != Tier::Lossless,
+                ) {
                     let sh = self.sh.clone();
                     let id = id.to_string();
                     tokio::spawn(async move {
@@ -613,35 +735,125 @@ impl Session {
                 p.get("throughput_kbps").unwrap_or(&serde_json::Value::Null),
                 p.get("dropouts").unwrap_or(&serde_json::Value::Null)
             ),
-            other => self.error(Some(re), "unknown-type", &format!("unknown frame type {other:?}")).await,
+            other => {
+                self.error(
+                    Some(re),
+                    "unknown-type",
+                    &format!("unknown frame type {other:?}"),
+                )
+                .await
+            }
         }
         Flow::Continue
     }
 
+    async fn companion_rpc(&self, p: &Value, re: u64) {
+        let Some(operation) = p.get("operation").and_then(Value::as_str) else {
+            self.error(Some(re), "bad-request", "operation is required")
+                .await;
+            return;
+        };
+        let Some(helper) = self.sh.helper.clone() else {
+            self.error(
+                Some(re),
+                "companion-unavailable",
+                "Companion service is unavailable",
+            )
+            .await;
+            return;
+        };
+        let args = p.get("args").unwrap_or(&Value::Null);
+        let peer = self.peer.to_string();
+        match helper.call(&peer, operation, args).await {
+            Ok(result) => {
+                self.reply("companion_result", json!({ "result": result }), re)
+                    .await
+            }
+            Err(HelperError::Forbidden) => {
+                self.error(
+                    Some(re),
+                    "forbidden",
+                    "that Companion operation is not allowed",
+                )
+                .await
+            }
+            Err(HelperError::TooLarge) => {
+                self.error(
+                    Some(re),
+                    "response-too-large",
+                    "Companion response exceeds the limit",
+                )
+                .await
+            }
+            Err(HelperError::InvalidResponse) => {
+                self.error(
+                    Some(re),
+                    "invalid-response",
+                    "Companion returned an invalid response",
+                )
+                .await
+            }
+            Err(HelperError::Unavailable) => {
+                self.error(
+                    Some(re),
+                    "companion-unavailable",
+                    "Companion service is unavailable",
+                )
+                .await
+            }
+        }
+    }
+
     async fn pair(&mut self, p: &Value, re: u64) -> Flow {
         let code = p.get("code").and_then(Value::as_str).unwrap_or("");
-        let name = p.get("device_name").and_then(Value::as_str).unwrap_or("").trim().to_string();
+        let name = p
+            .get("device_name")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim()
+            .to_string();
         let kind = p.get("client_kind").and_then(Value::as_str).unwrap_or("");
         if !matches!(kind, "pwa" | "android") || name.is_empty() {
-            self.error(Some(re), "bad-request", "pair needs device_name and client_kind pwa|android").await;
+            self.error(
+                Some(re),
+                "bad-request",
+                "pair needs device_name and client_kind pwa|android",
+            )
+            .await;
             return Flow::Close(codes::UNKNOWN_DEVICE, b"unknown-device");
         }
         let outcome = self.sh.pairing.lock().expect("pairing lock").check(code);
         match outcome {
             PairOutcome::Accepted => {
-                let entry = AllowEntry { id: self.peer.to_string(), name: name.clone(), tier_cap: Tier::Lossless, paired_at: now_iso() };
-                self.sh.allow.write().expect("allow lock").insert(self.peer, entry);
+                let entry = AllowEntry {
+                    id: self.peer.to_string(),
+                    name: name.clone(),
+                    tier_cap: Tier::Lossless,
+                    paired_at: now_iso(),
+                };
+                self.sh
+                    .allow
+                    .write()
+                    .expect("allow lock")
+                    .insert(self.peer, entry);
                 info!("awsp paired {} ({name}, {kind})", self.peer);
-                self.sh.emit(Event::Paired { id: self.peer.to_string(), name, client_kind: kind.to_string() });
-                self.reply("paired", json!({ "server_name": self.sh.server_name }), re).await;
+                self.sh.emit(Event::Paired {
+                    id: self.peer.to_string(),
+                    name,
+                    client_kind: kind.to_string(),
+                });
+                self.reply("paired", json!({ "server_name": self.sh.server_name }), re)
+                    .await;
                 Flow::Continue
             }
             PairOutcome::Rejected => {
-                self.error(Some(re), "pair-rejected", "wrong pairing code").await;
+                self.error(Some(re), "pair-rejected", "wrong pairing code")
+                    .await;
                 Flow::Close(codes::UNKNOWN_DEVICE, b"unknown-device")
             }
             PairOutcome::NoCode => {
-                self.error(Some(re), "pair-no-code", "no pairing code is active").await;
+                self.error(Some(re), "pair-no-code", "no pairing code is active")
+                    .await;
                 Flow::Close(codes::UNKNOWN_DEVICE, b"unknown-device")
             }
         }
@@ -653,7 +865,12 @@ impl Session {
         }
         let version = p.get("protocol_version").and_then(Value::as_u64);
         if version != Some(PROTOCOL_VERSION) {
-            self.error(Some(re), "protocol-version", "this server speaks protocol_version 1").await;
+            self.error(
+                Some(re),
+                "protocol-version",
+                "this server speaks protocol_version 1",
+            )
+            .await;
             return Flow::Close(codes::PROTOCOL, b"protocol-version");
         }
         let resumed = p
@@ -683,7 +900,10 @@ impl Session {
         let mut deltas = self.sh.deltas.subscribe();
         let out = self.out.clone().expect("session writer");
         tokio::spawn(async move {
-            let mut tick = tokio::time::interval_at(tokio::time::Instant::now() + STATE_INTERVAL, STATE_INTERVAL);
+            let mut tick = tokio::time::interval_at(
+                tokio::time::Instant::now() + STATE_INTERVAL,
+                STATE_INTERVAL,
+            );
             loop {
                 tokio::select! {
                     r = state.changed() => if r.is_err() { return },
@@ -710,21 +930,50 @@ impl Session {
 
     async fn artwork(&self, p: &Value, re: u64) {
         let Some(id) = p.get("track_id").and_then(Value::as_str) else {
-            return self.error(Some(re), "bad-request", "get_artwork needs track_id").await;
+            return self
+                .error(Some(re), "bad-request", "get_artwork needs track_id")
+                .await;
         };
-        let size = p.get("size").and_then(Value::as_u64).unwrap_or(512).min(4096) as u32;
+        let size = p
+            .get("size")
+            .and_then(Value::as_u64)
+            .unwrap_or(512)
+            .min(4096) as u32;
         let Some(track) = self.sh.lookup(id).await else {
             return self.error(Some(re), "not-found", "no such track").await;
         };
-        match self.sh.media.artwork(&track.id, &track.path, track.mtime_ms, size).await {
+        match self
+            .sh
+            .media
+            .artwork(&track.id, &track.path, track.mtime_ms, size)
+            .await
+        {
             Ok(Some(bytes)) => {
                 let data = base64::engine::general_purpose::STANDARD.encode(&bytes);
                 if data.len() + 512 > MAX_FRAME {
-                    return self.error(Some(re), "too-large", "artwork does not fit a frame; ask for a smaller size").await;
+                    return self
+                        .error(
+                            Some(re),
+                            "too-large",
+                            "artwork does not fit a frame; ask for a smaller size",
+                        )
+                        .await;
                 }
-                self.reply("artwork", json!({ "track_id": id, "size": size, "mime": "image/jpeg", "data": data }), re).await;
+                self.reply(
+                    "artwork",
+                    json!({ "track_id": id, "size": size, "mime": "image/jpeg", "data": data }),
+                    re,
+                )
+                .await;
             }
-            Ok(None) => self.reply("artwork", json!({ "track_id": id, "size": size, "mime": null, "data": null }), re).await,
+            Ok(None) => {
+                self.reply(
+                    "artwork",
+                    json!({ "track_id": id, "size": size, "mime": null, "data": null }),
+                    re,
+                )
+                .await
+            }
             Err(e) => self.error(Some(re), "artwork", &format!("{e:#}")).await,
         }
     }

@@ -160,8 +160,10 @@ function savePreferences(next: Preferences): Preferences {
   store!.set(PREFERENCES_KEY, next, new Date().toISOString());
   preferencesCache = next;
   syncWatchers();
-  // The port and the LAN setting are where the helper listens: both need it bound again.
+  // The port and LAN setting are where the helper listens: both need it bound again. A port change
+  // also refreshes the loopback endpoint in the AWSP sidecar's internal bridge config.
   if (before.helperPort !== next.helperPort || before.helperLan !== next.helperLan) void helper?.restart(next.helperPort);
+  if (before.helperPort !== next.helperPort) awsp?.helperChanged();
   log.setVerbose(next.verboseLogs);
   if (!before.checkForUpdates && next.checkForUpdates) updates?.start();
   else if (before.checkForUpdates && !next.checkForUpdates) updates?.stop();
@@ -918,7 +920,7 @@ if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow())))
     mainWindow = createWindow();
     createTray();
     void hub.refresh();
-    void helper.start(preferences().helperPort);
+    const helperReady = helper.start(preferences().helperPort);
     backups.start();
     liveTv.start();
     awsp = new AwspSupervisor({
@@ -932,9 +934,15 @@ if (!enforceSingleInstance(() => void app.whenReady().then(() => showWindow())))
       // The sidecar's own chatter is detail; what the supervisor decides is worth keeping.
       log: (line) => (line.startsWith('awsp-server:') ? log.debug(line) : log.info(line)),
       ffmpegPath: () => helper?.ffmpegPath() ?? null,
+      helperBridge: () => {
+        const token = helper?.token() ?? null;
+        const port = preferences().helperPort;
+        return token ? { port, token } : null;
+      },
       probeNetwork: () => probeConnection(),
     });
-    awsp.boot();
+    // The sidecar needs the helper's loopback port/token at process start; do not race helper startup.
+    void helperReady.then(() => awsp?.boot(), () => awsp?.boot());
     updates = new UpdateChecker({
       store,
       version: app.getVersion(),

@@ -343,17 +343,278 @@ dynamic = ("/* The app defines what this scene reads; the bridge says when it ha
 text = text[:m.start(1)] + dynamic + text[m.end():d_end] + "});\n" + text[d_end:]
 edits += 1
 
+# Pair the player with the Companion explicitly; the token is never part of the saved address.
+replace('            <div class="prefs__row">\n'
+        '              <label for="cfgCompanion">Address</label>\n'
+        '              <input class="prefs__field" type="text" id="cfgCompanion" placeholder="http://127.0.0.1:17342" spellcheck="false">\n'
+        '            </div>\n'
+        '            <div class="prefs__row">\n'
+        '              <span class="prefs__label">&nbsp;</span>\n'
+        '              <div class="conn__acts">\n'
+        '                <button class="prefs__btn" type="button" id="cfgConnect">Test Connection</button>\n'
+        '                <span class="prefs__status" id="cfgConnMsg" role="status">Not tested yet.</span>\n'
+        '              </div>\n'
+        '            </div>',
+        '            <details id="cfgLegacyHelper" style="grid-column:1 / -1">\n'
+        '              <summary>Advanced — legacy local helper access</summary>\n'
+        '              <div class="prefs__row">\n'
+        '                <label for="cfgCompanion">Local helper address</label>\n'
+        '                <input class="prefs__field" type="text" id="cfgCompanion" placeholder="http://127.0.0.1:17342" spellcheck="false">\n'
+        '              </div>\n'
+        '              <div class="prefs__row">\n'
+        '                <label for="cfgCompanionToken">Legacy helper token</label>\n'
+        '                <input class="prefs__field" type="password" id="cfgCompanionToken" autocomplete="off" spellcheck="false" aria-describedby="cfgCompanionTokenHelp" placeholder="Legacy local helper token">\n'
+        '              </div>\n'
+        '              <p class="prefs__hint" id="cfgCompanionTokenHelp">For older or local-only direct-helper workflows. New pairing uses the Companion address and one-time code below.</p>\n'
+        '              <p class="prefs__hint" id="cfgTokenSaved" hidden>Saved legacy token restored after reload; this password field stays masked. Use Forget saved token to remove it.</p>\n'
+        '              <div class="prefs__row">\n'
+        '                <span class="prefs__label">&nbsp;</span>\n'
+        '                <div class="conn__acts">\n'
+        '                  <button class="prefs__btn" type="button" id="cfgConnect">Connect / Test legacy helper</button>\n'
+        '                  <button class="prefs__btn" type="button" id="cfgForgetToken" hidden>Forget saved token</button>\n'
+        '                  <span class="prefs__status" id="cfgConnMsg" role="status">Not connected.</span>\n'
+        '                </div>\n'
+        '              </div>\n'
+        '            </details>')
+
+# A token is attached only after the bridge has authenticated this helper, and only to its exact origin.
+replace("      var tokMeta = document.querySelector('meta[name=\"np-helper-token\"]'), hdr = {};\n"
+        "      if (tokMeta && /\\/helper\\/v1\\//.test(url) && !/\\/health$/.test(url)) hdr['x-helper-token'] = tokMeta.content;",
+        "      var tokMeta = document.querySelector('meta[name=\"np-helper-token\"]'), hdr = {}, token = window.NP_HELPER_TOKEN || (tokMeta && tokMeta.content);\n"
+        "      if (token && /\\/helper\\/v1\\//.test(url) && !/\\/health$/.test(url)) {\n"
+        "        try { if (!window.COMPANION || new URL(url, location.href).origin !== new URL(window.COMPANION, location.href).origin) token = null; } catch (e) { token = null; }\n"
+        "        if (token) hdr['x-helper-token'] = token;\n"
+        "      }")
+
+# Group listening is never the startup default and requires a paired, reachable Hub.
+replace('        <button class="segmented__item" type="button" role="radio" aria-checked="false"\n'
+        '                data-mode="solo" aria-label="Solo listening" tabindex="-1">',
+        '        <button class="segmented__item" type="button" role="radio" aria-checked="true"\n'
+        '                data-mode="solo" aria-label="Solo listening" tabindex="0">')
+replace('        <button class="segmented__item" type="button" role="radio" aria-checked="true"\n'
+        '                data-mode="group" aria-label="Group listening">',
+        '        <button class="segmented__item" type="button" role="radio" aria-checked="false"\n'
+        '                data-mode="group" aria-label="Group listening" tabindex="-1" aria-disabled="true" disabled title="Connect a paired Hub to enable Group listening.">')
+replace("var mode = 'group';                       // matches the toggle's default",
+        "var mode = 'solo';                       // Group starts only after the person connects a Hub")
+replace_between("  // Solo / group segmented control.", "  })();", """  // Solo / group segmented control. Group requires a paired Hub that answers now.
+  (function () {
+    var group = document.getElementById('mode');
+    var items = Array.prototype.slice.call(group.querySelectorAll('[role=\"radio\"]'));
+    var refreshPromise = null;
+
+    function hubStatus() {
+      try { return window.NP_HUB && window.NP_HUB.status ? window.NP_HUB.status() : null; }
+      catch (e) { return null; }
+    }
+    function groupAvailable() {
+      var status = hubStatus();
+      return !!(status && status.connected === true);
+    }
+    window.groupListeningAvailable = groupAvailable;
+    window.groupListeningReason = function () {
+      var status = hubStatus();
+      return status && status.connected ? 'A paired Hub is connected.' : (status && status.reason) || 'Connect a paired Hub to enable Group listening.';
+    };
+
+    function commit(item, focus) {
+      items.forEach(function (el) {
+        var on = el === item;
+        el.setAttribute('aria-checked', String(on));
+        el.tabIndex = on ? 0 : -1;
+      });
+      if (focus) item.focus();
+      document.dispatchEvent(new CustomEvent('player:mode', { detail: { mode: item.dataset.mode } }));
+      return true;
+    }
+
+    function updateGroupAvailability(status) {
+      var current = status || hubStatus();
+      var available = !!(current && current.connected === true);
+      var groupItem = items.filter(function (el) { return el.dataset.mode === 'group'; })[0];
+      var soloItem = items.filter(function (el) { return el.dataset.mode === 'solo'; })[0];
+      if (groupItem) {
+        groupItem.disabled = !available;
+        groupItem.setAttribute('aria-disabled', String(!available));
+        groupItem.title = available ? 'A paired Hub is connected. Select to listen with the group.' : window.groupListeningReason();
+      }
+      document.dispatchEvent(new CustomEvent('player:group-availability', { detail: { available: available, reason: window.groupListeningReason() } }));
+      if (!available && soloItem && window.listeningMode && window.listeningMode() === 'group') commit(soloItem, false);
+    }
+
+    function refreshHub() {
+      if (!window.NP_HUB || !window.NP_HUB.refresh) return Promise.resolve(null);
+      if (refreshPromise) return refreshPromise;
+      refreshPromise = Promise.resolve().then(function () { return window.NP_HUB.refresh(); }).then(function (status) {
+        updateGroupAvailability(status);
+        return status;
+      }, function () {
+        var status = hubStatus();
+        updateGroupAvailability(status);
+        return status;
+      }).then(function (status) {
+        refreshPromise = null;
+        return status;
+      });
+      return refreshPromise;
+    }
+
+    function select(item, focus) {
+      if (!item || item.disabled) return Promise.resolve(false);
+      if (item.dataset.mode === 'group') {
+        return refreshHub().then(function (status) {
+          if (!status || status.connected !== true) {
+            if (window.say) window.say(window.groupListeningReason());
+            return false;
+          }
+          return commit(item, focus);
+        });
+      }
+      return Promise.resolve(commit(item, focus));
+    }
+
+    group.addEventListener('click', function (e) {
+      var item = e.target.closest('[role=\"radio\"]');
+      if (item && !item.disabled) select(item, false);
+    });
+
+    group.addEventListener('keydown', function (e) {
+      var enabled = items.filter(function (item) { return !item.disabled; });
+      var i = enabled.indexOf(document.activeElement);
+      if (i < 0 || !enabled.length) return;
+      var next = null;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = enabled[(i + 1) % enabled.length];
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = enabled[(i - 1 + enabled.length) % enabled.length];
+      else if (e.key === 'Home') next = enabled[0];
+      else if (e.key === 'End') next = enabled[enabled.length - 1];
+      else if (e.key === ' ' || e.key === 'Enter') next = enabled[i];
+      if (next) { e.preventDefault(); select(next, true); }
+    });
+
+    window.setListeningMode = function (mode) {
+      var item = items.filter(function (el) { return el.dataset.mode === mode; })[0];
+      if (!item || item.disabled) return Promise.resolve(false);
+      if (item.getAttribute('aria-checked') === 'true') return Promise.resolve(true);
+      return select(item, false);
+    };
+    window.listeningMode = function () {
+      var on = items.filter(function (el) { return el.getAttribute('aria-checked') === 'true'; })[0];
+      return on ? on.dataset.mode : 'solo';
+    };
+    document.addEventListener('player:mode', function (e) {
+      if (e.detail && e.detail.mode === 'group' && !groupAvailable()) {
+        e.stopImmediatePropagation();
+        var soloItem = items.filter(function (el) { return el.dataset.mode === 'solo'; })[0];
+        if (soloItem) commit(soloItem, false);
+        if (window.say) window.say(window.groupListeningReason());
+        return;
+      }
+      document.dispatchEvent(new CustomEvent('mode:shown', { detail: e.detail }));
+    });
+    if (window.NP_HUB && window.NP_HUB.subscribe) window.NP_HUB.subscribe(updateGroupAvailability);
+    else updateGroupAvailability(null);
+    setInterval(function () {
+      if (window.listeningMode && window.listeningMode() === 'group') refreshHub();
+    }, 15000);
+  })();""")
+
+replace("      document.getElementById('cfgGroup').checked =\n"
+        "        (window.listeningMode ? window.listeningMode() : 'group') === 'group';",
+        "      var groupBox = document.getElementById('cfgGroup');\n"
+        "      var groupAvailable = !!(window.groupListeningAvailable && window.groupListeningAvailable());\n"
+        "      groupBox.disabled = !groupAvailable;\n"
+        "      groupBox.title = window.groupListeningReason ? window.groupListeningReason() : 'Connect a paired Hub to enable Group listening.';\n"
+        "      groupBox.checked = groupAvailable && (window.listeningMode ? window.listeningMode() : 'solo') === 'group';")
+replace("    document.getElementById('cfgGroup').addEventListener('change', function () {\n"
+        "      if (window.setListeningMode) window.setListeningMode(this.checked ? 'group' : 'solo');\n"
+        "      setStatus(this.checked ? 'Listening with the group.' : 'Listening on your own.');\n"
+        "    });",
+        "    document.getElementById('cfgGroup').addEventListener('change', function () {\n"
+        "      var box = this;\n"
+        "      if (box.checked && !(window.groupListeningAvailable && window.groupListeningAvailable())) { box.checked = false; setStatus('Connect a paired Hub before enabling Group listening.'); return; }\n"
+        "      var change = window.setListeningMode ? window.setListeningMode(box.checked ? 'group' : 'solo') : Promise.resolve(false);\n"
+        "      Promise.resolve(change).then(function (active) { if (!active) { box.checked = false; setStatus('Connect a paired Hub before enabling Group listening.'); } else setStatus(box.checked ? 'Listening with the group.' : 'Listening on your own.'); });\n"
+        "    });")
+replace("    document.addEventListener('player:mode', function (e) {\n"
+        "      var box = document.getElementById('cfgGroup');\n"
+        "      if (box) box.checked = (e.detail && e.detail.mode) === 'group';\n"
+        "    });",
+        "    document.addEventListener('player:mode', function (e) {\n"
+        "      var box = document.getElementById('cfgGroup');\n"
+        "      if (box) { var available = !!(window.groupListeningAvailable && window.groupListeningAvailable()); box.disabled = !available; box.checked = available && (e.detail && e.detail.mode) === 'group'; }\n"
+        "    });\n"
+        "    document.addEventListener('player:group-availability', function (e) {\n"
+        "      var box = document.getElementById('cfgGroup');\n"
+        "      if (box) { box.disabled = !e.detail.available; box.title = e.detail.reason || 'Connect a paired Hub to enable Group listening.'; if (!e.detail.available) box.checked = false; }\n"
+        "    });")
+replace('          <p class="prefs__hint">A group session is a live broadcast: everyone hears the same thing at the\n'
+        '            same moment, so there is no position to seek to. Turning it off puts you back in solo, where the\n'
+        '            track is yours to scrub.</p>',
+        '          <p class="prefs__hint">Group listening requires a paired, reachable Hub. Connect your Hub first; if it disconnects, playback returns to Solo. The connected Hub controls the shared playback position.</p>')
+replace("    function applyMode(next) {\n      mode = next;",
+        "    function applyMode(next) {\n"
+        "      if (next === 'group' && !(window.groupListeningAvailable && window.groupListeningAvailable())) { next = 'solo'; if (window.setListeningMode) window.setListeningMode('solo'); }\n"
+        "      mode = next;")
+
 # ---- 11. the helper that served this page is found with nothing configured -------------------------------
 # A helper injects its token meta into the page it serves. Then its own origin is the first place to
 # look, and Connections asks at once rather than waiting for a click (the React player did the same).
-replace("      if (!typed) for (var i = 0; i < HELPER_SCAN; i++) tries.push('http://127.0.0.1:' + (HELPER_PORT + i));",
-        "      var servedBy = document.querySelector('meta[name=\"np-helper-token\"]') && /^https?:$/.test(location.protocol) ? location.origin : null;\n"
-        "      if (!typed && servedBy) tries.push(servedBy);\n"
-        "      if (!typed) for (var i = 0; i < HELPER_SCAN; i++) if ('http://127.0.0.1:' + (HELPER_PORT + i) !== servedBy) tries.push('http://127.0.0.1:' + (HELPER_PORT + i));")
+# The public health route only shows that a helper is present; only a protected request can pair it.
+replace("    function testApp() {\n"
+        "      var btn = document.getElementById('cfgConnect'), msg = document.getElementById('cfgConnMsg');\n"
+        "      var typed = connBase(document.getElementById('cfgCompanion').value);\n"
+        "      var tries = typed ? [typed] : [];\n"
+        "      if (!typed) for (var i = 0; i < HELPER_SCAN; i++) tries.push('http://127.0.0.1:' + (HELPER_PORT + i));\n"
+        "      btn.disabled = true; connLight('connAppDot', 'off');\n"
+        "      msg.textContent = typed ? 'Asking ' + typed + '…' : 'Looking on this PC…';\n"
+        "      var sawOther = false;\n"
+        "      (function next(k) {\n"
+        "        if (k >= tries.length) {\n"
+        "          btn.disabled = false; conn.app = null; connLight('connAppDot', 'bad'); connFacts('connAppFacts', []);\n"
+        "          msg.textContent = sawOther\n"
+        "            ? 'Something answered, but it is not the companion app.'\n"
+        "            : 'No answer from ' + (typed || 'ports ' + HELPER_PORT + '–' + (HELPER_PORT + HELPER_SCAN - 1)) + '. Check the app is running on this PC.';\n"
+        "          paintPassed(); return;\n"
+        "        }\n"
+        "        connGet('Companion', tries[k] + '/helper/v1/health').then(function (r) {\n"
+        "          if (r.json && isHelper(r.json)) {\n"
+        "            btn.disabled = false;\n"
+        "            if (typed) { cfg.companion = typed; cfgSave(); }\n"
+        "            showApp(tries[k], r.json); paintPassed(); return;\n"
+        "          }\n"
+        "          if (r.status) sawOther = true;\n"
+        "          next(k + 1);\n"
+        "        });\n"
+        "      })(0);\n"
+        "    }\n",
+        "    function companionLoopback(base) {\n"
+        "      try { var u = new URL(base), host = u.hostname.toLowerCase(); if (host.charAt(0) === '[' && host.charAt(host.length - 1) === ']') host = host.slice(1, -1); return ['localhost', '127.0.0.1', '::1'].indexOf(host) >= 0 && u.pathname === '/' && !u.search && !u.hash && !u.username && !u.password; } catch (e) { return false; }\n"
+        "    }\n"
+        "    function testApp() {\n"
+        "      var btn = document.getElementById('cfgConnect'), msg = document.getElementById('cfgConnMsg');\n"
+        "      var addressEl = document.getElementById('cfgCompanion'), tokenEl = document.getElementById('cfgCompanionToken');\n"
+        "      var typed = connBase(addressEl.value), token = String(tokenEl.value || '').trim();\n"
+        "      if (typed && !companionLoopback(typed)) { btn.disabled = false; connLight('connAppDot', 'bad'); msg.textContent = 'Use localhost, 127.0.0.1 or ::1 for the Companion running on this PC.'; return; }\n"
+        "      var tries = []; function add(base) { if (base && tries.indexOf(base) < 0) tries.push(base); }\n"
+        "      if (typed) add(typed); else { var meta = document.querySelector('meta[name=\"np-helper-token\"]'); if (meta && /^https?:$/.test(location.protocol)) add(location.origin); for (var i = 0; i < HELPER_SCAN; i++) add('http://127.0.0.1:' + (HELPER_PORT + i)); }\n"
+        "      btn.disabled = true; connLight('connAppDot', 'off'); msg.textContent = token ? 'Checking the Companion token…' : 'Checking the saved connection…';\n"
+        "      var tools = window.NP_TOOLS;\n"
+        "      var inspect = tools ? Promise.all([tools.detect().catch(function () { return null; }), tools.hasSaved().catch(function () { return false; })]) : Promise.resolve([null, false]);\n"
+        "      inspect.then(function (state) {\n"
+        "        var current = state[0], saved = state[1]; document.getElementById('cfgForgetToken').hidden = !saved;\n"
+        "        if (!token && current && current.kind === 'helper' && current.origin && (!typed || current.origin === typed)) { if (!typed) { addressEl.value = current.origin; cfg.companion = current.origin; cfgSave(); } btn.disabled = false; showApp(current.origin, current.health); document.getElementById('cfgForgetToken').hidden = !saved; paintPassed(); return; }\n"
+        "        var sawOther = false, sawHelper = false, rejected = false, helperBase = null;\n"
+        "        function finish() { var check = tools ? tools.detect().catch(function () { return null; }) : Promise.resolve(null); check.then(function (live) { if (live && live.kind === 'helper' && live.origin && live.health) { btn.disabled = false; showApp(live.origin, live.health); if (rejected) msg.textContent = 'That token was not accepted; the previously saved connection remains active.'; else if (typed && live.origin !== typed) msg.textContent = 'The requested address is not paired; the previously saved connection remains active.'; document.getElementById('cfgForgetToken').hidden = !saved; paintPassed(); return; } btn.disabled = false; conn.app = null; connFacts('connAppFacts', []); connLight('connAppDot', sawHelper ? 'warn' : 'bad'); if (sawHelper) { connFacts('connAppFacts', [['Address', helperBase, 'conn__mono'], ['Authentication', rejected ? 'Token rejected' : 'Token required']]); msg.textContent = rejected ? 'The helper answered, but did not accept that token. Copy the current token from Windows Companion → Settings → Network.' : saved ? 'The saved token did not authenticate. Paste the current token from Windows Companion → Settings → Network.' : 'The helper is running; paste its token from Windows Companion → Settings → Network.'; } else msg.textContent = sawOther ? 'Something answered, but it is not the companion app.' : 'No answer from ' + (typed || 'ports ' + HELPER_PORT + '–' + (HELPER_PORT + HELPER_SCAN - 1)) + '. Check the app is running on this PC.'; document.getElementById('cfgForgetToken').hidden = !saved; paintPassed(); }); }\n"
+        "        function next(k) { if (k >= tries.length) { finish(); return; } connGet('Companion', tries[k] + '/helper/v1/health').then(function (r) { if (r.json && isHelper(r.json)) { sawHelper = true; helperBase = tries[k]; if (!token || !tools) { if (token) rejected = true; next(k + 1); return; } tools.connect(tries[k], token).then(function (connected) { if (!connected) { rejected = true; next(k + 1); return; } cfg.companion = connected.origin; cfgSave(); addressEl.value = connected.origin; btn.disabled = false; showApp(connected.origin, connected.health); refreshCompanionTokenButton(); paintPassed(); }).catch(function () { rejected = true; next(k + 1); }); return; } if (r.status) sawOther = true; next(k + 1); }); }\n"
+        "        next(0);\n"
+        "      }).catch(function () { btn.disabled = false; msg.textContent = 'Could not verify the Companion connection.'; connLight('connAppDot', 'bad'); });\n"
+        "    }\n")
 replace("    document.getElementById('cfgConnect').addEventListener('click', testApp);",
+        "    function refreshCompanionTokenButton() { var button = document.getElementById('cfgForgetToken'), savedNote = document.getElementById('cfgTokenSaved'), tokenField = document.getElementById('cfgCompanionToken'), tools = window.NP_TOOLS; if (!button || !tools || !tools.hasSaved) { if (button) button.hidden = true; if (savedNote) savedNote.hidden = true; return Promise.resolve(false); } return Promise.all([tools.hasSaved(), tools.savedToken ? tools.savedToken().catch(function () { return null; }) : Promise.resolve(null)]).then(function (state) { var saved = state[0], savedToken = state[1]; button.hidden = !saved; if (savedNote) savedNote.hidden = !saved; if (tokenField && saved && savedToken) tokenField.value = savedToken; if (tokenField && !saved) tokenField.value = ''; return saved; }).catch(function () { button.hidden = true; if (savedNote) savedNote.hidden = true; return false; }); }\n"
+        "    function forgetCompanionToken() { var button = document.getElementById('cfgForgetToken'), savedNote = document.getElementById('cfgTokenSaved'), tokenField = document.getElementById('cfgCompanionToken'), msg = document.getElementById('cfgConnMsg'), tools = window.NP_TOOLS; if (!tools) return; button.disabled = true; tools.forgetSaved().then(function (removed) { if (removed && tokenField) tokenField.value = ''; if (removed && savedNote) savedNote.hidden = true; return tools.detect().then(function (current) { button.disabled = false; if (current && current.kind === 'helper' && current.origin) showApp(current.origin, current.health); else { conn.app = null; connLight('connAppDot', 'off'); connFacts('connAppFacts', []); msg.textContent = removed ? 'Saved token forgotten.' : 'No saved token to forget.'; } refreshCompanionTokenButton(); paintPassed(); }); }).catch(function () { button.disabled = false; msg.textContent = 'The saved token could not be removed.'; }); }\n"
         "    document.getElementById('cfgConnect').addEventListener('click', testApp);\n"
-        "    /* Served by a helper: it is the companion's helper, and it answers now. */\n"
-        "    if (document.querySelector('meta[name=\"np-helper-token\"]') && /^https?:$/.test(location.protocol)) testApp();")
+        "    document.getElementById('cfgForgetToken').addEventListener('click', forgetCompanionToken);\n"
+        "    refreshCompanionTokenButton().then(function (saved) { if (saved || document.querySelector('meta[name=\"np-helper-token\"]')) testApp(); });")
 
 # ---- 12. the Download key fetches for real, through the helper, with the reason stated ---------------------
 # In the mockup it was a toggle that saved nothing. A row from this device is already here; a row
@@ -461,26 +722,25 @@ replace("</style>\n",
 # machine identifier that hubs and logs already know, so it keeps the value it has always had.
 replace("AirwaveNowPlaying/1.0", "NowPlaying/1.0")
 
-# ---- 14. streaming from a PC (AWSP, docs/AWSP.md §6) -----------------------------------------------------
-# Sources ▸ Connections gains a third card: paste the PC's ticket, type its six-digit code, Pair. The
-# PC's library joins the list as rows with `remote: true`; they play through the engine like rows from
-# this device (the bridge points the element at the service worker's /awsp/track/<id>), and while one
-# plays a small indicator beside the transport says how it is carried: direct, relay-carried, bridge.
+# ---- 14. unified Companion pairing (AWSP, docs/AWSP.md §6) -----------------------------------------------
+# One Companion address and one-time code create the Player's per-device AWSP identity. Music streaming
+# and allowlisted Companion operations share that encrypted channel; the old direct-helper token stays
+# under an Advanced disclosure. The PC's library plays through /awsp/track/<id> as before.
 replace('          <p class="prefs__hint" style="margin:0 0 10px">Two things this player can talk to.',
-        '          <p class="prefs__hint" style="margin:0 0 10px">Three things this player can talk to.')
+        '          <p class="prefs__hint" style="margin:0 0 10px">Pair the Companion once with its address and one-time code. The Hub is optional.')
 replace('          <h3 class="conn__sub" id="connPassedH">What’s passed</h3>',
         '          <section class="conn__card" aria-labelledby="connPcH">\n'
-        '            <h3 class="conn__h" id="connPcH"><span class="conn__dot" id="connPcDot" data-state="off" aria-hidden="true"></span>Stream from a PC</h3>\n'
-        '            <p class="conn__what">Plays the music on a PC running the companion app, from anywhere: lossless, end-to-end encrypted, carried by the PC’s relay. On the PC, Settings ▸ Remote shows its ticket and a six-digit code.</p>\n'
+        '            <h3 class="conn__h" id="connPcH"><span class="conn__dot" id="connPcDot" data-state="off" aria-hidden="true"></span>Pair Companion</h3>\n'
+        '            <p class="conn__what">Enter the Companion pairing address and one-time code once. This creates a per-device revocable identity for encrypted music streaming and supported Companion features; no helper token is needed.</p>\n'
         '            <div class="prefs__row">\n'
-        '              <label for="pcTicket">Ticket</label>\n'
-        '              <input class="prefs__field" type="text" id="pcTicket" placeholder="endpoint…" spellcheck="false" autocomplete="off">\n'
+        '              <label for="pcTicket">Pairing address</label>\n'
+        '              <input class="prefs__field" type="text" id="pcTicket" placeholder="Companion address…" spellcheck="false" autocomplete="off">\n'
         '            </div>\n'
         '            <div class="prefs__row">\n'
         '              <label for="pcCode">Pairing code</label>\n'
         '              <div class="conn__acts">\n'
         '                <input class="prefs__field" type="text" id="pcCode" inputmode="numeric" maxlength="6" placeholder="6 digits" spellcheck="false" autocomplete="one-time-code" style="flex:1 1 120px;width:auto">\n'
-        '                <button class="prefs__btn" type="button" id="pcPair">Pair</button>\n'
+        '                <button class="prefs__btn" type="button" id="pcPair">Pair Companion</button>\n'
         '                <button class="prefs__btn" type="button" id="pcForget" hidden>Forget</button>\n'
         '              </div>\n'
         '            </div>\n'
@@ -518,6 +778,7 @@ replace("    paintRoots();\n  })();\n  };\n</script>",
         "    var pairBtn = document.getElementById('pcPair'), forgetBtn = document.getElementById('pcForget');\n"
         "    var msg = document.getElementById('pcMsg'), dot = document.getElementById('connPcDot'), facts = document.getElementById('pcFacts');\n"
         "    var TYPE = { relay: 'relay-carried — end-to-end encrypted, through the PC’s relay', direct: 'direct', bridge: 'bridge' };\n"
+        "    var downloaderSummary = null, downloaderLoading = false, downloaderPolls = 0, downloaderTimer = 0;\n"
         "    function fill(rows) {\n"
         "      facts.innerHTML = '';\n"
         "      rows.forEach(function (r) { var dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = r[0]; dd.textContent = r[1]; facts.appendChild(dt); facts.appendChild(dd); });\n"
@@ -534,8 +795,27 @@ replace("    paintRoots();\n  })();\n  };\n</script>",
         "          : s.status === 'refused' ? (s.lastError || 'The PC no longer accepts this player. Pair again.')\n"
         "          : s.status === 'reconnecting' || s.status === 'connecting' ? 'Paired with ' + name + '. Reaching it…'\n"
         "          : 'Paired with ' + name + '. Not connected.';\n"
-        "        fill([['PC', name], ['Connection', s.connectionType ? (TYPE[s.connectionType] || s.connectionType) : 'not connected'], ['Tracks', String(s.tracks)],\n"
-        "              ['This player', s.endpointId ? s.endpointId.slice(0, 16) + '…' : '—']]);\n"
+        "        var rows = [['PC', name], ['Connection', s.connectionType ? (TYPE[s.connectionType] || s.connectionType) : 'not connected'], ['Tracks', String(s.tracks)],\n"
+        "                    ['This player', s.endpointId ? s.endpointId.slice(0, 16) + '…' : '—']];\n"
+        "        if (s.status !== 'connected') { downloaderSummary = null; downloaderPolls = 0; if (downloaderTimer) { clearTimeout(downloaderTimer); downloaderTimer = 0; } }\n"
+        "        if (downloaderSummary) rows.push(['Downloaders', downloaderSummary]);\n"
+        "        fill(rows);\n"
+        "        if (s.status === 'connected' && !downloaderSummary && !downloaderLoading && window.NP_TOOLS) {\n"
+        "          downloaderLoading = true;\n"
+        "          window.NP_TOOLS.detect().then(function (t) {\n"
+        "            downloaderLoading = false;\n"
+        "            if (!t || !Array.isArray(t.tools)) { downloaderSummary = 'Status unavailable'; downloaderPolls = 0; paint(); return; }\n"
+        "            downloaderSummary = t.tools.map(function (tool) {\n"
+        "              var label = tool.id === 'ffmpeg' ? 'FFmpeg' : tool.id === 'spotdl' ? 'spotDL' : tool.id;\n"
+        "              var state = tool.setup && tool.setup.state === 'installing' ? 'setting up' : tool.present ? (tool.version || 'ready') : tool.setup && tool.setup.reason || 'not installed';\n"
+        "              return label + ': ' + state;\n"
+        "            }).join('; ');\n"
+        "            var pending = t.tools.some(function (tool) { return tool.setup && tool.setup.state === 'installing'; });\n"
+        "            if (pending && downloaderPolls < 20) { downloaderPolls += 1; downloaderTimer = setTimeout(function () { downloaderSummary = null; downloaderTimer = 0; paint(); }, 3000); }\n"
+        "            else downloaderPolls = 0;\n"
+        "            paint();\n"
+        "          }, function () { downloaderLoading = false; downloaderSummary = 'Status unavailable'; paint(); });\n"
+        "        }\n"
         "      });\n"
         "    }\n"
         "    pairBtn.addEventListener('click', function () {\n"
@@ -584,7 +864,11 @@ replace("    function getJSON(url, allowJsonp, ms) {\n"
         "    function getJSON(url, allowJsonp, ms, headers) {\n"
         "      var ctl = window.AbortController ? new AbortController() : null;\n"
         "      var t = ctl ? setTimeout(function () { ctl.abort(); }, ms || 12000) : 0;\n"
-        "      return fetch(url, { signal: ctl ? ctl.signal : undefined, headers: headers || undefined })")
+        "      var outHeaders = Object.assign({}, headers || {});\n"
+        "      try { var comp = window.COMPANION && new URL(window.COMPANION, location.href), target = new URL(url, location.href);\n"
+        "        if (comp && target.origin === comp.origin && target.pathname.indexOf('/helper/v1/') === 0 && !/\\/health$/.test(target.pathname) && window.NP_HELPER_TOKEN) outHeaders['x-helper-token'] = window.NP_HELPER_TOKEN;\n"
+        "      } catch (e) {}\n"
+        "      return fetch(url, { signal: ctl ? ctl.signal : undefined, headers: Object.keys(outHeaders).length ? outHeaders : undefined })")
 
 replace("        bpmTried: false,",
         "        bpmTried: false,\n"
@@ -1283,6 +1567,21 @@ replace("        function () {\n"
 replace("       browser; the companion beats both when it's running */",
         "       browser; a paired container, when there is one, beats both */")
 
+# ---- AWSP companion bridge: radio metadata uses the same one-time pairing ----------------------------
+replace("    function icyMeta(url) {\n",
+        "    var localIcyAsk = icyAsk;\n"
+        "    icyAsk = function (url) {\n"
+        "      return (window.NP_AWSP_READY || Promise.resolve(null)).then(function (awsp) {\n"
+        "        if (!awsp) return null;\n"
+        "        return awsp.status().then(function (s) {\n"
+        "          return s && s.paired ? awsp.companion('radio.nowPlaying', { url: url }) : null;\n"
+        "        });\n"
+        "      }).catch(function () { return null; }).then(function (d) {\n"
+        "        return d && d.title ? d : localIcyAsk(url);\n"
+        "      });\n"
+        "    };\n"
+        "    function icyMeta(url) {\n")
+
 # ---- Live TV: the companion's channels and guide (NP-TV-001) --------------------------------------------------
 # The companion keeps the M3U playlists and XMLTV guides pasted into its Live TV tab and serves them on
 # /helper/v1/tv/channels and /helper/v1/tv/guide. A player that can see a companion takes its channel
@@ -1319,7 +1618,7 @@ replace("        return { id: c.id || 'm3u-' + i, num: c.num || String(i + 1), n
         "      if (!window.COMPANION) return Promise.resolve(null);\n"
         "      var base = String(window.COMPANION).replace(/\\/$/, '');\n"
         "      var get = function (path) {\n"
-        "        return fetch(base + path, { cache: 'no-store' }).then(function (r) {\n"
+        "        return fetch(base + path, { cache: 'no-store', headers: window.NP_HELPER_TOKEN ? { 'x-helper-token': window.NP_HELPER_TOKEN } : {} }).then(function (r) {\n"
         "          if (!r.ok) throw new Error(String(r.status));\n"
         "          return r.json();\n"
         "        });\n"
@@ -1376,9 +1675,26 @@ replace("      conn.app = { base: base, health: j };\n"
         "      conn.app = { base: base, health: j };\n"
         "      window.COMPANION = base;\n"
         "      if (window.companionTv) window.companionTv();\n")
+# ---- AWSP companion bridge: Live TV and EPG use the same paired device identity ---------------------
+replace("    function companionTv() {\n",
+        "    var localTvFromCompanion = tvFromCompanion;\n"
+        "    tvFromCompanion = function () {\n"
+        "      return (window.NP_AWSP_READY || Promise.resolve(null)).then(function (awsp) {\n"
+        "        if (!awsp) return null;\n"
+        "        return awsp.status().then(function (s) {\n"
+        "          if (!s || !s.paired) return null;\n"
+        "          return Promise.all([awsp.companion('tv.channels'), awsp.companion('tv.guide')]).then(function (parts) {\n"
+        "            var c = parts[0] || {}, g = parts[1] || {};\n"
+        "            var channels = Array.isArray(c.channels) ? c.channels : [];\n"
+        "            return channels.length ? { channels: channels, guide: Array.isArray(g.guide) ? g.guide : [] } : null;\n"
+        "          });\n"
+        "        });\n"
+        "      }).catch(function () { return null; }).then(function (got) { return got || localTvFromCompanion(); });\n"
+        "    };\n"
+        "    function companionTv() {\n")
+
 replace("      if (cfg.companion) window.COMPANION = cfg.companion;\n",
-        "      if (cfg.companion) window.COMPANION = cfg.companion;\n"
-        "      if (window.companionTv) window.companionTv();\n")
+       "      /* cfg.companion is an address hint; the authenticated bridge sets window.COMPANION. */\n")
 replace("              'The companion app can fetch it instead.';\n",
         "              'Add it in the companion app\\u2019s Live TV tab instead: the companion reads it and the channels appear here.';\n")
 
@@ -2005,8 +2321,9 @@ replace('''<div class="toast" id="toast" role="status" aria-live="polite"></div>
         <label><input type="checkbox" name="pf" value="musicbrainz"> MusicBrainz</label>
         <label><input type="checkbox" name="pf" value="youtube"> YouTube</label>
         <label><input type="checkbox" name="pf" value="soundcloud"> SoundCloud</label>
+        <label><input type="checkbox" name="pf" value="musicsearch" disabled> MusicSearch (unavailable pending license clarification)</label>
       </fieldset>
-      <p class="sheet__msg srch-filter__note">YouTube and SoundCloud are searched by the hub or the companion (yt-dlp); with neither, this browser asks the others.</p>
+      <p class="sheet__msg srch-filter__note">MusicSearch is not bundled pending upstream license clarification. YouTube and SoundCloud need the hub or Companion (yt-dlp).</p>
       <p class="sheet__msg" id="srchFilterMsg" role="status"></p>
     </div>
     <div class="sheet__actions">
@@ -3609,22 +3926,24 @@ replace('''      var catBack = ctxCat && ctxCat.back;
       else if (algoBack && document.contains(algoBack)) algoBack.focus({ preventScroll: true });
 ''')
 
-# ---- a catalog visitor fetches a full source; Search audition stays separate (NP-FIND-011/012) -----------------
-# A song shown in the music list that is not on this device is metadata, not playable audio. Choosing it never starts
-# a 30-second sample in Now Playing; when a route exists, the fetch sheet asks for the person's rights basis and the
-# hub or companion gets a full song. The saved local copy then becomes the active track and plays at full duration.
-# With no route, the HUD says what is missing and plays nothing. Short clips are requested only by explicit Search
-# audition controls; Discover and collection rows neither preload nor play them. Spotify links may resolve metadata or
-# match an external source, but do not provide Spotify audio (search/visit.ts).
+# ---- a visitor plays: its preview, labelled, while the hub or the companion fetches it (NP-FIND-011/012) ----------
+# A song shown in the music list that is not on this device — a search result, a song of a catalog list on show, an
+# online Discover pick — used to be chosen with no sound ("Only tracks on this device play here"). Play on one now
+# plays its 30-second preview, labelled "Preview" under the title, and opens the fetch sheet: the paired hub fetches it
+# (POST /api/v1/catalog/download with the device credential, when the device may ask for downloads and receive files),
+# else the companion's helper; the row says "Fetching… N%", and the song plays from this device when it lands. With
+# nothing that can fetch it, the preview plays and the HUD says what the whole song needs. A preview is never logged
+# as a play, never reported as heard, and never runs on into the next row. The sheet itself names who fetches, and
+# for the hub, the source it chose and what it embedded, in the hub UI's words (search/visit.ts).
 replace('''        <p class="player__where" id="playerWhere" hidden></p>
       </div>''', '''        <p class="player__where" id="playerWhere" hidden></p>
-        <!-- Short auditions live in Search; a visitor row here never plays a 30-second clip. -->
+        <!-- A visitor's 30-second preview is said as one, never as the song (NP-FIND-011). -->
         <p class="player__preview" id="playerPreview" hidden></p>
       </div>''')
 replace('''  .player__where[hidden] { display: none; }
 ''', '''  .player__where[hidden] { display: none; }
 
-  /* Search audition timing is shown beside its result, never as Now Playing audio. */
+  /* "Preview · 30 seconds — not the whole song": a visitor's clip, said as one (NP-FIND-011) */
   .player__preview {
     display: inline-block;
     margin: 6px 0 0;
@@ -3756,7 +4075,7 @@ replace_between('    var fetchSheet = null;', '      fetchSheet.showModal();\n  
       if (!fetchSheet.open) fetchSheet.showModal();
     }
 
-    /* ---- a catalog visitor chosen: fetch its full song; no clip plays in Now Playing ---- */
+    /* ---- a visitor chosen (NP-FIND-011): its preview, said as one, and the fetch of the whole song ---- */
     var visitSeq = 0;
     function paintPreview() {
       var el = document.getElementById('playerPreview');
@@ -4309,8 +4628,9 @@ replace('''local: !!sg.local, remote: !!sg.remote,
                          visiting:''')
 
 # ---- adding a song chooses it quietly: no preview, no fetch sheet (NP-FIND-011) ---------------------------------
-# library:add selects the row without starting audio or fetching. A visitor remains metadata until the person chooses
-# it in the music list, which opens the authorized full-song fetch route; Search results alone offer short auditions.
+# library:add selects the new row and plays it, as it always has. A link row is a visitor now, and choosing a visitor
+# auditions its preview and opens the fetch sheet; adding a song is not asking to hear it or to fetch it, so the
+# choice it makes is quiet. Playing the row afterwards (Return, a double-click, the transport) visits it as usual.
 replace("""    function play(id) {
       var sg = song(id);
       if (!sg) return;""", """    function play(id, opts) {
@@ -4340,6 +4660,7 @@ replace("' — not on this device yet: choosing one plays its preview'", "' — 
 replace_between('    function visit(sg, target, previewOnly) {', '    /* a preview ends where it ends: it does not run on into the next row */', "    function visit(sg, target, previewOnly) {\n      var c = chosen[target], my = ++visitSeq;\n      c.preview = false;\n      if (window.NP_PLAYER && window.NP_PLAYER.playing()) window.NP_PLAYER.pause();\n      setPlaying(false);\n      paintPreview();\n      if (previewOnly) { window.say('Audition previews from Search instead.'); return; }\n      if (window.NP_FETCHING[sg.id]) {\n        window.say('The full song is still being fetched: ' + window.NP_FETCHING[sg.id]);\n        return;\n      }\n      if (!window.NP_VISIT) { window.say('The full song needs fetching first; previews are auditioned in Search.'); return; }\n      window.NP_VISIT.route().then(function (route) {\n        if (my !== visitSeq || chosen[target] !== c) return;\n        if (route.kind === 'none') {\n          var hasSearchPreview = /^https?:/.test(sg.preview || '');\n          window.say(hasSearchPreview\n            ? 'Preview it from Search; the full song needs fetching, and ' + route.why\n            : 'Nothing can play “' + sg.title + '” here: it has no preview, and ' + route.why);\n          return;\n        }\n        window.say('No preview plays in the music player; the full song will play after ' + route.label + ' fetches it.');\n        openFetch(sg);\n      });\n    }\n    /* a preview ends where it ends: it does not run on into the next row */\n")
 
 replace('  artwork: () => ({ url: displayedArtworkUrl, loaded: displayedArtworkLoaded, caseUsesArtwork: Boolean(displayedArtworkUrl && liveTextures && art.material.map === liveTextures[0]), discUsesArtwork: Boolean(displayedArtworkUrl && liveTextures && labelMat.map === liveTextures[2]) }),\n', "  artwork: () => {\n    const pixel = texture => {\n      const canvas = texture && texture.image;\n      if (!canvas || !canvas.getContext) return null;\n      try { return Array.from(canvas.getContext('2d').getImageData(Math.floor(canvas.width / 2), Math.floor(canvas.height / 2), 1, 1).data); }\n      catch { return null; }\n    };\n    return { url: displayedArtworkUrl, loaded: displayedArtworkLoaded, caseUsesArtwork: Boolean(displayedArtworkUrl && liveTextures && art.material.map === liveTextures[0]), discUsesArtwork: Boolean(displayedArtworkUrl && liveTextures && labelMat.map === liveTextures[2]), caseCenter: pixel(liveTextures && liveTextures[0]), discCenter: pixel(liveTextures && liveTextures[2]) };\n  },\n")
+
 
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):

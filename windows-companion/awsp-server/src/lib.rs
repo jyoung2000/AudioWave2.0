@@ -4,6 +4,7 @@
 //! process; this library holds everything testable behind it.
 
 pub mod config;
+pub mod helper;
 pub mod library;
 pub mod media;
 pub mod pairing;

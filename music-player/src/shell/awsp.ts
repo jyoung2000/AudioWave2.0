@@ -57,6 +57,13 @@ export interface ShellAwsp {
   status(): Promise<AwspStatusView>;
   /** One page (100 rows) of the PC's library, optionally a full-text query. */
   browse(page?: number, query?: string): Promise<{ page: number; total: number; items: Array<Record<string, unknown>> }>;
+  /** Allowlisted Companion operations routed over the paired, end-to-end encrypted AWSP channel. */
+  companion(
+    operation:
+      | 'tv.channels' | 'tv.guide' | 'radio.nowPlaying' | 'catalog.search'
+      | 'tools.status' | 'downloads.start' | 'downloads.status' | 'downloads.forget' | 'downloads.fileChunk',
+    args?: Record<string, unknown>,
+  ): Promise<unknown>;
   /** `relay` in a browser (§5), or null when not connected. */
   connectionType(): 'relay' | 'direct' | 'bridge' | null;
   /** `status`, `connection`, `state`, `library`. Returns the unsubscribe. */
@@ -309,6 +316,11 @@ export function installAwsp(db: PlayerDatabase, note: (line: string) => void): S
     async browse(page = 0, query) {
       await ensureStarted();
       return call({ op: 'request', type: 'browse', payload: { page, ...(query ? { query } : {}) } });
+    },
+    async companion(operation, args = {}) {
+      await ensureStarted();
+      const response = await call<{ result: unknown }>({ op: 'request', type: 'companion', payload: { operation, args } });
+      return response.result;
     },
     connectionType: () => connType,
     on(event, listener) {

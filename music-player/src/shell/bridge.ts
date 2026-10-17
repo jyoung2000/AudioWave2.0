@@ -19,14 +19,14 @@
  * `window.NP_READY` resolves when the store and library are loaded; the shell's boot function
  * (`window.__npStart`) is called then, so the first paint is the real library and never a placeholder.
  */
-import type { DownloadAuthorizationBasis, Track, TrackRef } from '@now-playing/contracts';
+import type { DownloadAuthorizationBasis, HelperHealth, Track, TrackRef } from '@now-playing/contracts';
 import { uuidv7 } from '@now-playing/domain';
 import { workletAssetUrl } from 'virtual:np-worklet-url';
 import { workletDataUrl } from '../lib/build-flags.js';
 import { openPlayerDb, getSetting, putSetting, type PlayerDatabase, type StoredRoot } from '../lib/db.js';
 import { indexPickedFiles, resolveFile, scanRoot, supportsDirectoryHandles } from '../lib/library.js';
 import { PlaybackEngine, type PlaybackState } from '../lib/playback.js';
-import { HubClient, type HubCredential } from '../lib/hub-client.js';
+import { HubClient, type HubCredential, type HubStatus } from '../lib/hub-client.js';
 import { normalizeCrossfade, crossfadeMsBetween } from '../lib/crossfade.js';
 import { toTrackRef } from '../state/store.js';
 import { registerServiceWorker } from '../lib/pwa.js';
@@ -35,7 +35,7 @@ import type { SearchApi } from './search/index.js';
 import * as recommend from './recommend/rank.js';
 import { detectBackend } from '../lib/tool-backend.js';
 import { runFetch, ToolError } from '../lib/tools-core.js';
-import type { SavedHelper } from '../lib/fetch-helper.js';
+import { connectHelper, loopbackHelperOrigin, tokenInDocument, type SavedHelper } from '../lib/fetch-helper.js';
 
 /**
  * The shell's surfaces, as design/coverage.json discovers them (kind `view-union`, prefix
@@ -134,7 +134,14 @@ declare global {
     NP_PLAYER?: ShellPlayer;
     NP_LIBRARY?: ShellLibrary;
     NP_TOOLS?: ShellTools;
-    NP_HUB?: { status(): unknown };
+    /** Set only after a Companion protected request accepts the stored token. */
+    COMPANION?: string;
+    NP_HELPER_TOKEN?: string;
+    NP_HUB?: {
+      status(): HubStatus;
+      refresh(): Promise<HubStatus>;
+      subscribe(listener: (status: HubStatus) => void): () => void;
+    };
     /** The paired hub's playlists (search/hub-shelf.ts): a hub library entry on show streams through it. */
     NP_HUB_SHELF?: {
       streamable(id: string): { trackId: string; title: string; artist: string; durationMs: number | null } | null;
@@ -495,9 +502,24 @@ function installPlayer(db: PlayerDatabase, engine: PlaybackEngine): ShellPlayer 
 
 /* --------------------------------------------------------------------- tools */
 
+export interface ShellToolDetection {
+  kind: 'built-in' | 'helper' | 'awsp';
+  label: string;
+  origin: string | null;
+  saved: boolean;
+  health: HelperHealth;
+  tools: HelperHealth['tools'];
+}
+
 export interface ShellTools {
-  /** What answered — the helper serving this page, a saved helper, or the Android bridge — or null. */
-  detect(): Promise<{ label: string; tools: Array<{ id: string; present: boolean; version: string | null }> } | null>;
+  /** What answered — the helper serving this page, a saved helper, or the native bridge — or null. */
+  detect(): Promise<ShellToolDetection | null>;
+  /** Validate and save the Companion token in IndexedDB, never in localStorage. */
+  connect(origin: string, token: string): Promise<ShellToolDetection | null>;
+  hasSaved(): Promise<boolean>;
+  /** Restore the saved helper token into the masked Settings field. */
+  savedToken(): Promise<string | null>;
+  forgetSaved(): Promise<boolean>;
   /**
    * Fetch a link through the helper and index what it saved. `basis` is the person's statement of
    * why they may have this file; the helper refuses without it, and so does this.
@@ -522,15 +544,70 @@ async function keepFetched(db: PlayerDatabase, files: readonly File[]): Promise<
   return { added: result.added, trackId: ref?.trackId ?? null };
 }
 
+function activateHelper(origin: string | null, token: string | null): void {
+  if (origin && token) {
+    window.COMPANION = origin;
+    window.NP_HELPER_TOKEN = token;
+  } else {
+    delete window.COMPANION;
+    delete window.NP_HELPER_TOKEN;
+  }
+}
+
+function toolDetection(
+  kind: 'built-in' | 'helper' | 'awsp',
+  label: string,
+  origin: string | null,
+  health: HelperHealth,
+  saved: boolean,
+): ShellToolDetection {
+  return { kind, label, origin, health, saved, tools: health.tools };
+}
+
 function installTools(db: PlayerDatabase): ShellTools {
   const tools: ShellTools = {
     async detect() {
-      const backend = await detectBackend(await getSetting<SavedHelper | null>(db, 'helper.saved', null));
-      if (!backend) return null;
-      return { label: backend.label, tools: backend.health.tools.map((t) => ({ id: t.id, present: t.present, version: t.version ?? null })) };
+      const saved = await getSetting<SavedHelper | null>(db, 'helper.saved', null);
+      const backend = await detectBackend(saved, document, window.NP_AWSP);
+      if (!backend) {
+        activateHelper(null, null);
+        return null;
+      }
+      const origin = backend.origin;
+      const localToken = tokenInDocument();
+      const savedMatches = Boolean(saved && origin && saved.origin.replace(/\/$/, '') === origin);
+      const token = backend.kind === 'helper'
+        ? (localToken && origin === window.location.origin ? localToken : savedMatches ? saved!.token : null)
+        : null;
+      if (backend.kind === 'helper' && origin && token) activateHelper(origin, token);
+      else activateHelper(null, null);
+      return toolDetection(backend.kind, backend.label, origin, backend.health, savedMatches && !localToken);
+    },
+    async connect(origin, token) {
+      const connected = await connectHelper(origin, token);
+      if (!connected) return null;
+      await putSetting(db, 'helper.saved', { origin: connected.origin, token: connected.token } satisfies SavedHelper);
+      activateHelper(connected.origin, connected.token);
+      note(`connected to Companion at ${connected.origin}`);
+      return toolDetection('helper', `A helper at ${connected.origin}`, connected.origin, connected.health, true);
+    },
+    async hasSaved() {
+      return Boolean(await getSetting<SavedHelper | null>(db, 'helper.saved', null));
+    },
+    async savedToken() {
+      const saved = await getSetting<SavedHelper | null>(db, 'helper.saved', null);
+      return saved && loopbackHelperOrigin(saved.origin) === saved.origin && saved.token.trim() ? saved.token : null;
+    },
+    async forgetSaved() {
+      const saved = await getSetting<SavedHelper | null>(db, 'helper.saved', null);
+      await putSetting(db, 'helper.saved', null);
+      const localToken = tokenInDocument();
+      activateHelper(localToken ? window.location.origin : null, localToken);
+      note(saved ? 'forgot the saved Companion token' : 'no saved Companion token to forget');
+      return Boolean(saved);
     },
     async fetch(url, basis, onProgress) {
-      const backend = await detectBackend(await getSetting<SavedHelper | null>(db, 'helper.saved', null));
+      const backend = await detectBackend(await getSetting<SavedHelper | null>(db, 'helper.saved', null), document, window.NP_AWSP);
       if (!backend) return { added: 0, trackId: null, reason: 'Fetching needs the local helper or the companion app running on this PC.' };
       try {
         const { files } = await runFetch(backend, { url, tool: 'auto', format: 'original', authorization: { basis, acknowledged: true } }, (job) =>
@@ -578,8 +655,8 @@ async function boot(): Promise<void> {
   installLibrary(db);
   const engine = new PlaybackEngine({ workletModuleUrl: workletDataUrl() ?? workletAssetUrl });
   installPlayer(db, engine);
-  installTools(db);
-  window.NP_HUB = { status: () => hub.getStatus() };
+  const tools = installTools(db);
+  window.NP_HUB = { status: () => hub.getStatus(), refresh: () => hub.refresh(), subscribe: (listener) => hub.subscribe(listener) };
   window.LIBRARY = await loadRows(db);
   // The ranker Discover and the Settings preview share (NP-DISC-001): pure functions, a few KB, in
   // the first load because Discover is one click from the first screen.
@@ -595,6 +672,7 @@ async function boot(): Promise<void> {
         note(`streaming from a PC is unavailable: ${err instanceof Error ? err.message : String(err)}`);
         return null;
       });
+  void window.NP_AWSP_READY.then(() => tools.detect());
   // The installable, offline player: the worker precaches the shell and its chunks. It is a no-op in
   // the single-file build and over file://, where a worker cannot run (see lib/pwa.ts).
   void registerServiceWorker((update) => {

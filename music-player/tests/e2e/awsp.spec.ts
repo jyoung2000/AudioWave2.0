@@ -1,6 +1,6 @@
 /**
  * Streaming from a PC, end to end (docs/AWSP.md §6, §8): a real browser, the real sidecar, a real
- * relay — nothing stubbed.
+ * relay, with the Companion HTTP helper as a controlled fixture.
  *
  * Before the test: a 24-bit / 96 kHz FLAC is generated with ffmpeg; a companion library database
  * (the tables of windows-companion/src/main/store.ts) is written with one track pointing at it; a
@@ -18,14 +18,15 @@
  * held and completes byte-identical.
  *
  * Needs: ffmpeg on PATH, `iroh-relay` (cargo install iroh-relay --version =1.2.0 --features server
- * --locked) and the sidecar built (cargo build --release in windows-companion/awsp-server). Without
- * them the test is skipped and says which is missing — never passed.
+ * --locked) and the sidecar built (cargo build in windows-companion/awsp-server). Without them the test
+ * is skipped and says which is missing — never passed.
  */
 import { expect, test } from '@playwright/test';
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
+import { createServer as createHttpServer, type Server } from 'node:http';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -35,20 +36,32 @@ import { boot, leavePrefs, resetToLibrary, stubOffline, watchErrors } from './np
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const exe = process.platform === 'win32' ? '.exe' : '';
-const SIDECAR = join(repo, 'windows-companion', 'awsp-server', 'target', 'release', `awsp-server${exe}`);
+const SIDECAR = [
+  join(repo, 'windows-companion', 'awsp-server', 'target', 'debug', `awsp-server${exe}`),
+  join(repo, 'windows-companion', 'awsp-server', 'target', 'release', `awsp-server${exe}`),
+].find((path) => existsSync(path)) ?? join(repo, 'windows-companion', 'awsp-server', 'target', 'debug', `awsp-server${exe}`);
 const RELAY = [process.env['AWSP_IROH_RELAY'], join(homedir(), '.cargo', 'bin', `iroh-relay${exe}`)].find((p): p is string => !!p && existsSync(p)) ?? null;
 const hasFfmpeg = spawnSync('ffmpeg', ['-version'], { stdio: 'ignore' }).status === 0;
-const missing = [!hasFfmpeg && 'ffmpeg', !RELAY && 'iroh-relay 1.2.0', !existsSync(SIDECAR) && 'the awsp-server release build'].filter(Boolean);
+const missing = [!hasFfmpeg && 'ffmpeg', !RELAY && 'iroh-relay 1.2.0', !existsSync(SIDECAR) && 'the awsp-server binary (cargo build)'].filter(Boolean);
 
 const TRACK_ID = randomUUID();
+const DOWNLOAD_JOB_ID = '4d270178-e6a9-4a52-84f5-5c73ee08f9db';
+const DOWNLOAD_FILE_ID = '29895cb0-28ea-4d72-86dc-9065146e2911';
 const TITLE = 'Harbour Lights (24-96)';
 const sha256 = (b: Uint8Array) => createHash('sha256').update(b).digest('hex');
 
 let dir = '';
 let fixture: Buffer = Buffer.alloc(0);
+let downloadFixture: Buffer = Buffer.alloc(0);
 let relayPort = 0;
+let helperPort = 0;
+let helperServer: Server | null = null;
 let relay: ChildProcessWithoutNullStreams | null = null;
 let sidecar: ChildProcessWithoutNullStreams | null = null;
+const helperRequests: Array<{ path: string; token: string }> = [];
+const downloadRequests: Array<Record<string, unknown>> = [];
+let setupPendingResponses = 0;
+const HELPER_TOKEN = 'awsp-e2e-helper-token';
 const sidecarLog: string[] = [];
 const events: Array<Record<string, unknown>> = [];
 
@@ -119,6 +132,10 @@ test.describe('streaming from a PC (AWSP)', () => {
     const ff = spawnSync('ffmpeg', ['-v', 'error', '-y', '-filter_complex', graph, '-map', '[out]', '-ac', '2', '-sample_fmt', 's32', '-bits_per_raw_sample', '24', '-c:a', 'flac', flac]);
     expect(ff.status, String(ff.stderr)).toBe(0);
     fixture = readFileSync(flac);
+    const tiny = join(dir, 'music', 'download-fixture.flac');
+    const tinyResult = spawnSync('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=880:duration=0.2', '-c:a', 'flac', tiny]);
+    expect(tinyResult.status, String(tinyResult.stderr)).toBe(0);
+    downloadFixture = readFileSync(tiny);
 
     // The companion's library, as the sidecar reads it (store.ts's tables; awsp-server tests/common).
     const db = new DatabaseSync(join(dir, 'companion.sqlite'));
@@ -135,6 +152,77 @@ test.describe('streaming from a PC (AWSP)', () => {
     writeFileSync(join(dir, 'relay.toml'), `http_bind_addr = "127.0.0.1:${relayPort}"\nenable_metrics = false\n`);
     await startRelay();
 
+    helperPort = await freePort();
+    helperRequests.length = 0;
+    helperServer = createHttpServer(async (request, response) => {
+      const path = request.url ?? '/';
+      const token = request.headers['x-helper-token'] ?? '';
+      helperRequests.push({ path, token: Array.isArray(token) ? token.join(',') : token });
+      const sendJson = (status: number, body: unknown) => {
+        response.writeHead(status, { 'content-type': 'application/json' });
+        response.end(JSON.stringify(body));
+      };
+      if (token !== HELPER_TOKEN) return sendJson(401, { error: 'unauthorized' });
+      const url = new URL(path, 'http://127.0.0.1');
+      const downloadJob = (state: 'queued' | 'done') => ({
+        id: DOWNLOAD_JOB_ID,
+        state,
+        url: 'https://soundcloud.com/e2e/creator-enabled-download',
+        tool: 'yt-dlp',
+        format: 'original',
+        stage: state === 'done' ? 'done' : 'fetching',
+        percent: state === 'done' ? 100 : 0,
+        message: null,
+        files: state === 'done' ? [{ id: DOWNLOAD_FILE_ID, name: 'Paired Companion Fixture.flac', sizeBytes: downloadFixture.length, contentType: 'audio/flac' }] : [],
+        error: null,
+        startedAt: '2026-10-16T12:00:00.000Z',
+        finishedAt: state === 'done' ? '2026-10-16T12:00:01.000Z' : null,
+      });
+      if (request.method === 'GET' && url.pathname === '/helper/v1/health') {
+        const installing = setupPendingResponses > 0;
+        if (installing) setupPendingResponses -= 1;
+        const tools = ['yt-dlp', 'spotdl', 'ffmpeg'].map((id) => ({
+          id, present: !installing, version: installing ? null : 'e2e-installed', origin: 'installed', installHint: null, installable: true,
+          setup: installing ? { state: 'installing' } : { state: 'ready' },
+        }));
+        return sendJson(200, {
+          helper: 'now-playing-local-helper', protocol: 1, version: 'e2e', servesApp: false, tools, allowedHosts: ['soundcloud.com'],
+          formats: ['original', 'mp3', 'aac', 'opus', 'flac'], startedAt: '2026-10-16T12:00:00.000Z',
+        });
+      }
+      if (request.method === 'GET' && url.pathname === '/helper/v1/tv/channels') return sendJson(200, { channels: [{ id: 'channel-e2e', name: 'Mock Channel' }] });
+      if (request.method === 'GET' && url.pathname === '/helper/v1/tv/guide') return sendJson(200, { guide: [{ tvgId: 'channel-e2e', title: 'Mock EPG' }] });
+      if (request.method === 'GET' && url.pathname === '/helper/v1/radio/now-playing') return sendJson(200, { title: 'Mock Radio', artist: 'Companion E2E' });
+      if (request.method === 'GET' && url.pathname === '/helper/v1/catalog/search') {
+        return sendJson(200, {
+          query: { q: 'unified bridge test' },
+          tracks: [{ id: 'catalog:e2e', title: 'Mock Companion Catalog Result', sources: [] }],
+          artists: [], albums: [], playlists: [], status: [],
+          page: { tracks: { offset: 0, limit: 25, hasMore: false }, artists: null, albums: null, playlists: null }, resolve: null,
+        });
+      }
+      if (request.method === 'POST' && url.pathname === '/helper/v1/fetch') {
+        const chunks: Buffer[] = [];
+        for await (const chunk of request) chunks.push(Buffer.from(chunk));
+        downloadRequests.push(JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>);
+        return sendJson(202, downloadJob('queued'));
+      }
+      if (request.method === 'GET' && url.pathname === `/helper/v1/jobs/${DOWNLOAD_JOB_ID}`) return sendJson(200, downloadJob('done'));
+      if (request.method === 'DELETE' && url.pathname === `/helper/v1/jobs/${DOWNLOAD_JOB_ID}`) return sendJson(200, { ok: true });
+      const fileRoute = /^\/helper\/v1\/jobs\/([^/]+)\/files\/([^/]+)\/chunk$/.exec(url.pathname);
+      if (request.method === 'GET' && fileRoute?.[1] === DOWNLOAD_JOB_ID && fileRoute[2] === DOWNLOAD_FILE_ID) {
+        const offset = Number(url.searchParams.get('offset'));
+        const length = Number(url.searchParams.get('length'));
+        const bytes = downloadFixture.subarray(offset, offset + length);
+        return sendJson(200, { offset, totalBytes: downloadFixture.length, dataBase64: bytes.toString('base64') });
+      }
+      return sendJson(404, { error: 'not-found' });
+    });
+    await new Promise<void>((resolve, reject) => {
+      helperServer!.once('error', reject);
+      helperServer!.listen(helperPort, '127.0.0.1', resolve);
+    });
+
     sidecar = spawn(SIDECAR, [], { stdio: 'pipe', env: { ...process.env, AWSP_RELAY_ONLY: '1', AWSP_LOG: 'info' } });
     createInterface({ input: sidecar.stdout }).on('line', (line) => {
       try {
@@ -148,6 +236,8 @@ test.describe('streaming from a PC (AWSP)', () => {
       secret_key_hex: randomBytes(32).toString('hex'),
       library_db: join(dir, 'companion.sqlite'),
       cache_dir: join(dir, 'cache'),
+      helper_port: helperPort,
+      helper_token: HELPER_TOKEN,
       server_name: 'Test PC',
       allowlist: [],
       relay_mode: 'custom',
@@ -165,7 +255,66 @@ test.describe('streaming from a PC (AWSP)', () => {
       if (sidecar.exitCode === null) sidecar.kill();
     }
     await stopRelay();
+    if (helperServer) await new Promise<void>((resolve) => helperServer!.close(() => resolve()));
+    helperServer = null;
     if (dir) rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('one paired Player identity carries Companion search, radio, TV, EPG and downloaders through AWSP', async ({ page }) => {
+    test.setTimeout(120_000);
+    helperRequests.length = 0;
+    downloadRequests.length = 0;
+    setupPendingResponses = 1;
+    await stubOffline(page);
+    const ready = await nextEvent('ready');
+    const ticket = String(ready['ticket']);
+    send({ cmd: 'new_pairing_code' });
+    const code = String((await nextEvent('pairing_code'))['code']);
+
+    await boot(page);
+    await page.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 20_000 });
+    await page.evaluate(() => window.NP_AWSP_READY!.then((awsp) => awsp!.tune({ pingMs: 1000 })));
+    await page.evaluate(() => { location.hash = '#settings/src'; });
+    await expect(page.locator('#pp-src')).toBeVisible({ timeout: 5000 });
+    await page.fill('#pcTicket', ticket);
+    await page.fill('#pcCode', code);
+    await page.click('#pcPair');
+    await expect(page.locator('#pcMsg')).toHaveText('Paired with Test PC.', { timeout: 30_000 });
+    await expect(page.locator('#pcFacts')).toContainText('yt-dlp: setting up', { timeout: 20_000 });
+    await expect(page.locator('#pcFacts')).toContainText('yt-dlp: e2e-installed', { timeout: 20_000 });
+    await expect(page.locator('#pcFacts')).toContainText('spotDL: e2e-installed');
+    await expect(page.locator('#pcFacts')).toContainText('FFmpeg: e2e-installed');
+
+    const result = await page.evaluate(async () => {
+      const awsp = await window.NP_AWSP_READY;
+      if (!awsp) throw new Error('AWSP client did not initialize');
+      return {
+        channels: await awsp.companion('tv.channels'),
+        guide: await awsp.companion('tv.guide'),
+        radio: await awsp.companion('radio.nowPlaying', { url: 'https://radio.example/stream' }),
+        search: await awsp.companion('catalog.search', { q: 'unified bridge test' }),
+      };
+    });
+    expect(result.channels).toMatchObject({ channels: [{ id: 'channel-e2e', name: 'Mock Channel' }] });
+    expect(result.guide).toMatchObject({ guide: [{ tvgId: 'channel-e2e', title: 'Mock EPG' }] });
+    expect(result.radio).toMatchObject({ title: 'Mock Radio', artist: 'Companion E2E' });
+    expect(result.search).toMatchObject({ tracks: [{ id: 'catalog:e2e' }] });
+
+    const downloaderFacts = await page.locator('#pcFacts').innerText();
+    expect(downloaderFacts).toContain('yt-dlp: e2e-installed');
+    expect(downloaderFacts).toContain('spotDL: e2e-installed');
+    expect(downloaderFacts).toContain('FFmpeg: e2e-installed');
+    const imported = await page.evaluate(() => window.NP_TOOLS!.fetch('https://soundcloud.com/e2e/creator-enabled-download', 'creator-download'));
+    expect(imported).toMatchObject({ added: 1, reason: null });
+    expect(downloadRequests).toEqual([{ url: 'https://soundcloud.com/e2e/creator-enabled-download', tool: 'auto', format: 'original', authorization: { basis: 'creator-download', acknowledged: true } }]);
+
+    expect(helperRequests.map(({ path }) => new URL(path, 'http://127.0.0.1').pathname)).toEqual([
+      '/helper/v1/health', '/helper/v1/health', '/helper/v1/tv/channels', '/helper/v1/tv/guide', '/helper/v1/radio/now-playing', '/helper/v1/catalog/search',
+      '/helper/v1/health', '/helper/v1/fetch', `/helper/v1/jobs/${DOWNLOAD_JOB_ID}`,
+      `/helper/v1/jobs/${DOWNLOAD_JOB_ID}/files/${DOWNLOAD_FILE_ID}/chunk`, `/helper/v1/jobs/${DOWNLOAD_JOB_ID}`,
+    ]);
+    expect(helperRequests.map(({ token }) => token)).toEqual(Array(11).fill(HELPER_TOKEN));
+    expect(JSON.stringify({ result, downloaderFacts, imported, downloadRequests })).not.toContain(HELPER_TOKEN);
   });
 
   test('pairs, plays relay-carried, is bit-identical, seeks by range, and resumes across a relay restart', async ({ page }) => {
@@ -203,6 +352,29 @@ test.describe('streaming from a PC (AWSP)', () => {
       await expect(page.locator('#pcFacts')).toContainText('Test PC');
       const paired = await nextEvent('paired');
       expect(paired['client_kind']).toBe('pwa');
+    });
+
+    await test.step('the same paired identity carries radio, catalog search, Live TV and EPG via the internal helper bridge', async () => {
+      helperRequests.length = 0;
+      const result = await page.evaluate(async () => {
+        const awsp = await window.NP_AWSP_READY;
+        if (!awsp) throw new Error('AWSP client did not initialize');
+        return {
+          channels: await awsp.companion('tv.channels'),
+          guide: await awsp.companion('tv.guide'),
+          radio: await awsp.companion('radio.nowPlaying', { url: 'https://radio.example/stream' }),
+          search: await awsp.companion('catalog.search', { q: 'unified bridge test' }),
+        };
+      });
+      expect(result.channels).toMatchObject({ channels: [{ id: 'channel-e2e', name: 'Mock Channel' }] });
+      expect(result.guide).toMatchObject({ guide: [{ tvgId: 'channel-e2e', title: 'Mock EPG' }] });
+      expect(result.radio).toMatchObject({ title: 'Mock Radio', artist: 'Companion E2E' });
+      expect(result.search).toMatchObject({ tracks: [{ id: 'catalog:e2e' }] });
+      expect(helperRequests.map(({ path }) => new URL(path, 'http://127.0.0.1').pathname)).toEqual([
+        '/helper/v1/tv/channels', '/helper/v1/tv/guide', '/helper/v1/radio/now-playing', '/helper/v1/catalog/search',
+      ]);
+      expect(helperRequests.map(({ token }) => token)).toEqual(Array(4).fill(HELPER_TOKEN));
+      expect(JSON.stringify(result)).not.toContain(HELPER_TOKEN);
     });
 
     const rowId = `awsp:${TRACK_ID}`;

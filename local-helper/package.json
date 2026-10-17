@@ -18,7 +18,7 @@
     "build": "pnpm typecheck && node scripts/build.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "start": "node dist/now-playing-helper.mjs",
-    "test": "vitest run --project unit --project integration"
+    "test": "vitest run --config vitest.config.ts --root .. --project unit --project integration local-helper"
   },
   "dependencies": {
     "@now-playing/contracts": "workspace:*",

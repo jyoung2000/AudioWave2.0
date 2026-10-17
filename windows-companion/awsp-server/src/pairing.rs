@@ -33,7 +33,9 @@ impl Pairing {
     }
 
     pub fn check(&mut self, attempt: &str) -> PairOutcome {
-        let Some((code, expires)) = &self.code else { return PairOutcome::NoCode };
+        let Some((code, expires)) = &self.code else {
+            return PairOutcome::NoCode;
+        };
         if Instant::now() >= *expires {
             self.code = None;
             return PairOutcome::NoCode;
@@ -81,7 +83,11 @@ mod tests {
         for _ in 0..4 {
             assert_eq!(p.check(wrong), PairOutcome::Rejected);
         }
-        assert_eq!(p.check(&code), PairOutcome::Accepted, "four failures leave the code live");
+        assert_eq!(
+            p.check(&code),
+            PairOutcome::Accepted,
+            "four failures leave the code live"
+        );
         let (code, _) = p.issue();
         for _ in 0..5 {
             assert_eq!(p.check(wrong), PairOutcome::Rejected);

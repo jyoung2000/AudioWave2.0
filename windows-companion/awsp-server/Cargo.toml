@@ -32,6 +32,7 @@ base64 = "0.22"
 n0-future = "0.3"
 # Same major as iroh's, for the opt-in `insecure_relay_tls` verifier only.
 rustls = { version = "0.23", default-features = false, features = ["std"] }
+reqwest = { version = "=0.13.5", default-features = false, features = ["json", "query", "rustls", "stream"] }
 
 [dev-dependencies]
 iroh = { version = "=1.2.0", features = ["test-utils"] }

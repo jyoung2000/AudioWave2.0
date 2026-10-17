@@ -163,6 +163,25 @@ describe('fetching', () => {
     expect(file.headers.get('content-disposition')).toContain('A%20Song.m4a');
   });
 
+  it('serves bounded file chunks to paired clients without revealing the staged path', async () => {
+    const job = (await (await post(HELPER_ROUTES.fetch, { url: 'https://www.youtube.com/watch?v=chunk', authorization: owned })).json()) as HelperJob;
+    const done = await settle(job.id);
+    const entry = done.files[0]!;
+    const response = await call(HELPER_ROUTES.fileChunk(done.id, entry.id, 0, 5));
+    expect(response.status).toBe(200);
+    const chunk = (await response.json()) as { offset: number; totalBytes: number; dataBase64: string };
+    expect(chunk).toMatchObject({ offset: 0, totalBytes: Buffer.byteLength('pretend audio') });
+    expect(Buffer.from(chunk.dataBase64, 'base64').toString()).toBe('prete');
+    expect(JSON.stringify(chunk)).not.toContain(root);
+
+    const invalid = await call(HELPER_ROUTES.fileChunk(done.id, entry.id, 0, 0));
+    expect(invalid.status).toBe(400);
+    const pastEnd = await call(HELPER_ROUTES.fileChunk(done.id, entry.id, chunk.totalBytes + 1, 1));
+    expect(pastEnd.status).toBe(416);
+    const unauthenticated = await fetch(`${base}${HELPER_ROUTES.fileChunk(done.id, entry.id, 0, 5)}`);
+    expect(unauthenticated.status).toBe(401);
+  });
+
   it('reports the tool’s own reason when it fails, without the warnings around it', async () => {
     const job = (await (await post(HELPER_ROUTES.fetch, { url: 'https://www.youtube.com/watch?v=fail', authorization: owned })).json()) as HelperJob;
     const done = await settle(job.id);

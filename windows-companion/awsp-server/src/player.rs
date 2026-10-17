@@ -108,7 +108,10 @@ impl PlayerState {
 
     pub fn set_queue(&mut self, ids: Vec<String>) {
         self.queue = ids;
-        self.index = self.track_id.as_ref().and_then(|t| self.queue.iter().position(|q| q == t));
+        self.index = self
+            .track_id
+            .as_ref()
+            .and_then(|t| self.queue.iter().position(|q| q == t));
     }
 
     /// The queue index `next`/`prev` would load, if any. `prev` more than 3 s into a track

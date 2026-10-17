@@ -25,7 +25,8 @@ fn env(name: &str) -> String {
 #[ignore = "CI-only: needs Linux network namespaces (see .github/workflows/awsp-netsim.yml)"]
 async fn streams_across_two_nats_and_survives_a_three_second_outage() {
     init_tracing();
-    let ticket = iroh_tickets::endpoint::EndpointTicket::from_str(&env("AWSP_NETSIM_TICKET")).expect("ticket");
+    let ticket = iroh_tickets::endpoint::EndpointTicket::from_str(&env("AWSP_NETSIM_TICKET"))
+        .expect("ticket");
     let key = SecretKey::from_str(&env("AWSP_NETSIM_CLIENT_KEY")).expect("client key");
     let track = env("AWSP_NETSIM_TRACK");
     let want_sha = env("AWSP_NETSIM_SHA256");
@@ -43,10 +44,19 @@ async fn streams_across_two_nats_and_survives_a_three_second_outage() {
     let deadline = Instant::now() + Duration::from_secs(180);
     let mut conn = conn;
     while (got.len() as u64) < total {
-        assert!(Instant::now() < deadline, "did not finish in time; held {} of {total} bytes", got.len());
+        assert!(
+            Instant::now() < deadline,
+            "did not finish in time; held {} of {total} bytes",
+            got.len()
+        );
         let start = got.len() as u64;
         let end = (start + CHUNK - 1).min(total - 1);
-        match fetch(&conn, json!({ "track_id": track, "byte_start": start, "byte_end": end, "tier": "lossless" })).await {
+        match fetch(
+            &conn,
+            json!({ "track_id": track, "byte_start": start, "byte_end": end, "tier": "lossless" }),
+        )
+        .await
+        {
             Ok((_, bytes)) => {
                 got.extend_from_slice(&bytes);
                 longest_gap = longest_gap.max(last.elapsed());
@@ -55,7 +65,12 @@ async fn streams_across_two_nats_and_survives_a_three_second_outage() {
             Err(_) => {
                 // The path went away: reconnect and carry on from the last contiguous byte.
                 tokio::time::sleep(Duration::from_millis(250)).await;
-                if let Ok(c) = tokio::time::timeout(T, client.connect(ticket.endpoint_addr().clone(), b"awsp/1")).await {
+                if let Ok(c) = tokio::time::timeout(
+                    T,
+                    client.connect(ticket.endpoint_addr().clone(), b"awsp/1"),
+                )
+                .await
+                {
                     if let Ok(c) = c {
                         conn = c;
                         let mut control = Control::open(&conn).await;
@@ -65,7 +80,14 @@ async fn streams_across_two_nats_and_survives_a_three_second_outage() {
             }
         }
     }
-    assert_eq!(sha256(&got), want_sha, "the bytes that arrived are the source's bytes");
-    assert!(longest_gap < Duration::from_secs(20), "no gap outlasted the 20 s buffer (longest {longest_gap:?})");
+    assert_eq!(
+        sha256(&got),
+        want_sha,
+        "the bytes that arrived are the source's bytes"
+    );
+    assert!(
+        longest_gap < Duration::from_secs(20),
+        "no gap outlasted the 20 s buffer (longest {longest_gap:?})"
+    );
     eprintln!("netsim: {} bytes, longest gap {:?}", got.len(), longest_gap);
 }

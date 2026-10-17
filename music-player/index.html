@@ -2102,7 +2102,7 @@
 
   .player__where[hidden] { display: none; }
 
-  /* Search audition timing is shown beside its result, never as Now Playing audio. */
+  /* "Preview · 30 seconds — not the whole song": a visitor's clip, said as one (NP-FIND-011) */
   .player__preview {
     display: inline-block;
     margin: 6px 0 0;
@@ -7273,15 +7273,15 @@ window.AW.startStats = function () {
            height and shoulder span are the avatar's proportions at k = 1.0
            (solo), 0.85 (front of the group) and 0.62 (the two behind). -->
       <div class="segmented" role="radiogroup" aria-label="Listening mode" id="mode">
-        <button class="segmented__item" type="button" role="radio" aria-checked="false"
-                data-mode="solo" aria-label="Solo listening" tabindex="-1">
+        <button class="segmented__item" type="button" role="radio" aria-checked="true"
+                data-mode="solo" aria-label="Solo listening" tabindex="0">
           <svg viewBox="0 0 30 20" aria-hidden="true">
             <circle cx="15" cy="7.5" r="3.5"/>
             <path d="M7.5 20C7.5 15.3 10.8 13 15 13s7.5 2.3 7.5 7z"/>
           </svg>
         </button>
-        <button class="segmented__item" type="button" role="radio" aria-checked="true"
-                data-mode="group" aria-label="Group listening">
+        <button class="segmented__item" type="button" role="radio" aria-checked="false"
+                data-mode="group" aria-label="Group listening" tabindex="-1" aria-disabled="true" disabled title="Connect a paired Hub to enable Group listening.">
           <svg viewBox="0 0 30 20" aria-hidden="true">
             <defs>
               <!-- Cuts a gap around the front figure so three same-coloured
@@ -7344,7 +7344,7 @@ window.AW.startStats = function () {
         <!-- Radio only: a track tells you its album, a broadcast tells you
              which station it is and where it is coming from. -->
         <p class="player__where" id="playerWhere" hidden></p>
-        <!-- Short auditions live in Search; a visitor row here never plays a 30-second clip. -->
+        <!-- A visitor's 30-second preview is said as one, never as the song (NP-FIND-011). -->
         <p class="player__preview" id="playerPreview" hidden></p>
       </div>
     </div>
@@ -7737,8 +7737,9 @@ window.AW.startStats = function () {
         <label><input type="checkbox" name="pf" value="musicbrainz"> MusicBrainz</label>
         <label><input type="checkbox" name="pf" value="youtube"> YouTube</label>
         <label><input type="checkbox" name="pf" value="soundcloud"> SoundCloud</label>
+        <label><input type="checkbox" name="pf" value="musicsearch" disabled> MusicSearch (unavailable pending license clarification)</label>
       </fieldset>
-      <p class="sheet__msg srch-filter__note">YouTube and SoundCloud are searched by the hub or the companion (yt-dlp); with neither, this browser asks the others.</p>
+      <p class="sheet__msg srch-filter__note">MusicSearch is not bundled pending upstream license clarification. YouTube and SoundCloud need the hub or Companion (yt-dlp).</p>
       <p class="sheet__msg" id="srchFilterMsg" role="status"></p>
     </div>
     <div class="sheet__actions">
@@ -8026,22 +8027,32 @@ window.AW.startStats = function () {
 
         <fieldset class="prefs__group" id="connGroup">
           <legend class="prefs__legend">Connections</legend>
-          <p class="prefs__hint" style="margin:0 0 10px">Three things this player can talk to. Test either one to see exactly what it answers, and the table below shows what goes to each.</p>
+          <p class="prefs__hint" style="margin:0 0 10px">Pair the Companion once with its address and one-time code. The Hub is optional. Test either one to see exactly what it answers, and the table below shows what goes to each.</p>
 
           <section class="conn__card" aria-labelledby="connAppH">
             <h3 class="conn__h" id="connAppH"><span class="conn__dot" id="connAppDot" data-state="off" aria-hidden="true"></span>Windows companion app</h3>
             <p class="conn__what">Runs on this PC. Reads your folders, fetches with yt-dlp, spotDL and FFmpeg, and decodes the song titles radio stations send. Leave the address empty to look on this PC’s usual ports.</p>
-            <div class="prefs__row">
-              <label for="cfgCompanion">Address</label>
-              <input class="prefs__field" type="text" id="cfgCompanion" placeholder="http://127.0.0.1:17342" spellcheck="false">
-            </div>
-            <div class="prefs__row">
-              <span class="prefs__label">&nbsp;</span>
-              <div class="conn__acts">
-                <button class="prefs__btn" type="button" id="cfgConnect">Test Connection</button>
-                <span class="prefs__status" id="cfgConnMsg" role="status">Not tested yet.</span>
+            <details id="cfgLegacyHelper" style="grid-column:1 / -1">
+              <summary>Advanced — legacy local helper access</summary>
+              <div class="prefs__row">
+                <label for="cfgCompanion">Local helper address</label>
+                <input class="prefs__field" type="text" id="cfgCompanion" placeholder="http://127.0.0.1:17342" spellcheck="false">
               </div>
-            </div>
+              <div class="prefs__row">
+                <label for="cfgCompanionToken">Legacy helper token</label>
+                <input class="prefs__field" type="password" id="cfgCompanionToken" autocomplete="off" spellcheck="false" aria-describedby="cfgCompanionTokenHelp" placeholder="Legacy local helper token">
+              </div>
+              <p class="prefs__hint" id="cfgCompanionTokenHelp">For older or local-only direct-helper workflows. New pairing uses the Companion address and one-time code below.</p>
+              <p class="prefs__hint" id="cfgTokenSaved" hidden>Saved legacy token restored after reload; this password field stays masked. Use Forget saved token to remove it.</p>
+              <div class="prefs__row">
+                <span class="prefs__label">&nbsp;</span>
+                <div class="conn__acts">
+                  <button class="prefs__btn" type="button" id="cfgConnect">Connect / Test legacy helper</button>
+                  <button class="prefs__btn" type="button" id="cfgForgetToken" hidden>Forget saved token</button>
+                  <span class="prefs__status" id="cfgConnMsg" role="status">Not connected.</span>
+                </div>
+              </div>
+            </details>
             <dl class="conn__facts" id="connAppFacts" hidden></dl>
           </section>
 
@@ -8074,17 +8085,17 @@ window.AW.startStats = function () {
           </section>
 
           <section class="conn__card" aria-labelledby="connPcH">
-            <h3 class="conn__h" id="connPcH"><span class="conn__dot" id="connPcDot" data-state="off" aria-hidden="true"></span>Stream from a PC</h3>
-            <p class="conn__what">Plays the music on a PC running the companion app, from anywhere: lossless, end-to-end encrypted, carried by the PC’s relay. On the PC, Settings ▸ Remote shows its ticket and a six-digit code.</p>
+            <h3 class="conn__h" id="connPcH"><span class="conn__dot" id="connPcDot" data-state="off" aria-hidden="true"></span>Pair Companion</h3>
+            <p class="conn__what">Enter the Companion pairing address and one-time code once. This creates a per-device revocable identity for encrypted music streaming and supported Companion features; no helper token is needed.</p>
             <div class="prefs__row">
-              <label for="pcTicket">Ticket</label>
-              <input class="prefs__field" type="text" id="pcTicket" placeholder="endpoint…" spellcheck="false" autocomplete="off">
+              <label for="pcTicket">Pairing address</label>
+              <input class="prefs__field" type="text" id="pcTicket" placeholder="Companion address…" spellcheck="false" autocomplete="off">
             </div>
             <div class="prefs__row">
               <label for="pcCode">Pairing code</label>
               <div class="conn__acts">
                 <input class="prefs__field" type="text" id="pcCode" inputmode="numeric" maxlength="6" placeholder="6 digits" spellcheck="false" autocomplete="one-time-code" style="flex:1 1 120px;width:auto">
-                <button class="prefs__btn" type="button" id="pcPair">Pair</button>
+                <button class="prefs__btn" type="button" id="pcPair">Pair Companion</button>
                 <button class="prefs__btn" type="button" id="pcForget" hidden>Forget</button>
               </div>
             </div>
@@ -8307,9 +8318,7 @@ window.AW.startStats = function () {
             <span class="prefs__label">Group</span>
             <label class="prefs__check"><input type="checkbox" id="cfgGroup"> Listen along with the group</label>
           </div>
-          <p class="prefs__hint">A group session is a live broadcast: everyone hears the same thing at the
-            same moment, so there is no position to seek to. Turning it off puts you back in solo, where the
-            track is yours to scrub.</p>
+          <p class="prefs__hint">Group listening requires a paired, reachable Hub. Connect your Hub first; if it disconnects, playback returns to Solo. The connected Hub controls the shared playback position.</p>
         </fieldset>
 
         <fieldset class="prefs__group">
@@ -12041,7 +12050,7 @@ window.AW.startStats = function () {
       if (!window.COMPANION) return Promise.resolve(null);
       var base = String(window.COMPANION).replace(/\/$/, '');
       var get = function (path) {
-        return fetch(base + path, { cache: 'no-store' }).then(function (r) {
+        return fetch(base + path, { cache: 'no-store', headers: window.NP_HELPER_TOKEN ? { 'x-helper-token': window.NP_HELPER_TOKEN } : {} }).then(function (r) {
           if (!r.ok) throw new Error(String(r.status));
           return r.json();
         });
@@ -12066,6 +12075,20 @@ window.AW.startStats = function () {
           });
       }).catch(function () { return null; });
     }
+    var localTvFromCompanion = tvFromCompanion;
+    tvFromCompanion = function () {
+      return (window.NP_AWSP_READY || Promise.resolve(null)).then(function (awsp) {
+        if (!awsp) return null;
+        return awsp.status().then(function (s) {
+          if (!s || !s.paired) return null;
+          return Promise.all([awsp.companion('tv.channels'), awsp.companion('tv.guide')]).then(function (parts) {
+            var c = parts[0] || {}, g = parts[1] || {};
+            var channels = Array.isArray(c.channels) ? c.channels : [];
+            return channels.length ? { channels: channels, guide: Array.isArray(g.guide) ? g.guide : [] } : null;
+          });
+        });
+      }).catch(function () { return null; }).then(function (got) { return got || localTvFromCompanion(); });
+    };
     function companionTv() {
       return tvFromCompanion().then(function (got) { return got || tvFromHub(); }).then(function (got) {
         if (!got) return 0;
@@ -15670,19 +15693,28 @@ window.AW.startStats = function () {
       /* Read from the control that owns the mode rather than from cfg: the
          segmented control in the status bar can change it while this window
          is shut, and a checkbox showing the stale answer is worse than none. */
-      document.getElementById('cfgGroup').checked =
-        (window.listeningMode ? window.listeningMode() : 'group') === 'group';
+      var groupBox = document.getElementById('cfgGroup');
+      var groupAvailable = !!(window.groupListeningAvailable && window.groupListeningAvailable());
+      groupBox.disabled = !groupAvailable;
+      groupBox.title = window.groupListeningReason ? window.groupListeningReason() : 'Connect a paired Hub to enable Group listening.';
+      groupBox.checked = groupAvailable && (window.listeningMode ? window.listeningMode() : 'solo') === 'group';
     }
 
     document.getElementById('cfgGroup').addEventListener('change', function () {
-      if (window.setListeningMode) window.setListeningMode(this.checked ? 'group' : 'solo');
-      setStatus(this.checked ? 'Listening with the group.' : 'Listening on your own.');
+      var box = this;
+      if (box.checked && !(window.groupListeningAvailable && window.groupListeningAvailable())) { box.checked = false; setStatus('Connect a paired Hub before enabling Group listening.'); return; }
+      var change = window.setListeningMode ? window.setListeningMode(box.checked ? 'group' : 'solo') : Promise.resolve(false);
+      Promise.resolve(change).then(function (active) { if (!active) { box.checked = false; setStatus('Connect a paired Hub before enabling Group listening.'); } else setStatus(box.checked ? 'Listening with the group.' : 'Listening on your own.'); });
     });
 
     /* ...and follow it while the window is open, so the two never disagree. */
     document.addEventListener('player:mode', function (e) {
       var box = document.getElementById('cfgGroup');
-      if (box) box.checked = (e.detail && e.detail.mode) === 'group';
+      if (box) { var available = !!(window.groupListeningAvailable && window.groupListeningAvailable()); box.disabled = !available; box.checked = available && (e.detail && e.detail.mode) === 'group'; }
+    });
+    document.addEventListener('player:group-availability', function (e) {
+      var box = document.getElementById('cfgGroup');
+      if (box) { box.disabled = !e.detail.available; box.title = e.detail.reason || 'Connect a paired Hub to enable Group listening.'; if (!e.detail.available) box.checked = false; }
     });
 
     /* Applied on load as well as on change, which is what makes a preference a
@@ -15813,8 +15845,11 @@ window.AW.startStats = function () {
       }
       /* Every helper route but health needs the run's token, which the helper
          writes into the page it serves (HELPER_TOKEN_META in contracts). */
-      var tokMeta = document.querySelector('meta[name="np-helper-token"]'), hdr = {};
-      if (tokMeta && /\/helper\/v1\//.test(url) && !/\/health$/.test(url)) hdr['x-helper-token'] = tokMeta.content;
+      var tokMeta = document.querySelector('meta[name="np-helper-token"]'), hdr = {}, token = window.NP_HELPER_TOKEN || (tokMeta && tokMeta.content);
+      if (token && /\/helper\/v1\//.test(url) && !/\/health$/.test(url)) {
+        try { if (!window.COMPANION || new URL(url, location.href).origin !== new URL(window.COMPANION, location.href).origin) token = null; } catch (e) { token = null; }
+        if (token) hdr['x-helper-token'] = token;
+      }
       return fetch(url, { cache: 'no-store', headers: hdr, signal: ctl ? ctl.signal : undefined })
         .then(function (r) {
           return r.text().then(function (txt) {
@@ -15885,41 +15920,36 @@ window.AW.startStats = function () {
         : 'Connected to the companion app.';
       say('Companion connected');
     }
+    function companionLoopback(base) {
+      try { var u = new URL(base), host = u.hostname.toLowerCase(); if (host.charAt(0) === '[' && host.charAt(host.length - 1) === ']') host = host.slice(1, -1); return ['localhost', '127.0.0.1', '::1'].indexOf(host) >= 0 && u.pathname === '/' && !u.search && !u.hash && !u.username && !u.password; } catch (e) { return false; }
+    }
     function testApp() {
       var btn = document.getElementById('cfgConnect'), msg = document.getElementById('cfgConnMsg');
-      var typed = connBase(document.getElementById('cfgCompanion').value);
-      var tries = typed ? [typed] : [];
-      var servedBy = document.querySelector('meta[name="np-helper-token"]') && /^https?:$/.test(location.protocol) ? location.origin : null;
-      if (!typed && servedBy) tries.push(servedBy);
-      if (!typed) for (var i = 0; i < HELPER_SCAN; i++) if ('http://127.0.0.1:' + (HELPER_PORT + i) !== servedBy) tries.push('http://127.0.0.1:' + (HELPER_PORT + i));
-      btn.disabled = true; connLight('connAppDot', 'off');
-      msg.textContent = typed ? 'Asking ' + typed + '…' : 'Looking on this PC…';
-      var sawOther = false;
-      (function next(k) {
-        if (k >= tries.length) {
-          btn.disabled = false; conn.app = null; connLight('connAppDot', 'bad'); connFacts('connAppFacts', []);
-          msg.textContent = sawOther
-            ? 'Something answered, but it is not the companion app.'
-            : 'No answer from ' + (typed || 'ports ' + HELPER_PORT + '–' + (HELPER_PORT + HELPER_SCAN - 1)) + '. Check the app is running on this PC.';
-          paintPassed(); return;
-        }
-        connGet('Companion', tries[k] + '/helper/v1/health').then(function (r) {
-          if (r.json && isHelper(r.json)) {
-            btn.disabled = false;
-            if (typed) { cfg.companion = typed; cfgSave(); }
-            showApp(tries[k], r.json); paintPassed(); return;
-          }
-          if (r.status) sawOther = true;
-          next(k + 1);
-        });
-      })(0);
+      var addressEl = document.getElementById('cfgCompanion'), tokenEl = document.getElementById('cfgCompanionToken');
+      var typed = connBase(addressEl.value), token = String(tokenEl.value || '').trim();
+      if (typed && !companionLoopback(typed)) { btn.disabled = false; connLight('connAppDot', 'bad'); msg.textContent = 'Use localhost, 127.0.0.1 or ::1 for the Companion running on this PC.'; return; }
+      var tries = []; function add(base) { if (base && tries.indexOf(base) < 0) tries.push(base); }
+      if (typed) add(typed); else { var meta = document.querySelector('meta[name="np-helper-token"]'); if (meta && /^https?:$/.test(location.protocol)) add(location.origin); for (var i = 0; i < HELPER_SCAN; i++) add('http://127.0.0.1:' + (HELPER_PORT + i)); }
+      btn.disabled = true; connLight('connAppDot', 'off'); msg.textContent = token ? 'Checking the Companion token…' : 'Checking the saved connection…';
+      var tools = window.NP_TOOLS;
+      var inspect = tools ? Promise.all([tools.detect().catch(function () { return null; }), tools.hasSaved().catch(function () { return false; })]) : Promise.resolve([null, false]);
+      inspect.then(function (state) {
+        var current = state[0], saved = state[1]; document.getElementById('cfgForgetToken').hidden = !saved;
+        if (!token && current && current.kind === 'helper' && current.origin && (!typed || current.origin === typed)) { if (!typed) { addressEl.value = current.origin; cfg.companion = current.origin; cfgSave(); } btn.disabled = false; showApp(current.origin, current.health); document.getElementById('cfgForgetToken').hidden = !saved; paintPassed(); return; }
+        var sawOther = false, sawHelper = false, rejected = false, helperBase = null;
+        function finish() { var check = tools ? tools.detect().catch(function () { return null; }) : Promise.resolve(null); check.then(function (live) { if (live && live.kind === 'helper' && live.origin && live.health) { btn.disabled = false; showApp(live.origin, live.health); if (rejected) msg.textContent = 'That token was not accepted; the previously saved connection remains active.'; else if (typed && live.origin !== typed) msg.textContent = 'The requested address is not paired; the previously saved connection remains active.'; document.getElementById('cfgForgetToken').hidden = !saved; paintPassed(); return; } btn.disabled = false; conn.app = null; connFacts('connAppFacts', []); connLight('connAppDot', sawHelper ? 'warn' : 'bad'); if (sawHelper) { connFacts('connAppFacts', [['Address', helperBase, 'conn__mono'], ['Authentication', rejected ? 'Token rejected' : 'Token required']]); msg.textContent = rejected ? 'The helper answered, but did not accept that token. Copy the current token from Windows Companion → Settings → Network.' : saved ? 'The saved token did not authenticate. Paste the current token from Windows Companion → Settings → Network.' : 'The helper is running; paste its token from Windows Companion → Settings → Network.'; } else msg.textContent = sawOther ? 'Something answered, but it is not the companion app.' : 'No answer from ' + (typed || 'ports ' + HELPER_PORT + '–' + (HELPER_PORT + HELPER_SCAN - 1)) + '. Check the app is running on this PC.'; document.getElementById('cfgForgetToken').hidden = !saved; paintPassed(); }); }
+        function next(k) { if (k >= tries.length) { finish(); return; } connGet('Companion', tries[k] + '/helper/v1/health').then(function (r) { if (r.json && isHelper(r.json)) { sawHelper = true; helperBase = tries[k]; if (!token || !tools) { if (token) rejected = true; next(k + 1); return; } tools.connect(tries[k], token).then(function (connected) { if (!connected) { rejected = true; next(k + 1); return; } cfg.companion = connected.origin; cfgSave(); addressEl.value = connected.origin; btn.disabled = false; showApp(connected.origin, connected.health); refreshCompanionTokenButton(); paintPassed(); }).catch(function () { rejected = true; next(k + 1); }); return; } if (r.status) sawOther = true; next(k + 1); }); }
+        next(0);
+      }).catch(function () { btn.disabled = false; msg.textContent = 'Could not verify the Companion connection.'; connLight('connAppDot', 'bad'); });
     }
     document.getElementById('cfgCompanion').addEventListener('change', function () {
       cfg.companion = connBase(this.value); cfgSave(); setStatus('Saved.');
     });
+    function refreshCompanionTokenButton() { var button = document.getElementById('cfgForgetToken'), savedNote = document.getElementById('cfgTokenSaved'), tokenField = document.getElementById('cfgCompanionToken'), tools = window.NP_TOOLS; if (!button || !tools || !tools.hasSaved) { if (button) button.hidden = true; if (savedNote) savedNote.hidden = true; return Promise.resolve(false); } return Promise.all([tools.hasSaved(), tools.savedToken ? tools.savedToken().catch(function () { return null; }) : Promise.resolve(null)]).then(function (state) { var saved = state[0], savedToken = state[1]; button.hidden = !saved; if (savedNote) savedNote.hidden = !saved; if (tokenField && saved && savedToken) tokenField.value = savedToken; if (tokenField && !saved) tokenField.value = ''; return saved; }).catch(function () { button.hidden = true; if (savedNote) savedNote.hidden = true; return false; }); }
+    function forgetCompanionToken() { var button = document.getElementById('cfgForgetToken'), savedNote = document.getElementById('cfgTokenSaved'), tokenField = document.getElementById('cfgCompanionToken'), msg = document.getElementById('cfgConnMsg'), tools = window.NP_TOOLS; if (!tools) return; button.disabled = true; tools.forgetSaved().then(function (removed) { if (removed && tokenField) tokenField.value = ''; if (removed && savedNote) savedNote.hidden = true; return tools.detect().then(function (current) { button.disabled = false; if (current && current.kind === 'helper' && current.origin) showApp(current.origin, current.health); else { conn.app = null; connLight('connAppDot', 'off'); connFacts('connAppFacts', []); msg.textContent = removed ? 'Saved token forgotten.' : 'No saved token to forget.'; } refreshCompanionTokenButton(); paintPassed(); }); }).catch(function () { button.disabled = false; msg.textContent = 'The saved token could not be removed.'; }); }
     document.getElementById('cfgConnect').addEventListener('click', testApp);
-    /* Served by a helper: it is the companion's helper, and it answers now. */
-    if (document.querySelector('meta[name="np-helper-token"]') && /^https?:$/.test(location.protocol)) testApp();
+    document.getElementById('cfgForgetToken').addEventListener('click', forgetCompanionToken);
+    refreshCompanionTokenButton().then(function (saved) { if (saved || document.querySelector('meta[name="np-helper-token"]')) testApp(); });
 
     /* ---- the Docker container ---- */
     function isLocal(host) { return /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|[^.]+\.local$|[^.]+$)/i.test(host); }
@@ -17304,8 +17334,7 @@ window.AW.startStats = function () {
     window.kv.get(PREFS_KEY).then(function (saved) {
       cfgLoad(saved);
       applyPlayer();
-      if (cfg.companion) window.COMPANION = cfg.companion;
-      if (window.companionTv) window.companionTv();
+      /* cfg.companion is an address hint; the authenticated bridge sets window.COMPANION. */
       document.dispatchEvent(new CustomEvent('prefs:ready', { detail: { cfg: cfg } }));
       /* A page opened straight at #settings/eq has to arrive on the equalizer,
          not on the player with a hash nobody read. The address is the state,
@@ -17408,58 +17437,126 @@ window.AW.startStats = function () {
     attach(document.getElementById('libraryScroll'), document.getElementById('library'));
   })();
 
-  // Solo / group segmented control. Radiogroup semantics: one tab stop, arrow
-  // keys move between segments the way a native segmented control does.
+  // Solo / group segmented control. Group requires a paired Hub that answers now.
   (function () {
     var group = document.getElementById('mode');
     var items = Array.prototype.slice.call(group.querySelectorAll('[role="radio"]'));
+    var refreshPromise = null;
 
-    function select(item, focus) {
+    function hubStatus() {
+      try { return window.NP_HUB && window.NP_HUB.status ? window.NP_HUB.status() : null; }
+      catch (e) { return null; }
+    }
+    function groupAvailable() {
+      var status = hubStatus();
+      return !!(status && status.connected === true);
+    }
+    window.groupListeningAvailable = groupAvailable;
+    window.groupListeningReason = function () {
+      var status = hubStatus();
+      return status && status.connected ? 'A paired Hub is connected.' : (status && status.reason) || 'Connect a paired Hub to enable Group listening.';
+    };
+
+    function commit(item, focus) {
       items.forEach(function (el) {
         var on = el === item;
         el.setAttribute('aria-checked', String(on));
         el.tabIndex = on ? 0 : -1;
       });
       if (focus) item.focus();
-      document.dispatchEvent(new CustomEvent('player:mode', {
-        detail: { mode: item.dataset.mode }
-      }));
+      document.dispatchEvent(new CustomEvent('player:mode', { detail: { mode: item.dataset.mode } }));
+      return true;
+    }
+
+    function updateGroupAvailability(status) {
+      var current = status || hubStatus();
+      var available = !!(current && current.connected === true);
+      var groupItem = items.filter(function (el) { return el.dataset.mode === 'group'; })[0];
+      var soloItem = items.filter(function (el) { return el.dataset.mode === 'solo'; })[0];
+      if (groupItem) {
+        groupItem.disabled = !available;
+        groupItem.setAttribute('aria-disabled', String(!available));
+        groupItem.title = available ? 'A paired Hub is connected. Select to listen with the group.' : window.groupListeningReason();
+      }
+      document.dispatchEvent(new CustomEvent('player:group-availability', { detail: { available: available, reason: window.groupListeningReason() } }));
+      if (!available && soloItem && window.listeningMode && window.listeningMode() === 'group') commit(soloItem, false);
+    }
+
+    function refreshHub() {
+      if (!window.NP_HUB || !window.NP_HUB.refresh) return Promise.resolve(null);
+      if (refreshPromise) return refreshPromise;
+      refreshPromise = Promise.resolve().then(function () { return window.NP_HUB.refresh(); }).then(function (status) {
+        updateGroupAvailability(status);
+        return status;
+      }, function () {
+        var status = hubStatus();
+        updateGroupAvailability(status);
+        return status;
+      }).then(function (status) {
+        refreshPromise = null;
+        return status;
+      });
+      return refreshPromise;
+    }
+
+    function select(item, focus) {
+      if (!item || item.disabled) return Promise.resolve(false);
+      if (item.dataset.mode === 'group') {
+        return refreshHub().then(function (status) {
+          if (!status || status.connected !== true) {
+            if (window.say) window.say(window.groupListeningReason());
+            return false;
+          }
+          return commit(item, focus);
+        });
+      }
+      return Promise.resolve(commit(item, focus));
     }
 
     group.addEventListener('click', function (e) {
       var item = e.target.closest('[role="radio"]');
-      if (item) select(item, false);
+      if (item && !item.disabled) select(item, false);
     });
 
     group.addEventListener('keydown', function (e) {
-      var i = items.indexOf(document.activeElement);
-      if (i < 0) return;
+      var enabled = items.filter(function (item) { return !item.disabled; });
+      var i = enabled.indexOf(document.activeElement);
+      if (i < 0 || !enabled.length) return;
       var next = null;
-      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = items[(i + 1) % items.length];
-      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = items[(i - 1 + items.length) % items.length];
-      else if (e.key === 'Home') next = items[0];
-      else if (e.key === 'End') next = items[items.length - 1];
-      else if (e.key === ' ' || e.key === 'Enter') next = items[i];
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = enabled[(i + 1) % enabled.length];
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = enabled[(i - 1 + enabled.length) % enabled.length];
+      else if (e.key === 'Home') next = enabled[0];
+      else if (e.key === 'End') next = enabled[enabled.length - 1];
+      else if (e.key === ' ' || e.key === 'Enter') next = enabled[i];
       if (next) { e.preventDefault(); select(next, true); }
     });
 
-    /* Preferences can set the mode too. It goes through the same select() the
-       segmented control uses rather than dispatching player:mode itself, so
-       the pills in the status bar always show which mode is actually on —
-       two routes to one setting, one place that knows what it is. */
-    window.setListeningMode = function (m) {
-      var item = items.filter(function (el) { return el.dataset.mode === m; })[0];
-      if (item && item.getAttribute('aria-checked') !== 'true') select(item, false);
+    window.setListeningMode = function (mode) {
+      var item = items.filter(function (el) { return el.dataset.mode === mode; })[0];
+      if (!item || item.disabled) return Promise.resolve(false);
+      if (item.getAttribute('aria-checked') === 'true') return Promise.resolve(true);
+      return select(item, false);
     };
     window.listeningMode = function () {
       var on = items.filter(function (el) { return el.getAttribute('aria-checked') === 'true'; })[0];
-      return on ? on.dataset.mode : 'group';
+      return on ? on.dataset.mode : 'solo';
     };
     document.addEventListener('player:mode', function (e) {
+      if (e.detail && e.detail.mode === 'group' && !groupAvailable()) {
+        e.stopImmediatePropagation();
+        var soloItem = items.filter(function (el) { return el.dataset.mode === 'solo'; })[0];
+        if (soloItem) commit(soloItem, false);
+        if (window.say) window.say(window.groupListeningReason());
+        return;
+      }
       document.dispatchEvent(new CustomEvent('mode:shown', { detail: e.detail }));
     });
+    if (window.NP_HUB && window.NP_HUB.subscribe) window.NP_HUB.subscribe(updateGroupAvailability);
+    else updateGroupAvailability(null);
+    setInterval(function () {
+      if (window.listeningMode && window.listeningMode() === 'group') refreshHub();
+    }, 15000);
   })();
-
   /* The profile button opens Preferences. It is the only chrome in the status
      bar that is about you rather than about what is playing, which is what
      made it the right place to hang the window off. */
@@ -17471,7 +17568,7 @@ window.AW.startStats = function () {
      tuned into a live broadcast — the position is not yours to move, so the
      controls go inert and the duration is replaced by a live marker. */
   (function () {
-    var mode = 'group';                       // matches the toggle's default
+    var mode = 'solo';                       // Group starts only after the person connects a Hub
     var dragging = false, playing = false;
     var pos = { solo: window.ALBUMS.solo.start, group: window.ALBUMS.group.start };
 
@@ -17656,6 +17753,17 @@ window.AW.startStats = function () {
       });
     }
 
+    var localIcyAsk = icyAsk;
+    icyAsk = function (url) {
+      return (window.NP_AWSP_READY || Promise.resolve(null)).then(function (awsp) {
+        if (!awsp) return null;
+        return awsp.status().then(function (s) {
+          return s && s.paired ? awsp.companion('radio.nowPlaying', { url: url }) : null;
+        });
+      }).catch(function () { return null; }).then(function (d) {
+        return d && d.title ? d : localIcyAsk(url);
+      });
+    };
     function icyMeta(url) {
       var key = 'icy:' + url, now = Date.now(), c = metaCache[key];
       if (c && c.pending) return c.pending;
@@ -17811,6 +17919,7 @@ window.AW.startStats = function () {
     }
 
     function applyMode(next) {
+      if (next === 'group' && !(window.groupListeningAvailable && window.groupListeningAvailable())) { next = 'solo'; if (window.setListeningMode) window.setListeningMode('solo'); }
       mode = next;
       var a = current(), live = isLive();
 
@@ -18057,7 +18166,7 @@ window.AW.startStats = function () {
       if (!fetchSheet.open) fetchSheet.showModal();
     }
 
-    /* ---- a catalog visitor chosen: fetch its full song; no clip plays in Now Playing ---- */
+    /* ---- a visitor chosen (NP-FIND-011): its preview, said as one, and the fetch of the whole song ---- */
     var visitSeq = 0;
     function paintPreview() {
       var el = document.getElementById('playerPreview');
@@ -18228,6 +18337,7 @@ window.AW.startStats = function () {
     var pairBtn = document.getElementById('pcPair'), forgetBtn = document.getElementById('pcForget');
     var msg = document.getElementById('pcMsg'), dot = document.getElementById('connPcDot'), facts = document.getElementById('pcFacts');
     var TYPE = { relay: 'relay-carried — end-to-end encrypted, through the PC’s relay', direct: 'direct', bridge: 'bridge' };
+    var downloaderSummary = null, downloaderLoading = false, downloaderPolls = 0, downloaderTimer = 0;
     function fill(rows) {
       facts.innerHTML = '';
       rows.forEach(function (r) { var dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = r[0]; dd.textContent = r[1]; facts.appendChild(dt); facts.appendChild(dd); });
@@ -18244,8 +18354,27 @@ window.AW.startStats = function () {
           : s.status === 'refused' ? (s.lastError || 'The PC no longer accepts this player. Pair again.')
           : s.status === 'reconnecting' || s.status === 'connecting' ? 'Paired with ' + name + '. Reaching it…'
           : 'Paired with ' + name + '. Not connected.';
-        fill([['PC', name], ['Connection', s.connectionType ? (TYPE[s.connectionType] || s.connectionType) : 'not connected'], ['Tracks', String(s.tracks)],
-              ['This player', s.endpointId ? s.endpointId.slice(0, 16) + '…' : '—']]);
+        var rows = [['PC', name], ['Connection', s.connectionType ? (TYPE[s.connectionType] || s.connectionType) : 'not connected'], ['Tracks', String(s.tracks)],
+                    ['This player', s.endpointId ? s.endpointId.slice(0, 16) + '…' : '—']];
+        if (s.status !== 'connected') { downloaderSummary = null; downloaderPolls = 0; if (downloaderTimer) { clearTimeout(downloaderTimer); downloaderTimer = 0; } }
+        if (downloaderSummary) rows.push(['Downloaders', downloaderSummary]);
+        fill(rows);
+        if (s.status === 'connected' && !downloaderSummary && !downloaderLoading && window.NP_TOOLS) {
+          downloaderLoading = true;
+          window.NP_TOOLS.detect().then(function (t) {
+            downloaderLoading = false;
+            if (!t || !Array.isArray(t.tools)) { downloaderSummary = 'Status unavailable'; downloaderPolls = 0; paint(); return; }
+            downloaderSummary = t.tools.map(function (tool) {
+              var label = tool.id === 'ffmpeg' ? 'FFmpeg' : tool.id === 'spotdl' ? 'spotDL' : tool.id;
+              var state = tool.setup && tool.setup.state === 'installing' ? 'setting up' : tool.present ? (tool.version || 'ready') : tool.setup && tool.setup.reason || 'not installed';
+              return label + ': ' + state;
+            }).join('; ');
+            var pending = t.tools.some(function (tool) { return tool.setup && tool.setup.state === 'installing'; });
+            if (pending && downloaderPolls < 20) { downloaderPolls += 1; downloaderTimer = setTimeout(function () { downloaderSummary = null; downloaderTimer = 0; paint(); }, 3000); }
+            else downloaderPolls = 0;
+            paint();
+          }, function () { downloaderLoading = false; downloaderSummary = 'Status unavailable'; paint(); });
+        }
       });
     }
     pairBtn.addEventListener('click', function () {

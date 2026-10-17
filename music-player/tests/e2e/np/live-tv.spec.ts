@@ -40,6 +40,34 @@ async function connect(page: Page): Promise<number> {
   }, COMPANION);
 }
 
+test('the one AWSP pairing delivers Companion channels and EPG without a helper token', async ({ page }) => {
+  await boot(page);
+  const calls = await page.evaluate(async ({ channels, listing }) => {
+    const w = window as unknown as {
+      COMPANION: string;
+      NP_AWSP_READY: Promise<unknown>;
+      companionTv: () => Promise<number>;
+      __awspCalls: string[];
+    };
+    w.COMPANION = '';
+    w.__awspCalls = [];
+    w.NP_AWSP_READY = Promise.resolve({
+      status: async () => ({ paired: true, serverName: 'Living room PC' }),
+      companion: async (operation: string) => {
+        w.__awspCalls.push(operation);
+        return operation === 'tv.channels' ? channels : listing;
+      },
+    });
+    const count = await w.companionTv();
+    return { count, calls: w.__awspCalls };
+  }, { channels: CHANNELS, listing: guide('AWSP Report') });
+  expect(calls.count).toBe(2);
+  expect(calls.calls).toEqual(['tv.channels', 'tv.guide']);
+  await page.click('.tb__btn[data-view="live-tv"]');
+  await expect(page.locator('#mediaMenu .rlist tbody tr')).toHaveCount(2);
+  await expect(page.locator('#mediaMenu .rlist tbody tr').first()).toContainText('AWSP Report');
+});
+
 test('the companion’s channels fill the guide, with what is on and what follows', async ({ page }) => {
   let title = 'Morning Report';
   await page.route(`${COMPANION}/helper/v1/tv/channels`, (r) => r.fulfill(json(CHANNELS)));

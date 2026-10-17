@@ -16,7 +16,9 @@ async fn main() {
     tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
         .with_ansi(false)
-        .with_env_filter(EnvFilter::try_from_env("AWSP_LOG").unwrap_or_else(|_| EnvFilter::new("info")))
+        .with_env_filter(
+            EnvFilter::try_from_env("AWSP_LOG").unwrap_or_else(|_| EnvFilter::new("info")),
+        )
         .init();
 
     let (events_tx, mut events_rx) = mpsc::unbounded_channel::<Event>();
@@ -45,11 +47,15 @@ async fn main() {
 
 async fn run(events: mpsc::UnboundedSender<Event>) -> anyhow::Result<()> {
     let mut lines = BufReader::new(tokio::io::stdin()).lines();
-    let Some(first) = lines.next_line().await? else { anyhow::bail!("stdin closed before the config line") };
+    let Some(first) = lines.next_line().await? else {
+        anyhow::bail!("stdin closed before the config line")
+    };
     let mut cfg = match Config::from_json_line(&first) {
         Ok(c) => c,
         Err(e) => {
-            let _ = events.send(Event::Error { message: format!("{e:#}") });
+            let _ = events.send(Event::Error {
+                message: format!("{e:#}"),
+            });
             return Err(e);
         }
     };
@@ -58,11 +64,17 @@ async fn run(events: mpsc::UnboundedSender<Event>) -> anyhow::Result<()> {
     let endpoint = match cfg.bind_endpoint().await {
         Ok(ep) => ep,
         Err(e) => {
-            let _ = events.send(Event::Error { message: format!("{e:#}") });
+            let _ = events.send(Event::Error {
+                message: format!("{e:#}"),
+            });
             return Err(e);
         }
     };
-    info!("awsp endpoint {} relay_only={}", endpoint.id(), cfg.relay_only);
+    info!(
+        "awsp endpoint {} relay_only={}",
+        endpoint.id(),
+        cfg.relay_only
+    );
     let server = Server::start(
         endpoint,
         ServerOptions {
@@ -70,6 +82,8 @@ async fn run(events: mpsc::UnboundedSender<Event>) -> anyhow::Result<()> {
             library_db: cfg.library_db.clone(),
             cache_dir: cfg.cache_dir.clone(),
             allowlist: cfg.allowlist.clone(),
+            helper_port: cfg.helper_port,
+            helper_token: cfg.helper_token.clone(),
             ffmpeg: None,
         },
         events.clone(),
@@ -87,7 +101,9 @@ async fn run(events: mpsc::UnboundedSender<Event>) -> anyhow::Result<()> {
                     }
                 }
                 Err(e) => {
-                    let _ = events.send(Event::Error { message: format!("bad command: {e}") });
+                    let _ = events.send(Event::Error {
+                        message: format!("bad command: {e}"),
+                    });
                 }
             },
             // stdin closed: the supervisor is gone, so stop too.

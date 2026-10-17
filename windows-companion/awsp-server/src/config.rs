@@ -9,9 +9,7 @@ use std::{
 
 use anyhow::{Context, bail};
 use iroh::{
-    Endpoint, RelayMap, RelayMode, RelayUrl, SecretKey,
-    endpoint::presets,
-    tls::CaTlsConfig,
+    Endpoint, RelayMap, RelayMode, RelayUrl, SecretKey, endpoint::presets, tls::CaTlsConfig,
 };
 use serde::{Deserialize, Serialize};
 
@@ -83,13 +81,19 @@ pub enum RelayModeConfig {
     Custom,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Clone, Deserialize)]
 pub struct Config {
     pub secret_key_hex: String,
     pub library_db: PathBuf,
     pub cache_dir: PathBuf,
     #[serde(default = "default_server_name")]
     pub server_name: String,
+    /// Companion's helper is always addressed over loopback; never accept a host from a Player.
+    #[serde(default)]
+    pub helper_port: Option<u16>,
+    /// Internal helper credential. Never log or return this value.
+    #[serde(default)]
+    pub helper_token: Option<String>,
     #[serde(default)]
     pub allowlist: Vec<AllowEntry>,
     #[serde(default)]
@@ -102,6 +106,28 @@ pub struct Config {
     pub bind_port: Option<u16>,
     #[serde(default)]
     pub insecure_relay_tls: bool,
+}
+
+impl std::fmt::Debug for Config {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Config")
+            .field("secret_key_hex", &"[REDACTED]")
+            .field("library_db", &self.library_db)
+            .field("cache_dir", &self.cache_dir)
+            .field("server_name", &self.server_name)
+            .field("helper_port", &self.helper_port)
+            .field(
+                "helper_token",
+                &self.helper_token.as_ref().map(|_| "[REDACTED]"),
+            )
+            .field("allowlist", &self.allowlist)
+            .field("relay_mode", &self.relay_mode)
+            .field("relay_urls", &self.relay_urls)
+            .field("relay_only", &self.relay_only)
+            .field("bind_port", &self.bind_port)
+            .field("insecure_relay_tls", &self.insecure_relay_tls)
+            .finish()
+    }
 }
 
 fn default_server_name() -> String {
@@ -140,7 +166,10 @@ impl Config {
                 let urls = self
                     .relay_urls
                     .iter()
-                    .map(|u| u.parse::<RelayUrl>().with_context(|| format!("bad relay url {u}")))
+                    .map(|u| {
+                        u.parse::<RelayUrl>()
+                            .with_context(|| format!("bad relay url {u}"))
+                    })
                     .collect::<anyhow::Result<Vec<_>>>()?;
                 RelayMode::Custom(RelayMap::from_iter(urls))
             }
@@ -194,7 +223,10 @@ impl Config {
 /// with a self-signed certificate; the AWSP traffic itself stays end-to-end encrypted QUIC.
 fn insecure_relay_tls() -> CaTlsConfig {
     CaTlsConfig::custom_server_cert_verifier(std::sync::Arc::new(|crypto_provider| {
-        Ok(std::sync::Arc::new(NoCertVerifier { crypto_provider }) as std::sync::Arc<dyn rustls::client::danger::ServerCertVerifier>)
+        Ok(std::sync::Arc::new(NoCertVerifier { crypto_provider })
+            as std::sync::Arc<
+                dyn rustls::client::danger::ServerCertVerifier,
+            >)
     }))
 }
 
@@ -234,7 +266,9 @@ impl rustls::client::danger::ServerCertVerifier for NoCertVerifier {
     }
 
     fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
-        self.crypto_provider.signature_verification_algorithms.supported_schemes()
+        self.crypto_provider
+            .signature_verification_algorithms
+            .supported_schemes()
     }
 }
 
@@ -314,11 +348,26 @@ mod tests {
 
     #[test]
     fn commands_and_events_match_the_contract() {
-        let c: Command = serde_json::from_str(r#"{"cmd":"set_tier_cap","id":"x","tier":"saver"}"#).unwrap();
-        assert!(matches!(c, Command::SetTierCap { tier: Tier::Saver, .. }));
+        let c: Command =
+            serde_json::from_str(r#"{"cmd":"set_tier_cap","id":"x","tier":"saver"}"#).unwrap();
+        assert!(matches!(
+            c,
+            Command::SetTierCap {
+                tier: Tier::Saver,
+                ..
+            }
+        ));
         let c: Command = serde_json::from_str(r#"{"cmd":"new_pairing_code"}"#).unwrap();
         assert!(matches!(c, Command::NewPairingCode));
-        let e = serde_json::to_string(&Event::Connection { peer: "p".into(), kind: "relay".into(), rtt_ms: 3 }).unwrap();
-        assert_eq!(e, r#"{"event":"connection","peer":"p","type":"relay","rtt_ms":3}"#);
+        let e = serde_json::to_string(&Event::Connection {
+            peer: "p".into(),
+            kind: "relay".into(),
+            rtt_ms: 3,
+        })
+        .unwrap();
+        assert_eq!(
+            e,
+            r#"{"event":"connection","peer":"p","type":"relay","rtt_ms":3}"#
+        );
     }
 }

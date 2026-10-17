@@ -11,8 +11,10 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HELPER_PROTOCOL, HELPER_TOKEN_META, type HelperHealth, type HelperJob } from '@now-playing/contracts';
+import { connectHelper, loopbackHelperOrigin } from '../../src/lib/fetch-helper.js';
 import { detectBackend, runFetch, ToolError } from '../../src/lib/tool-backend.js';
 import type { AndroidToolsBridge } from '../../src/lib/android-bridge.js';
+import type { ShellAwsp } from '../../src/shell/awsp.js';
 
 const health = (overrides: Partial<HelperHealth> = {}): HelperHealth => ({
   helper: 'now-playing-local-helper',
@@ -122,6 +124,48 @@ describe('finding a backend', () => {
     expect(backend?.origin).toBe(window.location.origin);
   });
 
+  it('does not treat public health as proof that a helper token is valid', async () => {
+    const fetchSpy = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      return url.endsWith('/helper/v1/health')
+        ? new Response(JSON.stringify(health()), { status: 200 })
+        : new Response(JSON.stringify({ error: 'auth', message: 'Unauthorized' }), { status: 401 });
+    });
+    vi.stubGlobal('fetch', fetchSpy);
+    withToken('wrong-token');
+
+    expect(await detectBackend(null)).toBeNull();
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('only lets the standalone pairing flow send tokens to a loopback origin', async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+
+    expect(loopbackHelperOrigin('localhost:17342/')).toBe('http://localhost:17342');
+    expect(loopbackHelperOrigin('http://[::1]:17342')).toBe('http://[::1]:17342');
+    expect(loopbackHelperOrigin('https://example.com')).toBeNull();
+    expect(loopbackHelperOrigin('http://localhost:17342/path')).toBeNull();
+    expect(await connectHelper('https://example.com', 'secret')).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('pairs with a loopback helper only after the token passes its protected route', async () => {
+    const fetchSpy = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/helper/v1/health')) return new Response(JSON.stringify(health()), { status: 200 });
+      expect(new Headers(init?.headers).get('x-helper-token')).toBe('good-token');
+      return new Response(JSON.stringify({ error: 'not-found' }), { status: 404 });
+    });
+    vi.stubGlobal('fetch', fetchSpy);
+
+    const connected = await connectHelper('localhost:17342/', ' good-token ');
+
+    expect(connected?.origin).toBe('http://localhost:17342');
+    expect(connected?.token).toBe('good-token');
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
   it('does not go looking on loopback for someone who never asked it to', async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);
@@ -133,6 +177,27 @@ describe('finding a backend', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(health()), { status: 200 })));
     const backend = await detectBackend({ origin: 'http://127.0.0.1:17342', token: 'tok' });
     expect(backend).toMatchObject({ kind: 'helper', label: 'A helper at http://127.0.0.1:17342' });
+  });
+
+  it('uses the paired Companion before a saved helper and loads its downloader status over AWSP', async () => {
+    const tools = health().tools.map((tool) => ({ ...tool, present: true, version: 'ready', setup: { state: 'ready' as const } }));
+    const rpc = vi.fn(async (operation: string) => operation === 'tools.status' ? health({ tools }) : null);
+    const awsp = {
+      status: async () => ({ paired: true, serverName: 'Test PC', status: 'connected' as const, connectionType: 'relay' as const, endpointId: null, lastError: null, tracks: 0 }),
+      connect: vi.fn(async () => ({ ok: true, reason: null })),
+      companion: rpc,
+      connectionType: () => 'relay' as const,
+    } as unknown as ShellAwsp;
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+
+    const backend = await detectBackend({ origin: 'http://127.0.0.1:17342', token: 'must-not-leave-player' }, document, awsp);
+
+    expect(backend).toMatchObject({ kind: 'awsp', label: 'Paired Windows Companion (relay-carried)', origin: null });
+    expect(backend?.health.tools.map((tool) => tool.id)).toEqual(['yt-dlp', 'spotdl', 'ffmpeg']);
+    expect(backend?.health.tools.every((tool) => tool.present && tool.setup?.state === 'ready')).toBe(true);
+    expect(rpc).toHaveBeenCalledWith('tools.status');
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it('reports a helper that will not answer as absent, not as an error', async () => {
@@ -154,6 +219,35 @@ describe('running a fetch', () => {
     expect(seen).toEqual(['queued', 'done']);
     expect(files.map((file) => file.name)).toEqual(['A Song.m4a']);
     expect(await files[0]!.text()).toBe('pretend audio');
+  });
+
+  it('downloads a paired Companion job through bounded chunks and removes the temporary job', async () => {
+    const id = '4d270178-e6a9-4a52-84f5-5c73ee08f9db';
+    const fileId = '29895cb0-28ea-4d72-86dc-9065146e2911';
+    const operations: string[] = [];
+    const awsp = {
+      status: async () => ({ paired: true, serverName: 'Test PC', status: 'connected' as const, connectionType: 'direct' as const, endpointId: null, lastError: null, tracks: 0 }),
+      connect: vi.fn(async () => ({ ok: true, reason: null })),
+      connectionType: () => 'direct' as const,
+      companion: async (operation: string) => {
+        operations.push(operation);
+        if (operation === 'tools.status') return health();
+        if (operation === 'downloads.start') return job({ id });
+        if (operation === 'downloads.status') return job({ id, state: 'done', stage: 'done', files: [{ id: fileId, name: 'A Song.m4a', sizeBytes: 5, contentType: 'audio/mp4' }] });
+        if (operation === 'downloads.fileChunk') return { offset: 0, totalBytes: 5, dataBase64: 'aGVsbG8=' };
+        if (operation === 'downloads.forget') return { ok: true };
+        throw new Error(`unexpected operation ${operation}`);
+      },
+    } as unknown as ShellAwsp;
+    const backend = await detectBackend(null, document, awsp);
+    expect(backend?.kind).toBe('awsp');
+    const started = await backend!.startFetch(request);
+    const done = await backend!.jobState(started.id);
+    const file = await backend!.fileOf(done, done.files[0]!);
+    await backend!.forget(done.id);
+
+    expect(await file.text()).toBe('hello');
+    expect(operations).toEqual(['tools.status', 'downloads.start', 'downloads.status', 'downloads.fileChunk', 'downloads.forget']);
   });
 
   it('throws the reason a job failed, not a generic failure', async () => {

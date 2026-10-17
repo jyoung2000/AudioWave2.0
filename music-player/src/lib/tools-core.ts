@@ -20,8 +20,8 @@
 import { HELPER_PROTOCOL, type HelperFetchRequest, type HelperHealth, type HelperInstallResult, type HelperJob, type HelperJobFile, type HelperToolId } from '@now-playing/contracts';
 
 export interface ToolBackend {
-  /** `built-in` is a native shell carrying the tools; `helper` is a program on loopback. */
-  kind: 'built-in' | 'helper';
+  /** `built-in` is native, `helper` is loopback, and `awsp` is the paired Companion bridge. */
+  kind: 'built-in' | 'helper' | 'awsp';
   /** How the interface names it, in a sentence. */
   label: string;
   health: HelperHealth;
@@ -71,14 +71,20 @@ export async function runFetch(backend: ToolBackend, request: HelperFetchRequest
     job = await backend.jobState(job.id);
     onProgress(job);
   }
-  if (job.state !== 'done') throw new ToolError(job.error ?? 'It stopped without saying why.', job.state);
+  if (job.state !== 'done') {
+    await backend.forget(job.id).catch(() => undefined);
+    throw new ToolError(job.error ?? 'It stopped without saying why.', job.state);
+  }
 
   const files: File[] = [];
-  for (const entry of job.files) files.push(await backend.fileOf(job, entry));
-  // Tidying up is best effort: failing to delete a temporary file is not worth failing an import
-  // that otherwise worked.
-  await backend.forget(job.id).catch(() => undefined);
-  return { job, files };
+  try {
+    for (const entry of job.files) files.push(await backend.fileOf(job, entry));
+    return { job, files };
+  } finally {
+    // Tidying up is best effort: failing to delete a temporary file is not worth failing an import
+    // that otherwise worked, and failed transfers must not leave a remote job grant behind.
+    await backend.forget(job.id).catch(() => undefined);
+  }
 }
 
 export function toolIn(health: HelperHealth, id: HelperToolId): HelperHealth['tools'][number] | undefined {
