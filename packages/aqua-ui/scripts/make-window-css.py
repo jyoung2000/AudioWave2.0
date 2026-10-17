@@ -129,6 +129,11 @@ EDITS: list[tuple[str, str, str]] = [
 @media (pointer: coarse) { .seg__btn { height: 44px; } }
 
 /* the "this is a mockup" plate under the window */'''),
+    # The scroll thumb's stripes (owner, 2026-10-17): the design's hard 2 px white stripe every 4 px at 16%
+    # was "a bit too dramatic and frequent"; the owner chose the scrubbers' new sheen for it too, a soft rib
+    # every 14 px peaking at 12%, the same as TrackScrubber and the player's bars.
+    ('airwave-window.css', 'background: repeating-linear-gradient(to bottom, var(--gel-stripe) 0 2px, transparent 2px 4px) padding-box, var(--gel-thumb) padding-box;', 'background: repeating-linear-gradient(to bottom, rgba(255,255,255,0) 0, rgba(255,255,255,.12) 7px, rgba(255,255,255,0) 14px) padding-box, var(--gel-thumb) padding-box;'),
+    ('airwave-window.css', 'background: repeating-linear-gradient(to bottom, var(--gel-stripe) 0 2px, transparent 2px 4px) padding-box, var(--gel-thumb-down) padding-box;', 'background: repeating-linear-gradient(to bottom, rgba(255,255,255,0) 0, rgba(255,255,255,.12) 7px, rgba(255,255,255,0) 14px) padding-box, var(--gel-thumb-down) padding-box;'),
 ]
 
 

@@ -935,8 +935,9 @@
   border-radius: 1px;
   background-image:
     /* a soft triangle wave, not 1 px lines: each rib fades in and out across the
-       full 5 px period, so it reads as sheen rather than stripes */
-    repeating-linear-gradient(to right, rgb(255 255 255 / 0%) 0, rgb(255 255 255 / 10%) 2.5px, rgb(255 255 255 / 0%) 5px),
+       full 14 px period, so it reads as sheen rather than stripes (owner, 2026-10-17:
+       the 5 px / 10% ribs were too dramatic and too frequent) */
+    repeating-linear-gradient(to right, rgb(255 255 255 / 0%) 0, rgb(255 255 255 / 12%) 7px, rgb(255 255 255 / 0%) 14px),
     var(--np-rail-fill);
   box-shadow: inset -1px 0 0 rgb(20 110 180 / 35%);
 }

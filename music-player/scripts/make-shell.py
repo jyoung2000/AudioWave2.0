@@ -4327,6 +4327,20 @@ replace("""      render();
       play(have.id, { quiet: true });
       var row = tbody.querySelector('tr[data-id="' + have.id + '"]');""")
 
+# ---- the scrubbers' ribs: wider and softer (owner, 2026-10-17) ------------------------------------------------
+# The owner found the 5 px / 10% sheen "a bit too dramatic and frequent" and chose 14 px / 12% in a side-by-side:
+# each rib still fades in and out across its whole period, so it reads as sheen, now about three times as far apart.
+# The same setting is on TrackScrubber (packages/aqua-ui now-playing.css) and the window kit's scroll thumb.
+replace("""      repeating-linear-gradient(to right,
+        rgba(255, 255, 255, 0) 0,
+        rgba(255, 255, 255, 0.1) 2.5px,
+        rgba(255, 255, 255, 0) 5px),""", """      repeating-linear-gradient(to right,
+        rgba(255, 255, 255, 0) 0,
+        rgba(255, 255, 255, 0.12) 7px,
+        rgba(255, 255, 255, 0) 14px),""")
+replace("""repeating-linear-gradient(to right,rgba(255,255,255,0) 0,rgba(255,255,255,.1) 2.5px,rgba(255,255,255,0) 5px)""",
+        """repeating-linear-gradient(to right,rgba(255,255,255,0) 0,rgba(255,255,255,.12) 7px,rgba(255,255,255,0) 14px)""")
+
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):
     assert bad not in text, f'left behind: {bad}'

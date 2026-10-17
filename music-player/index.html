@@ -2155,8 +2155,8 @@
          the full 5px period, so it reads as sheen rather than stripes */
       repeating-linear-gradient(to right,
         rgba(255, 255, 255, 0) 0,
-        rgba(255, 255, 255, 0.1) 2.5px,
-        rgba(255, 255, 255, 0) 5px),
+        rgba(255, 255, 255, 0.12) 7px,
+        rgba(255, 255, 255, 0) 14px),
       var(--bar-fill);
     box-shadow: inset -1px 0 0 rgba(20, 110, 180, 0.35);
   }
@@ -3331,7 +3331,7 @@ button.seg:active .ico{transform:translateY(1px)}
 .buffered{background:linear-gradient(#cdcdcd 0 1px,#b7b7b7 1px 2px,#b1b1b1 2px 3px,#b3b3b3 3px 4px,#c7c7c7 8px,#c9c9c9 12px);transition:width .35s var(--ease)}
 .hoverfill{background:rgba(0,0,0,.06);opacity:0;transition:opacity .15s}
 .track-wrap:hover .hoverfill{opacity:1}
-.played{left:0;background-image:repeating-linear-gradient(to right,rgba(255,255,255,0) 0,rgba(255,255,255,.1) 2.5px,rgba(255,255,255,0) 5px),linear-gradient(to bottom,#8fb9e4 0%,#79b7f2 12%,#62b4f8 30%,#4fa9f2 48%,#2b9bec 62%,#24b4f4 74%,#63d0f8 88%,#a5e9fd 100%);box-shadow:inset -1px 0 0 rgba(20,110,180,.35)}
+.played{left:0;background-image:repeating-linear-gradient(to right,rgba(255,255,255,0) 0,rgba(255,255,255,.12) 7px,rgba(255,255,255,0) 14px),linear-gradient(to bottom,#8fb9e4 0%,#79b7f2 12%,#62b4f8 30%,#4fa9f2 48%,#2b9bec 62%,#24b4f4 74%,#63d0f8 88%,#a5e9fd 100%);box-shadow:inset -1px 0 0 rgba(20,110,180,.35)}
 .thumb{position:absolute;top:6px;left:0;width:25px;height:27px;margin-left:-.5px;will-change:transform;transition:filter .15s}
 .thumb svg{display:block;transform-origin:12.4px 13.4px;transition:transform .18s var(--ease)}
 .track-wrap:hover .thumb svg,.track-wrap.drag .thumb svg{transform:scale(1.08)}
