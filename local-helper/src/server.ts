@@ -33,7 +33,7 @@ import { readStationTitle } from '@now-playing/domain/radio-node';
 import type { StationNowPlaying } from '@now-playing/contracts';
 import { serveApp, type AppSource } from './app.js';
 import { LAN_READ_ROUTES, checkFetchUrl, hostAllowed, isLoopbackAddress, lanHostAllowed, lanPageAllowed, originAllowed, tokenMatches, type OriginPolicy } from './security.js';
-import { cachedResolver, publicTool, type ResolvedTool } from './tools.js';
+import { cachedResolver, publicTool, toolSetupFor, type ResolvedTool } from './tools.js';
 import { CatalogAlbumRequest, CatalogArtistRequest, CatalogEnrichRequest, CatalogLyricsRequest, CatalogResolveRequest, CatalogSearchRequest, HELPER_CATALOG_ROUTES, NDJSON_CONTENT_TYPE } from '@now-playing/contracts';
 import { DomainError } from '@now-playing/domain';
 import { ndjsonLine, type CatalogFetch } from '@now-playing/domain/catalog';
@@ -130,6 +130,32 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
   let policy: OriginPolicy = { allowed: options.allowedOrigins, self: options.app ? origin : null, loopbackPages: options.loopbackPages === true };
   const stationCache = new Map<string, { at: number; value: Promise<StationNowPlaying> }>();
   let stationReads = 0;
+  /** The ICY read is cached, but the programme is not: it can change at an XMLTV boundary. */
+  async function withRadioGuide(url: string, track: StationNowPlaying): Promise<StationNowPlaying> {
+    const fallback = { ...track, programme: null, programmeSource: null };
+    if (!options.tv) return fallback;
+    try {
+      // An exact stream match is required. A similar station name or a track title is not a guide.
+      const matches = (await options.tv.channels()).filter((channel) => channel.url === url);
+      if (matches.length !== 1) return fallback;
+      const channel = matches[0]!;
+      const named = { ...fallback, station: track.station || channel.name };
+      if (!channel.tvgId) return named;
+      try {
+        const entries = (await options.tv.guide()).filter((entry) => entry.tvgId.toLowerCase() === channel.tvgId!.toLowerCase());
+        if (entries.length !== 1 || !entries[0]?.now) return named;
+        const current = entries[0].now;
+        const at = Date.now();
+        if (Date.parse(current.start) > at || at >= Date.parse(current.stop)) return named;
+        return { ...named, programme: current.title, programmeSource: 'schedule' };
+      } catch {
+        return named;
+      }
+    } catch {
+      // A cache read failure cannot hide the already-read ICY result.
+      return fallback;
+    }
+  }
   const tools = new ToolProvisioner({
     toolsDir: options.toolsDir,
     configured: options.configured,
@@ -219,7 +245,7 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
       if (!station || station.length > 2048) return fail(response, 400, 'bad-request', 'Say which station: ?url=');
       const now = Date.now();
       const hit = stationCache.get(station);
-      if (hit && now - hit.at < 15_000) return send(response, 200, await hit.value);
+      if (hit && now - hit.at < 15_000) return send(response, 200, await withRadioGuide(station, await hit.value));
       // One tuned station per player; a burst of distinct stations is not a player.
       if (stationReads >= 8) return fail(response, 429, 'busy', 'Too many stations at once. Try again in a moment.');
       const read = options.stationTitle ?? ((u: string) => readStationTitle(u, { timeoutMs: 8000, userAgent: `NowPlaying-helper/${options.version}` }));
@@ -232,7 +258,7 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
       stationCache.delete(station);
       if (stationCache.size >= 200) stationCache.delete(stationCache.keys().next().value!);
       stationCache.set(station, { at: now, value });
-      return send(response, 200, await value);
+      return send(response, 200, await withRadioGuide(station, await value));
     }
 
     // Live TV is read by the same pages for the same reason: a player opened from the hub cannot
@@ -292,7 +318,7 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
       const setup = tools.status();
       const withSetup = (id: ToolId) => {
         const record = publicTool(found[id]);
-        const state = setup[id];
+        const state = toolSetupFor(record, setup[id]);
         return state ? { ...record, setup: state } : record;
       };
       const health: HelperHealth = {

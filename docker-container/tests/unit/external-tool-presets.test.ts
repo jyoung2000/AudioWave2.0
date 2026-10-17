@@ -21,6 +21,17 @@ function adapter(extra: Record<string, string>, locate: (tool: 'yt-dlp' | 'spotd
 const HOSTILE = 'https://www.youtube.com/watch?v=x&--exec=rm%20-rf%20/';
 const ctx = (url = HOSTILE, ffmpeg: string | null = '/usr/bin/ffmpeg'): DownloadArgsContext => ({ url, outputDir: '/data/partial/job.d', ffmpeg, node: '/usr/local/bin/node' });
 
+describe('selected downloaders cannot cross over to another preset', () => {
+  it('does not route Spotify to yt-dlp when spotDL is disabled, even if an old extra host is stored', () => {
+    const tool = adapter({ preset: 'yt-dlp', allowedHosts: 'open.spotify.com' });
+    expect(tool.allowed('https://open.spotify.com/track/4PTG3Z6ehGkBFwjybzWkR8')).toBeNull();
+  });
+  it('does not route YouTube to spotDL when yt-dlp is disabled', () => {
+    const tool = adapter({ preset: 'spotdl', allowedHosts: 'youtube.com' });
+    expect(tool.allowed('https://youtube.com/watch?v=x')).toBeNull();
+  });
+});
+
 describe('the yt-dlp preset', () => {
   const preset = TOOL_PRESETS['yt-dlp'];
   const args = preset.download(ctx());

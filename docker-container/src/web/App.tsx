@@ -36,6 +36,7 @@ import { ProfilesView } from './views/Profiles.js';
 import { SharesView } from './views/Shares.js';
 import { DiscordView } from './views/Discord.js';
 import { NetworkView } from './views/Network.js';
+import { SecurityView } from './views/Security.js';
 import { DiagnosticsView } from './views/Diagnostics.js';
 import { BackupView } from './views/Backup.js';
 import { RecommendationsView } from './views/Recommendations.js';
@@ -49,7 +50,7 @@ const PlaylistsView = lazy(() => import('./views/Playlists.js').then((m) => ({ d
 const PRODUCT = BRANDING.products.hub;
 
 /** The sections. Each is a screen in design/coverage.json; the tab it lives in is below. */
-export type ViewId = 'overview' | 'devices' | 'groups' | 'profiles' | 'providers' | 'catalog' | 'library' | 'playlists' | 'downloads' | 'search' | 'shares' | 'recommendations' | 'discord' | 'network' | 'diagnostics' | 'backup';
+export type ViewId = 'overview' | 'devices' | 'groups' | 'profiles' | 'providers' | 'catalog' | 'library' | 'playlists' | 'downloads' | 'search' | 'shares' | 'recommendations' | 'discord' | 'network' | 'security' | 'diagnostics' | 'backup';
 
 export type TabId = 'overview' | 'devices' | 'music' | 'search' | 'groups' | 'sharing' | 'system';
 
@@ -104,7 +105,7 @@ const TABS: readonly TabSpec[] = [
     sections: ['groups'],
   },
   { id: 'sharing', label: 'Sharing', icon: ICONS.sharing, sections: ['shares', 'discord'] },
-  { id: 'system', label: 'System', icon: ICONS.system, sections: ['network', 'backup', 'diagnostics'] },
+  { id: 'system', label: 'System', icon: ICONS.system, sections: ['network', 'security', 'backup', 'diagnostics'] },
 ];
 
 const TAB_IDS: ReadonlySet<string> = new Set(TABS.map((t) => t.id));
@@ -127,6 +128,7 @@ const SECTION_TITLES: Record<ViewId, string> = {
   shares: 'Shared links',
   discord: 'Discord',
   network: 'Network',
+  security: 'Change admin password',
   backup: 'Backup',
   diagnostics: 'Diagnostics',
 };
@@ -583,7 +585,7 @@ function AdminShell({ session, onSessionChanged }: { session: SessionInfo; onSes
             {current.lead ? <p className="lead">{current.lead}</p> : null}
             {current.sections.map((section) => (
               <section key={section} id={section} aria-label={SECTION_TITLES[section]}>
-                <ViewBoundary resetKey={section}>{sectionBody(section)}</ViewBoundary>
+                <ViewBoundary resetKey={section}>{section === 'security' ? <SecurityView onSessionChanged={onSessionChanged} /> : sectionBody(section)}</ViewBoundary>
               </section>
             ))}
             {current.id === 'overview' ? (

@@ -64,12 +64,42 @@ export async function resolveTool(id: HelperToolId, options: ResolveOptions): Pr
 
   for (const candidate of candidates) {
     // spotDL's standalone build unpacks itself on every start, which can take a while the first time.
-    const version = await versionOf(candidate.path, id, id === 'spotdl' ? 30_000 : 8000);
+    // The yt-dlp Windows build is a self-extracting bundle too; the installer gives it 60 s, so the
+    // status check must not give up sooner and call a working copy missing.
+    const version = await versionOf(candidate.path, id, probeTimeoutMs(id));
     // A path that will not answer its version flag is not a tool, whatever its name says.
     if (version === null) continue;
     return { id, present: true, version, origin: candidate.origin, installHint: null, installable, path: candidate.path };
   }
-  return { id, present: false, version: null, origin: 'missing', installHint: installHint(id, installable), installable, path: null };
+  // A file that exists but would not run is a different problem from nothing being there.
+  const hint = candidates.length > 0
+    ? `${id} was found but did not report a version, so it is not being used. Setting it up again replaces it.`
+    : installHint(id, installable);
+  return { id, present: false, version: null, origin: 'missing', installHint: hint, installable, path: null };
+}
+
+/** How long a version check may take. */
+export function probeTimeoutMs(id: HelperToolId): number {
+  if (id === 'yt-dlp') return 60_000;
+  if (id === 'spotdl') return 30_000;
+  return 8000;
+}
+
+type ToolSetup = NonNullable<HelperTool['setup']>;
+
+/**
+ * The setup state to report next to what was actually found.
+ *
+ * Setup state is history: "ready" means the last install finished. It is not proof the tool runs
+ * now, so a tool that is not present is never reported ready — that is the contradiction the
+ * Player showed (missing, yet ready). Installing and real failure reasons pass through.
+ */
+export function toolSetupFor(tool: { present: boolean }, setup: ToolSetup | undefined): ToolSetup | undefined {
+  if (!setup) return undefined;
+  if (!tool.present && setup.state === 'ready') {
+    return { state: 'failed', reason: 'Set up earlier, but it did not run or report a version just now. Set it up again to repair it.' } as ToolSetup;
+  }
+  return setup;
 }
 
 export async function resolveAll(options: ResolveOptions): Promise<Record<HelperToolId, ResolvedTool>> {

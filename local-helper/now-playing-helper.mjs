@@ -19241,7 +19241,9 @@ var ProviderAppConfigView = external_exports.object({
   redirectUri: external_exports.string().optional(),
   contactEmail: external_exports.string().optional(),
   updatedAt: IsoDateTime.optional(),
-  missing: external_exports.array(external_exports.string()).default([]).describe("Names of required fields not yet provided")
+  missing: external_exports.array(external_exports.string()).default([]).describe("Names of required fields not yet provided"),
+  /** Admin-only safe selection, not arbitrary extra command/hosts or credentials. */
+  downloaderPreset: external_exports.enum(["both", "yt-dlp", "spotdl", "custom", "unknown"]).optional()
 });
 var UserPlatformSync = external_exports.object({
   userId: Uuid,
@@ -19989,6 +19991,9 @@ var StationNowPlaying = external_exports.object({
   artist: external_exports.string().max(300).nullable(),
   title: external_exports.string().max(300).nullable(),
   station: external_exports.string().max(200).nullable(),
+  /** Official schedule programme, when a supported station has a live timed listing. */
+  programme: external_exports.string().max(300).nullable().optional(),
+  programmeSource: external_exports.literal("schedule").nullable().optional(),
   reason: external_exports.string().max(200).nullable()
 });
 var GroupRequestResult = external_exports.object({
@@ -21260,6 +21265,7 @@ var routes = {
   providersConfigGet: defineRoute({ method: "GET", path: "/providers/:provider/config", operationId: "getProviderConfig", summary: "Application-level provider configuration (secrets masked)", tags: ["providers"], auth: "admin", params: external_exports.object({ provider: ProviderId }), response: ProviderAppConfigView }),
   providersConfigPut: defineRoute({ method: "PUT", path: "/providers/:provider/config", operationId: "putProviderConfig", summary: "Set application credentials once (admin); never returned", tags: ["providers"], auth: "admin", rateLimit: "write", params: external_exports.object({ provider: ProviderId }), body: ProviderAppConfigInput.omit({ provider: true }), response: ProviderAppConfigView }),
   providersTest: defineRoute({ method: "POST", path: "/providers/:provider/test", operationId: "testProvider", summary: "Test provider connectivity/credentials", tags: ["providers"], auth: "admin", params: external_exports.object({ provider: ProviderId }), response: external_exports.object({ ok: external_exports.boolean(), latencyMs: external_exports.number().nullable(), message: external_exports.string() }) }),
+  toolStatus: defineRoute({ method: "GET", path: "/tools/status", operationId: "getToolStatus", summary: "Verified readiness of the hub downloader tools (a status read never installs)", tags: ["tools"], auth: "admin-or-device", setupRequired: false, scopes: ["search:use"], rateLimit: "search", response: external_exports.object({ tools: external_exports.object({ "yt-dlp": external_exports.object({ present: external_exports.boolean(), state: external_exports.enum(["missing", "checking", "installing", "ready", "failed"]), version: external_exports.string().max(160).nullable(), reason: external_exports.string().max(300).nullable() }), spotdl: external_exports.object({ present: external_exports.boolean(), state: external_exports.enum(["missing", "checking", "installing", "ready", "failed"]), version: external_exports.string().max(160).nullable(), reason: external_exports.string().max(300).nullable() }), ffmpeg: external_exports.object({ present: external_exports.boolean(), state: external_exports.enum(["missing", "checking", "installing", "ready", "failed"]), version: external_exports.string().max(160).nullable(), reason: external_exports.string().max(300).nullable() }) }), musicsearch: external_exports.object({ configured: external_exports.boolean(), state: external_exports.enum(["disabled", "installing", "ready", "failed"]), reason: external_exports.string().max(300).nullable() }) }) }),
   radioNowPlaying: defineRoute({ method: "GET", path: "/radio/now-playing", operationId: "radioNowPlaying", summary: "The song an internet radio station says it is playing, read from its ICY metadata", tags: ["search"], auth: "admin-or-device", scopes: ["search:use"], rateLimit: "search", query: external_exports.object({ url: external_exports.string().min(1).max(2048) }), response: StationNowPlaying }),
   providersResolve: defineRoute({ method: "GET", path: "/providers/resolve", operationId: "resolveUrl", summary: "Resolve a pasted URL or id to a capability-annotated result", tags: ["providers"], auth: "admin-or-device", scopes: ["search:use"], rateLimit: "search", query: external_exports.object({ url: external_exports.string().min(1).max(2048) }), response: SearchResult }),
   providersUsage: defineRoute({ method: "GET", path: "/providers/usage", operationId: "providerUsage", summary: "Quota budgets, circuit state and request classes", tags: ["providers"], auth: "admin", response: external_exports.object({ items: external_exports.array(external_exports.object({ provider: ProviderId, health: ProviderHealth, budget: external_exports.object({ perMinute: external_exports.number(), perDay: external_exports.number().nullable(), usedMinute: external_exports.number(), usedDay: external_exports.number(), shedding: external_exports.array(external_exports.string()) }), queueDepth: external_exports.record(external_exports.string(), external_exports.number()), concurrency: external_exports.object({ limit: external_exports.number(), inFlight: external_exports.number() }) })) }) }),
@@ -22852,11 +22858,24 @@ async function resolveTool(id, options) {
   const onPath = findOnPath(binaryName(id));
   if (onPath) candidates.push({ path: onPath, origin: "path" });
   for (const candidate of candidates) {
-    const version2 = await versionOf(candidate.path, id, id === "spotdl" ? 3e4 : 8e3);
+    const version2 = await versionOf(candidate.path, id, probeTimeoutMs(id));
     if (version2 === null) continue;
     return { id, present: true, version: version2, origin: candidate.origin, installHint: null, installable, path: candidate.path };
   }
-  return { id, present: false, version: null, origin: "missing", installHint: installHint(id, installable), installable, path: null };
+  const hint = candidates.length > 0 ? `${id} was found but did not report a version, so it is not being used. Setting it up again replaces it.` : installHint(id, installable);
+  return { id, present: false, version: null, origin: "missing", installHint: hint, installable, path: null };
+}
+function probeTimeoutMs(id) {
+  if (id === "yt-dlp") return 6e4;
+  if (id === "spotdl") return 3e4;
+  return 8e3;
+}
+function toolSetupFor(tool, setup) {
+  if (!setup) return void 0;
+  if (!tool.present && setup.state === "ready") {
+    return { state: "failed", reason: "Set up earlier, but it did not run or report a version just now. Set it up again to repair it." };
+  }
+  return setup;
 }
 async function resolveAll(options) {
   const [ytDlp, spotdl, ffmpeg] = await Promise.all([resolveTool("yt-dlp", options), resolveTool("spotdl", options), resolveTool("ffmpeg", options)]);
@@ -26798,6 +26817,29 @@ async function startHelper(options) {
   let policy = { allowed: options.allowedOrigins, self: options.app ? origin : null, loopbackPages: options.loopbackPages === true };
   const stationCache = /* @__PURE__ */ new Map();
   let stationReads = 0;
+  async function withRadioGuide(url2, track) {
+    const fallback = { ...track, programme: null, programmeSource: null };
+    if (!options.tv) return fallback;
+    try {
+      const matches = (await options.tv.channels()).filter((channel2) => channel2.url === url2);
+      if (matches.length !== 1) return fallback;
+      const channel = matches[0];
+      const named = { ...fallback, station: track.station || channel.name };
+      if (!channel.tvgId) return named;
+      try {
+        const entries = (await options.tv.guide()).filter((entry) => entry.tvgId.toLowerCase() === channel.tvgId.toLowerCase());
+        if (entries.length !== 1 || !entries[0]?.now) return named;
+        const current = entries[0].now;
+        const at = Date.now();
+        if (Date.parse(current.start) > at || at >= Date.parse(current.stop)) return named;
+        return { ...named, programme: current.title, programmeSource: "schedule" };
+      } catch {
+        return named;
+      }
+    } catch {
+      return fallback;
+    }
+  }
   const tools = new ToolProvisioner({
     toolsDir: options.toolsDir,
     configured: options.configured,
@@ -26864,7 +26906,7 @@ async function startHelper(options) {
       if (!station || station.length > 2048) return fail(response, 400, "bad-request", "Say which station: ?url=");
       const now = Date.now();
       const hit = stationCache.get(station);
-      if (hit && now - hit.at < 15e3) return send(response, 200, await hit.value);
+      if (hit && now - hit.at < 15e3) return send(response, 200, await withRadioGuide(station, await hit.value));
       if (stationReads >= 8) return fail(response, 429, "busy", "Too many stations at once. Try again in a moment.");
       const read = options.stationTitle ?? ((u) => readStationTitle(u, { timeoutMs: 8e3, userAgent: `NowPlaying-helper/${options.version}` }));
       stationReads += 1;
@@ -26874,7 +26916,7 @@ async function startHelper(options) {
       stationCache.delete(station);
       if (stationCache.size >= 200) stationCache.delete(stationCache.keys().next().value);
       stationCache.set(station, { at: now, value });
-      return send(response, 200, await value);
+      return send(response, 200, await withRadioGuide(station, await value));
     }
     if ((path === HELPER_ROUTES.tvChannels || path === HELPER_ROUTES.tvGuide) && request.method === "GET") {
       if (origin_ === void 0 && !tokenMatches(options.token, header(request, "x-helper-token"))) {
@@ -26918,7 +26960,7 @@ async function startHelper(options) {
       const setup = tools.status();
       const withSetup = (id) => {
         const record2 = publicTool(found[id]);
-        const state = setup[id];
+        const state = toolSetupFor(record2, setup[id]);
         return state ? { ...record2, setup: state } : record2;
       };
       const health = {

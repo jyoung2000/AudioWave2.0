@@ -301,6 +301,42 @@ describe('Provider details', () => {
     'GET /providers/musicbrainz/config': { body: { provider: 'musicbrainz', enabled: true, clientId: null, clientSecretHint: null, apiKeyHint: null, contactEmail: null, missing: [] } },
   };
 
+  it('shows both hub downloaders and sends only the selected preset to the hub', async () => {
+    const hub = fakeHub({
+      ...ROUTES,
+      'GET /providers': { body: { items: [provider('external-tool', 'External media tool', true)], health: [] } },
+      'GET /providers/external-tool/config': { body: { provider: 'external-tool', enabled: true, configured: true, missing: [], downloaderPreset: 'both' } },
+      'GET /tools/status': { body: { tools: {
+        'yt-dlp': { state: 'ready', present: true, version: '2026.08.19', reason: null },
+        spotdl: { state: 'failed', present: true, version: null, reason: 'Version check failed' },
+        ffmpeg: { state: 'ready', present: true, version: '7.1.5', reason: null },
+      }, musicsearch: { configured: false, state: 'disabled', reason: null } } },
+      'PUT /providers/external-tool/config': { body: { provider: 'external-tool', enabled: true, configured: true, missing: [], downloaderPreset: 'yt-dlp' } },
+    });
+    render(<ProvidersView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Details of External media tool' }));
+    const detail = screen.getByRole('region', { name: 'External media tool details' });
+    expect(await within(detail).findByText(/Version check failed/)).toBeTruthy();
+    expect((within(detail).getByRole('checkbox', { name: /yt-dlp.*YouTube/ }) as HTMLInputElement).checked).toBe(true);
+    await userEvent.click(within(detail).getByRole('checkbox', { name: /spotDL.*Spotify/ }));
+    await userEvent.click(within(detail).getByRole('button', { name: 'Save and Test' }));
+    await waitFor(() => expect(hub.sent('PUT', '/providers/external-tool/config')).toHaveLength(1));
+    expect(hub.sent('PUT', '/providers/external-tool/config')[0]!.body).toMatchObject({ enabled: true, extra: { preset: 'yt-dlp' } });
+  });
+
+  it('does not replace an existing custom downloader command with presets', async () => {
+    const hub = fakeHub({ ...ROUTES,
+      'GET /providers': { body: { items: [provider('external-tool', 'External media tool', true)], health: [] } },
+      'GET /providers/external-tool/config': { body: { provider: 'external-tool', enabled: true, configured: true, missing: [], downloaderPreset: 'custom' } },
+    });
+    render(<ProvidersView />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Details of External media tool' }));
+    const detail = screen.getByRole('region', { name: 'External media tool details' });
+    expect(await within(detail).findByText(/custom command/)).toBeTruthy();
+    expect(within(detail).queryByRole('checkbox', { name: /spotDL.*Spotify/ })).toBeNull();
+    expect(hub.sent('PUT', '/providers/external-tool/config')).toHaveLength(0);
+  });
+
   it('open under their own row, take the caret, and close with Escape back onto the button', async () => {
     fakeHub(ROUTES);
     render(<ProvidersView />);

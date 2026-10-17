@@ -699,11 +699,12 @@
         "saved and tested (result beside the button)",
         "external tool on without setup (DEC-024)",
         "external tool row names the tools on this hub: (yt-dlp, spotDL) (DEC-036)",
+        "external tool details show independent yt-dlp, spotDL and FFmpeg readiness, allow each downloader to be enabled without credentials, and do not replace a custom command",
         "requests and limits",
         "details open under their own row; Escape closes them and puts the caret back on the button",
         "Requests and limits lists the providers in use, the rest behind a disclosure"
       ],
-      "rules": ["UX-PRIN-002", "UX-A11Y-001"],
+      "rules": ["UX-PRIN-002", "UX-A11Y-001", "UX-SETUP-001"],
       "guideAnchor": "screens",
       "mockup": "hub-providers",
       "authority": "adopted"
@@ -976,6 +977,25 @@
       "guideAnchor": "screens",
       "authority": "adopted",
       "mockup": "hub-network"
+    },
+    {
+      "id": "hub-security",
+      "kind": "screen",
+      "product": "hub",
+      "platform": "web",
+      "title": "Change admin password",
+      "entry": "System tab → Change admin password",
+      "sourcePaths": ["docker-container/src/web/views/Security.tsx"],
+      "components": ["Field", "Group", "Note", "ActionError", "Push", ".pref rows"],
+      "states": [
+        "signed-in admin only, current/new/confirmation required",
+        "mismatch refused before sending",
+        "weak or incorrect password refused by the server",
+        "password changed, admin sessions rotated and sensitive inputs cleared"
+      ],
+      "rules": ["UX-SAFE-002", "UX-FORM-001"],
+      "guideAnchor": "screens",
+      "authority": "adopted"
     },
     {
       "id": "hub-backup",
@@ -1784,7 +1804,8 @@
       "sourcePaths": [
         "music-player/index.html",
         "music-player/scripts/make-shell.py",
-        "music-player/src/shell/bridge.ts"
+        "music-player/src/shell/bridge.ts",
+        "music-player/src/shell/hub-features.ts"
       ],
       "components": ["shell markup (design/frontends/origin/airwave-now-playing.html)"],
       "states": [
@@ -1792,7 +1813,8 @@
         "a station playing",
         "station list",
         "the song on the air, read from the stream (paired or with the companion)",
-        "no feed and nothing to read the stream: the programme format, no invented title"
+        "no feed and nothing to read the stream: the programme format, no invented title",
+        "station directory from the paired Hub (metadata only, not a stream proxy); the public directory when unpaired, on an older Hub, or after a named refusal"
       ],
       "rules": ["NP-LIVE-001", "NP-RADIO-001", "NP-RADIO-002"],
       "guideAnchor": "shell",
@@ -1919,7 +1941,8 @@
       "sourcePaths": [
         "music-player/index.html",
         "music-player/scripts/make-shell.py",
-        "music-player/src/shell/bridge.ts"
+        "music-player/src/shell/bridge.ts",
+        "music-player/src/shell/hub-features.ts"
       ],
       "components": ["shell markup (design/frontends/origin/airwave-now-playing.html)"],
       "states": [
@@ -1928,7 +1951,9 @@
         "companion downloader setting up (with %), not counted as missing",
         "hub tested / paired",
         "backup measured (nothing sent)",
-        "backup will not fit (reason)"
+        "backup will not fit (reason)",
+        "Hub tools — authenticated: unpaired / loaded / credential refused (401) / missing permission naming its scope (403) / older Hub (unsupported) / unavailable (503) / unreachable, kept apart from the Companion cards (UX-SETUP-001)",
+        "each Hub runtime tool (yt-dlp, spotDL, FFmpeg, MusicSearch) shown as missing / checking / installing / ready / failed, or status unknown; refreshing never installs"
       ],
       "rules": ["NP-PREF-002", "UX-FEED-001", "UX-SETUP-001"],
       "guideAnchor": "screens",
@@ -2276,7 +2301,8 @@
         "music-player/src/shell/search/index.ts",
         "music-player/src/shell/search/view.ts",
         "music-player/src/shell/search/client.ts",
-        "music-player/src/shell/search/visit.ts"
+        "music-player/src/shell/search/visit.ts",
+        "music-player/src/shell/hub-features.ts"
       ],
       "components": ["shell markup (design/frontends/origin/airwave-now-playing.html)"],
       "states": [
@@ -2284,7 +2310,8 @@
         "enriched",
         "lyrics synced / plain / none / instrumental",
         "Download… through the hub (its chosen source and tags)",
-        "Download… (the hub, else the helper) / only in stores (says so)"
+        "Download… (the hub, else the helper) / only in stores (says so)",
+        "Hub Metadata: explicit MusicSearch metadata-only results as plain text (no play, preview, download or path action); refused while MusicSearch is not configured, installing or failed; cleared when the paired Hub changes (NP-FIND-012)"
       ],
       "rules": ["NP-FIND-006", "NP-FIND-001", "NP-FIND-012"],
       "guideAnchor": "screens",

@@ -32,7 +32,7 @@ describe('HubTools', () => {
     writeFileSync(shipped, 'x');
     const tools = new HubTools({ toolsDir: join(root, 'tools'), imagePaths: { spotdl: shipped }, env: { PATH: '' }, log: quiet });
     expect(tools.locate('spotdl')).toBe(shipped);
-    expect(tools.status().spotdl).toEqual({ present: true, reason: null });
+        expect(tools.status().spotdl).toEqual({ present: true, state: 'checking', version: null, reason: null });
   });
 
   it('finds spotDL in its own folder and on PATH', () => {
@@ -64,6 +64,8 @@ describe('HubTools', () => {
       log: quiet,
       platform: 'win32',
       onInstalled: (id) => landed.push(id),
+      // The mock writes non-executable files; the real probe would rightly refuse them.
+      probe: async (_path, id) => `${id} 1.0`,
       install: async (id, options) => {
         asked.push(id);
         mkdirSync(options.toolsDir, { recursive: true });
@@ -74,7 +76,11 @@ describe('HubTools', () => {
     await tools.ensure();
     expect(asked).toEqual(['yt-dlp', 'ffmpeg', 'spotdl']);
     expect(landed).toEqual(['yt-dlp', 'ffmpeg', 'spotdl']);
-    expect(tools.status()).toEqual({ 'yt-dlp': { present: true, reason: null }, ffmpeg: { present: true, reason: null }, spotdl: { present: true, reason: null } });
+    expect(tools.status()).toEqual({
+      'yt-dlp': { present: true, state: 'ready', version: 'yt-dlp 1.0', reason: null },
+      ffmpeg: { present: true, state: 'ready', version: 'ffmpeg 1.0', reason: null },
+      spotdl: { present: true, state: 'ready', version: 'spotdl 1.0', reason: null },
+    });
     await tools.ensure();
     expect(asked, 'present tools are left alone').toEqual(['yt-dlp', 'ffmpeg', 'spotdl']);
   });
@@ -94,8 +100,8 @@ describe('HubTools', () => {
     });
     await tools.ensure();
     expect(asked).toEqual(['yt-dlp', 'spotdl']);
-    expect(tools.status()['yt-dlp']).toEqual({ present: false, reason: 'no network' });
-    expect(tools.status().spotdl).toEqual({ present: false, reason: 'no network' });
+    expect(tools.status()['yt-dlp']).toEqual({ present: false, state: 'failed', version: null, reason: 'no network' });
+    expect(tools.status().spotdl).toEqual({ present: false, state: 'failed', version: null, reason: 'no network' });
   });
 
   it('treats a failed setup as a reason, not a crash', async () => {
@@ -110,7 +116,7 @@ describe('HubTools', () => {
       },
     });
     await expect(tools.ensure()).resolves.toBeUndefined();
-    expect(tools.status()['yt-dlp']).toEqual({ present: false, reason: 'offline' });
+    expect(tools.status()['yt-dlp']).toEqual({ present: false, state: 'failed', version: null, reason: 'It could not be set up' });
   });
 
   it('sets nothing up for a hub with no disk', async () => {

@@ -64,7 +64,8 @@ export function ProvidersView() {
   const usageState = listState(usage, () => shownUsage.length === 0, 'No provider is in use yet.');
 
   return (
-    <Group title="Providers" hint="Used through their own APIs and within their terms. What each can do is what its terms allow, not what would be convenient.">
+    <Group title="Providers" hint="Keyless tools and optional provider APIs. Each is limited to what its terms permit.">
+      <Note>For links from YouTube, YouTube Music, SoundCloud, Bandcamp, Archive.org and Spotify, use External media tool below: yt-dlp and spotDL ship with the Hub and need no API key. The separate YouTube, SoundCloud and Spotify API entries are optional and remain unconfigured without their own credentials. A paired Player also needs download and transfer scopes; only fetch content you have rights to.</Note>
       <div className="well">
         <table className="tbl" aria-label="Providers">
           <colgroup>
@@ -202,12 +203,14 @@ function ProviderDetail({ descriptor, health, onClose, onSaved }: { descriptor: 
   const provider = descriptor.provider;
   const { gated } = useHubUi();
   const config = useResource('providersConfigGet', { params: { provider } }, { enabled: !gated });
+  const toolStatus = useResource('toolStatus', {}, { enabled: !gated && provider === 'external-tool', pollMs: 15_000 });
 
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [downloaders, setDownloaders] = useState<'both' | 'yt-dlp' | 'spotdl' | 'off' | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   const save = useAction(async (body: Record<string, unknown>) => api('providersConfigPut', { params: { provider }, body }));
@@ -222,11 +225,24 @@ function ProviderDetail({ descriptor, health, onClose, onSaved }: { descriptor: 
     contactEmail: provider === 'musicbrainz',
   };
   const isOn = enabled ?? current?.enabled ?? descriptor.enabled;
+  const preset = downloaders ?? current?.downloaderPreset ?? 'both';
+  const custom = preset === 'custom' || preset === 'unknown';
+  const toolRows = (toolStatus.data as { tools?: Record<string, { state: string; version: string | null; reason: string | null }> } | null)?.tools;
+  const toggleDownloader = (which: 'yt-dlp' | 'spotdl'): void => {
+    const yt = isOn && (preset === 'both' || preset === 'yt-dlp');
+    const spot = isOn && (preset === 'both' || preset === 'spotdl');
+    const nextYt = which === 'yt-dlp' ? !yt : yt;
+    const nextSpot = which === 'spotdl' ? !spot : spot;
+    setDownloaders(nextYt && nextSpot ? 'both' : nextYt ? 'yt-dlp' : nextSpot ? 'spotdl' : 'off');
+    setEnabled(nextYt || nextSpot);
+  };
 
   const submit = useCallback(
     async () => {
       setMessage('Saving…');
-      const body: Record<string, unknown> = { enabled: isOn };
+      const body: Record<string, unknown> = { enabled: isOn && (provider !== 'external-tool' || preset !== 'off') };
+      // Only a reviewed preset name crosses the API; never a command, URL or local path.
+      if (provider === 'external-tool' && !custom) body['extra'] = { preset: preset === 'off' || preset === 'both' ? '' : preset };
       // An empty secret field means "leave what is stored alone", never "clear it".
       if (clientId.trim()) body['clientId'] = clientId.trim();
       if (clientSecret.trim()) body['clientSecret'] = clientSecret.trim();
@@ -241,8 +257,13 @@ function ProviderDetail({ descriptor, health, onClose, onSaved }: { descriptor: 
       setApiKey('');
       config.reload();
       onSaved();
-      if (!isOn) {
+      if (!body['enabled']) {
         setMessage('Saved. It is off.');
+        return;
+      }
+      if (provider === 'external-tool' && !custom) {
+        setMessage('Saved. The tool rows show independently verified readiness; the Player needs a paired device with downloads allowed.');
+        toolStatus.reload();
         return;
       }
       setMessage('Saved. Testing…');
@@ -250,7 +271,7 @@ function ProviderDetail({ descriptor, health, onClose, onSaved }: { descriptor: 
       setMessage(result ? `Saved. ${result.message}` : 'Saved, but the test could not run.');
       onSaved();
     },
-    [isOn, clientId, clientSecret, apiKey, contactEmail, save, test, config, onSaved],
+    [isOn, provider, preset, custom, clientId, clientSecret, apiKey, contactEmail, save, test, config, toolStatus, onSaved],
   );
 
   const status = PROVIDER_STATUS[health?.status ?? (descriptor.enabled ? 'ok' : 'disabled')] ?? PROVIDER_STATUS.down;
@@ -330,6 +351,25 @@ function ProviderDetail({ descriptor, health, onClose, onSaved }: { descriptor: 
               {descriptor.role === 'tool' ? 'Turn on, for content I own or may download' : 'Use this provider'}
             </Check>
           </div>
+          {provider === 'external-tool' ? (
+            <>
+              <span className="k top">Hub downloaders:</span>
+              <div className="v stack" aria-label="Hub downloaders">
+                <p className="sub">These run on the Hub, not in Companion. Enable only sources you may download. The Player must also be paired and granted downloads:request and transfers:receive.</p>
+                {custom ? <Note>A custom command is configured. Preset controls cannot replace it; the main switch still works.</Note> : (
+                  <>
+                    <Check checked={isOn && (preset === 'both' || preset === 'yt-dlp')} onChange={() => toggleDownloader('yt-dlp')}>yt-dlp — YouTube, YouTube Music, SoundCloud, Bandcamp and Archive.org</Check>
+                    <Check checked={isOn && (preset === 'both' || preset === 'spotdl')} onChange={() => toggleDownloader('spotdl')}>spotDL — Spotify links (matching audio from YouTube Music)</Check>
+                  </>
+                )}
+                {(['yt-dlp', 'spotdl', 'ffmpeg'] as const).map((id) => {
+                  const tool = toolRows?.[id];
+                  return <span key={id} className="sub" role="status">{id === 'spotdl' ? 'spotDL' : id === 'ffmpeg' ? 'FFmpeg' : id}: {tool ? `${tool.state}${tool.version ? ` · ${tool.version}` : ''}${tool.reason ? ` · ${tool.reason}` : ''}` : toolStatus.error ? 'Status unavailable' : 'Checking…'}</span>;
+                })}
+                <p className="sub">FFmpeg handles conversion and is required by spotDL. A ready tool is not an enabled provider or permission to download.</p>
+              </div>
+            </>
+          ) : null}
           {wants.clientId ? (
             <>
               <label className="k" htmlFor={`${id}-cid`}>

@@ -135,6 +135,32 @@ test('paired: the container reads the title, and the song goes to the group’s 
   expect(requests[0]!.body).toMatchObject({ query: 'Air Artist - Air Song' });
 });
 
+test('the paired Hub shows a scheduled programme when there is no song, without offering to save it as one', async ({ page }) => {
+  await boot(page);
+  await page.evaluate(async (a) => { await (window as unknown as { kv: { set(k: string, v: unknown): Promise<void> } }).kv.set('player:hub', a); }, ACCT);
+  await page.route(`${HUB}/**`, (r) => {
+    if (r.request().method() === 'OPTIONS') return r.fulfill({ status: 204, headers: CORS });
+    if (new URL(r.request().url()).pathname === '/api/v1/radio/now-playing')
+      return r.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'application/json' }, body: JSON.stringify({ raw: null, artist: null, title: null, station: 'WFMT', programme: 'The Morning Programme', programmeSource: 'schedule', reason: 'No song metadata' }) });
+    return r.fulfill({ status: 404, headers: CORS, body: '{}' });
+  });
+  await page.goto('about:blank');
+  await boot(page);
+  await tuneWfmt(page);
+  await expect(page.locator('.player__title')).toHaveText('The Morning Programme', { timeout: 10_000 });
+  await stationRow(page).click({ button: 'right', position: { x: 120, y: 8 } });
+  expect(await menuItems(page)).not.toContain('Add Song to Up Next');
+});
+
+test('the Companion shows its guide programme separately from its ICY song', async ({ page }) => {
+  await page.route(`${COMPANION}/helper/v1/radio/now-playing**`, (r) => r.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'application/json' }, body: JSON.stringify({ ...ON_AIR, programme: 'Morning Music Hour', programmeSource: 'schedule' }) }));
+  await boot(page);
+  await page.evaluate((c) => { (window as unknown as { COMPANION: string }).COMPANION = c; }, COMPANION);
+  await tuneWfmt(page);
+  await expect(page.locator('.player__title')).toHaveText('Air Song', { timeout: 10_000 });
+  await expect(page.locator('.player__where')).toContainText('Scheduled programme: Morning Music Hour');
+});
+
 test('touch: a long press on a station opens the same menu, and the lift does not retune', async ({ browser }) => {
   const ctx = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 }, baseURL: 'http://127.0.0.1:4173' });
   const page = await ctx.newPage();

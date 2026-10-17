@@ -58,6 +58,8 @@ export const ProviderAppConfigView = z.object({
   contactEmail: z.string().optional(),
   updatedAt: IsoDateTime.optional(),
   missing: z.array(z.string()).default([]).describe('Names of required fields not yet provided'),
+  /** Admin-only safe selection, not arbitrary extra command/hosts or credentials. */
+  downloaderPreset: z.enum(['both', 'yt-dlp', 'spotdl', 'custom', 'unknown']).optional(),
 });
 export type ProviderAppConfigView = z.infer<typeof ProviderAppConfigView>;
 

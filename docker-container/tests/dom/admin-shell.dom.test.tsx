@@ -191,6 +191,34 @@ describe('setup gate', () => {
 });
 
 describe('signed in', () => {
+  it('lets a signed-in administrator change the password from System with current-password verification', async () => {
+    const fetchMock = mockFetch({ ...SIGNED_IN, '/auth/change-password': SESSION });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<App />);
+    await signedIn();
+    await userEvent.click(screen.getByRole('tab', { name: 'System' }));
+    const section = await screen.findByRole('region', { name: 'Change admin password' });
+    const fields = within(section);
+    expect(screen.queryByRole('heading', { name: 'Choose a real password' })).toBeNull();
+    await userEvent.type(fields.getByLabelText('Current password:'), 'old-password');
+    await userEvent.type(fields.getByLabelText('New password:'), 'a-new-strong-password-1234');
+    await userEvent.type(fields.getByLabelText('Confirm new password:'), 'not-a-match-12345');
+    await userEvent.click(fields.getByRole('button', { name: 'Change Password' }));
+    expect((await fields.findByRole('alert')).textContent).toContain('don’t match');
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/auth/change-password'))).toBe(false);
+    await userEvent.clear(fields.getByLabelText('Confirm new password:'));
+    await userEvent.type(fields.getByLabelText('Confirm new password:'), 'a-new-strong-password-1234');
+    await userEvent.click(fields.getByRole('button', { name: 'Change Password' }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/auth/change-password'))).toBe(true));
+    const request = (fetchMock.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit]>).find(([url]) => String(url).includes('/auth/change-password'))!;
+    expect(request[1].method).toBe('POST');
+    expect(JSON.parse(String(request[1].body))).toEqual({ currentPassword: 'old-password', newPassword: 'a-new-strong-password-1234' });
+    await waitFor(() => expect((fields.getByLabelText('Current password:') as HTMLInputElement).value).toBe(''));
+    expect((fields.getByLabelText('New password:') as HTMLInputElement).value).toBe('');
+    expect((fields.getByLabelText('Confirm new password:') as HTMLInputElement).value).toBe('');
+    expect(fields.getByRole('status').textContent).toContain('Password changed');
+  });
+
   it('renders the window with the seven tabs, the status strip and Sign Out', async () => {
     vi.stubGlobal('fetch', mockFetch(SIGNED_IN));
     render(<App />);

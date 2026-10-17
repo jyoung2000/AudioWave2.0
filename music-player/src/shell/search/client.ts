@@ -80,25 +80,8 @@ export class Refused extends Error {
   }
 }
 
-interface HubAccount {
-  base: string;
-  credentialId: string;
-  secret: string;
-  hubName?: string;
-}
-
-type ShellKv = { get(key: string): Promise<unknown> };
-
-export async function hubAccount(): Promise<HubAccount | null> {
-  const kv = (window as unknown as { kv?: ShellKv }).kv;
-  if (!kv?.get) return null;
-  try {
-    const v = (await kv.get('player:hub')) as Partial<HubAccount> | null;
-    return v && typeof v.base === 'string' && v.credentialId && v.secret ? (v as HubAccount) : null;
-  } catch {
-    return null;
-  }
-}
+export { hubAccount } from '../hub-account.js';
+import { hubAccount } from '../hub-account.js';
 
 export function companionBase(): string | null {
   const c = (window as unknown as { COMPANION?: unknown }).COMPANION;

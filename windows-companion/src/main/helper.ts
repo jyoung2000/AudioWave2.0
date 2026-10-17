@@ -19,7 +19,7 @@
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { defaultHosts, resolveAll, resolveTool, startHelper, ToolProvisioner, type FinishedFile, type Helper, type HelperOptions } from '@now-playing/local-helper';
+import { defaultHosts, resolveAll, resolveTool, startHelper, toolSetupFor, ToolProvisioner, type FinishedFile, type Helper, type HelperOptions } from '@now-playing/local-helper';
 import type { BackupPart } from '@now-playing/local-helper/measure';
 import type { HelperJob, OutputFormat } from '@now-playing/contracts';
 import type { HelperStatus, HelperTool } from '../shared/ipc.js';
@@ -321,7 +321,9 @@ export class EmbeddedHelper {
     const tools = this.tools.map((tool): HelperTool => {
       const extra = { ...(this.latest.has(tool.id) ? { latest: this.latest.get(tool.id)! } : {}), ...(this.checking.has(tool.id) ? { checking: true } : {}) };
       // Chosen but still queued behind setup: shown as under way from the moment it is pressed.
-      const state = setup[tool.id]?.state === 'installing' || !this.pending.has(tool.id) ? setup[tool.id] : { state: 'installing' as const };
+      const queued = setup[tool.id]?.state === 'installing' || !this.pending.has(tool.id) ? setup[tool.id] : { state: 'installing' as const };
+      // Historical "ready" never outranks a tool that does not run right now.
+      const state = toolSetupFor(tool, queued);
       if (!state) return { ...tool, ...extra };
       // A tool setup cannot fetch here keeps the manual advice; anything else it handles itself.
       return { ...tool, ...extra, setup: state, advice: state.state === 'unsupported' ? (tool.advice ?? ADVICE[tool.id]) : null };

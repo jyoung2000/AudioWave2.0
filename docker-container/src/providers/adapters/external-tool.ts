@@ -338,7 +338,10 @@ export class ExternalToolAdapter extends BaseAdapter {
   /** Which preset handles a link: the one whose hosts it is on, else the first (an operator's extra host). */
   presetFor(url: URL): ToolPreset | null {
     const presets = this.presets();
-    return presets.find((p) => p.allowedHosts.some((h) => hostMatches(url.hostname, h))) ?? presets[0] ?? null;
+    const known = Object.values(TOOL_PRESETS).find((p) => p.allowedHosts.some((h) => hostMatches(url.hostname, h)));
+    // An old extra.allowedHosts (or a broad wildcard) must not bypass a disabled downloader.
+    if (known && !presets.includes(known)) return null;
+    return known ?? presets[0] ?? null;
   }
 
   /** The copy of a preset's tool to run: an operator's named binary (first preset only), the hub's copy, or the preset's path. */
@@ -433,7 +436,7 @@ export class ExternalToolAdapter extends BaseAdapter {
 
   allowed(url: string): URL | null {
     const check = validateOutboundUrl(url, { allowedHosts: this.allowedHosts(), allowedSchemes: ['https:'] });
-    if (!check.ok || !check.url) return null;
+    if (!check.ok || !check.url || !this.presetFor(check.url)) return null;
     return this.allowedHosts().some((h) => hostMatches(check.url!.hostname, h)) ? check.url : null;
   }
 

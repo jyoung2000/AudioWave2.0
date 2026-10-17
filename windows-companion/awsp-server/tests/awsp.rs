@@ -454,7 +454,7 @@ async fn companion_rpc_bridges_scoped_routes_without_exposing_helper_token() {
             } else if line.contains("/tv/guide") {
                 r#"{"guide":[{"tvgId":"test-1","title":"News"}]}"#
             } else if line.contains("/radio/now-playing") {
-                r#"{"title":"Late Night","artist":"DJ"}"#
+                r#"{"title":"Song","artist":"Band","station":"Community FM","programme":"Late Night","programmeSource":"schedule"}"#
             } else {
                 r#"{"tracks":[{"id":"musicsearch:1","title":"Search result"}]}"#
             };
@@ -498,7 +498,12 @@ async fn companion_rpc_bridges_scoped_routes_without_exposing_helper_token() {
         match operation {
             "tv.channels" => assert_eq!(payload["channels"][0]["id"], "channel-1"),
             "tv.guide" => assert_eq!(payload["guide"][0]["tvgId"], "test-1"),
-            "radio.nowPlaying" => assert_eq!(payload["title"], "Late Night"),
+            "radio.nowPlaying" => {
+                assert_eq!(payload["title"], "Song");
+                assert_eq!(payload["station"], "Community FM");
+                assert_eq!(payload["programme"], "Late Night");
+                assert_eq!(payload["programmeSource"], "schedule");
+            }
             "catalog.search" => assert_eq!(payload["tracks"][0]["id"], "musicsearch:1"),
             _ => unreachable!(),
         }

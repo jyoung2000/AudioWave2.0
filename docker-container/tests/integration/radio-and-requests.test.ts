@@ -38,6 +38,130 @@ describe('GET /radio/now-playing', () => {
     expect(asked).toEqual(['https://stream.example.com/live']);
   });
 
+  it('returns the active BBC programme from the official schedule even when the stream has no song title', async () => {
+    hub = await createTestHub({ deps: { stationTitle: async () => ({ raw: null, artist: null, title: null, station: null, reason: 'The station does not send song titles' }) } });
+    hub.fetch.on('ess.api.bbci.co.uk/schedules?serviceId=bbc_6music', () => ({ body: {
+      service: { id: 'bbc_6music', name: 'BBC Radio 6 Music' },
+      items: [
+        { service: { id: 'bbc_6music' }, brand: { title: 'Yesterday Show' }, published_time: { start: '2025-01-01T09:00:00Z', end: '2025-01-01T10:00:00Z' } },
+        { service: { id: 'bbc_6music' }, brand: { title: 'The Craig Charles Funk and Soul Show' }, episode: { title: 'Funk selection' }, published_time: { start: '2025-01-01T10:00:00Z', end: '2025-01-01T12:00:00Z' } },
+      ],
+    } }));
+    const admin = await hub.completeSetup();
+    const device = await pairDevice(hub, admin);
+    hub.clock.set(new Date('2025-01-01T11:00:00Z').getTime());
+    const url = `/api/v1/radio/now-playing?url=${encodeURIComponent('https://stream.live.vc.bbcmedia.co.uk/bbc_6music')}`;
+    const response = await hub.app.inject({ method: 'GET', url, headers: { authorization: device.authorization } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ title: null, programme: 'The Craig Charles Funk and Soul Show', programmeSource: 'schedule' });
+    expect(hub.fetch.calls.map((call) => call.url)).toEqual(['https://ess.api.bbci.co.uk/schedules?serviceId=bbc_6music']);
+  });
+
+  it('looks up BBC Radio 4 FM using its actual schedule service ID', async () => {
+    hub = await createTestHub({ deps: { stationTitle: async () => ({ raw: null, artist: null, title: null, station: null, reason: 'No song metadata' }) } });
+    hub.fetch.on('ess.api.bbci.co.uk/schedules?serviceId=bbc_radio_fourfm', () => ({ body: {
+      service: { id: 'bbc_radio_fourfm' }, items: [{ service: { id: 'bbc_radio_fourfm' }, brand: { title: 'Today' },
+        published_time: { start: '2026-10-17T09:00:00Z', end: '2026-10-17T10:00:00Z' } }],
+    } }));
+    const admin = await hub.completeSetup();
+    const device = await pairDevice(hub, admin);
+    hub.clock.set(new Date('2026-10-17T09:30:00Z').getTime());
+    const url = `/api/v1/radio/now-playing?url=${encodeURIComponent('https://stream.live.vc.bbcmedia.co.uk/bbc_radio_fourfm')}`;
+    const response = await hub.app.inject({ method: 'GET', url, headers: { authorization: device.authorization } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ programme: 'Today', programmeSource: 'schedule' });
+    expect(hub.fetch.calls.map((call) => call.url)).toEqual(['https://ess.api.bbci.co.uk/schedules?serviceId=bbc_radio_fourfm']);
+  });
+
+  it('keeps the ICY song separate from the scheduled programme, and shares both in the cache', async () => {
+    let reads = 0;
+    hub = await createTestHub({ deps: { stationTitle: async () => {
+      reads += 1;
+      return { raw: 'Artist - Song', artist: 'Artist', title: 'Song', station: 'BBC Radio 6 Music', reason: null };
+    } } });
+    hub.fetch.on('ess.api.bbci.co.uk/schedules?serviceId=bbc_6music', () => ({ body: {
+      service: { id: 'bbc_6music' }, items: [{ service: { id: 'bbc_6music' }, brand: { title: 'The Morning Show' },
+        published_time: { start: '2026-01-01T00:00:00Z', end: '2026-01-01T01:00:00Z' } }],
+    } }));
+    const admin = await hub.completeSetup();
+    const device = await pairDevice(hub, admin);
+    const url = `/api/v1/radio/now-playing?url=${encodeURIComponent('https://stream.live.vc.bbcmedia.co.uk/bbc_6music')}`;
+    for (let n = 0; n < 2; n += 1) {
+      const response = await hub.app.inject({ method: 'GET', url, headers: { authorization: device.authorization } });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ title: 'Song', artist: 'Artist', programme: 'The Morning Show', programmeSource: 'schedule' });
+    }
+    expect(reads).toBe(1);
+    expect(hub.fetch.calls).toHaveLength(1);
+  });
+
+  it('does not request a schedule for a host spoofing the BBC stream name', async () => {
+    hub = await createTestHub({ deps: { stationTitle: async () => ({ raw: 'Artist - Song', artist: 'Artist', title: 'Song', station: null, reason: null }) } });
+    const admin = await hub.completeSetup();
+    const device = await pairDevice(hub, admin);
+    const url = `/api/v1/radio/now-playing?url=${encodeURIComponent('https://stream.live.vc.bbcmedia.co.uk.evil.test/bbc_6music')}`;
+    const response = await hub.app.inject({ method: 'GET', url, headers: { authorization: device.authorization } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ title: 'Song', programme: null, programmeSource: null });
+    expect(hub.fetch.calls).toHaveLength(0);
+  });
+
+  it('ignores a redirect from the schedule API instead of following it to a private host', async () => {
+    hub = await createTestHub({ deps: { stationTitle: async () => ({ raw: 'Artist - Song', artist: 'Artist', title: 'Song', station: null, reason: null }) } });
+    hub.fetch.on('ess.api.bbci.co.uk/schedules?serviceId=bbc_6music', () => ({ status: 302, body: '', headers: { location: 'http://127.0.0.1/admin' } }));
+    const admin = await hub.completeSetup();
+    const device = await pairDevice(hub, admin);
+    const url = `/api/v1/radio/now-playing?url=${encodeURIComponent('https://stream.live.vc.bbcmedia.co.uk/bbc_6music')}`;
+    const response = await hub.app.inject({ method: 'GET', url, headers: { authorization: device.authorization } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ title: 'Song', programme: null, programmeSource: null });
+    expect(hub.fetch.calls.map((call) => call.url)).toEqual(['https://ess.api.bbci.co.uk/schedules?serviceId=bbc_6music']);
+  });
+
+  it('does not call the schedule API when its hostname resolves to a private address', async () => {
+    hub = await createTestHub({ deps: {
+      dnsLookup: async () => ['127.0.0.1'],
+      stationTitle: async () => ({ raw: 'Artist - Song', artist: 'Artist', title: 'Song', station: null, reason: null }),
+    } });
+    const admin = await hub.completeSetup();
+    const device = await pairDevice(hub, admin);
+    const url = `/api/v1/radio/now-playing?url=${encodeURIComponent('https://stream.live.vc.bbcmedia.co.uk/bbc_6music')}`;
+    const response = await hub.app.inject({ method: 'GET', url, headers: { authorization: device.authorization } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ title: 'Song', programme: null, programmeSource: null });
+    expect(hub.fetch.calls).toHaveLength(0);
+  });
+
+  it('uses the official episode title when the schedule has no programme brand', async () => {
+    hub = await createTestHub({ deps: { stationTitle: async () => ({ raw: null, artist: null, title: null, station: null, reason: 'No song title' }) } });
+    hub.fetch.on('ess.api.bbci.co.uk/schedules?serviceId=bbc_6music', () => ({ body: {
+      service: { id: 'bbc_6music' }, items: [{ service: { id: 'bbc_6music' }, brand: { title: '  ' },
+        episode: { title: 'Saturday Night Sessions' }, published_time: { start: '2026-01-01T00:00:00Z', end: '2026-01-01T01:00:00Z' } }],
+    } }));
+    const admin = await hub.completeSetup();
+    const device = await pairDevice(hub, admin);
+    const url = `/api/v1/radio/now-playing?url=${encodeURIComponent('https://stream.live.vc.bbcmedia.co.uk/bbc_6music')}`;
+    const response = await hub.app.inject({ method: 'GET', url, headers: { authorization: device.authorization } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ title: null, programme: 'Saturday Night Sessions', programmeSource: 'schedule' });
+  });
+
+  it('does not label a stale or mismatched schedule entry as the current programme', async () => {
+    hub = await createTestHub({ deps: { stationTitle: async () => ({ raw: null, artist: null, title: null, station: null, reason: 'No song title' }) } });
+    hub.fetch.on('ess.api.bbci.co.uk/schedules?serviceId=bbc_6music', () => ({ body: {
+      service: { id: 'bbc_6music' }, items: [
+        { service: { id: 'bbc_6music' }, brand: { title: 'Earlier' }, published_time: { start: '2025-12-31T22:00:00Z', end: '2025-12-31T23:00:00Z' } },
+        { service: { id: 'bbc_radio_one' }, brand: { title: 'Other station' }, published_time: { start: '2026-01-01T00:00:00Z', end: '2026-01-01T01:00:00Z' } },
+      ],
+    } }));
+    const admin = await hub.completeSetup();
+    const device = await pairDevice(hub, admin);
+    const url = `/api/v1/radio/now-playing?url=${encodeURIComponent('https://stream.live.vc.bbcmedia.co.uk/bbc_6music')}`;
+    const response = await hub.app.inject({ method: 'GET', url, headers: { authorization: device.authorization } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ title: null, programme: null, programmeSource: null });
+  });
+
   it('needs a paired device', async () => {
     hub = await createTestHub();
     await hub.completeSetup();

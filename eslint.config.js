@@ -33,6 +33,8 @@ export default tseslint.config(
       '**/playwright-report-local/**',
       '**/test-results-local/**',
       'docs/reference/**',
+      // Runtime Hub volume and PyInstaller scratch are user data, not source code.
+      'docker-container/data/**',
       // Build output that happens to be committed, so people can download one file and run it.
       // Its source is `local-helper/src`, which is linted; bundled esbuild output is not ours.
       'local-helper/now-playing-helper.mjs',

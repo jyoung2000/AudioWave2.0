@@ -8,7 +8,7 @@
  * The device credential is stored in IndexedDB, never in localStorage: it is a bearer secret, and
  * localStorage is readable by any script that manages to run on the page.
  */
-import { ReleaseMetadata } from '@now-playing/contracts';
+import { ReleaseMetadata, routes } from '@now-playing/contracts';
 import type { GroupPlaybackState, GroupView, HubIdentity, ProviderDescriptor, Queue, QueueCommand, SearchResponse, ShareLinkView, TrackRef } from '@now-playing/contracts';
 import { getSetting, putSetting, type PlayerDatabase } from './db.js';
 
@@ -33,6 +33,8 @@ export interface HubStatus {
   identity: HubIdentity | null;
   scopes: string[];
 }
+
+export type HubProviderStatus = ReturnType<typeof routes.providersList.response.parse>;
 
 const CREDENTIAL_KEY = 'hub.credential';
 
@@ -147,9 +149,12 @@ export class HubClient {
    * player carries its own reviewed table of what the platforms permit; this narrows it to what is
    * configured and reachable today.
    */
+  async providerStatus(): Promise<HubProviderStatus> {
+    return routes.providersList.response.parse(await this.request<unknown>('GET', '/api/v1/providers'));
+  }
+
   async providers(): Promise<ProviderDescriptor[]> {
-    const result = await this.request<{ items: ProviderDescriptor[] }>('GET', '/api/v1/providers');
-    return result.items;
+    return (await this.providerStatus()).items;
   }
 
   async search(query: string, scope = 'all'): Promise<SearchResponse> {

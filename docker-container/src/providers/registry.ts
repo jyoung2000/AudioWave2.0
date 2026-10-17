@@ -169,6 +169,10 @@ export class ProviderRegistry {
     if (cfg.applicationId) view.applicationId = cfg.applicationId;
     if (cfg.redirectUri) view.redirectUri = cfg.redirectUri;
     if (cfg.contactEmail) view.contactEmail = cfg.contactEmail;
+    if (id === 'external-tool') {
+      const selected = cfg.extra['preset']?.trim() ?? '';
+      view.downloaderPreset = cfg.extra['command']?.trim() ? 'custom' : selected === '' ? 'both' : selected === 'yt-dlp' || selected === 'spotdl' ? selected : 'unknown';
+    }
     if (row) view.updatedAt = row.updated_at;
     return view;
   }

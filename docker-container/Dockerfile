@@ -52,15 +52,14 @@ RUN --mount=type=cache,id=npm,target=/root/.npm \
 # yt-dlp for the external-tool provider, which is ready without setup and limited to allowlisted
 # hosts and requests that name a rights basis (docs/DOWNLOADS_AND_LEGAL.md). Fetched with
 # Node rather than curl so the runtime image needs no download tooling, verified against the
-# checksums published in the same release, and skipped without failing the build when there is no
-# network. The script explains why it is not pinned.
+# checksums published in the same release. The runtime-stage version smoke test below is mandatory:
+# if either release is unreachable or not runnable, the image build fails (never silently "ready").
 WORKDIR /repo/docker-container
 RUN node scripts/fetch-yt-dlp.mjs /repo/tools
 # spotDL for open.spotify.com links (owner decision 2026-10-04, design/decisions.md DEC-036), through
-# the hub's own verified installer: the release's published SHA-256, then a version check. Skipped
-# without failing the build when GitHub cannot be reached, like yt-dlp; a checksum mismatch, or a
-# verified build that cannot start here, fails it. spotDL's Linux build needs glibc 2.38, which is
-# why both stages are Debian trixie rather than bookworm.
+# the hub's own verified installer: the release's published SHA-256, then a version check. The
+# runtime smoke test makes an unavailable/non-runnable release a build error. spotDL's Linux build
+# needs glibc 2.38, which is why both stages are Debian trixie rather than bookworm.
 RUN pnpm exec tsx scripts/fetch-spotdl.ts /repo/tools
 
 # -------------------------------------------------------------- runtime stage
@@ -73,8 +72,8 @@ LABEL org.opencontainers.image.title="Now Playing Hub" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.source="https://github.com/jyoung2000/AudioWave2.0"
 
-# FFmpeg is optional at runtime: without it only byte-for-byte copies are possible, and the API
-# says so. It is included because converting a file the user owns is a normal thing to want.
+# FFmpeg is installed via apt so conversion, tagging and spotDL are usable out of the box.
+# Its version is smoke-tested below alongside both downloaders.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends ffmpeg ca-certificates tini && \
     rm -rf /var/lib/apt/lists/*
@@ -89,6 +88,15 @@ WORKDIR /app
 COPY --from=build /repo/docker-container/dist ./
 # Empty when the build could not reach the release, which the provider's own test() reports plainly.
 COPY --from=build /repo/tools/ /usr/local/bin/
+
+# A fetch that "succeeded" without a runnable binary is not a success: run each tool once before
+# the image is declared built. /tmp is a normal filesystem during build; at runtime the tool
+# environment points tools at a data-volume scratch because /tmp is small and noexec.
+RUN mkdir -p /opt/toolprobe \
+    && TMPDIR=/opt/toolprobe yt-dlp --version \
+    && TMPDIR=/opt/toolprobe spotdl --version \
+    && TMPDIR=/opt/toolprobe ffmpeg -version > /dev/null \
+    && rm -rf /opt/toolprobe
 
 # The `node` user ships with the base image; /data is created and owned before dropping to it.
 RUN mkdir -p /data && chown -R node:node /data /app

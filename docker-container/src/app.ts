@@ -139,8 +139,11 @@ export async function buildApp(deps: HubDeps): Promise<HubApp> {
   };
   // yt-dlp, FFmpeg and spotDL, found or fetched: downloads work without anyone setting anything up.
   const tools = new HubTools({
-    toolsDir: config.dataDir === ':memory:' ? null : join(config.dataDir, 'tools'),
-    log,
+      toolsDir: config.dataDir === ':memory:' ? null : join(config.dataDir, 'tools'),
+      log,
+      // Probes run in the same safe scratch environment downloads use: the PyInstaller binaries
+      // unpack into TMPDIR, and the container's /tmp is a small noexec tmpfs.
+      env: toolEnvironment(toolScratchDir(config.dataDir)),
     ...(deps.fetch ? { fetchImpl: deps.fetch } : {}),
     onInstalled: (id) => {
       // "There is no FFmpeg" was cached at the first question; it is no longer true.
@@ -271,7 +274,8 @@ export async function buildApp(deps: HubDeps): Promise<HubApp> {
     dbFile,
     repos,
     installKey,
-    sealer,
+        tools,
+        sealer,
     identity,
     logging,
     log,

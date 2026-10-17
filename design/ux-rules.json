@@ -495,19 +495,25 @@
       "id": "UX-SETUP-001",
       "group": "feedback",
       "title": "Downloaders set themselves up and say how far along they are",
-      "contract": "yt-dlp, spotDL and (on Windows) FFmpeg are set up without a prompt, in the background, into the app's own tools folder, and only after the file matches the SHA-256 its project published for that release. Each downloader row reads Setting up… with a named progress bar, Ready (adding \"Set up automatically\" when the app installed it), or Couldn’t set up: <reason> beside a Try Again button; the manual install advice appears only when the tool cannot be set up on this machine. Tools are set up one at a time, and one waiting its turn behind another also reads Setting up… — it is queued, not missing, so it shows no install advice and no badge. Only failed or unsupported tools count as missing — in the companion's Settings badge and on the player's Connections card, where a tool on its way reads \"setting up\". Where FFmpeg's absence explains an empty Tempo column, the Library says whether it is on its way or could not be set up.",
+      "contract": "yt-dlp, spotDL and (on Windows) FFmpeg are set up without a prompt, in the background, into the app's own tools folder, and only after the file matches the SHA-256 its project published for that release. Each downloader row reads Setting up… with a named progress bar, Ready (adding \"Set up automatically\" when the app installed it), or Couldn’t set up: <reason> beside a Try Again button; the manual install advice appears only when the tool cannot be set up on this machine. Tools are set up one at a time, and one waiting its turn behind another also reads Setting up… — it is queued, not missing, so it shows no install advice and no badge. Only failed or unsupported tools count as missing — in the companion's Settings badge and on the player's Connections card, where a tool on its way reads \"setting up\". Where FFmpeg's absence explains an empty Tempo column, the Library says whether it is on its way or could not be set up. The Hub image ships yt-dlp, spotDL and FFmpeg; its Providers details expose each tool’s verified readiness and allow separately enabling yt-dlp and spotDL without an API key, while a custom command remains untouched.",
       "example": "Settings ▸ Downloaders: “FFmpeg — Setting up… 42%” with a progress bar; “spotDL — Couldn’t set up: GitHub did not answer (503).” and Try Again. Music: “Setting up FFmpeg — tempos appear once it finishes.”",
       "authority": "adopted",
       "owners": [
         "local-helper/src/provision.ts",
         "local-helper/src/install.ts",
         "windows-companion/src/main/helper.ts",
+        "docker-container/src/web/views/Providers.tsx",
         "windows-companion/src/renderer/views/Settings.tsx",
         "windows-companion/src/renderer/views/Library.tsx",
         "windows-companion/src/renderer/App.tsx",
         "music-player/scripts/make-shell.py"
       ],
       "evidence": [
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/admin-forms.dom.test.tsx",
+          "name": "shows both hub downloaders and sends only the selected preset to the hub"
+        },
         {
           "type": "test",
           "path": "windows-companion/tests/dom/companion-shell.dom.test.tsx",
@@ -727,7 +733,7 @@
       "id": "UX-SAFE-002",
       "group": "safety",
       "title": "The bootstrap password must be replaced before anything else",
-      "contract": "admin/admin signs in once, into the same window: Overview, with the amber gate asking for a real password and the other five tabs locked with the reason. Every setup-gated route refuses until then, and the hub stays on loopback outside a container.",
+      "contract": "admin/admin signs in once, into the same window: Overview, with the amber gate asking for a real password and the other five tabs locked with the reason. Every setup-gated route refuses until then, and the hub stays on loopback outside a container. After setup, the signed-in admin can change the password again under System: current password required, two matching new entries, other admin sessions revoked and the current session rotated.",
       "authority": "adopted",
       "owners": ["docker-container/src/web/App.tsx", "docker-container/src/auth/service.ts"],
       "evidence": [
@@ -750,6 +756,16 @@
           "type": "test",
           "path": "docker-container/tests/dom/admin-shell.dom.test.tsx",
           "name": "explains what stays off until the password is changed"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/dom/admin-shell.dom.test.tsx",
+          "name": "lets a signed-in administrator change the password from System with current-password verification"
+        },
+        {
+          "type": "test",
+          "path": "docker-container/tests/integration/setup-and-pairing.test.ts",
+          "name": "allows a later change with the current password and rotates only admin sessions"
         }
       ]
     },
@@ -1646,7 +1662,7 @@
         {
           "type": "test",
           "path": "music-player/tests/e2e/np/prefs.spec.ts",
-          "name": "player preferences, the equalizer and group mode; the equalizer survives a reload"
+          "name": "player preferences, Solo-by-default group gating and the equalizer survive reload"
         },
         {
           "type": "test",

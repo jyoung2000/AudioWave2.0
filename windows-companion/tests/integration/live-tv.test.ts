@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { HELPER_ROUTES, HelperTvChannels, HelperTvGuide } from '@now-playing/contracts';
+import { HELPER_ROUTES, HelperTvChannels, HelperTvGuide, StationNowPlaying } from '@now-playing/contracts';
 import { startHelper, type Helper } from '@now-playing/local-helper';
 import { LiveTv, REFRESH_MS } from '../../src/main/live-tv/index.js';
 import { LinkError, checkLink, readLink, type ReadLinkOptions } from '../../src/main/live-tv/fetch.js';
@@ -372,6 +372,30 @@ describe('clearing the cache, and links from a backup', () => {
       const guideBody = HelperTvGuide.parse(await (await fetch(`${helper.origin}${HELPER_ROUTES.tvGuide}`, { headers: page })).json());
       expect(guideBody.guide.map((e) => e.tvgId)).toEqual(['One.Example', 'two.example']);
       expect((await fetch(`${helper.origin}${HELPER_ROUTES.tvChannels}`)).status).toBe(403);
+    } finally {
+      await helper?.close();
+    }
+  });
+
+  it('joins a playlist radio station to the current XMLTV programme through the helper without replacing its song', async () => {
+    clock.now = Date.now();
+    routes.set('/radio.m3u', { body: '#EXTM3U\n#EXTINF:-1 tvg-id="Radio.One",Community FM\nhttps://radio.example/live' });
+    routes.set('/radio.xml', { body: `<?xml version="1.0"?><tv><channel id="radio.one"><display-name>Community FM</display-name></channel><programme start="${stamp(clock.now - HOUR)}" stop="${stamp(clock.now + HOUR)}" channel="radio.one"><title>Live Community Hour</title></programme></tv>` });
+    const tv = liveTv();
+    await tv.add('m3u', `${base}/radio.m3u`);
+    await tv.add('epg', `${base}/radio.xml`);
+    let helper: Helper | null = null;
+    try {
+      helper = await startHelper({
+        port: 0, version: 'test', token: 'live-radio-helper-test-token',
+        workDir: join(root, 'radio-helper'), toolsDir: join(root, 'radio-helper', 'tools'), timeoutMs: 5000,
+        allowedHosts: [], allowedOrigins: [], loopbackPages: true, app: null, configured: {}, log: () => undefined,
+        tv: { channels: () => tv.channels(), guide: () => tv.guide() },
+        stationTitle: async () => ({ raw: 'Band - Song', artist: 'Band', title: 'Song', station: null, reason: null }),
+      });
+      const response = await fetch(`${helper.origin}${HELPER_ROUTES.radioNowPlaying}?url=${encodeURIComponent('https://radio.example/live')}`, { headers: { origin: 'http://127.0.0.1:4546' } });
+      expect(response.status).toBe(200);
+      expect(StationNowPlaying.parse(await response.json())).toMatchObject({ station: 'Community FM', title: 'Song', artist: 'Band', programme: 'Live Community Hour', programmeSource: 'schedule' });
     } finally {
       await helper?.close();
     }

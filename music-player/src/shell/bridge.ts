@@ -26,6 +26,7 @@ import { workletDataUrl } from '../lib/build-flags.js';
 import { openPlayerDb, getSetting, putSetting, type PlayerDatabase, type StoredRoot } from '../lib/db.js';
 import { indexPickedFiles, resolveFile, scanRoot, supportsDirectoryHandles } from '../lib/library.js';
 import { PlaybackEngine, type PlaybackState } from '../lib/playback.js';
+import { installHubFeatures } from './hub-features.js';
 import { HubClient, type HubCredential, type HubStatus } from '../lib/hub-client.js';
 import { normalizeCrossfade, crossfadeMsBetween } from '../lib/crossfade.js';
 import { toTrackRef } from '../state/store.js';
@@ -684,6 +685,7 @@ async function boot(): Promise<void> {
   note(`bridge ready: ${window.LIBRARY.length} tracks, hub ${hub.getStatus().connected ? 'paired' : 'not paired'}`);
   // Now the shell may run: everything it reads at boot is in place.
   window.__npStart?.();
+  installHubFeatures();
   loadSearch();
 }
 

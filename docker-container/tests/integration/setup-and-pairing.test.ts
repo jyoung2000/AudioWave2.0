@@ -76,6 +76,31 @@ describe('first run', () => {
     expect(retry.statusCode).toBe(401);
   });
 
+  it('allows a later change with the current password and rotates only admin sessions', async () => {
+    const old = await hub.completeSetup();
+    const oldPassword = 'a-real-password-1234';
+    const newPassword = 'another-strong-password-5678';
+    const wrong = await hub.app.inject({
+      method: 'POST', url: '/api/v1/auth/change-password',
+      headers: { cookie: old.cookie, 'x-csrf-token': old.csrfToken },
+      payload: { currentPassword: 'wrong-current', newPassword },
+    });
+    expect(wrong.statusCode).toBe(403);
+    const changed = await hub.app.inject({
+      method: 'POST', url: '/api/v1/auth/change-password',
+      headers: { cookie: old.cookie, 'x-csrf-token': old.csrfToken },
+      payload: { currentPassword: oldPassword, newPassword },
+    });
+    expect(changed.statusCode).toBe(200);
+    const cookieHeader = changed.headers['set-cookie'];
+    const cookie = (Array.isArray(cookieHeader) ? cookieHeader[0] : String(cookieHeader))?.split(';')[0] ?? '';
+    expect(cookie).not.toBe(old.cookie);
+    expect((await hub.app.inject({ method: 'GET', url: '/api/v1/auth/session', headers: { cookie: cookie } })).json()).toMatchObject({ authenticated: true, setupComplete: true, mustChangePassword: false });
+    expect((await hub.app.inject({ method: 'GET', url: '/api/v1/devices', headers: { cookie: old.cookie } })).statusCode).toBe(401);
+    expect((await hub.app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { username: 'admin', password: oldPassword } })).statusCode).toBe(401);
+    expect((await hub.app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { username: 'admin', password: newPassword } })).statusCode).toBe(200);
+  });
+
   it('rotates the session on password change so the old cookie stops working', async () => {
     const first = await hub.loginAsAdmin();
     await hub.app.inject({

@@ -4,7 +4,7 @@
  * row that came from a bare link becomes the catalog song the hub's catalog/download reads.
  */
 import { describe, expect, it } from 'vitest';
-import { sniffExtension, trackOf } from '../../src/shell/search/visit.js';
+import { boundedAudio, sniffExtension, trackOf } from '../../src/shell/search/visit.js';
 
 const bytes = (...parts: Array<string | number[]>): Uint8Array => {
   const out: number[] = [];
@@ -39,5 +39,25 @@ describe('a link row for the hub', () => {
     expect(trackOf({ id: 'x', title: 'A', artist: '', url: 'https://youtu.be/abc' })!.sources[0]!.platform).toBe('youtube');
     expect(trackOf({ id: 'x', title: 'A', artist: '', url: 'https://example.com/song.mp3' })).toBeNull();
     expect(trackOf({ id: 'x', title: 'A', artist: '', url: 'javascript:alert(1)' })).toBeNull();
+  });
+});
+
+
+describe('bounded Hub audio transfers', () => {
+  it('rejects oversized advertised files before reading', async () => {
+    const response = new Response('audio', { headers: { 'content-length': '100' } });
+    await expect(boundedAudio(response, 8)).rejects.toThrow('too large');
+  });
+  it('counts streaming bytes when Content-Length is absent', async () => {
+    const response = new Response(new ReadableStream({ start(c) { c.enqueue(new Uint8Array(5)); c.enqueue(new Uint8Array(5)); c.close(); } }));
+    await expect(boundedAudio(response, 8)).rejects.toThrow('too large');
+  });
+  it('rejects an empty stream', async () => {
+    await expect(boundedAudio(new Response(''), 8)).rejects.toThrow('no audio bytes');
+  });
+  it('retains bounded bytes for verification before import', async () => {
+    const blob = await boundedAudio(new Response('audio', { headers: { 'content-type': 'audio/mpeg' } }), 8);
+    expect(blob.size).toBe(5);
+    expect(blob.type).toBe('audio/mpeg');
   });
 });

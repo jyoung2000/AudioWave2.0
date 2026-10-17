@@ -88,7 +88,8 @@ test.describe('desktop', () => {
     const music = (await passed(page))[0]!;
     expect(music[1]!.includes('C:\\Users\\jalon\\Music') && music[2] === 'Companion app' && music[3] === 'Ready', 'a folder shows up as passed to the companion, ready: ' + JSON.stringify(music)).toBe(true);
 
-    // the container
+    // A local browser now defaults to the loopback Hub; clear it to test the empty-address error.
+    await page.fill('#cfgHub', '');
     await page.click('#hubTest'); await page.waitForTimeout(200);
     await expect(page.locator('#hubMsg'), 'the container needs an address to test').toContainText(/address first/);
     await page.fill('#cfgHub', '192.168.1.99:4546'); await page.click('#hubTest');

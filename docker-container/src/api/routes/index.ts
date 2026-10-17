@@ -8,6 +8,7 @@ import { registerMediaRoutes } from './media.js';
 import { registerPairingRoutes } from './pairing.js';
 import { registerProfileRoutes } from './profiles.js';
 import { registerProviderRoutes } from './providers.js';
+import { registerToolStatusRoutes } from './tool-status.js';
 import { registerShareRoutes } from './shares.js';
 import { registerSyncRoutes } from './sync.js';
 import { registerSystemRoutes } from './system.js';
@@ -21,6 +22,7 @@ export function registerAllRoutes(app: FastifyInstance, ctx: HubContext): void {
   registerSystemRoutes(app, ctx);
   registerPairingRoutes(app, ctx);
   registerProviderRoutes(app, ctx);
+  registerToolStatusRoutes(app, ctx);
   registerCatalogRoutes(app, ctx);
   registerPlaylistRoutes(app, ctx);
   registerGroupRoutes(app, ctx);

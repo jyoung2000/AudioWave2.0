@@ -85,9 +85,9 @@ export function installVisit(tools: () => VisitTools | undefined): ShellVisit {
     const scopes = (acct as { scopes?: unknown }).scopes;
     const has = (s: string): boolean => Array.isArray(scopes) && scopes.includes(s);
     if (!has('downloads:request'))
-      return { ok: false, why: `${label} has not allowed this device to ask for downloads` };
+      return { ok: false, why: `${label} has not allowed this device to ask for downloads (downloads:request)` };
     if (!has('transfers:receive'))
-      return { ok: false, why: `${label} has not allowed this device to receive files` };
+      return { ok: false, why: `${label} has not allowed this device to receive files (transfers:receive)` };
     return { ok: true, acct, label };
   }
 
@@ -117,6 +117,7 @@ export function installVisit(tools: () => VisitTools | undefined): ShellVisit {
         headers: { ...auth, 'content-type': 'application/json', accept: 'application/json' },
         body: JSON.stringify({ track, authorization: { basis, acknowledged: true }, target: { destination: 'player', format: 'original' } }),
         signal: AbortSignal.timeout(20_000),
+        redirect: 'error',
       });
     } catch {
       return say({ stage: 'failed', percent: null, words: `${label} did not answer. Check that it is on, and on this network.`, chosen: null });
@@ -137,7 +138,9 @@ export function installVisit(tools: () => VisitTools | undefined): ShellVisit {
       await new Promise((r) => setTimeout(r, POLL_MS));
       let job: { id: string; state: string; error?: string | null; checksumSha256?: string | null; progress?: { percent?: number | null } } | undefined;
       try {
-        const list = await fetch(`${base}/api/v1/downloads`, { headers: { ...auth, accept: 'application/json' }, signal: AbortSignal.timeout(10_000) });
+        const list = await fetch(`${base}/api/v1/downloads`, { headers: { ...auth, accept: 'application/json' }, signal: AbortSignal.timeout(10_000), redirect: 'error' });
+        if (list.status === 401 || list.status === 403)
+          return say({ stage: 'failed', percent: null, words: list.status === 403 ? `${label} no longer allows downloads:request for this device.` : `${label} no longer accepts this device credential.`, chosen });
         if (!list.ok) continue;
         job = ((await list.json()) as { items?: Array<NonNullable<typeof job>> }).items?.find((j) => j.id === answer.job.id);
       } catch {
@@ -148,6 +151,8 @@ export function installVisit(tools: () => VisitTools | undefined): ShellVisit {
         return say({ stage: 'failed', percent: null, words: `${label} could not fetch it: ${job.error ?? `the job was ${job.state}`}.`, chosen });
       const pct = typeof job.progress?.percent === 'number' ? Math.round(job.progress.percent) : null;
       if (job.state === 'completed' && job.checksumSha256) {
+        if (!/^[a-f0-9]{64}$/.test(job.checksumSha256))
+          return say({ stage: 'failed', percent: null, words: `${label} returned an invalid file identity. Nothing was requested.`, chosen });
         hash = job.checksumSha256;
         break;
       }
@@ -158,11 +163,13 @@ export function installVisit(tools: () => VisitTools | undefined): ShellVisit {
     say({ stage: 'saving', percent: 100, words: 'Saving to this device…', chosen });
     let blob: Blob;
     try {
-      const file = await fetch(`${base}/api/v1/files/${hash}`, { headers: auth, signal: AbortSignal.timeout(120_000) });
+      const file = await fetch(`${base}/api/v1/files/${hash}`, { headers: auth, signal: AbortSignal.timeout(120_000), redirect: 'error' });
       if (!file.ok) return say({ stage: 'failed', percent: null, words: `${label} fetched it, but would not send it to this device: ${await problem(file)}`, chosen });
-      blob = await file.blob();
-    } catch {
-      return say({ stage: 'failed', percent: null, words: `${label} fetched it, but the file did not reach this device.`, chosen });
+      blob = await boundedAudio(file);
+      const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', await blob.arrayBuffer())), (b) => b.toString(16).padStart(2, '0')).join('');
+      if (digest !== hash) return say({ stage: 'failed', percent: null, words: `${label} sent a file whose checksum did not match. Nothing was saved.`, chosen });
+    } catch (err) {
+      return say({ stage: 'failed', percent: null, words: err instanceof AudioTransferError ? err.message : `${label} fetched it, but the file did not reach this device.`, chosen });
     }
     const ext = sniffExtension(new Uint8Array(await blob.slice(0, 40).arrayBuffer()));
     if (!ext) return say({ stage: 'failed', percent: null, words: `${label} sent a file this player cannot read as audio.`, chosen });
@@ -272,4 +279,33 @@ async function problem(res: Response): Promise<string> {
     /* nothing readable */
   }
   return `it answered ${res.status}.`;
+}
+
+/** Hub transfers are byte-bounded before indexing, even when Content-Length is omitted. */
+const MAX_HUB_AUDIO_BYTES = 256 * 1024 * 1024;
+class AudioTransferError extends Error {}
+export async function boundedAudio(response: Response, limit = MAX_HUB_AUDIO_BYTES): Promise<Blob> {
+  const declared = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > limit) {
+    await response.body?.cancel();
+    throw new AudioTransferError('This Hub file is too large to keep on this device (256 MiB maximum).');
+  }
+  const reader = response.body?.getReader();
+  if (!reader) throw new AudioTransferError('The Hub sent no audio bytes.');
+  const parts: Uint8Array<ArrayBuffer>[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      size += chunk.value.byteLength;
+      if (size > limit) {
+        await reader.cancel();
+        throw new AudioTransferError('This Hub file is too large to keep on this device (256 MiB maximum).');
+      }
+      parts.push(new Uint8Array(chunk.value));
+    }
+  } finally { reader.releaseLock(); }
+  if (!size) throw new AudioTransferError('The Hub sent no audio bytes.');
+  return new Blob(parts, { type: response.headers.get('content-type') || 'application/octet-stream' });
 }

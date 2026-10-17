@@ -4662,9 +4662,82 @@ replace_between('    function visit(sg, target, previewOnly) {', '    /* a previ
 replace('  artwork: () => ({ url: displayedArtworkUrl, loaded: displayedArtworkLoaded, caseUsesArtwork: Boolean(displayedArtworkUrl && liveTextures && art.material.map === liveTextures[0]), discUsesArtwork: Boolean(displayedArtworkUrl && liveTextures && labelMat.map === liveTextures[2]) }),\n', "  artwork: () => {\n    const pixel = texture => {\n      const canvas = texture && texture.image;\n      if (!canvas || !canvas.getContext) return null;\n      try { return Array.from(canvas.getContext('2d').getImageData(Math.floor(canvas.width / 2), Math.floor(canvas.height / 2), 1, 1).data); }\n      catch { return null; }\n    };\n    return { url: displayedArtworkUrl, loaded: displayedArtworkLoaded, caseUsesArtwork: Boolean(displayedArtworkUrl && liveTextures && art.material.map === liveTextures[0]), discUsesArtwork: Boolean(displayedArtworkUrl && liveTextures && labelMat.map === liveTextures[2]), caseCenter: pixel(liveTextures && liveTextures[0]), discCenter: pixel(liveTextures && liveTextures[2]) };\n  },\n")
 
 
+# One-time code must not remain in a hidden field after it has been submitted.
+replace("      var base = conn.hub.base, btn = this; btn.disabled = true; msg.textContent = 'Asking ' + base + '…';",
+        "      var base = conn.hub.base, btn = this; btn.disabled = true; msg.textContent = 'Asking ' + base + '…'; document.getElementById('hubCode').value = '';")
+
+# ---- the Hub address on this PC is a real local default, not a misleading LAN sample -------
+# The browser running at localhost can reach the loopback-only Docker default without opening a
+# LAN port. A saved remote address is never overwritten, and another device gets no local default.
+replace('id="cfgHub" placeholder="http://192.168.1.20:4546"',
+        'id="cfgHub" placeholder="http://127.0.0.1:4546"')
+replace("document.getElementById('cfgHub').value = cfg.hub || '';",
+        "document.getElementById('cfgHub').value = cfg.hub || (/^(localhost|127\\.0\\.0\\.1)$/.test(location.hostname) ? 'http://127.0.0.1:4546' : '');")
+
+# ---- authenticated Hub tools stay distinct from Companion (UX-SETUP-001, NP-FIND-012) ----------------
+replace('            <dl class="conn__facts" id="connHubFacts" hidden></dl>',
+        '            <dl class="conn__facts" id="connHubFacts" hidden></dl>\n'
+        '            <h4 class="conn__sub">Hub tools — authenticated</h4>\n'
+        '            <p class="prefs__hint" id="hubToolMsg" role="status">Pair a Hub to check its tools. Companion status is separate.</p>\n'
+        '            <button class="prefs__btn" type="button" id="hubToolsRefresh">Refresh Hub Tools</button>\n'
+        '            <dl class="conn__facts" id="hubToolFacts" hidden></dl>')
+replace('          <button class="srch__filter" type="button" id="srchFilterBtn"',
+        '          <button class="srch__filter" type="button" id="srchHubMusicSearch" aria-controls="srchHubMetadata" title="Search Hub MusicSearch for metadata only — no audio or downloads">Hub Metadata</button>\n'
+        '          <button class="srch__filter" type="button" id="srchFilterBtn"')
+replace('        <div class="srch__people" id="srchPeople" hidden></div>',
+        '        <section class="srch__people" id="srchHubMetadata" aria-label="Hub MusicSearch metadata only" aria-live="polite" hidden></section>\n'
+        '        <div class="srch__people" id="srchPeople" hidden></div>')
+replace('function hubSave() { return window.kv.set(HUB_KEY, hubAcct); }',
+        "function hubSave() { return Promise.resolve(window.kv.set(HUB_KEY, hubAcct)).then(function () { document.dispatchEvent(new Event('hub:changed')); }); }")
+replace('hubAcct = null; myProfile = null; setMyAvatar(null); window.kv.set(HUB_KEY, null);',
+        "hubAcct = null; myProfile = null; setMyAvatar(null); Promise.resolve(window.kv.set(HUB_KEY, null)).then(function () { document.dispatchEvent(new Event('hub:changed')); });")
+
+# ---- Hub radio directory parity: paired Hub first, public directory when unusable ----------
+replace('    function radioApi(params) {\n      params.hidebroken',
+        '    function radioApi(params) {\n'
+        '      var viaHub = window.NP_HUB_RADIO ? window.NP_HUB_RADIO.search(Object.assign({}, params), HTTPS_PAGE) : null;\n'
+        '      if (!viaHub) return radioDirect(params);\n'
+        '      return viaHub.then(function (rows) { return rows ? rows : radioDirect(params); }, function () { return radioDirect(params); });\n'
+        '    }\n'
+        '    function radioDirect(params) {\n      params.hidebroken')
+
+# ---- radio: a scheduled programme is not an ICY song; display both separately ----------------
+replace("        var t = d && d.title ? { title: String(d.title), artist: d.artist ? String(d.artist) : '' } : null;",
+        "        var p = d && d.programme && d.programmeSource === 'schedule' ? String(d.programme) : '';\n"
+        "        var t = d && d.title ? { title: String(d.title), artist: d.artist ? String(d.artist) : '', programme: p } :\n"
+        "                p ? { title: p, artist: '', about: true, programme: p } : null;")
+replace("        return d && d.title ? d : localIcyAsk(url);",
+        "        return localIcyAsk(url).catch(function () { return null; }).then(function (primary) {\n"
+        "          if (!d) return primary;\n"
+        "          return { title: (primary && primary.title) || d.title || null,\n"
+        "                   artist: (primary && primary.artist) || d.artist || null,\n"
+        "                   programme: (primary && primary.programme) || d.programme || null,\n"
+        "                   programmeSource: (primary && primary.programmeSource) || d.programmeSource || null };\n"
+        "        });")
+replace("        if (!nowTrack || nowTrack.title !== t.title || nowTrack.artist !== t.artist) {",
+        "        if (!nowTrack || nowTrack.title !== t.title || nowTrack.artist !== t.artist || nowTrack.programme !== t.programme) {")
+replace("          document.dispatchEvent(new CustomEvent('radio:track',\n"
+        "            { detail: { id: mine, track: t } }));",
+        "          document.dispatchEvent(new CustomEvent(t.about ? 'radio:clear-track' : 'radio:track',\n"
+        "            { detail: { id: mine, track: t.about ? null : t } }));")
+replace("    function stationWhere(st) {",
+        "    document.addEventListener('radio:clear-track', function (e) {\n"
+        "      if (!e.detail || !e.detail.id) return;\n"
+        "      delete trackByStation[e.detail.id];\n"
+        "      if (radioNow && radioNow.id === e.detail.id) paintMetaRow(radioNow);\n"
+        "    });\n\n"
+        "    function stationWhere(st) {")
+replace("            album: station.name,\n            where: place,",
+        "            album: station.name,\n"
+        "            where: nowTrack.programme ? 'Scheduled programme: ' + nowTrack.programme + (place ? ' · ' + place : '') : place,")
+replace("          album: place,\n          where: '',",
+        "          album: place,\n          where: nowTrack && nowTrack.about ? 'Scheduled programme' : '',")
+
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):
     assert bad not in text, f'left behind: {bad}'
 
+# The source video script has two whitespace-only spacer lines; keep the generated file diff-clean.
+text = text.replace('  \n  \n}\nnew ResizeObserver(snap)', '\n\n}\nnew ResizeObserver(snap)')
 DST.write_text(text, encoding='utf-8')
 print(f'{DST.relative_to(ROOT)}: {edits} edits, {len(text.splitlines())} lines, {len(text.encode("utf-8")) // 1024} KB')

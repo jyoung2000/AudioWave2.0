@@ -277,6 +277,8 @@ export default {
     await page.goto(`${origin}/`);
     await until(() => Boolean(window.NP_READY), undefined, { what: 'the bridge' });
     await evaluate(() => window.NP_READY);
+    // The mockup fixture is a local Companion; set the address explicitly in this isolated browser.
+    await page.evaluate((base) => { window.COMPANION = base; }, HELPER);
     const added = await evaluate(addSongs, SEED);
     if (added !== SEED.length) throw new Error(`player: the shell indexed ${added} of ${SEED.length} songs`);
 

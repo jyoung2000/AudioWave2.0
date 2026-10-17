@@ -31,7 +31,7 @@ import { SearchView } from './views/Search.js';
 import { StreamingView } from './views/Streaming.js';
 import { TransfersView } from './views/Transfers.js';
 import { PRODUCT_NAME } from '../shared/identity.js';
-import type { AwspStatus, HelperStatus, HubConnection, Preferences, TvLinks } from '../shared/ipc.js';
+import type { AwspStatus, HelperStatus, HubConnection, TvLinks } from '../shared/ipc.js';
 
 /** The sections. Each is a screen in design/coverage.json; the tab it lives in is below. */
 export type ViewId = 'folders' | 'library' | 'playlists' | 'search' | 'live-tv' | 'streaming' | 'hub' | 'transfers' | 'settings' | 'backup' | 'about';

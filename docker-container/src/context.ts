@@ -38,6 +38,7 @@ import type { ProfileService } from './profiles/service.js';
 import type { ReleaseService } from './releases/service.js';
 import type { JobScheduler } from './jobs/scheduler.js';
 import type { DiscordService } from './discord/service-interface.js';
+import type { HubTools } from './media/tools.js';
 import type { AccountsService } from './providers/accounts.js';
 import type { RecommendationService } from './providers/recommendations.js';
 import type { PlatformSyncService } from './providers/platform-sync.js';
@@ -109,6 +110,8 @@ export interface HubContext {
   releases: ReleaseService;
   jobs: JobScheduler;
   discord: DiscordService;
+  /** The hub's own yt-dlp / FFmpeg / spotDL: located, probed and set up. */
+  tools: HubTools;
 }
 
 export function nowIso(ctx: Pick<HubContext, 'clock'>): string {

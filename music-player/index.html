@@ -7215,6 +7215,7 @@ window.AW.startStats = function () {
         <div class="srch__head">
           <button class="srch__back" type="button" id="srchBack" hidden aria-label="Back">&#8249; Back</button>
           <p class="srch__count" id="srchCount"></p>
+          <button class="srch__filter" type="button" id="srchHubMusicSearch" aria-controls="srchHubMetadata" title="Search Hub MusicSearch for metadata only — no audio or downloads">Hub Metadata</button>
           <button class="srch__filter" type="button" id="srchFilterBtn" aria-haspopup="dialog" aria-controls="srchFilter">Filter</button>
           <button class="srch__clear" type="button" id="srchClear">Clear</button>
         </div>
@@ -7226,6 +7227,7 @@ window.AW.startStats = function () {
           <button class="srch__btn srch__advgo" type="submit">Search</button>
         </form>
         <p class="srch__status" id="srchStatus" hidden></p>
+        <section class="srch__people" id="srchHubMetadata" aria-label="Hub MusicSearch metadata only" aria-live="polite" hidden></section>
         <div class="srch__people" id="srchPeople" hidden></div>
         <!-- One type per page (NP-FIND-004): which type to list, and a field that searches that type alone. -->
         <div class="srch__type" id="srchType" hidden>
@@ -8061,7 +8063,7 @@ window.AW.startStats = function () {
             <p class="conn__what">The Airwave hub on your server. Keeps the shared library, the channel playlists and guide, and group listening. Its port is 4546 unless you changed it.</p>
             <div class="prefs__row">
               <label for="cfgHub">Address</label>
-              <input class="prefs__field" type="text" id="cfgHub" placeholder="http://192.168.1.20:4546" spellcheck="false">
+              <input class="prefs__field" type="text" id="cfgHub" placeholder="http://127.0.0.1:4546" spellcheck="false">
             </div>
             <div class="prefs__row">
               <span class="prefs__label">&nbsp;</span>
@@ -8071,6 +8073,10 @@ window.AW.startStats = function () {
               </div>
             </div>
             <dl class="conn__facts" id="connHubFacts" hidden></dl>
+            <h4 class="conn__sub">Hub tools — authenticated</h4>
+            <p class="prefs__hint" id="hubToolMsg" role="status">Pair a Hub to check its tools. Companion status is separate.</p>
+            <button class="prefs__btn" type="button" id="hubToolsRefresh">Refresh Hub Tools</button>
+            <dl class="conn__facts" id="hubToolFacts" hidden></dl>
             <div class="pf__pair" id="hubPair" hidden>
               <div class="prefs__row">
                 <label for="hubCode">Pairing code</label>
@@ -11261,6 +11267,12 @@ window.AW.startStats = function () {
       if (st) paintMetaRow(st);
     });
 
+    document.addEventListener('radio:clear-track', function (e) {
+      if (!e.detail || !e.detail.id) return;
+      delete trackByStation[e.detail.id];
+      if (radioNow && radioNow.id === e.detail.id) paintMetaRow(radioNow);
+    });
+
     function stationWhere(st) {
       return st.where || tidyPlace(st.state) || tidyPlace(shortPlace(st.country)) || '—';
     }
@@ -11270,6 +11282,11 @@ window.AW.startStats = function () {
        deadline: without one a hung host holds the whole chain open. */
     var radioHostAt = 0;
     function radioApi(params) {
+      var viaHub = window.NP_HUB_RADIO ? window.NP_HUB_RADIO.search(Object.assign({}, params), HTTPS_PAGE) : null;
+      if (!viaHub) return radioDirect(params);
+      return viaHub.then(function (rows) { return rows ? rows : radioDirect(params); }, function () { return radioDirect(params); });
+    }
+    function radioDirect(params) {
       params.hidebroken = 'true';
       params.limit = params.limit || '60';
       if (HTTPS_PAGE) params.is_https = 'true';
@@ -15581,7 +15598,7 @@ window.AW.startStats = function () {
         document.getElementById(SRC_FIELDS[k]).value = cfg.sources[k] || '';
       });
       document.getElementById('cfgCompanion').value = cfg.companion || '';
-      document.getElementById('cfgHub').value = cfg.hub || '';
+      document.getElementById('cfgHub').value = cfg.hub || (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? 'http://127.0.0.1:4546' : '');
       srcNote();
       if (typeof paintPassed === 'function') paintPassed();
     }
@@ -16225,7 +16242,7 @@ window.AW.startStats = function () {
         });
     }
     function hubCall(method, path, body, opts) { opts = opts || {}; opts.auth = true; return hubRaw(method, hubAcct.base, path, body, opts); }
-    function hubSave() { return window.kv.set(HUB_KEY, hubAcct); }
+    function hubSave() { return Promise.resolve(window.kv.set(HUB_KEY, hubAcct)).then(function () { document.dispatchEvent(new Event('hub:changed')); }); }
 
     /* ---- pairing ---- */
     function hexId(n) { var a = new Uint8Array(n); crypto.getRandomValues(a); return [].map.call(a, function (b) { return ('0' + b.toString(16)).slice(-2); }).join(''); }
@@ -16244,7 +16261,7 @@ window.AW.startStats = function () {
       var msg = document.getElementById('hubPairMsg'), code = document.getElementById('hubCode').value.replace(/\s+/g, '');
       if (!conn.hub) { msg.textContent = 'Test the container first.'; return; }
       if (code.length < 8) { msg.textContent = 'The code is the 8 or more characters shown in the container’s Devices tab.'; return; }
-      var base = conn.hub.base, btn = this; btn.disabled = true; msg.textContent = 'Asking ' + base + '…';
+      var base = conn.hub.base, btn = this; btn.disabled = true; msg.textContent = 'Asking ' + base + '…'; document.getElementById('hubCode').value = '';
       var pubKey = hexId(32);
       hubRaw('POST', base, '/pairing/claim', { code: code, deviceName: 'Now Playing — ' + (navigator.platform || 'browser'), deviceKind: 'player',
         publicKey: pubKey, appVersion: '43', protocolVersion: 1, platform: 'web' }).then(function (r) {
@@ -16276,7 +16293,7 @@ window.AW.startStats = function () {
       });
     });
     document.getElementById('hubUnpair').addEventListener('click', function () {
-      hubAcct = null; myProfile = null; setMyAvatar(null); window.kv.set(HUB_KEY, null);
+      hubAcct = null; myProfile = null; setMyAvatar(null); Promise.resolve(window.kv.set(HUB_KEY, null)).then(function () { document.dispatchEvent(new Event('hub:changed')); });
       paintHubPair(); paintProfileTab();
       document.getElementById('hubPairMsg').textContent = 'Unpaired. The container still lists this player until it’s revoked there.';
       if (paneShown === 'profile') showPane('src');
@@ -17761,7 +17778,13 @@ window.AW.startStats = function () {
           return s && s.paired ? awsp.companion('radio.nowPlaying', { url: url }) : null;
         });
       }).catch(function () { return null; }).then(function (d) {
-        return d && d.title ? d : localIcyAsk(url);
+        return localIcyAsk(url).catch(function () { return null; }).then(function (primary) {
+          if (!d) return primary;
+          return { title: (primary && primary.title) || d.title || null,
+                   artist: (primary && primary.artist) || d.artist || null,
+                   programme: (primary && primary.programme) || d.programme || null,
+                   programmeSource: (primary && primary.programmeSource) || d.programmeSource || null };
+        });
       });
     };
     function icyMeta(url) {
@@ -17769,7 +17792,9 @@ window.AW.startStats = function () {
       if (c && c.pending) return c.pending;
       if (c && now - c.at < 20000) return Promise.resolve(c.val);
       var pr = icyAsk(url).then(function (d) {
-        var t = d && d.title ? { title: String(d.title), artist: d.artist ? String(d.artist) : '' } : null;
+        var p = d && d.programme && d.programmeSource === 'schedule' ? String(d.programme) : '';
+        var t = d && d.title ? { title: String(d.title), artist: d.artist ? String(d.artist) : '', programme: p } :
+                p ? { title: p, artist: '', about: true, programme: p } : null;
         metaCache[key] = { at: Date.now(), val: t };
         return t;
       }, function () {
@@ -17814,11 +17839,11 @@ window.AW.startStats = function () {
       delete metaCache['icy:' + url];
       window.radioMeta(url, true).then(function (t) {
         if (!station || station.id !== mine || !t) return;  // tuned away meanwhile
-        if (!nowTrack || nowTrack.title !== t.title || nowTrack.artist !== t.artist) {
+        if (!nowTrack || nowTrack.title !== t.title || nowTrack.artist !== t.artist || nowTrack.programme !== t.programme) {
           nowTrack = t;
           applyMode(mode);
-          document.dispatchEvent(new CustomEvent('radio:track',
-            { detail: { id: mine, track: t } }));
+          document.dispatchEvent(new CustomEvent(t.about ? 'radio:clear-track' : 'radio:track',
+            { detail: { id: mine, track: t.about ? null : t } }));
         }
       });
     }
@@ -17865,14 +17890,14 @@ window.AW.startStats = function () {
             title: nowTrack.title,
             artist: nowTrack.artist || station.name,
             album: station.name,
-            where: place,
+            where: nowTrack.programme ? 'Scheduled programme: ' + nowTrack.programme + (place ? ' · ' + place : '') : place,
           };
         }
         return {
           title: nowTrack ? nowTrack.title : stationFormat(station),
           artist: station.name,
           album: place,
-          where: '',
+          where: nowTrack && nowTrack.about ? 'Scheduled programme' : '',
         };
       }
       return chosen[mode] || album();
@@ -20552,8 +20577,8 @@ function snap(){
   if(player.classList.contains('fs')){screen.style.height='';return}
   const w=player.getBoundingClientRect().width;
   screen.style.height=Math.round(w*9/16)+'px';
-  
-  
+
+
 }
 new ResizeObserver(snap).observe(page);window.addEventListener('resize',snap);document.addEventListener('fullscreenchange',snap);
 
