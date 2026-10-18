@@ -520,6 +520,8 @@ export interface ShellTools {
   hasSaved(): Promise<boolean>;
   /** Restore the saved helper token into the masked Settings field. */
   savedToken(): Promise<string | null>;
+  /** Restore only the validated loopback origin, even while the helper is offline. */
+  savedOrigin(): Promise<string | null>;
   forgetSaved(): Promise<boolean>;
   /**
    * Fetch a link through the helper and index what it saved. `basis` is the person's statement of
@@ -598,6 +600,10 @@ function installTools(db: PlayerDatabase): ShellTools {
     async savedToken() {
       const saved = await getSetting<SavedHelper | null>(db, 'helper.saved', null);
       return saved && loopbackHelperOrigin(saved.origin) === saved.origin && saved.token.trim() ? saved.token : null;
+    },
+    async savedOrigin() {
+      const saved = await getSetting<SavedHelper | null>(db, 'helper.saved', null);
+      return saved && saved.token.trim() ? loopbackHelperOrigin(saved.origin) : null;
     },
     async forgetSaved() {
       const saved = await getSetting<SavedHelper | null>(db, 'helper.saved', null);

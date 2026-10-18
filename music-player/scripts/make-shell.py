@@ -614,7 +614,16 @@ replace("    document.getElementById('cfgConnect').addEventListener('click', tes
         "    function forgetCompanionToken() { var button = document.getElementById('cfgForgetToken'), savedNote = document.getElementById('cfgTokenSaved'), tokenField = document.getElementById('cfgCompanionToken'), msg = document.getElementById('cfgConnMsg'), tools = window.NP_TOOLS; if (!tools) return; button.disabled = true; tools.forgetSaved().then(function (removed) { if (removed && tokenField) tokenField.value = ''; if (removed && savedNote) savedNote.hidden = true; return tools.detect().then(function (current) { button.disabled = false; if (current && current.kind === 'helper' && current.origin) showApp(current.origin, current.health); else { conn.app = null; connLight('connAppDot', 'off'); connFacts('connAppFacts', []); msg.textContent = removed ? 'Saved token forgotten.' : 'No saved token to forget.'; } refreshCompanionTokenButton(); paintPassed(); }); }).catch(function () { button.disabled = false; msg.textContent = 'The saved token could not be removed.'; }); }\n"
         "    document.getElementById('cfgConnect').addEventListener('click', testApp);\n"
         "    document.getElementById('cfgForgetToken').addEventListener('click', forgetCompanionToken);\n"
-        "    refreshCompanionTokenButton().then(function (saved) { if (saved || document.querySelector('meta[name=\"np-helper-token\"]')) testApp(); });")
+        "    refreshCompanionTokenButton().then(function (saved) {\n"
+        "      if (!saved) { if (document.querySelector('meta[name=\"np-helper-token\"]')) testApp(); return; }\n"
+        "      var tools = window.NP_TOOLS, addressEl = document.getElementById('cfgCompanion');\n"
+        "      Promise.all([tools.savedOrigin(), tools.detect()]).then(function (state) {\n"
+        "        var origin = state[0], live = state[1];\n"
+        "        if (origin) { addressEl.value = origin; cfg.companion = origin; }\n"
+        "        if (live && live.kind === 'helper' && live.origin && live.health) { showApp(live.origin, live.health); paintPassed(); return; }\n"
+        "        connLight('connAppDot', 'warn'); document.getElementById('cfgConnMsg').textContent = 'Saved Companion pairing is offline. Start the app and press Connect; no new token is needed.';\n"
+        "      }).catch(function () { document.getElementById('cfgConnMsg').textContent = 'Could not check the saved Companion pairing.'; });\n"
+        "    });")
 
 # ---- 12. the Download key fetches for real, through the helper, with the reason stated ---------------------
 # In the mockup it was a toggle that saved nothing. A row from this device is already here; a row
@@ -4732,6 +4741,58 @@ replace("            album: station.name,\n            where: place,",
         "            where: nowTrack.programme ? 'Scheduled programme: ' + nowTrack.programme + (place ? ' · ' + place : '') : place,")
 replace("          album: place,\n          where: '',",
         "          album: place,\n          where: nowTrack && nowTrack.about ? 'Scheduled programme' : '',")
+
+# A 403 on Profile means permission denied, not that the entire Hub pairing is invalid.
+replace("if (r.status === 401 || r.status === 403) { myProfile = null; return 'The container no longer accepts this player. Unpair it in Sources ▸ Connections and pair again.'; }",
+        "if (r.status === 401) { myProfile = null; return 'The Hub no longer accepts this player. Unpair it in Sources ▸ Connections and pair again.'; }\n"
+        "        if (r.status === 403) { myProfile = null; return 'The Hub denied profile access (403). This pairing may lack profile:read. In Hub ▸ Devices, issue a new Player pairing with profile:read and profile:write, then pair again.'; }")
+
+# A valid but narrowly scoped device is connected for its granted operations, not for Profile.
+replace("      if (paired) document.getElementById('hubPairMsg').textContent = 'This player is paired with ' + (hubAcct.hubName || 'the container') + '. Your profile is in Settings ▸ Profile.';",
+        "      if (paired) {\n"
+        "        var name = hubAcct.hubName || 'the container';\n"
+        "        var noProfile = Array.isArray(hubAcct.scopes) && hubAcct.scopes.length && !hubAcct.scopes.includes('profile:read');\n"
+        "        document.getElementById('hubPairMsg').textContent = noProfile\n"
+        "          ? 'This player is paired with ' + name + ' for granted operations. Profile access was not granted. In Hub ▸ Devices, issue a new Player pairing with profile:read and profile:write to use Profile.'\n"
+        "          : 'This player is paired with ' + name + '. Your profile is in Settings ▸ Profile.';\n"
+        "      }")
+
+# An administrator can change a device's scopes without issuing a new credential.
+# Read the authenticated Hub as the authority, then update the saved pairing and visible permissions.
+replace("    function hubCall(method, path, body, opts) { opts = opts || {}; opts.auth = true; return hubRaw(method, hubAcct.base, path, body, opts); }",
+        "    function hubCall(method, path, body, opts) { opts = opts || {}; opts.auth = true; return hubRaw(method, hubAcct.base, path, body, opts); }\n"
+        "    function refreshHubScopes() {\n"
+        "      if (!hubAcct) return Promise.resolve(false);\n"
+        "      var account = hubAcct;\n"
+        "      return hubCall('GET', '/devices/me', null, { quiet: true }).then(function (r) {\n"
+        "        if (hubAcct !== account) return false;\n"
+        "        if (r.status === 401 || r.status === 403) {\n"
+        "          document.getElementById('hubPairMsg').textContent = 'The Hub is reachable, but it rejected this Player credential. Re-pair in Hub ▸ Devices.';\n"
+        "          return false;\n"
+        "        }\n"
+        "        if (!r.ok || !r.json || !Array.isArray(r.json.scopes)) return false;\n"
+        "        var scopes = r.json.scopes;\n"
+        "        if (JSON.stringify(scopes) === JSON.stringify(account.scopes || [])) { paintHubPair(); return true; }\n"
+        "        account.scopes = scopes.slice();\n"
+        "        return hubSave().then(function () { if (hubAcct === account) paintHubPair(); return true; });\n"
+        "      });\n"
+        "    }")
+
+# Account and preferences restore independently; test only after both have loaded.
+# Otherwise a paired Player can show "Not tested yet" indefinitely because the address field is still empty.
+replace("    window.kv.get(HUB_KEY).then(function (v) {",
+        "    var hubPrefsReady = false;\n"
+        "    function autoTestPairedHub() {\n"
+        "      var address = connBase(cfg.hub || (/^(localhost|127\\.0\\.0\\.1)$/.test(location.hostname) ? 'http://127.0.0.1:4546' : ''));\n"
+        "      if (!hubAcct || !address || address !== connBase(hubAcct.base)) return;\n"
+        "      document.getElementById('cfgHub').value = address;\n"
+        "      testHub();\n"
+        "      refreshHubScopes();\n"
+        "    }\n"
+        "    document.addEventListener('prefs:ready', function () { hubPrefsReady = true; autoTestPairedHub(); });\n"
+        "    window.kv.get(HUB_KEY).then(function (v) {")
+replace("if (v && v.base && v.credentialId && v.secret) { hubAcct = v; paintHubPair(); paintProfileTab(); loadMe(); }",
+        "if (v && v.base && v.credentialId && v.secret) { hubAcct = v; paintHubPair(); paintProfileTab(); loadMe(); if (hubPrefsReady) autoTestPairedHub(); }")
 
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):

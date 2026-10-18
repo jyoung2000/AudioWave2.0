@@ -15966,7 +15966,16 @@ window.AW.startStats = function () {
     function forgetCompanionToken() { var button = document.getElementById('cfgForgetToken'), savedNote = document.getElementById('cfgTokenSaved'), tokenField = document.getElementById('cfgCompanionToken'), msg = document.getElementById('cfgConnMsg'), tools = window.NP_TOOLS; if (!tools) return; button.disabled = true; tools.forgetSaved().then(function (removed) { if (removed && tokenField) tokenField.value = ''; if (removed && savedNote) savedNote.hidden = true; return tools.detect().then(function (current) { button.disabled = false; if (current && current.kind === 'helper' && current.origin) showApp(current.origin, current.health); else { conn.app = null; connLight('connAppDot', 'off'); connFacts('connAppFacts', []); msg.textContent = removed ? 'Saved token forgotten.' : 'No saved token to forget.'; } refreshCompanionTokenButton(); paintPassed(); }); }).catch(function () { button.disabled = false; msg.textContent = 'The saved token could not be removed.'; }); }
     document.getElementById('cfgConnect').addEventListener('click', testApp);
     document.getElementById('cfgForgetToken').addEventListener('click', forgetCompanionToken);
-    refreshCompanionTokenButton().then(function (saved) { if (saved || document.querySelector('meta[name="np-helper-token"]')) testApp(); });
+    refreshCompanionTokenButton().then(function (saved) {
+      if (!saved) { if (document.querySelector('meta[name="np-helper-token"]')) testApp(); return; }
+      var tools = window.NP_TOOLS, addressEl = document.getElementById('cfgCompanion');
+      Promise.all([tools.savedOrigin(), tools.detect()]).then(function (state) {
+        var origin = state[0], live = state[1];
+        if (origin) { addressEl.value = origin; cfg.companion = origin; }
+        if (live && live.kind === 'helper' && live.origin && live.health) { showApp(live.origin, live.health); paintPassed(); return; }
+        connLight('connAppDot', 'warn'); document.getElementById('cfgConnMsg').textContent = 'Saved Companion pairing is offline. Start the app and press Connect; no new token is needed.';
+      }).catch(function () { document.getElementById('cfgConnMsg').textContent = 'Could not check the saved Companion pairing.'; });
+    });
 
     /* ---- the Docker container ---- */
     function isLocal(host) { return /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|[^.]+\.local$|[^.]+$)/i.test(host); }
@@ -16242,6 +16251,22 @@ window.AW.startStats = function () {
         });
     }
     function hubCall(method, path, body, opts) { opts = opts || {}; opts.auth = true; return hubRaw(method, hubAcct.base, path, body, opts); }
+    function refreshHubScopes() {
+      if (!hubAcct) return Promise.resolve(false);
+      var account = hubAcct;
+      return hubCall('GET', '/devices/me', null, { quiet: true }).then(function (r) {
+        if (hubAcct !== account) return false;
+        if (r.status === 401 || r.status === 403) {
+          document.getElementById('hubPairMsg').textContent = 'The Hub is reachable, but it rejected this Player credential. Re-pair in Hub ▸ Devices.';
+          return false;
+        }
+        if (!r.ok || !r.json || !Array.isArray(r.json.scopes)) return false;
+        var scopes = r.json.scopes;
+        if (JSON.stringify(scopes) === JSON.stringify(account.scopes || [])) { paintHubPair(); return true; }
+        account.scopes = scopes.slice();
+        return hubSave().then(function () { if (hubAcct === account) paintHubPair(); return true; });
+      });
+    }
     function hubSave() { return Promise.resolve(window.kv.set(HUB_KEY, hubAcct)).then(function () { document.dispatchEvent(new Event('hub:changed')); }); }
 
     /* ---- pairing ---- */
@@ -16254,7 +16279,13 @@ window.AW.startStats = function () {
       document.getElementById('hubPairBtn').hidden = paired;
       document.getElementById('hubUnpair').hidden = !paired;
       document.querySelector('label[for="hubCode"]').textContent = paired ? 'Paired' : 'Pairing code';
-      if (paired) document.getElementById('hubPairMsg').textContent = 'This player is paired with ' + (hubAcct.hubName || 'the container') + '. Your profile is in Settings ▸ Profile.';
+      if (paired) {
+        var name = hubAcct.hubName || 'the container';
+        var noProfile = Array.isArray(hubAcct.scopes) && hubAcct.scopes.length && !hubAcct.scopes.includes('profile:read');
+        document.getElementById('hubPairMsg').textContent = noProfile
+          ? 'This player is paired with ' + name + ' for granted operations. Profile access was not granted. In Hub ▸ Devices, issue a new Player pairing with profile:read and profile:write to use Profile.'
+          : 'This player is paired with ' + name + '. Your profile is in Settings ▸ Profile.';
+      }
     }
     var pairPoll = 0;
     document.getElementById('hubPairBtn').addEventListener('click', function () {
@@ -16335,7 +16366,8 @@ window.AW.startStats = function () {
     function loadMe() {
       if (!hubAcct) return Promise.resolve();
       return hubCall('GET', '/profiles/me').then(function (r) {
-        if (r.status === 401 || r.status === 403) { myProfile = null; return 'The container no longer accepts this player. Unpair it in Sources ▸ Connections and pair again.'; }
+        if (r.status === 401) { myProfile = null; return 'The Hub no longer accepts this player. Unpair it in Sources ▸ Connections and pair again.'; }
+        if (r.status === 403) { myProfile = null; return 'The Hub denied profile access (403). This pairing may lack profile:read. In Hub ▸ Devices, issue a new Player pairing with profile:read and profile:write, then pair again.'; }
         if (r.status === 404) { myProfile = null; return 'This container doesn’t keep profiles yet — it needs the profiles update (docs/hub-profiles.md in the AudioWave repo).'; }
         if (!r.ok || !r.json) { myProfile = null; return 'No answer from ' + hubAcct.hubName + '. Check it’s running.'; }
         myProfile = r.json;
@@ -16913,8 +16945,17 @@ window.AW.startStats = function () {
       open: openProfile
     };
 
+    var hubPrefsReady = false;
+    function autoTestPairedHub() {
+      var address = connBase(cfg.hub || (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? 'http://127.0.0.1:4546' : ''));
+      if (!hubAcct || !address || address !== connBase(hubAcct.base)) return;
+      document.getElementById('cfgHub').value = address;
+      testHub();
+      refreshHubScopes();
+    }
+    document.addEventListener('prefs:ready', function () { hubPrefsReady = true; autoTestPairedHub(); });
     window.kv.get(HUB_KEY).then(function (v) {
-      if (v && v.base && v.credentialId && v.secret) { hubAcct = v; paintHubPair(); paintProfileTab(); loadMe(); }
+      if (v && v.base && v.credentialId && v.secret) { hubAcct = v; paintHubPair(); paintProfileTab(); loadMe(); if (hubPrefsReady) autoTestPairedHub(); }
       checkInviteHash();
     });
     window.connState = function () { return { app: conn.app, hub: conn.hub, log: connEntries.slice() }; };

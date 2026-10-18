@@ -64,6 +64,7 @@ let setupPendingResponses = 0;
 const HELPER_TOKEN = 'awsp-e2e-helper-token';
 const sidecarLog: string[] = [];
 const events: Array<Record<string, unknown>> = [];
+let readyEvent: Record<string, unknown> | null = null;
 
 function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -266,7 +267,8 @@ test.describe('streaming from a PC (AWSP)', () => {
     downloadRequests.length = 0;
     setupPendingResponses = 1;
     await stubOffline(page);
-    const ready = await nextEvent('ready');
+    const ready = readyEvent ?? await nextEvent('ready');
+    readyEvent = ready;
     const ticket = String(ready['ticket']);
     send({ cmd: 'new_pairing_code' });
     const code = String((await nextEvent('pairing_code'))['code']);
@@ -315,6 +317,21 @@ test.describe('streaming from a PC (AWSP)', () => {
     ]);
     expect(helperRequests.map(({ token }) => token)).toEqual(Array(11).fill(HELPER_TOKEN));
     expect(JSON.stringify({ result, downloaderFacts, imported, downloadRequests })).not.toContain(HELPER_TOKEN);
+
+    // The six-digit code is single-use: reload twice, keeping the authenticated
+    // device identity and allowlisted Companion operations without another code.
+    const pairedIdentity = await page.evaluate(async () => (await window.NP_AWSP!.status()).endpointId);
+    expect(pairedIdentity).toBeTruthy();
+    await page.reload();
+    await expect(page.locator('#pcMsg')).toHaveText('Paired with Test PC.', { timeout: 30_000 });
+    await expect(page.locator('#connPcDot')).toHaveAttribute('data-state', 'ok');
+    await expect(page.locator('#pcCode')).toHaveValue('');
+    expect(await page.evaluate(async () => (await window.NP_AWSP!.status()).endpointId)).toBe(pairedIdentity);
+    await page.reload();
+    await expect(page.locator('#pcMsg')).toHaveText('Paired with Test PC.', { timeout: 30_000 });
+    await expect(page.locator('#pcFacts')).toContainText('yt-dlp: e2e-installed', { timeout: 20_000 });
+    expect(await page.evaluate(async () => (await window.NP_AWSP!.status()).endpointId)).toBe(pairedIdentity);
+    expect(await page.evaluate(() => window.NP_AWSP!.companion('tv.channels'))).toMatchObject({ channels: [{ id: 'channel-e2e' }] });
   });
 
   test('pairs, plays relay-carried, is bit-identical, seeks by range, and resumes across a relay restart', async ({ page }) => {
@@ -326,7 +343,8 @@ test.describe('streaming from a PC (AWSP)', () => {
     });
     await stubOffline(page);
 
-    const ready = await nextEvent('ready');
+    const ready = readyEvent ?? await nextEvent('ready');
+    readyEvent = ready;
     const ticket = String(ready['ticket']);
     expect(ticket).toMatch(/^endpoint[a-z2-7]+$/);
     expect(ready['relay_url'], 'the sidecar reached the local relay, so its ticket carries it').toBe(`http://127.0.0.1:${relayPort}/`);

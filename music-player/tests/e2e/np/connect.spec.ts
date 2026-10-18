@@ -75,6 +75,13 @@ test.describe('desktop', () => {
     expect(await page.evaluate(async () => await window.NP_TOOLS?.hasSaved()), 'the accepted token is saved for this browser').toBe(true);
     expect(await page.evaluate(() => Array.from({ length: localStorage.length }, (_, i) => localStorage.getItem(localStorage.key(i) ?? '')).some((value) => value?.includes('test-token'))), 'the token is not stored in localStorage').toBe(false);
 
+    // A stale address hint must not make startup retry the saved token at the
+    // wrong port: the authenticated saved origin is authoritative on reload.
+    await page.evaluate(async () => {
+      const stored = await window.storage!.get('player:prefs');
+      const next = { ...JSON.parse(stored?.value ?? '{}'), companion: 'http://127.0.0.1:17342' };
+      await window.storage!.set('player:prefs', JSON.stringify(next));
+    });
     await reload(page);
     await expect(page.locator('#cfgConnMsg'), 'the accepted token reconnects automatically after reload').toContainText('Connected, but 1 downloader is missing.');
     await page.locator('#cfgLegacyHelper summary').click();
@@ -125,8 +132,7 @@ test.describe('desktop', () => {
     await page.selectOption('#bkTo', 'both'); await page.waitForTimeout(100);
     expect((await passed(page)).filter((r) => r[0] === 'Backup'), 'both: one backup row for each destination').toHaveLength(2);
     await expect.poll(async () => (await prefs(page))!.backup?.to, { message: 'the choice is kept' }).toBe('both');
-    await page.waitForTimeout(400);
-    expect(await page.textContent('#bkSize'), 'Backup gives an expected size, from the companion’s measure of the folder').toMatch(/^About 42\.5 GB$/);
+    await expect(page.locator('#bkSize'), 'Backup gives an expected size, from the companion’s measure of the folder').toHaveText(/^About 42\.5 GB$/);
     await expect(page.locator('#bkParts'), 'and says what makes it up').toContainText('Music');
     const space = (await page.textContent('#bkSpace')) ?? '';
     expect(/120 GB free of 500 GB/.test(space) && /D:\\Airwave\\Backups/.test(space), 'and how much space the backup location has: ' + space.slice(0, 120)).toBe(true);
@@ -146,6 +152,86 @@ test.describe('desktop', () => {
     await expect(page.locator('#cfgCompanionToken')).toHaveValue('');
     expect(await page.evaluate(async () => await window.NP_TOOLS?.hasSaved())).toBe(false);
     expect(await page.evaluate(() => (window as unknown as { COMPANION?: string }).COMPANION)).toBeUndefined();
+  });
+
+  test('a saved Companion pairing ignores an outdated address hint after a reload', async ({ page }) => {
+    const wrongPort: string[] = [];
+    let helperOnline = true;
+    await page.route('http://127.0.0.1:17342/helper/v1/**', (route) => {
+      wrongPort.push(new URL(route.request().url()).pathname);
+      const health = route.request().url().endsWith('/health');
+      return route.fulfill({ status: health ? 200 : 401, headers: CORS, body: JSON.stringify(health ? HELPER : { error: 'auth' }) });
+    });
+    await page.route('http://127.0.0.1:17343/helper/v1/**', (route) => {
+      const health = route.request().url().endsWith('/health');
+      return route.fulfill({ status: !helperOnline ? 503 : health ? 200 : 404, headers: CORS, body: JSON.stringify(health && helperOnline ? HELPER : { error: 'not-found' }) });
+    });
+    await boot(page, '#settings/src');
+    expect(await page.evaluate(() => window.NP_TOOLS!.connect('http://127.0.0.1:17343', 'test-token'))).toMatchObject({ saved: true });
+    await page.evaluate(async () => {
+      const stored = await window.storage!.get('player:prefs');
+      await window.storage!.set('player:prefs', JSON.stringify({ ...JSON.parse(stored?.value ?? '{}'), companion: 'http://127.0.0.1:17342' }));
+    });
+    await reload(page);
+    await expect(page.locator('#cfgConnMsg')).toContainText('Connected, but 1 downloader is missing.');
+    expect((await page.evaluate(() => window.NP_TOOLS!.detect()))?.origin).toBe('http://127.0.0.1:17343');
+    expect(wrongPort.filter((path) => path.includes('/jobs/')), 'the saved token must not be retried at a stale port').toEqual([]);
+
+    helperOnline = false;
+    await reload(page);
+    await expect(page.locator('#cfgConnMsg')).toContainText('Saved Companion pairing is offline.');
+    await expect(page.locator('#cfgCompanion')).toHaveValue('http://127.0.0.1:17343');
+    expect(await page.evaluate(() => window.NP_TOOLS!.hasSaved())).toBe(true);
+    helperOnline = true;
+    await page.locator('#cfgLegacyHelper summary').click();
+    await page.locator('#cfgConnect').click();
+    await expect(page.locator('#cfgConnMsg')).toContainText('Connected, but 1 downloader is missing.');
+    expect(wrongPort.filter((path) => path.includes('/jobs/'))).toEqual([]);
+  });
+
+  test('a saved Player pairing checks the live Hub connection on every load', async ({ page }) => {
+    let publicChecks = 0;
+    let protectedChecks = 0;
+    let hubOnline = true;
+    let liveScopes = ['search:use', 'downloads:request', 'transfers:receive'];
+    await page.route('http://127.0.0.1:4546/**', (route) => {
+      const path = new URL(route.request().url()).pathname;
+      if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
+      if (path === '/healthz') { publicChecks++; if (!hubOnline) return route.abort('connectionrefused'); return route.fulfill({ status: 200, headers: CORS, body: JSON.stringify({ status: 'ok', version: '2.3.0' }) }); }
+      if (path === '/readyz') return route.fulfill({ status: 200, headers: CORS, body: JSON.stringify({ status: 'ok', checks: { database: 'ok' } }) });
+      if (path === '/api/v1/hub') return route.fulfill({ status: 200, headers: CORS, body: JSON.stringify({ name: 'TOWER', fingerprint: 'AB12' }) });
+      if (route.request().headers().authorization === 'Bearer synthetic-device.synthetic-secret') protectedChecks++;
+      if (path === '/api/v1/devices/me') return route.fulfill({ status: 200, headers: CORS, body: JSON.stringify({ scopes: liveScopes }) });
+      if (path === '/api/v1/profiles/me') return route.fulfill({ status: 403, headers: CORS, body: '{}' });
+      if (path === '/api/v1/providers') return route.fulfill({ status: 200, headers: CORS, body: JSON.stringify({ items: [], health: [] }) });
+      if (path === '/api/v1/tools/status') return route.fulfill({ status: 200, headers: CORS, body: JSON.stringify({ tools: Object.fromEntries(['yt-dlp', 'spotdl', 'ffmpeg'].map((id) => [id, { present: true, state: 'ready', version: 'test', reason: null }])), musicsearch: { configured: false, state: 'disabled', reason: null } }) });
+      return route.fulfill({ status: 404, headers: CORS, body: '{}' });
+    });
+    await boot(page, '#settings/src');
+    await page.fill('#cfgHub', 'http://127.0.0.1:4546');
+    await page.dispatchEvent('#cfgHub', 'change');
+    await expect.poll(async () => (await prefs(page))!.hub).toBe('http://127.0.0.1:4546');
+    await page.evaluate(async () => { await (window as unknown as { kv: { set(k: string, v: unknown): Promise<void> } }).kv.set('player:hub', { base: 'http://127.0.0.1:4546', credentialId: 'synthetic-device', secret: 'synthetic-secret', hubName: 'TOWER', scopes: ['search:use', 'downloads:request', 'transfers:receive'] }); });
+    await reload(page);
+    await expect(page.locator('#cfgHub')).toHaveValue('http://127.0.0.1:4546');
+    await expect(page.locator('#hubPairMsg')).toContainText('paired with TOWER');
+    await expect(page.locator('#hubPairMsg')).toContainText('Profile access was not granted');
+    await expect(page.locator('#hubMsg')).toHaveText(/^Connected to (TOWER|the container)\.$/);
+    await expect(page.locator('#connHubDot')).toHaveAttribute('data-state', 'ok');
+    expect(publicChecks).toBeGreaterThan(0);
+    expect(protectedChecks).toBeGreaterThan(0);
+    await page.click('#pt-profile');
+    await expect(page.locator('#pfGate')).toContainText('profile:read');
+    liveScopes = [...liveScopes, 'profile:read', 'profile:write'];
+    await reload(page);
+    await expect(page.locator('#hubMsg')).toHaveText(/^Connected to (TOWER|the container)\.$/);
+    await expect(page.locator('#hubPairMsg')).not.toContainText('Profile access was not granted');
+    await expect.poll(async () => (await page.evaluate(async () => (await (window as unknown as { kv: { get(k: string): Promise<{ scopes: string[] }> } }).kv.get('player:hub')).scopes))).toContain('profile:read');
+    expect(publicChecks).toBeGreaterThan(1);
+    hubOnline = false;
+    await reload(page);
+    await expect(page.locator('#hubMsg')).toContainText('No answer from http://127.0.0.1:4546');
+    await expect(page.locator('#connHubDot')).toHaveAttribute('data-state', 'bad');
   });
 
   test('public health is not pairing, a wrong token is refused, and remote token targets are blocked', async ({ page }) => {
