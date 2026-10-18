@@ -11183,6 +11183,20 @@ window.AW.startStats = function () {
             place.indexOf(lower + ',') === 0 || place.indexOf(lower + ' ') === 0) continue;
         return tag.charAt(0).toUpperCase() + tag.slice(1);
       }
+      /* The directory carries no tags for a great many stations — every iHeart one — but the
+         stream itself announces a genre, and the Hub or the Companion can read it. Second best,
+         not invented: still the station's own description of itself. */
+      var t = trackByStation[st.id];
+      if (t && t.genre) return t.genre.charAt(0).toUpperCase() + t.genre.slice(1);
+      return '—';
+    }
+
+    /* Same story for the bitrate: the directory records 0 for stations it never measured, while
+       the stream announces icy-br. */
+    function stationKbps(st) {
+      if (st.bitrate) return String(st.bitrate);
+      var t = trackByStation[st.id];
+      if (t && t.bitrate) return String(t.bitrate);
       return '—';
     }
 
@@ -11258,7 +11272,9 @@ window.AW.startStats = function () {
         var st = pick[next++].station;
         return window.radioMeta(st.url).then(function (t) {
           if (run !== metaRun) return;
-          if (t) { trackByStation[st.id] = t; delete metaMiss[st.id]; }
+          /* An answer with no song but a genre or a bitrate is still an answer: keep it for those
+             columns and mark the song as asked-and-unnamed. */
+          if (t && (t.title || t.genre || t.bitrate)) { trackByStation[st.id] = t; if (t.title) delete metaMiss[st.id]; else metaMiss[st.id] = true; }
           else if (!(radioNow && radioNow.id === st.id)) { delete trackByStation[st.id]; metaMiss[st.id] = true; }
           paintMetaRow(st);
         }, function () { return null; }).then(function () {
@@ -11284,8 +11300,14 @@ window.AW.startStats = function () {
       if (!row) return;
       var song = row.querySelector('.rlist-song');
       var artist = row.querySelector('.rlist-artist');
+      var genre = row.querySelector('td.rlist-genre');
+      var kbps = row.querySelector('td.lib-col-bpm');
       if (song) { song.textContent = songCell(st); song.title = songHint(st) || songCell(st); }
       if (artist) artist.textContent = artistCell(st);
+      /* Genre and Kbps come back on the same request as the song, so they are painted with it
+         rather than left at whatever the directory did or did not carry. */
+      if (genre) { genre.textContent = stationGenre(st); genre.title = stationGenre(st); }
+      if (kbps) kbps.textContent = stationKbps(st);
     }
 
     function cssEsc(v) {
@@ -11624,7 +11646,7 @@ window.AW.startStats = function () {
                 '<td class="rlist-song" title="' + esc(songHint(st) || songCell(st)) + '">' + esc(songCell(st)) + '</td>' +
                 '<td class="lib-col-artist rlist-artist">' + esc(artistCell(st)) + '</td>' +
                 '<td class="rlist-genre" title="' + esc(stationGenre(st)) + '">' + esc(stationGenre(st)) + '</td>' +
-                '<td class="lib-num lib-col-bpm">' + (st.bitrate || '\u2014') + '</td>' +
+                '<td class="lib-num lib-col-bpm">' + esc(stationKbps(st)) + '</td>' +
                 '<td class="lib-col-album">' + esc(stationWhere(st)) + '</td>' +
               '</tr>';
             }).join('') +
@@ -17867,14 +17889,47 @@ window.AW.startStats = function () {
         });
       });
     };
+    /* A genre every station on a network repeats classifies nothing. The Hub and the Companion
+       already drop these, but an older one of either may not, and a column reading "Various" is
+       noise dressed as data. */
+    var PLACEHOLDER_GENRE = /^(various|varied|misc|miscellaneous|unknown|none|other|radio|music)$/i;
+
+    /* What the stream says about itself, as opposed to what it is playing. A station with its own
+       song feed never needs the Hub for its Song column, but the directory may still carry no genre
+       and no bitrate for it — and only the Hub or the Companion can read those from the stream. A
+       description does not change between songs, so it is asked once and kept for half an hour. */
+    var aboutCache = {};
+    function icyAbout(url) {
+      var key = 'about:' + url, now = Date.now(), c = aboutCache[key];
+      if (c && c.pending) return c.pending;
+      if (c && now - c.at < 1800000) return Promise.resolve(c.val);
+      var pr = icyMeta(url).then(function (t) {
+        var val = { genre: (t && t.genre) || '', bitrate: (t && t.bitrate) || 0 };
+        aboutCache[key] = { at: Date.now(), val: val };
+        return val;
+      }, function () {
+        var val = { genre: '', bitrate: 0 };
+        aboutCache[key] = { at: Date.now(), val: val };
+        return val;
+      });
+      aboutCache[key] = { at: now, val: c ? c.val : { genre: '', bitrate: 0 }, pending: pr };
+      return pr;
+    }
+
     function icyMeta(url) {
       var key = 'icy:' + url, now = Date.now(), c = metaCache[key];
       if (c && c.pending) return c.pending;
       if (c && now - c.at < 20000) return Promise.resolve(c.val);
       var pr = icyAsk(url).then(function (d) {
         var p = d && d.programme && d.programmeSource === 'schedule' ? String(d.programme) : '';
+        /* What the stream says about itself fills the Genre and Kbps columns the directory left
+           empty, and it outlives having no song: a station naming no track still has a genre. */
+        var gen = d && d.genre && !PLACEHOLDER_GENRE.test(String(d.genre).trim()) ? String(d.genre) : '';
+        var br = d ? Number(d.bitrate) || 0 : 0;
         var t = d && d.title ? { title: String(d.title), artist: d.artist ? String(d.artist) : '', programme: p } :
-                p ? { title: p, artist: '', about: true, programme: p } : null;
+                p ? { title: p, artist: '', about: true, programme: p } :
+                (gen || br) ? { title: '', artist: '' } : null;
+        if (t) { t.genre = gen; t.bitrate = br; }
         metaCache[key] = { at: Date.now(), val: t };
         return t;
       }, function () {
@@ -17909,11 +17964,18 @@ window.AW.startStats = function () {
         .then(function (t) {
           /* No song in the feed (an ad break, a 204): the Hub or the Companion
              reads the stream itself and names the show on the air. */
-          if (!tuned) return t || icyMeta(url);
+          if (!tuned) {
+            if (!t) return icyMeta(url);
+            /* The feed answered the song; the stream still answers the Genre and Kbps columns. */
+            return icyAbout(url).then(function (a) {
+              return { title: t.title, artist: t.artist, genre: a.genre, bitrate: a.bitrate };
+            }, function () { return t; });
+          }
           return icyMeta(url).then(function (d) {
             if (!t) return d;
-            if (!d || !d.programme) return t;
-            return { title: t.title, artist: t.artist, programme: d.programme };
+            if (!d) return t;
+            return { title: t.title, artist: t.artist, programme: d.programme || '',
+                     genre: d.genre || '', bitrate: d.bitrate || 0 };
           });
         });
       metaCache[url] = { at: now, val: c ? c.val : null, pending: pr };

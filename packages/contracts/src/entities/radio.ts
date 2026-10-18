@@ -11,6 +11,13 @@ export const StationNowPlaying = z.object({
   artist: z.string().max(300).nullable(),
   title: z.string().max(300).nullable(),
   station: z.string().max(200).nullable(),
+  /**
+   * What the stream announces about itself, for the columns a directory leaves empty: `icy-genre`
+   * and `icy-br`. Many stations (every iHeart one) have no tags and bitrate 0 in the directory.
+   * Placeholder genres ("Various", "Misc") are reported as null rather than shown as a genre.
+   */
+  genre: z.string().max(120).nullable().optional(),
+  bitrate: z.number().int().positive().max(2000).nullable().optional(),
   /** Official schedule programme, when a supported station has a live timed listing. */
   programme: z.string().max(300).nullable().optional(),
   programmeSource: z.literal('schedule').nullable().optional(),

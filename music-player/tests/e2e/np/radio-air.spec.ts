@@ -136,6 +136,61 @@ test('station lists longer than forty read the last station with bounded concurr
   await expect(page.locator('#radioMenu .rlist tbody tr', { hasText: 'Station 000' }).locator('.rlist-genre')).toHaveText('Jazz');
 });
 
+test('a station the directory describes thinly fills Genre and Kbps from its stream', async ({ page }) => {
+  // radio-browser often carries no tags and bitrate 0 (every iHeart station, for one). The stream
+  // itself announces icy-genre/icy-br, which only the Hub or Companion can read for the page.
+  const stations = [
+    { stationuuid: 'thin-1', name: 'Thin Station', url_resolved: 'https://radio.example/thin', state: 'Chicago, IL', country: 'United States', countrycode: 'US', tags: '', bitrate: 0 },
+    { stationuuid: 'vague-1', name: 'Vague Station', url_resolved: 'https://radio.example/vague', state: 'Chicago, IL', country: 'United States', countrycode: 'US', tags: '', bitrate: 0 },
+  ];
+  await page.route(/radio-browser\.info/i, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stations) }));
+  await page.route(`${COMPANION}/helper/v1/radio/now-playing**`, (r) => {
+    const url = new URL(r.request().url()).searchParams.get('url') ?? '';
+    // "Various" is what a stream says when it is saying nothing; it is not a genre.
+    const body = /vague/.test(url)
+      ? { raw: null, artist: null, title: null, station: 'Vague', genre: 'Various', bitrate: null, reason: 'The station sent no song title' }
+      : { raw: null, artist: null, title: null, station: 'Thin', genre: 'College', bitrate: 56, reason: 'The station sent no song title' };
+    return r.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  });
+  await boot(page);
+  await page.evaluate((c) => { (window as unknown as { COMPANION: string }).COMPANION = c; }, COMPANION);
+  await page.click('.tb__btn[data-view="radio"]');
+  const thin = page.locator('#radioMenu .rlist tbody tr', { hasText: 'Thin Station' });
+  await expect(thin.locator('.rlist-genre')).toHaveText('College', { timeout: 20_000 });
+  await expect(thin.locator('.lib-col-bpm')).toHaveText('56');
+  const vague = page.locator('#radioMenu .rlist tbody tr', { hasText: 'Vague Station' });
+  await expect(vague.locator('.rlist-genre')).toHaveText('—');
+  await expect(vague.locator('.lib-col-bpm')).toHaveText('—');
+});
+
+test('a station with its own song feed still fills Genre from the stream', async ({ page }) => {
+  // WMBI publishes songs through Triton, so the page never needed the Hub for its Song column —
+  // but the directory carries no tags for it, and only the Hub can read the stream's icy-genre.
+  const stations = [
+    { stationuuid: 'feed-1', name: 'Feed Station', url_resolved: 'https://14123.live.streamtheworld.com/FEEDFM.mp3', state: 'Chicago, IL', country: 'United States', countrycode: 'US', tags: '', bitrate: 0 },
+  ];
+  await page.route(/radio-browser\.info/i, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stations) }));
+  await page.route(/np\.tritondigital\.com\/public\/nowplaying\?.*/i, (r) => r.fulfill({
+    status: 200, headers: { ...CORS, 'content-type': 'text/xml' },
+    body: '<?xml version="1.0" encoding="UTF-8"?><nowplaying-info-list><nowplaying-info mountName="FEEDFM" type="track"><property name="cue_title"><![CDATA[Feed Song]]></property><property name="track_artist_name"><![CDATA[Feed Artist]]></property></nowplaying-info></nowplaying-info-list>',
+  }));
+  let askedAbout = 0;
+  await page.route(`${COMPANION}/helper/v1/radio/now-playing**`, (r) => {
+    askedAbout++;
+    return r.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'application/json' }, body: JSON.stringify({
+      raw: null, artist: null, title: null, station: 'Feed', genre: 'Christian', bitrate: 96, reason: 'The station sent no song title',
+    }) });
+  });
+  await boot(page);
+  await page.evaluate((c) => { (window as unknown as { COMPANION: string }).COMPANION = c; }, COMPANION);
+  await page.click('.tb__btn[data-view="radio"]');
+  const row = page.locator('#radioMenu .rlist tbody tr', { hasText: 'Feed Station' });
+  await expect(row.locator('.rlist-song')).toHaveText('Feed Song', { timeout: 20_000 });
+  await expect(row.locator('.rlist-genre')).toHaveText('Christian', { timeout: 20_000 });
+  await expect(row.locator('.lib-col-bpm')).toHaveText('96');
+  expect(askedAbout, 'the stream is asked about itself, not polled for it').toBeLessThanOrEqual(2);
+});
+
 test('with no companion and no container, a station without a feed invents nothing', async ({ page }) => {
   await boot(page);
   await tuneWfmt(page);

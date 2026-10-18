@@ -58,7 +58,7 @@ export function registerProviderRoutes(app: FastifyInstance, ctx: HubContext): v
     if (hit && now - hit.at < STATION_TTL_MS) return hit.value;
     const read = ctx.deps.stationTitle ?? ((url: string) => readStationTitle(url, { timeoutMs: 8000, userAgent: `NowPlaying/${ctx.version}` }));
     const value = Promise.all([
-      read(query.url).catch((): StationNowPlaying => ({ raw: null, artist: null, title: null, station: null, reason: 'The station could not be read' })),
+      read(query.url).catch((): StationNowPlaying => ({ raw: null, artist: null, title: null, station: null, genre: null, bitrate: null, reason: 'The station could not be read' })),
       readCurrentProgramme(query.url, ctx.http, now),
     ]).then(([station, programme]) => ({ ...station, programme, programmeSource: programme ? 'schedule' as const : null }));
     stationCache.delete(query.url);

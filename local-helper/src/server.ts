@@ -265,7 +265,7 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
       const read = options.stationTitle ?? ((u: string) => readStationTitle(u, { timeoutMs: 8000, userAgent: `NowPlaying-helper/${options.version}` }));
       stationReads += 1;
       const value = read(station)
-        .catch((): StationNowPlaying => ({ raw: null, artist: null, title: null, station: null, reason: 'The station could not be read' }))
+        .catch((): StationNowPlaying => ({ raw: null, artist: null, title: null, station: null, genre: null, bitrate: null, reason: 'The station could not be read' }))
         .finally(() => {
           stationReads -= 1;
         });

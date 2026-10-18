@@ -24,6 +24,14 @@ export interface StationTitle {
   title: string | null;
   /** The station's own name (`icy-name`), when it sends one. */
   station: string | null;
+  /**
+   * The genre the stream announces (`icy-genre`). Directory listings often carry no tags at all, so
+   * this is the only genre many stations have. Placeholders ("Various", "Misc") are reported as
+   * null: a column saying "Various" is noise dressed as data.
+   */
+  genre: string | null;
+  /** The bitrate the stream announces (`icy-br`), in kbps; null when it announces none. */
+  bitrate: number | null;
   /** Why there is no title, in words a person can read; null when there is one. */
   reason: string | null;
 }
@@ -39,8 +47,28 @@ export interface ReadStationTitleOptions {
 
 const MAX_REDIRECTS = 3;
 
-function none(reason: string, station: string | null = null): StationTitle {
-  return { raw: null, artist: null, title: null, station, reason };
+function none(reason: string, station: string | null = null, about: StationAbout = {}): StationTitle {
+  return { raw: null, artist: null, title: null, station, genre: about.genre ?? null, bitrate: about.bitrate ?? null, reason };
+}
+
+interface StationAbout {
+  genre?: string | null;
+  bitrate?: number | null;
+}
+
+/**
+ * What a stream says about itself, for the columns a directory leaves empty. A genre every station
+ * on a network repeats ("Various", "Misc", "Unknown") classifies nothing, so it counts as absent.
+ */
+const PLACEHOLDER_GENRES = new Set(['various', 'varied', 'misc', 'miscellaneous', 'unknown', 'none', 'other', 'radio', 'music']);
+
+function stationAbout(headers: Record<string, string | string[] | undefined>): Required<StationAbout> {
+  const genre = headerText(headers['icy-genre']);
+  const bitrate = Number.parseInt(headerText(headers['icy-br']) ?? '', 10);
+  return {
+    genre: genre && !PLACEHOLDER_GENRES.has(genre.toLowerCase()) ? genre : null,
+    bitrate: Number.isInteger(bitrate) && bitrate > 0 && bitrate <= 2000 ? bitrate : null,
+  };
 }
 
 export async function readStationTitle(input: string, options: ReadStationTitleOptions = {}): Promise<StationTitle> {
@@ -109,8 +137,8 @@ function once(url: string, options: ReadStationTitleOptions & { timeoutMs: numbe
         const feed = titleConsumer(response.headers, maxBytes, finish);
         if (!feed) return;
         response.on('data', feed);
-        response.on('end', () => finish(none('The station sent no song title', headerText(response.headers['icy-name']))));
-        response.on('error', () => finish(none('The station stopped sending', headerText(response.headers['icy-name']))));
+        response.on('end', () => finish(none('The station sent no song title', headerText(response.headers['icy-name']), stationAbout(response.headers))));
+        response.on('error', () => finish(none('The station stopped sending', headerText(response.headers['icy-name']), stationAbout(response.headers))));
       },
     );
     request.on('error', (err) => {
@@ -135,9 +163,10 @@ function once(url: string, options: ReadStationTitleOptions & { timeoutMs: numbe
  */
 function titleConsumer(headers: Record<string, string | string[] | undefined>, maxBytes: number, finish: (value: StationTitle) => void): ((chunk: Buffer) => void) | null {
   const stationName = headerText(headers['icy-name']);
+  const about = stationAbout(headers);
   const metaint = Number.parseInt(headerText(headers['icy-metaint']) ?? '', 10);
   if (!Number.isInteger(metaint) || metaint <= 0 || metaint > 256 * 1024) {
-    finish(none('This station does not send song titles', stationName));
+    finish(none('This station does not send song titles', stationName, about));
     return null;
   }
   const reader = new IcyReader(metaint);
@@ -151,14 +180,14 @@ function titleConsumer(headers: Record<string, string | string[] | undefined>, m
       if (raw) {
         const parts = splitOnAir(raw);
         if (parts) {
-          finish({ raw, artist: parts.artist, title: parts.title, station: stationName, reason: null });
+          finish({ raw, artist: parts.artist, title: parts.title, station: stationName, genre: about.genre, bitrate: about.bitrate, reason: null });
           return;
         }
         // An ad-break marker or station imaging: the song is usually the very next block.
         markers += 1;
         if (markers === 1) markerAt = seen;
         if (markers >= 4) {
-          finish(none('The station sent no song title', stationName));
+          finish(none('The station sent no song title', stationName, about));
           return;
         }
       }
@@ -168,7 +197,7 @@ function titleConsumer(headers: Record<string, string | string[] | undefined>, m
     // never fills its title): answer that now rather than holding the request open until the
     // timeout. After a marker, two intervals with no song is an ad break still running.
     if (reader.blocks - markers >= 2 || (markers > 0 && seen - markerAt > 2 * (metaint + 1)) || seen > maxBytes) {
-      finish(none('The station sent no song title', stationName));
+      finish(none('The station sent no song title', stationName, about));
     }
   };
 }

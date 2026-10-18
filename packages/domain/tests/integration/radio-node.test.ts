@@ -153,6 +153,41 @@ describe('readStationTitle', () => {
     expect(r.reason).toMatch(/unreadable/);
   });
 
+  // radio-browser carries no tags and bitrate 0 for many stations (every iHeart one). The stream's
+  // own headers fill those columns — but "Various"/"Misc" is a placeholder, not a genre.
+  it('reports the stream\'s announced genre and bitrate alongside the title', async () => {
+    const url = await station((socket) => {
+      socket.write('HTTP/1.0 200 OK\r\nContent-Type: audio/mpeg\r\nicy-metaint: 8\r\nicy-name: Radio DePaul\r\nicy-genre: College\r\nicy-br: 56\r\n\r\n');
+      socket.write(Buffer.concat([Buffer.alloc(8, 0x41), metaBlock("StreamTitle='Band - Track';")]));
+    });
+    const r = await readStationTitle(url, LOCAL);
+    expect(r).toMatchObject({ title: 'Track', station: 'Radio DePaul', genre: 'College', bitrate: 56 });
+  });
+
+  it('a placeholder genre and an unparsable bitrate are reported as absent', async () => {
+    const url = await station((socket) => {
+      socket.write('HTTP/1.0 200 OK\r\nicy-metaint: 8\r\nicy-name: WGCI-FM ZC Backup\r\nicy-genre: Various\r\nicy-br: \r\n\r\n');
+      socket.write(Buffer.concat([Buffer.alloc(8, 0x41), Buffer.from([0]), Buffer.alloc(8, 0x41), Buffer.from([0])]));
+    });
+    const r = await readStationTitle(url, LOCAL);
+    expect(r.station).toBe('WGCI-FM ZC Backup');
+    expect(r.genre).toBeNull();
+    expect(r.bitrate).toBeNull();
+  });
+
+  it('carries the genre and bitrate across a redirect to the real stream', async () => {
+    const target = await station((socket) => {
+      socket.write('HTTP/1.0 200 OK\r\nicy-metaint: 4\r\nicy-genre: Smooth Jazz\r\nicy-br: 128\r\n\r\n');
+      socket.write(Buffer.concat([Buffer.alloc(4, 0x41), metaBlock("StreamTitle='After - Hop';")]));
+    });
+    const first = server;
+    server = null;
+    const hop = await station((socket) => socket.end(`HTTP/1.1 302 Found\r\nLocation: ${target}\r\nContent-Length: 0\r\n\r\n`));
+    const r = await readStationTitle(hop, LOCAL);
+    expect(r).toMatchObject({ raw: 'After - Hop', genre: 'Smooth Jazz', bitrate: 128 });
+    await new Promise<void>((resolve) => first!.close(() => resolve()));
+  });
+
   it('refuses private and loopback addresses unless a test says otherwise', async () => {
     const r = await readStationTitle('http://127.0.0.1:1/stream', { timeoutMs: 1000 });
     expect(r.title).toBeNull();
