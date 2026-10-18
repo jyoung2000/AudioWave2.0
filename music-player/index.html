@@ -990,6 +990,10 @@
     cursor: default;
   }
   .lib-scope__refresh[hidden] { display: none; }
+  /* One turn of the glyph, so a refresh that comes back with the same rows still reads as having run. */
+  .lib-scope__refresh.is-spinning { animation: scope-spin 0.9s linear; }
+  @keyframes scope-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .lib-scope__refresh.is-spinning { animation: none; opacity: 0.55; } }
   .lib-scope__refresh:hover { background: rgba(0, 0, 0, 0.07); }
   .lib-scope__refresh:active { background: rgba(0, 0, 0, 0.13); border-color: var(--scope-btn-edge); }
   .lib-scope__refresh:focus { outline: none; }
@@ -7619,6 +7623,12 @@ window.AW.startStats = function () {
       </button>
       <button class="lib-scope__refresh" type="button" id="libDiscRefresh" hidden aria-label="New songs"
               title="New songs — Shift-click to start over">&#8635;</button>
+      <!-- Radio only: re-ask the directory for this level and re-read what every station is
+           playing. The list caches each level, so without this the only way to see a changed
+           directory or a newer song across the whole list was to leave the tab and come back. -->
+      <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden
+              aria-label="Refresh the station list"
+              title="Refresh the station list and what each station is playing">&#8635;</button>
 
       <div class="lib-find">
         <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -11441,6 +11451,8 @@ window.AW.startStats = function () {
        library's focus. Same three slots, same rules: a caption when the level
        is a narrowing of something, the level's name, and a badge that leaves
        it — hidden at the root, which is home and has nothing to leave. */
+    var radioRefreshBtn = document.getElementById('libRadioRefresh');
+
     function radioPaintScope() {
       if (!scope) return;
       var t = radioTop();
@@ -11450,7 +11462,32 @@ window.AW.startStats = function () {
       scopeKind.textContent = kind;
       scopeKind.hidden = !kind || kind === label;
       scopeClear.hidden = radioStack.length === 0;
+      /* Offered on a list of stations the directory answered, not on a menu of genres and
+         countries: there is nothing to re-ask for a list this page wrote itself. */
+      if (radioRefreshBtn) radioRefreshBtn.hidden = !(radioOn && !!t && !!t.key);
     }
+
+    /* What a person means by refreshing this list: ask the directory again instead of serving the
+       cached level, and ask every row again what it is playing \u2014 descriptions included, since a
+       station that named nothing a minute ago may be naming a song now. The level, the search and
+       the station on air are all kept: this reloads what is shown, it does not navigate. */
+    function radioRefresh() {
+      var t = radioTop();
+      if (!t || !t.key) return;
+      delete radioCache[t.key];
+      metaCache = {};
+      aboutCache = {};
+      metaMiss = {};
+      clearTimeout(metaRefresh);
+      metaRun++;                        // orphan answers still in flight for the pass being replaced
+      if (radioRefreshBtn) {
+        radioRefreshBtn.classList.add('is-spinning');
+        setTimeout(function () { radioRefreshBtn.classList.remove('is-spinning'); }, 900);
+      }
+      radioRender();
+    }
+
+    if (radioRefreshBtn) radioRefreshBtn.addEventListener('click', radioRefresh);
 
     /* The tab opens here rather than on the menu. A menu is what you go to
        when you want something other than what is in front of you; opening on
@@ -12031,6 +12068,7 @@ window.AW.startStats = function () {
         ipodBtn.setAttribute('aria-controls', 'ipodMenu');
         ipodBtn.setAttribute('aria-label', 'Library menu');
         ipodBtn.setAttribute('aria-expanded', 'false');   // a disclosure again
+        if (radioRefreshBtn) radioRefreshBtn.hidden = true;
         paintScope();
       }
     }

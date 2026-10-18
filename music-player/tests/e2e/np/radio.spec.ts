@@ -187,6 +187,39 @@ test('searching names the query, lists only matches, and Escape clears', async (
   expect(await page.inputValue('#libFind'), 'Escape clears the query').toBe('');
 });
 
+test('the filter bar carries a refresh that re-asks the directory and the stream readers', async ({ page }) => {
+  // The list caches each level, so without this the only way to see a changed directory or a new
+  // song across the whole list was to leave the tab and come back.
+  let directoryCalls = 0;
+  const stations = (take: string) => [
+    { stationuuid: 'rf-1', name: `Refresh One ${take}`, url_resolved: 'https://radio.example/one', state: 'Chicago, IL', country: 'United States', countrycode: 'US', tags: 'jazz', bitrate: 128 },
+  ];
+  await page.unroute(/radio-browser\.info/i);
+  await page.route(/radio-browser\.info/i, (r) => {
+    directoryCalls++;
+    return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stations(directoryCalls === 1 ? 'A' : 'B')) });
+  });
+  await page.click('.tb__btn[data-view="radio"]');
+  await expect(page.locator('#radioMenu .rlist tbody tr', { hasText: 'Refresh One A' })).toBeVisible({ timeout: 15_000 });
+  expect(directoryCalls).toBe(1);
+
+  const refresh = page.locator('#libRadioRefresh');
+  await expect(refresh, 'the refresh sits in the same bar as the filter').toBeVisible();
+  const sameBar = await page.evaluate(() => {
+    const bar = document.getElementById('libRadioRefresh')?.closest('.lib-scope');
+    return !!bar && bar === document.getElementById('libFind')?.closest('.lib-scope');
+  });
+  expect(sameBar, 'refresh and filter share the ribbon').toBe(true);
+
+  await refresh.click();
+  await expect(page.locator('#radioMenu .rlist tbody tr', { hasText: 'Refresh One B' })).toBeVisible({ timeout: 15_000 });
+  expect(directoryCalls, 'refresh re-asks the directory instead of serving the cache').toBe(2);
+
+  // It belongs to Radio: the Music tab's own ribbon must not grow a stray control.
+  await page.click('.tb__btn[data-view="music"]');
+  await expect(refresh).toBeHidden();
+});
+
 test('S keeps a station in Favourites, and choosing a track drops the radio', async ({ page }) => {
   await seed(page);
   await resetToLibrary(page);
