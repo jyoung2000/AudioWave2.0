@@ -4964,6 +4964,22 @@ replace("          document.dispatchEvent(new CustomEvent(t.about ? 'radio:clear
 replace("          title: nowTrack ? nowTrack.title : stationFormat(station),",
         "          title: nowTrack ? nowTrack.title : 'Song not available',")
 
+# ---- radio: keep directory genre separate from the live Song and Artist columns ----
+replace("    function stationGenre(st) {\n      var t = (st.tags || '').split(',')[0].trim();\n      if (!t) return '—';\n      return t.charAt(0).toUpperCase() + t.slice(1);\n    }",
+        "    function stationGenre(st) {\n      var place = String(st.where || st.state || '').trim().toLowerCase();\n      var country = String(st.country || '').trim().toLowerCase();\n      var code = String(st.code || '').trim().toLowerCase();\n      var tags = String(st.tags || '').split(',');\n      for (var i = 0; i < tags.length; i++) {\n        var tag = tags[i].trim(), lower = tag.toLowerCase();\n        if (!tag || lower === country || lower === code || lower === place ||\n            place.indexOf(lower + ',') === 0 || place.indexOf(lower + ' ') === 0) continue;\n        return tag.charAt(0).toUpperCase() + tag.slice(1);\n      }\n      return '—';\n    }")
+replace('            \'<colgroup><col style="width: 28px"><col style="width: 26%">\' +\n              \'<col>\' +\n              \'<col class="lib-col-artist" style="width: 20%">\' +\n              \'<col class="lib-col-bpm" style="width: 46px">\' +\n              \'<col class="lib-col-album" style="width: 16%"></colgroup>\' +',
+        '            \'<colgroup><col style="width: 28px"><col style="width: 24%">\' +\n              \'<col>\' +\n              \'<col class="lib-col-artist" style="width: 16%">\' +\n              \'<col class="rlist-genre" style="width: 18%">\' +\n              \'<col class="lib-col-bpm" style="width: 46px">\' +\n              \'<col class="lib-col-album" style="width: 12%"></colgroup>\' +')
+replace('              \'<th scope="col" class="lib-col-artist">Artist</th>\' +\n              \'<th scope="col" class="lib-num lib-col-bpm">Kbps</th>\' +',
+        '              \'<th scope="col" class="lib-col-artist">Artist</th>\' +\n              \'<th scope="col" class="rlist-genre">Genre</th>\' +\n              \'<th scope="col" class="lib-num lib-col-bpm">Kbps</th>\' +')
+replace('                \'<td class="lib-col-artist rlist-artist">\' + esc(artistCell(st)) + \'</td>\' +\n                \'<td class="lib-num lib-col-bpm">\' + (st.bitrate || \'\\u2014\') + \'</td>\' +',
+        '                \'<td class="lib-col-artist rlist-artist">\' + esc(artistCell(st)) + \'</td>\' +\n                \'<td class="rlist-genre" title="\' + esc(stationGenre(st)) + \'">\' + esc(stationGenre(st)) + \'</td>\' +\n                \'<td class="lib-num lib-col-bpm">\' + (st.bitrate || \'\\u2014\') + \'</td>\' +')
+replace('  .rlist tbody tr { cursor: default; }',
+        '  .rlist tbody tr { cursor: default; }\n  /* A separate Genre column must not crush the Song column on phones.\n     Let the radio list scroll sideways while preserving readable track and genre cells. */\n  .rlist { min-width: 700px; }\n  #radioMenu .ipod__list { overflow-x: auto; overscroll-behavior-x: contain; }')
+
+# A narrow Song column keeps full track text accessible on hover, including after updates.
+replace('      if (song) { song.textContent = songCell(st); song.title = songHint(st); }', '      if (song) { song.textContent = songCell(st); song.title = songHint(st) || songCell(st); }')
+replace('                \'<td class="rlist-song">\' + esc(songCell(st)) + \'</td>\' +', '                \'<td class="rlist-song" title="\' + esc(songHint(st) || songCell(st)) + \'">\' + esc(songCell(st)) + \'</td>\' +')
+
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):
     assert bad not in text, f'left behind: {bad}'

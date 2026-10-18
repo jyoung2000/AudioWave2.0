@@ -101,7 +101,7 @@ test('the tab opens on stations, not on a menu, and the panel is the song listâ€
   expect(Math.abs(geom.headH - LIB.headH), 'the column header matches the song listâ€™s').toBeLessThanOrEqual(1);
   expect(geom.font, 'same type size as the song list').toBe(LIB.font);
   expect(geom.stripe, 'same Aqua stripe as the song list').toBe(LIB.stripe);
-  expect(geom.cols, 'station columns').toEqual(['On air', 'Station', 'Song', 'Artist', 'Kbps', 'Where']);
+  expect(geom.cols, 'station columns').toEqual(['On air', 'Station', 'Song', 'Artist', 'Genre', 'Kbps', 'Where']);
 
   function names() { return page.$$eval('#radioMenu .rlist tbody .lib-title', (n) => n.map((x) => x.textContent ?? '')); }
 });

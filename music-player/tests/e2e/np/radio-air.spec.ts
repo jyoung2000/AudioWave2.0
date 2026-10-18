@@ -74,6 +74,12 @@ test('every station in the list shows what is on the air, never its genre', asyn
   // Nothing tuned: the list itself asks, and the song lands in the WFMT row.
   await expect(stationRow(page).first().locator('.rlist-song')).toHaveText('Air Song', { timeout: 20_000 });
   await expect(stationRow(page).first().locator('.rlist-artist')).toHaveText('Air Artist');
+  await expect(stationRow(page).first().locator('.rlist-song')).toHaveAttribute('title', 'Air Song');
+  // A genre is useful context, but must have its own column rather than masquerade as a song.
+  await expect(page.locator('#radioMenu .rlist thead th')).toContainText(['On air', 'Station', 'Song', 'Artist', 'Genre', 'Kbps', 'Where']);
+  const wgci = page.locator('#radioMenu .rlist tbody tr', { hasText: '107.5 WGCI' });
+  await expect(wgci.locator('.rlist-genre')).toHaveText('Urban contemporary');
+  await expect(stationRow(page).first().locator('.rlist-genre')).toHaveText('Classical');
   expect(new Set(asked).size, 'stations without a feed of their own are read too').toBeGreaterThan(3);
   await expect.poll(async () => {
     const rows = await page.$$eval('#radioMenu .rlist tbody tr', (rs) => rs.map((r) => ({ tags: '', song: (r.querySelector('.rlist-song')?.textContent ?? '').trim() })));
@@ -81,12 +87,29 @@ test('every station in the list shows what is on the air, never its genre', asyn
   }, { timeout: 10_000, message: 'a genre is never shown as the song' }).toEqual([]);
 });
 
+test('Genre remains reachable on narrow screens without collapsing Song', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await boot(page);
+  await page.click('.tb__btn[data-view="radio"]');
+  await expect(page.locator('#radioMenu .rlist tbody tr').first()).toBeVisible({ timeout: 15_000 });
+  const size = await page.locator('#radioMenu .ipod__list').evaluate((list) => ({ client: list.clientWidth, scroll: list.scrollWidth }));
+  expect(size.scroll, 'radio table scrolls horizontally at phone width').toBeGreaterThan(size.client);
+  await page.locator('#radioMenu .ipod__list').evaluate((list) => { list.scrollLeft = list.scrollWidth; });
+  const genre = page.locator('#radioMenu .rlist thead th.rlist-genre');
+  await expect(genre).toBeVisible();
+  const box = await genre.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+  await expect(page.locator('#radioMenu .rlist tbody tr', { hasText: '107.5 WGCI' }).locator('.rlist-genre')).toHaveText('Urban contemporary');
+});
+
 test('station lists longer than forty read the last station with bounded concurrency', async ({ page }) => {
   const stations = Array.from({ length: 45 }, (_, i) => ({
     stationuuid: `radio-${String(i).padStart(3, '0')}`,
     name: `Station ${String(i).padStart(3, '0')}`,
     url_resolved: `https://radio.example/live/${String(i).padStart(3, '0')}`,
-    state: 'Illinois', country: 'United States', countrycode: 'US', tags: 'jazz',
+    state: 'Chicago, IL', country: 'United States', countrycode: 'US', tags: i === 0 ? 'chicago,jazz' : 'jazz',
   }));
   await page.route(/radio-browser\.info/i, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stations) }));
   const asked: string[] = [];
@@ -110,6 +133,7 @@ test('station lists longer than forty read the last station with bounded concurr
   expect(asked).toContain('https://radio.example/live/044');
   expect(maxActive).toBeLessThanOrEqual(4);
   await expect(page.locator('#radioMenu .rlist tbody tr', { hasText: 'Station 000' }).locator('.rlist-song')).toHaveText('Live 000');
+  await expect(page.locator('#radioMenu .rlist tbody tr', { hasText: 'Station 000' }).locator('.rlist-genre')).toHaveText('Jazz');
 });
 
 test('with no companion and no container, a station without a feed invents nothing', async ({ page }) => {

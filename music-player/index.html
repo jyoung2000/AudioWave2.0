@@ -2618,6 +2618,10 @@
 
   .library tbody tr,
   .rlist tbody tr { cursor: default; }
+  /* A separate Genre column must not crush the Song column on phones.
+     Let the radio list scroll sideways while preserving readable track and genre cells. */
+  .rlist { min-width: 700px; }
+  #radioMenu .ipod__list { overflow-x: auto; overscroll-behavior-x: contain; }
   .library tbody tr:nth-child(even),
   .rlist tbody tr:nth-child(even) { background: var(--lib-alt); }
 
@@ -11169,9 +11173,17 @@ window.AW.startStats = function () {
        in whatever case the submitter typed, and only the first one is worth a
        column. */
     function stationGenre(st) {
-      var t = (st.tags || '').split(',')[0].trim();
-      if (!t) return '—';
-      return t.charAt(0).toUpperCase() + t.slice(1);
+      var place = String(st.where || st.state || '').trim().toLowerCase();
+      var country = String(st.country || '').trim().toLowerCase();
+      var code = String(st.code || '').trim().toLowerCase();
+      var tags = String(st.tags || '').split(',');
+      for (var i = 0; i < tags.length; i++) {
+        var tag = tags[i].trim(), lower = tag.toLowerCase();
+        if (!tag || lower === country || lower === code || lower === place ||
+            place.indexOf(lower + ',') === 0 || place.indexOf(lower + ' ') === 0) continue;
+        return tag.charAt(0).toUpperCase() + tag.slice(1);
+      }
+      return '—';
     }
 
     /* The finest grain the directory has. In a city list this is the city, in
@@ -11272,7 +11284,7 @@ window.AW.startStats = function () {
       if (!row) return;
       var song = row.querySelector('.rlist-song');
       var artist = row.querySelector('.rlist-artist');
-      if (song) { song.textContent = songCell(st); song.title = songHint(st); }
+      if (song) { song.textContent = songCell(st); song.title = songHint(st) || songCell(st); }
       if (artist) artist.textContent = artistCell(st);
     }
 
@@ -11587,16 +11599,18 @@ window.AW.startStats = function () {
            rules: the two differ in their columns, not in what they are. */
         body =
           '<table class="rlist" aria-label="' + esc(lvl.title) + '">' +
-            '<colgroup><col style="width: 28px"><col style="width: 26%">' +
+            '<colgroup><col style="width: 28px"><col style="width: 24%">' +
               '<col>' +
-              '<col class="lib-col-artist" style="width: 20%">' +
+              '<col class="lib-col-artist" style="width: 16%">' +
+              '<col class="rlist-genre" style="width: 18%">' +
               '<col class="lib-col-bpm" style="width: 46px">' +
-              '<col class="lib-col-album" style="width: 16%"></colgroup>' +
+              '<col class="lib-col-album" style="width: 12%"></colgroup>' +
             '<thead><tr>' +
               '<th scope="col" class="lib-idx"><span class="vh">On air</span></th>' +
               '<th scope="col">Station</th>' +
               '<th scope="col">Song</th>' +
               '<th scope="col" class="lib-col-artist">Artist</th>' +
+              '<th scope="col" class="rlist-genre">Genre</th>' +
               '<th scope="col" class="lib-num lib-col-bpm">Kbps</th>' +
               '<th scope="col" class="lib-col-album">Where</th>' +
             '</tr></thead><tbody>' +
@@ -11607,8 +11621,9 @@ window.AW.startStats = function () {
                   (it.air ? ' class="is-playing" aria-current="true"' : '') + '>' +
                 '<td class="lib-idx">' + (it.air ? NP_ON_AIR : '') + '</td>' +
                 '<td class="lib-title">' + esc(st.name) + '</td>' +
-                '<td class="rlist-song">' + esc(songCell(st)) + '</td>' +
+                '<td class="rlist-song" title="' + esc(songHint(st) || songCell(st)) + '">' + esc(songCell(st)) + '</td>' +
                 '<td class="lib-col-artist rlist-artist">' + esc(artistCell(st)) + '</td>' +
+                '<td class="rlist-genre" title="' + esc(stationGenre(st)) + '">' + esc(stationGenre(st)) + '</td>' +
                 '<td class="lib-num lib-col-bpm">' + (st.bitrate || '\u2014') + '</td>' +
                 '<td class="lib-col-album">' + esc(stationWhere(st)) + '</td>' +
               '</tr>';
