@@ -11239,8 +11239,8 @@ window.AW.startStats = function () {
          and behind everything else the page asks the Hub for. */
       var pick = items.filter(function (it) {
         return it.station && window.radioMetaSupported(it.station.url);
-      }).slice(0, 40);
-      var next = 0;
+      });
+      var next = 0, completed = 0, startedAt = Date.now();
       function one() {
         if (run !== metaRun || next >= pick.length) return null;
         var st = pick[next++].station;
@@ -11249,13 +11249,19 @@ window.AW.startStats = function () {
           if (t) { trackByStation[st.id] = t; delete metaMiss[st.id]; }
           else if (!(radioNow && radioNow.id === st.id)) { delete trackByStation[st.id]; metaMiss[st.id] = true; }
           paintMetaRow(st);
-        }, function () { return null; }).then(one);
+        }, function () { return null; }).then(function () {
+          if (run !== metaRun) return;
+          completed++;
+          if (completed === pick.length) {
+            /* Refresh only after every row was checked; otherwise a slow list
+               restarts before its last station ever gets a turn. */
+            metaRefresh = setTimeout(function () {
+              if (run === metaRun && !radio.hidden) radioFillMeta(items);
+            }, Math.max(1000, 60000 - (Date.now() - startedAt)));
+          } else return one();
+        });
       }
-      for (var k = 0; k < 4; k++) one();
-      /* Songs change: ask again in a minute while this list is the one shown. */
-      metaRefresh = setTimeout(function () {
-        if (run === metaRun && !radio.hidden) radioFillMeta(items);
-      }, 60000);
+      for (var k = 0; k < Math.min(4, pick.length); k++) one();
     }
 
     /* Patch the two cells in place. Re-rendering the whole table for one

@@ -81,6 +81,37 @@ test('every station in the list shows what is on the air, never its genre', asyn
   }, { timeout: 10_000, message: 'a genre is never shown as the song' }).toEqual([]);
 });
 
+test('station lists longer than forty read the last station with bounded concurrency', async ({ page }) => {
+  const stations = Array.from({ length: 45 }, (_, i) => ({
+    stationuuid: `radio-${String(i).padStart(3, '0')}`,
+    name: `Station ${String(i).padStart(3, '0')}`,
+    url_resolved: `https://radio.example/live/${String(i).padStart(3, '0')}`,
+    state: 'Illinois', country: 'United States', countrycode: 'US', tags: 'jazz',
+  }));
+  await page.route(/radio-browser\.info/i, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stations) }));
+  const asked: string[] = [];
+  let active = 0, maxActive = 0;
+  await page.route(`${COMPANION}/helper/v1/radio/now-playing**`, async (r) => {
+    const url = new URL(r.request().url()).searchParams.get('url') ?? '';
+    asked.push(url);
+    active++; maxActive = Math.max(active, maxActive);
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    active--;
+    return r.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'application/json' }, body: JSON.stringify({
+      title: `Live ${url.slice(-3)}`, artist: 'Test Artist', programme: null, programmeSource: null,
+    }) });
+  });
+  await boot(page);
+  await page.evaluate((c) => { (window as unknown as { COMPANION: string }).COMPANION = c; }, COMPANION);
+  await page.click('.tb__btn[data-view="radio"]');
+  await expect(page.locator('#radioMenu .rlist tbody tr')).toHaveCount(45, { timeout: 15_000 });
+  const last = page.locator('#radioMenu .rlist tbody tr', { hasText: 'Station 044' });
+  await expect(last.locator('.rlist-song')).toHaveText('Live 044', { timeout: 25_000 });
+  expect(asked).toContain('https://radio.example/live/044');
+  expect(maxActive).toBeLessThanOrEqual(4);
+  await expect(page.locator('#radioMenu .rlist tbody tr', { hasText: 'Station 000' }).locator('.rlist-song')).toHaveText('Live 000');
+});
+
 test('with no companion and no container, a station without a feed invents nothing', async ({ page }) => {
   await boot(page);
   await tuneWfmt(page);
