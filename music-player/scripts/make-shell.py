@@ -4794,6 +4794,49 @@ replace("    window.kv.get(HUB_KEY).then(function (v) {",
 replace("if (v && v.base && v.credentialId && v.secret) { hubAcct = v; paintHubPair(); paintProfileTab(); loadMe(); }",
         "if (v && v.base && v.credentialId && v.secret) { hubAcct = v; paintHubPair(); paintProfileTab(); loadMe(); if (hubPrefsReady) autoTestPairedHub(); }")
 
+# iHeart's live track feed answers again (us.api.iheart.com, CORS open): the song on the air at every
+# iHeart station, for the list and the player alike. 204 is "no song now" (an ad break, talk); a cue
+# past its end is the same. The station's description is no longer passed off as what is playing.
+replace("""        /* iHeart. Its track feed answers 410 for every station now, so there
+           is no song to be had — but the station's own description is a
+           truer programme line than a directory tag, and the id is sitting
+           in the stream URL (zc841 is station 841). */
+        match: /revma\\.ihrhls\\.com\\/zc([0-9]+)/i,
+        url: function (m) {
+          return 'https://us.api.iheart.com/api/v2/content/liveStations/' + m[1];
+        },
+        read: function (j) {
+          var h = j && j.hits && j.hits[0];
+          return h && h.description ? { title: h.description, artist: '', about: true } : null;
+        },""",
+        """        /* iHeart publishes the song on the air at each station, and the id is
+           sitting in the stream URL (zc841 is station 841). No content (204)
+           means no song right now; a cue that has already ended is the same. */
+        match: /revma\\.ihrhls\\.com\\/zc([0-9]+)/i,
+        url: function (m) {
+          return 'https://us.api.iheart.com/api/v3/live-meta/stream/' + m[1] + '/currentTrackMeta?defaultMetadata=true';
+        },
+        text: true,
+        read: function (body) {
+          var j = null;
+          try { j = body ? JSON.parse(body) : null; } catch (e) { j = null; }
+          if (!j || typeof j.title !== 'string' || !j.title.trim()) return null;
+          if (typeof j.endTime === 'number' && Date.now() > j.endTime + 60000) return null;
+          return { title: j.title.trim(), artist: typeof j.artist === 'string' ? j.artist.trim() : '' };
+        },""")
+
+# The tuned station also asks the paired Hub or the Companion, even when a feed named the song: they
+# add the programme on the air (an official schedule), and fill the song when the feed has none.
+replace("        .then(function (t) { return t || (tuned ? icyMeta(url) : null); });",
+        "        .then(function (t) {\n"
+        "          if (!tuned) return t;\n"
+        "          return icyMeta(url).then(function (d) {\n"
+        "            if (!t) return d;\n"
+        "            if (!d || !d.programme) return t;\n"
+        "            return { title: t.title, artist: t.artist, programme: d.programme };\n"
+        "          });\n"
+        "        });")
+
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):
     assert bad not in text, f'left behind: {bad}'

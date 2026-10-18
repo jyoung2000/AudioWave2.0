@@ -143,19 +143,33 @@ function titleConsumer(headers: Record<string, string | string[] | undefined>, m
   const reader = new IcyReader(metaint);
   let seen = 0;
   let blocks = 0;
+  let markers = 0;
+  let markerAt = 0;
   return (chunk: Buffer) => {
     seen += chunk.length;
     for (const meta of reader.feed(chunk)) {
       blocks += 1;
-      const raw = parseStreamTitle(meta);
+      const raw = parseStreamTitle(meta) ?? (/^adContext="/.test(meta.trim()) ? meta.trim() : null);
       if (raw) {
         const parts = splitOnAir(raw);
-        finish({ raw, artist: parts?.artist ?? null, title: parts?.title ?? null, station: stationName, reason: parts ? null : 'The station sent no song title' });
-        return;
+        if (parts) {
+          finish({ raw, artist: parts.artist, title: parts.title, station: stationName, reason: null });
+          return;
+        }
+        // An ad-break marker or station imaging: the song is usually the very next block.
+        markers += 1;
+        if (markers === 1) markerAt = seen;
+        if (markers >= 4) {
+          finish(none('The station sent no song title', stationName));
+          return;
+        }
       }
     }
-    // Two empty blocks in a row is a station between songs; asking again later is the answer.
-    if (blocks >= 2 || seen > maxBytes) finish(none('The station sent no song title', stationName));
+    // Two empty blocks in a row is a station between songs; asking again later is the answer. After
+    // a marker, two intervals with no song is an ad break still running (empty blocks are not counted).
+    if (blocks - markers >= 2 || (markers > 0 && seen - markerAt > 2 * (metaint + 1)) || seen > maxBytes) {
+      finish(none('The station sent no song title', stationName));
+    }
   };
 }
 

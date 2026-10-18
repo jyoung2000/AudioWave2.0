@@ -95,6 +95,20 @@ describe('GET /radio/now-playing', () => {
     expect(hub.fetch.calls).toHaveLength(1);
   });
 
+  it("returns an iHeart station's on-air show from its official schedule, alongside the ICY song", async () => {
+    hub = await createTestHub({ deps: { stationTitle: async () => ({ raw: 'x', artist: 'Belly Gang Kushington / 21 Savage', title: 'Wtf Goin', station: 'WGCI-FM', reason: null }) } });
+    const now = hub.clock.now();
+    hub.fetch.on('us.api.iheart.com/api/v2/content/liveStations/841', () => ({ body: { hits: [{ id: 841, website: 'wgci.iheart.com' }] } }));
+    hub.fetch.on('webapi.radioedit.iheart.com/graphql', () => ({ body: { data: { sites: { find: { onAirSchedule: { current: { name: 'Jamal Smallz', startMs: now - 60_000, stopMs: now + 60_000 } } } } } } }));
+    const owner = await hub.completeSetup();
+    const device = await pairDevice(hub, owner);
+    const url = `/api/v1/radio/now-playing?url=${encodeURIComponent('https://stream.revma.ihrhls.com/zc841')}`;
+    const response = await hub.app.inject({ method: 'GET', url, headers: { authorization: device.authorization } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ artist: 'Belly Gang Kushington / 21 Savage', title: 'Wtf Goin', programme: 'Jamal Smallz', programmeSource: 'schedule' });
+    expect(hub.fetch.calls.map((call) => new URL(call.url).hostname)).toEqual(['us.api.iheart.com', 'webapi.radioedit.iheart.com']);
+  });
+
   it('does not request a schedule for a host spoofing the BBC stream name', async () => {
     hub = await createTestHub({ deps: { stationTitle: async () => ({ raw: 'Artist - Song', artist: 'Artist', title: 'Song', station: null, reason: null }) } });
     const admin = await hub.completeSetup();

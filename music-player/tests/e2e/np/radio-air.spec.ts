@@ -161,6 +161,80 @@ test('the Companion shows its guide programme separately from its ICY song', asy
   await expect(page.locator('.player__where')).toContainText('Scheduled programme: Morning Music Hour');
 });
 
+/* 107.5 WGCI: an iHeart station. Its song comes from iHeart's live track feed; its show from the Hub. */
+const WGCI_TRACK = { title: 'WTF GOIN (Clean) (feat. 21 Savage)', artist: 'Belly Gang Kushington & 21 Savage', startTime: Date.now() - 30_000, endTime: Date.now() + 150_000 };
+const wgciRow = (page: Page) => page.locator('#radioMenu .rlist tbody tr', { hasText: '107.5 WGCI' });
+
+async function iheartFeed(page: Page, answer: () => { status: number; body: string }): Promise<string[]> {
+  const asked: string[] = [];
+  await page.route(/us\.api\.iheart\.com\/api\/v3\/live-meta\/stream\/\d+\/currentTrackMeta/, (r) => {
+    asked.push(r.request().url());
+    const a = answer();
+    return r.fulfill({ status: a.status, headers: { 'access-control-allow-origin': '*', 'content-type': 'application/json' }, body: a.body });
+  });
+  return asked;
+}
+
+async function tuneWgci(page: Page): Promise<void> {
+  await page.click('.tb__btn[data-view="radio"]');
+  await expect(page.locator('#libScopeLabel')).toHaveText('Chicago', { timeout: 15_000 });
+  await expect(wgciRow(page)).toBeVisible({ timeout: 15_000 });
+  await wgciRow(page).dispatchEvent('click');
+  await expect(wgciRow(page)).toHaveClass(/is-playing/, { timeout: 10_000 });
+}
+
+test('107.5 WGCI: the station list and the player show the song iHeart says is on the air', async ({ page }) => {
+  const asked = await iheartFeed(page, () => ({ status: 200, body: JSON.stringify(WGCI_TRACK) }));
+  await boot(page);
+  await page.click('.tb__btn[data-view="radio"]');
+  await expect(page.locator('#libScopeLabel')).toHaveText('Chicago', { timeout: 15_000 });
+  await expect(wgciRow(page).locator('.rlist-song')).toHaveText(WGCI_TRACK.title, { timeout: 15_000 });
+  await expect(wgciRow(page).locator('.rlist-artist')).toHaveText(WGCI_TRACK.artist);
+  expect(asked.some((u) => /\/stream\/841\/currentTrackMeta/.test(u)), JSON.stringify(asked)).toBe(true);
+  await tuneWgci(page);
+  await expect(page.locator('.player__title')).toHaveText(WGCI_TRACK.title, { timeout: 10_000 });
+});
+
+test('107.5 WGCI paired with the Hub: the song from iHeart, the show on the air from the Hub', async ({ page }) => {
+  await iheartFeed(page, () => ({ status: 200, body: JSON.stringify(WGCI_TRACK) }));
+  const hubAsked: string[] = [];
+  await boot(page);
+  await page.evaluate(async (a) => { await (window as unknown as { kv: { set(k: string, v: unknown): Promise<void> } }).kv.set('player:hub', a); }, ACCT);
+  await page.route(`${HUB}/**`, (r) => {
+    if (r.request().method() === 'OPTIONS') return r.fulfill({ status: 204, headers: CORS });
+    const u = new URL(r.request().url());
+    if (u.pathname === '/api/v1/radio/now-playing') {
+      hubAsked.push(u.searchParams.get('url') ?? '');
+      return r.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'application/json' }, body: JSON.stringify({ raw: 'x', artist: 'Belly Gang Kushington / 21 Savage', title: 'Wtf Goin', station: 'WGCI-FM', programme: 'Jamal Smallz', programmeSource: 'schedule', reason: null }) });
+    }
+    return r.fulfill({ status: 404, headers: CORS, body: '{}' });
+  });
+  await page.goto('about:blank');
+  await boot(page);
+  await tuneWgci(page);
+  await expect(page.locator('.player__title')).toHaveText(WGCI_TRACK.title, { timeout: 10_000 });
+  await expect(page.locator('.player__where')).toContainText('Scheduled programme: Jamal Smallz', { timeout: 10_000 });
+  expect(hubAsked).toContain('https://stream.revma.ihrhls.com/zc841');
+});
+
+test('107.5 WGCI in an ad break: no feed song, so the paired Hub names the show instead of a song', async ({ page }) => {
+  await iheartFeed(page, () => ({ status: 204, body: '' }));
+  await boot(page);
+  await page.evaluate(async (a) => { await (window as unknown as { kv: { set(k: string, v: unknown): Promise<void> } }).kv.set('player:hub', a); }, ACCT);
+  await page.route(`${HUB}/**`, (r) => {
+    if (r.request().method() === 'OPTIONS') return r.fulfill({ status: 204, headers: CORS });
+    if (new URL(r.request().url()).pathname === '/api/v1/radio/now-playing')
+      return r.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'application/json' }, body: JSON.stringify({ raw: null, artist: null, title: null, station: 'WGCI-FM', programme: 'Jamal Smallz', programmeSource: 'schedule', reason: 'The station sent no song title' }) });
+    return r.fulfill({ status: 404, headers: CORS, body: '{}' });
+  });
+  await page.goto('about:blank');
+  await boot(page);
+  await tuneWgci(page);
+  await expect(page.locator('.player__title')).toHaveText('Jamal Smallz', { timeout: 10_000 });
+  await wgciRow(page).click({ button: 'right', position: { x: 120, y: 8 } });
+  expect(await menuItems(page), 'a show is not a song to keep').not.toContain('Add Song to Up Next');
+});
+
 test('touch: a long press on a station opens the same menu, and the lift does not retune', async ({ browser }) => {
   const ctx = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 }, baseURL: 'http://127.0.0.1:4173' });
   const page = await ctx.newPage();

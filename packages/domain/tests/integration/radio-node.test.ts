@@ -80,6 +80,35 @@ describe('readStationTitle', () => {
     expect(Date.now() - t0).toBeLessThan(3000);
   });
 
+  it('reads past an iHeart ad-break marker to the song that follows it', async () => {
+    const url = await station((socket) => {
+      socket.write('HTTP/1.0 200 OK\r\nicy-metaint: 8\r\nicy-name: WGCI-FM\r\n\r\n');
+      socket.write(Buffer.concat([
+        Buffer.alloc(8, 0x41), metaBlock(`StreamTitle=' - text="Spot Block End" amgTrackId="9876543" length="00:00:00"';`),
+        Buffer.alloc(8, 0x41), metaBlock(`StreamTitle='Belly Gang Kushington / 21 Savage - text="Wtf Goin" song_spot="M" length="00:03:03"';`),
+      ]));
+    });
+    const r = await readStationTitle(url, LOCAL);
+    expect(r).toMatchObject({ artist: 'Belly Gang Kushington / 21 Savage', title: 'Wtf Goin', station: 'WGCI-FM', reason: null });
+  });
+
+  it('an ad break with no song after it is no song, not the marker text', async () => {
+    const url = await station((socket) => {
+      socket.write('HTTP/1.0 200 OK\r\nicy-metaint: 8\r\n\r\n');
+      socket.write(Buffer.concat([
+        Buffer.alloc(8, 0x41), metaBlock(`StreamTitle=' - text="Spot Block End" amgTrackId="9876543" length="00:00:00"';`),
+        Buffer.alloc(8, 0x41), metaBlock(`StreamTitle='adContext="aHR0cHM6Ly9leGFtcGxl"';`),
+        Buffer.alloc(8, 0x41), Buffer.from([0]), Buffer.alloc(8, 0x41), Buffer.from([0]),
+      ]));
+      // The stream keeps playing the break: more audio, and no song.
+      setTimeout(() => socket.write(Buffer.alloc(64, 0x41)), 50);
+    });
+    const r = await readStationTitle(url, LOCAL);
+    expect(r.title).toBeNull();
+    expect(r.artist).toBeNull();
+    expect(r.reason).toMatch(/no song title/);
+  });
+
   it('follows a redirect to the real stream', async () => {
     const target = await station((socket) => {
       socket.write('HTTP/1.0 200 OK\r\nicy-metaint: 4\r\n\r\n');

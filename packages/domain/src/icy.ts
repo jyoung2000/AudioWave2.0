@@ -73,11 +73,46 @@ export function parseStreamTitle(meta: string): string | null {
   return title ? title : null;
 }
 
+/**
+ * iHeart's revma streams write `Artist - text="Song" song_spot="M" length="00:03:03" …`: the artist
+ * before the dash, the song quoted in `text=`, and a `song_spot` that is "M" for music and "T" (and
+ * friends) for station imaging. Ad markers come as ` - text="Spot Block End" …` or `adContext="…"`.
+ */
+const TAGGED = /^(.*?)\s*-\s*text="([^"]*)"(.*)$/s;
+const AD_CONTEXT = /^adContext="/;
+const ENTITIES: Record<string, string> = { amp: '&', apos: "'", quot: '"', lt: '<', gt: '>' };
+
+function decodeEntities(value: string): string {
+  return value.replace(/&(amp|apos|quot|lt|gt|#\d+|#x[0-9a-f]+);/gi, (whole, name: string) => {
+    if (name[0] === '#') {
+      const code = name[1] === 'x' || name[1] === 'X' ? Number.parseInt(name.slice(2), 16) : Number.parseInt(name.slice(1), 10);
+      return Number.isFinite(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : whole;
+    }
+    return ENTITIES[name.toLowerCase()] ?? whole;
+  });
+}
+
+function splitTagged(text: string): { artist: string | null; title: string } | null | undefined {
+  if (AD_CONTEXT.test(text)) return null;
+  const tagged = TAGGED.exec(text);
+  if (!tagged) return undefined;
+  const rest = tagged[3] ?? '';
+  const spot = /\bsong_spot="([^"]*)"/.exec(rest)?.[1];
+  // Without a song_spot an artist-less cue ("Spot Block End") is an ad marker; with one, only music counts.
+  if (spot !== undefined ? spot.toUpperCase() !== 'M' : !tagged[1]!.trim()) return null;
+  const title = decodeEntities(tagged[2]!).trim();
+  const artist = decodeEntities(tagged[1]!).trim();
+  if (!/[\p{L}\p{N}]/u.test(title)) return null;
+  return { artist: artist || null, title };
+}
+
 /** "Artist - Title" as stations write it; a title with no spaced dash keeps no artist. */
 export function splitOnAir(value: string): { artist: string | null; title: string } | null {
   const text = value.trim();
   // A block of dashes or a lone separator is a station between songs, not a song.
   if (!/[\p{L}\p{N}]/u.test(text)) return null;
+  const tagged = splitTagged(text);
+  if (tagged !== undefined) return tagged;
   const at = text.indexOf(' - ');
   if (at < 0) return text ? { artist: null, title: text } : null;
   const artist = text.slice(0, at).trim();

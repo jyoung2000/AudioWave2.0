@@ -34,6 +34,26 @@ describe('splitOnAir', () => {
   });
 });
 
+/* Exactly what iHeart's revma streams sent for 107.5 WGCI and Rock 95.5 (captured live). */
+const IHEART_SONG = 'Belly Gang Kushington / 21 Savage - text="Wtf Goin" song_spot="M" MediaBaseId="0" itunesTrackId="0" amgTrackId="-1" amgArtistId="0" TAID="0" TPID="408731045" cartcutId="0447613001" amgArtworkURL="https://i.iheart.com/v3/catalog/track/408731045?ops=fit(200,200),format(%22jpeg%22)" length="00:03:03" unsID="-1" spotInstanceId="-1"';
+const IHEART_IMAGING = 'Chicago\'s Rock Station - text="ROCK 95.5" song_spot="T" MediaBaseId="0" itunesTrackId="0" amgTrackId="0" amgArtistId="0" TAID="0" TPID="0" cartcutId="0" amgArtworkURL="" length="00:00:00" unsID="0" spotInstanceId="-1"';
+const IHEART_SPOT_END = ' - text="Spot Block End" amgTrackId="9876543" length="00:00:00"';
+const IHEART_AD = 'adContext="aHR0cHM6Ly9uMjJiLWUyLnJldm1hLmlocmhscy5jb20vY2FjaGUvdmFzdC8y"';
+
+describe('splitOnAir with iHeart tagged titles', () => {
+  it('reads the artist and the quoted song out of a music cue', () => {
+    expect(splitOnAir(IHEART_SONG)).toEqual({ artist: 'Belly Gang Kushington / 21 Savage', title: 'Wtf Goin' });
+  });
+  it('station imaging, the end of an ad break and an ad context are not songs', () => {
+    expect(splitOnAir(IHEART_IMAGING)).toBeNull();
+    expect(splitOnAir(IHEART_SPOT_END)).toBeNull();
+    expect(splitOnAir(IHEART_AD)).toBeNull();
+  });
+  it('decodes the entities iHeart writes inside a quoted title', () => {
+    expect(splitOnAir('Guns N&apos; Roses - text="Don&apos;t Cry" song_spot="M" length="00:04:44"')).toEqual({ artist: "Guns N' Roses", title: "Don't Cry" });
+  });
+});
+
 describe('IcyReader', () => {
   it('skips the audio and returns the metadata text, across chunk boundaries', () => {
     const bytes = block(32, "StreamTitle='A - B';");

@@ -9,6 +9,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./radio-node": "./src/radio-node.ts",
+    "./radio-schedule": "./src/radio-schedule.ts",
     "./tool-install": "./src/tool-install/index.ts",
     "./catalog": "./src/catalog/index.ts",
     "./playlist-folder": "./src/playlist-folder/index.ts"

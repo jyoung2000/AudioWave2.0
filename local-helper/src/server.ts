@@ -30,6 +30,7 @@ import { HELPER_DEFAULT_HOSTS, HELPER_FILE_CHUNK_BYTES, HELPER_PROTOCOL, HELPER_
 import { Jobs, redactPaths, type FinishedFile } from './jobs.js';
 import { ResolveError, createResolver } from './resolve.js';
 import { readStationTitle } from '@now-playing/domain/radio-node';
+import { IHEART_HOSTS, readIheartProgramme } from '@now-playing/domain/radio-schedule';
 import type { StationNowPlaying } from '@now-playing/contracts';
 import { serveApp, type AppSource } from './app.js';
 import { LAN_READ_ROUTES, checkFetchUrl, hostAllowed, isLoopbackAddress, lanHostAllowed, lanPageAllowed, originAllowed, tokenMatches, type OriginPolicy } from './security.js';
@@ -37,7 +38,7 @@ import { cachedResolver, publicTool, toolSetupFor, type ResolvedTool } from './t
 import { CatalogAlbumRequest, CatalogArtistRequest, CatalogEnrichRequest, CatalogLyricsRequest, CatalogResolveRequest, CatalogSearchRequest, HELPER_CATALOG_ROUTES, NDJSON_CONTENT_TYPE } from '@now-playing/contracts';
 import { DomainError } from '@now-playing/domain';
 import { ndjsonLine, type CatalogFetch } from '@now-playing/domain/catalog';
-import { createHelperCatalog } from './catalog.js';
+import { createHelperCatalog, guardedCatalogFetch } from './catalog.js';
 import { ToolProvisioner } from './provision.js';
 
 const MAX_BODY_BYTES = 64 * 1024;
@@ -56,6 +57,8 @@ export interface HelperOptions {
   loopbackPages?: boolean;
   /** Reads a station's ICY title; tests inject a fake station. */
   stationTitle?: (url: string) => Promise<StationNowPlaying>;
+  /** Reads a station's published on-air schedule (iHeart only, today); tests inject a fake. */
+  scheduleFetch?: (url: string) => Promise<unknown>;
   app: AppSource | null;
   configured: { 'yt-dlp'?: string | undefined; spotdl?: string | undefined; ffmpeg?: string | undefined };
   log: (line: string) => void;
@@ -131,8 +134,19 @@ export async function startHelper(options: HelperOptions): Promise<Helper> {
   const stationCache = new Map<string, { at: number; value: Promise<StationNowPlaying> }>();
   let stationReads = 0;
   /** The ICY read is cached, but the programme is not: it can change at an XMLTV boundary. */
+  const scheduleFetch = options.scheduleFetch ?? ((): ((url: string) => Promise<unknown>) => {
+    const guarded = guardedCatalogFetch(fetch, undefined, IHEART_HOSTS);
+    return async (url: string) => {
+      const response = await guarded(url, { signal: AbortSignal.timeout(4000), headers: { accept: 'application/json' } });
+      if (response.status !== 200) throw new Error(`${new URL(url).hostname} answered ${response.status}`);
+      return response.json();
+    };
+  })();
   async function withRadioGuide(url: string, track: StationNowPlaying): Promise<StationNowPlaying> {
     const fallback = { ...track, programme: null, programmeSource: null };
+    // The station's own published schedule, when it has one; a Live TV guide entry otherwise.
+    const published = await readIheartProgramme(url, scheduleFetch, Date.now());
+    if (published) return { ...track, programme: published, programmeSource: 'schedule' };
     if (!options.tv) return fallback;
     try {
       // An exact stream match is required. A similar station name or a track title is not a guide.

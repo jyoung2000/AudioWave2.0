@@ -17764,17 +17764,20 @@ window.AW.startStats = function () {
         },
       },
       {
-        /* iHeart. Its track feed answers 410 for every station now, so there
-           is no song to be had — but the station's own description is a
-           truer programme line than a directory tag, and the id is sitting
-           in the stream URL (zc841 is station 841). */
+        /* iHeart publishes the song on the air at each station, and the id is
+           sitting in the stream URL (zc841 is station 841). No content (204)
+           means no song right now; a cue that has already ended is the same. */
         match: /revma\.ihrhls\.com\/zc([0-9]+)/i,
         url: function (m) {
-          return 'https://us.api.iheart.com/api/v2/content/liveStations/' + m[1];
+          return 'https://us.api.iheart.com/api/v3/live-meta/stream/' + m[1] + '/currentTrackMeta?defaultMetadata=true';
         },
-        read: function (j) {
-          var h = j && j.hits && j.hits[0];
-          return h && h.description ? { title: h.description, artist: '', about: true } : null;
+        text: true,
+        read: function (body) {
+          var j = null;
+          try { j = body ? JSON.parse(body) : null; } catch (e) { j = null; }
+          if (!j || typeof j.title !== 'string' || !j.title.trim()) return null;
+          if (typeof j.endTime === 'number' && Date.now() > j.endTime + 60000) return null;
+          return { title: j.title.trim(), artist: typeof j.artist === 'string' ? j.artist.trim() : '' };
         },
       },
     ];
@@ -17867,7 +17870,14 @@ window.AW.startStats = function () {
           metaCache[url] = { at: Date.now(), val: null };
           return null;
         })
-        .then(function (t) { return t || (tuned ? icyMeta(url) : null); });
+        .then(function (t) {
+          if (!tuned) return t;
+          return icyMeta(url).then(function (d) {
+            if (!t) return d;
+            if (!d || !d.programme) return t;
+            return { title: t.title, artist: t.artist, programme: d.programme };
+          });
+        });
       metaCache[url] = { at: now, val: c ? c.val : null, pending: pr };
       return pr;
     };

@@ -22,11 +22,11 @@ const MAX_BODY_BYTES = 4 * 1024 * 1024;
  * `fetch`, held to the catalog's hosts. Each hop's URL is validated, its name resolved and every
  * address it resolves to checked against private, loopback and link-local ranges before connecting.
  */
-export function guardedCatalogFetch(fetchImpl: typeof fetch = fetch, resolveName: (host: string) => Promise<string[]> = async (host) => (await lookup(host, { all: true })).map((a) => a.address)): CatalogFetch {
+export function guardedCatalogFetch(fetchImpl: typeof fetch = fetch, resolveName: (host: string) => Promise<string[]> = async (host) => (await lookup(host, { all: true })).map((a) => a.address), hosts: readonly string[] = CATALOG_API_HOSTS): CatalogFetch {
   return async (input, init) => {
     let url = input;
     for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
-      const checked = validateOutboundUrl(url, { allowedHosts: CATALOG_API_HOSTS, allowedSchemes: ['https:'], maxLength: 4096 });
+      const checked = validateOutboundUrl(url, { allowedHosts: hosts, allowedSchemes: ['https:'], maxLength: 4096 });
       if (!checked.ok || !checked.url) throw new Error(`Blocked outbound URL: ${checked.reason ?? 'not allowed'}`);
       const addresses = await resolveName(checked.url.hostname);
       const allowed = isResolvedAddressAllowed(addresses);

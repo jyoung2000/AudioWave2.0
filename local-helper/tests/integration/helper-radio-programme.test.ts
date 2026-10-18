@@ -17,6 +17,7 @@ let guide: HelperTvGuideEntry[] = [{ tvgId: 'fm-1', now: { title: 'Morning News'
 let track: StationNowPlaying = { raw: 'Band - Song', artist: 'Band', title: 'Song', station: null, reason: null };
 let reads = 0;
 let guideFails = false;
+const scheduleAsked: string[] = [];
 
 afterEach(() => {
   guideFails = false;
@@ -33,6 +34,12 @@ beforeAll(async () => {
     loopbackPages: true, app: null, configured: {}, log: () => {},
     tv: { channels: () => channels, guide: () => { if (guideFails) throw new Error('guide unavailable'); return guide; } },
     stationTitle: async () => { reads += 1; return track; },
+    scheduleFetch: async (url: string) => {
+      scheduleAsked.push(url);
+      if (url.includes('liveStations/841')) return { hits: [{ id: 841, website: 'wgci.iheart.com' }] };
+      if (url.includes('webapi.radioedit.iheart.com/graphql')) return { data: { sites: { find: { onAirSchedule: { current: { name: 'Jamal Smallz', startMs: Date.now() - 60_000, stopMs: Date.now() + 60_000 } } } } } };
+      throw new Error(`unexpected ${url}`);
+    },
   });
   base = helper.origin;
 });
@@ -89,5 +96,20 @@ describe('Companion radio metadata through the helper', () => {
     // A fresh stream URL bypasses the cached first-test title but uses the same playlist channel.
     channels = [{ ...channel, url: `${stream}?live=1` }];
     expect(await ask(`${stream}?live=1`)).toMatchObject({ station: 'Live Stream Name', title: null, programme: null, programmeSource: null, reason: 'No song metadata.' });
+  });
+
+  it("an iHeart station's on-air show comes from its official schedule, with the ICY song", async () => {
+    channels = [];
+    track = { raw: 'x', artist: 'Belly Gang Kushington / 21 Savage', title: 'Wtf Goin', station: 'WGCI-FM', reason: null };
+    expect(await ask('https://stream.revma.ihrhls.com/zc841')).toMatchObject({
+      artist: 'Belly Gang Kushington / 21 Savage', title: 'Wtf Goin', station: 'WGCI-FM', programme: 'Jamal Smallz', programmeSource: 'schedule',
+    });
+    expect(scheduleAsked.map((u) => new URL(u).hostname)).toEqual(['us.api.iheart.com', 'webapi.radioedit.iheart.com']);
+  });
+
+  it('a stream that is not iHeart never asks the iHeart schedule', async () => {
+    const before = scheduleAsked.length;
+    await ask('https://radio.example/other');
+    expect(scheduleAsked.length).toBe(before);
   });
 });

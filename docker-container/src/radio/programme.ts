@@ -1,4 +1,5 @@
 import type { SafeHttpClient } from '../providers/http.js';
+import { IHEART_HOSTS, readIheartProgramme } from '@now-playing/domain/radio-schedule';
 
 const BBC_SCHEDULE_HOST = 'ess.api.bbci.co.uk';
 const BBC_STREAM_HOST = 'stream.live.vc.bbcmedia.co.uk';
@@ -8,8 +9,12 @@ const BBC_SERVICES = new Set([
   'bbc_radio_four_extra', 'bbc_asian_network', 'bbc_world_service',
 ]);
 
-/** Only a known BBC stream path can select a service; never fetch the listener's URL as a schedule. */
+/** Only a known BBC stream path or an iHeart revma stream can select a schedule; never fetch the listener's URL as one. */
 export async function readCurrentProgramme(stream: string, http: SafeHttpClient, now: number): Promise<string | null> {
+  const iheart = await readIheartProgramme(stream, (url) => http.getJson<unknown>(url, {
+    allowedHosts: IHEART_HOSTS, allowedSchemes: ['https:'], maxRedirects: 0, timeoutMs: 3000, maxBytes: 300_000,
+  }), now);
+  if (iheart) return iheart;
   let url: URL;
   try { url = new URL(stream); } catch { return null; }
   const serviceId = url.pathname.slice(1);
