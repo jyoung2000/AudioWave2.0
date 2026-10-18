@@ -282,6 +282,10 @@ test.describe('streaming from a PC (AWSP)', () => {
     await page.fill('#pcCode', code);
     await page.click('#pcPair');
     await expect(page.locator('#pcMsg')).toHaveText('Paired with Test PC.', { timeout: 30_000 });
+    // The Connections table must recognise the encrypted Companion pairing, not only the legacy
+    // direct-helper token. Hub pairing is independent; both can be active at once.
+    await expect(page.locator('#connPassed tbody tr', { hasText: 'Station titles' }).locator('td').last()).toHaveText('Ready');
+    await expect(page.locator('#connPassed tbody tr', { hasText: 'Downloads' }).locator('td').last()).toHaveText('Ready');
     await expect(page.locator('#pcFacts')).toContainText('yt-dlp: setting up', { timeout: 20_000 });
     await expect(page.locator('#pcFacts')).toContainText('yt-dlp: e2e-installed', { timeout: 20_000 });
     await expect(page.locator('#pcFacts')).toContainText('spotDL: e2e-installed');
@@ -332,6 +336,9 @@ test.describe('streaming from a PC (AWSP)', () => {
     await expect(page.locator('#pcFacts')).toContainText('yt-dlp: e2e-installed', { timeout: 20_000 });
     expect(await page.evaluate(async () => (await window.NP_AWSP!.status()).endpointId)).toBe(pairedIdentity);
     expect(await page.evaluate(() => window.NP_AWSP!.companion('tv.channels'))).toMatchObject({ channels: [{ id: 'channel-e2e' }] });
+    await page.evaluate(() => window.NP_AWSP!.forget());
+    await expect(page.locator('#connPassed tbody tr', { hasText: 'Station titles' }).locator('td').last()).toHaveText('Waiting — not connected');
+    await expect(page.locator('#connPassed tbody tr', { hasText: 'Downloads' }).locator('td').last()).toHaveText('Waiting — not connected');
   });
 
   test('pairs, plays relay-carried, is bit-identical, seeks by range, and resumes across a relay restart', async ({ page }) => {

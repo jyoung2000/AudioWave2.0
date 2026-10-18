@@ -15921,8 +15921,16 @@ window.AW.startStats = function () {
        /api/v1/hub on 4546. Every request lands in the log with what came
        back, so "is it connected" is always something you can read. */
     var HELPER_PORT = 17342, HELPER_SCAN = 4, CONN_WAIT = 4000;
-    var conn = { app: null, hub: null };       // the last good answer from each
+    var conn = { app: null, hub: null, awsp: false }; // legacy helper, Hub, encrypted Companion
     var connEntries = [];
+    /* Encrypted Companion status comes from the separate AWSP settings card. The legacy helper
+       credential is independent, so only its supported routes use AWSP as an alternative. */
+    document.addEventListener('awsp:connection', function (event) {
+      var connected = !!(event.detail && event.detail.connected);
+      if (conn.awsp === connected) return;
+      conn.awsp = connected;
+      paintPassed();
+    });
 
     function connBase(v) {
       v = String(v || '').trim().replace(/\/+$/, '');
@@ -16136,7 +16144,7 @@ window.AW.startStats = function () {
       var tb = document.querySelector('#connPassed tbody');
       if (!tb) return;
       if (typeof paintBackup === 'function' && document.getElementById('bkNow')) paintBackup();
-      var S = cfg.sources, app = !!conn.app, hub = !!conn.hub;
+      var S = cfg.sources, app = !!conn.app, hub = !!conn.hub, awsp = !!conn.awsp;
       var group = window.listeningMode ? window.listeningMode() === 'group' : false;
       var rows = [
         ['Music folder', S.music, 'app', 'Scanned there; the path stays on this PC'],
@@ -16159,7 +16167,10 @@ window.AW.startStats = function () {
       rows.forEach(function (r) {
         var tr = document.createElement('tr');
         var set = !!r[1] && r[1] !== 'Off';
-        var up = r[2] === 'app' ? app : hub;
+        /* The encrypted Companion bridge carries downloads and radio titles without a legacy
+           helper token. Folder/backup rows still need their own configured path or direct helper. */
+        var viaAwsp = awsp && (r[0] === 'Downloads' || r[0] === 'Station titles');
+        var up = r[2] === 'app' ? (app || viaAwsp) : hub;
         var td = function (t, cls) { var c = document.createElement('td'); c.textContent = t; if (cls) c.className = cls; tr.appendChild(c); };
         td(r[0]);
         td(r[1] || 'Not set', r[1] && /[\\/:]/.test(r[1]) ? 'conn__mono' : r[1] ? '' : 'muted');
@@ -18563,6 +18574,7 @@ window.AW.startStats = function () {
         var name = s.serverName || 'your PC';
         forgetBtn.hidden = !s.paired;
         dot.setAttribute('data-state', s.status === 'connected' ? 'ok' : s.status === 'refused' ? 'bad' : s.paired ? 'warn' : 'off');
+        document.dispatchEvent(new CustomEvent('awsp:connection', { detail: { connected: s.paired && s.status === 'connected' } }));
         if (!s.paired) { fill([]); if (!pairBtn.disabled) msg.textContent = 'Not paired.'; return; }
         msg.textContent = s.status === 'connected' ? 'Paired with ' + name + '.'
           : s.status === 'refused' ? (s.lastError || 'The PC no longer accepts this player. Pair again.')

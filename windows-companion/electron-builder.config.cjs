@@ -33,8 +33,9 @@ module.exports = {
   // The native SQLite binding has to stay a real file on disk; it cannot be loaded from inside asar.
   asarUnpack: ['**/node_modules/better-sqlite3/**'],
   // The AWSP streaming server (awsp-server/, Rust) ships beside the app as its own executable; the
-  // main process finds it in resources/ (src/main/awsp.ts findAwspBinary). Built by `cargo build
-  // --release` in awsp-server/ before packaging; when it is absent, streaming says so in Settings.
+  // main process finds it in resources/ (src/main/awsp.ts findAwspBinary). Both `pnpm package`
+  // and `pnpm package:dir` compile it first; a stale executable can pair but reject newer Companion
+  // operations such as radio.nowPlaying with `unknown frame type "companion"`.
   extraResources: [{ from: 'awsp-server/target/release/awsp-server.exe', to: 'awsp-server.exe' }],
   npmRebuild: true,
   electronLanguages: ['en-US'],

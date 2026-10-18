@@ -5014,6 +5014,18 @@ replace("        ipodBtn.setAttribute('aria-expanded', 'false');   // a disclosu
 replace('  .lib-scope__refresh[hidden] { display: none; }',
         '  .lib-scope__refresh[hidden] { display: none; }\n  /* One turn of the glyph, so a refresh that comes back with the same rows still reads as having run. */\n  .lib-scope__refresh.is-spinning { animation: scope-spin 0.9s linear; }\n  @keyframes scope-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }\n  @media (prefers-reduced-motion: reduce) { .lib-scope__refresh.is-spinning { animation: none; opacity: 0.55; } }')
 
+# ---- connections: a paired encrypted Companion is also a working source of downloads and radio titles ----
+replace('    var conn = { app: null, hub: null };       // the last good answer from each',
+        '    var conn = { app: null, hub: null, awsp: false }; // legacy helper, Hub, encrypted Companion')
+replace('    var connEntries = [];',
+        "    var connEntries = [];\n    /* Encrypted Companion status comes from the separate AWSP settings card. The legacy helper\n       credential is independent, so only its supported routes use AWSP as an alternative. */\n    document.addEventListener('awsp:connection', function (event) {\n      var connected = !!(event.detail && event.detail.connected);\n      if (conn.awsp === connected) return;\n      conn.awsp = connected;\n      paintPassed();\n    });")
+replace('      var S = cfg.sources, app = !!conn.app, hub = !!conn.hub;',
+        '      var S = cfg.sources, app = !!conn.app, hub = !!conn.hub, awsp = !!conn.awsp;')
+replace("        var up = r[2] === 'app' ? app : hub;",
+        "        /* The encrypted Companion bridge carries downloads and radio titles without a legacy\n           helper token. Folder/backup rows still need their own configured path or direct helper. */\n        var viaAwsp = awsp && (r[0] === 'Downloads' || r[0] === 'Station titles');\n        var up = r[2] === 'app' ? (app || viaAwsp) : hub;")
+replace("        dot.setAttribute('data-state', s.status === 'connected' ? 'ok' : s.status === 'refused' ? 'bad' : s.paired ? 'warn' : 'off');\n        if (!s.paired)",
+        "        dot.setAttribute('data-state', s.status === 'connected' ? 'ok' : s.status === 'refused' ? 'bad' : s.paired ? 'warn' : 'off');\n        document.dispatchEvent(new CustomEvent('awsp:connection', { detail: { connected: s.paired && s.status === 'connected' } }));\n        if (!s.paired)")
+
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):
     assert bad not in text, f'left behind: {bad}'
