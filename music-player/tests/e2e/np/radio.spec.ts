@@ -49,8 +49,11 @@ test('radio now-playing metadata uses the paired Companion channel before local 
     const metadata = await w.radioMeta('https://metadata.example/stream', true);
     return { metadata, calls: w.__awspCalls };
   });
-  expect(result.metadata).toEqual({ title: 'Night Broadcast', artist: 'Companion Radio' });
-  expect(result.calls).toEqual([{ operation: 'radio.nowPlaying', args: { url: 'https://metadata.example/stream' } }]);
+  expect(result.metadata).toMatchObject({ title: 'Night Broadcast', artist: 'Companion Radio' });
+  // The app may concurrently load its TV guide; that does not change the radio channel used.
+  expect(result.calls.filter((call) => call.operation === 'radio.nowPlaying')).toEqual([
+    { operation: 'radio.nowPlaying', args: { url: 'https://metadata.example/stream' } },
+  ]);
 });
 
 async function openRadio(page: Page): Promise<void> {

@@ -28,6 +28,9 @@ describe('splitOnAir', () => {
   it('splits "Artist - Title" on the first spaced dash', () => {
     expect(splitOnAir('Daft Punk - Harder - Better')).toEqual({ artist: 'Daft Punk', title: 'Harder - Better' });
   });
+  it('does not treat an advertisement marker as a song', () => {
+    expect(splitOnAir('- Advertisement')).toBeNull();
+  });
   it('keeps a bare title whole, and a station slogan is not a song', () => {
     expect(splitOnAir('Morning Show')).toEqual({ artist: null, title: 'Morning Show' });
     expect(splitOnAir(' - ')).toBeNull();
@@ -48,6 +51,14 @@ describe('splitOnAir with iHeart tagged titles', () => {
     expect(splitOnAir(IHEART_IMAGING)).toBeNull();
     expect(splitOnAir(IHEART_SPOT_END)).toBeNull();
     expect(splitOnAir(IHEART_AD)).toBeNull();
+  });
+  it('does not display iHeart fallback cue attributes as a song title', () => {
+    // Rock 95.5 and KISS returned this during a live 204/no-song break.
+    expect(splitOnAir('title="Last Resort",artist="PAPA ROACH",url="song_spot="F" MediaBaseId="0" length="00:03:19"')).toBeNull();
+    expect(splitOnAir('title="Hot Girl Bummer",artist="BLACKBEAR",url="song_spot="F"')).toBeNull();
+  });
+  it('parses the alternate key/value shape only when iHeart marks it as music', () => {
+    expect(splitOnAir('title="Wtf Goin",artist="Belly Gang Kushington",url="song_spot="M"')).toEqual({ title: 'Wtf Goin', artist: 'Belly Gang Kushington' });
   });
   it('decodes the entities iHeart writes inside a quoted title', () => {
     expect(splitOnAir('Guns N&apos; Roses - text="Don&apos;t Cry" song_spot="M" length="00:04:44"')).toEqual({ artist: "Guns N' Roses", title: "Don't Cry" });

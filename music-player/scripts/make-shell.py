@@ -4837,6 +4837,127 @@ replace("        .then(function (t) { return t || (tuned ? icyMeta(url) : null);
         "          });\n"
         "        });")
 
+# Every station's Song column is what is on the air, never its genre. Stations without a feed of their
+# own are read by the paired Hub (or the Companion) — the same reader the tuned station uses — a few at a
+# time, and refreshed every minute while the list is open. A station that names nothing shows an empty
+# cell (with the reason on hover), a station between songs shows its scheduled show, and a genre is
+# never passed off as a song.
+replace("""         a real track, from SomaFM, Triton or radio.co;
+         the station's own description, where it publishes one but no track
+           (iHeart does exactly this — its track feed answers 410 for every
+           station, so "The Chi's #1 for Hip-Hop & R&B" is the most it will
+           ever say about what is on);
+         the format the directory has on file, for everyone else.
+
+       The Artist column is filled only by the first tier. It is left blank
+       rather than given a genre, because an empty cell reads as "not known",
+       which is true, and a mislabelled one does not. */""",
+        """         a real track, from a feed the station publishes (SomaFM, Triton,
+           radio.co, iHeart) or read from the stream itself by the paired Hub
+           or the Companion;
+         the show on the air, from the station's published schedule, when
+           there is no song (an ad break, talk);
+         nothing, for everyone else. A genre is not what is on the air.
+
+       An empty cell reads as "not known", which is true, and a mislabelled one
+       does not. */""")
+replace("""    function songCell(st) {
+      var t = trackByStation[st.id];
+      return (t && t.title) ? t.title : stationProgramme(st);
+    }""",
+        """    function songCell(st) {
+      var t = trackByStation[st.id];
+      return (t && t.title) ? t.title : '';
+    }
+
+    /* Why a cell is empty, for the tooltip: asked and told nothing, or not
+       asked yet. */
+    var metaMiss = {};
+    function songHint(st) {
+      var t = trackByStation[st.id];
+      if (t && t.about) return 'Scheduled programme (no song right now)';
+      if (t && t.title) return '';
+      return metaMiss[st.id] ? 'This station is not naming a song right now' : '';
+    }""")
+replace("""    var metaTimers = [];
+    function radioFillMeta(items) {
+      metaTimers.forEach(clearTimeout);
+      metaTimers = [];
+      if (typeof window.radioMeta !== 'function') return;
+      /* Only rows that have a feed count against the cap. Counting every row
+         meant a list whose first eight stations publish nothing spent its
+         whole allowance on silence and filled not one cell. */
+      var pick = items.filter(function (it) {
+        return it.station && window.radioMetaSupported(it.station.url);
+      }).slice(0, 24);
+      pick.forEach(function (it, n) {
+        metaTimers.push(setTimeout(function () {
+          var st = it.station;
+          window.radioMeta(st.url).then(function (t) {
+            if (!t) return;
+            trackByStation[st.id] = t;
+            paintMetaRow(st);
+          });
+        }, n * 220));
+      });
+    }""",
+        """    var metaRun = 0, metaRefresh = 0;
+    function radioFillMeta(items) {
+      var run = ++metaRun;
+      clearTimeout(metaRefresh);
+      if (typeof window.radioMeta !== 'function') return;
+      /* Four at a time: a station read from its stream holds a request open
+         for a second or so, and forty at once would queue behind each other
+         and behind everything else the page asks the Hub for. */
+      var pick = items.filter(function (it) {
+        return it.station && window.radioMetaSupported(it.station.url);
+      }).slice(0, 40);
+      var next = 0;
+      function one() {
+        if (run !== metaRun || next >= pick.length) return null;
+        var st = pick[next++].station;
+        return window.radioMeta(st.url).then(function (t) {
+          if (run !== metaRun) return;
+          if (t) { trackByStation[st.id] = t; delete metaMiss[st.id]; }
+          else if (!(radioNow && radioNow.id === st.id)) { delete trackByStation[st.id]; metaMiss[st.id] = true; }
+          paintMetaRow(st);
+        }, function () { return null; }).then(one);
+      }
+      for (var k = 0; k < 4; k++) one();
+      /* Songs change: ask again in a minute while this list is the one shown. */
+      metaRefresh = setTimeout(function () {
+        if (run === metaRun && !radio.hidden) radioFillMeta(items);
+      }, 60000);
+    }""")
+replace("""      if (song) song.textContent = songCell(st);
+      if (artist) artist.textContent = artistCell(st);""",
+        """      if (song) { song.textContent = songCell(st); song.title = songHint(st); }
+      if (artist) artist.textContent = artistCell(st);""")
+replace("""       to the station list (radioMetaSupported stays feed-only). */""",
+        """       to the station list as well as the tuned station. */""")
+replace("""    window.radioMetaSupported = function (url) { return !!feedFor(url); };""",
+        """    window.radioMetaSupported = function (url) { return !!url; };""")
+replace("""      if (!hit) return tuned ? icyMeta(url) : Promise.resolve(null);""",
+        """      if (!hit) return icyMeta(url);""")
+replace("""        .then(function (t) {
+          if (!tuned) return t;
+          return icyMeta(url).then(function (d) {""",
+        """        .then(function (t) {
+          /* No song in the feed (an ad break, a 204): the Hub or the Companion
+             reads the stream itself and names the show on the air. */
+          if (!tuned) return t || icyMeta(url);
+          return icyMeta(url).then(function (d) {""")
+
+# A scheduled programme is on the air, not a song: keep it in the station row but never in
+# the context menu's 'save song' actions (onAirSong already rejects t.about).
+replace("          document.dispatchEvent(new CustomEvent(t.about ? 'radio:clear-track' : 'radio:track',\n"
+        "            { detail: { id: mine, track: t.about ? null : t } }));",
+        "          document.dispatchEvent(new CustomEvent('radio:track',\n"
+        "            { detail: { id: mine, track: t } }));")
+# Without metadata, the Now Playing headline must not repurpose a directory genre as a song.
+replace("          title: nowTrack ? nowTrack.title : stationFormat(station),",
+        "          title: nowTrack ? nowTrack.title : 'Song not available',")
+
 # ---- sanity: none of the words that would mean sample data survive ----------------------------------------------
 for bad in ("S.src = 'demo'", "? 'browser' : 'demo'", 'Cassette Bloom', 'Fennel Grove', 'AW.buildDemo', 'Demo year', "'demo-'", 'DEMO_HISTORY', 'api.anthropic.com', 'anthropic-version', 'cdn.jsdelivr.net/npm/three@', 'Airwave One', 'The Glass Coast'):
     assert bad not in text, f'left behind: {bad}'

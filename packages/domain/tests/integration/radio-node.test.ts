@@ -80,6 +80,30 @@ describe('readStationTitle', () => {
     expect(Date.now() - t0).toBeLessThan(3000);
   });
 
+  // WRTE (Icecast): one "StreamTitle='';" block, then a zero-length block every interval after it.
+  it('an empty title followed by unchanged (zero-length) blocks answers promptly, not at the timeout', async () => {
+    const url = await station((socket) => {
+      socket.write('HTTP/1.0 200 OK\r\nicy-metaint: 8\r\nicy-name: wdcb-MP3\r\n\r\n');
+      socket.write(Buffer.concat([Buffer.alloc(8, 0x41), metaBlock("StreamTitle='';"), Buffer.alloc(8, 0x41), Buffer.from([0]), Buffer.alloc(8, 0x41), Buffer.from([0]), Buffer.alloc(8, 0x41)]));
+    });
+    const t0 = Date.now();
+    const r = await readStationTitle(url, { ...LOCAL, timeoutMs: 2500 });
+    expect(r).toMatchObject({ title: null, station: 'wdcb-MP3', reason: 'The station sent no song title' });
+    expect(Date.now() - t0).toBeLessThan(1500);
+  });
+
+  // WGN: metadata enabled, but every block is zero-length.
+  it('a station whose blocks are all empty says "no song title" without waiting out the timeout', async () => {
+    const url = await station((socket) => {
+      socket.write('HTTP/1.0 200 OK\r\nicy-metaint: 8\r\nicy-name: WGN-AM\r\n\r\n');
+      socket.write(Buffer.concat([Buffer.alloc(8, 0x41), Buffer.from([0]), Buffer.alloc(8, 0x41), Buffer.from([0]), Buffer.alloc(8, 0x41), Buffer.from([0]), Buffer.alloc(8, 0x41)]));
+    });
+    const t0 = Date.now();
+    const r = await readStationTitle(url, { ...LOCAL, timeoutMs: 2500 });
+    expect(r).toMatchObject({ title: null, station: 'WGN-AM', reason: 'The station sent no song title' });
+    expect(Date.now() - t0).toBeLessThan(1500);
+  });
+
   it('reads past an iHeart ad-break marker to the song that follows it', async () => {
     const url = await station((socket) => {
       socket.write('HTTP/1.0 200 OK\r\nicy-metaint: 8\r\nicy-name: WGCI-FM\r\n\r\n');

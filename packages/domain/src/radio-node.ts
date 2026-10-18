@@ -142,13 +142,11 @@ function titleConsumer(headers: Record<string, string | string[] | undefined>, m
   }
   const reader = new IcyReader(metaint);
   let seen = 0;
-  let blocks = 0;
   let markers = 0;
   let markerAt = 0;
   return (chunk: Buffer) => {
     seen += chunk.length;
     for (const meta of reader.feed(chunk)) {
-      blocks += 1;
       const raw = parseStreamTitle(meta) ?? (/^adContext="/.test(meta.trim()) ? meta.trim() : null);
       if (raw) {
         const parts = splitOnAir(raw);
@@ -165,9 +163,11 @@ function titleConsumer(headers: Record<string, string | string[] | undefined>, m
         }
       }
     }
-    // Two empty blocks in a row is a station between songs; asking again later is the answer. After
-    // a marker, two intervals with no song is an ad break still running (empty blocks are not counted).
-    if (blocks - markers >= 2 || (markers > 0 && seen - markerAt > 2 * (metaint + 1)) || seen > maxBytes) {
+    // Two blocks with no song — an empty title, or the zero-length "unchanged" block many stations
+    // send every interval — is a station with no song to name right now (talk radio, a stream that
+    // never fills its title): answer that now rather than holding the request open until the
+    // timeout. After a marker, two intervals with no song is an ad break still running.
+    if (reader.blocks - markers >= 2 || (markers > 0 && seen - markerAt > 2 * (metaint + 1)) || seen > maxBytes) {
       finish(none('The station sent no song title', stationName));
     }
   };

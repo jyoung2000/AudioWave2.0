@@ -55,15 +55,38 @@ test('a station with no feed shows the song its stream carries, read by the comp
   await expect(page.locator('.player__title')).toHaveText('Air Song', { timeout: 10_000 });
   await expect(stationRow(page).locator('.rlist-song')).toHaveText('Air Song');
   await expect(stationRow(page).locator('.rlist-artist')).toHaveText('Air Artist');
-  expect(asked.length, 'the helper was asked').toBeGreaterThan(0);
-  expect(asked.every((u) => /wfmt\.streamguys1\.com/.test(u)), `only the tuned stream is read, never the list: ${JSON.stringify(asked)}`).toBe(true);
+  expect(asked.some((u) => /wfmt\.streamguys1\.com/.test(u)), JSON.stringify(asked)).toBe(true);
+});
+
+test('every station in the list shows what is on the air, never its genre', async ({ page }) => {
+  // The Companion names a song for WFMT only; every other stream it reads has none right now.
+  const asked: string[] = [];
+  await page.route(`${COMPANION}/helper/v1/radio/now-playing**`, (r) => {
+    const u = new URL(r.request().url()).searchParams.get('url') ?? '';
+    asked.push(u);
+    const body = /wfmt/.test(u) ? ON_AIR : { raw: null, artist: null, title: null, station: null, programme: null, programmeSource: null, reason: 'The station sent no song title' };
+    return r.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  });
+  await boot(page);
+  await page.evaluate((c) => { (window as unknown as { COMPANION: string }).COMPANION = c; }, COMPANION);
+  await page.click('.tb__btn[data-view="radio"]');
+  await expect(page.locator('#libScopeLabel')).toHaveText('Chicago', { timeout: 15_000 });
+  // Nothing tuned: the list itself asks, and the song lands in the WFMT row.
+  await expect(stationRow(page).first().locator('.rlist-song')).toHaveText('Air Song', { timeout: 20_000 });
+  await expect(stationRow(page).first().locator('.rlist-artist')).toHaveText('Air Artist');
+  expect(new Set(asked).size, 'stations without a feed of their own are read too').toBeGreaterThan(3);
+  await expect.poll(async () => {
+    const rows = await page.$$eval('#radioMenu .rlist tbody tr', (rs) => rs.map((r) => ({ tags: '', song: (r.querySelector('.rlist-song')?.textContent ?? '').trim() })));
+    return rows.filter((r) => /^(Jazz|Classical|Gospel|Pop|Rock|Oldies|Charts|Audio drama|Live broadcast|Urban contemporary|Classic hits)$/i.test(r.song)).map((r) => r.song);
+  }, { timeout: 10_000, message: 'a genre is never shown as the song' }).toEqual([]);
 });
 
 test('with no companion and no container, a station without a feed invents nothing', async ({ page }) => {
   await boot(page);
   await tuneWfmt(page);
   await page.waitForTimeout(1500);
-  await expect(page.locator('.player__title')).not.toHaveText('Air Song');
+  await expect(page.locator('.player__title')).toHaveText('Song not available');
+  await expect(page.locator('.player__title')).not.toHaveText('Classical');
   await stationRow(page).click({ button: 'right', position: { x: 120, y: 8 } });
   expect(await menuItems(page), 'no song, so nothing to keep').not.toContain('Add Song to Up Next');
 });
@@ -229,8 +252,12 @@ test('107.5 WGCI in an ad break: no feed song, so the paired Hub names the show 
   });
   await page.goto('about:blank');
   await boot(page);
+  await page.evaluate(() => { (window as unknown as { __radioClear: number }).__radioClear = 0;
+    document.addEventListener('radio:clear-track', () => { (window as unknown as { __radioClear: number }).__radioClear++; }); });
   await tuneWgci(page);
   await expect(page.locator('.player__title')).toHaveText('Jamal Smallz', { timeout: 10_000 });
+  await expect(wgciRow(page).locator('.rlist-song')).toHaveText('Jamal Smallz');
+  expect(await page.evaluate(() => (window as unknown as { __radioClear: number }).__radioClear), 'a programme should remain in the tuned station row').toBe(0);
   await wgciRow(page).click({ button: 'right', position: { x: 120, y: 8 } });
   expect(await menuItems(page), 'a show is not a song to keep').not.toContain('Add Song to Up Next');
 });

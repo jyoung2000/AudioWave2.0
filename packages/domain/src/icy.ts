@@ -13,6 +13,8 @@ export class IcyReader {
   private audioLeft: number;
   private metaLeft = -1;
   private meta: number[] = [];
+  /** Every metadata block completed so far, empty ones included (a zero length byte means "unchanged"). */
+  blocks = 0;
 
   constructor(private readonly metaint: number) {
     if (!Number.isInteger(metaint) || metaint <= 0) throw new RangeError('icy-metaint must be a positive integer');
@@ -41,6 +43,7 @@ export class IcyReader {
         i += take;
       }
       if (this.metaLeft === 0) {
+        this.blocks += 1;
         const text = decodeMeta(Uint8Array.from(this.meta));
         if (text) out.push(text);
       }
@@ -94,6 +97,16 @@ function decodeEntities(value: string): string {
 
 function splitTagged(text: string): { artist: string | null; title: string } | null | undefined {
   if (AD_CONTEXT.test(text)) return null;
+  // iHeart occasionally sends a second, key/value cue shape rather than "Artist - text=...".
+  // A live F (fallback) cue was observed while the official song feed returned 204: do not
+  // print its raw attributes as a song. Only an explicitly marked M cue may name one.
+  if (/^title=\"/i.test(text)) {
+    const cue = /^title="([^"]*)",artist="([^"]*)",url="song_spot="([^"]*)"/i.exec(text);
+    if (!cue || cue[3]!.toUpperCase() !== 'M') return null;
+    const title = decodeEntities(cue[1]!).trim();
+    if (!/[\p{L}\p{N}]/u.test(title)) return null;
+    return { title, artist: decodeEntities(cue[2]!).trim() || null };
+  }
   const tagged = TAGGED.exec(text);
   if (!tagged) return undefined;
   const rest = tagged[3] ?? '';
@@ -109,6 +122,8 @@ function splitTagged(text: string): { artist: string | null; title: string } | n
 /** "Artist - Title" as stations write it; a title with no spaced dash keeps no artist. */
 export function splitOnAir(value: string): { artist: string | null; title: string } | null {
   const text = value.trim();
+  // WGN transmits this literal cue during ad breaks; a cue is not a track or a programme.
+  if (/^(?:[-–—]\s*)?(?:advertisement|commercial break|ad break)$/i.test(text)) return null;
   // A block of dashes or a lone separator is a station between songs, not a song.
   if (!/[\p{L}\p{N}]/u.test(text)) return null;
   const tagged = splitTagged(text);
