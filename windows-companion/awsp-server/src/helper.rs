@@ -86,6 +86,41 @@ fn valid_download_request(args: &Value) -> bool {
         })
 }
 
+/// The sections the catalog defines. A paired device may ask for any of them -- the same ones the
+/// companion's own window can ask for -- and nothing else: an unknown word is dropped rather than
+/// forwarded, so AWSP can never widen what the helper is asked for beyond the catalog's own list.
+const CATALOG_SECTIONS: [&str; 4] = ["tracks", "artists", "albums", "playlists"];
+
+/// Build the helper's catalog-search query from a paired device's arguments.
+///
+/// Sections were hardcoded to `tracks`, so a paired player could never open an artist or an album
+/// through the companion even though the helper answers every section. Naming none still means
+/// songs, which is what every existing caller relies on.
+fn catalog_search_query(args: &Value) -> Option<Vec<(String, String)>> {
+    let search = args
+        .get("q")
+        .and_then(Value::as_str)
+        .filter(|v| !v.trim().is_empty() && v.len() <= 400)?;
+
+    let named = args.get("sections").and_then(Value::as_str).unwrap_or("");
+    let mut sections: Vec<&str> = named
+        .split(',')
+        .map(str::trim)
+        .filter(|s| CATALOG_SECTIONS.contains(s))
+        .collect();
+    sections.dedup();
+    if sections.is_empty() {
+        sections.push("tracks");
+    }
+
+    Some(vec![
+        ("q".to_string(), search.to_string()),
+        ("sections".to_string(), sections.join(",")),
+        ("limit".to_string(), "25".to_string()),
+        ("stream".to_string(), "0".to_string()),
+    ])
+}
+
 fn safe_file_id<'a>(args: &'a Value, key: &str) -> Option<&'a str> {
     args.get(key)
         .and_then(Value::as_str)
@@ -166,24 +201,14 @@ impl HelperBridge {
             }
             "catalog.search" => {
                 path = "/helper/v1/catalog/search".into();
-                let Some(search) = args
-                    .get("q")
-                    .and_then(Value::as_str)
-                    .filter(|v| !v.trim().is_empty() && v.len() <= 400)
-                else {
-                    return Err(HelperError::Forbidden);
-                };
-                // Metadata search only: `sections=tracks` keeps this to catalog lookups, and the
-                // provider list is left to the helper's own default. Naming a provider here once
+                // The provider list is left to the helper's own default: naming one here once
                 // pinned it to "musicsearch", which is not a CatalogProviderId at all, so the
                 // helper rejected every paired search with a 400 and the PWA saw only
                 // "companion-unavailable".
-                query.extend([
-                    ("q".into(), search.into()),
-                    ("sections".into(), "tracks".into()),
-                    ("limit".into(), "25".into()),
-                    ("stream".into(), "0".into()),
-                ]);
+                let Some(built) = catalog_search_query(&args) else {
+                    return Err(HelperError::Forbidden);
+                };
+                query.extend(built);
             }
             "tools.status" => path = "/helper/v1/health".into(),
             "downloads.start" => {
@@ -320,6 +345,48 @@ impl HelperBridge {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    /// A paired device asked for a song and could only ever get songs.
+    ///
+    /// The companion's own window asks the helper for artists and albums too, and the hub answers
+    /// every section. Over AWSP the sections were hardcoded to `tracks`, so a paired player could
+    /// never open an artist or an album through the companion -- the same search that works in the
+    /// companion's window came back songs-only on the device, which is one of the ways the three
+    /// apps disagreed about an artist's discography.
+    ///
+    /// The sections a caller names are passed through, limited to the ones the catalog defines so a
+    /// paired device still cannot ask the helper for anything the companion's window would not.
+    #[test]
+    fn catalog_search_passes_through_the_sections_a_caller_asked_for() {
+        let asked = catalog_search_query(&json!({ "q": "drake", "sections": "artists,albums" }))
+            .expect("a valid search");
+        let sections = asked
+            .iter()
+            .find(|(k, _)| k == "sections")
+            .map(|(_, v)| v.as_str())
+            .expect("sections are always sent");
+        assert_eq!(sections, "artists,albums");
+    }
+
+    /// Naming nothing still means songs, which is what every existing caller relies on.
+    #[test]
+    fn catalog_search_defaults_to_tracks() {
+        let asked = catalog_search_query(&json!({ "q": "drake" })).expect("a valid search");
+        assert!(asked.contains(&("sections".to_string(), "tracks".to_string())));
+    }
+
+    /// A section the catalog does not define is dropped rather than forwarded.
+    #[test]
+    fn catalog_search_refuses_sections_the_catalog_does_not_define() {
+        let asked = catalog_search_query(&json!({ "q": "drake", "sections": "artists,passwords" }))
+            .expect("a valid search");
+        let sections = asked
+            .iter()
+            .find(|(k, _)| k == "sections")
+            .map(|(_, v)| v.as_str())
+            .expect("sections are always sent");
+        assert_eq!(sections, "artists");
+    }
 
     #[test]
     fn downloader_requests_require_supported_tools_and_explicit_rights() {
