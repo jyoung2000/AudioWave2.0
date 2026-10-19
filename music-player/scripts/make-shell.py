@@ -4986,6 +4986,67 @@ replace('  .rlist tbody tr { cursor: default; }',
 replace('      if (song) { song.textContent = songCell(st); song.title = songHint(st); }', '      if (song) { song.textContent = songCell(st); song.title = songHint(st) || songCell(st); }')
 replace('                \'<td class="rlist-song">\' + esc(songCell(st)) + \'</td>\' +', '                \'<td class="rlist-song" title="\' + esc(songHint(st) || songCell(st)) + \'">\' + esc(songCell(st)) + \'</td>\' +')
 
+# ---- radio: the Song and Artist columns are a live reading, so a pass must always finish ----
+# A station can accept the connection and then never send a title. That read stayed outstanding for
+# as long as the page was open, `completed` never reached the row count, and the next pass was
+# therefore never armed: one silent station froze Song and Artist for the whole list. Each read now
+# has its own bounded wait, and the pass is armed from a single place once the readings are in.
+replace("""      var next = 0, completed = 0, startedAt = Date.now();
+      function one() {
+        if (run !== metaRun || next >= pick.length) return null;
+        var st = pick[next++].station;
+        return window.radioMeta(st.url).then(function (t) {""",
+        """      var next = 0, completed = 0, startedAt = Date.now(), armed = false;
+      /* One place arms the next pass. A hidden list postpones it rather than cancelling it: polling a
+         list nobody is looking at wastes requests, but dropping the timer altogether is what used to
+         leave the view frozen on stale songs when it was opened again. */
+      function arm() {
+        if (run !== metaRun || armed) return;
+        armed = true;
+        clearTimeout(metaRefresh);
+        metaRefresh = setTimeout(function () {
+          if (run !== metaRun) return;
+          if (radio.hidden) { armed = false; arm(); return; }
+          radioFillMeta(items);
+        }, Math.max(1000, 60000 - (Date.now() - startedAt)));
+      }
+      /* A stream that connects and then stays silent is counted as unanswered rather than waited on
+         forever, so one such station cannot stop the rest of the list from keeping up. */
+      var SLOW_READ = { slow: true };
+      function readWithDeadline(url) {
+        return new Promise(function (resolve) {
+          var settled = false, timer = setTimeout(function () {
+            if (settled) return;
+            settled = true;
+            /* Not an answer of "no song": an answer that has not arrived yet. Reported as its own
+               thing so a slow read leaves the row as it was instead of blanking a playing song. */
+            resolve(SLOW_READ);
+          }, 20000);
+          window.radioMeta(url).then(function (t) {
+            if (settled) return;
+            settled = true; clearTimeout(timer); resolve(t);
+          }, function () {
+            if (settled) return;
+            settled = true; clearTimeout(timer); resolve(null);
+          });
+        });
+      }
+      function one() {
+        if (run !== metaRun || next >= pick.length) return null;
+        var st = pick[next++].station;
+        return readWithDeadline(st.url).then(function (t) {""")
+replace("""          completed++;
+          if (completed === pick.length) {
+            /* Refresh only after every row was checked; otherwise a slow list
+               restarts before its last station ever gets a turn. */
+            metaRefresh = setTimeout(function () {
+              if (run === metaRun && !radio.hidden) radioFillMeta(items);
+            }, Math.max(1000, 60000 - (Date.now() - startedAt)));
+          } else return one();""",
+        """          completed++;
+          if (completed < pick.length) return one();
+          arm();""")
+
 # ---- radio: fill Genre and Kbps from the stream when the directory carries neither ----
 replace("    function stationGenre(st) {\n      var place = String(st.where || st.state || '').trim().toLowerCase();\n      var country = String(st.country || '').trim().toLowerCase();\n      var code = String(st.code || '').trim().toLowerCase();\n      var tags = String(st.tags || '').split(',');\n      for (var i = 0; i < tags.length; i++) {\n        var tag = tags[i].trim(), lower = tag.toLowerCase();\n        if (!tag || lower === country || lower === code || lower === place ||\n            place.indexOf(lower + ',') === 0 || place.indexOf(lower + ' ') === 0) continue;\n        return tag.charAt(0).toUpperCase() + tag.slice(1);\n      }\n      return '—';\n    }",
         "    function stationGenre(st) {\n      var place = String(st.where || st.state || '').trim().toLowerCase();\n      var country = String(st.country || '').trim().toLowerCase();\n      var code = String(st.code || '').trim().toLowerCase();\n      var tags = String(st.tags || '').split(',');\n      for (var i = 0; i < tags.length; i++) {\n        var tag = tags[i].trim(), lower = tag.toLowerCase();\n        if (!tag || lower === country || lower === code || lower === place ||\n            place.indexOf(lower + ',') === 0 || place.indexOf(lower + ' ') === 0) continue;\n        return tag.charAt(0).toUpperCase() + tag.slice(1);\n      }\n      /* The directory carries no tags for a great many stations — every iHeart one — but the\n         stream itself announces a genre, and the Hub or the Companion can read it. Second best,\n         not invented: still the station's own description of itself. */\n      var t = trackByStation[st.id];\n      if (t && t.genre) return t.genre.charAt(0).toUpperCase() + t.genre.slice(1);\n      return '—';\n    }\n\n    /* Same story for the bitrate: the directory records 0 for stations it never measured, while\n       the stream announces icy-br. */\n    function stationKbps(st) {\n      if (st.bitrate) return String(st.bitrate);\n      var t = trackByStation[st.id];\n      if (t && t.bitrate) return String(t.bitrate);\n      return '—';\n    }")
@@ -4994,7 +5055,7 @@ replace("      var song = row.querySelector('.rlist-song');\n      var artist = 
 replace('                \'<td class="lib-num lib-col-bpm">\' + (st.bitrate || \'\\u2014\') + \'</td>\' +',
         '                \'<td class="lib-num lib-col-bpm">\' + esc(stationKbps(st)) + \'</td>\' +')
 replace('          if (t) { trackByStation[st.id] = t; delete metaMiss[st.id]; }\n          else if (!(radioNow && radioNow.id === st.id)) { delete trackByStation[st.id]; metaMiss[st.id] = true; }',
-        '          /* An answer with no song but a genre or a bitrate is still an answer: keep it for those\n             columns and mark the song as asked-and-unnamed. */\n          if (t && (t.title || t.genre || t.bitrate)) { trackByStation[st.id] = t; if (t.title) delete metaMiss[st.id]; else metaMiss[st.id] = true; }\n          else if (!(radioNow && radioNow.id === st.id)) { delete trackByStation[st.id]; metaMiss[st.id] = true; }')
+        '          /* Still outstanding: keep what the row shows. Counting a slow read as "no song" would\n             wipe a song that is still playing. */\n          if (t === SLOW_READ) return;\n          /* An answer with no song but a genre or a bitrate is still an answer: keep it for those\n             columns and mark the song as asked-and-unnamed. */\n          if (t && (t.title || t.genre || t.bitrate)) { trackByStation[st.id] = t; if (t.title) delete metaMiss[st.id]; else metaMiss[st.id] = true; }\n          else if (!(radioNow && radioNow.id === st.id)) { delete trackByStation[st.id]; metaMiss[st.id] = true; }')
 replace("      var pr = icyAsk(url).then(function (d) {\n        var p = d && d.programme && d.programmeSource === 'schedule' ? String(d.programme) : '';\n        var t = d && d.title ? { title: String(d.title), artist: d.artist ? String(d.artist) : '', programme: p } :\n                p ? { title: p, artist: '', about: true, programme: p } : null;\n        metaCache[key] = { at: Date.now(), val: t };\n        return t;\n      }, function () {",
         "      var pr = icyAsk(url).then(function (d) {\n        var p = d && d.programme && d.programmeSource === 'schedule' ? String(d.programme) : '';\n        /* What the stream says about itself fills the Genre and Kbps columns the directory left\n           empty, and it outlives having no song: a station naming no track still has a genre. */\n        var gen = d && d.genre ? String(d.genre) : '';\n        var br = d ? Number(d.bitrate) || 0 : 0;\n        var t = d && d.title ? { title: String(d.title), artist: d.artist ? String(d.artist) : '', programme: p } :\n                p ? { title: p, artist: '', about: true, programme: p } :\n                (gen || br) ? { title: '', artist: '' } : null;\n        if (t) { t.genre = gen; t.bitrate = br; }\n        metaCache[key] = { at: Date.now(), val: t };\n        return t;\n      }, function () {")
 replace('          if (!tuned) return t || icyMeta(url);\n          return icyMeta(url).then(function (d) {\n            if (!t) return d;\n            if (!d || !d.programme) return t;\n            return { title: t.title, artist: t.artist, programme: d.programme };\n          });',

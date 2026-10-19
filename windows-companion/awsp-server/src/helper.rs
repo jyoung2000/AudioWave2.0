@@ -173,10 +173,13 @@ impl HelperBridge {
                 else {
                     return Err(HelperError::Forbidden);
                 };
-                // MusicSearch is forced to metadata search only; callers cannot select download APIs.
+                // Metadata search only: `sections=tracks` keeps this to catalog lookups, and the
+                // provider list is left to the helper's own default. Naming a provider here once
+                // pinned it to "musicsearch", which is not a CatalogProviderId at all, so the
+                // helper rejected every paired search with a 400 and the PWA saw only
+                // "companion-unavailable".
                 query.extend([
                     ("q".into(), search.into()),
-                    ("providers".into(), "musicsearch".into()),
                     ("sections".into(), "tracks".into()),
                     ("limit".into(), "25".into()),
                     ("stream".into(), "0".into()),

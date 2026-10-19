@@ -11276,12 +11276,49 @@ window.AW.startStats = function () {
       var pick = items.filter(function (it) {
         return it.station && window.radioMetaSupported(it.station.url);
       });
-      var next = 0, completed = 0, startedAt = Date.now();
+      var next = 0, completed = 0, startedAt = Date.now(), armed = false;
+      /* One place arms the next pass. A hidden list postpones it rather than cancelling it: polling a
+         list nobody is looking at wastes requests, but dropping the timer altogether is what used to
+         leave the view frozen on stale songs when it was opened again. */
+      function arm() {
+        if (run !== metaRun || armed) return;
+        armed = true;
+        clearTimeout(metaRefresh);
+        metaRefresh = setTimeout(function () {
+          if (run !== metaRun) return;
+          if (radio.hidden) { armed = false; arm(); return; }
+          radioFillMeta(items);
+        }, Math.max(1000, 60000 - (Date.now() - startedAt)));
+      }
+      /* A stream that connects and then stays silent is counted as unanswered rather than waited on
+         forever, so one such station cannot stop the rest of the list from keeping up. */
+      var SLOW_READ = { slow: true };
+      function readWithDeadline(url) {
+        return new Promise(function (resolve) {
+          var settled = false, timer = setTimeout(function () {
+            if (settled) return;
+            settled = true;
+            /* Not an answer of "no song": an answer that has not arrived yet. Reported as its own
+               thing so a slow read leaves the row as it was instead of blanking a playing song. */
+            resolve(SLOW_READ);
+          }, 20000);
+          window.radioMeta(url).then(function (t) {
+            if (settled) return;
+            settled = true; clearTimeout(timer); resolve(t);
+          }, function () {
+            if (settled) return;
+            settled = true; clearTimeout(timer); resolve(null);
+          });
+        });
+      }
       function one() {
         if (run !== metaRun || next >= pick.length) return null;
         var st = pick[next++].station;
-        return window.radioMeta(st.url).then(function (t) {
+        return readWithDeadline(st.url).then(function (t) {
           if (run !== metaRun) return;
+          /* Still outstanding: keep what the row shows. Counting a slow read as "no song" would
+             wipe a song that is still playing. */
+          if (t === SLOW_READ) return;
           /* An answer with no song but a genre or a bitrate is still an answer: keep it for those
              columns and mark the song as asked-and-unnamed. */
           if (t && (t.title || t.genre || t.bitrate)) { trackByStation[st.id] = t; if (t.title) delete metaMiss[st.id]; else metaMiss[st.id] = true; }
@@ -11290,13 +11327,8 @@ window.AW.startStats = function () {
         }, function () { return null; }).then(function () {
           if (run !== metaRun) return;
           completed++;
-          if (completed === pick.length) {
-            /* Refresh only after every row was checked; otherwise a slow list
-               restarts before its last station ever gets a turn. */
-            metaRefresh = setTimeout(function () {
-              if (run === metaRun && !radio.hidden) radioFillMeta(items);
-            }, Math.max(1000, 60000 - (Date.now() - startedAt)));
-          } else return one();
+          if (completed < pick.length) return one();
+          arm();
         });
       }
       for (var k = 0; k < Math.min(4, pick.length); k++) one();

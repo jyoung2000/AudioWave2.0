@@ -163,6 +163,9 @@ test('a station the directory describes thinly fills Genre and Kbps from its str
   await expect(vague.locator('.lib-col-bpm')).toHaveText('—');
 });
 
+/* The Song and Artist columns are a live reading, not a one-time fill: a station changes song every
+   few minutes, so a list left open must keep up with it. Two ways the refresh used to die for good
+   are pinned here, because both left the columns frozen with no sign anything was wrong. */
 test('a paired AWSP companion keeps the stream Genre and Kbps in separate columns', async ({ page }) => {
   const stations = [{ stationuuid: 'awsp-1', name: 'College Station', url_resolved: 'https://radio.example/college', state: 'Chicago, IL', country: 'United States', countrycode: 'US', tags: '', bitrate: 0 }];
   await page.route(/radio-browser\.info/i, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stations) }));
@@ -312,7 +315,13 @@ test('the Companion shows its guide programme separately from its ICY song', asy
 });
 
 /* 107.5 WGCI: an iHeart station. Its song comes from iHeart's live track feed; its show from the Hub. */
-const WGCI_TRACK = { title: 'WTF GOIN (Clean) (feat. 21 Savage)', artist: 'Belly Gang Kushington & 21 Savage', startTime: Date.now() - 30_000, endTime: Date.now() + 150_000 };
+/* Title and artist are fixed; the airtime window is not. The player drops an iHeart track whose
+   window closed more than a minute ago — correctly, because such a track is no longer on the air.
+   Freezing `endTime` at module load made this fixture expire partway through a slow run, so the
+   drill failed for having taken too long rather than for anything it was testing. The window is
+   therefore computed per request, which is also how iHeart actually answers. */
+const WGCI_TRACK = { title: 'WTF GOIN (Clean) (feat. 21 Savage)', artist: 'Belly Gang Kushington & 21 Savage' };
+const wgciOnAir = () => ({ ...WGCI_TRACK, startTime: Date.now() - 30_000, endTime: Date.now() + 150_000 });
 const wgciRow = (page: Page) => page.locator('#radioMenu .rlist tbody tr', { hasText: '107.5 WGCI' });
 
 async function iheartFeed(page: Page, answer: () => { status: number; body: string }): Promise<string[]> {
@@ -334,7 +343,7 @@ async function tuneWgci(page: Page): Promise<void> {
 }
 
 test('107.5 WGCI: the station list and the player show the song iHeart says is on the air', async ({ page }) => {
-  const asked = await iheartFeed(page, () => ({ status: 200, body: JSON.stringify(WGCI_TRACK) }));
+  const asked = await iheartFeed(page, () => ({ status: 200, body: JSON.stringify(wgciOnAir()) }));
   await boot(page);
   await page.click('.tb__btn[data-view="radio"]');
   await expect(page.locator('#libScopeLabel')).toHaveText('Chicago', { timeout: 15_000 });
@@ -346,7 +355,7 @@ test('107.5 WGCI: the station list and the player show the song iHeart says is o
 });
 
 test('107.5 WGCI paired with the Hub: the song from iHeart, the show on the air from the Hub', async ({ page }) => {
-  await iheartFeed(page, () => ({ status: 200, body: JSON.stringify(WGCI_TRACK) }));
+  await iheartFeed(page, () => ({ status: 200, body: JSON.stringify(wgciOnAir()) }));
   const hubAsked: string[] = [];
   await boot(page);
   await page.evaluate(async (a) => { await (window as unknown as { kv: { set(k: string, v: unknown): Promise<void> } }).kv.set('player:hub', a); }, ACCT);

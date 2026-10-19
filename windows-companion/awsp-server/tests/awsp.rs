@@ -515,7 +515,16 @@ async fn companion_rpc_bridges_scoped_routes_without_exposing_helper_token() {
             .iter()
             .all(|line| line.ends_with("|unit-helper-key"))
     );
-    assert!(requests.iter().any(|line| line.contains("/catalog/search?") && line.contains("providers=musicsearch")));
+    // Assert the shape the real helper accepts, not merely that some query text was sent: the old
+    // assertion matched `providers=musicsearch` against a stub that echoes anything, so it stayed
+    // green while the live helper rejected that provider with a 400. A paired search must name no
+    // provider at all, and must stay pinned to metadata sections.
+    assert!(requests.iter().any(|line| {
+        line.contains("/catalog/search?")
+            && !line.contains("providers=")
+            && line.contains("sections=tracks")
+            && line.contains("stream=0")
+    }));
     drop(requests);
 
     control
