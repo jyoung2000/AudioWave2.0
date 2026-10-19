@@ -22,9 +22,12 @@
  * it instead, asking for genres rather than artists, so its cuts leave something to rank.
  *
  * **The genre a row carries.** A catalog song often arrives with a genre of its own (the engine's
- * enrichment); when it does not and the query *was* a genre, the rows it returned were that genre, so
- * the hint travels with them. That is something the query carried rather than a guess, and without it
- * `genreAffinity` could rarely fire for an online row.
+ * enrichment). When it does not, the row has no genre: a genre *query* says what was asked for, not
+ * what came back, and YouTube and SoundCloud answer a genre search with plenty of rows that are not
+ * that genre. Copying the query onto the row invented a tag and then scored `genreAffinity` from the
+ * invention, which is a guess dressed as data. The asked genre travels beside the row instead
+ * (`searchedGenre`), for explaining and grouping, and only a genre the provider actually stated
+ * feeds the genre factor.
  *
  * What this deliberately does not do: fetch, play or extract audio. A Discover pick is metadata, not
  * a player source; short clips are auditioned only from an explicit Search result control. A full song
@@ -163,8 +166,9 @@ export function toRankSong(gathered: GatheredRow): RankSong {
     artist,
     ...(album ? { album } : {}),
     bpm: row.bpm && row.bpm > 0 ? row.bpm : null,
-    // The catalog's genre when it gave one, else the query's own genre when the query was one.
-    genre: genre || asked.genre,
+    // Only a genre the provider actually stated. A genre query is what was asked for, not a fact
+    // about the row, so it is not written here; it rides along as `searchedGenre` instead.
+    genre: genre || null,
     date: null,
     added: null,
     liked: false,
@@ -180,6 +184,11 @@ export interface OnlinePick<X = unknown> {
   url: string | null;
   preview: string | null;
   asked: AskedQuery;
+  /**
+   * The genre this row was *searched* under, when the query was a genre. Context for explaining and
+   * grouping a pick — deliberately not the row's own `song.genre`, which only a provider may state.
+   */
+  searchedGenre: string | null;
   extra?: X;
 }
 
@@ -282,6 +291,7 @@ export function rankFound<X = unknown>(
       url: g.row.u ?? null,
       preview: g.row.c ?? null,
       asked: g.asked,
+      searchedGenre: g.asked.genre,
     };
     if (g.extra !== undefined) pick.extra = g.extra;
     return [pick];

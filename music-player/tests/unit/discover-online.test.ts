@@ -173,7 +173,7 @@ describe('ranking found rows with the listener algorithm', () => {
     expect(alder.parts.artistAffinity).toBeGreaterThan(0);
   });
 
-  it('lets a genre query feed the genre factor, which a bare row could never do', () => {
+  it('keeps genre search context without inventing a genre or genre affinity for an untagged result', () => {
     const jazz = onlineQueries(LIB, PLAYS, defaults(), { artists: 0, genres: 1 })[0]!;
     const { picks } = rankFound({
       gathered: [{ row: row({ t: 'Something New', a: 'Someone Else', u: 'https://youtu.be/jazz' }), asked: jazz }],
@@ -184,7 +184,13 @@ describe('ranking found rows with the listener algorithm', () => {
       now: NOW,
     });
     expect(jazz.genre).toBe('jazz');
-    expect(picks[0]!.row.parts.genreAffinity).toBeGreaterThan(0);
+    // A genre search says what was asked for, not what the result is: YouTube and SoundCloud return
+    // plenty of rows that do not belong to the asked genre. Treating the query as the row's own genre
+    // fabricated a tag and then scored genre affinity from that fabrication. An untagged row keeps a
+    // null genre and earns nothing from the genre factor; `searchedGenre` records the context.
+    expect(picks[0]!.song.genre).toBeNull();
+    expect(picks[0]!.row.parts.genreAffinity).toBe(0);
+    expect(picks[0]!.searchedGenre).toBe('jazz');
   });
 
   it('ranks under the mode chosen, never another: Deep cuts keeps only artists you have never played', () => {
