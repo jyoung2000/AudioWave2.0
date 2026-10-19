@@ -24629,7 +24629,79 @@ var HYDRATE_CONCURRENCY = 8;
 var HYDRATE_BUDGET_MS = 6e3;
 var HYDRATE_MAX_ROWS = 25;
 var APPLE_GENRE_MAX_ASKS = 8;
+var GENRE_REACH_MAX_ROWS = CATALOG_PAGE_MAX;
+var APPLE_GENRE_SEARCH_LIMIT = 25;
 var THUMBNAIL_PLATFORMS = /* @__PURE__ */ new Set(["youtube", "youtube-music", "soundcloud"]);
+function needsGenre(track) {
+  return track.genre === null && track.title.trim().length > 0;
+}
+function fairGenreOrder(rows) {
+  const groups = /* @__PURE__ */ new Map();
+  rows.forEach((row, index) => {
+    const platform = row.sources[0]?.platform ?? "";
+    const list = groups.get(platform);
+    if (list) list.push(index);
+    else groups.set(platform, [index]);
+  });
+  const lists = [...groups.values()];
+  const out = [];
+  for (let turn = 0; out.length < rows.length; turn += 1) {
+    for (const list of lists) if (turn < list.length) out.push(list[turn]);
+  }
+  return out;
+}
+var GenrePool = class _GenrePool {
+  constructor(max = 2e3) {
+    this.max = max;
+  }
+  max;
+  /** By the same main-artist key `sameRecording` compares on, so a long page is not a full scan. */
+  byArtist = /* @__PURE__ */ new Map();
+  /** By ISRC, the one identity `sameRecording` accepts across differing artist spellings. */
+  byIsrc = /* @__PURE__ */ new Map();
+  order = [];
+  seen = /* @__PURE__ */ new Set();
+  static key(track) {
+    return matchArtist(track.artist);
+  }
+  add(candidates) {
+    for (const candidate of candidates) {
+      if (!candidate.genre || this.seen.has(candidate.id)) continue;
+      this.seen.add(candidate.id);
+      this.order.push(candidate);
+      const key = _GenrePool.key(candidate);
+      const list = this.byArtist.get(key);
+      if (list) list.push(candidate);
+      else this.byArtist.set(key, [candidate]);
+      if (candidate.isrc && !this.byIsrc.has(candidate.isrc)) this.byIsrc.set(candidate.isrc, candidate);
+    }
+    for (const gone of this.order.splice(0, Math.max(0, this.order.length - this.max))) {
+      this.seen.delete(gone.id);
+      if (gone.isrc && this.byIsrc.get(gone.isrc) === gone) this.byIsrc.delete(gone.isrc);
+      const list = this.byArtist.get(_GenrePool.key(gone));
+      if (!list) continue;
+      const at = list.indexOf(gone);
+      if (at !== -1) list.splice(at, 1);
+      if (!list.length) this.byArtist.delete(_GenrePool.key(gone));
+    }
+  }
+  /** The stored record of this very recording, or null. Never a near miss, never a row with a genre. */
+  match(row) {
+    if (!needsGenre(row)) return null;
+    const byIsrc = row.isrc ? this.byIsrc.get(row.isrc) : void 0;
+    if (byIsrc && sameRecording(row, byIsrc)) return byIsrc;
+    return this.byArtist.get(_GenrePool.key(row))?.find((candidate) => sameRecording(row, candidate)) ?? null;
+  }
+  get size() {
+    return this.order.length;
+  }
+  clear() {
+    this.order = [];
+    this.byArtist.clear();
+    this.byIsrc.clear();
+    this.seen.clear();
+  }
+};
 function needsFacts(track) {
   return track.bpm === null || track.isrc === null || track.explicit === null || track.artworkUrl === null || track.artists.length <= 1 || track.album === null || track.trackNumber === null || (track.releaseDate?.length ?? 0) < 10 || track.genre === null || track.artistId === null;
 }
@@ -26062,6 +26134,11 @@ var CatalogEngine = class {
   factsCache;
   /** The Cover Art Archive's front image for a release, by release id (null: none listed). */
   coverCache;
+  /**
+   * Every song a genre search has already answered with, so the rest of a page reads its genre
+   * without a call. Lives as long as the engine, like the other caches.
+   */
+  genres = new GenrePool();
   sessions = /* @__PURE__ */ new Map();
   /** Add or replace a provider (tests, or a server with a provider of its own). */
   register(provider) {
@@ -26294,24 +26371,38 @@ var CatalogEngine = class {
     const rows = tracks.filter(needsFacts).slice(0, options.max ?? HYDRATE_MAX_ROWS);
     if (!rows.length) return [];
     const deezer = { on: (options.askDeezer ?? true) && this.options.enabled?.()?.deezer !== false && !this.health.coolingUntil("deezer") };
-    const appleAsks = { left: options.askApple ?? true ? APPLE_GENRE_MAX_ASKS : 0 };
-    const results = await runPool(rows, (row) => this.hydrateOne(row, deezer, appleAsks, deadline, options.signal), { concurrency: HYDRATE_CONCURRENCY, deadline, now: this.now, ...options.signal ? { signal: options.signal } : {} });
-    const out = [];
+    const filled = /* @__PURE__ */ new Map();
+    const keep = (before, after) => {
+      if (trackChanged(before, after)) filled.set(after.id, after);
+    };
+    const current = (row) => filled.get(row.id) ?? row;
+    const results = await runPool(rows, (row) => this.hydrateOne(row, deezer, deadline, options.signal), { concurrency: HYDRATE_CONCURRENCY, deadline, now: this.now, ...options.signal ? { signal: options.signal } : {} });
     rows.forEach((row, i) => {
-      const filled = results.get(i);
-      if (filled && trackChanged(row, filled)) out.push(filled);
+      const after = results.get(i);
+      if (after) keep(row, after);
     });
-    return out;
+    const wanted = tracks.slice(0, GENRE_REACH_MAX_ROWS).map(current).filter(needsGenre);
+    if (wanted.length) {
+      const appleAsks = { left: options.askApple ?? true ? APPLE_GENRE_MAX_ASKS : 0 };
+      const queue = fairGenreOrder(wanted).map((index) => wanted[index]);
+      const genres = await runPool(queue, (row) => this.appleGenre(row, appleAsks, deadline, options.signal), { concurrency: HYDRATE_CONCURRENCY, deadline, now: this.now, ...options.signal ? { signal: options.signal } : {} });
+      queue.forEach((row, i) => {
+        const detail = genres.get(i);
+        if (detail) keep(row, fillTrack(row, detail, "metadata"));
+      });
+      for (const row of wanted.map(current).filter(needsGenre)) {
+        const known = this.genres.match(row);
+        if (known) keep(row, fillTrack(row, known, "metadata"));
+      }
+    }
+    const order = new Map(tracks.map((row, i) => [row.id, i]));
+    return [...filled.values()].sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
   }
-  async hydrateOne(row, deezer, appleAsks, deadline, signal) {
+  async hydrateOne(row, deezer, deadline, signal) {
     let out = row;
     if (deezer.on) {
       const detail = await this.deezerDetail(row, deezer, deadline, signal);
       if (detail) out = fillTrack(out, detail.track, detail.matchedBy);
-    }
-    if (!out.genre) {
-      const detail = await this.appleGenre(out, appleAsks, deadline, signal);
-      if (detail) out = fillTrack(out, detail, "metadata");
     }
     if (!out.artworkUrl && out.sources.length && out.sources.every((s) => s.platform === "musicbrainz")) {
       const recording = out.sources[0].id;
@@ -26327,12 +26418,15 @@ var CatalogEngine = class {
    * Apple's record of this row's recording, for the genre its own platform never stated.
    *
    * Not asked when Apple was skipped for this query (an ISRC lookup it cannot do), switched off,
-   * or resting. One search, cached by name and rough length so a page of rows by the same artist
-   * asks once.
+   * or resting. What Apple has already said is read first and costs nothing, so a page's budget is
+   * spent only on recordings no answer in hand covers — and a pass with no budget at all still
+   * tags every row the pool already knows.
    * Apple's per-minute budget is shared with search, and a rate-limited answer rests the provider
    * rather than retrying. Null when Apple has nothing confidently the same recording.
    */
   async appleGenre(row, appleAsks, deadline, signal) {
+    const known = this.genres.match(row);
+    if (known) return known;
     if (!row.title || appleAsks.left <= 0 || this.options.enabled?.()?.itunes === false || this.health.coolingUntil("itunes")) return null;
     const words = `${row.artists[0] ?? row.artist} ${row.title}`.replace(/\s+/g, " ").trim();
     if (!words) return null;
@@ -26341,8 +26435,9 @@ var CatalogEngine = class {
       this.factsCache.get(key, async () => {
         if (appleAsks.left <= 0) return null;
         appleAsks.left -= 1;
-        const rows = await this.itunes.get(ITUNES_SEARCH, { term: words, entity: "song", limit: 5 }, signal);
+        const rows = await this.itunes.get(ITUNES_SEARCH, { term: words, entity: "song", limit: APPLE_GENRE_SEARCH_LIMIT }, signal);
         const candidates = rows.map((candidate) => itunesTrack(candidate)).filter((candidate) => candidate !== null);
+        this.genres.add(candidates);
         return candidates.find((candidate) => candidate.genre !== null && sameRecording(row, candidate)) ?? null;
       }),
       deadline - this.now()

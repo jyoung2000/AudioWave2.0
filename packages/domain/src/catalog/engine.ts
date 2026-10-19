@@ -35,7 +35,7 @@ import { DomainError } from '../errors.js';
 import { CatalogHttpError, getText, type CatalogFetch } from './http.js';
 import { ProviderHealth, TtlCache, describeError, statusFor, type Now, type Sleep } from './limits.js';
 import { CatalogMerger, mergeSources, mergeTrack, sameRecording } from './merge.js';
-import { APPLE_GENRE_MAX_ASKS, HYDRATE_BUDGET_MS, HYDRATE_CONCURRENCY, HYDRATE_MAX_ROWS, fillTrack, needsFacts, runPool, trackChanged } from './hydrate.js';
+import { APPLE_GENRE_MAX_ASKS, APPLE_GENRE_SEARCH_LIMIT, GENRE_REACH_MAX_ROWS, GenrePool, HYDRATE_BUDGET_MS, HYDRATE_CONCURRENCY, HYDRATE_MAX_ROWS, fairGenreOrder, fillTrack, needsFacts, needsGenre, runPool, trackChanged } from './hydrate.js';
 import { headLike } from './http.js';
 import { ProviderResting, type CatalogProvider, type ProviderResult } from './provider.js';
 import { ApplePageChanged, fetchApplePlaylistPage, type ApplePlaylistPage } from './providers/applemusic-page.js';
@@ -177,6 +177,11 @@ export class CatalogEngine {
   private readonly factsCache: TtlCache<CatalogTrack | null>;
   /** The Cover Art Archive's front image for a release, by release id (null: none listed). */
   private readonly coverCache: TtlCache<string | null>;
+  /**
+   * Every song a genre search has already answered with, so the rest of a page reads its genre
+   * without a call. Lives as long as the engine, like the other caches.
+   */
+  private readonly genres = new GenrePool();
   private readonly sessions = new Map<string, { at: number; rows: Array<{ track: CatalogTrack; offset: number }> }>();
 
   constructor(private readonly options: CatalogEngineOptions) {
@@ -465,33 +470,60 @@ export class CatalogEngine {
     const rows = tracks.filter(needsFacts).slice(0, options.max ?? HYDRATE_MAX_ROWS);
     if (!rows.length) return [];
     const deezer = { on: (options.askDeezer ?? true) && this.options.enabled?.()?.deezer !== false && !this.health.coolingUntil('deezer') };
-    // Shared across the pool: the whole pass may ask Apple this many times, not each row.
-    const appleAsks = { left: (options.askApple ?? true) ? APPLE_GENRE_MAX_ASKS : 0 };
-    const results = await runPool(rows, (row) => this.hydrateOne(row, deezer, appleAsks, deadline, options.signal), { concurrency: HYDRATE_CONCURRENCY, deadline, now: this.now, ...(options.signal ? { signal: options.signal } : {}) });
-    const out: CatalogTrack[] = [];
+    const filled = new Map<string, CatalogTrack>();
+    const keep = (before: CatalogTrack, after: CatalogTrack): void => {
+      if (trackChanged(before, after)) filled.set(after.id, after);
+    };
+    const current = (row: CatalogTrack): CatalogTrack => filled.get(row.id) ?? row;
+
+    // The facts pass: the top of the page, each row's own detail and cover, in the page's order.
+    const results = await runPool(rows, (row) => this.hydrateOne(row, deezer, deadline, options.signal), { concurrency: HYDRATE_CONCURRENCY, deadline, now: this.now, ...(options.signal ? { signal: options.signal } : {}) });
     rows.forEach((row, i) => {
-      const filled = results.get(i);
-      if (filled && trackChanged(row, filled)) out.push(filled);
+      const after = results.get(i);
+      if (after) keep(row, after);
     });
-    return out;
+
+    // The genre pass has its own reach (UX-CAT-006). The facts window is the top of the page by
+    // rank, and the services that state no genre of their own answer first and in bulk, so that
+    // window was in practice all Deezer: the YouTube and SoundCloud rows below it were never asked
+    // about at all. The genre pass therefore looks at the whole page (bounded by
+    // `GENRE_REACH_MAX_ROWS`), takes a turn from each platform in sequence (`fairGenreOrder`), and
+    // spends the same `APPLE_GENRE_MAX_ASKS` calls on that queue instead of on the first rows of
+    // one service. Apple's per-minute budget is untouched: it is still the same number of calls,
+    // still through `ItunesClient`'s own budget, still skipped while Apple is resting.
+    const wanted = tracks.slice(0, GENRE_REACH_MAX_ROWS).map(current).filter(needsGenre);
+    if (wanted.length) {
+      const appleAsks = { left: (options.askApple ?? true) ? APPLE_GENRE_MAX_ASKS : 0 };
+      const queue = fairGenreOrder(wanted).map((index) => wanted[index]!);
+      const genres = await runPool(queue, (row) => this.appleGenre(row, appleAsks, deadline, options.signal), { concurrency: HYDRATE_CONCURRENCY, deadline, now: this.now, ...(options.signal ? { signal: options.signal } : {}) });
+      queue.forEach((row, i) => {
+        const detail = genres.get(i);
+        if (detail) keep(row, fillTrack(row, detail, 'metadata'));
+      });
+      // A last free sweep: every row still without a genre, read against what the asks above (or an
+      // earlier page) already brought back. One Apple answer names many of the artist's songs, so
+      // this is where most of a page's genres come from, and it costs nothing — a row is never left
+      // blank merely because the call budget ran out before its turn.
+      for (const row of wanted.map(current).filter(needsGenre)) {
+        const known = this.genres.match(row);
+        if (known) keep(row, fillTrack(row, known, 'metadata'));
+      }
+    }
+
+    // In the page's own order: a caller upserts these, and a chunk should read top-down.
+    const order = new Map(tracks.map((row, i) => [row.id, i]));
+    return [...filled.values()].sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
   }
 
-  private async hydrateOne(row: CatalogTrack, deezer: { on: boolean }, appleAsks: { left: number }, deadline: number, signal?: AbortSignal): Promise<CatalogTrack> {
+  private async hydrateOne(row: CatalogTrack, deezer: { on: boolean }, deadline: number, signal?: AbortSignal): Promise<CatalogTrack> {
     let out = row;
     if (deezer.on) {
       const detail = await this.deezerDetail(row, deezer, deadline, signal);
       if (detail) out = fillTrack(out, detail.track, detail.matchedBy);
     }
-    // Deezer's track record carries no genre at all (no genre field, and no `genre_id` on its album
-    // sub-object), so filling from Deezer can never give a row one. Apple states `primaryGenreName`
-    // on every song, so a row still missing a genre is matched against Apple's record of the same
-    // recording and copies what Apple stated. Matched on the merger's own identity test, so a
-    // same-titled different recording contributes nothing, and a song Apple does not carry stays
-    // untagged rather than being given an invented genre.
-    if (!out.genre) {
-      const detail = await this.appleGenre(out, appleAsks, deadline, signal);
-      if (detail) out = fillTrack(out, detail, 'metadata');
-    }
+    // A row's genre is not asked for here: Deezer's track record carries none at all (no genre
+    // field, and no `genre_id` on its album sub-object), so only Apple can answer, and that is one
+    // shared budget over the whole page rather than a per-row lookup. `hydrateTracks` runs it.
     if (!out.artworkUrl && out.sources.length && out.sources.every((s) => s.platform === 'musicbrainz')) {
       const recording = out.sources[0]!.id;
       const release = recording ? releaseOfRecording(recording) : null;
@@ -507,12 +539,17 @@ export class CatalogEngine {
    * Apple's record of this row's recording, for the genre its own platform never stated.
    *
    * Not asked when Apple was skipped for this query (an ISRC lookup it cannot do), switched off,
-   * or resting. One search, cached by name and rough length so a page of rows by the same artist
-   * asks once.
+   * or resting. What Apple has already said is read first and costs nothing, so a page's budget is
+   * spent only on recordings no answer in hand covers — and a pass with no budget at all still
+   * tags every row the pool already knows.
    * Apple's per-minute budget is shared with search, and a rate-limited answer rests the provider
    * rather than retrying. Null when Apple has nothing confidently the same recording.
    */
   private async appleGenre(row: CatalogTrack, appleAsks: { left: number }, deadline: number, signal?: AbortSignal): Promise<CatalogTrack | null> {
+    // Free first, always: an answer already in hand is not a call, so it is read even when the
+    // call budget is gone, Apple is resting or the caller asked for no Apple calls at all.
+    const known = this.genres.match(row);
+    if (known) return known;
     // Apple being off or resting means Apple is not asked -- a genre is not worth overriding either
     // the listener's own provider choice or a rate-limit backoff.
     if (!row.title || appleAsks.left <= 0 || this.options.enabled?.()?.itunes === false || this.health.coolingUntil('itunes')) return null;
@@ -523,8 +560,13 @@ export class CatalogEngine {
       this.factsCache.get(key, async () => {
         if (appleAsks.left <= 0) return null;
         appleAsks.left -= 1;
-        const rows = await this.itunes.get(ITUNES_SEARCH, { term: words, entity: 'song', limit: 5 }, signal);
+        // Apple answers a page of the artist's songs for the same single call. Asking for five and
+        // keeping one threw the rest away, so every further row of the same artist cost another
+        // call and the page ran out of budget long before it ran out of rows; keeping them all is
+        // what lets these few calls tag the whole page.
+        const rows = await this.itunes.get(ITUNES_SEARCH, { term: words, entity: 'song', limit: APPLE_GENRE_SEARCH_LIMIT }, signal);
         const candidates = rows.map((candidate) => itunesTrack(candidate)).filter((candidate): candidate is CatalogTrack => candidate !== null);
+        this.genres.add(candidates);
         return candidates.find((candidate) => candidate.genre !== null && sameRecording(row, candidate)) ?? null;
       }),
       deadline - this.now(),

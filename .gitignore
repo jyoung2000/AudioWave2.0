@@ -59,3 +59,7 @@ music-player/awsp-web/target/
 .verify-artifacts/
 
 .superpowers/
+
+# Per-machine agent CLI config (Codex). Machine-local and a common place for provider
+# credentials to end up, so it is never committed from this repo.
+.codex/

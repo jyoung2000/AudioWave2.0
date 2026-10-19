@@ -418,6 +418,49 @@ export function spinner(): string {
   return `${s}</span>`;
 }
 
+/**
+ * Under an artist's albums (NP-FIND-004/006): the way to the next page of the discography, what is
+ * coming, what failed with the way to ask again, or the end — and, where the catalog stops paging an
+ * artist's albums, that it is the catalog's bound and not the whole discography (NP-PRIN-002).
+ */
+export function albumsTailHTML(o: {
+  /** Albums on screen now, after merging; what the action's label counts. */
+  shown: number;
+  loading: boolean;
+  error: string | null;
+  more: boolean;
+  /** The server said more albums remain, but past the offset the catalog answers. */
+  capped: boolean;
+  cap: number;
+}): string {
+  // Loading keeps the control, inert and busy rather than removed: a keyboard stays where it was,
+  // and a screen reader hears the same button say what it is doing.
+  if (o.loading)
+    return (
+      '<p class="srch__dacts">' +
+      '<button class="srch__btn" type="button" data-act="albums-more" aria-disabled="true" aria-busy="true">' +
+      `${spinner()}Loading more albums…</button></p>`
+    );
+  if (o.error)
+    return (
+      `<div class="srch__msg"><span>${esc(o.error)}</span>` +
+      '<button class="srch__btn" type="button" data-act="albums-retry" aria-label="Try that page of albums again">Try again</button>' +
+      '</div>'
+    );
+  if (o.more)
+    return (
+      '<p class="srch__dacts">' +
+      `<button class="srch__btn" type="button" data-act="albums-more" aria-label="Load more albums — ${count(o.shown, 'albums')} shown so far">Load more albums</button>` +
+      '</p>'
+    );
+  if (!o.shown) return '';
+  return `<div class="srch__end">${
+    o.capped
+      ? `That’s the ${count(o.shown, 'albums')} this page can show: the catalog answers an artist’s albums only to ${o.cap}.`
+      : `That’s all ${count(o.shown, 'albums')}.`
+  }</div>`;
+}
+
 /* ---------------------------------------------------------- detail heads */
 
 export function detailHead(o: {

@@ -218,6 +218,18 @@ type View =
       name: string;
       detail: CatalogArtistDetail | null;
       error: string | null;
+      /**
+       * The discography as it has been read: every album from every page, once each by id, in the
+       * order the pages brought them (NP-FIND-004). It lives on the view, so Back finds it whole.
+       */
+      albums: CatalogAlbum[];
+      /** The offset the next page is asked from: the server's own page (`offset + limit`). */
+      albumsNext: number;
+      albumsMore: boolean;
+      albumsLoading: boolean;
+      albumsError: string | null;
+      /** More albums exist, but past the offset the catalog answers: said, never a silent cut. */
+      albumsCapped: boolean;
     }
   | {
       kind: 'song';
@@ -317,6 +329,12 @@ const PAGE_ROWS: Record<Section, number> = {
 };
 /** The engine's search offset limit: past it a page is not asked for. */
 const OFFSET_MAX = 1000;
+/**
+ * The furthest offset the catalog answers for an artist's albums (`CatalogArtistRequest.albumsOffset`
+ * is bounded at 500). Past it the discography is not asked for, and the page says so.
+ */
+const ARTIST_ALBUMS_OFFSET_MAX = 500;
+
 /** One page of an album's or playlist's songs: the contract's page limit (catalog/resolve, catalog/album). */
 const LIST_PAGE = CATALOG_PAGE_MAX;
 const FILTER_KEY = 'player:search';
@@ -832,7 +850,8 @@ export function installSearch(): SearchApi {
       live.textContent = v.error ?? 'Opening the artist';
       return;
     }
-    const { artist, topTracks, albums } = v.detail;
+    const { artist, topTracks } = v.detail;
+    const albums = v.albums;
     const facts = [
       artist.genre,
       artist.fans ? `${artist.fans.toLocaleString('en-US')} fans` : null,
@@ -861,8 +880,20 @@ export function installSearch(): SearchApi {
           { label: 'Albums', opts: albums.map((al) => ({ kind: 'album' as const, al })) },
         ],
         `${artist.name}: songs and albums`,
-      );
-    live.textContent = `${artist.name}: ${topTracks.length} songs, ${albums.length} albums`;
+      ) +
+      V.albumsTailHTML({
+        shown: albums.length,
+        loading: v.albumsLoading,
+        error: v.albumsError,
+        more: v.albumsMore,
+        capped: v.albumsCapped,
+        cap: ARTIST_ALBUMS_OFFSET_MAX,
+      });
+    live.textContent =
+      v.albumsError ??
+      (v.albumsLoading
+        ? 'Loading more albums'
+        : `${artist.name}: ${topTracks.length} songs, ${V.count(albums.length, 'albums')}${v.albumsMore ? ', more to load' : ''}`);
   }
 
   function renderSong(v: Extract<View, { kind: 'song' }>): void {
@@ -1450,6 +1481,12 @@ export function installSearch(): SearchApi {
       name: a.name,
       detail: null,
       error: null,
+      albums: [],
+      albumsNext: 0,
+      albumsMore: false,
+      albumsLoading: false,
+      albumsError: null,
+      albumsCapped: false,
     };
     push(v);
     render();
@@ -1457,6 +1494,7 @@ export function installSearch(): SearchApi {
     ask((c) => c.artist(a.id))
       .then(({ value }) => {
         v.detail = value;
+        takeAlbums(v, value);
       })
       .catch((err: unknown) => {
         v.error =
@@ -1466,6 +1504,78 @@ export function installSearch(): SearchApi {
       })
       .finally(() => {
         if (mine === seq && top() === v) render();
+      });
+  }
+
+  /**
+   * One page of a discography folded into the artist page (NP-FIND-004): an album already shown —
+   * the same id from another page, or the same release the services sent twice — joins the row it is
+   * instead of making a second. The next offset is the server's own page (`offset + limit`), never
+   * the number of rows kept, so a page of duplicates still moves the discography on; past the offset
+   * the catalog answers, nothing more is asked and the page says so.
+   */
+  function takeAlbums(
+    v: Extract<View, { kind: 'artist' }>,
+    detail: CatalogArtistDetail,
+  ): void {
+    const seen = new Set(v.albums.map((al) => al.id));
+    for (const al of detail.albums) {
+      if (seen.has(al.id)) continue;
+      seen.add(al.id);
+      v.albums.push(al);
+    }
+    const page = detail.albumsPage;
+    v.albumsNext = Math.max(v.albumsNext, page.offset + page.limit);
+    v.albumsCapped = page.hasMore && v.albumsNext > ARTIST_ALBUMS_OFFSET_MAX;
+    v.albumsMore = page.hasMore && !v.albumsCapped;
+    v.albumsError = null;
+  }
+
+  /** The next page of the artist's albums, on request. */
+  function moreAlbums(v: Extract<View, { kind: 'artist' }>): void {
+    if (v.albumsLoading || !v.detail || (!v.albumsMore && !v.albumsError)) return;
+    const offset = v.albumsNext;
+    if (offset > ARTIST_ALBUMS_OFFSET_MAX) {
+      v.albumsMore = false;
+      v.albumsCapped = true;
+      render();
+      return;
+    }
+    // The tail is redrawn under the hand that pressed it: a keyboard is put back on the control it
+    // was on (the next action, or the retry), and only lands in the field when there is none left.
+    const keepFocus = Boolean(
+      document.activeElement?.closest?.('[data-act="albums-more"], [data-act="albums-retry"]'),
+    );
+    const restore = (): void => {
+      if (!keepFocus) return;
+      const el = body.querySelector<HTMLButtonElement>(
+        '[data-act="albums-more"], [data-act="albums-retry"]',
+      );
+      if (el) el.focus();
+      else input.focus();
+    };
+    v.albumsLoading = true;
+    v.albumsError = null;
+    const mine = seq;
+    render();
+    restore();
+    ask((c) => c.artist(v.id, offset))
+      .then(({ value }) => {
+        takeAlbums(v, value);
+      })
+      .catch((err: unknown) => {
+        // The albums already on screen stay; what failed is said, with the way to ask again.
+        v.albumsError =
+          err instanceof Refused
+            ? err.message
+            : 'More albums could not be loaded just now. Try again.';
+      })
+      .finally(() => {
+        v.albumsLoading = false;
+        if (mine === seq && top() === v) {
+          render();
+          restore();
+        }
       });
   }
 
@@ -2497,6 +2607,11 @@ export function installSearch(): SearchApi {
           v.detail.page,
         );
       if (act.dataset['act'] === 'add' && v?.kind === 'song') addToLibrary(0);
+      if (
+        (act.dataset['act'] === 'albums-more' || act.dataset['act'] === 'albums-retry') &&
+        v?.kind === 'artist'
+      )
+        moreAlbums(v);
       if (act.dataset['act'] === 'download' && v?.kind === 'song')
         download(v.t, v.enrich ? [...v.t.sources, ...v.enrich.sources] : v.t.sources);
       return;

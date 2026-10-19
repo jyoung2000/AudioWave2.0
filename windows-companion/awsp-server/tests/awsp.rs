@@ -410,6 +410,163 @@ async fn relay_only_survives_a_three_second_outage() {
     );
 }
 
+/// The whole paired catalog path: search paging, an album's track list, an artist's discography and
+/// a pasted music link, each reaching its own fixed helper route over the encrypted control stream.
+///
+/// `catalog.search` used to be the only catalog operation the sidecar routed, pinned to the first
+/// 25 rows, so a paired player's result card opened nothing: no track list, no discography, no link
+/// reading. This drives the real sidecar against a controlled helper and asserts the route, the
+/// bounded query and that the helper's bearer never leaves the companion -- and that an id or link
+/// carrying a route, a host, a port or a credential is refused before any request is made.
+#[tokio::test]
+async fn companion_catalog_paths_page_details_without_widening_the_allowlist() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    init_tracing();
+    let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+        .await
+        .unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let observed = Arc::new(Mutex::new(Vec::<String>::new()));
+    let observed_server = observed.clone();
+    tokio::spawn(async move {
+        for _ in 0..4 {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut request = Vec::new();
+            let mut chunk = [0u8; 1024];
+            loop {
+                let n = stream.read(&mut chunk).await.unwrap();
+                if n == 0 {
+                    break;
+                }
+                request.extend_from_slice(&chunk[..n]);
+                if request.windows(4).any(|w| w == [13u8, 10, 13, 10]) {
+                    break;
+                }
+            }
+            let text = String::from_utf8_lossy(&request);
+            let line = text.lines().next().unwrap_or("").to_string();
+            let token = text
+                .lines()
+                .find(|line| line.to_ascii_lowercase().starts_with("x-helper-token:"))
+                .and_then(|line| {
+                    line.split_once(':')
+                        .map(|(_, value)| value.trim().to_string())
+                })
+                .unwrap_or_default();
+            observed_server.lock().await.push(format!("{line}|{token}"));
+            let body = if line.contains("/catalog/album") {
+                r#"{"album":{"id":"deezer:6575789"},"page":{"tracks":[{"id":"deezer:1"}],"offset":50,"limit":50,"hasMore":true},"collection":{"id":"6575789"}}"#
+            } else if line.contains("/catalog/artist") {
+                r#"{"artist":{"id":"deezer:246791"},"topTracks":[],"albums":[],"albumsPage":{"offset":25,"limit":25,"hasMore":true}}"#
+            } else if line.contains("/catalog/resolve") {
+                r#"{"url":"https://www.deezer.com/album/6575789","platform":"deezer","kind":"album"}"#
+            } else {
+                r#"{"tracks":[{"id":"deezer:1"}],"artists":[],"albums":[]}"#
+            };
+            let crlf = String::from_utf8(vec![13u8, 10]).unwrap();
+            let response = format!(
+                "HTTP/1.1 200 OK{crlf}content-type: application/json{crlf}content-length: {}{crlf}connection: close{crlf}{crlf}{}",
+                body.len(),
+                body
+            );
+            stream.write_all(response.as_bytes()).await.unwrap();
+        }
+    });
+
+    let dir = tempfile::tempdir().unwrap();
+    let key = SecretKey::generate();
+    let mut cfg = base_config(dir.path());
+    cfg.allowlist = vec![allow(&key, Tier::Lossless)];
+    cfg.helper_port = Some(port);
+    cfg.helper_token = Some("unit-helper-key".into());
+    let h = start(cfg, dir).await;
+    let client = direct_client(key).await;
+    let conn = connect(&client, &h.addr).await;
+    let mut control = Control::open(&conn).await;
+    control.hello().await;
+
+    // A second page of a search, an album's second page, an artist's second page of albums and a
+    // pasted album link: the four things a result card's rows need to open.
+    for (operation, args, expect) in [
+        (
+            "catalog.search",
+            json!({"q":"drake","sections":"tracks,artists,albums","offset":25,"limit":50}),
+            vec!["/catalog/search?", "offset=25", "limit=50", "stream=0"],
+        ),
+        (
+            "catalog.album",
+            json!({"id":"deezer:6575789","offset":50,"limit":50}),
+            vec!["/catalog/album?", "id=deezer%3A6575789", "offset=50"],
+        ),
+        (
+            "catalog.artist",
+            json!({"id":"deezer:246791","albumsOffset":25}),
+            vec![
+                "/catalog/artist?",
+                "albumsOffset=25",
+                "albumsLimit=25",
+                "topLimit=10",
+            ],
+        ),
+        (
+            "catalog.resolve",
+            json!({"url":"https://www.deezer.com/album/6575789","offset":0,"limit":50}),
+            vec!["/catalog/resolve?", "deezer.com", "limit=50"],
+        ),
+    ] {
+        let id = control
+            .send("companion", json!({"operation":operation,"args":args}))
+            .await;
+        let result = control.expect("companion_result").await;
+        assert_eq!(result.re, Some(id), "{operation} answered its own request");
+        let asked = observed.lock().await;
+        let line = asked.last().expect("the helper saw a request").clone();
+        drop(asked);
+        for needle in expect {
+            assert!(line.contains(needle), "{operation}: {line} lacks {needle}");
+        }
+        assert!(
+            line.ends_with("|unit-helper-key"),
+            "the helper's bearer stays in the companion"
+        );
+        assert!(
+            !line.contains("providers="),
+            "{operation} names no provider: the helper picks its own services"
+        );
+    }
+
+    let answered = observed.lock().await.len();
+    assert_eq!(answered, 4);
+    drop(observed.lock().await);
+
+    // Anything that could widen the path -- a traversal, a loopback host, a custom port, embedded
+    // credentials, a Spotify link spotDL cannot read in time, a window limit, an unbounded page --
+    // is refused before a request is made.
+    for args in [
+        json!({"operation":"catalog.album","args":{"id":"../../helper/v1/settings"}}),
+        json!({"operation":"catalog.album","args":{"id":"deezer:6575789","limit":500}}),
+        json!({"operation":"catalog.artist","args":{"id":"deezer:246791","albumsLimit":50}}),
+        json!({"operation":"catalog.artist","args":{"id":"deezer:246791","albumsOffset":5000}}),
+        json!({"operation":"catalog.resolve","args":{"url":"https://127.0.0.1/helper/v1/settings"}}),
+        json!({"operation":"catalog.resolve","args":{"url":"https://www.deezer.com:9/album/1"}}),
+        json!({"operation":"catalog.resolve","args":{"url":"https://user:pw@www.deezer.com/album/1"}}),
+        json!({"operation":"catalog.resolve","args":{"url":"https://deezer.com.attacker.example/album/1"}}),
+        json!({"operation":"catalog.resolve","args":{"url":"https://open.spotify.com/album/1"}}),
+        json!({"operation":"catalog.search","args":{"q":"drake","offset":100000}}),
+        json!({"operation":"catalog.lyrics","args":{"title":"Hold On","artist":"Drake"}}),
+    ] {
+        control.send("companion", args.clone()).await;
+        let denied = control.expect("error").await;
+        assert_eq!(denied.payload["code"], "forbidden", "allowed: {args}");
+    }
+    assert_eq!(
+        observed.lock().await.len(),
+        answered,
+        "nothing refused ever reached the helper"
+    );
+}
+
 /// A paired device can request allowlisted Companion routes over the encrypted AWSP control stream.
 /// The helper's bearer token stays server-side; arbitrary operations are rejected before reaching it.
 #[tokio::test]

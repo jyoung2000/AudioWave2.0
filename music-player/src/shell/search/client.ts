@@ -17,6 +17,9 @@ import {
   CatalogEnrichment,
   CatalogLyrics,
   CatalogResolveResult,
+  CatalogSearchAggregate,
+  CATALOG_COLLECTION_CAP,
+  CATALOG_MAX_LIMIT,
   HELPER_CATALOG_ROUTES,
   type CatalogProviderId,
   type CatalogSearchChunk,
@@ -37,7 +40,7 @@ export interface SearchParams {
   limit: number;
 }
 
-export type ClientKind = 'hub' | 'helper' | 'browser';
+export type ClientKind = 'hub' | 'helper' | 'awsp' | 'browser';
 
 export interface CatalogClient {
   kind: ClientKind;
@@ -266,6 +269,292 @@ const HUB_PATHS = {
   enrich: '/api/v1/catalog/enrich',
 };
 
+/* ------------------------------------------------- the catalog over a paired PC */
+
+/**
+ * The AWSP operations the sidecar routes to the companion's own helper. This list is the whole of
+ * what a paired PC can be asked for: there is no operation that takes a route, a host or a method,
+ * so a caller cannot reach anything the companion's own window would not ask for either.
+ */
+export const AWSP_CATALOG_OPERATIONS = {
+  search: 'catalog.search',
+  album: 'catalog.album',
+  artist: 'catalog.artist',
+  resolve: 'catalog.resolve',
+} as const;
+
+/**
+ * The most rows one paired page carries (`CATALOG_MAX_LIMIT`). The paired transport frames answers
+ * at 256 KiB, so a page is kept to the catalog's own ceiling rather than the 200 an HTTP client may
+ * ask a hub for: a wider page would be refused whole by the sidecar and the person would see
+ * nothing instead of a shorter list.
+ */
+export const AWSP_CATALOG_PAGE_MAX = CATALOG_MAX_LIMIT;
+
+/** The catalog's own offset ceilings, mirrored so an out-of-range page is never sent. */
+const AWSP_MAX_SEARCH_OFFSET = 1000;
+const AWSP_MAX_ALBUMS_OFFSET = 500;
+const AWSP_MAX_COLLECTION_OFFSET = CATALOG_COLLECTION_CAP;
+
+/**
+ * How long one paired catalog request may take. Under the worker's own 15 s request deadline, so a
+ * PC that cannot answer is passed over for the next client with a reason rather than aborting the
+ * whole search.
+ */
+const AWSP_CATALOG_TIMEOUT_MS = 12_000;
+
+/** A paired answer must fit the transport's frame (`MAX_FRAME`, 256 KiB) to have arrived at all. */
+const AWSP_MAX_RESPONSE_BYTES = 256 * 1024;
+
+/** The music hosts a paired `resolve` will read: the sidecar's own list, checked before sending. */
+const AWSP_LINK_HOSTS = new Set([
+  'music.apple.com',
+  'itunes.apple.com',
+  'deezer.com',
+  'www.deezer.com',
+  'link.deezer.com',
+  'deezer.page.link',
+  'youtube.com',
+  'www.youtube.com',
+  'm.youtube.com',
+  'music.youtube.com',
+  'youtu.be',
+  'soundcloud.com',
+  'www.soundcloud.com',
+  'm.soundcloud.com',
+]);
+const AWSP_LINK_SUFFIXES = ['bandcamp.com'];
+
+const CATALOG_ID_PLATFORMS = new Set<string>([
+  'apple-music',
+  'deezer',
+  'musicbrainz',
+  'youtube',
+  'youtube-music',
+  'soundcloud',
+  'spotify',
+  'bandcamp',
+  'tidal',
+  'qobuz',
+  'amazon-music',
+]);
+
+/** `platform:id` for a platform the catalog defines, and nothing that could be a path or a host. */
+function catalogId(id: string): string | null {
+  if (id.length < 3 || id.length > 260) return null;
+  const at = id.indexOf(':');
+  if (at <= 0) return null;
+  const platform = id.slice(0, at);
+  const rest = id.slice(at + 1);
+  if (!CATALOG_ID_PLATFORMS.has(platform)) return null;
+  if (!rest || rest.length > 200 || !/^[A-Za-z0-9._~-]+$/.test(rest)) return null;
+  return id;
+}
+
+/**
+ * An https music page a paired PC will read. Spotify is deliberately absent: spotDL takes 20-50 s
+ * to match one link, longer than a paired request waits, so a Spotify link is left to the hub or
+ * this PC's own helper instead of timing out on the device.
+ */
+function catalogLink(url: string): string | null {
+  const raw = url.trim();
+  if (!raw || raw.length > 2048) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== 'https:' || parsed.port) return null;
+  if (parsed.username || parsed.password) return null;
+  const host = parsed.hostname.toLowerCase();
+  const allowed =
+    AWSP_LINK_HOSTS.has(host) ||
+    AWSP_LINK_SUFFIXES.some((suffix) => host === suffix || host.endsWith(`.${suffix}`));
+  return allowed ? raw : null;
+}
+
+const clamp = (value: number, max: number): number =>
+  Math.min(Math.max(Math.trunc(Number.isFinite(value) ? value : 0), 0), max);
+
+/** The paired PC's own shape, as `awsp.ts` installs it: one allowlisted call and a status. */
+export interface PairedCompanion {
+  status(): Promise<{ paired: boolean; serverName: string | null }>;
+  companion(operation: string, args?: Record<string, unknown>): Promise<unknown>;
+}
+
+/**
+ * A paired PC's catalog, over AWSP.
+ *
+ * A paired player could search a companion and then had nowhere to go: `catalog.search` was the
+ * only catalog operation the sidecar routed, pinned to the first 25 songs, and the player had no
+ * paired client at all — so an album row opened no track list, an artist no discography and a
+ * pasted link read as nothing on the device, even though the companion's own window could open all
+ * three. A paired PC is also the one machine with yt-dlp when there is no hub and no local
+ * companion, so without this the browser engine answered alone.
+ *
+ * Every argument is bounded here before it is sent, and only the four allowlisted operation names
+ * are ever named: no route, host, method, provider or credential travels from a caller.
+ */
+export function awspClient(awsp: PairedCompanion, serverName: string | null): CatalogClient {
+  const label = `the PC ${serverName ?? ''}`.trim() || 'the paired PC';
+
+  const ask = async <T>(
+    operation: string,
+    args: Record<string, unknown>,
+    parse: (v: unknown) => T,
+    signal?: AbortSignal,
+  ): Promise<T> => {
+    if (signal?.aborted) throw new DOMException('aborted', 'AbortError');
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const answer = awsp.companion(operation, args);
+    try {
+      const value = await Promise.race([
+        answer,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Unreachable(`${label} did not answer in time`)),
+            AWSP_CATALOG_TIMEOUT_MS,
+          );
+          signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), {
+            once: true,
+          });
+        }),
+      ]);
+      // Measured, not assumed: an answer past the transport's frame could not have been framed, so
+      // say so instead of handing a half-parsed page to the view.
+      const size = JSON.stringify(value ?? null).length;
+      if (size > AWSP_MAX_RESPONSE_BYTES)
+        throw new Refused(`${label} sent an answer too large to carry (${size} bytes).`);
+      return parse(value);
+    } catch (err) {
+      if (err instanceof Unreachable || err instanceof Refused) throw err;
+      if (err instanceof DOMException && err.name === 'AbortError') throw err;
+      // What the sidecar says about itself ("forbidden", "companion-unavailable") is not shown as
+      // the catalog's answer: the next client is asked instead.
+      throw new Unreachable(`${label} could not answer`);
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
+      // An answer that lands after the deadline is nobody's: swallow it rather than leave a reject.
+      void answer.catch(() => undefined);
+    }
+  };
+
+  return {
+    kind: 'awsp',
+    label,
+    async *search(params, signal) {
+      const text = (v: string | undefined, max: number): string | undefined => {
+        const trimmed = (v ?? '').trim();
+        return trimmed ? trimmed.slice(0, max) : undefined;
+      };
+      const q = text(params.q, 400);
+      const track = text(params.track, 200);
+      const artist = text(params.artist, 200);
+      const album = text(params.album, 200);
+      if (!q && !track && !artist && !album)
+        throw new Unreachable('a paired PC is not asked for an empty search');
+      const sections = params.sections.length ? params.sections.join(',') : 'tracks';
+      const aggregate = await ask(
+        AWSP_CATALOG_OPERATIONS.search,
+        {
+          ...(q ? { q } : {}),
+          ...(track ? { track } : {}),
+          ...(artist ? { artist } : {}),
+          ...(album ? { album } : {}),
+          sections,
+          offset: clamp(params.offset, AWSP_MAX_SEARCH_OFFSET),
+          limit: Math.max(1, clamp(params.limit, AWSP_CATALOG_PAGE_MAX)),
+        },
+        (v) => CatalogSearchAggregate.parse(v),
+        signal,
+      );
+      // One answer, drawn as the stream the view already reads: the rows, then the page and totals.
+      yield {
+        type: 'results',
+        seq: 0,
+        provider: null,
+        query: aggregate.query,
+        tracks: aggregate.tracks,
+        artists: aggregate.artists,
+        albums: aggregate.albums,
+        playlists: aggregate.playlists,
+        status: aggregate.status,
+      };
+      yield {
+        type: 'done',
+        seq: 1,
+        query: aggregate.query,
+        status: aggregate.status,
+        page: aggregate.page,
+        totals: {
+          tracks: aggregate.tracks.length,
+          artists: aggregate.artists.length,
+          albums: aggregate.albums.length,
+          playlists: aggregate.playlists.length,
+        },
+        resolve: aggregate.resolve,
+        linkedOnly: [],
+      };
+    },
+    album: async (id, offset, limit, signal) => {
+      const safe = catalogId(id);
+      if (!safe) throw new Unreachable('that is not a catalog album id');
+      return ask(
+        AWSP_CATALOG_OPERATIONS.album,
+        {
+          id: safe,
+          offset: clamp(offset, AWSP_MAX_COLLECTION_OFFSET),
+          limit: Math.max(1, clamp(limit, AWSP_CATALOG_PAGE_MAX)),
+        },
+        (v) => CatalogAlbumDetail.parse(v),
+        signal,
+      );
+    },
+    artist: async (id, albumsOffset, signal) => {
+      const safe = catalogId(id);
+      if (!safe) throw new Unreachable('that is not a catalog artist id');
+      return ask(
+        AWSP_CATALOG_OPERATIONS.artist,
+        { id: safe, albumsOffset: clamp(albumsOffset ?? 0, AWSP_MAX_ALBUMS_OFFSET) },
+        (v) => CatalogArtistDetail.parse(v),
+        signal,
+      );
+    },
+    resolve: async (url, offset, limit, signal) => {
+      const safe = catalogLink(url);
+      if (!safe) throw new Unreachable('a paired PC does not read that address');
+      return ask(
+        AWSP_CATALOG_OPERATIONS.resolve,
+        {
+          url: safe,
+          offset: clamp(offset, AWSP_MAX_COLLECTION_OFFSET),
+          limit: Math.max(1, clamp(limit, AWSP_CATALOG_PAGE_MAX)),
+        },
+        (v) => CatalogResolveResult.parse(v),
+        signal,
+      );
+    },
+    // Lyrics and enrichment are not on the sidecar's allowlist, and adding a generic proxy to reach
+    // them is exactly what the contract forbids. They stay unreachable here so the hub, this PC's
+    // own helper or the browser engine answers them.
+    lyrics: () => Promise.reject(new Unreachable('a paired PC does not answer lyrics')),
+    enrich: () => Promise.reject(new Unreachable('a paired PC does not answer enrichment')),
+  };
+}
+
+/** The paired PC, when one is paired and its bridge has loaded. */
+async function pairedCompanion(): Promise<{ awsp: PairedCompanion; serverName: string | null } | null> {
+  const awsp = (window as unknown as { NP_AWSP?: PairedCompanion }).NP_AWSP;
+  if (!awsp?.companion || !awsp.status) return null;
+  try {
+    const status = await awsp.status();
+    return status?.paired ? { awsp, serverName: status.serverName ?? null } : null;
+  } catch {
+    return null;
+  }
+}
+
 /* ------------------------------------------------- the engine, in this page */
 
 let jsonpN = 0;
@@ -485,7 +774,13 @@ async function oembedTrack(
 
 /* ------------------------------------------------------------- the order */
 
-/** Every client that may answer, best first. The browser is always last and always there. */
+/**
+ * Every client that may answer, best first. The browser is always last and always there.
+ *
+ * A paired PC sits after the hub and this PC's own companion — both reach the same engine over a
+ * local network or loopback, so they answer faster — and before the browser engine, which has no
+ * yt-dlp and so cannot search YouTube or SoundCloud at all.
+ */
 export async function clients(): Promise<CatalogClient[]> {
   const out: CatalogClient[] = [];
   const acct = await hubAccount();
@@ -516,6 +811,8 @@ export async function clients(): Promise<CatalogClient[]> {
       ),
     );
   }
+  const pc = await pairedCompanion();
+  if (pc) out.push(awspClient(pc.awsp, pc.serverName));
   out.push(browserClient);
   return out;
 }

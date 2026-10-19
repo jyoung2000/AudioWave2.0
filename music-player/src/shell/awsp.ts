@@ -57,10 +57,19 @@ export interface ShellAwsp {
   status(): Promise<AwspStatusView>;
   /** One page (100 rows) of the PC's library, optionally a full-text query. */
   browse(page?: number, query?: string): Promise<{ page: number; total: number; items: Array<Record<string, unknown>> }>;
-  /** Allowlisted Companion operations routed over the paired, end-to-end encrypted AWSP channel. */
+  /**
+   * Allowlisted Companion operations routed over the paired, end-to-end encrypted AWSP channel.
+   *
+   * The four `catalog.*` operations are the companion's own catalog, bounded by the sidecar:
+   * `catalog.search` pages songs, artists, albums and playlists; `catalog.album` and
+   * `catalog.artist` take a `platform:id` and page a track list or a discography; `catalog.resolve`
+   * reads a music link on the sidecar's own host list. There is no operation that takes a route, a
+   * host or a method, so this list is the whole of what a paired player can ask a PC for.
+   */
   companion(
     operation:
-      | 'tv.channels' | 'tv.guide' | 'radio.nowPlaying' | 'catalog.search'
+      | 'tv.channels' | 'tv.guide' | 'radio.nowPlaying'
+      | 'catalog.search' | 'catalog.album' | 'catalog.artist' | 'catalog.resolve'
       | 'tools.status' | 'downloads.start' | 'downloads.status' | 'downloads.forget' | 'downloads.fileChunk',
     args?: Record<string, unknown>,
   ): Promise<unknown>;
