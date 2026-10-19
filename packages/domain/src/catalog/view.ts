@@ -112,6 +112,15 @@ export const OVERVIEW_ROWS: Record<CatalogSearchSection, number> = { tracks: 5, 
 /** A type's own page (UX-SEARCH-009) is paged in these: 25 songs, or 12 artists, albums or playlists. */
 export const TYPE_PAGE_ROWS: Record<CatalogSearchSection, number> = { tracks: 25, artists: 12, albums: 12, playlists: 12 };
 
+/**
+ * One artist page, for every window that opens one.
+ *
+ * The player asked for 25 albums and the hub and the companion for 12, which showed the same artist
+ * with a different catalogue in each app. They share these now so the three cannot drift apart again.
+ */
+export const ARTIST_ALBUMS_LIMIT = 25;
+export const ARTIST_TOP_LIMIT = 10;
+
 /** The kinds in the order every window shows them. */
 export const SEARCH_TYPES: readonly CatalogSearchSection[] = ['tracks', 'artists', 'albums', 'playlists'];
 

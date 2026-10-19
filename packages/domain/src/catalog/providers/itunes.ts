@@ -142,9 +142,15 @@ export class ItunesClient {
     const songs = await this.get(ITUNES_LOOKUP, { id, entity: 'song', limit: Math.min(topLimit, 200) }, signal).catch(() => [] as Json[]);
     const list = albums.filter((r) => r['wrapperType'] === 'collection').map(itunesAlbum).filter((a): a is CatalogAlbum => a !== null);
     const firstArt = list.find((a) => a.artworkUrl)?.artworkUrl ?? null;
-    return { artist: { ...artist, albumCount: list.length || null, pictureUrl: artist.pictureUrl ?? firstArt }, albums: list, topTracks: songs.filter((r) => r['wrapperType'] === 'track').map(itunesTrack).filter((t): t is CatalogTrack => t !== null) };
+    return { artist: { ...artist, albumCount: list.length >= ITUNES_LOOKUP_MAX ? null : list.length || null, pictureUrl: artist.pictureUrl ?? firstArt }, albums: list, topTracks: songs.filter((r) => r['wrapperType'] === 'track').map(itunesTrack).filter((t): t is CatalogTrack => t !== null) };
   }
 }
+
+/**
+ * Apple's lookup returns at most 200 rows and takes no offset, so 200 is the most of an artist's
+ * catalogue that can be seen at all. A list this long is therefore a ceiling, not a total.
+ */
+export const ITUNES_LOOKUP_MAX = 200;
 
 const ENTITY: Record<CatalogSection, string> = { tracks: 'song', artists: 'musicArtist', albums: 'album' };
 

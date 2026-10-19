@@ -41,7 +41,7 @@ import { ProviderResting, type CatalogProvider, type ProviderResult } from './pr
 import { ApplePageChanged, fetchApplePlaylistPage, type ApplePlaylistPage } from './providers/applemusic-page.js';
 import { readSpotifyEmbed as parseSpotifyEmbed } from './providers/spotify-embed.js';
 import { DeezerClient, DeezerProvider, deezerTrack } from './providers/deezer.js';
-import { ItunesClient, ItunesProvider } from './providers/itunes.js';
+import { ITUNES_LOOKUP_MAX, ItunesClient, ItunesProvider } from './providers/itunes.js';
 import { MusicBrainzClient, MusicBrainzProvider, releaseOfRecording } from './providers/musicbrainz.js';
 import { ToolSearchProvider, type ToolSearchRunner } from './providers/ytdlp.js';
 import { parseCatalogQuery, parseMusicLink, type MusicLink } from './query.js';
@@ -659,10 +659,15 @@ export class CatalogEngine {
       return { artist: found.artist, topTracks: await this.withFacts(found.topTracks, signal), albums: found.albums, albumsPage: { offset: albumsOffset, limit: albumsLimit, hasMore: found.albumsTotal !== null ? albumsOffset + found.albums.length < found.albumsTotal : found.albums.length >= albumsLimit } };
     }
     if (platform === 'apple-music') {
-      const found = await this.upstream(() => this.itunes.artist(native, albumsOffset + albumsLimit, topLimit, signal), 'Apple Music');
+      // Apple's lookup has no offset, so paging it deeper is not possible: ask once for as much as
+      // it will give and serve pages out of that. Asking for `albumsOffset + albumsLimit` instead
+      // made the answer depend on the size of page the caller wanted -- the player asks for 25 and
+      // the hub and companion for 12, and the same artist came back with a different album count in
+      // each app.
+      const found = await this.upstream(() => this.itunes.artist(native, ITUNES_LOOKUP_MAX, topLimit, signal), 'Apple Music');
       if (!found) throw new DomainError('not-found', 'Apple Music has no artist with that id');
       const albums = found.albums.slice(albumsOffset, albumsOffset + albumsLimit);
-      return { artist: found.artist, topTracks: await this.withFacts(found.topTracks.slice(0, topLimit), signal), albums, albumsPage: { offset: albumsOffset, limit: albumsLimit, hasMore: found.albums.length >= albumsOffset + albumsLimit } };
+      return { artist: found.artist, topTracks: await this.withFacts(found.topTracks.slice(0, topLimit), signal), albums, albumsPage: { offset: albumsOffset, limit: albumsLimit, hasMore: albumsOffset + albums.length < found.albums.length } };
     }
     throw new DomainError('unsupported', `Artists are opened from Deezer or Apple Music, not ${platform}`);
   }

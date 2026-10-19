@@ -10,7 +10,7 @@
  * and the filter are kept in the companion's own store.
  */
 import { CatalogAlbumDetail, CatalogArtistDetail, CatalogEnrichment, CatalogLyrics, CatalogResolveResult, HELPER_CATALOG_ROUTES, HELPER_ROUTES, HelperJob, SavedCollection, type CatalogCollectionRef, type CatalogSearchChunk, type CatalogSource, type CatalogTrack, type DownloadAuthorizationBasis, type OutputFormat } from '@now-playing/contracts';
-import { collectionKey, pickDownloadSource, readCatalogStream } from '@now-playing/domain/catalog';
+import { collectionKey, pickDownloadSource, readCatalogStream, ARTIST_ALBUMS_LIMIT, ARTIST_TOP_LIMIT } from '@now-playing/domain/catalog';
 import type { z } from 'zod';
 import { CatalogFilter, type CatalogSearchIpc } from '../shared/ipc.js';
 
@@ -114,7 +114,7 @@ export class CompanionCatalog {
   }
 
   artist(id: string, albumsOffset: number) {
-    return this.get(HELPER_CATALOG_ROUTES.artist, { id, albumsOffset, albumsLimit: 12, topLimit: 10 }, CatalogArtistDetail);
+    return this.get(HELPER_CATALOG_ROUTES.artist, { id, albumsOffset, albumsLimit: ARTIST_ALBUMS_LIMIT, topLimit: ARTIST_TOP_LIMIT }, CatalogArtistDetail);
   }
 
   resolve(url: string, offset: number, limit: number) {

@@ -179,3 +179,62 @@ describe('a long list, page by page (no 200-song cap)', () => {
     expect(result.capped).toBe(false);
   });
 });
+
+/**
+ * An Apple artist whose catalogue is `total` releases long, answering a lookup the way Apple does:
+ * `limit` rows and no offset, because Apple's lookup has no offset parameter.
+ */
+function appleArtistFetch(total: number): { fetch: CatalogFetch; limits: number[] } {
+  const limits: number[] = [];
+  const json = (body: unknown) => ({ status: 200, headers: { get: () => null }, json: async () => body, text: async () => JSON.stringify(body) });
+  const fetch: CatalogFetch = async (url) => {
+    const u = new URL(url);
+    if (!u.pathname.includes('/lookup')) throw new Error(`No answer for ${url}`);
+    const limit = Number(u.searchParams.get('limit'));
+    if (u.searchParams.get('entity') === 'song') return json({ resultCount: 0, results: [] });
+    limits.push(limit);
+    const rows = Array.from({ length: Math.min(limit, total) }, (_, i) => ({
+      wrapperType: 'collection', collectionType: 'Album', collectionId: 900 + i, collectionName: `Album ${i + 1}`,
+      artistName: 'Band', artistId: 271256, trackCount: 10, releaseDate: '2020-01-01T07:00:00Z',
+      artworkUrl100: 'https://is1-ssl.mzstatic.com/image/thumb/Music/v4/1/100x100bb.jpg',
+      collectionViewUrl: `https://music.apple.com/album/${900 + i}`,
+    }));
+    return json({ resultCount: rows.length + 1, results: [{ wrapperType: 'artist', artistId: 271256, artistName: 'Band', primaryGenreName: 'Hip-Hop/Rap', artistLinkUrl: 'https://music.apple.com/artist/271256' }, ...rows] });
+  };
+  return { fetch, limits };
+}
+
+describe('an artist whose catalogue is longer than one page', () => {
+  /**
+   * How many albums an artist has is a fact about the artist, not about how many rows the app that
+   * asked happened to want. The player asks for 25 and the hub and the companion for 12, and the
+   * count was taken from the rows in hand, so the same artist was reported as having 25 albums in
+   * one app and 12 in another.
+   */
+  it('reports the same album count however many rows the caller asked for', async () => {
+    const twelve = appleArtistFetch(94);
+    const twentyFive = appleArtistFetch(94);
+    const a = await new CatalogEngine({ fetch: twelve.fetch, userAgent: 'AirwaveTest/1.0 (test)', sleep: noSleep, crossLinkTop: 0 }).artist('apple-music:271256', { albumsLimit: 12, topLimit: 10 });
+    const b = await new CatalogEngine({ fetch: twentyFive.fetch, userAgent: 'AirwaveTest/1.0 (test)', sleep: noSleep, crossLinkTop: 0 }).artist('apple-music:271256', { albumsLimit: 25, topLimit: 10 });
+
+    // A page of the size each caller asked for: that part is correct and stays.
+    expect(a.albums).toHaveLength(12);
+    expect(b.albums).toHaveLength(25);
+    // The artist is the same artist in both, so the count has to agree.
+    expect(a.artist.albumCount).toBe(b.artist.albumCount);
+    // Both pages say there is more to come, which there is.
+    expect(a.albumsPage.hasMore).toBe(true);
+    expect(b.albumsPage.hasMore).toBe(true);
+  });
+
+  /**
+   * Apple's lookup stops at 200 rows and has no offset, so at 200 the real total is unknown. Saying
+   * "200" states the ceiling as a fact; an unknown count is left unknown.
+   */
+  it('does not present the 200-row ceiling as the artist\'s album count', async () => {
+    const { fetch } = appleArtistFetch(640);
+    const detail = await new CatalogEngine({ fetch, userAgent: 'AirwaveTest/1.0 (test)', sleep: noSleep, crossLinkTop: 0 }).artist('apple-music:271256', { albumsLimit: 25, topLimit: 10 });
+    expect(detail.artist.albumCount).toBeNull();
+    expect(detail.albumsPage.hasMore).toBe(true);
+  });
+});

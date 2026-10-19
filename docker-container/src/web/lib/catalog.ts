@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CatalogAlbumDetail, CatalogArtistDetail, CatalogEnrichment, CatalogLyrics, CatalogProviderId, CatalogResolveResult, CatalogSearchChunk, CatalogSearchSection, CatalogTrack, SavedCollection } from '@now-playing/contracts';
 import { CATALOG_PROVIDERS } from '@now-playing/contracts';
-import { collectionKey, EMPTY_RESULTS, foldCatalogChunk, readCatalogStream, type CatalogFields, type CatalogResults } from '@now-playing/domain/catalog';
+import { collectionKey, EMPTY_RESULTS, foldCatalogChunk, readCatalogStream, type CatalogFields, type CatalogResults, ARTIST_ALBUMS_LIMIT, ARTIST_TOP_LIMIT } from '@now-playing/domain/catalog';
 import { api, ApiError, apiStream } from './api.js';
 import { useStoredState } from './hooks.js';
 
@@ -41,7 +41,7 @@ export const hubCatalog = {
     }
   },
   album: (id: string, offset: number, limit: number, signal?: AbortSignal) => api('catalogAlbum', { query: { id, offset, limit }, ...(signal ? { signal } : {}) }) as Promise<CatalogAlbumDetail>,
-  artist: (id: string, albumsOffset: number, signal?: AbortSignal) => api('catalogArtist', { query: { id, albumsOffset, albumsLimit: 12, topLimit: 10 }, ...(signal ? { signal } : {}) }) as Promise<CatalogArtistDetail>,
+  artist: (id: string, albumsOffset: number, signal?: AbortSignal) => api('catalogArtist', { query: { id, albumsOffset, albumsLimit: ARTIST_ALBUMS_LIMIT, topLimit: ARTIST_TOP_LIMIT }, ...(signal ? { signal } : {}) }) as Promise<CatalogArtistDetail>,
   resolve: (url: string, offset: number, limit: number, signal?: AbortSignal) => api('catalogResolve', { query: { url, offset, limit }, ...(signal ? { signal } : {}) }) as Promise<CatalogResolveResult>,
   lyrics: (track: CatalogTrack, signal?: AbortSignal) =>
     api('catalogLyrics', { query: { title: track.title, artist: track.artists[0] ?? track.artist, album: track.album ?? undefined, durationSec: track.durationMs ? Math.round(track.durationMs / 1000) : undefined }, ...(signal ? { signal } : {}) }) as Promise<CatalogLyrics>,

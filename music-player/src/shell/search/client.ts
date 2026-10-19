@@ -23,7 +23,7 @@ import {
   type CatalogSearchSection,
   type CatalogTrack,
 } from '@now-playing/contracts';
-import { readCatalogStream } from '@now-playing/domain/catalog';
+import { readCatalogStream, ARTIST_ALBUMS_LIMIT, ARTIST_TOP_LIMIT } from '@now-playing/domain/catalog';
 import type { CatalogEngine, CatalogFetch, CatalogResponse } from '@now-playing/domain/catalog';
 
 export interface SearchParams {
@@ -211,7 +211,7 @@ function httpClient(
     artist: (id, signal) =>
       get(
         paths.artist,
-        query({ id, topLimit: 10, albumsLimit: 25 }),
+        query({ id, topLimit: ARTIST_TOP_LIMIT, albumsLimit: ARTIST_ALBUMS_LIMIT }),
         (v) => CatalogArtistDetail.parse(v),
         signal,
       ),
@@ -380,7 +380,7 @@ const browserClient: CatalogClient = {
       .catch((e: unknown) => Promise.reject(asRefused(e))),
   artist: async (id, signal) =>
     (await browserEngine())
-      .artist(id, { topLimit: 10, albumsLimit: 25 }, signal)
+      .artist(id, { topLimit: ARTIST_TOP_LIMIT, albumsLimit: ARTIST_ALBUMS_LIMIT }, signal)
       .catch((e: unknown) => Promise.reject(asRefused(e))),
   resolve: async (url, offset, limit, signal) => {
     const result = await (
