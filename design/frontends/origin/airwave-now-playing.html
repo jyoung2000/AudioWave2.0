@@ -15106,9 +15106,11 @@ window.AW.startStats = function () {
 
     /* ---- the companion app ---- */
     function isHelper(j) { return j && j.helper === 'now-playing-local-helper' && typeof j.version === 'string'; }
-    function showApp(base, j) {
-      conn.app = { base: base, health: j };
-      window.COMPANION = base;
+    /* `base` is null for a Companion reached by pairing: it has no address of its own, the relay
+       carries the calls. Everything else about it is reported the same way. */
+    function showApp(base, j, how) {
+      conn.app = { base: base, health: j, how: how || (base ? 'address' : 'paired') };
+      if (base) window.COMPANION = base;
       var tools = (Array.isArray(j.tools) ? j.tools : []);
       var frag = document.createDocumentFragment(), missing = 0;
       tools.forEach(function (t, i) {
@@ -15120,7 +15122,8 @@ window.AW.startStats = function () {
       });
       if (!tools.length) frag.appendChild(document.createTextNode('none reported'));
       connFacts('connAppFacts', [
-        ['Address', base, 'conn__mono'],
+        base ? ['Address', base, 'conn__mono']
+             : ['Reached by', 'Paired' + (conn.app.how === 'relay' ? ' — carried by the relay' : ' — direct')],
         ['Version', 'v' + j.version + (j.protocol ? ' · protocol ' + j.protocol : '')],
         ['Downloaders', frag],
         ['Can save as', (j.formats || []).join(', ') || 'nothing yet — FFmpeg converts'],
@@ -15130,7 +15133,7 @@ window.AW.startStats = function () {
       connLight('connAppDot', missing ? 'warn' : 'ok');
       document.getElementById('cfgConnMsg').textContent = missing
         ? 'Connected, but ' + missing + (missing > 1 ? ' downloaders are' : ' downloader is') + ' missing.'
-        : 'Connected to the companion app.';
+        : base ? 'Connected to the companion app.' : 'Connected to the paired Companion.';
       say('Companion connected');
     }
     function testApp() {
@@ -15164,6 +15167,31 @@ window.AW.startStats = function () {
       cfg.companion = connBase(this.value); cfgSave(); setStatus('Saved.');
     });
     document.getElementById('cfgConnect').addEventListener('click', testApp);
+
+    /* Whatever is already there should say so the moment the player has finished loading: the
+       Companion is paired once and expected to be available afterwards, so making the listener
+       open Settings and press Connect to find that out is asking them to re-do a done thing.
+       The bridge already probes at boot; this paints what the probe found. Named on window so the
+       tests can await the same pass the page runs. */
+    window.npBootConnections = function () {
+      var tools = window.NP_TOOLS;
+      if (!tools || !tools.detect) return Promise.resolve();
+      return tools.detect().then(function (live) {
+        if (!live || !live.health) return;
+        /* A paired Companion carries no origin, a legacy helper does. Both are the Companion as
+           far as this card is concerned; only the way it is reached differs. */
+        if (live.kind === 'awsp') showApp(null, live.health, live.label && /relay/i.test(live.label) ? 'relay' : 'direct');
+        else if (live.kind === 'helper' && live.origin) showApp(live.origin, live.health, 'address');
+        if (typeof paintPassed === 'function') paintPassed();
+      }, function () {
+        /* No Companion is the ordinary state for most people, not a fault: the dot stays off and
+           nothing is said about it. */
+      });
+    };
+    /* After the bridge has installed NP_TOOLS and the paired transport, not before. */
+    (window.NP_READY || Promise.resolve()).then(function () {
+      return (window.NP_AWSP_READY || Promise.resolve(null));
+    }).then(function () { return window.npBootConnections(); });
 
     /* ---- the Docker container ---- */
     function isLocal(host) { return /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|[^.]+\.local$|[^.]+$)/i.test(host); }
@@ -16821,7 +16849,12 @@ window.AW.startStats = function () {
         url: function (m) { return 'https://somafm.com/songs/' + m[1] + '.json'; },
         read: function (j) {
           var s0 = j && j.songs && j.songs[0];
-          return s0 && s0.title ? { title: s0.title, artist: s0.artist || '' } : null;
+          if (!s0 || !s0.title) return null;
+          /* `date` is when this song started, in seconds. No length is published, so elapsed is
+             all that can honestly be shown for these. */
+          var began = Number(s0.date);
+          return { title: s0.title, artist: s0.artist || '',
+                   startedAt: isFinite(began) && began > 0 ? began * 1000 : null, duration: null };
         },
       },
       {
@@ -16841,7 +16874,13 @@ window.AW.startStats = function () {
             return m2 ? m2[1].trim() : '';
           }
           var title = prop('cue_title');
-          return title ? { title: title, artist: prop('track_artist_name') } : null;
+          if (!title) return null;
+          /* Triton times its cues: when it started, in epoch milliseconds, and how long it runs,
+             also in milliseconds. It times programmes the same way it times songs. */
+          var began = Number(prop('cue_time_start')), runs = Number(prop('cue_time_duration'));
+          return { title: title, artist: prop('track_artist_name'),
+                   startedAt: isFinite(began) && began > 0 ? began : null,
+                   duration: isFinite(runs) && runs > 0 ? Math.round(runs / 1000) : null };
         },
       },
       {
@@ -16911,6 +16950,31 @@ window.AW.startStats = function () {
       metaCache[url] = { at: now, val: c ? c.val : null, pending: pr };
       return pr;
     };
+
+    /* Where the broadcast is in what it is playing, from the cue the station timed -- not from
+       when we happened to tune in. null when the feed publishes no timing, which keeps the
+       honest cases honest: no timing, no claim. */
+    var airClock = 0;
+    function radioAir() {
+      if (!station || !nowTrack || !nowTrack.startedAt) return null;
+      var secs = Math.floor((Date.now() - nowTrack.startedAt) / 1000);
+      if (!isFinite(secs) || secs < 0) return null;
+      var runs = nowTrack.duration || 0;
+      /* A cue that has outlived its own length is stale: the feed has not caught up yet, and
+         filling past the end would be a lie dressed as precision. */
+      if (runs && secs > runs + 90) return null;
+      return { elapsed: runs ? Math.min(secs, runs) : secs, duration: runs || null };
+    }
+    window.radioAir = radioAir;
+    /* The broadcast clock has to run on its own: the song is advancing whether or not the feed
+       is polled, and the feed is only read every 20s. */
+    function startAirClock() {
+      clearInterval(airClock);
+      airClock = setInterval(function () {
+        if (station && nowTrack && nowTrack.startedAt && typeof window.npPaint === 'function') window.npPaint();
+      }, 1000);
+    }
+    startAirClock();
 
     function pollTrack() {
       if (!station) return;
@@ -17000,10 +17064,28 @@ window.AW.startStats = function () {
 
     function paint() {
       var cur = pos[mode];
+      /* On radio the broadcast's own clock wins over ours: a station is mid-song when it is
+         tuned in, and our 0:00 described how long we had been listening rather than where the
+         song was. Feeds that time their cues let us say the latter. */
+      var air = typeof radioAir === 'function' ? radioAir() : null;
+      if (air) cur = air.elapsed;
       elapsedEl.textContent = fmt(cur);
       if (isLive()) {
-        fill.style.width = '100%';            // always at the live edge
-        track.setAttribute('aria-label', 'Live broadcast, ' + fmt(cur) + ' elapsed');
+        if (air && air.duration) {
+          /* A song with a known length gets a real progress bar, filled to where the broadcast
+             is. The stream stays live and unseekable; this reports, it does not offer. */
+          fill.style.width = Math.max(0, Math.min(100, (air.elapsed / air.duration) * 100)) + '%';
+          remainEl.hidden = false;
+          remainEl.textContent = '-' + fmt(Math.max(0, air.duration - air.elapsed));
+          track.setAttribute('aria-label', 'Live broadcast, ' + fmt(air.elapsed) + ' of ' + fmt(air.duration));
+        } else {
+          /* No length published: nothing is invented, so the bar stays at the live edge and
+             only the elapsed figure is shown. */
+          fill.style.width = '100%';
+          remainEl.hidden = true;
+          remainEl.textContent = '';
+          track.setAttribute('aria-label', 'Live broadcast, ' + fmt(cur) + ' elapsed');
+        }
       } else {
         var dur = total();
         fill.style.width = (cur / dur) * 100 + '%';
@@ -17013,6 +17095,8 @@ window.AW.startStats = function () {
         track.setAttribute('aria-valuetext', fmt(cur) + ' of ' + fmt(dur));
       }
     }
+
+    window.npPaint = paint;
 
     function setPlaying(p) {
       playing = (isLive() && !isRadio()) ? true : p;   // a shared broadcast can't be paused

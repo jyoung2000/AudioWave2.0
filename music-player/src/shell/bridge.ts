@@ -686,7 +686,25 @@ async function boot(): Promise<void> {
     note('a new version is ready');
     const say = (window as unknown as { say?: (text: string) => void }).say;
     say?.('A new version of Airwave is ready — reload to use it.');
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') update.reload(); }, { once: true });
+    /* Take the first safe moment, rather than only a hidden tab. A player left open on the radio is
+       never hidden, and a build that waits for that moment waits forever: a worker was found parked
+       while the server was serving a newer app, so a fix the listener had asked for sat installed
+       and unused. Nothing is playing means nothing is interrupted, so hand over at once; otherwise
+       wait for the track to end or the tab to be put away, whichever comes first. */
+    const playing = (): boolean => {
+      const audio = document.querySelector('audio');
+      return Boolean(audio && !audio.paused && !audio.ended);
+    };
+    if (!playing()) { update.reload(); return; }
+    const onceQuiet = (): void => {
+      if (playing()) return;
+      document.removeEventListener('visibilitychange', onHidden);
+      update.reload();
+    };
+    function onHidden(): void { if (document.visibilityState === 'hidden') update.reload(); }
+    document.addEventListener('visibilitychange', onHidden, { once: true });
+    document.querySelector('audio')?.addEventListener('ended', onceQuiet, { once: true });
+    document.querySelector('audio')?.addEventListener('pause', onceQuiet, { once: true });
   });
   note(`bridge ready: ${window.LIBRARY.length} tracks, hub ${hub.getStatus().connected ? 'paired' : 'not paired'}`);
   // Now the shell may run: everything it reads at boot is in place.

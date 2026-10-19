@@ -1679,10 +1679,10 @@ replace("        return { id: c.id || 'm3u-' + i, num: c.num || String(i + 1), n
         "    /* A player that has only a hub still asks once at start; pairing later asks again. */\n"
         "    setTimeout(companionTv, 1500);\n"
         "    setInterval(companionTv, 5 * 60 * 1000);\n")
-replace("      conn.app = { base: base, health: j };\n"
-        "      window.COMPANION = base;\n",
-        "      conn.app = { base: base, health: j };\n"
-        "      window.COMPANION = base;\n"
+replace("      conn.app = { base: base, health: j, how: how || (base ? 'address' : 'paired') };\n"
+        "      if (base) window.COMPANION = base;\n",
+        "      conn.app = { base: base, health: j, how: how || (base ? 'address' : 'paired') };\n"
+        "      if (base) window.COMPANION = base;\n"
         "      if (window.companionTv) window.companionTv();\n")
 # ---- AWSP companion bridge: Live TV and EPG use the same paired device identity ---------------------
 replace("    function companionTv() {\n",
@@ -4828,7 +4828,13 @@ replace("""        /* iHeart. Its track feed answers 410 for every station now, 
           try { j = body ? JSON.parse(body) : null; } catch (e) { j = null; }
           if (!j || typeof j.title !== 'string' || !j.title.trim()) return null;
           if (typeof j.endTime === 'number' && Date.now() > j.endTime + 60000) return null;
-          return { title: j.title.trim(), artist: typeof j.artist === 'string' ? j.artist.trim() : '' };
+          /* The cue says when it began and how long it runs, so a listener joining halfway can be
+             told where the song already is instead of being shown 0:00. Carried in seconds. */
+          var startedAt = typeof j.startTime === 'number' ? j.startTime : null;
+          var runs = typeof j.trackDuration === 'number' && j.trackDuration > 0 ? j.trackDuration
+            : (startedAt && typeof j.endTime === 'number' && j.endTime > startedAt ? Math.round((j.endTime - startedAt) / 1000) : null);
+          return { title: j.title.trim(), artist: typeof j.artist === 'string' ? j.artist.trim() : '',
+                   startedAt: startedAt, duration: runs };
         },""")
 
 # The tuned station also asks the paired Hub or the Companion, even when a feed named the song: they
@@ -5110,7 +5116,7 @@ replace('    function icyMeta(url) {',
 replace('    function icyMeta(url) {',
         "    /* What the stream says about itself, as opposed to what it is playing. A station with its own\n       song feed never needs the Hub for its Song column, but the directory may still carry no genre\n       and no bitrate for it — and only the Hub or the Companion can read those from the stream. A\n       description does not change between songs, so it is asked once and kept for half an hour. */\n    var aboutCache = {};\n    function icyAbout(url) {\n      var key = 'about:' + url, now = Date.now(), c = aboutCache[key];\n      if (c && c.pending) return c.pending;\n      if (c && now - c.at < 1800000) return Promise.resolve(c.val);\n      var pr = icyMeta(url).then(function (t) {\n        var val = { genre: (t && t.genre) || '', bitrate: (t && t.bitrate) || 0 };\n        aboutCache[key] = { at: Date.now(), val: val };\n        return val;\n      }, function () {\n        var val = { genre: '', bitrate: 0 };\n        aboutCache[key] = { at: Date.now(), val: val };\n        return val;\n      });\n      aboutCache[key] = { at: now, val: c ? c.val : { genre: '', bitrate: 0 }, pending: pr };\n      return pr;\n    }\n\n    function icyMeta(url) {")
 replace('          if (!tuned) return t || icyMeta(url);',
-        '          if (!tuned) {\n            if (!t) return icyMeta(url);\n            /* The feed answered the song; the stream still answers the Genre and Kbps columns. */\n            return icyAbout(url).then(function (a) {\n              return { title: t.title, artist: t.artist, genre: a.genre, bitrate: a.bitrate };\n            }, function () { return t; });\n          }')
+        '          if (!tuned) {\n            if (!t) return icyMeta(url);\n            /* The feed answered the song; the stream still answers the Genre and Kbps columns. */\n            return icyAbout(url).then(function (a) {\n              return { title: t.title, artist: t.artist, genre: a.genre, bitrate: a.bitrate,\n                       startedAt: t.startedAt || null, duration: t.duration || null,\n                       programme: t.programme, about: t.about };\n            }, function () { return t; });\n          }')
 
 # ---- radio: a refresh control in the same ribbon as the filter ----
 replace('      <button class="lib-scope__refresh" type="button" id="libDiscRefresh" hidden aria-label="New songs"\n              title="New songs — Shift-click to start over">&#8635;</button>\n',
