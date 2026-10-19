@@ -1,4 +1,4 @@
-import type { AggregateTasteProfile, ArtistRelation, CanonicalArtist, CanonicalTrack, DiscoveryJob, ListeningEvent, RecommendationFeedback, TrackPlatform } from '@now-playing/contracts';
+import type { AggregateTasteProfile, ArtistRelation, CanonicalArtist, CanonicalTrack, DiscoveryCacheEntry, DiscoveryJob, ListeningEvent, RecommendationFeedback, TrackPlatform } from '@now-playing/contracts';
 import type { Db } from '../connection.js';
 
 interface CanonicalTrackRow {
@@ -343,6 +343,33 @@ export class CanonicalRepository {
    */
   deleteCacheFor(userId: string): number {
     return this.db.prepare('DELETE FROM discovery_cache WHERE key LIKE ?').run(`discover:${userId}:%`).changes;
+  }
+
+  /**
+   * What the warm cycle found for one listener, for recommending from.
+   *
+   * Scoped by the same user-id key prefix that `deleteCacheFor` uses, so one person's warm run can
+   * never turn into another person's recommendations. Expired rows are left out rather than served
+   * stale, and malformed rows are skipped instead of failing the whole read.
+   */
+  cacheForUser(userId: string, now: string = new Date().toISOString()): DiscoveryCacheEntry[] {
+    const rows = this.db
+      .prepare<[string, string], { key: string; provider: string; query: string; results: string; created_at: string; expires_at: string; hits: number }>(
+        'SELECT key, provider, query, results, created_at, expires_at, hits FROM discovery_cache WHERE key LIKE ? AND expires_at >= ? ORDER BY hits DESC, created_at DESC',
+      )
+      .all(`discover:${userId}:%`, now);
+    const out: DiscoveryCacheEntry[] = [];
+    for (const row of rows) {
+      let results: unknown[];
+      try {
+        const parsed: unknown = JSON.parse(row.results);
+        results = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        continue;
+      }
+      out.push({ key: row.key, provider: row.provider as DiscoveryCacheEntry['provider'], query: row.query, results, createdAt: row.created_at, expiresAt: row.expires_at, hits: row.hits });
+    }
+    return out;
   }
 
   cachePurge(before: string): number {

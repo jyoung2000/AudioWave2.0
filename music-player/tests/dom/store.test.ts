@@ -193,3 +193,69 @@ describe('editing the queue', () => {
     expect(store.canGoNext(), 'the pass is over').toBe(false);
   });
 });
+
+/**
+ * A hub learns nothing from a listener whose events never leave the browser.
+ *
+ * `recordEvent` wrote every play, skip and like to the player's own IndexedDB and stopped there:
+ * `HubClient.sendEvents` existed with no caller anywhere in the repo, so a paired hub's taste
+ * profile stayed at cold-start however much music was played, and the recommendations it served
+ * were built from nothing. The hub is told as well, not instead -- a listener with no hub paired
+ * keeps exactly what they kept before.
+ */
+describe('a paired hub hears what this player played', () => {
+  it('sends recorded events to the hub and keeps its own copy', async () => {
+    const { store } = await setup();
+    const sent: unknown[][] = [];
+    store.setEventSink(async (events) => {
+      sent.push([...events]);
+      return { accepted: events.length, duplicates: 0 };
+    });
+
+    store.recordEvent('started', track(1));
+    await store.flushEvents();
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toHaveLength(1);
+    expect((sent[0]![0] as { type: string }).type).toBe('started');
+    expect(store.getSnapshot().events).toHaveLength(1);
+    expect(store.unsentEventCount()).toBe(0);
+  });
+
+  /** Nothing is attempted and nothing is lost when no hub is paired. */
+  it('keeps events when no hub is listening', async () => {
+    const { store } = await setup();
+    store.recordEvent('started', track(1));
+    await store.flushEvents();
+    expect(store.getSnapshot().events).toHaveLength(1);
+  });
+
+  /** A hub that is down must not cost the listener their history. */
+  it('keeps an event the hub refused, to go again later', async () => {
+    const { store } = await setup();
+    let calls = 0;
+    store.setEventSink(async () => {
+      calls += 1;
+      throw new Error('hub is down');
+    });
+    store.recordEvent('started', track(1));
+    await store.flushEvents();
+    expect(calls).toBe(1);
+    expect(store.getSnapshot().events).toHaveLength(1);
+    expect(store.unsentEventCount(), 'still owed to the hub').toBe(1);
+  });
+
+  /** An event already accepted is not sent twice. */
+  it('does not send the same event again once the hub has it', async () => {
+    const { store } = await setup();
+    let batches = 0;
+    store.setEventSink(async (events) => {
+      batches += 1;
+      return { accepted: events.length, duplicates: 0 };
+    });
+    store.recordEvent('started', track(1));
+    await store.flushEvents();
+    await store.flushEvents();
+    expect(batches).toBe(1);
+  });
+});

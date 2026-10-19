@@ -163,6 +163,12 @@ const artworkKey = (provider: string): string => `${ARTWORK_PREFIX}${provider}`;
 
 export type Listener = () => void;
 
+/** How a paired hub is told about listening events. Resolves when the hub has them. */
+export type EventSink = (events: readonly ListeningEvent[]) => Promise<{ accepted: number; duplicates: number }>;
+
+/** Events per request, so a long backlog goes up in bounded pieces rather than one huge body. */
+const EVENT_BATCH_MAX = 200;
+
 export class PlayerStore {
   private state: AppState;
   private readonly listeners = new Set<Listener>();
@@ -173,6 +179,10 @@ export class PlayerStore {
   private loadGeneration = 0;
   /** Where a hub-held track streams from; set once a hub client exists. */
   private streamUrl: ((track: TrackRef) => Promise<string | null> | string | null) | null = null;
+  private eventSink: EventSink | null = null;
+  /** Recorded but not yet accepted by the hub; kept until it confirms. */
+  private unsentEvents: ListeningEvent[] = [];
+  private flushing = false;
 
   constructor(readonly playback: PlaybackEngine) {
     this.state = {
@@ -738,6 +748,45 @@ export class PlayerStore {
   }
 
   /**
+   * Where this player's listening events go besides its own database.
+   *
+   * A hub builds its taste profile from the events it is told about, so a player that never tells
+   * it anything leaves it at cold-start no matter how much music is played. Null when no hub is
+   * paired: events are still recorded locally, they are simply owed to nobody.
+   */
+  setEventSink(sink: EventSink | null): void {
+    this.eventSink = sink;
+    if (sink) void this.flushEvents();
+  }
+
+  /** Events recorded but not yet accepted by the hub. */
+  unsentEventCount(): number {
+    return this.unsentEvents.length;
+  }
+
+  /**
+   * Hand the hub everything it has not accepted yet.
+   *
+   * Events stay in the queue until the hub confirms them, so a hub that is asleep, restarting or
+   * unreachable costs the listener nothing: the next flush carries the backlog. Failure is not
+   * surfaced to the listener -- their music did not go wrong, and the history is not lost.
+   */
+  async flushEvents(): Promise<void> {
+    if (!this.eventSink || this.flushing || this.unsentEvents.length === 0) return;
+    this.flushing = true;
+    const batch = this.unsentEvents.slice(0, EVENT_BATCH_MAX);
+    try {
+      await this.eventSink(batch);
+      const sent = new Set(batch.map((e) => e.id));
+      this.unsentEvents = this.unsentEvents.filter((e) => !sent.has(e.id));
+    } catch {
+      // Kept for the next flush: the hub not answering is not the listener's problem.
+    } finally {
+      this.flushing = false;
+    }
+  }
+
+  /**
    * Move on. `user` is a skip, `ended` the natural end of the track, and `crossfade` the point
    * one crossfade before that end: the next track starts now, over this one, and this one's
    * completion is recorded when its deck actually finishes.
@@ -1166,6 +1215,9 @@ export class PlayerStore {
     };
     this.patch({ events: [...this.state.events, event] });
     void this.db?.put('events', event).catch(() => this.notice('warning', 'A listening event could not be saved; your history may be incomplete.'));
+    // The hub learns from these too, when one is paired; the local copy above is kept either way.
+    this.unsentEvents.push(event);
+    void this.flushEvents();
   }
 
   metrics(topN = 10): ReturnType<typeof computeListeningMetrics> {

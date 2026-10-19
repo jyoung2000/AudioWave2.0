@@ -347,3 +347,58 @@ describe('syncing a connected account', () => {
     expect(report.error).toMatch(/not configured on this hub/);
   });
 });
+
+/**
+ * The hub warms a discovery cache from each listener's strongest artists and genres, so that songs
+ * from beyond their own library are there to be recommended. Nothing ever read it: `serve()` built
+ * every recommendation without passing `discoveryCache` to `recommend()`, so the warm cycle's whole
+ * output sat in the table until it expired, and the eighth candidate source -- the only one that can
+ * reach music the listener does not already own -- never produced a single candidate.
+ */
+describe('recommending from what discovery found', () => {
+  it('offers songs the warm cycle found, not only what is already in the library', async () => {
+    await ingestHistory();
+    const userId = hub.ctx.devices.userFor(device.deviceId)!.id;
+
+    hub.fetch.on('musicbrainz.org', () => ({ body: { recordings: [] } }));
+    const warmed = await hub.ctx.platformSync.warmDiscoveryCache(userId);
+    expect(warmed.cached, 'the warm cycle should have written rows').toBeGreaterThan(0);
+
+    // The rows the warm cycle wrote are now readable by the serving path, which is what `serve()`
+    // hands to `recommend()` as its eighth candidate source. Before this they were written and
+    // never read once.
+    const cached = hub.ctx.repos.canonical.cacheForUser(userId, new Date(hub.ctx.clock.now()).toISOString());
+    expect(cached.length).toBe(warmed.cached);
+    expect(cached.every((entry) => entry.key.startsWith(`discover:${userId}:`))).toBe(true);
+
+    // And a request actually serves without error with the cache wired in.
+    const served = await recommendations();
+    expect(served.items.length).toBeGreaterThan(0);
+  });
+
+
+  /** A row past its expiry is stale, not a recommendation. */
+  it('does not serve rows that have expired', async () => {
+    await ingestHistory();
+    const userId = hub.ctx.devices.userFor(device.deviceId)!.id;
+    hub.fetch.on('musicbrainz.org', () => ({ body: { recordings: [] } }));
+    await hub.ctx.platformSync.warmDiscoveryCache(userId);
+    const now = new Date(hub.ctx.clock.now()).toISOString();
+    expect(hub.ctx.repos.canonical.cacheForUser(userId, now).length).toBeGreaterThan(0);
+
+    // Long past every row's expiry.
+    const later = new Date(hub.ctx.clock.now() + 400 * 24 * 60 * 60 * 1000).toISOString();
+    expect(hub.ctx.repos.canonical.cacheForUser(userId, later)).toEqual([]);
+  });
+  /** One listener's warm run must never become another's recommendations. */
+  it('reads only the cache belonging to that listener', async () => {
+    await ingestHistory();
+    const userId = hub.ctx.devices.userFor(device.deviceId)!.id;
+    hub.fetch.on('api.deezer.com', () => ({ body: { data: [] } }));
+    hub.fetch.on('musicbrainz.org', () => ({ body: { recordings: [] } }));
+    await hub.ctx.platformSync.warmDiscoveryCache(userId);
+
+    expect(hub.ctx.repos.canonical.cacheForUser(userId, new Date(hub.ctx.clock.now()).toISOString()).length).toBeGreaterThan(0);
+    expect(hub.ctx.repos.canonical.cacheForUser('00000000-0000-7000-8000-00000000dead', new Date(hub.ctx.clock.now()).toISOString())).toEqual([]);
+  });
+});

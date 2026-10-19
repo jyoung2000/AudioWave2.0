@@ -78,6 +78,9 @@ export function PlayerProvider({ children, store: injected }: { children: ReactN
       setHub(client);
       client.subscribe(setHubStatus);
       store.setStreamUrlResolver((track) => client.streamUrl(track));
+      // The hub's recommendations are only as good as what it knows was played; until now it was
+      // told nothing. Events it cannot take are kept and offered again on the next flush.
+      store.setEventSink((events) => client.sendEvents(events));
       const groups = new GroupClient(client, () => 'This device');
       groups.subscribe(setShared);
       setGroup(groups);

@@ -366,6 +366,9 @@ export class RecommendationService {
       profile,
       catalogue,
       platforms,
+      // What the warm cycle found beyond this listener's own library. Without it the discovery-cache
+      // source has nothing to offer, and every recommendation can only ever be music already owned.
+      discoveryCache: this.repo.cacheForUser(request.userId, new Date(this.clock.now()).toISOString()),
       mode: request.mode,
       limit: request.limit,
       seed: Math.floor(this.clock.now() / 3_600_000),
