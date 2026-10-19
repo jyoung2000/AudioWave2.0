@@ -312,4 +312,28 @@ describe('starred albums and playlists (UX-SEARCH-005)', () => {
     const bad = await hub.app.inject({ method: 'PUT', url: '/api/v1/catalog/saved', headers: { cookie: admin.cookie, 'x-csrf-token': admin.csrfToken }, payload: { ...saved, ref: { ...ref, kind: 'radio' } } });
     expect(bad.statusCode).toBe(400);
   });
+  /**
+   * What the algorithm can learn from each platform.
+   *
+   * A recommendation's genre factor can only read a genre a platform actually stated. SoundCloud
+   * states one; YouTube does not (it publishes a category and the uploader's keywords, which are not
+   * the same claim), so a YouTube row stays untagged here rather than carrying a guess. Both reach
+   * the hub through yt-dlp with no API key, which is the only way this hub has them at all.
+   */
+  it("keeps SoundCloud's stated genre and leaves YouTube's rows untagged", async () => {
+    const search = CatalogSearchAggregate.parse((await get('/api/v1/catalog/search?q=lucky&stream=0&sections=tracks&providers=soundcloud,youtube')).json());
+    const answered = search.status.filter((s) => s.state === 'ok').map((s) => s.provider);
+    expect(answered).toEqual(expect.arrayContaining(['soundcloud', 'youtube']));
+
+    const platformsOf = (t: { sources: ReadonlyArray<{ platform: string }> }) => t.sources.map((s) => s.platform);
+    const sc = search.tracks.find((t) => platformsOf(t).includes('soundcloud') && !platformsOf(t).includes('youtube'));
+    const yt = search.tracks.find((t) => platformsOf(t).includes('youtube') && !platformsOf(t).includes('soundcloud'));
+    expect(sc, 'a SoundCloud-only row').toBeDefined();
+    expect(yt, 'a YouTube-only row').toBeDefined();
+
+    // Stated by the platform, so the recommender may learn it.
+    expect(sc!.genre).toBe('Electronic');
+    // Not stated by the platform: blank, not invented from a category or an uploader's keywords.
+    expect(yt!.genre).toBeNull();
+  });
 });
