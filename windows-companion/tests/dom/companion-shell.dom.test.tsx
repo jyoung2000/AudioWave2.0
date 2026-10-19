@@ -605,12 +605,14 @@ describe('streaming to devices', () => {
     const onChanged = vi.fn();
     alone(<StreamingView status={awsp()} onChanged={onChanged} />);
     expect(screen.getByText('Turn on streaming to pair a device')).toBeTruthy();
-    expect(screen.getByText('Streaming is off')).toBeTruthy();
+    // The control is labelled by what it grants, not by the transport: 'Player access', the same
+    // words the window uses beside the switch.
+    expect(screen.getByText('Player access is off')).toBeTruthy();
     const code = screen.getByRole('button', { name: 'New Code' }) as HTMLButtonElement;
     expect(code.disabled).toBe(true);
-    expect(code.title).toBe('Turn on streaming first.');
+    expect(code.title).toBe('Allow Player access first.');
     expect(screen.getByText('Nothing paired yet — enter the code on a device to pair it.')).toBeTruthy();
-    await userEvent.click(screen.getByRole('checkbox', { name: /Let paired devices stream from this PC/ }));
+    await userEvent.click(screen.getByRole('checkbox', { name: /Allow paired Player devices to connect/ }));
     await waitFor(() => expect(called(invoked, 'awsp:set-enabled')[0]?.request).toEqual({ enabled: true }));
     await waitFor(() => expect(onChanged).toHaveBeenCalledWith(expect.objectContaining({ enabled: true })));
   });
@@ -630,14 +632,14 @@ describe('streaming to devices', () => {
     alone(<StreamingView status={running} onChanged={() => undefined} />);
     expect(screen.getByText('417 302')).toBeTruthy();
     expect(screen.getByText(/^Code expires in 9:\d\d$/)).toBeTruthy();
-    expect(screen.getByRole('img', { name: 'QR code of this PC’s ticket' })).toBeTruthy();
+    expect(screen.getByRole('img', { name: 'QR code of this Companion’s pairing address' })).toBeTruthy();
     const devices = screen.getByRole('list', { name: 'Paired devices' });
     expect(within(devices).getByText('Sam’s Phone')).toBeTruthy();
     expect(within(devices).getByText('Android · direct · 23 ms')).toBeTruthy();
     await userEvent.click(within(devices).getByRole('button', { name: 'Revoke Sam’s Phone' }));
-    expect(await screen.findByText('Stop “Sam’s Phone” streaming from this PC?')).toBeTruthy();
+    expect(await screen.findByText('Revoke “Sam’s Phone” Companion access?')).toBeTruthy();
     expect(called(invoked, 'awsp:revoke')).toHaveLength(0);
-    await userEvent.click(screen.getByRole('button', { name: 'Revoke' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Revoke access' }));
     await waitFor(() => expect(called(invoked, 'awsp:revoke')[0]?.request).toEqual({ id: 'dev-1' }));
   });
 });
