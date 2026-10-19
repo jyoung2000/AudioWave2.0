@@ -35,13 +35,13 @@ import { DomainError } from '../errors.js';
 import { CatalogHttpError, getText, type CatalogFetch } from './http.js';
 import { ProviderHealth, TtlCache, describeError, statusFor, type Now, type Sleep } from './limits.js';
 import { CatalogMerger, mergeSources, mergeTrack, sameRecording } from './merge.js';
-import { HYDRATE_BUDGET_MS, HYDRATE_CONCURRENCY, HYDRATE_MAX_ROWS, fillTrack, needsFacts, runPool, trackChanged } from './hydrate.js';
+import { APPLE_GENRE_MAX_ASKS, HYDRATE_BUDGET_MS, HYDRATE_CONCURRENCY, HYDRATE_MAX_ROWS, fillTrack, needsFacts, runPool, trackChanged } from './hydrate.js';
 import { headLike } from './http.js';
 import { ProviderResting, type CatalogProvider, type ProviderResult } from './provider.js';
 import { ApplePageChanged, fetchApplePlaylistPage, type ApplePlaylistPage } from './providers/applemusic-page.js';
 import { readSpotifyEmbed as parseSpotifyEmbed } from './providers/spotify-embed.js';
 import { DeezerClient, DeezerProvider, deezerTrack } from './providers/deezer.js';
-import { ITUNES_LOOKUP_MAX, ItunesClient, ItunesProvider } from './providers/itunes.js';
+import { ITUNES_LOOKUP_MAX, ITUNES_SEARCH, ItunesClient, ItunesProvider, itunesTrack } from './providers/itunes.js';
 import { MusicBrainzClient, MusicBrainzProvider, releaseOfRecording } from './providers/musicbrainz.js';
 import { ToolSearchProvider, type ToolSearchRunner } from './providers/ytdlp.js';
 import { parseCatalogQuery, parseMusicLink, type MusicLink } from './query.js';
@@ -327,7 +327,7 @@ export class CatalogEngine {
     // Every result carries its facts (UX-CAT-006): the page's rows, filled in from Deezer's detail and
     // the Cover Art Archive within a budget, sent as one last merge-only chunk the clients upsert by id.
     if (this.options.hydrate !== false && !signal?.aborted && sections.includes('tracks')) {
-      const filled = await this.hydrateTracks(merger.snapshot().tracks, { signal, askDeezer: wanted.has('deezer') && statuses.get('deezer')?.state !== 'skipped' });
+      const filled = await this.hydrateTracks(merger.snapshot().tracks, { signal, askDeezer: wanted.has('deezer') && statuses.get('deezer')?.state !== 'skipped', askApple: statuses.get('itunes')?.state !== 'skipped' });
       const patched = filled.map((t) => merger.patchTrack(t.id, () => t)).filter((t): t is CatalogTrack => t !== null);
       if (patched.length) yield { type: 'results', seq: seq++, provider: null, query, tracks: canonical(patched), artists: [], albums: [], playlists: [], status: list() };
     }
@@ -460,12 +460,14 @@ export class CatalogEngine {
    * refusal ends this page's Deezer lookups and rests the service as a search would.
    * Returns only the rows that changed, with their ids as given, so a chunk can upsert them.
    */
-  async hydrateTracks(tracks: readonly CatalogTrack[], options: { signal?: AbortSignal | undefined; budgetMs?: number | undefined; max?: number | undefined; askDeezer?: boolean | undefined } = {}): Promise<CatalogTrack[]> {
+  async hydrateTracks(tracks: readonly CatalogTrack[], options: { signal?: AbortSignal | undefined; budgetMs?: number | undefined; max?: number | undefined; askDeezer?: boolean | undefined; askApple?: boolean | undefined } = {}): Promise<CatalogTrack[]> {
     const deadline = this.now() + (options.budgetMs ?? this.options.hydrateBudgetMs ?? HYDRATE_BUDGET_MS);
     const rows = tracks.filter(needsFacts).slice(0, options.max ?? HYDRATE_MAX_ROWS);
     if (!rows.length) return [];
     const deezer = { on: (options.askDeezer ?? true) && this.options.enabled?.()?.deezer !== false && !this.health.coolingUntil('deezer') };
-    const results = await runPool(rows, (row) => this.hydrateOne(row, deezer, deadline, options.signal), { concurrency: HYDRATE_CONCURRENCY, deadline, now: this.now, ...(options.signal ? { signal: options.signal } : {}) });
+    // Shared across the pool: the whole pass may ask Apple this many times, not each row.
+    const appleAsks = { left: (options.askApple ?? true) ? APPLE_GENRE_MAX_ASKS : 0 };
+    const results = await runPool(rows, (row) => this.hydrateOne(row, deezer, appleAsks, deadline, options.signal), { concurrency: HYDRATE_CONCURRENCY, deadline, now: this.now, ...(options.signal ? { signal: options.signal } : {}) });
     const out: CatalogTrack[] = [];
     rows.forEach((row, i) => {
       const filled = results.get(i);
@@ -474,11 +476,21 @@ export class CatalogEngine {
     return out;
   }
 
-  private async hydrateOne(row: CatalogTrack, deezer: { on: boolean }, deadline: number, signal?: AbortSignal): Promise<CatalogTrack> {
+  private async hydrateOne(row: CatalogTrack, deezer: { on: boolean }, appleAsks: { left: number }, deadline: number, signal?: AbortSignal): Promise<CatalogTrack> {
     let out = row;
     if (deezer.on) {
       const detail = await this.deezerDetail(row, deezer, deadline, signal);
       if (detail) out = fillTrack(out, detail.track, detail.matchedBy);
+    }
+    // Deezer's track record carries no genre at all (no genre field, and no `genre_id` on its album
+    // sub-object), so filling from Deezer can never give a row one. Apple states `primaryGenreName`
+    // on every song, so a row still missing a genre is matched against Apple's record of the same
+    // recording and copies what Apple stated. Matched on the merger's own identity test, so a
+    // same-titled different recording contributes nothing, and a song Apple does not carry stays
+    // untagged rather than being given an invented genre.
+    if (!out.genre) {
+      const detail = await this.appleGenre(out, appleAsks, deadline, signal);
+      if (detail) out = fillTrack(out, detail, 'metadata');
     }
     if (!out.artworkUrl && out.sources.length && out.sources.every((s) => s.platform === 'musicbrainz')) {
       const recording = out.sources[0]!.id;
@@ -489,6 +501,39 @@ export class CatalogEngine {
       }
     }
     return out;
+  }
+
+  /**
+   * Apple's record of this row's recording, for the genre its own platform never stated.
+   *
+   * Not asked when Apple was skipped for this query (an ISRC lookup it cannot do), switched off,
+   * or resting. One search, cached by name and rough length so a page of rows by the same artist
+   * asks once.
+   * Apple's per-minute budget is shared with search, and a rate-limited answer rests the provider
+   * rather than retrying. Null when Apple has nothing confidently the same recording.
+   */
+  private async appleGenre(row: CatalogTrack, appleAsks: { left: number }, deadline: number, signal?: AbortSignal): Promise<CatalogTrack | null> {
+    // Apple being off or resting means Apple is not asked -- a genre is not worth overriding either
+    // the listener's own provider choice or a rate-limit backoff.
+    if (!row.title || appleAsks.left <= 0 || this.options.enabled?.()?.itunes === false || this.health.coolingUntil('itunes')) return null;
+    const words = `${row.artists[0] ?? row.artist} ${row.title}`.replace(/\s+/g, ' ').trim();
+    if (!words) return null;
+    const key = `apple:${words.toLowerCase()}|${row.durationMs ? Math.round(row.durationMs / 5000) : ''}`;
+    return this.withDeadline(
+      this.factsCache.get(key, async () => {
+        if (appleAsks.left <= 0) return null;
+        appleAsks.left -= 1;
+        const rows = await this.itunes.get(ITUNES_SEARCH, { term: words, entity: 'song', limit: 5 }, signal);
+        const candidates = rows.map((candidate) => itunesTrack(candidate)).filter((candidate): candidate is CatalogTrack => candidate !== null);
+        return candidates.find((candidate) => candidate.genre !== null && sameRecording(row, candidate)) ?? null;
+      }),
+      deadline - this.now(),
+    ).catch((error: unknown) => {
+      if (error instanceof CatalogHttpError && error.kind === 'rate-limited') {
+        this.health.restUntil('itunes', this.now() + Math.max(1000, error.retryAfterMs ?? 5000), error.message);
+      }
+      return null;
+    });
   }
 
   /** Deezer's full record of the row's recording, and how it was tied to the row. */

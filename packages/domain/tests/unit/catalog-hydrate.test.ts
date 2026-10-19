@@ -11,7 +11,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { CatalogSearchChunk, CatalogTrack } from '@now-playing/contracts';
-import { CatalogEngine, HYDRATE_CONCURRENCY, creditLine, emptyResult, fillTrack, needsFacts, runPool, type CatalogEngineOptions, type CatalogProvider } from '@now-playing/domain/catalog';
+import { APPLE_GENRE_MAX_ASKS, CatalogEngine, HYDRATE_CONCURRENCY, creditLine, emptyResult, fillTrack, needsFacts, runPool, type CatalogEngineOptions, type CatalogProvider } from '@now-playing/domain/catalog';
 import { STANDARD_ROUTES, fixtureFetch, type Route } from './catalog-fixtures.js';
 
 const noSleep = async (): Promise<void> => undefined;
@@ -123,10 +123,14 @@ describe('every result carries its facts (UX-CAT-006)', () => {
     const all = await e.searchAll({ q: 'daft punk get lucky', sections: ['tracks'], providers: ['youtube', 'deezer'] });
     const a = all.tracks.find((t) => t.id === 'musicbrainz:aaa')!;
     expect(a).toMatchObject({ bpm: 116.1, explicit: false, album: 'Random Access Memories' });
+    // Deezer fills the facts but states no genre, so Apple is asked for one and joins as a
+    // matched source: the row is the same recording on three services now.
     expect(a.sources.map((s) => [s.platform, s.matchedBy])).toEqual([
       ['musicbrainz', 'search'],
       ['deezer', 'isrc'],
+      ['apple-music', 'metadata'],
     ]);
+    expect(a.genre, 'the genre Apple stated, which Deezer never carries').toBeTruthy();
     const b = all.tracks.find((t) => t.id === 'youtube:radio')!;
     expect(b).toMatchObject({ bpm: 116.13, isrc: 'USQX91300809', artists: ['Daft Punk', 'Pharrell Williams', 'Nile Rodgers'] });
     // A video thumbnail gives way to the store's square cover, as the merger's rule has it.
@@ -324,5 +328,73 @@ describe('the credit line (UX-CAT-006)', () => {
     expect(credits('A', ['A', 'B', 'C', 'D', 'E', 'F', 'G'])).toBe('A feat. B, C, D, E & others');
     expect(credits('A', [])).toBe('A');
     expect(credits('', ['Solo'])).toBe('Solo');
+  });
+});
+
+/**
+ * Deezer's `/track/{id}` carries no genre -- measured against the live API, the payload has no
+ * genre field at all, and its album sub-object has no `genre_id` either. So filling a row from
+ * Deezer can never give it a genre, and a YouTube-only row stayed untagged however often it was
+ * asked (measured: 0 of 202 live rows over six queries, unchanged by asking more often).
+ *
+ * Apple states one: `primaryGenreName` on every song row. A row with no genre is matched to Apple's
+ * record of the same recording -- the merger's own identity test, nothing looser -- and copies the
+ * genre it stated. Never invented: a row nobody can match keeps no genre.
+ */
+describe('a genre for a row whose own platform states none', () => {
+  const APPLE_HIT: Route = [
+    /itunes\.apple\.com\/search/,
+    { status: 200, body: { resultCount: 1, results: [{ wrapperType: 'track', kind: 'song', trackId: 1, trackName: 'Headlines', artistName: 'Drake', artistId: 271_256, collectionId: 9, collectionName: 'Take Care', trackTimeMillis: 244_000, primaryGenreName: 'Hip-Hop/Rap', releaseDate: '2011-11-15T08:00:00Z', trackNumber: 4, discNumber: 1, isStreamable: true, trackViewUrl: 'https://music.apple.com/x', artworkUrl100: 'https://is1-ssl.mzstatic.com/x/100x100bb.jpg' }] } },
+  ];
+  const APPLE_MISS: Route = [/itunes\.apple\.com\/search/, { status: 200, body: { resultCount: 0, results: [] } }];
+  const DEEZER_MISS: Route = [/api\.deezer\.com\/search\/track/, { status: 200, body: { data: [] } }];
+
+  it('asks Apple for a genre when the row has none and Deezer cannot give one', async () => {
+    const { engine: e, calls } = engine([DEEZER_MISS, APPLE_HIT, ...STANDARD_ROUTES]);
+    const untagged = row({ id: 'youtube:v', title: 'Headlines', artist: 'Drake', durationMs: 244_000, sources: [yt('v')] });
+
+    const [filled] = await e.hydrateTracks([untagged]);
+
+    expect(calls.some((u) => u.includes('itunes.apple.com/search')), 'Apple should have been asked').toBe(true);
+    expect(filled?.genre).toBe('Hip-Hop/Rap');
+    expect(filled?.sources.map((s) => s.platform)).toContain('youtube');
+    expect(filled?.sources.map((s) => s.platform)).toContain('apple-music');
+  });
+
+  it('leaves a row untagged when Apple does not have it either', async () => {
+    const { engine: e } = engine([DEEZER_MISS, APPLE_MISS, ...STANDARD_ROUTES]);
+    const untagged = row({ id: 'youtube:v', title: 'A Live Set Nobody Sells', artist: 'Unsigned', durationMs: 3_600_000, sources: [yt('v')] });
+
+    const out = await e.hydrateTracks([untagged]);
+    expect(out[0]?.genre ?? null, 'no platform stated a genre, so the row has none').toBeNull();
+  });
+
+  /**
+   * Apple allows about 20 searches a minute and the catalog's own search spends from the same
+   * budget, while a page can bring 25 rows to be filled. Asking Apple for every untagged row would
+   * spend the whole minute on genres and leave searching itself resting -- a worse page than the
+   * one with some genres missing. So the genre lookups are capped per pass, well under the budget.
+   */
+  it('asks Apple for only a few genres per page, leaving the budget for searching', async () => {
+    const { engine: e, calls } = engine([DEEZER_MISS, APPLE_MISS, ...STANDARD_ROUTES]);
+    const many = Array.from({ length: 20 }, (_, i) =>
+      row({ id: `youtube:v${i}`, title: `Song ${i}`, artist: `Band ${i}`, durationMs: 200_000 + i * 1000, sources: [yt(`v${i}`)] }),
+    );
+
+    await e.hydrateTracks(many);
+
+    const appleCalls = calls.filter((u) => u.includes('itunes.apple.com/search')).length;
+    expect(appleCalls, 'well under Apple’s 20-a-minute budget').toBeLessThanOrEqual(APPLE_GENRE_MAX_ASKS);
+    expect(appleCalls, 'but it did ask for some').toBeGreaterThan(0);
+  });
+
+  /** A song Apple has, but a different recording: not this row, so no genre is taken from it. */
+  it('does not take a genre from a different recording', async () => {
+    const { engine: e } = engine([DEEZER_MISS, APPLE_HIT, ...STANDARD_ROUTES]);
+    // Same words, nowhere near the same length: the identity test must reject it.
+    const other = row({ id: 'youtube:v', title: 'Headlines', artist: 'Drake', durationMs: 32_000, sources: [yt('v')] });
+
+    const out = await e.hydrateTracks([other]);
+    expect(out[0]?.genre ?? null).toBeNull();
   });
 });

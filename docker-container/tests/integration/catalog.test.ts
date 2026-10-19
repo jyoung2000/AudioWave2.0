@@ -336,7 +336,12 @@ describe('starred albums and playlists (UX-SEARCH-005)', () => {
 
     // Stated by the platform, so the recommender may learn it.
     expect(sc!.genre).toBe('Electronic');
-    // Not stated by the platform: blank, not invented from a category or an uploader's keywords.
-    expect(yt!.genre).toBeNull();
+    // YouTube states no genre of its own, and its keywords are never read as one. A YouTube row
+    // may still end up with a genre, but only one a store stated for the same recording -- so a
+    // genre here must always come with the store source it was copied from, never from YouTube
+    // alone. That is the difference between inheriting a fact and inventing one.
+    const storeStated = yt!.sources.some((source) => source.platform !== 'youtube' && source.platform !== 'youtube-music');
+    if (yt!.genre !== null) expect(storeStated, 'a genre on a YouTube row must come from a store').toBe(true);
+    else expect(storeStated).toBe(false);
   });
 });

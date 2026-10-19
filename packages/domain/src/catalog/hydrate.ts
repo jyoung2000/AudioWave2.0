@@ -27,6 +27,17 @@ export const HYDRATE_BUDGET_MS = 6000;
 /** Rows a page fills, from the top by rank: a quota-sized slice of what is shown first. */
 export const HYDRATE_MAX_ROWS = 25;
 
+/**
+ * Genre lookups asked of Apple per filling pass.
+ *
+ * Apple allows about 20 searches a minute and the catalog's own searching spends from the same
+ * budget, while a page can bring `HYDRATE_MAX_ROWS` rows needing a genre. Asking for every one
+ * would spend the minute on genres and leave searching itself resting, which is a worse page than
+ * one with some genres still missing. Rows are filled from the top by rank, so the ones a listener
+ * actually looks at are the ones that get asked.
+ */
+export const APPLE_GENRE_MAX_ASKS = 8;
+
 /** A platform whose cover is a video or upload thumbnail, never a store's square artwork. */
 const THUMBNAIL_PLATFORMS: ReadonlySet<string> = new Set(['youtube', 'youtube-music', 'soundcloud']);
 
