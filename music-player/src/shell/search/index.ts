@@ -1385,7 +1385,35 @@ export function installSearch(): SearchApi {
 
   /* ---------------------------------------------------------------- details */
 
-  function openAlbum(al: Pick<CatalogAlbum, 'id' | 'title'>): void {
+  /**
+   * An album row opens its detail page when a store can be asked for it by id (Deezer, Apple Music).
+   * SoundCloud albums have no such endpoint — they are sets, read through their address — so those
+   * open straight into the music list, the way a playlist does.
+   */
+  function openAlbum(al: Pick<CatalogAlbum, 'id' | 'title'> & Partial<Pick<CatalogAlbum, 'artworkUrl' | 'sources'>>): void {
+    if (!/^(deezer|apple-music):/.test(al.id)) {
+      const src = al.sources?.find((s) => /^https?:/.test(s.url));
+      if (!src) {
+        say('This album has no link to read its songs from');
+        return;
+      }
+      showInList(
+        {
+          ref: {
+            platform: src.platform,
+            kind: 'album',
+            id: src.id ?? al.id,
+            url: src.url,
+            title: al.title,
+            owner: null,
+          },
+          artworkUrl: al.artworkUrl ?? null,
+          covers: [],
+        },
+        null,
+      );
+      return;
+    }
     stopPreview();
     const v: Extract<View, { kind: 'album' }> = {
       kind: 'album',

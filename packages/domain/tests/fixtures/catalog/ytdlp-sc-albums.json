@@ -1,0 +1,56 @@
+{
+  "_type": "playlist",
+  "id": "285007811",
+  "title": "yvngxchris (Albums)",
+  "extractor_key": "SoundcloudUser",
+  "webpage_url": "https://soundcloud.com/yvngxchrisss/albums",
+  "playlist_count": null,
+  "release_year": null,
+  "_version": {
+    "version": "2026.08.19"
+  },
+  "entries": [
+    {
+      "_type": "url",
+      "ie_key": "SoundcloudSet",
+      "id": "1671498727",
+      "title": "Everyone Hates Chris II",
+      "url": "https://soundcloud.com/yvngxchrisss/sets/ehc2"
+    },
+    {
+      "_type": "url",
+      "ie_key": "SoundcloudSet",
+      "id": "1983733081",
+      "title": "2DAY2MR4EVR",
+      "url": "https://soundcloud.com/yvngxchrisss/sets/2day2mr4evr",
+      "thumbnails": [
+        {
+          "id": "t500x500",
+          "url": "https://i1.sndcdn.com/artworks-ns0mAq8aQoHdUEny-0-t500x500.jpg",
+          "width": 500,
+          "height": 500
+        }
+      ]
+    },
+    {
+      "_type": "url",
+      "ie_key": "SoundcloudSet",
+      "id": "1671498728",
+      "url": "https://soundcloud.com/yvngxchrisss/sets/levity-two"
+    },
+    {
+      "_type": "url",
+      "ie_key": "Soundcloud",
+      "id": "1151035177",
+      "title": "a single, not an album",
+      "url": "https://soundcloud.com/yvngxchrisss/blood-on-the-leaves-prod-2300"
+    },
+    {
+      "_type": "url",
+      "ie_key": "SoundcloudSet",
+      "id": "1671498727",
+      "title": "Everyone Hates Chris II",
+      "url": "https://soundcloud.com/yvngxchrisss/sets/ehc2"
+    }
+  ]
+}

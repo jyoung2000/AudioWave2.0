@@ -91,7 +91,7 @@ export interface CatalogEngineOptions {
    */
   matchBudgetMs?: number | undefined;
   /** Per-call timeouts, shortened by tests. */
-  timeouts?: Partial<Record<'itunes' | 'deezer' | 'musicbrainz' | 'tools' | 'lrclib' | 'odesli', number>> | undefined;
+  timeouts?: Partial<Record<'itunes' | 'deezer' | 'musicbrainz' | 'tools' | 'soundcloud' | 'lrclib' | 'odesli', number>> | undefined;
 }
 
 export interface CatalogSearchInput {
@@ -202,7 +202,10 @@ export class CatalogEngine {
     this.register(new MusicBrainzProvider(this.musicbrainz));
     if (options.toolSearch) {
       this.register(new ToolSearchProvider('youtube', options.toolSearch, t.tools ?? 30_000));
-      this.register(new ToolSearchProvider('soundcloud', options.toolSearch, t.tools ?? 30_000));
+      // SoundCloud also lists albums, which costs a profile listing per uploader after the song
+      // search: a longer default so adding albums cannot time the song search out. An explicitly
+      // configured `tools` timeout still governs both, so nothing can be made to wait longer than asked.
+      this.register(new ToolSearchProvider('soundcloud', options.toolSearch, t.soundcloud ?? t.tools ?? 45_000));
     }
   }
 

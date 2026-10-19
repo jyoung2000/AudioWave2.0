@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CatalogSearchChunk, CatalogResolveResult, CatalogSearchAggregate } from '@now-playing/contracts';
-import { CatalogEngine, CatalogHttpError, LinkReadError, Pacer, ProviderHealth, deezerPlaylist, deezerTrack, itunesTrack, musicbrainzTrack, parseOdesli, readCatalogStream, ndjsonLine, toolSearchTracks, ToolSearchProvider, type CatalogEngineOptions, type LinkReader, type ToolSearchRunner } from '@now-playing/domain/catalog';
+import { CatalogEngine, CatalogHttpError, LinkReadError, Pacer, ProviderHealth, deezerPlaylist, deezerTrack, itunesTrack, musicbrainzTrack, parseOdesli, readCatalogStream, ndjsonLine, soundcloudAlbums, soundcloudAlbumsArgs, soundcloudUploaders, toolSearchTracks, ToolSearchProvider, type CatalogEngineOptions, type LinkReader, type ToolSearchRunner } from '@now-playing/domain/catalog';
 import { STANDARD_ROUTES, fixture, fixtureFetch, type Route } from './catalog-fixtures.js';
 
 const noSleep = async (): Promise<void> => undefined;
@@ -78,6 +78,65 @@ describe('provider answers, as catalog rows', () => {
     const result = await provider.search({ kind: 'text', text: 'daft punk get lucky', track: null, artist: null, album: null, isrc: null, url: null }, { sections: ['tracks'], offset: 0, limit: 5, signal: new AbortController().signal });
     expect(result.tracks).toHaveLength(3);
     expect(result.full.tracks).toBe(true);
+  });
+
+  it('reads a SoundCloud album tab: sets only, each once, nothing invented', () => {
+    const albums = soundcloudAlbums(fixture('ytdlp-sc-albums'), 'yvngxchrisss');
+    // The loose song is not an album, and the repeated set is one row.
+    expect(albums.map((a) => a.id)).toEqual(['soundcloud:yvngxchrisss/sets/ehc2', 'soundcloud:yvngxchrisss/sets/2day2mr4evr', 'soundcloud:yvngxchrisss/sets/levity-two']);
+    expect(albums[0]).toMatchObject({ title: 'Everyone Hates Chris II', artist: 'yvngxchrisss', trackCount: null, year: null, releaseDate: null, artworkUrl: null });
+    expect(albums[0]!.sources).toEqual([{ platform: 'soundcloud', id: 'yvngxchrisss/sets/ehc2', url: 'https://soundcloud.com/yvngxchrisss/sets/ehc2', previewUrl: null, matchedBy: 'search' }]);
+    // An entry listed by address alone is still named, from its slug.
+    expect(albums[2]!.title).toBe('Levity Two');
+    expect(albums[1]!.artworkUrl).toBe('https://i1.sndcdn.com/artworks-ns0mAq8aQoHdUEny-0-t500x500.jpg');
+  });
+
+  it('names the uploaders of a SoundCloud song search by permalink, each once', () => {
+    expect(soundcloudUploaders(fixture('ytdlp-scsearch-live'), 3)).toEqual(['daftpunkofficialmusic', 'eldjkb', 'twindiplomacy']);
+    // A profile name is not a permalink: an entry with no SoundCloud address is skipped, not guessed.
+    expect(soundcloudUploaders({ entries: [{ uploader: 'Someone' }, { webpage_url: 'https://example.com/a/b' }] })).toEqual([]);
+  });
+
+  it('a SoundCloud search also answers albums: one listing per uploader, song paging unaffected', async () => {
+    const asked: string[] = [];
+    const provider = new ToolSearchProvider('soundcloud', async ({ args }) => {
+      const last = args.at(-1)!;
+      asked.push(last);
+      return last.startsWith('scsearch') ? fixture('ytdlp-scsearch-live') : fixture('ytdlp-sc-albums');
+    });
+    const query = { kind: 'text', text: 'yung chris', track: null, artist: null, album: null, isrc: null, url: null } as const;
+    const first = await provider.search(query, { sections: ['tracks', 'albums'], offset: 0, limit: 5, signal: new AbortController().signal });
+    expect(provider.sections).toEqual(['tracks', 'albums']);
+    expect(first.tracks).toHaveLength(3);
+    expect(first.albums.map((a) => a.id)).toEqual(['soundcloud:yvngxchrisss/sets/ehc2', 'soundcloud:yvngxchrisss/sets/2day2mr4evr', 'soundcloud:yvngxchrisss/sets/levity-two']);
+    // The song search, then one album tab per uploader within the bound — never more.
+    expect(asked.filter((a) => a.endsWith('/albums'))).toEqual(['https://soundcloud.com/daftpunkofficialmusic/albums', 'https://soundcloud.com/eldjkb/albums']);
+    // Albums are a first-page answer only: a deeper page of songs asks for no more tabs.
+    asked.length = 0;
+    const next = await provider.search(query, { sections: ['tracks', 'albums'], offset: 5, limit: 5, signal: new AbortController().signal });
+    expect(next.albums).toEqual([]);
+    expect(asked.some((a) => a.endsWith('/albums'))).toBe(false);
+  });
+
+  it('a profile with no album tab does not fail the search', async () => {
+    const provider = new ToolSearchProvider('soundcloud', async ({ args }) => {
+      if (args.at(-1)!.endsWith('/albums')) throw new Error('HTTP Error 404: Not Found');
+      return fixture('ytdlp-scsearch-live');
+    });
+    const result = await provider.search({ kind: 'text', text: 'yung chris', track: null, artist: null, album: null, isrc: null, url: null }, { sections: ['tracks', 'albums'], offset: 0, limit: 5, signal: new AbortController().signal });
+    expect(result.tracks).toHaveLength(3);
+    expect(result.albums).toEqual([]);
+  });
+
+  it('YouTube answers songs alone: it has no album tab to list', () => {
+    expect(new ToolSearchProvider('youtube', async () => ({})).sections).toEqual(['tracks']);
+  });
+
+  it('an album tab address is built only for a real profile name', () => {
+    expect(soundcloudAlbumsArgs('yvngxchrisss', 25).at(-1)).toBe('https://soundcloud.com/yvngxchrisss/albums');
+    expect(soundcloudAlbumsArgs('yvngxchrisss', 25)[0]).toBe('--ignore-config');
+    expect(soundcloudAlbumsArgs('yvngxchrisss', 25).at(-2)).toBe('--');
+    for (const bad of ['--flag', 'a/b', 'has space', '', 'x'.repeat(80), 'ok;rm -rf']) expect(() => soundcloudAlbumsArgs(bad, 25)).toThrow();
   });
 });
 

@@ -10,6 +10,8 @@ interface NpAwsp {
   companion(operation: string, args?: Record<string, unknown>): Promise<unknown>;
   stats(): Promise<unknown>;
   tune(options: { pingMs?: number; relayOverride?: string | null }): void;
+  /** Drops the saved pairing, so the Player is unpaired again. */
+  forget(): Promise<void>;
 }
 
 declare global {
@@ -42,6 +44,8 @@ declare global {
       subscribe(listener: (status: { connected: boolean; endpoint: string | null; hubName: string | null; reason: string | null }) => void): () => void;
     };
     NP_BRIDGE?: { version: number; log: string[] };
+    /** Every `kv` key the shell keeps (prefs, library state, the saved pairings) — see `bridge.ts`. */
+    storage?: { get(key: string): Promise<{ key: string; value: string } | null>; set(key: string, value: unknown): Promise<void> | void };
     NP_AWSP?: NpAwsp;
     NP_AWSP_READY?: Promise<NpAwsp | null>;
   }

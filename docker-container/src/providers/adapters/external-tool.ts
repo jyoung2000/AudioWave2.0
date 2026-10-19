@@ -476,17 +476,20 @@ export class ExternalToolAdapter extends BaseAdapter {
   }
 
   /**
-   * One page of a catalog search through yt-dlp (`ytsearchN:` / `scsearchN:`, DEC-039). The arguments
-   * are `toolSearchArgs` from the domain and are checked for that shape again here: `--ignore-config`
-   * first, the search last behind `--`. Shares the two metadata slots, so searches cannot pile up
-   * processes.
+   * One page of a catalog search through yt-dlp (`ytsearchN:` / `scsearchN:`, DEC-039), or one
+   * SoundCloud profile's album tab, which is how that platform's albums are listed at all. The
+   * arguments are `toolSearchArgs` / `soundcloudAlbumsArgs` from the domain and are checked for that
+   * shape again here: `--ignore-config` first, the search or the tab address last behind `--`.
+   * Shares the two metadata slots, so searches cannot pile up processes.
    */
   async catalogSearch(args: readonly string[], signal?: AbortSignal): Promise<unknown> {
     const preset = TOOL_PRESETS['yt-dlp'];
     if (!this.presets().includes(preset)) throw new DomainError('unsupported', 'The external tool is not set to yt-dlp here, so YouTube and SoundCloud cannot be searched');
     const binary = this.binaryFor(preset);
     if (!existsSync(binary)) throw new DomainError('setup-required', 'yt-dlp is not on this hub yet. The hub sets it up by itself when it can reach github.com.');
-    if (args[0] !== '--ignore-config' || args.at(-2) !== '--' || !/^(yt|sc)search\d{1,3}:./.test(args.at(-1) ?? '')) throw new DomainError('validation', 'That is not a catalog search');
+    const last = args.at(-1) ?? '';
+    const listing = /^(yt|sc)search\d{1,3}:./.test(last) || /^https:\/\/soundcloud\.com\/[A-Za-z0-9][A-Za-z0-9_-]{1,70}\/albums$/.test(last);
+    if (args[0] !== '--ignore-config' || args.at(-2) !== '--' || !listing) throw new DomainError('validation', 'That is not a catalog search');
     return this.withSlot(async () => {
       let stdout: string;
       try {

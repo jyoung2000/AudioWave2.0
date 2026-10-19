@@ -11,6 +11,8 @@
  * search). `ytdlp-ytsearch-live.json` and `ytdlp-scsearch-live.json` are yt-dlp 2026.08.19's real
  * answers on 2026-10-10, trimmed: fewer entries, no counts, uploader ids, formats or the
  * `__x_forwarded_for_ip` field, and thumbnail addresses without their signed query.
+ * `ytdlp-sc-albums.json` follows a real SoundCloud album tab (2026-10-18), with a loose song and a
+ * repeat added to stage what the reader must drop.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

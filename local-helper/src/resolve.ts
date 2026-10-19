@@ -350,7 +350,11 @@ export function createResolver(options: ResolverOptions): Resolver {
 
   return {
     async search(args: readonly string[], signal?: AbortSignal): Promise<unknown> {
-      if (args[0] !== '--ignore-config' || args.at(-2) !== '--' || !/^(yt|sc)search[0-9]{1,3}:./.test(args.at(-1) ?? '')) throw new ResolveError('That is not a catalog search.', 'failed');
+      // A search (`ytsearchN:` / `scsearchN:`) or a SoundCloud profile's album tab, which is how that
+      // platform's albums are listed at all. Same shape check as the hub's.
+      const last = args.at(-1) ?? '';
+      const listing = /^(yt|sc)search[0-9]{1,3}:./.test(last) || /^https:\/\/soundcloud\.com\/[A-Za-z0-9][A-Za-z0-9_-]{1,70}\/albums$/.test(last);
+      if (args[0] !== '--ignore-config' || args.at(-2) !== '--' || !listing) throw new ResolveError('That is not a catalog search.', 'failed');
       const tools = await options.tools();
       const ytDlp = tools['yt-dlp'];
       if (!ytDlp.present || !ytDlp.path) throw new ResolveError(ytDlp.installHint ?? 'yt-dlp is not set up on this PC yet.', 'tool-missing');
