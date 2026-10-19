@@ -163,6 +163,23 @@ test('a station the directory describes thinly fills Genre and Kbps from its str
   await expect(vague.locator('.lib-col-bpm')).toHaveText('—');
 });
 
+test('a paired AWSP companion keeps the stream Genre and Kbps in separate columns', async ({ page }) => {
+  const stations = [{ stationuuid: 'awsp-1', name: 'College Station', url_resolved: 'https://radio.example/college', state: 'Chicago, IL', country: 'United States', countrycode: 'US', tags: '', bitrate: 0 }];
+  await page.route(/radio-browser\.info/i, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stations) }));
+  await boot(page);
+  await page.evaluate(() => {
+    (window as unknown as { NP_AWSP_READY: Promise<unknown> }).NP_AWSP_READY = Promise.resolve({
+      status: async () => ({ paired: true, status: 'connected' }),
+      companion: async () => ({ title: null, artist: null, genre: 'College', bitrate: 56, reason: 'The station sent no song title' }),
+    });
+  });
+  await page.click('.tb__btn[data-view="radio"]');
+  const row = page.locator('#radioMenu .rlist tbody tr', { hasText: 'College Station' });
+  await expect(row.locator('.rlist-genre')).toHaveText('College', { timeout: 20_000 });
+  await expect(row.locator('.lib-col-bpm')).toHaveText('56');
+  await expect(row.locator('.rlist-song')).toBeEmpty();
+});
+
 test('a station with its own song feed still fills Genre from the stream', async ({ page }) => {
   // WMBI publishes songs through Triton, so the page never needed the Hub for its Song column —
   // but the directory carries no tags for it, and only the Hub can read the stream's icy-genre.

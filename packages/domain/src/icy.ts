@@ -128,10 +128,16 @@ export function splitOnAir(value: string): { artist: string | null; title: strin
   if (!/[\p{L}\p{N}]/u.test(text)) return null;
   const tagged = splitTagged(text);
   if (tagged !== undefined) return tagged;
-  const at = text.indexOf(' - ');
-  if (at < 0) return text ? { artist: null, title: text } : null;
-  const artist = text.slice(0, at).trim();
-  const title = text.slice(at + 3).trim();
-  if (!title) return artist ? { artist: null, title: artist } : null;
-  return { artist: artist || null, title };
+  /* Stations pad a fixed-width field with the separator itself: WFMT sends
+     " - Fiesta! with Elbio Barilari -  -  - " for a programme with no track. Splitting on the
+     first dash alone made the padding the song and the programme the artist, so a dash standing
+     on its own is dropped and only what the station actually wrote is read. A dash inside a word
+     ("-M-") is left alone. */
+  const fields = text
+    .split(' - ')
+    .map((f) => f.trim().replace(/^-+(?=\s)/, '').replace(/(?<=\s)-+$/, '').trim())
+    .filter((f) => /[\p{L}\p{N}]/u.test(f));
+  if (!fields.length) return null;
+  if (fields.length === 1) return { artist: null, title: fields[0]! };
+  return { artist: fields[0]!, title: fields.slice(1).join(' - ') };
 }

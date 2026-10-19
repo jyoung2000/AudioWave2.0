@@ -17934,7 +17934,9 @@ window.AW.startStats = function () {
           return { title: (primary && primary.title) || d.title || null,
                    artist: (primary && primary.artist) || d.artist || null,
                    programme: (primary && primary.programme) || d.programme || null,
-                   programmeSource: (primary && primary.programmeSource) || d.programmeSource || null };
+                   programmeSource: (primary && primary.programmeSource) || d.programmeSource || null,
+                   genre: (primary && primary.genre) || d.genre || null,
+                   bitrate: (primary && primary.bitrate) || d.bitrate || null };
         });
       });
     };

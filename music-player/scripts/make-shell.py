@@ -4721,7 +4721,13 @@ replace("        return d && d.title ? d : localIcyAsk(url);",
         "          return { title: (primary && primary.title) || d.title || null,\n"
         "                   artist: (primary && primary.artist) || d.artist || null,\n"
         "                   programme: (primary && primary.programme) || d.programme || null,\n"
-        "                   programmeSource: (primary && primary.programmeSource) || d.programmeSource || null };\n"
+        "                   programmeSource: (primary && primary.programmeSource) || d.programmeSource || null,\n"
+        # What the stream says about itself - its genre and its bitrate - belongs to the station,
+        # not to the song, and is often the only source either column has (the directory carries
+        # neither for whole networks). Dropping it here emptied the Genre and Kbps columns for
+        # every station whose reader is the paired Companion.
+        "                   genre: (primary && primary.genre) || d.genre || null,\n"
+        "                   bitrate: (primary && primary.bitrate) || d.bitrate || null };\n"
         "        });")
 replace("        if (!nowTrack || nowTrack.title !== t.title || nowTrack.artist !== t.artist) {",
         "        if (!nowTrack || nowTrack.title !== t.title || nowTrack.artist !== t.artist || nowTrack.programme !== t.programme) {")

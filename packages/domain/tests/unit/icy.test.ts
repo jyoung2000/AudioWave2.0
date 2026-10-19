@@ -35,6 +35,16 @@ describe('splitOnAir', () => {
     expect(splitOnAir('Morning Show')).toEqual({ artist: null, title: 'Morning Show' });
     expect(splitOnAir(' - ')).toBeNull();
   });
+  /* WFMT's classical streams pad one field with empty dash-separated slots: the live capture on
+     2026-10-18 was "StreamTitle=' - Fiesta! with Elbio Barilari -  -  - '". Split naively, the
+     padding became the song ("-  -") and the programme became the artist. The dashes carry no
+     information, so they are dropped and the one thing the station did name is the title. */
+  it('drops empty dash-padded slots instead of reading them as a song', () => {
+    expect(splitOnAir(' - Fiesta! with Elbio Barilari -  -  - ')).toEqual({ artist: null, title: 'Fiesta! with Elbio Barilari' });
+    expect(splitOnAir('Exultate Chamber Singers -  - ')).toEqual({ artist: null, title: 'Exultate Chamber Singers' });
+    expect(splitOnAir(' - Mozart - Symphony No. 41 - ')).toEqual({ artist: 'Mozart', title: 'Symphony No. 41' });
+    expect(splitOnAir(' -  -  - ')).toBeNull();
+  });
 });
 
 /* Exactly what iHeart's revma streams sent for 107.5 WGCI and Rock 95.5 (captured live). */
