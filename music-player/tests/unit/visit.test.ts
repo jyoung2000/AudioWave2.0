@@ -3,8 +3,10 @@
  * application/octet-stream is, from its first bytes (the library indexes by extension), and how a
  * row that came from a bare link becomes the catalog song the hub's catalog/download reads.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { boundedAudio, sniffExtension, trackOf } from '../../src/shell/search/visit.js';
+import { HELPER_CATALOG_ROUTES } from '@now-playing/contracts';
+import { httpClient } from '../../src/shell/search/client.js';
 
 const bytes = (...parts: Array<string | number[]>): Uint8Array => {
   const out: number[] = [];
@@ -59,5 +61,56 @@ describe('bounded Hub audio transfers', () => {
     const blob = await boundedAudio(new Response('audio', { headers: { 'content-type': 'audio/mpeg' } }), 8);
     expect(blob.size).toBe(5);
     expect(blob.type).toBe('audio/mpeg');
+  });
+});
+
+/**
+ * A discography longer than one page was unreachable from the player.
+ *
+ * The hub has always taken an `albumsOffset` and answered with an `albumsPage` saying whether more
+ * exists -- the catalog contract and the engine both support it. But the player's client never sent
+ * an offset, so `artist()` could only ever return the first page of albums. For Drake, whose
+ * measured discography is 24 albums plus 2 EPs, the player stopped at the first page with no sign
+ * there was more, which is part of why the three apps disagreed about how much an artist released.
+ */
+describe('an artist with more albums than fit on one page', () => {
+  const detail = (offset: number, hasMore: boolean) => ({
+    artist: { id: 'deezer:246791', name: 'Drake', sources: [{ platform: 'deezer', id: '246791', url: 'https://www.deezer.com/artist/246791', previewUrl: null, matchedBy: 'search' }] },
+    topTracks: [],
+    albums: [],
+    albumsPage: { offset, limit: 25, hasMore },
+  });
+
+  const stubFetch = (asked: string[], body: unknown) => {
+    globalThis.fetch = (async (url: unknown) => {
+      asked.push(String(url));
+      return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as unknown as typeof fetch;
+  };
+
+  const realFetch = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+  });
+
+  it('asks for the page it was given, and says whether more exists', async () => {
+    const asked: string[] = [];
+    stubFetch(asked, detail(25, true));
+    const client = httpClient('hub', 'Hub', 'http://hub.test', HELPER_CATALOG_ROUTES, {});
+
+    const out = await client.artist('deezer:246791', 25);
+
+    expect(asked[0], 'the offset must reach the hub').toContain('albumsOffset=25');
+    expect(out.albumsPage.hasMore, 'and the answer must say more exists').toBe(true);
+  });
+
+  it('asks for the first page when none is named', async () => {
+    const asked: string[] = [];
+    stubFetch(asked, detail(0, false));
+    const client = httpClient('hub', 'Hub', 'http://hub.test', HELPER_CATALOG_ROUTES, {});
+
+    await client.artist('deezer:27');
+
+    expect(asked[0]).toContain('albumsOffset=0');
   });
 });

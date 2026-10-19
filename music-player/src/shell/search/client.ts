@@ -50,7 +50,11 @@ export interface CatalogClient {
     limit: number,
     signal?: AbortSignal,
   ): Promise<CatalogAlbumDetail>;
-  artist(id: string, signal?: AbortSignal): Promise<CatalogArtistDetail>;
+  /**
+   * An artist's page of albums. `albumsOffset` pages the discography the way `album()` pages a
+   * track list; the answer's `albumsPage.hasMore` says whether asking further finds more.
+   */
+  artist(id: string, albumsOffset?: number, signal?: AbortSignal): Promise<CatalogArtistDetail>;
   resolve(
     url: string,
     offset: number,
@@ -173,7 +177,7 @@ async function readJson<T>(
 }
 
 /** A server's catalog, reached over HTTP: the hub's and the helper's answer in the same shapes. */
-function httpClient(
+export function httpClient(
   kind: 'hub' | 'helper',
   label: string,
   base: string,
@@ -208,10 +212,10 @@ function httpClient(
     },
     album: (id, offset, limit, signal) =>
       get(paths.album, query({ id, offset, limit }), (v) => CatalogAlbumDetail.parse(v), signal),
-    artist: (id, signal) =>
+    artist: (id, albumsOffset, signal) =>
       get(
         paths.artist,
-        query({ id, topLimit: ARTIST_TOP_LIMIT, albumsLimit: ARTIST_ALBUMS_LIMIT }),
+        query({ id, topLimit: ARTIST_TOP_LIMIT, albumsLimit: ARTIST_ALBUMS_LIMIT, albumsOffset: albumsOffset ?? 0 }),
         (v) => CatalogArtistDetail.parse(v),
         signal,
       ),
@@ -378,9 +382,9 @@ const browserClient: CatalogClient = {
     (await browserEngine())
       .album(id, offset, limit, signal)
       .catch((e: unknown) => Promise.reject(asRefused(e))),
-  artist: async (id, signal) =>
+  artist: async (id, albumsOffset, signal) =>
     (await browserEngine())
-      .artist(id, { topLimit: ARTIST_TOP_LIMIT, albumsLimit: ARTIST_ALBUMS_LIMIT }, signal)
+      .artist(id, { topLimit: ARTIST_TOP_LIMIT, albumsLimit: ARTIST_ALBUMS_LIMIT, albumsOffset: albumsOffset ?? 0 }, signal)
       .catch((e: unknown) => Promise.reject(asRefused(e))),
   resolve: async (url, offset, limit, signal) => {
     const result = await (
