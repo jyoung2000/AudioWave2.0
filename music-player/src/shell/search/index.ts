@@ -44,7 +44,7 @@ import {
   CATALOG_PROVIDERS,
   CATALOG_SEARCH_SECTIONS,
 } from '@now-playing/contracts';
-import { mergeTrack, pickDownloadSource, sameRecording } from '@now-playing/domain/catalog';
+import { CatalogStreamTruncated, mergeTrack, pickDownloadSource, sameRecording } from '@now-playing/domain/catalog';
 import {
   ask,
   clients,
@@ -1147,6 +1147,8 @@ export function installSearch(): SearchApi {
     if (err instanceof Refused) return err.message;
     if (err instanceof Unreachable)
       return 'Couldn’t search: neither the hub, the companion nor the music services answered. Check the connection and try again.';
+    // Rows did arrive and are on screen; what is wrong is that they are not all of them.
+    if (err instanceof CatalogStreamTruncated) return 'These are partial results: the search stopped part way. Try again for the rest.';
     return `Couldn’t search: ${err instanceof Error ? err.message : 'something went wrong'}.`;
   }
 

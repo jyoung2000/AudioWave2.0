@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CatalogSearchChunk, CatalogResolveResult, CatalogSearchAggregate } from '@now-playing/contracts';
-import { CatalogEngine, CatalogHttpError, LinkReadError, Pacer, ProviderHealth, deezerPlaylist, deezerTrack, itunesTrack, musicbrainzTrack, parseOdesli, readCatalogStream, ndjsonLine, soundcloudAlbums, soundcloudAlbumsArgs, soundcloudUploaders, toolSearchTracks, ToolSearchProvider, type CatalogEngineOptions, type LinkReader, type ToolSearchRunner } from '@now-playing/domain/catalog';
+import { CatalogEngine, CatalogHttpError, CatalogStreamTruncated, LinkReadError, Pacer, ProviderHealth, deezerPlaylist, deezerTrack, itunesTrack, musicbrainzTrack, parseOdesli, readCatalogStream, ndjsonLine, soundcloudAlbums, soundcloudAlbumsArgs, soundcloudUploaders, toolSearchTracks, ToolSearchProvider, type CatalogEngineOptions, type LinkReader, type ToolSearchRunner } from '@now-playing/domain/catalog';
 import { STANDARD_ROUTES, fixture, fixtureFetch, type Route } from './catalog-fixtures.js';
 
 const noSleep = async (): Promise<void> => undefined;
@@ -535,5 +535,36 @@ describe('the plumbing', () => {
     for await (const c of readCatalogStream(stream)) back.push(c);
     expect(back).toHaveLength(chunks.length);
     expect((back.at(-1) as { type: string }).type).toBe('done');
+  });
+  /**
+   * A stream that stops early must not read as a finished search.
+   *
+   * The reader returned cleanly whenever the body ended, so a search cut off midway -- a provider
+   * rate-limiting, a dropped connection, a hub restarting -- looked exactly like a complete one, and
+   * the window told the listener their results were all in. The `done` chunk is the server saying it
+   * finished; without it the search did not finish, and the reader now says so.
+   */
+  it('refuses to call a stream that stopped before the end a finished search', async () => {
+    const { engine: e } = engine();
+    const chunks = await collect(e.search({ q: 'get lucky', limit: 2 }));
+    expect(chunks.at(-1)).toMatchObject({ type: 'done' });
+
+    // Everything the server sent except the line that says it was finished.
+    const cut = chunks.slice(0, -1);
+    expect(cut.length).toBeGreaterThan(0);
+    const bytes = new TextEncoder().encode(cut.map(ndjsonLine).join(''));
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(bytes);
+        controller.close();
+      },
+    });
+
+    const back: unknown[] = [];
+    await expect(async () => {
+      for await (const c of readCatalogStream(stream)) back.push(c);
+    }).rejects.toThrow(CatalogStreamTruncated);
+    // What did arrive is still handed over: a partial answer beats no answer.
+    expect(back).toHaveLength(cut.length);
   });
 });
