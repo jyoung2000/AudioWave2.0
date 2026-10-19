@@ -253,6 +253,28 @@ describe('deleting your data', () => {
     // Back to cold start: nothing about this person is left to recommend from.
     expect((await recommendations()).coverage.coldStart).toBe(true);
   });
+
+  /**
+   * The discovery cache is built from the listener's strongest artists and genres, so a row of it is
+   * a statement about their taste. Deleting everything about a person has to reach it too, or what
+   * they asked to have removed is still sitting in the cache until it happens to expire.
+   */
+  it('removes the discovery cache built from that listener, not only the events', async () => {
+    await ingestHistory();
+    const userId = hub.ctx.devices.userFor(device.deviceId)!.id;
+
+    // Warm through the real path, with the fake fetch answering the providers.
+    hub.fetch.on('api.deezer.com', () => ({ body: { data: [] } }));
+    hub.fetch.on('musicbrainz.org', () => ({ body: { recordings: [] } }));
+    const warmed = await hub.ctx.platformSync.warmDiscoveryCache(userId);
+    expect(warmed.queries).toBeGreaterThan(0);
+
+    const rows = () => hub.ctx.db.prepare('SELECT COUNT(*) AS n FROM discovery_cache').get() as { n: number };
+    expect(rows().n).toBeGreaterThan(0);
+
+    hub.ctx.recommendations.deleteEverythingFor(userId);
+    expect(rows().n).toBe(0);
+  });
 });
 
 describe('syncing a connected account', () => {

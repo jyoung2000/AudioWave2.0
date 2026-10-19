@@ -334,6 +334,17 @@ export class CanonicalRepository {
     this.db.prepare('INSERT INTO discovery_cache (key, provider, query, results, created_at, expires_at, hits) VALUES (?, ?, ?, ?, ?, ?, 0) ON CONFLICT(key) DO UPDATE SET results = excluded.results, created_at = excluded.created_at, expires_at = excluded.expires_at').run(key, provider, query, JSON.stringify(results), createdAt, expiresAt);
   }
 
+  /**
+   * Forget the discovery cache belonging to one listener.
+   *
+   * Its rows are built from that person's strongest artists and genres, so they are a statement
+   * about their taste and have to go when they ask to be forgotten -- otherwise what they deleted
+   * sits in the cache until it happens to expire. Keys are prefixed with the user id for this.
+   */
+  deleteCacheFor(userId: string): number {
+    return this.db.prepare('DELETE FROM discovery_cache WHERE key LIKE ?').run(`discover:${userId}:%`).changes;
+  }
+
   cachePurge(before: string): number {
     return this.db.prepare('DELETE FROM discovery_cache WHERE expires_at < ?').run(before).changes;
   }

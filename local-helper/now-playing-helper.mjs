@@ -16063,8 +16063,8 @@ function rewriteKeyNames(ctx) {
       bySchema.set(entry.schema, entry);
   }
   const rewrites = /* @__PURE__ */ new Map();
-  for (const record2 of pendingRecords.get(ctx) ?? []) {
-    const seen = ctx.seen.get(record2);
+  for (const record3 of pendingRecords.get(ctx) ?? []) {
+    const seen = ctx.seen.get(record3);
     const names = (seen?.def ?? seen?.schema)?.propertyNames;
     if (!names || names === true || rewrites.has(names))
       continue;
@@ -19991,6 +19991,13 @@ var StationNowPlaying = external_exports.object({
   artist: external_exports.string().max(300).nullable(),
   title: external_exports.string().max(300).nullable(),
   station: external_exports.string().max(200).nullable(),
+  /**
+   * What the stream announces about itself, for the columns a directory leaves empty: `icy-genre`
+   * and `icy-br`. Many stations (every iHeart one) have no tags and bitrate 0 in the directory.
+   * Placeholder genres ("Various", "Misc") are reported as null rather than shown as a genre.
+   */
+  genre: external_exports.string().max(120).nullable().optional(),
+  bitrate: external_exports.number().int().positive().max(2e3).nullable().optional(),
   /** Official schedule programme, when a supported station has a live timed listing. */
   programme: external_exports.string().max(300).nullable().optional(),
   programmeSource: external_exports.literal("schedule").nullable().optional(),
@@ -22060,6 +22067,8 @@ var IcyReader = class {
   audioLeft;
   metaLeft = -1;
   meta = [];
+  /** Every metadata block completed so far, empty ones included (a zero length byte means "unchanged"). */
+  blocks = 0;
   /** Returns the text of every non-empty metadata block completed by this chunk. */
   feed(chunk) {
     const out = [];
@@ -22082,6 +22091,7 @@ var IcyReader = class {
         i += take;
       }
       if (this.metaLeft === 0) {
+        this.blocks += 1;
         const text2 = decodeMeta(Uint8Array.from(this.meta));
         if (text2) out.push(text2);
       }
@@ -22108,15 +22118,47 @@ function parseStreamTitle(meta3) {
   const title = match?.[1]?.trim();
   return title ? title : null;
 }
+var TAGGED = /^(.*?)\s*-\s*text="([^"]*)"(.*)$/s;
+var AD_CONTEXT = /^adContext="/;
+var ENTITIES = { amp: "&", apos: "'", quot: '"', lt: "<", gt: ">" };
+function decodeEntities(value) {
+  return value.replace(/&(amp|apos|quot|lt|gt|#\d+|#x[0-9a-f]+);/gi, (whole, name) => {
+    if (name[0] === "#") {
+      const code = name[1] === "x" || name[1] === "X" ? Number.parseInt(name.slice(2), 16) : Number.parseInt(name.slice(1), 10);
+      return Number.isFinite(code) && code > 0 && code <= 1114111 ? String.fromCodePoint(code) : whole;
+    }
+    return ENTITIES[name.toLowerCase()] ?? whole;
+  });
+}
+function splitTagged(text2) {
+  if (AD_CONTEXT.test(text2)) return null;
+  if (/^title=\"/i.test(text2)) {
+    const cue = /^title="([^"]*)",artist="([^"]*)",url="song_spot="([^"]*)"/i.exec(text2);
+    if (!cue || cue[3].toUpperCase() !== "M") return null;
+    const title2 = decodeEntities(cue[1]).trim();
+    if (!/[\p{L}\p{N}]/u.test(title2)) return null;
+    return { title: title2, artist: decodeEntities(cue[2]).trim() || null };
+  }
+  const tagged = TAGGED.exec(text2);
+  if (!tagged) return void 0;
+  const rest = tagged[3] ?? "";
+  const spot = /\bsong_spot="([^"]*)"/.exec(rest)?.[1];
+  if (spot !== void 0 ? spot.toUpperCase() !== "M" : !tagged[1].trim()) return null;
+  const title = decodeEntities(tagged[2]).trim();
+  const artist = decodeEntities(tagged[1]).trim();
+  if (!/[\p{L}\p{N}]/u.test(title)) return null;
+  return { artist: artist || null, title };
+}
 function splitOnAir(value) {
   const text2 = value.trim();
+  if (/^(?:[-–—]\s*)?(?:advertisement|commercial break|ad break)$/i.test(text2)) return null;
   if (!/[\p{L}\p{N}]/u.test(text2)) return null;
-  const at = text2.indexOf(" - ");
-  if (at < 0) return text2 ? { artist: null, title: text2 } : null;
-  const artist = text2.slice(0, at).trim();
-  const title = text2.slice(at + 3).trim();
-  if (!title) return artist ? { artist: null, title: artist } : null;
-  return { artist: artist || null, title };
+  const tagged = splitTagged(text2);
+  if (tagged !== void 0) return tagged;
+  const fields = text2.split(" - ").map((f) => f.trim().replace(/^-+(?=\s)/, "").replace(/(?<=\s)-+$/, "").trim()).filter((f) => /[\p{L}\p{N}]/u.test(f));
+  if (!fields.length) return null;
+  if (fields.length === 1) return { artist: null, title: fields[0] };
+  return { artist: fields[0], title: fields.slice(1).join(" - ") };
 }
 
 // ../packages/domain/src/media-tags.ts
@@ -22528,11 +22570,11 @@ function openZip(source2) {
     const locator = source2.read(eocdAt - 20, 20);
     if (locator.readUInt32LE(0) !== ZIP64_LOCATOR) throw new ZipError("The archive says it is ZIP64 but has no ZIP64 locator.");
     const recordAt = toNumber(locator.readBigUInt64LE(8));
-    const record2 = source2.read(recordAt, 56);
-    if (record2.readUInt32LE(0) !== ZIP64_EOCD) throw new ZipError("The ZIP64 end record is missing.");
-    count = toNumber(record2.readBigUInt64LE(32));
-    directorySize = toNumber(record2.readBigUInt64LE(40));
-    directoryOffset = toNumber(record2.readBigUInt64LE(48));
+    const record3 = source2.read(recordAt, 56);
+    if (record3.readUInt32LE(0) !== ZIP64_EOCD) throw new ZipError("The ZIP64 end record is missing.");
+    count = toNumber(record3.readBigUInt64LE(32));
+    directorySize = toNumber(record3.readBigUInt64LE(40));
+    directoryOffset = toNumber(record3.readBigUInt64LE(48));
   }
   const directory = source2.read(directoryOffset, directorySize);
   const entries = [];
@@ -22981,9 +23023,9 @@ var Jobs = class {
     return [...this.records.values()].map((r) => r.job);
   }
   filePath(jobId, fileId) {
-    const record2 = this.records.get(jobId);
-    const path = record2?.paths.get(fileId);
-    const file2 = record2?.job.files.find((f) => f.id === fileId);
+    const record3 = this.records.get(jobId);
+    const path = record3?.paths.get(fileId);
+    const file2 = record3?.job.files.find((f) => f.id === fileId);
     return path && file2 ? { path, file: file2 } : null;
   }
   /** Whether anything is running or waiting — while so, a tool binary may be held open. */
@@ -23014,19 +23056,19 @@ var Jobs = class {
    * a job behind that counts against the cap forever.
    */
   async forget(id) {
-    const record2 = this.records.get(id);
-    if (!record2) return false;
+    const record3 = this.records.get(id);
+    if (!record3) return false;
     this.records.delete(id);
     this.queue = this.queue.filter((q) => q !== id);
-    record2.cancelled = true;
-    const running = record2.running;
+    record3.cancelled = true;
+    const running = record3.running;
     if (running) {
       clearTimeout(running.timer);
       killTree(running.child);
-      this.finish(record2, { state: "cancelled", error: "Cancelled." });
+      this.finish(record3, { state: "cancelled", error: "Cancelled." });
       await Promise.race([running.closed, new Promise((resolve3) => setTimeout(resolve3, CLOSE_WAIT_MS).unref())]);
     }
-    this.remove(record2.root);
+    this.remove(record3.root);
     return true;
   }
   /** Drop finished jobs older than the TTL. */
@@ -23061,55 +23103,55 @@ var Jobs = class {
     while (this.active.size < this.limit()) {
       const id = this.queue.shift();
       if (!id) return;
-      const record2 = this.records.get(id);
-      if (!record2) continue;
+      const record3 = this.records.get(id);
+      if (!record3) continue;
       this.active.add(id);
-      void this.runOne(record2);
+      void this.runOne(record3);
     }
   }
-  async runOne(record2) {
+  async runOne(record3) {
     try {
-      await this.run(record2);
+      await this.run(record3);
     } catch (error61) {
-      if (!record2.cancelled) this.finish(record2, { state: "failed", error: redactPaths(error61 instanceof Error ? error61.message : String(error61), record2).slice(0, 600) });
+      if (!record3.cancelled) this.finish(record3, { state: "failed", error: redactPaths(error61 instanceof Error ? error61.message : String(error61), record3).slice(0, 600) });
     } finally {
-      this.active.delete(record2.job.id);
+      this.active.delete(record3.job.id);
       void this.pump();
     }
   }
-  async run(record2) {
+  async run(record3) {
     const tools = await this.options.tools();
-    const tool = tools[record2.job.tool];
-    if (!tool.present || !tool.path) throw new Error(`${record2.job.tool} is not installed on this machine.`);
+    const tool = tools[record3.job.tool];
+    if (!tool.present || !tool.path) throw new Error(`${record3.job.tool} is not installed on this machine.`);
     const ffmpeg = tools.ffmpeg;
-    if (record2.job.tool === "spotdl" && !ffmpeg.present) throw new Error("spotDL needs FFmpeg, and there is none on this machine.");
-    if (record2.job.format !== "original" && !ffmpeg.present) throw new Error(`Converting to ${record2.job.format} needs FFmpeg, and there is none on this machine.`);
-    const limits = { rateLimitKBps: record2.rateLimitKBps };
-    let args = record2.job.tool === "yt-dlp" ? ytDlpArgs(record2.job, record2.directory, ffmpeg, limits) : spotdlArgs(record2.job, record2.directory, ffmpeg, limits);
-    if (record2.cancelled) return;
-    const env = record2.job.tool === "spotdl" ? childEnv(process.env, { HOME: record2.home, USERPROFILE: record2.home }) : childEnv();
+    if (record3.job.tool === "spotdl" && !ffmpeg.present) throw new Error("spotDL needs FFmpeg, and there is none on this machine.");
+    if (record3.job.format !== "original" && !ffmpeg.present) throw new Error(`Converting to ${record3.job.format} needs FFmpeg, and there is none on this machine.`);
+    const limits = { rateLimitKBps: record3.rateLimitKBps };
+    let args = record3.job.tool === "yt-dlp" ? ytDlpArgs(record3.job, record3.directory, ffmpeg, limits) : spotdlArgs(record3.job, record3.directory, ffmpeg, limits);
+    if (record3.cancelled) return;
+    const env = record3.job.tool === "spotdl" ? childEnv(process.env, { HOME: record3.home, USERPROFILE: record3.home }) : childEnv();
     const { command, prefix } = toolCommand(tool.path);
-    if (record2.job.tool === "yt-dlp" && ffmpeg.present) {
-      this.patch(record2, { state: "running", stage: "preflight", message: "Reading the link\u2019s details\u2026" });
-      const infoFile = await this.prepareInfo(record2, command, prefix, env);
-      if (record2.cancelled) return;
-      if (infoFile) args = ytDlpArgs(record2.job, record2.directory, ffmpeg, limits, { infoFile });
+    if (record3.job.tool === "yt-dlp" && ffmpeg.present) {
+      this.patch(record3, { state: "running", stage: "preflight", message: "Reading the link\u2019s details\u2026" });
+      const infoFile = await this.prepareInfo(record3, command, prefix, env);
+      if (record3.cancelled) return;
+      if (infoFile) args = ytDlpArgs(record3.job, record3.directory, ffmpeg, limits, { infoFile });
     }
-    this.patch(record2, { state: "running", stage: "fetching", message: null });
-    await this.spawnTool(record2, command, [...prefix, ...args], env, (chunk) => this.readProgress(record2, chunk.toString()));
-    if (record2.cancelled) return;
-    this.patch(record2, { stage: "finalizing" });
-    const files = this.collect(record2);
-    if (!files.length) throw new Error(`${record2.job.tool} finished without producing an audio file.`);
-    const lost = record2.job.tool === "yt-dlp" && !ffmpeg.present ? { message: FFMPEG_MISSING_NOTE } : {};
-    this.finish(record2, { state: "done", files, ...lost });
+    this.patch(record3, { state: "running", stage: "fetching", message: null });
+    await this.spawnTool(record3, command, [...prefix, ...args], env, (chunk) => this.readProgress(record3, chunk.toString()));
+    if (record3.cancelled) return;
+    this.patch(record3, { stage: "finalizing" });
+    const files = this.collect(record3);
+    if (!files.length) throw new Error(`${record3.job.tool} finished without producing an audio file.`);
+    const lost = record3.job.tool === "yt-dlp" && !ffmpeg.present ? { message: FFMPEG_MISSING_NOTE } : {};
+    this.finish(record3, { state: "done", files, ...lost });
     if (this.options.onFinished) {
       const done = files.flatMap((file2) => {
-        const path = record2.paths.get(file2.id);
+        const path = record3.paths.get(file2.id);
         return path ? [{ name: file2.name, path }] : [];
       });
       try {
-        this.options.onFinished(record2.job, done);
+        this.options.onFinished(record3.job, done);
       } catch (error61) {
         this.options.log?.(`after a download: ${error61 instanceof Error ? error61.message : String(error61)}`);
       }
@@ -23119,7 +23161,7 @@ var Jobs = class {
    * One run of the tool, killed with its whole tree on cancel or timeout. Resolves when it exits 0;
    * otherwise rejects with the tool's own last meaningful line.
    */
-  spawnTool(record2, command, argv, env, onStdout) {
+  spawnTool(record3, command, argv, env, onStdout) {
     const spawnImpl = this.options.spawnImpl ?? spawn;
     return new Promise((resolve3, reject) => {
       let settle = () => {
@@ -23127,9 +23169,9 @@ var Jobs = class {
       const closed = new Promise((done) => {
         settle = done;
       });
-      const child = spawnImpl(command, argv, { cwd: record2.directory, stdio: ["ignore", "pipe", "pipe"], env, shell: false, windowsHide: true, detached: process.platform !== "win32" });
+      const child = spawnImpl(command, argv, { cwd: record3.directory, stdio: ["ignore", "pipe", "pipe"], env, shell: false, windowsHide: true, detached: process.platform !== "win32" });
       const timer = setTimeout(() => killTree(child), this.options.timeoutMs);
-      record2.running = { child, timer, closed };
+      record3.running = { child, timer, closed };
       let stderr = "";
       child.stdout?.on("data", onStdout);
       child.stderr?.on("data", (chunk) => {
@@ -23141,16 +23183,16 @@ var Jobs = class {
       });
       child.on("error", (error61) => {
         clearTimeout(timer);
-        record2.running = null;
+        record3.running = null;
         settle();
-        reject(new Error(`${record2.job.tool} could not be started: ${error61.message}`));
+        reject(new Error(`${record3.job.tool} could not be started: ${error61.message}`));
       });
       child.on("close", (code) => {
         clearTimeout(timer);
-        record2.running = null;
+        record3.running = null;
         settle();
         if (code === 0) resolve3();
-        else reject(new Error(lastMeaningfulLine(stderr) ?? `${record2.job.tool} exited with code ${code ?? "unknown"}.`));
+        else reject(new Error(lastMeaningfulLine(stderr) ?? `${record3.job.tool} exited with code ${code ?? "unknown"}.`));
       });
     });
   }
@@ -23161,12 +23203,12 @@ var Jobs = class {
    * read. Returns null when the description could not be used, and the download then names the URL
    * as it always did; a failure of the tool itself fails the job, with the tool's reason.
    */
-  async prepareInfo(record2, command, prefix, env) {
+  async prepareInfo(record3, command, prefix, env) {
     const chunks = [];
     let size = 0;
     let overflow = false;
     let failure = null;
-    await this.spawnTool(record2, command, [...prefix, ...ytDlpInfoArgs(record2.job)], env, (chunk) => {
+    await this.spawnTool(record3, command, [...prefix, ...ytDlpInfoArgs(record3.job)], env, (chunk) => {
       if (overflow) return;
       size += chunk.length;
       if (size > MAX_INFO_BYTES) {
@@ -23178,12 +23220,12 @@ var Jobs = class {
     }).catch((error61) => {
       failure = error61;
     });
-    if (record2.cancelled) return null;
+    if (record3.cancelled) return null;
     if (failure) {
       const partial2 = chunks.length ? parseObject(Buffer.concat(chunks).toString("utf8")) : null;
       if (!partial2 || !Array.isArray(partial2["entries"]) || !partial2["entries"].length) throw failure;
       this.options.log?.("some songs in this playlist could not be described; downloading the rest");
-      const file3 = join7(record2.root, "info.json");
+      const file3 = join7(record3.root, "info.json");
       writeFileSync2(file3, JSON.stringify(withCleanTags(partial2)));
       return file3;
     }
@@ -23196,7 +23238,7 @@ var Jobs = class {
       this.options.log?.("the link\u2019s description was not JSON; downloading without it");
       return null;
     }
-    const file2 = join7(record2.root, "info.json");
+    const file2 = join7(record3.root, "info.json");
     writeFileSync2(file2, JSON.stringify(withCleanTags(info)));
     return file2;
   }
@@ -23205,31 +23247,31 @@ var Jobs = class {
    * is there. spotDL reports per song rather than per byte, so its percentage stays null and its
    * own last line is shown instead — a made-up number would be worse than none.
    */
-  readProgress(record2, chunk) {
-    if (record2.cancelled) return;
+  readProgress(record3, chunk) {
+    if (record3.cancelled) return;
     for (const line of chunk.split(/\r?\n/)) {
-      const text2 = redactPaths(line.trim(), record2);
+      const text2 = redactPaths(line.trim(), record3);
       if (!text2) continue;
       const percent = /^\[download\]\s+([\d.]+)%/.exec(text2);
       if (percent) {
-        this.patch(record2, { percent: Math.min(100, Number(percent[1])), stage: "fetching", message: text2.slice(0, 400) });
+        this.patch(record3, { percent: Math.min(100, Number(percent[1])), stage: "fetching", message: text2.slice(0, 400) });
         continue;
       }
       if (/^\[(ExtractAudio|Merger|VideoConvertor|EmbedThumbnail|Metadata)\]/.test(text2)) {
-        this.patch(record2, { stage: "converting", message: text2.slice(0, 400) });
+        this.patch(record3, { stage: "converting", message: text2.slice(0, 400) });
         continue;
       }
-      this.patch(record2, { message: text2.slice(0, 400) });
+      this.patch(record3, { message: text2.slice(0, 400) });
     }
   }
-  collect(record2) {
+  collect(record3) {
     const files = [];
-    for (const name of walk(record2.directory)) {
+    for (const name of walk(record3.directory)) {
       const extension = extname2(name).toLowerCase();
       if (!AUDIO_EXTENSIONS.has(extension)) continue;
-      const absolute = join7(record2.directory, name);
+      const absolute = join7(record3.directory, name);
       const id = randomUUID();
-      record2.paths.set(id, absolute);
+      record3.paths.set(id, absolute);
       files.push({
         id,
         // The name is rebuilt rather than trusted: it came from a page title on someone else's site.
@@ -23240,12 +23282,12 @@ var Jobs = class {
     }
     return files.sort((a, b) => a.name.localeCompare(b.name));
   }
-  patch(record2, patch) {
-    record2.job = { ...record2.job, ...patch };
-    this.options.onChange?.(record2.job);
+  patch(record3, patch) {
+    record3.job = { ...record3.job, ...patch };
+    this.options.onChange?.(record3.job);
   }
-  finish(record2, patch) {
-    this.patch(record2, { stage: "done", finishedAt: (/* @__PURE__ */ new Date()).toISOString(), ...patch });
+  finish(record3, patch) {
+    this.patch(record3, { stage: "done", finishedAt: (/* @__PURE__ */ new Date()).toISOString(), ...patch });
   }
 };
 var MAX_INFO_BYTES = 256 * 1024 * 1024;
@@ -23637,7 +23679,9 @@ function createResolver(options) {
   }
   return {
     async search(args, signal) {
-      if (args[0] !== "--ignore-config" || args.at(-2) !== "--" || !/^(yt|sc)search[0-9]{1,3}:./.test(args.at(-1) ?? "")) throw new ResolveError("That is not a catalog search.", "failed");
+      const last = args.at(-1) ?? "";
+      const listing = /^(yt|sc)search[0-9]{1,3}:./.test(last) || /^https:\/\/soundcloud\.com\/[A-Za-z0-9][A-Za-z0-9_-]{1,70}\/albums$/.test(last);
+      if (args[0] !== "--ignore-config" || args.at(-2) !== "--" || !listing) throw new ResolveError("That is not a catalog search.", "failed");
       const tools = await options.tools();
       const ytDlp = tools["yt-dlp"];
       if (!ytDlp.present || !ytDlp.path) throw new ResolveError(ytDlp.installHint ?? "yt-dlp is not set up on this PC yet.", "tool-missing");
@@ -23675,8 +23719,17 @@ import https from "node:https";
 import net from "node:net";
 import tls from "node:tls";
 var MAX_REDIRECTS = 3;
-function none(reason, station = null) {
-  return { raw: null, artist: null, title: null, station, reason };
+function none(reason, station = null, about = {}) {
+  return { raw: null, artist: null, title: null, station, genre: about.genre ?? null, bitrate: about.bitrate ?? null, reason };
+}
+var PLACEHOLDER_GENRES = /* @__PURE__ */ new Set(["various", "varied", "misc", "miscellaneous", "unknown", "none", "other", "radio", "music"]);
+function stationAbout(headers) {
+  const genre = headerText(headers["icy-genre"]);
+  const bitrate = Number.parseInt(headerText(headers["icy-br"]) ?? "", 10);
+  return {
+    genre: genre && !PLACEHOLDER_GENRES.has(genre.toLowerCase()) ? genre : null,
+    bitrate: Number.isInteger(bitrate) && bitrate > 0 && bitrate <= 2e3 ? bitrate : null
+  };
 }
 async function readStationTitle(input2, options = {}) {
   const timeoutMs = options.timeoutMs ?? 8e3;
@@ -23743,8 +23796,8 @@ function once(url2, options) {
         const feed = titleConsumer(response.headers, maxBytes, finish);
         if (!feed) return;
         response.on("data", feed);
-        response.on("end", () => finish(none("The station sent no song title", headerText(response.headers["icy-name"]))));
-        response.on("error", () => finish(none("The station stopped sending", headerText(response.headers["icy-name"]))));
+        response.on("end", () => finish(none("The station sent no song title", headerText(response.headers["icy-name"]), stationAbout(response.headers))));
+        response.on("error", () => finish(none("The station stopped sending", headerText(response.headers["icy-name"]), stationAbout(response.headers))));
       }
     );
     request.on("error", (err) => {
@@ -23762,26 +23815,37 @@ function once(url2, options) {
 }
 function titleConsumer(headers, maxBytes, finish) {
   const stationName = headerText(headers["icy-name"]);
+  const about = stationAbout(headers);
   const metaint = Number.parseInt(headerText(headers["icy-metaint"]) ?? "", 10);
   if (!Number.isInteger(metaint) || metaint <= 0 || metaint > 256 * 1024) {
-    finish(none("This station does not send song titles", stationName));
+    finish(none("This station does not send song titles", stationName, about));
     return null;
   }
   const reader = new IcyReader(metaint);
   let seen = 0;
-  let blocks = 0;
+  let markers = 0;
+  let markerAt = 0;
   return (chunk) => {
     seen += chunk.length;
     for (const meta3 of reader.feed(chunk)) {
-      blocks += 1;
-      const raw = parseStreamTitle(meta3);
+      const raw = parseStreamTitle(meta3) ?? (/^adContext="/.test(meta3.trim()) ? meta3.trim() : null);
       if (raw) {
         const parts = splitOnAir(raw);
-        finish({ raw, artist: parts?.artist ?? null, title: parts?.title ?? null, station: stationName, reason: parts ? null : "The station sent no song title" });
-        return;
+        if (parts) {
+          finish({ raw, artist: parts.artist, title: parts.title, station: stationName, genre: about.genre, bitrate: about.bitrate, reason: null });
+          return;
+        }
+        markers += 1;
+        if (markers === 1) markerAt = seen;
+        if (markers >= 4) {
+          finish(none("The station sent no song title", stationName, about));
+          return;
+        }
       }
     }
-    if (blocks >= 2 || seen > maxBytes) finish(none("The station sent no song title", stationName));
+    if (reader.blocks - markers >= 2 || markers > 0 && seen - markerAt > 2 * (metaint + 1) || seen > maxBytes) {
+      finish(none("The station sent no song title", stationName, about));
+    }
   };
 }
 function rawOnce(target, options, lookup2, maxBytes) {
@@ -23839,6 +23903,58 @@ Accept: */*\r
 function headerText(value) {
   const first = Array.isArray(value) ? value[0] : value;
   return first?.trim() || null;
+}
+
+// ../packages/domain/src/radio-schedule.ts
+var IHEART_API_HOST = "us.api.iheart.com";
+var IHEART_SCHEDULE_HOST = "webapi.radioedit.iheart.com";
+var IHEART_HOSTS = [IHEART_API_HOST, IHEART_SCHEDULE_HOST];
+var STREAM = /^https?:\/\/(?:stream|cloud)\.revma\.ihrhls\.com\/zc(\d{1,7})(?:[/?#]|$)/i;
+var SITE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.iheart\.com$/;
+function iheartStationId(stream) {
+  let url2;
+  try {
+    url2 = new URL(stream);
+  } catch {
+    return null;
+  }
+  if (url2.username || url2.password || url2.port) return null;
+  return STREAM.exec(`${url2.protocol}//${url2.hostname}${url2.pathname}`)?.[1] ?? null;
+}
+var sites = /* @__PURE__ */ new Map();
+var SITE_TTL_MS = 6 * 60 * 60 * 1e3;
+function record2(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+}
+async function siteFor(id, getJson2, now) {
+  const hit = sites.get(id);
+  if (hit && now - hit.at < SITE_TTL_MS) return hit.host;
+  const body = record2(await getJson2(`https://${IHEART_API_HOST}/api/v2/content/liveStations/${id}`));
+  const station = record2(Array.isArray(body?.hits) ? body.hits[0] : null);
+  const website = typeof station?.website === "string" ? station.website.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "") : "";
+  const host = String(station?.id ?? "") === id && SITE.test(website) ? website : null;
+  if (sites.size >= 500) sites.delete(sites.keys().next().value);
+  sites.set(id, { at: now, host });
+  return host;
+}
+var QUERY = "query($host:String!){sites{find(type:HOSTNAME,value:$host){onAirSchedule{current{name startMs stopMs}}}}}";
+async function readIheartProgramme(stream, getJson2, now) {
+  const id = iheartStationId(stream);
+  if (!id) return null;
+  try {
+    const host = await siteFor(id, getJson2, now);
+    if (!host) return null;
+    const url2 = `https://${IHEART_SCHEDULE_HOST}/graphql?query=${encodeURIComponent(QUERY)}&variables=${encodeURIComponent(JSON.stringify({ host }))}`;
+    const body = record2(await getJson2(url2));
+    const current = record2(record2(record2(record2(record2(body?.data)?.sites)?.find)?.onAirSchedule)?.current);
+    const name = typeof current?.name === "string" ? current.name.trim() : "";
+    const start = typeof current?.startMs === "number" ? current.startMs : NaN;
+    const stop = typeof current?.stopMs === "number" ? current.stopMs : NaN;
+    if (!name || name.length > 300 || !(start <= now && now < stop)) return null;
+    return name;
+  } catch {
+    return null;
+  }
 }
 
 // ../packages/domain/src/catalog/http.ts
@@ -24347,13 +24463,25 @@ function mergeTrack(into, other) {
     rank: Math.max(into.rank, other.rank)
   };
 }
+function sameArtist(a, b) {
+  if (matchArtist(a.name) !== matchArtist(b.name) || normalizeText(a.name) !== normalizeText(b.name)) return false;
+  for (const left of a.sources) {
+    for (const right of b.sources) {
+      if (left.platform === right.platform && left.id !== null && right.id !== null && left.id !== right.id) return false;
+    }
+  }
+  return true;
+}
 function mergeArtist(into, other) {
+  const best = (other.fans ?? -1) > (into.fans ?? -1) ? other : into;
+  const rest = best === into ? other : into;
   return {
-    ...into,
-    pictureUrl: into.pictureUrl ?? other.pictureUrl,
-    albumCount: into.albumCount ?? other.albumCount,
-    fans: into.fans ?? other.fans,
-    genre: into.genre ?? other.genre,
+    ...best,
+    id: into.id,
+    pictureUrl: best.pictureUrl ?? rest.pictureUrl,
+    albumCount: best.albumCount ?? rest.albumCount,
+    fans: best.fans ?? rest.fans,
+    genre: best.genre ?? rest.genre,
     sources: mergeSources(into.sources, other.sources),
     rank: Math.max(into.rank, other.rank)
   };
@@ -24395,6 +24523,11 @@ function relevance(query, title, artist, album = null) {
 function rankOf(query, row, position) {
   return Math.round((relevance(query, row.title, row.artist, row.album ?? null) * 100 + Math.min(row.sources.length, 6) * 4 - Math.min(position, 100) * 0.5) * 100) / 100;
 }
+function artistRankOf(query, row, position) {
+  const base = rankOf(query, { title: row.name, artist: row.name, sources: row.sources }, position);
+  const audience = row.fans && row.fans > 0 ? Math.min(Math.log10(row.fans) / 8, 1) * 6 : 0;
+  return Math.round((base + audience) * 100) / 100;
+}
 var CatalogMerger = class {
   constructor(query) {
     this.query = query;
@@ -24416,8 +24549,8 @@ var CatalogMerger = class {
       upsert(changed.tracks, rescored);
     });
     (rows.artists ?? []).forEach((row, position) => {
-      const ranked = { ...row, rank: rankOf(this.query, { title: row.name, artist: row.name, sources: row.sources }, position) };
-      const index = this.artists.findIndex((a) => matchArtist(a.name) === matchArtist(ranked.name) && normalizeText(a.name) === normalizeText(ranked.name));
+      const ranked = { ...row, rank: artistRankOf(this.query, row, position) };
+      const index = this.artists.findIndex((a) => sameArtist(a, ranked));
       const next = index === -1 ? ranked : mergeArtist(this.artists[index], ranked);
       if (index === -1) this.artists.push(next);
       else this.artists[index] = next;
@@ -24557,6 +24690,7 @@ var ProviderResting = class extends Error {
 
 // ../packages/domain/src/catalog/providers/ytdlp.ts
 var PREFIX = { youtube: "ytsearch", soundcloud: "scsearch" };
+var TOOL_ALBUM_UPLOADERS = 2;
 var TOOL_SEARCH_MAX = 100;
 var SOUNDCLOUD_PREVIEW_SECONDS = 30;
 function toolSearchTerm(text2) {
@@ -24569,6 +24703,11 @@ function toolSearchArgs(platform, text2, offset, limit) {
   const end = Math.min(Math.max(offset, 0) + Math.max(limit, 1), TOOL_SEARCH_MAX);
   const start = Math.min(Math.max(offset, 0) + 1, end);
   return ["--ignore-config", "--no-colors", "--no-cache-dir", "--no-warnings", "--flat-playlist", "--dump-single-json", "--playlist-start", String(start), "--playlist-end", String(end), "--", `${PREFIX[platform]}${end}:${term}`];
+}
+function soundcloudAlbumsArgs(user, limit) {
+  if (!/^[a-z0-9][a-z0-9_-]{1,70}$/i.test(user)) throw new Error("That is not a SoundCloud profile name");
+  const end = Math.min(Math.max(limit, 1), TOOL_SEARCH_MAX);
+  return ["--ignore-config", "--no-colors", "--no-cache-dir", "--no-warnings", "--flat-playlist", "--dump-single-json", "--playlist-start", "1", "--playlist-end", String(end), "--", `https://soundcloud.com/${user.toLowerCase()}/albums`];
 }
 function youtubeThumbnail(id) {
   return `https://i.ytimg.com/vi/${encodeURIComponent(id)}/hqdefault.jpg`;
@@ -24663,26 +24802,106 @@ function toolSearchTracks(platform, document) {
   if (!isObject2(document)) return [];
   return arr(document["entries"]).filter((e) => e["_type"] !== "playlist" && !(typeof e["ie_key"] === "string" && /Tab|Playlist|User/i.test(e["ie_key"]))).map((e) => toolSearchTrack(platform, e)).filter((t2) => t2 !== null);
 }
+function soundcloudUploaders(document, max = TOOL_ALBUM_UPLOADERS) {
+  if (!isObject2(document)) return [];
+  const out = [];
+  for (const row of arr(document["entries"])) {
+    const profile = webUrl2(row["uploader_url"]) ?? webUrl2(row["channel_url"]);
+    const page = webUrl2(row["webpage_url"]);
+    let user = null;
+    for (const candidate of [profile, page]) {
+      if (!candidate) continue;
+      try {
+        const url2 = new URL(candidate);
+        if (!/(^|\.)soundcloud\.com$/.test(url2.hostname)) continue;
+        const first = url2.pathname.split("/").filter(Boolean)[0];
+        if (first && /^[a-z0-9][a-z0-9_-]{1,70}$/i.test(first)) {
+          user = first.toLowerCase();
+          break;
+        }
+      } catch {
+        continue;
+      }
+    }
+    if (user && !out.includes(user)) out.push(user);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+function soundcloudAlbums(document, owner) {
+  if (!isObject2(document)) return [];
+  const out = [];
+  for (const row of arr(document["entries"])) {
+    const url2 = webUrl2(row["webpage_url"]) ?? webUrl2(row["url"]);
+    if (!url2) continue;
+    let path;
+    try {
+      const parsed = new URL(url2);
+      if (!/(^|\.)soundcloud\.com$/.test(parsed.hostname)) continue;
+      path = parsed.pathname.split("/").filter(Boolean);
+    } catch {
+      continue;
+    }
+    if (path.length < 3 || path[1] !== "sets") continue;
+    const id = `${path[0]}/sets/${path[2]}`;
+    const title = str2(row["title"]) ?? fromSlug(path[2]);
+    const artist = str2(row["uploader"]) ?? str2(row["artist"]) ?? owner ?? fromSlug(path[0]);
+    if (out.some((a) => a.id === `soundcloud:${id}`)) continue;
+    out.push({
+      id: `soundcloud:${id}`,
+      title,
+      artist,
+      artworkUrl: bestThumbnail(row),
+      releaseDate: null,
+      year: null,
+      trackCount: null,
+      label: null,
+      genre: null,
+      explicit: null,
+      upc: null,
+      sources: [{ platform: "soundcloud", id, url: `https://soundcloud.com/${id}`, previewUrl: null, matchedBy: "search" }],
+      rank: 0
+    });
+  }
+  return out;
+}
 var ToolSearchProvider = class {
   constructor(id, run3, timeoutMs = 3e4) {
     this.id = id;
     this.run = run3;
     this.timeoutMs = timeoutMs;
+    this.sections = id === "soundcloud" ? ["tracks", "albums"] : ["tracks"];
   }
   id;
   run;
   timeoutMs;
-  sections = ["tracks"];
+  sections;
   supports(query) {
     return query.kind === "text" || query.kind === "advanced";
   }
   async search(query, options) {
     const out = emptyResult();
-    if (!options.sections.includes("tracks") || options.offset >= TOOL_SEARCH_MAX) return out;
+    const wantsTracks = options.sections.includes("tracks");
+    const wantsAlbums = this.id === "soundcloud" && options.sections.includes("albums");
+    if (!wantsTracks && !wantsAlbums || options.offset >= TOOL_SEARCH_MAX) return out;
     const document = await this.run({ platform: this.id, args: toolSearchArgs(this.id, query.text, options.offset, options.limit), signal: options.signal });
-    out.tracks = toolSearchTracks(this.id, document);
-    const listed = isObject2(document) ? arr(document["entries"]).length : 0;
-    out.full.tracks = listed >= options.limit && options.offset + options.limit < TOOL_SEARCH_MAX;
+    if (wantsTracks) {
+      out.tracks = toolSearchTracks(this.id, document);
+      const listed = isObject2(document) ? arr(document["entries"]).length : 0;
+      out.full.tracks = listed >= options.limit && options.offset + options.limit < TOOL_SEARCH_MAX;
+    }
+    if (wantsAlbums && options.offset === 0) {
+      for (const user of soundcloudUploaders(document)) {
+        if (options.signal.aborted) break;
+        try {
+          const tab = await this.run({ platform: this.id, args: soundcloudAlbumsArgs(user, options.limit), signal: options.signal });
+          for (const album of soundcloudAlbums(tab, user)) if (!out.albums.some((a) => a.id === album.id)) out.albums.push(album);
+        } catch {
+          continue;
+        }
+      }
+      out.full.albums = false;
+    }
     return out;
   }
 };
@@ -25751,7 +25970,7 @@ var CatalogEngine = class {
     this.register(new MusicBrainzProvider(this.musicbrainz));
     if (options.toolSearch) {
       this.register(new ToolSearchProvider("youtube", options.toolSearch, t2.tools ?? 3e4));
-      this.register(new ToolSearchProvider("soundcloud", options.toolSearch, t2.tools ?? 3e4));
+      this.register(new ToolSearchProvider("soundcloud", options.toolSearch, t2.soundcloud ?? t2.tools ?? 45e3));
     }
   }
   options;
@@ -26489,11 +26708,11 @@ var CATALOG_SEARCH_SECTION_LABELS = { ...CATALOG_SECTION_LABELS, playlists: "Pla
 import { lookup } from "node:dns/promises";
 var MAX_REDIRECTS2 = 3;
 var MAX_BODY_BYTES = 4 * 1024 * 1024;
-function guardedCatalogFetch(fetchImpl = fetch, resolveName = async (host) => (await lookup(host, { all: true })).map((a) => a.address)) {
+function guardedCatalogFetch(fetchImpl = fetch, resolveName = async (host) => (await lookup(host, { all: true })).map((a) => a.address), hosts = CATALOG_API_HOSTS) {
   return async (input2, init) => {
     let url2 = input2;
     for (let hop = 0; hop <= MAX_REDIRECTS2; hop += 1) {
-      const checked = validateOutboundUrl(url2, { allowedHosts: CATALOG_API_HOSTS, allowedSchemes: ["https:"], maxLength: 4096 });
+      const checked = validateOutboundUrl(url2, { allowedHosts: hosts, allowedSchemes: ["https:"], maxLength: 4096 });
       if (!checked.ok || !checked.url) throw new Error(`Blocked outbound URL: ${checked.reason ?? "not allowed"}`);
       const addresses = await resolveName(checked.url.hostname);
       const allowed = isResolvedAddressAllowed(addresses);
@@ -26592,30 +26811,30 @@ async function ensureTools(options) {
   for (const id of SETUP_ORDER) {
     if (options.only && !options.only.includes(id)) continue;
     if (options.signal?.aborted) break;
-    const record2 = state.tools[id] ??= {};
+    const record3 = state.tools[id] ??= {};
     const tool = await resolve3(id);
     const source2 = toolSource(id, platform, arch);
     if (tool.present && !options.force) {
-      if (id === "yt-dlp" && tool.origin === "installed" && source2 && (options.autoUpdate?.() ?? true) && due(record2.lastUpdateCheckAt, UPDATE_CHECK_MS, now) && !options.busy?.()) {
+      if (id === "yt-dlp" && tool.origin === "installed" && source2 && (options.autoUpdate?.() ?? true) && due(record3.lastUpdateCheckAt, UPDATE_CHECK_MS, now) && !options.busy?.()) {
         try {
           const latest = await release(source2.repo);
           const behind = !!latest.tag && !!tool.version && latest.tag.trim() !== tool.version.trim();
-          if (!behind) record2.lastUpdateCheckAt = new Date(now()).toISOString();
+          if (!behind) record3.lastUpdateCheckAt = new Date(now()).toISOString();
           else if (options.busy?.()) log("yt-dlp update deferred: downloads are running");
           else {
             log(`yt-dlp ${tool.version} is behind ${latest.tag}; updating`);
             const outcome2 = await runInstall(id);
-            record2.lastAttemptAt = new Date(now()).toISOString();
-            record2.lastError = outcome2.installed ? null : outcome2.reason;
+            record3.lastAttemptAt = new Date(now()).toISOString();
+            record3.lastError = outcome2.installed ? null : outcome2.reason;
             if (outcome2.installed) {
-              record2.lastUpdateCheckAt = new Date(now()).toISOString();
-              record2.tag = outcome2.tag ?? latest.tag;
-              record2.verified = outcome2.verified ?? null;
+              record3.lastUpdateCheckAt = new Date(now()).toISOString();
+              record3.tag = outcome2.tag ?? latest.tag;
+              record3.verified = outcome2.verified ?? null;
               options.onInstalled?.(id, outcome2);
             } else log(`yt-dlp update refused: ${outcome2.reason ?? "unknown"}`);
           }
         } catch (error61) {
-          record2.lastUpdateCheckAt = new Date(now()).toISOString();
+          record3.lastUpdateCheckAt = new Date(now()).toISOString();
           log(`could not check for a newer yt-dlp: ${error61 instanceof Error ? error61.message : String(error61)}`);
         }
       }
@@ -26626,25 +26845,25 @@ async function ensureTools(options) {
       report(id, { state: "unsupported", reason: installHint(id, false) });
       continue;
     }
-    if (!options.ignoreBackoff && !options.force && record2.lastError && !due(record2.lastAttemptAt, RETRY_AFTER_MS, now)) {
-      report(id, { state: "failed", reason: record2.lastError });
+    if (!options.ignoreBackoff && !options.force && record3.lastError && !due(record3.lastAttemptAt, RETRY_AFTER_MS, now)) {
+      report(id, { state: "failed", reason: record3.lastError });
       continue;
     }
     log(`setting up ${id} in ${options.toolsDir}`);
     const outcome = await runInstall(id);
-    record2.lastAttemptAt = new Date(now()).toISOString();
+    record3.lastAttemptAt = new Date(now()).toISOString();
     if (outcome.installed) {
-      record2.lastError = null;
-      record2.tag = outcome.tag ?? null;
-      if (outcome.installed) record2.verified = outcome.verified ?? null;
-      if (id === "yt-dlp") record2.lastUpdateCheckAt = record2.lastAttemptAt;
+      record3.lastError = null;
+      record3.tag = outcome.tag ?? null;
+      if (outcome.installed) record3.verified = outcome.verified ?? null;
+      if (id === "yt-dlp") record3.lastUpdateCheckAt = record3.lastAttemptAt;
       log(`set up ${id} ${outcome.version ?? ""}`.trim());
       report(id, { state: "ready" });
       options.onInstalled?.(id, outcome);
     } else {
-      record2.lastError = outcome.reason ?? "It could not be set up.";
-      log(`could not set up ${id}: ${record2.lastError}`);
-      report(id, tool.present ? { state: "ready" } : { state: "failed", reason: record2.lastError });
+      record3.lastError = outcome.reason ?? "It could not be set up.";
+      log(`could not set up ${id}: ${record3.lastError}`);
+      report(id, tool.present ? { state: "ready" } : { state: "failed", reason: record3.lastError });
     }
   }
   writeState(options.toolsDir, state, log);
@@ -26751,8 +26970,8 @@ var ToolProvisioner = class {
     const release = this.options.release ?? ((repo) => latestRelease(repo, { ...this.options.fetchImpl ? { fetchImpl: this.options.fetchImpl } : {}, signal: AbortSignal.any([this.stopped.signal, AbortSignal.timeout(2e4)]) }));
     try {
       const latest = await release(source2.repo);
-      const record2 = readState(this.options.toolsDir).tools[id];
-      return { ...compareRelease(id, tool, latest, record2?.verified, source2.asset(latest.assets.map((a) => a.name))), checkedAt };
+      const record3 = readState(this.options.toolsDir).tools[id];
+      return { ...compareRelease(id, tool, latest, record3?.verified, source2.asset(latest.assets.map((a) => a.name))), checkedAt };
     } catch (error61) {
       this.options.log?.(`could not check ${id}: ${error61 instanceof Error ? error61.message : String(error61)}`);
       return { latest: null, updateAvailable: null, reason: "GitHub didn\u2019t answer, so the latest version isn\u2019t known. Check again in a moment.", checkedAt };
@@ -26817,8 +27036,18 @@ async function startHelper(options) {
   let policy = { allowed: options.allowedOrigins, self: options.app ? origin : null, loopbackPages: options.loopbackPages === true };
   const stationCache = /* @__PURE__ */ new Map();
   let stationReads = 0;
+  const scheduleFetch = options.scheduleFetch ?? (() => {
+    const guarded = guardedCatalogFetch(fetch, void 0, IHEART_HOSTS);
+    return async (url2) => {
+      const response = await guarded(url2, { signal: AbortSignal.timeout(4e3), headers: { accept: "application/json" } });
+      if (response.status !== 200) throw new Error(`${new URL(url2).hostname} answered ${response.status}`);
+      return response.json();
+    };
+  })();
   async function withRadioGuide(url2, track) {
     const fallback = { ...track, programme: null, programmeSource: null };
+    const published = await readIheartProgramme(url2, scheduleFetch, Date.now());
+    if (published) return { ...track, programme: published, programmeSource: "schedule" };
     if (!options.tv) return fallback;
     try {
       const matches = (await options.tv.channels()).filter((channel2) => channel2.url === url2);
@@ -26910,7 +27139,7 @@ async function startHelper(options) {
       if (stationReads >= 8) return fail(response, 429, "busy", "Too many stations at once. Try again in a moment.");
       const read = options.stationTitle ?? ((u) => readStationTitle(u, { timeoutMs: 8e3, userAgent: `NowPlaying-helper/${options.version}` }));
       stationReads += 1;
-      const value = read(station).catch(() => ({ raw: null, artist: null, title: null, station: null, reason: "The station could not be read" })).finally(() => {
+      const value = read(station).catch(() => ({ raw: null, artist: null, title: null, station: null, genre: null, bitrate: null, reason: "The station could not be read" })).finally(() => {
         stationReads -= 1;
       });
       stationCache.delete(station);
@@ -26959,9 +27188,9 @@ async function startHelper(options) {
       const found = await resolve_();
       const setup = tools.status();
       const withSetup = (id) => {
-        const record2 = publicTool(found[id]);
-        const state = toolSetupFor(record2, setup[id]);
-        return state ? { ...record2, setup: state } : record2;
+        const record3 = publicTool(found[id]);
+        const state = toolSetupFor(record3, setup[id]);
+        return state ? { ...record3, setup: state } : record3;
       };
       const health = {
         helper: "now-playing-local-helper",

@@ -168,19 +168,21 @@ export class PlatformSyncService {
    */
   async warmDiscoveryCache(userId: string): Promise<{ queries: number; cached: number }> {
     const profile = this.recommendations.view(userId);
-    // `dimensions` is the canonical shape: a weighted list per dimension, strongest first.
-    const seeds = [...topKeys(profile, 'artist', 5), ...topKeys(profile, 'genre', 3)];
+    // `dimensions` is the canonical shape: a weighted list per dimension, strongest first. The names
+    // are plural, as `profileView` writes them -- asking for 'artist'/'genre' found nothing at all,
+    // which left every warm run with no seeds and so no cache to serve discovery from.
+    const seeds = [...topKeys(profile, 'artists', 5), ...topKeys(profile, 'genres', 3)];
     if (!seeds.length) return { queries: 0, cached: 0 };
 
     let cached = 0;
     for (const seed of seeds) {
       for (const adapter of this.registry.searchable()) {
-        const key = discoveryKey(adapter.id, seed);
+        const key = discoveryKey(userId, adapter.id, seed);
         const hit = this.repo.cacheGet(key);
         if (hit && Date.parse(hit.expiresAt) > this.clock.now()) continue;
         try {
           const page = await this.rateLimiter.run(adapter.id, 'P4', () => adapter.search(seed, { scope: 'songs', limit: 25 }, null), { timeoutMs: 15_000, cost: adapter.id === 'youtube' ? 100 : 1 });
-          this.repo.cachePut(key, adapter.id, seed, page.results, this.nowIso(), new Date(this.clock.now() + DISCOVERY_TTL_MS).toISOString());
+          this.repo.cachePut(key, adapter.id, key, page.results, this.nowIso(), new Date(this.clock.now() + DISCOVERY_TTL_MS).toISOString());
           for (const result of page.results) this.recommendations.canonicaliseSearchResult(result);
           cached += 1;
         } catch {
@@ -201,11 +203,11 @@ export class PlatformSyncService {
    */
   async refreshNewReleases(userId: string): Promise<{ artists: number; found: number }> {
     const profile = this.recommendations.view(userId);
-    const artists = topKeys(profile, 'artist', 10);
+    const artists = topKeys(profile, 'artists', 10);
     const currentYear = new Date(this.clock.now()).getUTCFullYear();
     let found = 0;
     for (const artist of artists) {
-      const key = discoveryKey('new-releases', artist);
+      const key = discoveryKey(userId, 'new-releases', artist);
       const hit = this.repo.cacheGet(key);
       if (hit && Date.parse(hit.expiresAt) > this.clock.now()) continue;
       const results: SearchResult[] = [];
@@ -222,16 +224,16 @@ export class PlatformSyncService {
           this.metrics.increment(`discovery.new_releases_failed.${adapter.id}`);
         }
       }
-      this.repo.cachePut(key, 'new-releases', artist, results, this.nowIso(), new Date(this.clock.now() + NEW_RELEASE_TTL_MS).toISOString());
+      this.repo.cachePut(key, 'new-releases', key, results, this.nowIso(), new Date(this.clock.now() + NEW_RELEASE_TTL_MS).toISOString());
       found += results.length;
     }
     this.metrics.increment('discovery.new_releases', found);
     return { artists: artists.length, found };
   }
 
-  /** Cached provider results for a seed, if any are still fresh. */
-  cachedFor(provider: string, seed: string): SearchResult[] | null {
-    const hit = this.repo.cacheGet(discoveryKey(provider, seed));
+  /** Cached provider results for one listener's seed, if any are still fresh. */
+  cachedFor(userId: string, provider: string, seed: string): SearchResult[] | null {
+    const hit = this.repo.cacheGet(discoveryKey(userId, provider, seed));
     if (!hit || Date.parse(hit.expiresAt) <= this.clock.now()) return null;
     return hit.results as SearchResult[];
   }
@@ -254,8 +256,16 @@ function topKeys(profile: TasteProfileView, dimension: string, n: number): strin
     .map((entry) => entry.key);
 }
 
-function discoveryKey(provider: string, seed: string): string {
-  return `discover:${provider}:${createHash('sha256').update(seed.toLowerCase().trim()).digest('hex').slice(0, 32)}`;
+/**
+ * The cache key for one listener's discovery seed.
+ *
+ * The user id is part of the key for two reasons: one person's warm run must not make another
+ * person's warm run skip on a cache they cannot see, and forgetting a listener has to be able to
+ * find their rows. The seed itself is hashed -- it is that person's strongest artist or genre, and
+ * nothing reads it back, so there is no reason to keep it in the clear.
+ */
+function discoveryKey(userId: string, provider: string, seed: string): string {
+  return `discover:${userId}:${provider}:${createHash('sha256').update(seed.toLowerCase().trim()).digest('hex').slice(0, 32)}`;
 }
 
 /** A stable digest of a page of results, so an unchanged upstream library is detected cheaply. */

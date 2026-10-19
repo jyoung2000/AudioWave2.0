@@ -341,11 +341,13 @@ export class RecommendationService {
     };
   }
 
-  deleteEverythingFor(userId: string): { events: number; profile: boolean } {
+  deleteEverythingFor(userId: string): { events: number; profile: boolean; discoveryCache: number } {
     const events = this.repo.deleteEvents(userId);
     const profile = this.repo.deleteProfile(userId);
+    // The warm cache is built from this person's taste, so forgetting them has to reach it too.
+    const discoveryCache = this.repo.deleteCacheFor(userId);
     this.profiles.delete(userId);
-    return { events, profile };
+    return { events, profile, discoveryCache };
   }
 
   /* ---------------------------------------------------------------- serving */
