@@ -4913,7 +4913,11 @@ replace("""    var metaTimers = [];
     function radioEverySecs() {
       var v = window.NP_PREFS && window.NP_PREFS.radioRefresh;
       if (v === 'off') return 0;
-      return (v === 30 || v === 60 || v === 120 || v === 300) ? v : 60;
+      /* Any whole number the settings accepted, not just the offered ones: the menu's presets
+         and a typed time are the same stored seconds. Held to the same range here too, so a
+         value that reached the file by another route cannot become a one-second clock. */
+      if (typeof v === 'number' && isFinite(v)) return Math.min(3600, Math.max(10, Math.round(v)));
+      return 60;
     }
     /* Called by the setting when it changes: drop the pending timer and arm a fresh one on the
        new interval, counted from now. */

@@ -148,7 +148,7 @@ test('the refresh interval is a setting, and Off means only the button refreshes
   await expect(sel).toBeVisible();
   await expect(sel, 'a minute unless it is changed').toHaveValue('60');
   expect(await sel.locator('option').evaluateAll((os) => os.map((o) => (o as HTMLOptionElement).value)))
-    .toEqual(['30', '60', '120', '300', 'off']);
+    .toEqual(['30', '60', '120', '300', 'custom', 'off']);
 
   // Off: the pass that is already running finishes, and no further pass is armed.
   await sel.selectOption('off');
@@ -172,4 +172,57 @@ test('the refresh interval is a setting, and Off means only the button refreshes
   // And the choice is kept on the device, like every other setting in this pane.
   await boot(page, '#settings/src');
   await expect(page.locator('#cfgRadioRefresh')).toHaveValue('off');
+});
+
+test('a time the listener types is used, kept, and held to a sane floor', async ({ page }) => {
+  const stations = [{ stationuuid: 'cust-1', name: 'Custom Station', url_resolved: 'https://radio.example/cust', state: 'Chicago, IL', country: 'United States', countrycode: 'US', tags: '', bitrate: 0 }];
+  await page.route(/radio-browser\.info/i, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stations) }));
+  let plays = 0;
+  await page.route(`${COMPANION}/helper/v1/radio/now-playing**`, (r) => {
+    plays += 1;
+    return r.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'application/json' }, body: JSON.stringify({ title: `Song ${plays}`, artist: 'A', programme: null, programmeSource: null, genre: 'Jazz', bitrate: 128 }) });
+  });
+
+  await boot(page, '#settings/src');
+  await page.evaluate((c) => { (window as unknown as { COMPANION: string }).COMPANION = c; }, COMPANION);
+
+  // The field is only of interest once a time of one's own is asked for.
+  const field = page.locator('#cfgRadioRefreshCustom');
+  await expect(field).toBeHidden();
+  await page.selectOption('#cfgRadioRefresh', 'custom');
+  await expect(field).toBeVisible();
+
+  /* Below the floor is corrected rather than obeyed: one read per station per pass means a two
+     second clock would hammer whatever answers them. The field shows what it was changed to. */
+  await field.fill('2');
+  await field.dispatchEvent('change');
+  await expect(field).toHaveValue('10');
+  await expect(page.locator('#prefsStatus')).toContainText('10 seconds');
+
+  // Above the ceiling likewise.
+  await field.fill('9999');
+  await field.dispatchEvent('change');
+  await expect(field).toHaveValue('3600');
+
+  // A time in range is taken as given, and is what the clock actually runs on.
+  await field.fill('25');
+  await field.dispatchEvent('change');
+  await expect(field).toHaveValue('25');
+
+  await page.click('#prefsBack');
+  await page.waitForTimeout(600);
+  await page.click('.tb__btn[data-view="radio"]');
+  const row = page.locator('#radioMenu .rlist tbody tr', { hasText: 'Custom Station' });
+  await expect(row.locator('.rlist-song')).toHaveText(/Song \d+/, { timeout: 25_000 });
+  await expect(page.locator('#libRadioRefresh')).not.toHaveClass(/is-spinning/, { timeout: 30_000 });
+
+  /* 25s must behave like 25s and not like the minute it replaced: a further pass well inside the
+     old interval is the whole point of letting a time be typed. */
+  const settled = plays;
+  await expect.poll(() => plays, { timeout: 45_000, intervals: [500] }).toBeGreaterThan(settled);
+
+  // Kept on the device, and the menu remembers it was a typed time rather than a preset.
+  await boot(page, '#settings/src');
+  await expect(page.locator('#cfgRadioRefresh')).toHaveValue('custom');
+  await expect(page.locator('#cfgRadioRefreshCustom')).toHaveValue('25');
 });
