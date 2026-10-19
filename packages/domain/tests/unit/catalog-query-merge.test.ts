@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CatalogTrack } from '@now-playing/contracts';
+import type { CatalogArtist, CatalogTrack } from '@now-playing/contracts';
 import { CatalogMerger, matchArtist, matchTitle, mergeTrack, normaliseIsrc, parseCatalogQuery, parseMusicLink, sameRecording, toolSearchArgs } from '@now-playing/domain/catalog';
 
 const track = (patch: Partial<CatalogTrack> & Pick<CatalogTrack, 'id' | 'title' | 'artist'>): CatalogTrack => ({
@@ -124,6 +124,47 @@ describe('one song across services (UX-CAT-002)', () => {
     expect(second.tracks[0]!.id).toBe('deezer:1');
     expect(second.tracks[0]!.sources.map((s) => s.platform)).toEqual(['deezer', 'apple-music']);
     expect(merger.snapshot().tracks).toHaveLength(1);
+  });
+
+  it('keeps two artists of the same name apart when one platform calls them different people', () => {
+    // Deezer answers "Drake" with four artists (measured 2026-10-19): 67927442 with 179 fans and 6
+    // albums, 67926762 with 148, the real 246791 with 24.1 million fans and 94 albums, and 303396411
+    // with 9. They are four people who share a name, and Deezer says so by giving them four ids.
+    // Matching on the name alone folded them into whichever arrived first, so the row kept the
+    // 6-album stranger's id and fan count and the real Drake's discography became unreachable.
+    const artist = (id: string, fans: number, albumCount: number): CatalogArtist => ({
+      id: `deezer:${id}`,
+      name: 'Drake',
+      pictureUrl: null,
+      albumCount,
+      fans,
+      genre: null,
+      sources: [{ platform: 'deezer', id, url: `https://www.deezer.com/artist/${id}`, previewUrl: null, matchedBy: 'search' }],
+      rank: 0,
+    });
+    const merger = new CatalogMerger(parseCatalogQuery({ q: 'drake' }));
+    merger.add({ artists: [artist('67927442', 179, 6)] });
+    merger.add({ artists: [artist('67926762', 148, 7)] });
+    merger.add({ artists: [artist('246791', 24_110_938, 94)] });
+
+    const rows = merger.snapshot().artists;
+    expect(rows).toHaveLength(3);
+    expect(rows.map((a) => a.id)).toEqual(expect.arrayContaining(['deezer:67927442', 'deezer:246791']));
+    // Each row keeps its own identity: no row claims another's catalogue.
+    expect(rows.find((a) => a.id === 'deezer:246791')).toMatchObject({ fans: 24_110_938, albumCount: 94 });
+    expect(rows.find((a) => a.id === 'deezer:67927442')).toMatchObject({ fans: 179, albumCount: 6 });
+    // The one a listener means is the one the platform's own audience points to.
+    expect([...rows].sort((a, b) => b.rank - a.rank)[0]!.id).toBe('deezer:246791');
+  });
+
+  it('still merges one artist found on two platforms', () => {
+    const merger = new CatalogMerger(parseCatalogQuery({ q: 'daft punk' }));
+    merger.add({ artists: [{ id: 'deezer:27', name: 'Daft Punk', pictureUrl: null, albumCount: 12, fans: 9_000_000, genre: 'Electro', sources: [{ platform: 'deezer', id: '27', url: 'https://www.deezer.com/artist/27', previewUrl: null, matchedBy: 'search' }], rank: 0 }] });
+    merger.add({ artists: [{ id: 'apple-music:5468295', name: 'Daft Punk', pictureUrl: 'https://example.test/a.jpg', albumCount: null, fans: null, genre: null, sources: [{ platform: 'apple-music', id: '5468295', url: 'https://music.apple.com/artist/5468295', previewUrl: null, matchedBy: 'search' }], rank: 0 }] });
+    const rows = merger.snapshot().artists;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.sources.map((s) => s.platform)).toEqual(['deezer', 'apple-music']);
+    expect(rows[0]).toMatchObject({ fans: 9_000_000, pictureUrl: 'https://example.test/a.jpg' });
   });
 });
 

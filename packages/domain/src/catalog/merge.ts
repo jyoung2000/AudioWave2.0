@@ -179,13 +179,34 @@ export function mergeTrack(into: CatalogTrack, other: CatalogTrack): CatalogTrac
   };
 }
 
+/**
+ * Two rows are the same artist when their names agree *and* no platform has already said they are
+ * different people. A platform gives one id per artist, so two different ids on the same platform are
+ * two artists however alike the names look: Deezer answers "Drake" with four, and folding them into
+ * one row by name handed the row whichever id arrived first — a stranger with 179 fans and 6 albums
+ * standing in for the artist with 24 million, whose catalogue then could not be opened at all.
+ */
+function sameArtist(a: CatalogArtist, b: CatalogArtist): boolean {
+  if (matchArtist(a.name) !== matchArtist(b.name) || normalizeText(a.name) !== normalizeText(b.name)) return false;
+  for (const left of a.sources) {
+    for (const right of b.sources) {
+      if (left.platform === right.platform && left.id !== null && right.id !== null && left.id !== right.id) return false;
+    }
+  }
+  return true;
+}
+
 function mergeArtist(into: CatalogArtist, other: CatalogArtist): CatalogArtist {
+  // The fuller answer wins each field, rather than whichever row happened to arrive first.
+  const best = (other.fans ?? -1) > (into.fans ?? -1) ? other : into;
+  const rest = best === into ? other : into;
   return {
-    ...into,
-    pictureUrl: into.pictureUrl ?? other.pictureUrl,
-    albumCount: into.albumCount ?? other.albumCount,
-    fans: into.fans ?? other.fans,
-    genre: into.genre ?? other.genre,
+    ...best,
+    id: into.id,
+    pictureUrl: best.pictureUrl ?? rest.pictureUrl,
+    albumCount: best.albumCount ?? rest.albumCount,
+    fans: best.fans ?? rest.fans,
+    genre: best.genre ?? rest.genre,
     sources: mergeSources(into.sources, other.sources),
     rank: Math.max(into.rank, other.rank),
   };
@@ -236,6 +257,19 @@ export function rankOf(query: CatalogQuery, row: { title: string; artist: string
   return Math.round((relevance(query, row.title, row.artist, row.album ?? null) * 100 + Math.min(row.sources.length, 6) * 4 - Math.min(position, 100) * 0.5) * 100) / 100;
 }
 
+/**
+ * Artists who share a name cannot be told apart by relevance — every spelling is the same — so the
+ * order a service happened to answer in was deciding which "Drake" a listener was shown. A platform
+ * that counts its own audience is stating which one people mean: 24.1 million followers against 179.
+ * The weight is small (at most the 6-point value of one extra service) so it breaks a tie between
+ * equal names without ever outweighing a genuinely better match for the words typed.
+ */
+export function artistRankOf(query: CatalogQuery, row: CatalogArtist, position: number): number {
+  const base = rankOf(query, { title: row.name, artist: row.name, sources: row.sources }, position);
+  const audience = row.fans && row.fans > 0 ? Math.min(Math.log10(row.fans) / 8, 1) * 6 : 0;
+  return Math.round((base + audience) * 100) / 100;
+}
+
 /* ---------- the merger a search feeds ---------- */
 
 export interface MergeUpdate {
@@ -270,8 +304,8 @@ export class CatalogMerger {
       upsert(changed.tracks, rescored);
     });
     (rows.artists ?? []).forEach((row, position) => {
-      const ranked = { ...row, rank: rankOf(this.query, { title: row.name, artist: row.name, sources: row.sources }, position) };
-      const index = this.artists.findIndex((a) => matchArtist(a.name) === matchArtist(ranked.name) && normalizeText(a.name) === normalizeText(ranked.name));
+      const ranked = { ...row, rank: artistRankOf(this.query, row, position) };
+      const index = this.artists.findIndex((a) => sameArtist(a, ranked));
       const next = index === -1 ? ranked : mergeArtist(this.artists[index]!, ranked);
       if (index === -1) this.artists.push(next);
       else this.artists[index] = next;
