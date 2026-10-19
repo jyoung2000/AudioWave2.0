@@ -465,6 +465,9 @@ async function oembedTrack(
         bpm: null,
         explicit: null,
         genre: null,
+        artistId: null,
+        albumId: null,
+        tags: [],
         label: null,
         sources: [{ platform, id: null, url, previewUrl: null, matchedBy: 'link' }],
         rank: 0,
@@ -615,6 +618,9 @@ export async function legacyHubSearch(
       bpm: typeof x.bpm === 'number' && x.bpm > 0 ? x.bpm : null,
       explicit: null,
       genre,
+      artistId: null,
+      albumId: null,
+      tags: [],
       label: null,
       sources: [
         {

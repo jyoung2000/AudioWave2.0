@@ -164,7 +164,7 @@ describe('a long list, page by page (no 200-song cap)', () => {
         seen.push([offset, limit]);
         const tracks = songs(n)
           .slice(offset, offset + limit)
-          .map((s, i) => ({ id: `x:${offset + i}`, title: s.title!, artist: 'Band', artists: [], album: null, albumArtist: null, durationMs: null, isrc: null, artworkUrl: null, releaseDate: null, year: null, trackNumber: null, discNumber: null, bpm: null, explicit: null, genre: null, label: null, sources: [{ platform: 'spotify' as const, id: null, url: s.url!, previewUrl: null, matchedBy: 'link' as const }], rank: 0 }));
+          .map((s, i) => ({ id: `x:${offset + i}`, title: s.title!, artist: 'Band', artists: [], album: null, albumArtist: null, durationMs: null, isrc: null, artworkUrl: null, releaseDate: null, year: null, trackNumber: null, discNumber: null, bpm: null, explicit: null, genre: null, artistId: null, albumId: null, tags: [], label: null, sources: [{ platform: 'spotify' as const, id: null, url: s.url!, previewUrl: null, matchedBy: 'link' as const }], rank: 0 }));
         return { url: 'u', platform: 'spotify', kind: 'playlist', track: null, artist: null, reason: null, resolvedAt: '2026-10-06T00:00:00.000Z', collection: { ref: { platform: 'spotify', kind: 'playlist', id: 'p', url: 'u', title: 't', owner: null }, artworkUrl: null, covers: [], releaseDate: null, page: { tracks, offset, limit, total: n, hasMore: offset + tracks.length < n, capped: false } } };
       },
       { max: CATALOG_COLLECTION_CAP, pageSize: CATALOG_PAGE_MAX },

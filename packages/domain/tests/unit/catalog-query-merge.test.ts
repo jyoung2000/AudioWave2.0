@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { CatalogArtist, CatalogTrack } from '@now-playing/contracts';
+import type { CatalogArtist } from '@now-playing/contracts';
+import { CatalogTrack } from '@now-playing/contracts';
 import { CatalogMerger, matchArtist, matchTitle, mergeTrack, normaliseIsrc, parseCatalogQuery, parseMusicLink, sameRecording, toolSearchArgs } from '@now-playing/domain/catalog';
 
 const track = (patch: Partial<CatalogTrack> & Pick<CatalogTrack, 'id' | 'title' | 'artist'>): CatalogTrack => ({
@@ -16,6 +17,9 @@ const track = (patch: Partial<CatalogTrack> & Pick<CatalogTrack, 'id' | 'title' 
   bpm: null,
   explicit: null,
   genre: null,
+  artistId: null,
+  albumId: null,
+  tags: [],
   label: null,
   sources: [{ platform: 'deezer', id: '1', url: 'https://www.deezer.com/track/1', previewUrl: null, matchedBy: 'search' }],
   rank: 0,
@@ -180,5 +184,51 @@ describe('the yt-dlp search command line', () => {
   it('pages with --playlist-start/--playlist-end and caps the depth', () => {
     expect(toolSearchArgs('soundcloud', 'x', 20, 10)).toEqual(expect.arrayContaining(['--playlist-start', '21', '--playlist-end', '30', 'scsearch30:x']));
     expect(toolSearchArgs('youtube', 'x', 95, 50).at(-1)).toBe('ytsearch100:x');
+  });
+});
+
+describe('what a discovered song can tell the recommender', () => {
+  /**
+   * The recommender scores artist affinity, genre affinity and tags, and a song found in the
+   * catalog is where discovery gets its candidates. Apple states an artistId and a collectionId and
+   * Deezer an artist.id and album.id, but a found song had nowhere to put them, so every discovered
+   * candidate reached the ranker with an anonymous artist and no tags -- the artist factor could
+   * only ever match on a name string, and tag affinity had nothing at all to read.
+   */
+  it('carries the artist and album ids a platform states, and its tags', () => {
+    const t = track({
+      id: 'apple-music:617154366',
+      title: 'Get Lucky',
+      artist: 'Daft Punk',
+      artistId: 'apple-music:5468295',
+      albumId: 'apple-music:617154241',
+      genre: 'Pop',
+      tags: ['nu-disco'],
+    });
+    const parsed = CatalogTrack.parse(t);
+    expect(parsed.artistId).toBe('apple-music:5468295');
+    expect(parsed.albumId).toBe('apple-music:617154241');
+    expect(parsed.tags).toEqual(['nu-disco']);
+  });
+
+  /** A song nobody has identified stays unidentified rather than inventing an id. */
+  it('leaves them empty when no platform stated them', () => {
+    const parsed = CatalogTrack.parse(track({ id: 'youtube:abc', title: 'Some Upload', artist: 'Someone' }));
+    expect(parsed.artistId).toBeNull();
+    expect(parsed.albumId).toBeNull();
+    expect(parsed.tags).toEqual([]);
+  });
+
+  /**
+   * Merging keeps the identifier a platform stated: a YouTube row that merges with Apple should end
+   * up knowing who the artist is, the same way it inherits a genre.
+   */
+  it('takes the ids from whichever platform knew them', () => {
+    const yt = track({ id: 'youtube:DvE7O3bLQgE', title: 'Get Lucky', artist: 'Daft Punk', sources: [{ platform: 'youtube', id: 'DvE7O3bLQgE', url: 'https://www.youtube.com/watch?v=DvE7O3bLQgE', previewUrl: null, matchedBy: 'search' }] });
+    const ap = track({ id: 'apple-music:617154366', title: 'Get Lucky', artist: 'Daft Punk', artistId: 'apple-music:5468295', genre: 'Pop', tags: ['nu-disco'], sources: [{ platform: 'apple-music', id: '617154366', url: 'https://music.apple.com/song/617154366', previewUrl: null, matchedBy: 'search' }] });
+    const merged = mergeTrack(CatalogTrack.parse(yt), CatalogTrack.parse(ap));
+    expect(merged.artistId).toBe('apple-music:5468295');
+    expect(merged.genre).toBe('Pop');
+    expect(merged.tags).toEqual(['nu-disco']);
   });
 });

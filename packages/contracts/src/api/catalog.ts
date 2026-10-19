@@ -102,6 +102,16 @@ export const CatalogTrack = z.object({
   bpm: z.number().positive().nullable().default(null),
   explicit: z.boolean().nullable().default(null),
   genre: z.string().max(100).nullable().default(null),
+  /**
+   * Who and what this is, as the platform itself identifies them -- Apple states an `artistId` and a
+   * `collectionId`, Deezer an `artist.id` and `album.id`. The recommender scores artist affinity, so
+   * without these a discovered candidate could only ever be matched on a name string, and two artists
+   * sharing a name were the same artist to it.
+   */
+  artistId: z.string().max(260).nullable().default(null),
+  albumId: z.string().max(260).nullable().default(null),
+  /** Descriptive words the platform published for the song. Empty when it published none. */
+  tags: z.array(z.string().max(80)).max(30).default([]),
   label: z.string().max(300).nullable().default(null),
   sources: z.array(CatalogSource).min(1).max(20),
   /** Higher is a better answer to the query. Ties keep arrival order. */

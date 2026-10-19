@@ -173,6 +173,11 @@ export function mergeTrack(into: CatalogTrack, other: CatalogTrack): CatalogTrac
     bpm: pick('bpm'),
     explicit: pick('explicit'),
     genre: pick('genre'),
+    artistId: pick('artistId'),
+    albumId: pick('albumId'),
+    // Every word either platform published, each kept once: a tag one service knows is still true of
+    // the song when another service has never heard of it.
+    tags: [...new Set([...(best.tags ?? []), ...(rest.tags ?? [])])].slice(0, 30),
     label: pick('label'),
     sources: mergeSources(into.sources, other.sources),
     rank: Math.max(into.rank, other.rank),

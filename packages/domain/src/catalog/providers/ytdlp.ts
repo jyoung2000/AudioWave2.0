@@ -126,6 +126,9 @@ export function toolSearchTrack(platform: ToolSearchPlatform, row: Json): Catalo
       bpm: null,
       explicit: null,
       genre: null,
+      artistId: null,
+      albumId: null,
+      tags: [],
       label: null,
       sources: [source],
       rank: 0,
@@ -164,6 +167,13 @@ export function toolSearchTrack(platform: ToolSearchPlatform, row: Json): Catalo
     explicit: null,
     // A search entry names its genres as a list (`genres: ["Electronic"]`); a track page as `genre`.
     genre: str(row['genre'], 100) ?? str(Array.isArray(row['genres']) ? (row['genres'] as unknown[])[0] : null, 100),
+    artistId: null,
+    albumId: null,
+    // SoundCloud publishes the uploader's own words for the track. They are the platform's stated
+    // tags, unlike YouTube's, which are search keywords the uploader chose to be found by.
+    tags: Array.isArray(row['tags'])
+      ? [...new Set((row['tags'] as unknown[]).map((t) => str(t, 80)).filter((t): t is string => !!t))].slice(0, 30)
+      : [],
     label: null,
     sources: [{ platform: 'soundcloud', id, url: url.split('?')[0]!, previewUrl: null, matchedBy: 'search' }],
     rank: 0,

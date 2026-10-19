@@ -944,7 +944,7 @@ export class CatalogEngine {
       }
       return answer({ kind: 'album', collection: { ref: collectionRef(link, 'album', found.title, found.artist), artworkUrl: found.artworkUrl, covers: found.artworkUrl ? [found.artworkUrl] : [], releaseDate: null, page: { tracks: [], offset: 0, limit: 1, total: null, hasMore: false, capped: false } }, reason: `${label} albums list their songs only when the same album is on Deezer.` });
     }
-    const track: CatalogTrack = { id: `${link.platform}:${link.id ?? link.url}`, title: found.title, artist: found.artist ?? '', artists: found.artist ? [found.artist] : [], album: null, albumArtist: null, durationMs: null, isrc: null, artworkUrl: found.artworkUrl, releaseDate: null, year: null, trackNumber: null, discNumber: null, bpm: null, explicit: null, genre: null, label: null, sources, rank: 0 };
+    const track: CatalogTrack = { id: `${link.platform}:${link.id ?? link.url}`, title: found.title, artist: found.artist ?? '', artists: found.artist ? [found.artist] : [], album: null, albumArtist: null, durationMs: null, isrc: null, artworkUrl: found.artworkUrl, releaseDate: null, year: null, trackNumber: null, discNumber: null, bpm: null, explicit: null, genre: null, artistId: null, albumId: null, tags: [], label: null, sources, rank: 0 };
     return answer({ kind: 'track', track });
   }
 

@@ -260,6 +260,9 @@ describe('catalog settings and downloads', () => {
       bpm: 116.1,
       explicit: false,
       genre: null,
+      artistId: 'deezer:27',
+      albumId: 'deezer:6516139',
+      tags: [],
       label: null,
       sources: [
         { platform: 'deezer', id: '67238735', url: 'https://www.deezer.com/track/67238735', previewUrl: null, matchedBy: 'search' },
