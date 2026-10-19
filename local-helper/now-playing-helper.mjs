@@ -19179,6 +19179,14 @@ var TrackRef = external_exports.object({
   /** Optional in the type: a snapshot written before enrichment simply has neither. */
   genres: external_exports.array(external_exports.string().max(60)).optional(),
   bpm: external_exports.number().positive().max(400).nullable().optional(),
+  /**
+   * The ids and tags the recommender learns from. Ids keep two artists who share a name from being
+   * learned as one taste; tags feed the factors a bare genre cannot. Optional for the same reason as
+   * `genres`: a reference written before enrichment carries none.
+   */
+  artistId: Uuid.nullable().optional(),
+  albumId: Uuid.nullable().optional(),
+  tags: external_exports.array(external_exports.string().max(60)).optional(),
   year: external_exports.number().int().nullable().default(null)
 });
 var TrackAvailability = external_exports.object({
@@ -20555,6 +20563,16 @@ var CatalogTrack = external_exports.object({
   bpm: external_exports.number().positive().nullable().default(null),
   explicit: external_exports.boolean().nullable().default(null),
   genre: external_exports.string().max(100).nullable().default(null),
+  /**
+   * Who and what this is, as the platform itself identifies them -- Apple states an `artistId` and a
+   * `collectionId`, Deezer an `artist.id` and `album.id`. The recommender scores artist affinity, so
+   * without these a discovered candidate could only ever be matched on a name string, and two artists
+   * sharing a name were the same artist to it.
+   */
+  artistId: external_exports.string().max(260).nullable().default(null),
+  albumId: external_exports.string().max(260).nullable().default(null),
+  /** Descriptive words the platform published for the song. Empty when it published none. */
+  tags: external_exports.array(external_exports.string().max(80)).max(30).default([]),
   label: external_exports.string().max(300).nullable().default(null),
   sources: external_exports.array(CatalogSource).min(1).max(20),
   /** Higher is a better answer to the query. Ties keep arrival order. */
@@ -21002,6 +21020,15 @@ var SearchResultBase = external_exports.object({
   year: external_exports.number().int().nullable().default(null),
   genre: external_exports.string().max(60).nullable().default(null),
   genres: external_exports.array(external_exports.string().max(60)).default([]),
+  /**
+   * What the platform's uploader called this track, when it publishes such a thing.
+   *
+   * Distinct from `genres`: a genre is a claim about which kind of music this is, a tag is whatever
+   * word the uploader chose. SoundCloud is the one searchable platform that states them, and the
+   * recommender keeps a whole tag dimension that had no source without this. Empty when the
+   * platform states none -- never filled from a search query or from title words.
+   */
+  tags: external_exports.array(external_exports.string().max(60)).max(30).default([]),
   genreProfile: GenreProfile.default({}),
   featuredArtists: external_exports.array(external_exports.string().max(300)).default([]),
   bpm: external_exports.number().positive().max(400).nullable().default(null),
@@ -21349,10 +21376,10 @@ var routes = {
   aggregateDelete: defineRoute({ method: "DELETE", path: "/aggregate-profiles/me", operationId: "deleteAggregateProfile", summary: "Revoke and delete shared aggregate", tags: ["recommendations"], auth: "device", response: Ok }),
   aggregateGet: defineRoute({ method: "GET", path: "/aggregate-profiles/me", operationId: "getAggregateProfile", summary: "Preview what is shared", tags: ["recommendations"], auth: "device", response: external_exports.object({ profile: AggregateTasteProfile.nullable() }) }),
   eventsIngest: defineRoute({ method: "POST", path: "/listening-events", operationId: "ingestListeningEvents", summary: "Opt-in listening events for hub-side personalization (scope history:events)", tags: ["recommendations"], auth: "device", scopes: ["history:events"], rateLimit: "write", body: external_exports.object({ events: external_exports.array(ListeningEvent).min(1).max(1e3) }), response: external_exports.object({ accepted: external_exports.number().int(), duplicates: external_exports.number().int() }) }),
-  recommendationsGet: defineRoute({ method: "GET", path: "/recommendations", operationId: "getRecommendations", summary: "Ranked, diversified recommendations for a mode", tags: ["recommendations"], auth: "device", query: external_exports.object({ mode: RecommendationMode.default("for-you"), contextId: external_exports.string().max(200).optional(), seeds: external_exports.string().max(2e3).optional().describe("Comma-separated canonical track/artist ids for similar mode"), limit: external_exports.coerce.number().int().min(1).max(100).default(30), exploration: external_exports.coerce.number().min(0).max(1).optional() }), response: external_exports.object({ mode: RecommendationMode, items: external_exports.array(Recommendation), generatedAt: IsoDateTime, fromCache: external_exports.boolean(), coverage: external_exports.object({ candidates: external_exports.number().int(), sources: external_exports.record(external_exports.string(), external_exports.number().int()), coldStart: external_exports.boolean() }) }) }),
-  recommendationsFeedback: defineRoute({ method: "POST", path: "/recommendations/:recommendationId/feedback", operationId: "recommendationFeedback", summary: "Like / Not for me / Less from this artist / Already know it", tags: ["recommendations"], auth: "device", rateLimit: "write", params: external_exports.object({ recommendationId: Uuid }), body: external_exports.object({ feedback: RecommendationFeedback }), response: Ok }),
-  recommendationsSeeds: defineRoute({ method: "POST", path: "/recommendations/seeds", operationId: "setRecommendationSeeds", summary: "Cold-start seeds (artists, genres, starter likes)", tags: ["recommendations"], auth: "device", rateLimit: "write", body: external_exports.object({ artists: external_exports.array(external_exports.string().max(200)).max(50).default([]), genres: external_exports.array(external_exports.string().max(60)).max(50).default([]), likedTrackIds: external_exports.array(external_exports.string().max(200)).max(50).default([]) }), response: Ok }),
-  recommendationsProfile: defineRoute({ method: "GET", path: "/recommendations/profile", operationId: "getTasteProfile", summary: "Inspectable taste profile (dimensions and contexts)", tags: ["recommendations"], auth: "device", response: TasteProfileView }),
+  recommendationsGet: defineRoute({ method: "GET", path: "/recommendations", operationId: "getRecommendations", summary: "Ranked, diversified recommendations for a mode", tags: ["recommendations"], auth: "device", scopes: ["history:events"], query: external_exports.object({ mode: RecommendationMode.default("for-you"), contextId: external_exports.string().max(200).optional(), seeds: external_exports.string().max(2e3).optional().describe("Comma-separated canonical track/artist ids for similar mode"), limit: external_exports.coerce.number().int().min(1).max(100).default(30), exploration: external_exports.coerce.number().min(0).max(1).optional() }), response: external_exports.object({ mode: RecommendationMode, items: external_exports.array(Recommendation), generatedAt: IsoDateTime, fromCache: external_exports.boolean(), coverage: external_exports.object({ candidates: external_exports.number().int(), sources: external_exports.record(external_exports.string(), external_exports.number().int()), coldStart: external_exports.boolean() }) }) }),
+  recommendationsFeedback: defineRoute({ method: "POST", path: "/recommendations/:recommendationId/feedback", operationId: "recommendationFeedback", summary: "Like / Not for me / Less from this artist / Already know it", tags: ["recommendations"], auth: "device", scopes: ["history:events"], rateLimit: "write", params: external_exports.object({ recommendationId: Uuid }), body: external_exports.object({ feedback: RecommendationFeedback }), response: Ok }),
+  recommendationsSeeds: defineRoute({ method: "POST", path: "/recommendations/seeds", operationId: "setRecommendationSeeds", summary: "Cold-start seeds (artists, genres, starter likes)", tags: ["recommendations"], auth: "device", scopes: ["history:events"], rateLimit: "write", body: external_exports.object({ artists: external_exports.array(external_exports.string().max(200)).max(50).default([]), genres: external_exports.array(external_exports.string().max(60)).max(50).default([]), likedTrackIds: external_exports.array(external_exports.string().max(200)).max(50).default([]) }), response: Ok }),
+  recommendationsProfile: defineRoute({ method: "GET", path: "/recommendations/profile", operationId: "getTasteProfile", summary: "Inspectable taste profile (dimensions and contexts)", tags: ["recommendations"], auth: "device", scopes: ["history:events"], response: TasteProfileView }),
   recommendationsConfigGet: defineRoute({ method: "GET", path: "/recommendations/config", operationId: "getRecommendationConfig", summary: "Weights, decay and diversity configuration", tags: ["recommendations"], auth: "admin", response: external_exports.record(external_exports.string(), external_exports.unknown()) }),
   recommendationsConfigPut: defineRoute({ method: "PUT", path: "/recommendations/config", operationId: "putRecommendationConfig", summary: "Update recommendation configuration", tags: ["recommendations"], auth: "admin", rateLimit: "write", body: external_exports.record(external_exports.string(), external_exports.unknown()), response: external_exports.record(external_exports.string(), external_exports.unknown()) }),
   /* profiles */
@@ -24458,6 +24485,11 @@ function mergeTrack(into, other) {
     bpm: pick2("bpm"),
     explicit: pick2("explicit"),
     genre: pick2("genre"),
+    artistId: pick2("artistId"),
+    albumId: pick2("albumId"),
+    // Every word either platform published, each kept once: a tag one service knows is still true of
+    // the song when another service has never heard of it.
+    tags: [.../* @__PURE__ */ new Set([...best.tags ?? [], ...rest.tags ?? []])].slice(0, 30),
     label: pick2("label"),
     sources: mergeSources(into.sources, other.sources),
     rank: Math.max(into.rank, other.rank)
@@ -24596,9 +24628,10 @@ function upsert(list, row) {
 var HYDRATE_CONCURRENCY = 8;
 var HYDRATE_BUDGET_MS = 6e3;
 var HYDRATE_MAX_ROWS = 25;
+var APPLE_GENRE_MAX_ASKS = 8;
 var THUMBNAIL_PLATFORMS = /* @__PURE__ */ new Set(["youtube", "youtube-music", "soundcloud"]);
 function needsFacts(track) {
-  return track.bpm === null || track.isrc === null || track.explicit === null || track.artworkUrl === null || track.artists.length <= 1 || track.album === null || track.trackNumber === null || (track.releaseDate?.length ?? 0) < 10;
+  return track.bpm === null || track.isrc === null || track.explicit === null || track.artworkUrl === null || track.artists.length <= 1 || track.album === null || track.trackNumber === null || (track.releaseDate?.length ?? 0) < 10 || track.genre === null || track.artistId === null;
 }
 function coverIsThumbnail(track) {
   if (!track.artworkUrl) return true;
@@ -24626,6 +24659,11 @@ function fillTrack(into, detail, matchedBy) {
     bpm: fill("bpm"),
     explicit: fill("explicit"),
     genre: fill("genre"),
+    artistId: fill("artistId"),
+    albumId: fill("albumId"),
+    // Additive, like the credits: a word one store knows is still true when the other never
+    // heard it. Deduped and capped the same way the merger caps them.
+    tags: [.../* @__PURE__ */ new Set([...into.tags, ...detail.tags])].slice(0, 30),
     label: fill("label"),
     sources
   };
@@ -24759,6 +24797,9 @@ function toolSearchTrack(platform, row) {
       bpm: null,
       explicit: null,
       genre: null,
+      artistId: null,
+      albumId: null,
+      tags: [],
       label: null,
       sources: [source2],
       rank: 0
@@ -24793,6 +24834,11 @@ function toolSearchTrack(platform, row) {
     explicit: null,
     // A search entry names its genres as a list (`genres: ["Electronic"]`); a track page as `genre`.
     genre: str2(row["genre"], 100) ?? str2(Array.isArray(row["genres"]) ? row["genres"][0] : null, 100),
+    artistId: null,
+    albumId: null,
+    // SoundCloud publishes the uploader's own words for the track. They are the platform's stated
+    // tags, unlike YouTube's, which are search keywords the uploader chose to be found by.
+    tags: Array.isArray(row["tags"]) ? [...new Set(row["tags"].map((t2) => str2(t2, 80)).filter((t2) => !!t2))].slice(0, 30) : [],
     label: null,
     sources: [{ platform: "soundcloud", id, url: url2.split("?")[0], previewUrl: null, matchedBy: "search" }],
     rank: 0
@@ -24960,6 +25006,9 @@ function trackFromLink(entry, fallback) {
     bpm: null,
     explicit: entry.explicit ?? null,
     genre: entry.genre ?? null,
+    artistId: null,
+    albumId: null,
+    tags: [],
     label: entry.label ?? null,
     sources,
     rank: 0
@@ -25156,6 +25205,9 @@ function itunesTrack(row) {
     bpm: null,
     explicit: explicit(row["trackExplicitness"]),
     genre: str2(row["primaryGenreName"], 100),
+    artistId: posInt(row["artistId"]) !== null ? `apple-music:${posInt(row["artistId"])}` : null,
+    albumId: posInt(row["collectionId"]) !== null ? `apple-music:${posInt(row["collectionId"])}` : null,
+    tags: [],
     label: null,
     sources: [{ platform: "apple-music", id: String(id), url: url2.replace(/[?&]uo=\d+$/, ""), previewUrl: webUrl2(row["previewUrl"]), matchedBy: "search" }],
     rank: 0
@@ -25231,9 +25283,10 @@ var ItunesClient = class {
     const songs = await this.get(ITUNES_LOOKUP, { id, entity: "song", limit: Math.min(topLimit, 200) }, signal).catch(() => []);
     const list = albums.filter((r) => r["wrapperType"] === "collection").map(itunesAlbum).filter((a) => a !== null);
     const firstArt = list.find((a) => a.artworkUrl)?.artworkUrl ?? null;
-    return { artist: { ...artist, albumCount: list.length || null, pictureUrl: artist.pictureUrl ?? firstArt }, albums: list, topTracks: songs.filter((r) => r["wrapperType"] === "track").map(itunesTrack).filter((t2) => t2 !== null) };
+    return { artist: { ...artist, albumCount: list.length >= ITUNES_LOOKUP_MAX ? null : list.length || null, pictureUrl: artist.pictureUrl ?? firstArt }, albums: list, topTracks: songs.filter((r) => r["wrapperType"] === "track").map(itunesTrack).filter((t2) => t2 !== null) };
   }
 };
+var ITUNES_LOOKUP_MAX = 200;
 var ENTITY = { tracks: "song", artists: "musicArtist", albums: "album" };
 var ItunesProvider = class {
   constructor(client) {
@@ -25313,6 +25366,9 @@ function deezerTrack(row, album = null) {
     bpm: bpm !== null && bpm > 0 ? bpm : null,
     explicit: explicit2,
     genre: album?.genre ?? null,
+    artistId: posInt(artistObj?.["id"]) !== null ? `deezer:${posInt(artistObj?.["id"])}` : null,
+    albumId: posInt(albumObj?.["id"]) !== null ? `deezer:${posInt(albumObj?.["id"])}` : null,
+    tags: [],
     label: album?.label ?? null,
     sources: [source("track", id, webUrl2(row["preview"]))],
     rank: 0
@@ -25558,6 +25614,9 @@ function musicbrainzTrack(row) {
     bpm: null,
     explicit: null,
     genre: topGenre(row),
+    artistId: null,
+    albumId: null,
+    tags: [],
     label: null,
     sources: [{ platform: "musicbrainz", id, url: `https://musicbrainz.org/recording/${id}`, previewUrl: null, matchedBy: "search" }],
     rank: 0
@@ -25763,6 +25822,9 @@ function trackOf(item, playlistId, index) {
     bpm: null,
     explicit: null,
     genre: null,
+    artistId: null,
+    albumId: null,
+    tags: [],
     label: null,
     sources: [source2],
     rank: 0
@@ -26101,7 +26163,7 @@ var CatalogEngine = class {
       }
     }
     if (this.options.hydrate !== false && !signal?.aborted && sections.includes("tracks")) {
-      const filled = await this.hydrateTracks(merger.snapshot().tracks, { signal, askDeezer: wanted.has("deezer") && statuses.get("deezer")?.state !== "skipped" });
+      const filled = await this.hydrateTracks(merger.snapshot().tracks, { signal, askDeezer: wanted.has("deezer") && statuses.get("deezer")?.state !== "skipped", askApple: statuses.get("itunes")?.state !== "skipped" });
       const patched = filled.map((t2) => merger.patchTrack(t2.id, () => t2)).filter((t2) => t2 !== null);
       if (patched.length) yield { type: "results", seq: seq++, provider: null, query, tracks: canonical(patched), artists: [], albums: [], playlists: [], status: list() };
     }
@@ -26232,7 +26294,8 @@ var CatalogEngine = class {
     const rows = tracks.filter(needsFacts).slice(0, options.max ?? HYDRATE_MAX_ROWS);
     if (!rows.length) return [];
     const deezer = { on: (options.askDeezer ?? true) && this.options.enabled?.()?.deezer !== false && !this.health.coolingUntil("deezer") };
-    const results = await runPool(rows, (row) => this.hydrateOne(row, deezer, deadline, options.signal), { concurrency: HYDRATE_CONCURRENCY, deadline, now: this.now, ...options.signal ? { signal: options.signal } : {} });
+    const appleAsks = { left: options.askApple ?? true ? APPLE_GENRE_MAX_ASKS : 0 };
+    const results = await runPool(rows, (row) => this.hydrateOne(row, deezer, appleAsks, deadline, options.signal), { concurrency: HYDRATE_CONCURRENCY, deadline, now: this.now, ...options.signal ? { signal: options.signal } : {} });
     const out = [];
     rows.forEach((row, i) => {
       const filled = results.get(i);
@@ -26240,11 +26303,15 @@ var CatalogEngine = class {
     });
     return out;
   }
-  async hydrateOne(row, deezer, deadline, signal) {
+  async hydrateOne(row, deezer, appleAsks, deadline, signal) {
     let out = row;
     if (deezer.on) {
       const detail = await this.deezerDetail(row, deezer, deadline, signal);
       if (detail) out = fillTrack(out, detail.track, detail.matchedBy);
+    }
+    if (!out.genre) {
+      const detail = await this.appleGenre(out, appleAsks, deadline, signal);
+      if (detail) out = fillTrack(out, detail, "metadata");
     }
     if (!out.artworkUrl && out.sources.length && out.sources.every((s) => s.platform === "musicbrainz")) {
       const recording = out.sources[0].id;
@@ -26255,6 +26322,36 @@ var CatalogEngine = class {
       }
     }
     return out;
+  }
+  /**
+   * Apple's record of this row's recording, for the genre its own platform never stated.
+   *
+   * Not asked when Apple was skipped for this query (an ISRC lookup it cannot do), switched off,
+   * or resting. One search, cached by name and rough length so a page of rows by the same artist
+   * asks once.
+   * Apple's per-minute budget is shared with search, and a rate-limited answer rests the provider
+   * rather than retrying. Null when Apple has nothing confidently the same recording.
+   */
+  async appleGenre(row, appleAsks, deadline, signal) {
+    if (!row.title || appleAsks.left <= 0 || this.options.enabled?.()?.itunes === false || this.health.coolingUntil("itunes")) return null;
+    const words = `${row.artists[0] ?? row.artist} ${row.title}`.replace(/\s+/g, " ").trim();
+    if (!words) return null;
+    const key = `apple:${words.toLowerCase()}|${row.durationMs ? Math.round(row.durationMs / 5e3) : ""}`;
+    return this.withDeadline(
+      this.factsCache.get(key, async () => {
+        if (appleAsks.left <= 0) return null;
+        appleAsks.left -= 1;
+        const rows = await this.itunes.get(ITUNES_SEARCH, { term: words, entity: "song", limit: 5 }, signal);
+        const candidates = rows.map((candidate) => itunesTrack(candidate)).filter((candidate) => candidate !== null);
+        return candidates.find((candidate) => candidate.genre !== null && sameRecording(row, candidate)) ?? null;
+      }),
+      deadline - this.now()
+    ).catch((error61) => {
+      if (error61 instanceof CatalogHttpError && error61.kind === "rate-limited") {
+        this.health.restUntil("itunes", this.now() + Math.max(1e3, error61.retryAfterMs ?? 5e3), error61.message);
+      }
+      return null;
+    });
   }
   /** Deezer's full record of the row's recording, and how it was tied to the row. */
   async deezerDetail(row, deezer, deadline, signal) {
@@ -26412,10 +26509,10 @@ var CatalogEngine = class {
       return { artist: found.artist, topTracks: await this.withFacts(found.topTracks, signal), albums: found.albums, albumsPage: { offset: albumsOffset, limit: albumsLimit, hasMore: found.albumsTotal !== null ? albumsOffset + found.albums.length < found.albumsTotal : found.albums.length >= albumsLimit } };
     }
     if (platform === "apple-music") {
-      const found = await this.upstream(() => this.itunes.artist(native, albumsOffset + albumsLimit, topLimit, signal), "Apple Music");
+      const found = await this.upstream(() => this.itunes.artist(native, ITUNES_LOOKUP_MAX, topLimit, signal), "Apple Music");
       if (!found) throw new DomainError("not-found", "Apple Music has no artist with that id");
       const albums = found.albums.slice(albumsOffset, albumsOffset + albumsLimit);
-      return { artist: found.artist, topTracks: await this.withFacts(found.topTracks.slice(0, topLimit), signal), albums, albumsPage: { offset: albumsOffset, limit: albumsLimit, hasMore: found.albums.length >= albumsOffset + albumsLimit } };
+      return { artist: found.artist, topTracks: await this.withFacts(found.topTracks.slice(0, topLimit), signal), albums, albumsPage: { offset: albumsOffset, limit: albumsLimit, hasMore: albumsOffset + albums.length < found.albums.length } };
     }
     throw new DomainError("unsupported", `Artists are opened from Deezer or Apple Music, not ${platform}`);
   }
@@ -26670,7 +26767,7 @@ var CatalogEngine = class {
       }
       return answer({ kind: "album", collection: { ref: collectionRef(link, "album", found.title, found.artist), artworkUrl: found.artworkUrl, covers: found.artworkUrl ? [found.artworkUrl] : [], releaseDate: null, page: { tracks: [], offset: 0, limit: 1, total: null, hasMore: false, capped: false } }, reason: `${label} albums list their songs only when the same album is on Deezer.` });
     }
-    const track = { id: `${link.platform}:${link.id ?? link.url}`, title: found.title, artist: found.artist ?? "", artists: found.artist ? [found.artist] : [], album: null, albumArtist: null, durationMs: null, isrc: null, artworkUrl: found.artworkUrl, releaseDate: null, year: null, trackNumber: null, discNumber: null, bpm: null, explicit: null, genre: null, label: null, sources, rank: 0 };
+    const track = { id: `${link.platform}:${link.id ?? link.url}`, title: found.title, artist: found.artist ?? "", artists: found.artist ? [found.artist] : [], album: null, albumArtist: null, durationMs: null, isrc: null, artworkUrl: found.artworkUrl, releaseDate: null, year: null, trackNumber: null, discNumber: null, bpm: null, explicit: null, genre: null, artistId: null, albumId: null, tags: [], label: null, sources, rank: 0 };
     return answer({ kind: "track", track });
   }
   /* ---------------------------------------------------- lyrics, enrichment */
