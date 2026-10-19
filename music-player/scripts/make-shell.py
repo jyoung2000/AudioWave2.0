@@ -4907,7 +4907,23 @@ replace("""    var metaTimers = [];
         }, n * 220));
       });
     }""",
-        """    var metaRun = 0, metaRefresh = 0, metaActive = false;
+        """    var metaRun = 0, metaRefresh = 0, metaActive = false, metaItems = null;
+    /* The setting in seconds, or 0 for "only when I ask". Read on every arm rather than cached,
+       so a change applies to the very next pass. */
+    function radioEverySecs() {
+      var v = window.NP_PREFS && window.NP_PREFS.radioRefresh;
+      if (v === 'off') return 0;
+      return (v === 30 || v === 60 || v === 120 || v === 300) ? v : 60;
+    }
+    /* Called by the setting when it changes: drop the pending timer and arm a fresh one on the
+       new interval, counted from now. */
+    window.radioRearm = function () {
+      clearTimeout(metaRefresh);
+      if (metaActive || !metaItems || radio.hidden) return;
+      var every = radioEverySecs();
+      if (!every) return;
+      metaRefresh = setTimeout(function () { if (!radio.hidden) radioFillMeta(metaItems); }, every * 1000);
+    };
     /* The glyph turns while a reading pass is actually running, so the list says "I am re-reading
        this" whether a person asked for it or the minute came round on its own. Spinning for a fixed
        0.9s on click only said it about the click. */
@@ -5018,12 +5034,19 @@ replace("""      var next = 0, completed = 0, startedAt = Date.now();
            that replaced it. */
         radioSpin(false);
         clearTimeout(metaRefresh);
+        /* "Only when I ask" stops the clock, not the feature: the refresh button still reads
+           now, and the reading already on screen stays. */
+        var every = radioEverySecs();
+        if (!every) return;
         metaRefresh = setTimeout(function () {
           if (run !== metaRun) return;
           if (radio.hidden) { armed = false; arm(); return; }
           radioFillMeta(items);
-        }, Math.max(1000, 60000 - (Date.now() - startedAt)));
+        }, Math.max(1000, every * 1000 - (Date.now() - startedAt)));
       }
+      /* Remembered for radioRearm: changing the setting re-arms the pass that is already
+         waiting, instead of the new interval only taking hold after the next reload. */
+      metaItems = items;
       /* A stream that connects and then stays silent is counted as unanswered rather than waited on
          forever, so one such station cannot stop the rest of the list from keeping up. */
       var SLOW_READ = { slow: true };

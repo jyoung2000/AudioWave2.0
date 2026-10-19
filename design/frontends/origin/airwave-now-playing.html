@@ -7643,6 +7643,21 @@ window.AW.startStats = function () {
         </fieldset>
 
         <fieldset class="prefs__group">
+          <legend class="prefs__legend">Radio</legend>
+          <div class="prefs__row">
+            <label for="cfgRadioRefresh">Check what is playing</label>
+            <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60">Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="off">Only when I ask</option>
+            </select>
+          </div>
+          <p class="prefs__hint">How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.</p>
+        </fieldset>
+
+        <fieldset class="prefs__group">
           <legend class="prefs__legend">Live TV</legend>
           <div class="prefs__row">
             <label for="srcM3u">Channel playlist</label>
@@ -12461,6 +12476,7 @@ window.AW.startStats = function () {
       theme: 'auto', motion: false, stage: true,
       tab: 'music', region: 'city', quality: 'best',
       companion: '', hub: '',
+      radioRefresh: 60,     // seconds between automatic radio re-reads; 'off' for manual only
       volume: { mode: 'last', level: 72 },
       backup: { music: true, tv: false, movies: false, lists: true, algo: true, to: 'hub', when: 'manual', last: 0 },
       sources: { music: '', m3u: '', epg: '', tv: '', movies: '' },
@@ -12482,6 +12498,9 @@ window.AW.startStats = function () {
       ['motion', 'stage'].forEach(function (k) {
         if (typeof saved[k] === 'boolean') cfg[k] = saved[k];
       });
+      /* Only the offered choices are accepted. A number from a hand-edited file could
+         otherwise become a one-second clock and hammer whatever answers the reads. */
+      if (saved.radioRefresh === 'off' || [30, 60, 120, 300].indexOf(saved.radioRefresh) >= 0) cfg.radioRefresh = saved.radioRefresh;
       if (saved.volume && typeof saved.volume === 'object') {
         if (/^(last|fixed)$/.test(saved.volume.mode)) cfg.volume.mode = saved.volume.mode;
         if (typeof saved.volume.level === 'number' && saved.volume.level >= 0 && saved.volume.level <= 100) cfg.volume.level = Math.round(saved.volume.level);
@@ -14830,6 +14849,7 @@ window.AW.startStats = function () {
       });
       document.getElementById('cfgCompanion').value = cfg.companion || '';
       document.getElementById('cfgHub').value = cfg.hub || '';
+      document.getElementById('cfgRadioRefresh').value = String(cfg.radioRefresh);
       srcNote();
       if (typeof paintPassed === 'function') paintPassed();
     }
@@ -15175,6 +15195,14 @@ window.AW.startStats = function () {
     }
     document.getElementById('cfgHub').addEventListener('change', function () {
       cfg.hub = connBase(this.value); cfgSave(); setStatus('Saved.');
+    });
+    document.getElementById('cfgRadioRefresh').addEventListener('change', function () {
+      cfg.radioRefresh = this.value === 'off' ? 'off' : Number(this.value);
+      cfgSave();
+      /* Applied to the clock now rather than at the next reload: the radio list may be on screen
+         while this changes, and waiting would look like the setting did nothing. */
+      if (typeof window.radioRearm === 'function') window.radioRearm();
+      setStatus(this.value === 'off' ? 'The list will re-read only when you ask.' : 'Saved.');
     });
     document.getElementById('hubTest').addEventListener('click', testHub);
 

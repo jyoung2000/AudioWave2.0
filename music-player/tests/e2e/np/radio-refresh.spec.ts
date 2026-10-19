@@ -130,3 +130,46 @@ test('the refresh glyph turns on its own, not only when it is clicked', async ({
   await page.click('#libRadioRefresh');
   await expect.poll(spins, { timeout: 10_000, intervals: [250] }).toBeGreaterThan(beforeClick);
 });
+
+test('the refresh interval is a setting, and Off means only the button refreshes', async ({ page }) => {
+  const stations = [{ stationuuid: 'pref-1', name: 'Pref Station', url_resolved: 'https://radio.example/pref', state: 'Chicago, IL', country: 'United States', countrycode: 'US', tags: '', bitrate: 0 }];
+  await page.route(/radio-browser\.info/i, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stations) }));
+  let plays = 0;
+  await page.route(`${COMPANION}/helper/v1/radio/now-playing**`, (r) => {
+    plays += 1;
+    return r.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'application/json' }, body: JSON.stringify({ title: `Song ${plays}`, artist: 'A', programme: null, programmeSource: null, genre: 'Jazz', bitrate: 128 }) });
+  });
+
+  /* The control lives with the other source settings, reached by the same hash route the rest of
+     the suite uses rather than by clicking through the index. */
+  await boot(page, '#settings/src');
+  await page.evaluate((c) => { (window as unknown as { COMPANION: string }).COMPANION = c; }, COMPANION);
+  const sel = page.locator('#cfgRadioRefresh');
+  await expect(sel).toBeVisible();
+  await expect(sel, 'a minute unless it is changed').toHaveValue('60');
+  expect(await sel.locator('option').evaluateAll((os) => os.map((o) => (o as HTMLOptionElement).value)))
+    .toEqual(['30', '60', '120', '300', 'off']);
+
+  // Off: the pass that is already running finishes, and no further pass is armed.
+  await sel.selectOption('off');
+  /* Leave Settings the way the rest of the suite does: the pane covers the toolbar, so the Radio
+     tab is not clickable until it is closed. */
+  await page.click('#prefsBack');
+  await page.waitForTimeout(600);
+  await page.click('.tb__btn[data-view="radio"]');
+  const row = page.locator('#radioMenu .rlist tbody tr', { hasText: 'Pref Station' });
+  await expect(row.locator('.rlist-song')).toHaveText(/Song \d+/, { timeout: 25_000 });
+  await expect(page.locator('#libRadioRefresh')).not.toHaveClass(/is-spinning/, { timeout: 30_000 });
+
+  const settled = plays;
+  await page.waitForTimeout(75_000);
+  expect(plays, 'Off must not arm another pass').toBe(settled);
+
+  // ...but the button still works, because Off turns off the clock, not the feature.
+  await page.click('#libRadioRefresh');
+  await expect.poll(() => plays, { timeout: 25_000, intervals: [500] }).toBeGreaterThan(settled);
+
+  // And the choice is kept on the device, like every other setting in this pane.
+  await boot(page, '#settings/src');
+  await expect(page.locator('#cfgRadioRefresh')).toHaveValue('off');
+});
