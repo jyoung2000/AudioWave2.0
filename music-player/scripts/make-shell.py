@@ -4907,17 +4907,27 @@ replace("""    var metaTimers = [];
         }, n * 220));
       });
     }""",
-        """    var metaRun = 0, metaRefresh = 0;
+        """    var metaRun = 0, metaRefresh = 0, metaActive = false;
+    /* The glyph turns while a reading pass is actually running, so the list says "I am re-reading
+       this" whether a person asked for it or the minute came round on its own. Spinning for a fixed
+       0.9s on click only said it about the click. */
+    function radioSpin(on) {
+      var btn = document.getElementById('libRadioRefresh');
+      if (btn) btn.classList.toggle('is-spinning', !!on);
+    }
     function radioFillMeta(items) {
       var run = ++metaRun;
       clearTimeout(metaRefresh);
-      if (typeof window.radioMeta !== 'function') return;
+      if (typeof window.radioMeta !== 'function') { metaActive = false; radioSpin(false); return; }
       /* Four at a time: a station read from its stream holds a request open
          for a second or so, and forty at once would queue behind each other
          and behind everything else the page asks the Hub for. */
       var pick = items.filter(function (it) {
         return it.station && window.radioMetaSupported(it.station.url);
       });
+      if (!pick.length) { metaActive = false; radioSpin(false); return; }
+      metaActive = true;
+      radioSpin(true);
       var next = 0, completed = 0, startedAt = Date.now();
       function one() {
         if (run !== metaRun || next >= pick.length) return null;
@@ -5003,6 +5013,10 @@ replace("""      var next = 0, completed = 0, startedAt = Date.now();
       function arm() {
         if (run !== metaRun || armed) return;
         armed = true;
+        /* Every reading is in, so this pass is done and the glyph stops. A superseded pass never
+           gets here (run !== metaRun), which is what keeps it from stopping the spin of the pass
+           that replaced it. */
+        radioSpin(false);
         clearTimeout(metaRefresh);
         metaRefresh = setTimeout(function () {
           if (run !== metaRun) return;
@@ -5075,11 +5089,11 @@ replace('          if (!tuned) return t || icyMeta(url);',
 replace('      <button class="lib-scope__refresh" type="button" id="libDiscRefresh" hidden aria-label="New songs"\n              title="New songs — Shift-click to start over">&#8635;</button>\n',
         '      <button class="lib-scope__refresh" type="button" id="libDiscRefresh" hidden aria-label="New songs"\n              title="New songs — Shift-click to start over">&#8635;</button>\n      <!-- Radio only: re-ask the directory for this level and re-read what every station is\n           playing. The list caches each level, so without this the only way to see a changed\n           directory or a newer song across the whole list was to leave the tab and come back. -->\n      <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden\n              aria-label="Refresh the station list"\n              title="Refresh the station list and what each station is playing">&#8635;</button>\n')
 replace("    function radioPaintScope() {\n      if (!scope) return;\n      var t = radioTop();\n      var kind = (t && t.kind) || '';\n      var label = t ? t.title : 'Radio';\n      scopeLabel.textContent = label;\n      scopeKind.textContent = kind;\n      scopeKind.hidden = !kind || kind === label;\n      scopeClear.hidden = radioStack.length === 0;\n    }",
-        "    var radioRefreshBtn = document.getElementById('libRadioRefresh');\n\n    function radioPaintScope() {\n      if (!scope) return;\n      var t = radioTop();\n      var kind = (t && t.kind) || '';\n      var label = t ? t.title : 'Radio';\n      scopeLabel.textContent = label;\n      scopeKind.textContent = kind;\n      scopeKind.hidden = !kind || kind === label;\n      scopeClear.hidden = radioStack.length === 0;\n      /* Offered on a list of stations the directory answered, not on a menu of genres and\n         countries: there is nothing to re-ask for a list this page wrote itself. */\n      if (radioRefreshBtn) radioRefreshBtn.hidden = !(radioOn && !!t && !!t.key);\n    }\n\n    /* What a person means by refreshing this list: ask the directory again instead of serving the\n       cached level, and ask every row again what it is playing \\u2014 descriptions included, since a\n       station that named nothing a minute ago may be naming a song now. The level, the search and\n       the station on air are all kept: this reloads what is shown, it does not navigate. */\n    function radioRefresh() {\n      var t = radioTop();\n      if (!t || !t.key) return;\n      delete radioCache[t.key];\n      metaCache = {};\n      aboutCache = {};\n      metaMiss = {};\n      clearTimeout(metaRefresh);\n      metaRun++;                        // orphan answers still in flight for the pass being replaced\n      if (radioRefreshBtn) {\n        radioRefreshBtn.classList.add('is-spinning');\n        setTimeout(function () { radioRefreshBtn.classList.remove('is-spinning'); }, 900);\n      }\n      radioRender();\n    }\n\n    if (radioRefreshBtn) radioRefreshBtn.addEventListener('click', radioRefresh);")
+        "    var radioRefreshBtn = document.getElementById('libRadioRefresh');\n\n    function radioPaintScope() {\n      if (!scope) return;\n      var t = radioTop();\n      var kind = (t && t.kind) || '';\n      var label = t ? t.title : 'Radio';\n      scopeLabel.textContent = label;\n      scopeKind.textContent = kind;\n      scopeKind.hidden = !kind || kind === label;\n      scopeClear.hidden = radioStack.length === 0;\n      /* Offered on a list of stations the directory answered, not on a menu of genres and\n         countries: there is nothing to re-ask for a list this page wrote itself. */\n      if (radioRefreshBtn) radioRefreshBtn.hidden = !(radioOn && !!t && !!t.key);\n    }\n\n    /* What a person means by refreshing this list: ask the directory again instead of serving the\n       cached level, and ask every row again what it is playing \\u2014 descriptions included, since a\n       station that named nothing a minute ago may be naming a song now. The level, the search and\n       the station on air are all kept: this reloads what is shown, it does not navigate. */\n    function radioRefresh() {\n      var t = radioTop();\n      if (!t || !t.key) return;\n      delete radioCache[t.key];\n      metaCache = {};\n      aboutCache = {};\n      metaMiss = {};\n      clearTimeout(metaRefresh);\n      metaRun++;                        // orphan answers still in flight for the pass being replaced\n      /* The pass radioRender starts turns the glyph and stops it when every row has been read, so\n         a click animates for exactly as long as the work takes instead of a fixed 0.9s. Turned on\n         here too, so the click answers at once even before the first read lands. */\n      radioSpin(true);\n      radioRender();\n    }\n\n    if (radioRefreshBtn) radioRefreshBtn.addEventListener('click', radioRefresh);")
 replace("        ipodBtn.setAttribute('aria-expanded', 'false');   // a disclosure again\n        paintScope();",
         "        ipodBtn.setAttribute('aria-expanded', 'false');   // a disclosure again\n        if (radioRefreshBtn) radioRefreshBtn.hidden = true;\n        paintScope();")
 replace('  .lib-scope__refresh[hidden] { display: none; }',
-        '  .lib-scope__refresh[hidden] { display: none; }\n  /* One turn of the glyph, so a refresh that comes back with the same rows still reads as having run. */\n  .lib-scope__refresh.is-spinning { animation: scope-spin 0.9s linear; }\n  @keyframes scope-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }\n  @media (prefers-reduced-motion: reduce) { .lib-scope__refresh.is-spinning { animation: none; opacity: 0.55; } }')
+        '  .lib-scope__refresh[hidden] { display: none; }\n  /* One turn of the glyph, so a refresh that comes back with the same rows still reads as having run. */\n  /* Turns for as long as the pass runs, so it is a progress indicator and not a 0.9s flourish. */\n  .lib-scope__refresh.is-spinning { animation: scope-spin 0.9s linear infinite; }\n  @keyframes scope-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }\n  @media (prefers-reduced-motion: reduce) { .lib-scope__refresh.is-spinning { animation: none; opacity: 0.55; } }')
 
 # ---- connections: a paired encrypted Companion is also a working source of downloads and radio titles ----
 replace('    var conn = { app: null, hub: null };       // the last good answer from each',

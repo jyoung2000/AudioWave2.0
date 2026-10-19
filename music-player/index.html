@@ -991,7 +991,8 @@
   }
   .lib-scope__refresh[hidden] { display: none; }
   /* One turn of the glyph, so a refresh that comes back with the same rows still reads as having run. */
-  .lib-scope__refresh.is-spinning { animation: scope-spin 0.9s linear; }
+  /* Turns for as long as the pass runs, so it is a progress indicator and not a 0.9s flourish. */
+  .lib-scope__refresh.is-spinning { animation: scope-spin 0.9s linear infinite; }
   @keyframes scope-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .lib-scope__refresh.is-spinning { animation: none; opacity: 0.55; } }
   .lib-scope__refresh:hover { background: rgba(0, 0, 0, 0.07); }
@@ -11265,17 +11266,27 @@ window.AW.startStats = function () {
        staggered: the first few rows, a beat apart, and never again inside the
        cache window. A list of forty stations must not become forty requests
        the moment it appears. */
-    var metaRun = 0, metaRefresh = 0;
+    var metaRun = 0, metaRefresh = 0, metaActive = false;
+    /* The glyph turns while a reading pass is actually running, so the list says "I am re-reading
+       this" whether a person asked for it or the minute came round on its own. Spinning for a fixed
+       0.9s on click only said it about the click. */
+    function radioSpin(on) {
+      var btn = document.getElementById('libRadioRefresh');
+      if (btn) btn.classList.toggle('is-spinning', !!on);
+    }
     function radioFillMeta(items) {
       var run = ++metaRun;
       clearTimeout(metaRefresh);
-      if (typeof window.radioMeta !== 'function') return;
+      if (typeof window.radioMeta !== 'function') { metaActive = false; radioSpin(false); return; }
       /* Four at a time: a station read from its stream holds a request open
          for a second or so, and forty at once would queue behind each other
          and behind everything else the page asks the Hub for. */
       var pick = items.filter(function (it) {
         return it.station && window.radioMetaSupported(it.station.url);
       });
+      if (!pick.length) { metaActive = false; radioSpin(false); return; }
+      metaActive = true;
+      radioSpin(true);
       var next = 0, completed = 0, startedAt = Date.now(), armed = false;
       /* One place arms the next pass. A hidden list postpones it rather than cancelling it: polling a
          list nobody is looking at wastes requests, but dropping the timer altogether is what used to
@@ -11283,6 +11294,10 @@ window.AW.startStats = function () {
       function arm() {
         if (run !== metaRun || armed) return;
         armed = true;
+        /* Every reading is in, so this pass is done and the glyph stops. A superseded pass never
+           gets here (run !== metaRun), which is what keeps it from stopping the spin of the pass
+           that replaced it. */
+        radioSpin(false);
         clearTimeout(metaRefresh);
         metaRefresh = setTimeout(function () {
           if (run !== metaRun) return;
@@ -11512,10 +11527,10 @@ window.AW.startStats = function () {
       metaMiss = {};
       clearTimeout(metaRefresh);
       metaRun++;                        // orphan answers still in flight for the pass being replaced
-      if (radioRefreshBtn) {
-        radioRefreshBtn.classList.add('is-spinning');
-        setTimeout(function () { radioRefreshBtn.classList.remove('is-spinning'); }, 900);
-      }
+      /* The pass radioRender starts turns the glyph and stops it when every row has been read, so
+         a click animates for exactly as long as the work takes instead of a fixed 0.9s. Turned on
+         here too, so the click answers at once even before the first read lands. */
+      radioSpin(true);
       radioRender();
     }
 

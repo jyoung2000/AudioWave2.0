@@ -8,6 +8,12 @@ import { expect, test, type Page } from '@playwright/test';
 import { CORS, boot } from './_shell';
 
 const COMPANION = 'http://127.0.0.1:17999';
+
+/* Every drill in this file waits out a real 60-second refresh cycle, and two of them wait for a
+   second one. The suite's 60s per-test budget cannot contain that -- the assertions here ask for up
+   to 110s, so the test was killed before the behaviour it describes could happen. Three minutes is
+   one cycle, the pass that follows it, and room for a slow read's 20s deadline. */
+test.describe.configure({ timeout: 180_000 });
 let errors: string[];
 
 test.beforeEach(async ({ page }) => {
@@ -82,3 +88,45 @@ test('one station that never answers does not freeze the other rows', async ({ p
   await page.unroute(`${COMPANION}/helper/v1/radio/now-playing**`);
 });
 
+test('the refresh glyph turns on its own, not only when it is clicked', async ({ page }) => {
+  const stations = [{ stationuuid: 'spin-1', name: 'Spin Station', url_resolved: 'https://radio.example/spin', state: 'Chicago, IL', country: 'United States', countrycode: 'US', tags: '', bitrate: 0 }];
+  await page.route(/radio-browser\.info/i, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stations) }));
+  let plays = 0;
+  await page.route(`${COMPANION}/helper/v1/radio/now-playing**`, (r) => {
+    plays += 1;
+    return r.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'application/json' }, body: JSON.stringify({ title: `Song ${plays}`, artist: 'A', programme: null, programmeSource: null, genre: 'Jazz', bitrate: 128 }) });
+  });
+  await boot(page);
+  await page.evaluate((c) => { (window as unknown as { COMPANION: string }).COMPANION = c; }, COMPANION);
+  await page.click('.tb__btn[data-view="radio"]');
+
+  const row = page.locator('#radioMenu .rlist tbody tr', { hasText: 'Spin Station' });
+  await expect(row.locator('.rlist-song')).toHaveText('Song 1', { timeout: 25_000 });
+
+  /* Count the turns rather than sampling the class: a pass can be shorter than a poll interval, so
+     a snapshot would walk straight past it. A MutationObserver latches every start. */
+  const spins = () => page.evaluate(() => (window as unknown as { __spun: number }).__spun);
+  await page.evaluate(() => {
+    const btn = document.getElementById('libRadioRefresh');
+    const w = window as unknown as { __spun: number };
+    w.__spun = 0;
+    if (!btn) throw new Error('no refresh button');
+    new MutationObserver(() => { if (btn.classList.contains('is-spinning')) w.__spun += 1; })
+      .observe(btn, { attributes: true, attributeFilter: ['class'] });
+  });
+
+  // The pass that is already running must stop, so what follows is unambiguously a new one.
+  await expect(page.locator('#libRadioRefresh')).not.toHaveClass(/is-spinning/, { timeout: 30_000 });
+
+  /* The point of the whole drill: nobody touches the button, the minute comes round, and the glyph
+     turns because a reading pass is running. Before the fix this stayed at zero forever. */
+  const beforeCycle = await spins();
+  await expect.poll(spins, { timeout: 115_000, intervals: [1000] }).toBeGreaterThan(beforeCycle);
+  await expect(row.locator('.rlist-song')).not.toHaveText('Song 1');
+
+  // And a click still turns it, which is the behaviour that already worked.
+  await expect(page.locator('#libRadioRefresh')).not.toHaveClass(/is-spinning/, { timeout: 40_000 });
+  const beforeClick = await spins();
+  await page.click('#libRadioRefresh');
+  await expect.poll(spins, { timeout: 10_000, intervals: [250] }).toBeGreaterThan(beforeClick);
+});
