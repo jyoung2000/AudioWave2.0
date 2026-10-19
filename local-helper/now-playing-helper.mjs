@@ -22043,7 +22043,8 @@ var STATUS = {
 
 // ../packages/domain/src/titles.ts
 var NOISE = /\s*[[(]\s*(official\s*(music\s*)?(video|audio|lyric\s*video|visuali[sz]er)|lyrics?(\s*video)?|audio|visuali[sz]er|hd|hq|4k|\d{2,3}\s?fps|explicit|clean|(4k\s+)?remaster(ed)?(\s*\d{4})?|prod\.?\s+by[^\])]*|music\s*video|mv|m\/v)\s*[\])]/gi;
-var TRAILING_NOISE = /\s+(hd|hq|4k|\d{2,3}\s?fps|official\s+video|official\s+audio|lyrics)\s*$/i;
+var TRAILING_NOISE = /\s+(hd|hq|4k|\d{2,3}\s?fps|official\s+video|official\s+audio|lyrics|explicit|clean)\s*$/i;
+var LOPSIDED_DASH = /^(.+?)[-–—]\s+(.+)$/;
 var TRAILING_OFFICIAL = /\s+[-–—]\s+official\b[^-–—]*$/i;
 var FEAT_INLINE = /\s*[[(]\s*(?:feat\.?|ft\.?|featuring)\s+([^\])]+)\s*[\])]/i;
 var FEAT_MID = /\s+(?:feat\.?|ft\.?|featuring)\s+(.+?)(?=\s+[-\u2013\u2014]\s)/i;
@@ -22074,8 +22075,8 @@ function cleanVideoTitle(input2) {
   raw = stripTrailingNoise(noFeat);
   const topic = input2.channel?.match(/^(.+?)\s+-\s+Topic$/);
   if (topic) return { title: unquote(raw), artist: topic[1].trim(), featured, fromTopicChannel: true };
-  const dash = raw.match(/^(.+?)\s+[-–—]\s+(.+)$/);
-  if (dash) return { title: unquote(dash[2]), artist: dash[1].trim(), featured, fromTopicChannel: false };
+  const dash = raw.match(/^(.+?)\s+[-–—]\s+(.+)$/) ?? raw.match(LOPSIDED_DASH);
+  if (dash) return { title: unquote(stripTrailingNoise(dash[2])), artist: dash[1].trim(), featured, fromTopicChannel: false };
   const quoted2 = raw.match(/^(.+?)\s+["“](.+)["”]$/);
   if (quoted2) return { title: quoted2[2].trim(), artist: quoted2[1].trim(), featured, fromTopicChannel: false };
   const pipe2 = raw.match(/^(.+?)\s+\|\s+(.+)$/);

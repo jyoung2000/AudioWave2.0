@@ -5,7 +5,14 @@
  * of them is returned as it was, with artist null — never a guess.
  */
 const NOISE = /\s*[[(]\s*(official\s*(music\s*)?(video|audio|lyric\s*video|visuali[sz]er)|lyrics?(\s*video)?|audio|visuali[sz]er|hd|hq|4k|\d{2,3}\s?fps|explicit|clean|(4k\s+)?remaster(ed)?(\s*\d{4})?|prod\.?\s+by[^\])]*|music\s*video|mv|m\/v)\s*[\])]/gi;
-const TRAILING_NOISE = /\s+(hd|hq|4k|\d{2,3}\s?fps|official\s+video|official\s+audio|lyrics)\s*$/i;
+const TRAILING_NOISE = /\s+(hd|hq|4k|\d{2,3}\s?fps|official\s+video|official\s+audio|lyrics|explicit|clean)\s*$/i;
+/**
+ * An uploader who writes "Drake- Headlines" means the same dash as "Drake - Headlines". Apple's
+ * search was measured on both: the unspaced form credited to its channel returns nothing, the split
+ * form returns the recording with its genre. A hyphen with no space on either side stays put, so
+ * "Jay-Z", "Wu-Tang Clan" and "Hip-Hop" are untouched -- only a hyphen followed by a space splits.
+ */
+const LOPSIDED_DASH = /^(.+?)[-–—]\s+(.+)$/;
 /**
  * A trailing " - Official …" segment describes the upload, not the song ("Big Buck Bunny - Official
  * Blender Foundation Short Film", "Artist - Song - Official Music Video"). It comes off before the
@@ -48,8 +55,8 @@ export function cleanVideoTitle(input: { title: string; channel: string | null }
   raw = stripTrailingNoise(noFeat);
   const topic = input.channel?.match(/^(.+?)\s+-\s+Topic$/);
   if (topic) return { title: unquote(raw), artist: topic[1]!.trim(), featured, fromTopicChannel: true };
-  const dash = raw.match(/^(.+?)\s+[-–—]\s+(.+)$/);
-  if (dash) return { title: unquote(dash[2]!), artist: dash[1]!.trim(), featured, fromTopicChannel: false };
+  const dash = raw.match(/^(.+?)\s+[-–—]\s+(.+)$/) ?? raw.match(LOPSIDED_DASH);
+  if (dash) return { title: unquote(stripTrailingNoise(dash[2]!)), artist: dash[1]!.trim(), featured, fromTopicChannel: false };
   const quoted = raw.match(/^(.+?)\s+["“](.+)["”]$/);
   if (quoted) return { title: quoted[2]!.trim(), artist: quoted[1]!.trim(), featured, fromTopicChannel: false };
   const pipe = raw.match(/^(.+?)\s+\|\s+(.+)$/);

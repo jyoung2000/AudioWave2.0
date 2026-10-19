@@ -45,3 +45,29 @@ describe('cleanVideoTitle', () => {
     expect(cleanVideoTitle({ title: 'Artist - Song', channel: 'X' }).fromTopicChannel).toBe(false);
   });
 });
+
+describe('a dash an uploader did not space out', () => {
+  // Measured against Apple's own search: the term '04beachy Drake- Headlines' returns zero rows,
+  // while 'Drake Headlines' returns the recording with its genre. The channel is not the artist --
+  // it only stood in because the dash rule required a space on both sides, so these rows were
+  // credited to whoever uploaded them.
+  it.each([
+    ['Drake- Headlines', 'Drake', 'Headlines'],
+    ['DRAKE- HEADLINES', 'DRAKE', 'HEADLINES'],
+    ['Artist- Song (Official Video)', 'Artist', 'Song'],
+  ])('%s is read as artist and song', (title, artist, song) => {
+    expect(cleanVideoTitle({ title, channel: 'SomeUploader' })).toMatchObject({ artist, title: song });
+  });
+
+  it('still leaves a hyphen inside a name alone', () => {
+    expect(cleanVideoTitle({ title: 'Jay-Z - 99 Problems', channel: 'X' })).toMatchObject({ artist: 'Jay-Z', title: '99 Problems' });
+    expect(cleanVideoTitle({ title: '90s Hip-Hop Mix', channel: 'X' })).toMatchObject({ artist: null, title: '90s Hip-Hop Mix' });
+    expect(cleanVideoTitle({ title: 'Wu-Tang Clan', channel: 'X' })).toMatchObject({ artist: null, title: 'Wu-Tang Clan' });
+    expect(cleanVideoTitle({ title: 'Drake-Headlines', channel: 'X' })).toMatchObject({ artist: null, title: 'Drake-Headlines' });
+  });
+
+  it('takes a trailing explicit or clean marker off the song', () => {
+    expect(cleanVideoTitle({ title: 'Drake Headlines Explicit', channel: 'X' })).toMatchObject({ title: 'Drake Headlines' });
+    expect(cleanVideoTitle({ title: 'Artist - Song Clean', channel: 'X' })).toMatchObject({ artist: 'Artist', title: 'Song' });
+  });
+});
