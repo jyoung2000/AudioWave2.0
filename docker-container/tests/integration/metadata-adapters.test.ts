@@ -4,6 +4,7 @@ import type { AcousticBrainzAdapter } from '../../src/providers/adapters/acousti
 import type { DeezerAdapter } from '../../src/providers/adapters/deezer.js';
 import type { LastFmAdapter } from '../../src/providers/adapters/lastfm.js';
 import type { MusicBrainzAdapter } from '../../src/providers/adapters/musicbrainz.js';
+import type { SoundCloudAdapter } from '../../src/providers/adapters/soundcloud.js';
 
 describe('metadata adapters', () => {
   let hub: TestHub;
@@ -24,6 +25,67 @@ describe('metadata adapters', () => {
     hub.fetch.on('api.deezer.com/track/7', () => ({ body: { id: 7, bpm: 120 } }));
     expect(await deezer.bpmBySearch('Artist', 'Song', 200_000)).toBeNull();
     expect(await deezer.bpmBySearch('Artist', 'Song', 241_000)).toEqual({ bpm: 120 });
+  });
+
+  /**
+   * SoundCloud is the one searchable platform that states what a track is: a genre, and a
+   * `tag_list` of the uploader's own words. The recommender keeps a whole `tags` dimension for
+   * exactly this, and `CanonicalTrack` has a `tags` column -- but `SearchResult` had nowhere to put
+   * them and the adapter never read `tag_list`, so every tag SoundCloud published was dropped at
+   * the door and the tags dimension stayed empty on a hub whose only tag source was SoundCloud.
+   *
+   * Quoted phrases in a `tag_list` are one tag ("deep house" is not "deep" and "house").
+   */
+  it('soundcloud: keeps the tags the uploader stated, quoted phrases included', async () => {
+    const sc = hub.ctx.providers.get('soundcloud') as SoundCloudAdapter;
+    hub.fetch.on('secure.soundcloud.com/oauth/token', () => ({ body: { access_token: 'sc-token', expires_in: 3600 } }));
+    hub.fetch.on('api.soundcloud.com/tracks', () => ({
+      body: { collection: [{
+        id: 77_001,
+        title: 'Pelican Coast',
+        duration: 212_000,
+        genre: 'Electronic',
+        tag_list: 'nu-disco "deep house" cover',
+        permalink_url: 'https://soundcloud.com/x/77001',
+        streamable: true,
+        access: 'playable',
+        user: { username: 'Harbour Glass' },
+      }] },
+    }));
+
+    const { results } = await sc.search('pelican coast', { scope: 'songs', limit: 5 }, null);
+    expect(results).toHaveLength(1);
+    expect(results[0]!.genre).toBe('Electronic');
+    expect(results[0]!.tags).toEqual(['nu-disco', 'deep house', 'cover']);
+  });
+
+  /** A track with no tags states none -- not an empty string turned into a tag. */
+  it('soundcloud: states no tags when the uploader gave none', async () => {
+    const sc = hub.ctx.providers.get('soundcloud') as SoundCloudAdapter;
+    hub.fetch.on('secure.soundcloud.com/oauth/token', () => ({ body: { access_token: 'sc-token', expires_in: 3600 } }));
+    hub.fetch.on('api.soundcloud.com/tracks', () => ({
+      body: { collection: [{ id: 77_002, title: 'Quiet One', duration: 100_000, tag_list: '   ', permalink_url: 'https://soundcloud.com/x/77002', streamable: true, access: 'playable', user: { username: 'Harbour Glass' } }] },
+    }));
+    const { results } = await sc.search('quiet one', { scope: 'songs', limit: 5 }, null);
+    expect(results[0]!.tags).toEqual([]);
+  });
+
+  /**
+   * The tags have to survive the trip into the taste profile, which is the only reason to read
+   * them: the recommender's tag factor scores what the listener played against this dimension.
+   */
+  it('soundcloud: stated tags reach the canonical track the recommender reads', async () => {
+    const sc = hub.ctx.providers.get('soundcloud') as SoundCloudAdapter;
+    hub.fetch.on('secure.soundcloud.com/oauth/token', () => ({ body: { access_token: 'sc-token', expires_in: 3600 } }));
+    hub.fetch.on('api.soundcloud.com/tracks', () => ({
+      body: { collection: [{ id: 77_003, title: 'Tideline', duration: 180_000, genre: 'Indie', tag_list: 'shoegaze "slow core"', permalink_url: 'https://soundcloud.com/x/77003', streamable: true, access: 'playable', user: { username: 'Harbour Glass' } }] },
+    }));
+
+    const { results } = await sc.search('tideline', { scope: 'songs', limit: 5 }, null);
+    const [result] = results;
+    const canonical = hub.ctx.recommendations.canonicaliseSearchResult(result!);
+    expect(canonical.genres).toContain('indie');
+    expect(canonical.tags).toEqual(['shoegaze', 'slow core']);
   });
 
   it('acousticbrainz: reads rhythm.bpm and treats 404 as unknown', async () => {

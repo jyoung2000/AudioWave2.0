@@ -150,13 +150,40 @@ export function mergeSearchResults(groups: ReadonlyArray<readonly SearchResult[]
     if (better) {
       const { variants, ...primary } = existing;
       const idx = merged.indexOf(existing);
-      merged[idx] = { ...r, variants: [primary, ...variants] };
+      merged[idx] = { ...inherit(r, primary), variants: [primary, ...variants] };
     } else {
       const { variants: _v, ...variant } = r;
       existing.variants.push(variant);
+      Object.assign(existing, inherit(existing, variant));
     }
   }
   return merged;
+}
+
+/**
+ * Let the winning row keep facts only the other source stated.
+ *
+ * The primary is chosen for playability, which usually means the listener's own file -- and a local
+ * file states no genre and no tags. Demoting the one source that did state them to a variant left
+ * the surviving row claiming the song has no genre, because nothing reads `variants` for one.
+ *
+ * A genre the primary already stated is not replaced: this fills gaps, it does not arbitrate. Tags
+ * and the genre list are additive, because one platform knowing a word does not make another's
+ * words wrong. Identity, provider and capabilities are untouched -- those belong to the primary.
+ */
+function inherit(primary: SearchResult, other: Omit<SearchResult, 'variants'>): SearchResult {
+  const genres = [...new Set([...primary.genres, ...other.genres])].slice(0, 12);
+  return {
+    ...primary,
+    genre: primary.genre ?? other.genre,
+    genres,
+    tags: [...new Set([...primary.tags, ...other.tags])].slice(0, 30),
+    year: primary.year ?? other.year,
+    bpm: primary.bpm ?? other.bpm,
+    bpmSource: primary.bpm ? primary.bpmSource : (other.bpmSource ?? primary.bpmSource),
+    artworkUrl: primary.artworkUrl ?? other.artworkUrl,
+    featuredArtists: primary.featuredArtists.length ? primary.featuredArtists : [...other.featuredArtists],
+  };
 }
 
 function rank(r: SearchResult): number {

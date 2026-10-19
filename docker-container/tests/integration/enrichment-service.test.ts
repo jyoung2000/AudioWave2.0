@@ -20,7 +20,7 @@ const RECORDING = {
 function spotifyResult(isrc: string | null = 'USUM71703861'): SearchResult {
   return {
     id: 'spotify:track:abc', kind: 'track', provider: 'spotify', providerId: 'abc', title: 'Song', artistName: 'Artist', albumName: null, durationMs: 200_000,
-    artworkUrl: null, canonicalUrl: null, year: null, genre: null, genres: [], genreProfile: {}, featuredArtists: [], bpm: null, bpmSource: null,
+    artworkUrl: null, canonicalUrl: null, year: null, genre: null, genres: [], tags: [], genreProfile: {}, featuredArtists: [], bpm: null, bpmSource: null,
     capabilities: caps({ metadata: 'available' }),
     identity: { contentHash: null, quickHash: null, isrc, musicbrainzRecordingId: null, musicbrainzReleaseId: null, acoustidId: null, providerIds: {} },
     attribution: null, cachedAt: null, stale: false, accessState: 'available', previewUrl: null, trackId: null, variants: [],

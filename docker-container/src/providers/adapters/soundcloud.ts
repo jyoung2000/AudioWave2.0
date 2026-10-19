@@ -13,6 +13,7 @@ interface ScTrack {
   title: string;
   duration: number;
   genre?: string | null;
+  tag_list?: string | null;
   artwork_url?: string | null;
   permalink_url: string;
   release_year?: number | null;
@@ -23,6 +24,21 @@ interface ScTrack {
   license?: string;
   user?: { username: string };
   isrc?: string | null;
+}
+
+/**
+ * Read SoundCloud's `tag_list`, where tags are space separated and a multi-word tag is quoted:
+ * `nu-disco "deep house" cover` is three tags, not four. Splitting on whitespace alone would
+ * invent 'deep' and 'house' as separate tags the uploader never wrote.
+ */
+export function parseTagList(list: string | null | undefined): string[] {
+  if (!list) return [];
+  const out: string[] = [];
+  for (const match of list.matchAll(/"([^"]+)"|(\S+)/g)) {
+    const tag = (match[1] ?? match[2] ?? '').trim();
+    if (tag) out.push(tag.slice(0, 60));
+  }
+  return [...new Set(out)].slice(0, 30);
 }
 
 /**
@@ -85,7 +101,7 @@ export class SoundCloudAdapter extends BaseAdapter implements OAuthCapableAdapte
     const base = this.capabilities();
     const downloadable = t.downloadable === true && t.has_downloads_left !== false;
     const capabilities: ProviderCapabilities = { ...base, playback: access === 'playable' ? 'available' : access === 'preview' ? 'restricted' : 'unsupported', preview: access === 'blocked' ? 'unsupported' : 'available', creatorDownload: downloadable ? 'available' : 'unsupported', reason: access === 'playable' ? (downloadable ? 'Creator enabled downloads for this track' : 'Streaming allowed; the creator did not enable downloads') : access === 'preview' ? 'Only a 30-second preview is available outside SoundCloud' : 'The creator blocked playback outside SoundCloud' };
-    return result({ provider: this.id, kind: 'track', providerId: String(t.id), title: t.title, artistName: t.user?.username ?? null, durationMs: t.duration, artworkUrl: t.artwork_url ?? null, canonicalUrl: t.permalink_url, year: t.release_year ?? null, genre: t.genre ?? null, capabilities, identity: { isrc: t.isrc ?? null }, attribution: 'on SoundCloud', accessState: access === 'playable' ? 'available' : access === 'preview' ? 'restricted' : 'unsupported' });
+    return result({ provider: this.id, kind: 'track', providerId: String(t.id), title: t.title, artistName: t.user?.username ?? null, durationMs: t.duration, artworkUrl: t.artwork_url ?? null, canonicalUrl: t.permalink_url, year: t.release_year ?? null, genre: t.genre ?? null, tags: parseTagList(t.tag_list), capabilities, identity: { isrc: t.isrc ?? null }, attribution: 'on SoundCloud', accessState: access === 'playable' ? 'available' : access === 'preview' ? 'restricted' : 'unsupported' });
   }
 
   override async search(query: string, filters: { scope: string; limit: number }, cursor: string | null): Promise<ProviderSearchPage> {

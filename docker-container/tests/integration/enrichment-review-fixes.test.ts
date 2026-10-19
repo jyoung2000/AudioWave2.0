@@ -28,7 +28,7 @@ function result(over: Omit<Partial<SearchResult>, 'identity'> & { identity?: Par
   const identity = { contentHash: null, quickHash: null, isrc: null, musicbrainzRecordingId: null, musicbrainzReleaseId: null, acoustidId: null, providerIds: {}, ...(over.identity ?? {}) };
   return {
     id: 'spotify:track:abc', kind: 'track', provider: 'spotify', providerId: 'abc', title: 'Song', artistName: 'Artist', albumName: null,
-    durationMs: 200_000, artworkUrl: null, canonicalUrl: null, year: null, genre: null, genres: [], genreProfile: {}, featuredArtists: [],
+    durationMs: 200_000, artworkUrl: null, canonicalUrl: null, year: null, genre: null, genres: [], tags: [], genreProfile: {}, featuredArtists: [],
     bpm: null, bpmSource: null, capabilities: caps({ metadata: 'available' }), attribution: null, cachedAt: null, stale: false,
     accessState: 'available', previewUrl: null, trackId: null, variants: [], ...over, identity,
   } as SearchResult;

@@ -149,6 +149,15 @@ export const SearchResultBase = z.object({
   year: z.number().int().nullable().default(null),
   genre: z.string().max(60).nullable().default(null),
   genres: z.array(z.string().max(60)).default([]),
+  /**
+   * What the platform's uploader called this track, when it publishes such a thing.
+   *
+   * Distinct from `genres`: a genre is a claim about which kind of music this is, a tag is whatever
+   * word the uploader chose. SoundCloud is the one searchable platform that states them, and the
+   * recommender keeps a whole tag dimension that had no source without this. Empty when the
+   * platform states none -- never filled from a search query or from title words.
+   */
+  tags: z.array(z.string().max(60)).max(30).default([]),
   genreProfile: GenreProfile.default({}),
   featuredArtists: z.array(z.string().max(300)).default([]),
   bpm: z.number().positive().max(400).nullable().default(null),

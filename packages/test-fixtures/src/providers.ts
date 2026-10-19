@@ -27,6 +27,7 @@ export function fixtureSearchResults(provider: string, query: string, caps: Prov
     year: 2018,
     genre: 'Electronic',
     genres: [],
+    tags: [],
     genreProfile: {},
     featuredArtists: [],
     bpm: null,

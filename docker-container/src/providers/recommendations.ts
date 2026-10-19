@@ -207,6 +207,8 @@ export class RecommendationService {
       // The full list the search carried. Collapsing it to the singular `genre` threw away every
       // genre after the first, and the recommender's genre factor reads this list.
       genres: result.genres.length ? result.genres : result.genre ? [result.genre] : [],
+      // The uploader's own words for the track, which the recommender's tag factor scores against.
+      tags: result.tags,
       musicbrainzRecordingId: result.identity.musicbrainzRecordingId,
       isrc: result.identity.isrc,
       provider: result.provider,

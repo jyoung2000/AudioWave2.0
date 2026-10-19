@@ -24,6 +24,8 @@ export interface ResultInput {
   year?: number | null;
   genre?: string | null;
   genres?: string[];
+  /** Words the platform's uploader put on the track, where the platform publishes them. */
+  tags?: readonly string[];
   genreProfile?: SearchResult['genreProfile'];
   featuredArtists?: string[];
   bpm?: number | null;
@@ -53,6 +55,7 @@ export function result(input: ResultInput): SearchResult {
     year: input.year ?? null,
     genre: input.genre?.slice(0, 60) ?? null,
     genres: input.genres ?? [],
+    tags: (input.tags ?? []).map((t) => t.slice(0, 60)).slice(0, 30),
     genreProfile: input.genreProfile ?? {},
     featuredArtists: input.featuredArtists ?? [],
     bpm: input.bpm ?? null,

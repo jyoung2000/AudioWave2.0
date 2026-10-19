@@ -13,6 +13,9 @@ function ev(type: ListeningEvent['type'], at: string, track: { title: string; ar
   return { id: `0192b1f0-0000-7000-8000-${String(n).padStart(12, '0')}`, schemaVersion: 1, type, occurredAt: at, sessionId: SES, deviceId: DEV, mode: 'solo', groupId: null, trackId: null, track: { title: track.title, artistName: track.artistName, artistId: null, albumName: 'Album', albumId: null, genre: track.genre ?? null, tags: [], year: track.year ?? null, durationMs: 200_000, provider: track.provider ?? 'local', popularity: null }, positionMs: null, secondsPlayed: null, completionPercent: null, reason: null, playlistId: null, presetId: null, recommendationId: null, contextKind: null, contextId: null, mood: null, activity: null, ...extra };
 }
 
+const caps = { metadata: 'available', search: 'available', preview: 'available', playback: 'available', importLikes: 'unsupported', importPlaylists: 'unsupported', creatorDownload: 'unsupported', userOwnedDownload: 'unsupported', groupSync: 'best_effort', eq: 'unsupported' } as const;
+const base = (provider: string, id: string, extra: Partial<SearchResult> = {}): SearchResult => ({ id: `${provider}:track:${id}`, kind: 'track', provider, providerId: id, title: 'Same Song', artistName: 'Same Artist', albumName: null, durationMs: 200_000, artworkUrl: null, canonicalUrl: null, year: null, genre: null, genres: [], tags: [], genreProfile: {}, featuredArtists: [], bpm: null, bpmSource: null, capabilities: { ...caps }, identity: { contentHash: null, quickHash: null, isrc: null, musicbrainzRecordingId: null, musicbrainzReleaseId: null, acoustidId: null, providerIds: {} }, attribution: null, cachedAt: null, stale: false, accessState: 'available', previewUrl: null, trackId: null, variants: [], ...extra });
+
 describe('metrics', () => {
   it('meaningful listen thresholds', () => {
     expect(isMeaningfulListen(31, 200_000)).toBe(true);
@@ -78,9 +81,42 @@ describe('local search', () => {
     expect(idx.search('blue onions')).toEqual([]);
     expect(idx.search('')).toEqual([]);
   });
+  /**
+   * The row that wins is the most playable one, usually the listener's own copy -- and a local file
+   * states no genre and no tags. SoundCloud is the one searchable platform that states both, but it
+   * ranks below local/hub/companion, so merging demoted it to a variant and the surviving row said
+   * the song had no genre at all. Nothing reads `variants` for a genre, so what a platform did
+   * state was thrown away by the act of finding the song in two places.
+   *
+   * The primary keeps its own identity and playability; it only gains facts it was missing.
+   */
+  it('keeps a genre and tags that only one provider stated', () => {
+    const merged = mergeSearchResults([
+      [base('local', 'l1')],
+      [base('soundcloud', 's1', { genre: 'Electronic', genres: ['Electronic'], tags: ['nu-disco', 'deep house'] })],
+    ]);
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0]!.provider, 'the playable local copy still wins').toBe('local');
+    expect(merged[0]!.genre).toBe('Electronic');
+    expect(merged[0]!.genres).toEqual(['Electronic']);
+    expect(merged[0]!.tags).toEqual(['nu-disco', 'deep house']);
+  });
+
+  /** What the winning row already stated is not overwritten by a lower-ranked provider. */
+  it('does not overwrite a genre the winning row already stated', () => {
+    const merged = mergeSearchResults([
+      [base('local', 'l1', { genre: 'Jazz', genres: ['Jazz'], tags: ['live'] })],
+      [base('soundcloud', 's1', { genre: 'Electronic', genres: ['Electronic'], tags: ['nu-disco'] })],
+    ]);
+
+    expect(merged[0]!.genre).toBe('Jazz');
+    // Additive: one platform knowing a word does not make another's words wrong.
+    expect(merged[0]!.genres).toEqual(['Jazz', 'Electronic']);
+    expect(merged[0]!.tags).toEqual(['live', 'nu-disco']);
+  });
+
   it('merges cross-provider results into variants and keeps actions capability-driven', () => {
-    const caps = { metadata: 'available', search: 'available', preview: 'available', playback: 'available', importLikes: 'unsupported', importPlaylists: 'unsupported', creatorDownload: 'unsupported', userOwnedDownload: 'unsupported', groupSync: 'best_effort', eq: 'unsupported' } as const;
-    const base = (provider: string, id: string, extra: Partial<SearchResult> = {}): SearchResult => ({ id: `${provider}:track:${id}`, kind: 'track', provider, providerId: id, title: 'Same Song', artistName: 'Same Artist', albumName: null, durationMs: 200_000, artworkUrl: null, canonicalUrl: null, year: null, genre: null, genres: [], genreProfile: {}, featuredArtists: [], bpm: null, bpmSource: null, capabilities: { ...caps }, identity: { contentHash: null, quickHash: null, isrc: null, musicbrainzRecordingId: null, musicbrainzReleaseId: null, acoustidId: null, providerIds: {} }, attribution: null, cachedAt: null, stale: false, accessState: 'available', previewUrl: null, trackId: null, variants: [], ...extra });
     const merged = mergeSearchResults([[base('youtube', 'y1')], [base('local', 'l1')], [base('soundcloud', 's1', { title: 'Different' })]]);
     expect(merged).toHaveLength(2);
     expect(merged[0]!.provider).toBe('local');
