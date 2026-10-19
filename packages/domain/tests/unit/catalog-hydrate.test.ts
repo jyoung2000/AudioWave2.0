@@ -214,7 +214,7 @@ describe('every result carries its facts (UX-CAT-006)', () => {
 });
 
 describe('the filling itself', () => {
-  const detail = row({ id: 'deezer:1', title: 'Song', artist: 'Band', artists: ['Band', 'Guest'], album: 'Album', durationMs: 200_000, isrc: 'GBAAA0000001', artworkUrl: 'https://cdn-images.dzcdn.net/images/cover/x/1000x1000-000000-80-0-0.jpg', releaseDate: '2020-03-04', year: 2020, trackNumber: 3, discNumber: 1, bpm: 120, explicit: true, sources: [dz('1')] });
+  const detail = row({ id: 'deezer:1', title: 'Song', artist: 'Band', artists: ['Band', 'Guest'], album: 'Album', durationMs: 200_000, isrc: 'GBAAA0000001', genre: 'Hip-hop & Rap', artistId: 'deezer:27', albumId: 'deezer:6516139', artworkUrl: 'https://cdn-images.dzcdn.net/images/cover/x/1000x1000-000000-80-0-0.jpg', releaseDate: '2020-03-04', year: 2020, trackNumber: 3, discNumber: 1, bpm: 120, explicit: true, sources: [dz('1')] });
 
   it('fills only what is null, keeps the fuller date, grows the credits, and keeps a store’s cover', () => {
     const into = row({ id: 'apple-music:9', title: 'Song', artist: 'Band & Guest', album: 'My Album', durationMs: 201_000, artworkUrl: 'https://is1-ssl.mzstatic.com/x/600x600bb.jpg', releaseDate: '2020', sources: [{ platform: 'apple-music', id: '9', url: 'https://music.apple.com/x', previewUrl: null, matchedBy: 'search' }] });
@@ -227,6 +227,52 @@ describe('the filling itself', () => {
     ]);
     expect(needsFacts(out)).toBe(false);
     expect(needsFacts(into)).toBe(true);
+  });
+
+  /**
+   * A YouTube row states no genre -- YouTube publishes none, and its keywords are chosen to be
+   * found by rather than to describe, so they are not read as one. That left YouTube-only rows with
+   * no genre at all (measured: 0 of 260 live rows), and the recommender's genre factor blind to
+   * every song a listener found there.
+   *
+   * The filling step already asks a store for the same recording and copies across what the row is
+   * missing, and it already copies a genre. But `needsFacts` did not count a missing genre as a
+   * reason to ask, so a row that had everything else was never filled and stayed untagged. The
+   * genre still comes only from a platform that stated one -- it is copied, never invented.
+   */
+  it('counts a missing genre as a reason to ask a store', () => {
+    const untagged = row({ id: 'youtube:v', title: 'Song', artist: 'Band', artists: ['Band', 'Guest'], album: 'Album', durationMs: 200_000, isrc: 'GBAAA0000001', artworkUrl: 'https://cdn-images.dzcdn.net/images/cover/x/1000x1000-000000-80-0-0.jpg', releaseDate: '2020-03-04', year: 2020, trackNumber: 3, discNumber: 1, bpm: 120, explicit: true, sources: [yt('v')] });
+    expect(untagged.genre, 'a YouTube row states no genre').toBeNull();
+    expect(needsFacts(untagged), 'so there is still something worth asking for').toBe(true);
+
+    const filled = fillTrack(untagged, row({ id: 'deezer:1', title: 'Song', artist: 'Band', genre: 'Hip-hop & Rap', artistId: 'deezer:27', sources: [dz('1')] }), 'metadata');
+    expect(filled.genre).toBe('Hip-hop & Rap');
+    expect(needsFacts(filled), 'now nothing is missing').toBe(false);
+  });
+
+  /**
+   * The ids and tags a store states have to survive the filling too: they are what lets the
+   * recommender tell two artists with the same name apart, and they were added to the row contract
+   * after this function was written, so it copied neither.
+   */
+  it('fills the artist and album ids and unions the tags a store stated', () => {
+    const anonymous = row({ id: 'youtube:v', title: 'Song', artist: 'Band', tags: ['live'], sources: [yt('v')] });
+    expect(anonymous.artistId).toBeNull();
+
+    const detailed = row({ id: 'deezer:1', title: 'Song', artist: 'Band', artistId: 'deezer:27', albumId: 'deezer:302127', tags: ['nu-disco', 'live'], sources: [dz('1')] });
+    const out = fillTrack(anonymous, detailed, 'metadata');
+
+    expect(out.artistId).toBe('deezer:27');
+    expect(out.albumId).toBe('deezer:302127');
+    // Additive and deduped: 'live' was already known, 'nu-disco' is new.
+    expect(out.tags).toEqual(['live', 'nu-disco']);
+  });
+
+  /** An id the row already states is its own; a store's copy does not replace it. */
+  it('keeps an id the row already stated', () => {
+    const known = row({ id: 'apple-music:9', title: 'Song', artist: 'Band', artistId: 'apple-music:271256', sources: [{ platform: 'apple-music', id: '9', url: 'https://music.apple.com/x', previewUrl: null, matchedBy: 'search' }] });
+    const out = fillTrack(known, row({ id: 'deezer:1', title: 'Song', artist: 'Band', artistId: 'deezer:27', sources: [dz('1')] }), 'metadata');
+    expect(out.artistId).toBe('apple-music:271256');
   });
 
   it('a thumbnail gives way to the store’s cover; a row with everything needs nothing', () => {

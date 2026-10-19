@@ -32,7 +32,7 @@ const THUMBNAIL_PLATFORMS: ReadonlySet<string> = new Set(['youtube', 'youtube-mu
 
 /** The facts a row can still gain from a lookup. False when there is nothing left to ask for. */
 export function needsFacts(track: CatalogTrack): boolean {
-  return track.bpm === null || track.isrc === null || track.explicit === null || track.artworkUrl === null || track.artists.length <= 1 || track.album === null || track.trackNumber === null || (track.releaseDate?.length ?? 0) < 10;
+  return track.bpm === null || track.isrc === null || track.explicit === null || track.artworkUrl === null || track.artists.length <= 1 || track.album === null || track.trackNumber === null || (track.releaseDate?.length ?? 0) < 10 || track.genre === null || track.artistId === null;
 }
 
 /** Whether a row's cover is at best a thumbnail from an upload, so a store's cover should replace it. */
@@ -69,6 +69,11 @@ export function fillTrack(into: CatalogTrack, detail: CatalogTrack, matchedBy: C
     bpm: fill('bpm'),
     explicit: fill('explicit'),
     genre: fill('genre'),
+    artistId: fill('artistId'),
+    albumId: fill('albumId'),
+    // Additive, like the credits: a word one store knows is still true when the other never
+    // heard it. Deduped and capped the same way the merger caps them.
+    tags: [...new Set([...into.tags, ...detail.tags])].slice(0, 30),
     label: fill('label'),
     sources,
   };
