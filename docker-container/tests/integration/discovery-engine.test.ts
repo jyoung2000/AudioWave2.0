@@ -11,6 +11,7 @@
  * or a job kind was renamed. Here, a job with no handler fails the test rather than sitting in the
  * queue being retried in production.
  */
+import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { DiscoveryJob, Recommendation, TasteProfileView } from '@now-playing/contracts';
 import { generateListeningEvents } from '@now-playing/test-fixtures';
@@ -71,6 +72,45 @@ describe('ingesting listening history', () => {
     const again = await hub.app.inject({ method: 'POST', url: '/api/v1/listening-events', headers: { authorization: device.authorization }, payload: { events } });
     expect((again.json() as { accepted: number; duplicates: number }).duplicates).toBe(accepted);
     expect((again.json() as { accepted: number }).accepted).toBe(0);
+  });
+
+  /**
+   * Sending plays to the hub is a separate grant (`history:events`), and the tests above prove the
+   * ingest route honours it. But what the hub *makes* of those plays was readable without it: the
+   * recommendations, the taste profile it is built from, the feedback that edits it, and the seeds
+   * that steer it all declared no scope, so any paired device -- a borrowed speaker, a guest's
+   * player, a companion paired for file transfer alone -- could read back what this person listens
+   * to. PRIVACY.md is explicit that history reaches the hub only with the scope; a profile derived
+   * from that history is the same information in aggregate, and so is read under the same grant.
+   */
+  it('keeps what the hub made of that history behind the same grant', async () => {
+    const limited = await pairDevice(hub, admin, { name: 'Borrowed speaker', scopes: ['library:read', 'search:use'] });
+    const headers = { authorization: limited.authorization };
+
+    const reads = await Promise.all([
+      ['/api/v1/recommendations', await hub.app.inject({ method: 'GET', url: '/api/v1/recommendations', headers })] as const,
+      ['/api/v1/recommendations/profile', await hub.app.inject({ method: 'GET', url: '/api/v1/recommendations/profile', headers })] as const,
+    ]);
+    for (const [route, response] of reads) expect(response.statusCode, route).toBe(403);
+
+    const writes = await Promise.all([
+      ['/recommendations/seeds', await hub.app.inject({ method: 'POST', url: '/api/v1/recommendations/seeds', headers, payload: { artists: ['Daft Punk'], genres: [], likedTrackIds: [] } })] as const,
+      ['/recommendations/:id/feedback', await hub.app.inject({ method: 'POST', url: `/api/v1/recommendations/${randomUUID()}/feedback`, headers, payload: { feedback: 'like' } })] as const,
+    ]);
+    for (const [route, response] of writes) expect(response.statusCode, route).toBe(403);
+  });
+
+  /** The grant a player is actually given still works: this must not lock out the paired PWA. */
+  it('still serves a device that was granted history:events', async () => {
+    const granted = await pairDevice(hub, admin, { name: 'The usual player', scopes: ['library:read', 'search:use', 'history:events'] });
+    const headers = { authorization: granted.authorization };
+
+    // An empty hub answers 503 ('no catalogue yet') -- a precondition, not a permission. What
+    // this asserts is that the grant is never what stands in the way for a device that has it.
+    const recommendations = await hub.app.inject({ method: 'GET', url: '/api/v1/recommendations', headers });
+    expect(recommendations.statusCode, recommendations.body).not.toBe(403);
+    const profile = await hub.app.inject({ method: 'GET', url: '/api/v1/recommendations/profile', headers });
+    expect(profile.statusCode, profile.body).toBe(200);
   });
 
   it('needs the history:events scope, which is a separate grant', async () => {
