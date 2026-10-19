@@ -1139,11 +1139,12 @@ export class PlayerStore {
         ? {
             title: track.title,
             artistName: track.artistName,
-            artistId: null,
+            // What the reference carries, not a null: these are the recommender's inputs.
+            artistId: track.artistId ?? null,
             albumName: track.albumName,
-            albumId: null,
+            albumId: track.albumId ?? null,
             genre: track.genre,
-            tags: [],
+            tags: track.tags ?? [],
             year: track.year,
             durationMs: track.durationMs,
             provider: track.provider,
@@ -1372,6 +1373,15 @@ function ephemeralIds(files: readonly { trackId: string; ephemeral?: boolean }[]
   return new Set(files.filter((file) => file.ephemeral).map((file) => file.trackId));
 }
 
+/**
+ * A library song as a reference an event can remember.
+ *
+ * Everything the recommender scores on travels with it: the plural genres, the tags, the tempo and
+ * the artist and album ids. These were being dropped here, which left the genre and tempo factors
+ * (together about a third of the ranking weight) with nothing to read on a song the listener owns,
+ * and made two artists who share a name one taste. A song that carries none of it still says so
+ * honestly — empty, not invented.
+ */
 export function toTrackRef(track: Track): TrackRef {
   return {
     trackId: track.id,
@@ -1384,6 +1394,11 @@ export function toTrackRef(track: Track): TrackRef {
     locators: track.locators,
     provider: 'local',
     genre: track.genre,
+    genres: track.genres ?? [],
+    bpm: track.bpm ?? null,
+    artistId: track.artistId ?? null,
+    albumId: track.albumId ?? null,
+    tags: track.tags ?? [],
     year: track.year,
   };
 }

@@ -121,6 +121,14 @@ export const TrackRef = z.object({
   /** Optional in the type: a snapshot written before enrichment simply has neither. */
   genres: z.array(z.string().max(60)).optional(),
   bpm: z.number().positive().max(400).nullable().optional(),
+  /**
+   * The ids and tags the recommender learns from. Ids keep two artists who share a name from being
+   * learned as one taste; tags feed the factors a bare genre cannot. Optional for the same reason as
+   * `genres`: a reference written before enrichment carries none.
+   */
+  artistId: Uuid.nullable().optional(),
+  albumId: Uuid.nullable().optional(),
+  tags: z.array(z.string().max(60)).optional(),
   year: z.number().int().nullable().default(null),
 });
 export type TrackRef = z.infer<typeof TrackRef>;

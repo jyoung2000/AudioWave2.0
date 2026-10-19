@@ -204,7 +204,9 @@ export class RecommendationService {
       albumName: result.albumName,
       durationMs: result.durationMs,
       releaseYear: result.year,
-      genres: result.genre ? [result.genre] : [],
+      // The full list the search carried. Collapsing it to the singular `genre` threw away every
+      // genre after the first, and the recommender's genre factor reads this list.
+      genres: result.genres.length ? result.genres : result.genre ? [result.genre] : [],
       musicbrainzRecordingId: result.identity.musicbrainzRecordingId,
       isrc: result.identity.isrc,
       provider: result.provider,
