@@ -313,7 +313,17 @@ export function installAwsp(db: PlayerDatabase, note: (line: string) => void): S
       try {
         await ensureStarted();
         void loadLibrary().catch((e: unknown) => note(`awsp: library not loaded: ${String(e)}`));
-        return { ok: true, reason: null };
+        /* `ensureStarted` resolving means the worker accepted the request, not that a connection
+           exists: a PC that is asleep, or a relay session that died on its keepalive, leaves the
+           worker in `reconnecting` and this used to answer `ok: true` anyway. Measured in the
+           paired profile, that reported a connected Companion whose `connectionType` was null and
+           whose tool detection returned nothing. Report what the connection actually is. */
+        const live = await call<{ status?: string; lastError?: string | null }>({ op: 'status' });
+        if (live.status === 'connected') return { ok: true, reason: null };
+        return {
+          ok: false,
+          reason: live.lastError ?? `The PC has not answered yet (${live.status ?? 'unknown'}).`,
+        };
       } catch (e) {
         return { ok: false, reason: e instanceof Error ? e.message : String(e) };
       }

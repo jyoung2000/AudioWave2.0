@@ -18391,13 +18391,25 @@ window.AW.startStats = function () {
           remainEl.hidden = false;
           remainEl.textContent = '-' + fmt(Math.max(0, air.duration - air.elapsed));
           track.setAttribute('aria-label', 'Live broadcast, ' + fmt(air.elapsed) + ' of ' + fmt(air.duration));
-        } else {
-          /* No length published: nothing is invented, so the bar stays at the live edge and
-             only the elapsed figure is shown. */
+        } else if (air) {
+          /* A cue with a start but no length: the elapsed figure is real, so it is shown, but
+             no total may be invented -- and with nothing to fill towards, the bar sits at the
+             live edge. */
           fill.style.width = '100%';
           remainEl.hidden = true;
           remainEl.textContent = '';
           track.setAttribute('aria-label', 'Live broadcast, ' + fmt(cur) + ' elapsed');
+        } else {
+          /* No cue at all: a talk programme, an advert break, or a feed that publishes nothing.
+             Measured on WGCI during 'Shay Diddy': the bar sat at 100% while the clock climbed to
+             05:42, which reads as a song ending for ever -- our time-since-tune-in dressed up as
+             the broadcast's position. There is nothing to report here, so the bar is empty and
+             the clock says nothing rather than something untrue. */
+          fill.style.width = '0%';
+          elapsedEl.textContent = fmt(0);
+          remainEl.hidden = true;
+          remainEl.textContent = '';
+          track.setAttribute('aria-label', 'Live broadcast');
         }
       } else {
         var dur = total() || 1;

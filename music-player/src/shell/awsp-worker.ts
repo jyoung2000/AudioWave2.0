@@ -83,7 +83,7 @@ let rttMs: number | null = null;
 let lastError: string | null = null;
 let nextId = 0;
 const waiters: Array<{ resolve: (l: Live) => void; reject: (e: Error) => void }> = [];
-const stats = { connects: 0, welcomes: 0, resumedWelcomes: 0, lost: 0, fetches: 0, bytes: 0, resumes: [] as ResumeRecord[] };
+const stats = { connects: 0, welcomes: 0, resumedWelcomes: 0, lost: 0, rebuilds: 0, fetches: 0, bytes: 0, resumes: [] as ResumeRecord[] };
 
 function emit(event: string, data: unknown): void {
   self.postMessage({ event, data });
@@ -261,16 +261,98 @@ function lost(l: Live, why: string, code: number | null = null): void {
   scheduleReconnect();
 }
 
+/* ------------------------------------------------------- one tab at a time */
+
+/**
+ * Which tab of this player holds the PC connection.
+ *
+ * The endpoint identity is derived from the pairing secret, and that secret is shared by every tab
+ * of the same origin — so two open tabs raise two QUIC endpoints with *the same* endpoint id and
+ * compete for one relay slot. Measured with two tabs open: both reported endpoint
+ * `7c6102674bb8234228af…`, the Companion's log showed a fresh accepted connection every ~35s, and
+ * each tab lost its keepalive to the other with "3 pongs missed" indefinitely.
+ *
+ * So ownership is explicit: the tab that asks most recently keeps the connection, and the others
+ * stand down rather than fight. Claiming is what a person's attention means here — the tab being
+ * looked at is the one that should reach the PC.
+ */
+const owners = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('awsp-owner');
+const tabId = Math.random().toString(36).slice(2);
+let owned = true;
+
+function claimOwnership(): void {
+  owned = true;
+  owners?.postMessage({ claim: tabId });
+}
+
+if (owners) {
+  owners.onmessage = (e: MessageEvent) => {
+    const msg = e.data as { claim?: string; release?: string };
+    if (msg.claim && msg.claim !== tabId) {
+      // Another tab is in front: hand the single relay slot over instead of talking over it.
+      owned = false;
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+      if (live) drop(live, 'another tab of this player took the PC connection');
+      setStatus('idle', 'Another tab of this player is using the connection to your PC.');
+    }
+    if (msg.release && msg.release !== tabId && !owned) {
+      // The owner closed: whoever is left may have it.
+      claimOwnership();
+      attempt = 0;
+      scheduleReconnect();
+    }
+  };
+}
+
+/* ------------------------------------------------------------------ revival */
+
+/**
+ * Build a new client on the same identity.
+ *
+ * Measured against a paired Companion: after a session died on its keepalive ("3 pongs missed"),
+ * every retry failed with "connecting timed out" for as long as the player was left open, while the
+ * Companion's own log showed it accepting connections from this very endpoint at 90-200ms rtt. The
+ * endpoint on this side was wedged, not the network, and only a reload fixed it -- so the backoff
+ * loop span forever and the Companion read as unavailable with its downloaders out of reach.
+ *
+ * The secret is carried over deliberately: pairing is bound to the key, so a fresh endpoint on the
+ * same secret is the same device to the PC and needs no re-pairing.
+ */
+async function rebuildClient(): Promise<void> {
+  const old = client;
+  if (!old) return;
+  let secret: Uint8Array | null = null;
+  try {
+    secret = old.secret_key();
+  } catch {
+    secret = null;
+  }
+  client = null;
+  stats.rebuilds++;
+  try {
+    await old.close();
+  } catch {
+    // Already gone: nothing to release.
+  }
+  await ensureClient(secret);
+}
+
 function scheduleReconnect(): void {
-  if (reconnectTimer || status === 'refused' || status === 'idle') return;
+  if (reconnectTimer || status === 'refused' || status === 'idle' || !owned) return;
   const ceiling = Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * 2 ** attempt);
   const delay = Math.random() * ceiling;
   attempt++;
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
-    session(null).catch((e: unknown) => {
+    session(null).catch(async (e: unknown) => {
       if (status === 'idle' || status === 'refused') return;
       lastError = message(e);
+      /* A connect that times out means this endpoint is no longer being heard, which retrying on
+         the same endpoint cannot mend. Give the next attempt a new one (§5). */
+      if (/timed out/.test(lastError)) await rebuildClient().catch(() => undefined);
       scheduleReconnect();
     });
   }, delay);
@@ -412,6 +494,9 @@ async function start(s: Start): Promise<{ secret: Uint8Array; endpointId: string
 
 async function connect(pairCode: string | null): Promise<ReturnType<typeof snapshot>> {
   if (!client) throw new Error('Not started.');
+  /* An explicit connect is this tab saying it is the one in use; take the slot from any other tab
+     rather than letting two endpoints with the same id fight over it. */
+  claimOwnership();
   if (live && !live.dead && pairCode === null) return snapshot();
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
@@ -445,6 +530,8 @@ async function stop(): Promise<void> {
   client = null;
   if (c) await c.close().catch(() => undefined);
   setStatus('idle', null);
+  /* Let another tab have the PC rather than leaving nobody connected. */
+  owners?.postMessage({ release: tabId });
 }
 
 type Op =

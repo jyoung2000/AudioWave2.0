@@ -57,7 +57,15 @@ export async function awspBackend(awsp: PairedCompanionTools | null | undefined)
     if (!initial.paired) return null;
     if (initial.status !== 'connected') {
       const connected = await awsp.connect();
-      if (!connected.ok) return null;
+      /* `connect()` failing is not proof the channel is unusable, and this gate used to end here.
+         Measured against the paired Companion: the worker reported `reconnecting` (its keepalive had
+         missed) while `companion('tools.status')` answered over the same relay with yt-dlp 2026.08.19,
+         spotdl 4.5.2 and ffmpeg n9.0.1 -- so the downloaders were reachable and reported absent. Ask
+         the channel itself; what it answers settles it, not what the status field believes. */
+      if (!connected.ok) {
+        const probe = HelperHealth.safeParse(await awsp.companion('tools.status').catch(() => null));
+        if (!probe.success || !protocolMatches(probe.data)) return null;
+      }
     }
     const health = HelperHealth.safeParse(await awsp.companion('tools.status'));
     if (!health.success || !protocolMatches(health.data)) return null;
