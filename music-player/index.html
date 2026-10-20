@@ -18001,6 +18001,9 @@ window.AW.startStats = function () {
        answers, the programme format the directory carries takes the line. */
     var nowTrack = null;      // { title, artist } for the tuned station
     var trackTimer = 0;
+    /* A cue knows when it ends, so there is no reason to find out late: the twenty-second
+       poll is the floor, and this fires once, just after the song is due to finish. */
+    var cueTimer = 0;
 
     var TRACK_FEEDS = [
       {
@@ -18263,18 +18266,47 @@ window.AW.startStats = function () {
       delete metaCache[url];                              // the point is freshness
       delete metaCache['icy:' + url];
       window.radioMeta(url, true).then(function (t) {
-        if (!station || station.id !== mine || !t) return;  // tuned away meanwhile
+        if (!station || station.id !== mine) return;        // tuned away meanwhile
+        /* A station that has stopped naming a song -- an ad break, a talk segment, a feed that
+           answered 204 -- used to leave the last song on screen with its clock still running,
+           so a track that finished minutes ago still looked like it was playing. No answer is
+           an answer: clear the song and let the bar fall back to the live edge. */
+        if (!t) {
+          if (nowTrack) { nowTrack = null; applyMode(mode); }
+          return;
+        }
+        /* The harder case, and the one actually reported: the feed keeps serving the SAME cue
+           after it has ended, so there is an answer -- it is just an old one. Watched live, a
+           song sat on screen for five and a half minutes against its own 3:28 length with the
+           bar full. A cue whose length has plainly passed names a song that is no longer
+           playing, so it stops being shown, and the feed is asked again every few seconds
+           until it catches up rather than once every twenty. */
+        if (t.startedAt && t.duration
+            && (Date.now() - t.startedAt) / 1000 > t.duration + 15) {
+          if (nowTrack) { nowTrack = null; applyMode(mode); }
+          clearTimeout(cueTimer);
+          cueTimer = setTimeout(pollTrack, 5000);
+          return;
+        }
         if (!nowTrack || nowTrack.title !== t.title || nowTrack.artist !== t.artist || nowTrack.programme !== t.programme) {
           nowTrack = t;
           applyMode(mode);
           document.dispatchEvent(new CustomEvent('radio:track',
             { detail: { id: mine, track: t } }));
         }
+        /* Waiting out the poll means the finished song lingers and the bar sits full for
+           up to twenty seconds. The cue says when it ends; ask again a moment after. */
+        clearTimeout(cueTimer);
+        if (t.startedAt && t.duration) {
+          var left = (t.startedAt + t.duration * 1000 + 1500) - Date.now();
+          if (left > 0 && left < 600000) cueTimer = setTimeout(pollTrack, left);
+        }
       });
     }
 
     function startTrackPolling() {
       clearInterval(trackTimer);
+      clearTimeout(cueTimer);
       nowTrack = null;
       if (!station) return;
       pollTrack();

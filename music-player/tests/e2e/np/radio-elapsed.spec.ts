@@ -90,3 +90,61 @@ test('a feed with a start but no length shows elapsed and invents no total', asy
   const pct = await page.locator('#fill').evaluate((n) => parseFloat((n as HTMLElement).style.width));
   expect(pct, 'no total means no fraction to fill').toBe(100);
 });
+
+/* Three reports arrived together: the song kept playing after the bar finished, a new song never
+   replaced it, and the bar never reset. They are one failure with three faces -- the poll ignored a
+   feed that had stopped naming a song, and only ran every twenty seconds, so a finished cue stayed
+   on screen with its clock still running.
+
+   The fixtures below switch on elapsed wall-clock, not on a call count: the station list reads the
+   same feed before anything is tuned, so counting calls attributes the first answer to the wrong
+   reader. */
+test('a finished song gives way to the next one, and the bar starts over', async ({ page }) => {
+  const openedAt = Date.now();
+  await page.route(/us\.api\.iheart\.com\/.*currentTrackMeta/i, (r) => {
+    const now = Date.now();
+    // Until the station is tuned and seen: a song with 3 seconds left. After that: the next song.
+    const body = now - openedAt < 12_000
+      ? { title: 'Joy.', artist: 'Ariana Grande', trackDuration: 60, startTime: now - 57_000, endTime: now + 3_000 }
+      : { title: 'Risk It All', artist: 'Leon Thomas', trackDuration: 204, startTime: now - 4_000, endTime: now + 200_000 };
+    return r.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  });
+
+  await boot(page);
+  await tune(page, '107.5 WGCI');
+
+  await expect(page.locator('.player__title')).toHaveText('Joy.', { timeout: 10_000 });
+  const nearEnd = await page.locator('#fill').evaluate((n) => parseFloat((n as HTMLElement).style.width));
+  expect(nearEnd, 'almost finished').toBeGreaterThan(85);
+
+  /* The cue ends in 3s. Without the end-of-cue re-poll this waits out the 20s interval, so the
+     finished song sits on screen with a full bar -- exactly what was reported. */
+  await expect(page.locator('.player__title')).toHaveText('Risk It All', { timeout: 30_000 });
+  const restarted = await page.locator('#fill').evaluate((n) => parseFloat((n as HTMLElement).style.width));
+  expect(restarted, 'the bar starts the new song over, it does not stay full').toBeLessThan(40);
+  const el = await page.locator('#elapsed').textContent();
+  expect(el, 'and the clock starts over too').toMatch(/0?0:[0-3][0-9]/);
+});
+
+/* A station that stops naming a song -- an ad break, a talk segment, a 204 -- used to keep the last
+   song on screen forever with its clock still climbing. WGCI was doing exactly this when the report
+   came in: it had moved to a talk programme while the player still showed the previous track. */
+test('a station that stops naming a song stops claiming one', async ({ page }) => {
+  const openedAt = Date.now();
+  await page.route(/us\.api\.iheart\.com\/.*currentTrackMeta/i, (r) => {
+    const now = Date.now();
+    if (now - openedAt < 12_000) {
+      return r.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'application/json' }, body: JSON.stringify({
+        title: 'Friend Do Remix', artist: 'Belly Gang Kushington', trackDuration: 171, startTime: now - 60_000, endTime: now + 111_000,
+      }) });
+    }
+    return r.fulfill({ status: 204, headers: CORS, body: '' });   // the break begins
+  });
+
+  await boot(page);
+  await tune(page, '107.5 WGCI');
+  await expect(page.locator('.player__title')).toHaveText('Friend Do Remix', { timeout: 10_000 });
+
+  // Once the feed goes quiet the song must go with it, rather than ticking on for minutes.
+  await expect(page.locator('.player__title')).not.toHaveText('Friend Do Remix', { timeout: 45_000 });
+});

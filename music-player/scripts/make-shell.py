@@ -1256,9 +1256,9 @@ replace("    window.radioMeta = function (url) {\n"
         "      var hit = feedFor(url);\n"
         "      if (!hit) return tuned ? icyMeta(url) : Promise.resolve(null);")
 replace("      window.radioMeta(url).then(function (t) {\n"
-        "        if (!station || station.id !== mine || !t) return;  // tuned away meanwhile",
+        "        if (!station || station.id !== mine) return;        // tuned away meanwhile",
         "      window.radioMeta(url, true).then(function (t) {\n"
-        "        if (!station || station.id !== mine || !t) return;  // tuned away meanwhile")
+        "        if (!station || station.id !== mine) return;        // tuned away meanwhile")
 
 # A feed that is down or empty is not the last word either: the stream itself may still say.
 replace("          metaCache[url] = { at: Date.now(), val: null };\n"
