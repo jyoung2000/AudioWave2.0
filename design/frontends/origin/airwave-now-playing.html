@@ -16914,6 +16914,78 @@ window.AW.startStats = function () {
       },
     ];
 
+    /* Icecast publishes what it is playing at `<origin>/status-json.xsl`, with CORS open --
+       measured against the Illinois shelf: `Herbie Hancock - Gentle Thoughts` on
+       icecast.will.illinois.edu and `Failure - Wet Gravity` on wzrd.streamguys1.com, both
+       answering `Access-Control-Allow-Origin` to this page directly.
+
+       This matters most when nothing else is helping. 28 of the 112 Illinois stations the
+       directory lists stream from an Icecast server, more than any other family, and unpaired
+       the list named a song for 9 of 38 stations where the paired one named 31 -- not because
+       the data needs the PC, but because nobody had asked the stations that answer for
+       themselves.
+
+       Unlike every entry in TRACK_FEEDS, this is a guess at any host rather than a match on a
+       host known to publish something, so it is the only reader that can be wrong about whom it
+       is asking. That makes it last and cheap: it runs only once a matched feed and the stream's
+       own ICY metadata have come back with nothing, it gets a short deadline of its own so a
+       guess cannot spend a station's whole read budget, and a host that answers with anything
+       else is never asked again. */
+    var ICECAST_DEADLINE = 4000;
+    var icecastAsked = {};
+    function hostOf(u) { var m = String(u || '').match(/^https?:\/\/([^/]+)/i); return m ? m[1].toLowerCase() : ''; }
+
+    function icecastMeta(url) {
+      var m = String(url || '').match(/^(https?:\/\/[^/]+)\/([^/?#]+?)(?:\.[a-z0-9]+)?(?:\?|#|$)/i);
+      if (!m) return Promise.resolve(null);
+      var host = hostOf(url);
+      if (icecastAsked[host] === false) return Promise.resolve(null);
+      var ctl = typeof AbortController === 'function' ? new AbortController() : null;
+      var killer = ctl ? setTimeout(function () { ctl.abort(); }, ICECAST_DEADLINE) : 0;
+      return fetch(m[1] + '/status-json.xsl', ctl ? { cache: 'no-store', signal: ctl.signal }
+                                                  : { cache: 'no-store' })
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          if (killer) clearTimeout(killer);
+          var src = j && j.icestats && j.icestats.source;
+          if (!src) { icecastAsked[host] = false; return null; }
+          var all = Object.prototype.toString.call(src) === '[object Array]' ? src : [src];
+          var mount = String(m[2] || '').toLowerCase();
+          var pick = null;
+          for (var i = 0; i < all.length; i++) {
+            var u = String(all[i].listenurl || '').replace(/\/$/, '').toLowerCase();
+            if (mount && u.slice(-(mount.length + 1)) === '/' + mount) { pick = all[i]; break; }
+          }
+          if (!pick && all.length === 1) pick = all[0];
+          if (!pick) return null;
+          var line = String(pick.title || pick.yp_currently_playing || '').trim();
+          /* Icecast's convention is StreamTitle='Artist - Title'; the artist leads. Stations fill
+             that template loosely: CRIS Radio publishes 'Peter Katt -  -  ', an artist with the
+             title left blank, which split naively leaves a lone dash sitting in the song column.
+             Each side is taken only if it says something. */
+          var at = line.indexOf(' - ');
+          var title = at > 0 ? line.slice(at + 3) : line;
+          var artist = at > 0 ? line.slice(0, at) : (pick.artist || '');
+          title = String(title).replace(/\s*-\s*/g, ' ').trim();
+          artist = String(artist).trim();
+          if (/^[\s-]*$/.test(title)) title = '';
+          if (/^[\s-]*$/.test(artist)) artist = '';
+          /* An artist with no song is still worth saying, and the row has a column for it. */
+          if (!title && artist) { title = artist; artist = ''; }
+          if (!title) return null;
+          /* The server states its own genre and bitrate: the station's words, not a guess made
+             here, so they are reportable. It states no cue timing, so no position is claimed. */
+          return { title: title, artist: artist, genre: pick.genre || '',
+                   bitrate: pick.bitrate || 0, startedAt: null, duration: null };
+        })
+        .catch(function () {
+          if (killer) clearTimeout(killer);
+          icecastAsked[host] = false;
+          return null;
+        });
+    }
+    window.icecastMeta = icecastMeta;
+
     function feedFor(url) {
       for (var i = 0; i < TRACK_FEEDS.length; i++) {
         var m = String(url || '').match(TRACK_FEEDS[i].match);
@@ -16958,6 +17030,12 @@ window.AW.startStats = function () {
        when we happened to tune in. null when the feed publishes no timing, which keeps the
        honest cases honest: no timing, no claim. */
     var airClock = 0;
+    /* Feeds disagree about capitalisation and spacing for the same song; neither difference makes
+       it a different song. */
+    function sameName_(a, b) {
+      return String(a == null ? '' : a).trim().replace(/\s+/g, ' ').toLowerCase()
+          === String(b == null ? '' : b).trim().replace(/\s+/g, ' ').toLowerCase();
+    }
     function radioAir() {
       if (!station || !nowTrack || !nowTrack.startedAt) return null;
       var secs = Math.floor((Date.now() - nowTrack.startedAt) / 1000);
@@ -17009,11 +17087,33 @@ window.AW.startStats = function () {
           cueTimer = setTimeout(pollTrack, 5000);
           return;
         }
-        if (!nowTrack || nowTrack.title !== t.title || nowTrack.artist !== t.artist) {
+        /* Title and artist are not the whole of a cue: its timing can change under the same
+           name. Watched live on WLS, the feed re-cued "You Shook Me All Night Long" with a fresh
+           start while the old cue had just outrun its own length -- and because only the name was
+           compared, the new timing was thrown away and the song kept the expired start. The bar
+           was right to show no position for it, but the name then sat there for three minutes
+           with the station playing on. A new start time is new information, so take it. */
+        /* Two sources naming one song must not look like two songs. Watched paired on WGCI, the
+           station list offered "Is It A Crime" with no timing and the tuned feed then published
+           "Is It a Crime" with a real cue, 75s into 181s -- a single capital letter apart. Compared
+           exactly, that reads as a song change: the positionless name sat on screen for four
+           samples with an empty bar, then "changed" to the same song with a bar, and the rest of
+           the app was told a new track had begun. Names are compared for what they say, not how
+           they are typed. */
+        var sameName = nowTrack && sameName_(nowTrack.title, t.title)
+                                && sameName_(nowTrack.artist, t.artist);
+        var sameTiming = nowTrack && nowTrack.startedAt === t.startedAt
+                                  && nowTrack.duration === t.duration;
+        if (!sameName || !sameTiming) {
+          var renamed = !sameName;
           nowTrack = t;
           applyMode(mode);
-          document.dispatchEvent(new CustomEvent('radio:track',
-            { detail: { id: mine, track: t } }));
+          /* Only a genuinely different song is an event; re-timing the same one is not something
+             the rest of the app should hear about as a track change. */
+          if (renamed) {
+            document.dispatchEvent(new CustomEvent('radio:track',
+              { detail: { id: mine, track: t } }));
+          }
         }
         /* Waiting out the poll means the finished song lingers and the bar sits full for
            up to twenty seconds. The cue says when it ends; ask again a moment after. */

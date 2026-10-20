@@ -4729,12 +4729,15 @@ replace("        return d && d.title ? d : localIcyAsk(url);",
         "                   genre: (primary && primary.genre) || d.genre || null,\n"
         "                   bitrate: (primary && primary.bitrate) || d.bitrate || null };\n"
         "        });")
-replace("        if (!nowTrack || nowTrack.title !== t.title || nowTrack.artist !== t.artist) {",
-        "        if (!nowTrack || nowTrack.title !== t.title || nowTrack.artist !== t.artist || nowTrack.programme !== t.programme) {")
-replace("          document.dispatchEvent(new CustomEvent('radio:track',\n"
-        "            { detail: { id: mine, track: t } }));",
-        "          document.dispatchEvent(new CustomEvent(t.about ? 'radio:clear-track' : 'radio:track',\n"
-        "            { detail: { id: mine, track: t.about ? null : t } }));")
+replace("        var sameName = nowTrack && sameName_(nowTrack.title, t.title)\n"
+        "                                && sameName_(nowTrack.artist, t.artist);",
+        "        var sameName = nowTrack && sameName_(nowTrack.title, t.title)\n"
+        "                                && sameName_(nowTrack.artist, t.artist)\n"
+        "                                && nowTrack.programme === t.programme;")
+replace("            document.dispatchEvent(new CustomEvent('radio:track',\n"
+        "              { detail: { id: mine, track: t } }));",
+        "            document.dispatchEvent(new CustomEvent(t.about ? 'radio:clear-track' : 'radio:track',\n"
+        "              { detail: { id: mine, track: t.about ? null : t } }));")
 replace("    function stationWhere(st) {",
         "    document.addEventListener('radio:clear-track', function (e) {\n"
         "      if (!e.detail || !e.detail.id) return;\n"
@@ -4847,7 +4850,10 @@ replace("        .then(function (t) { return t || (tuned ? icyMeta(url) : null);
         "            if (!d || !d.programme) return t;\n"
         "            return { title: t.title, artist: t.artist, programme: d.programme };\n"
         "          });\n"
-        "        });")
+        "        })\n"
+        "        /* A matched feed that said nothing and a stream that said nothing still leave the\n"
+        "           Icecast server itself unasked, and it answers from the page. */\n"
+        "        .then(function (t) { return t || icecastMeta(url); });")
 
 # Every station's Song column is what is on the air, never its genre. Stations without a feed of their
 # own are read by the paired Hub (or the Companion) — the same reader the tuned station uses — a few at a
@@ -4986,7 +4992,7 @@ replace("""       to the station list (radioMetaSupported stays feed-only). */""
 replace("""    window.radioMetaSupported = function (url) { return !!feedFor(url); };""",
         """    window.radioMetaSupported = function (url) { return !!url; };""")
 replace("""      if (!hit) return tuned ? icyMeta(url) : Promise.resolve(null);""",
-        """      if (!hit) return icyMeta(url);""")
+        """      if (!hit) return icyMeta(url).then(function (d) { return d || icecastMeta(url); });""")
 replace("""        .then(function (t) {
           if (!tuned) return t;
           return icyMeta(url).then(function (d) {""",
@@ -4998,10 +5004,10 @@ replace("""        .then(function (t) {
 
 # A scheduled programme is on the air, not a song: keep it in the station row but never in
 # the context menu's 'save song' actions (onAirSong already rejects t.about).
-replace("          document.dispatchEvent(new CustomEvent(t.about ? 'radio:clear-track' : 'radio:track',\n"
-        "            { detail: { id: mine, track: t.about ? null : t } }));",
-        "          document.dispatchEvent(new CustomEvent('radio:track',\n"
-        "            { detail: { id: mine, track: t } }));")
+replace("            document.dispatchEvent(new CustomEvent(t.about ? 'radio:clear-track' : 'radio:track',\n"
+        "              { detail: { id: mine, track: t.about ? null : t } }));",
+        "            document.dispatchEvent(new CustomEvent('radio:track',\n"
+        "              { detail: { id: mine, track: t } }));")
 # Without metadata, the Now Playing headline must not repurpose a directory genre as a song.
 replace("          title: nowTrack ? nowTrack.title : stationFormat(station),",
         "          title: nowTrack ? nowTrack.title : 'Song not available',")

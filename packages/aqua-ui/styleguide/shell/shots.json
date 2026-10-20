@@ -1,7 +1,7 @@
 {
   "source": "music-player/index.html",
-  "sourceHash": "733db473139c7275",
-  "takenAt": "2026-10-20T05:36:28.817Z",
+  "sourceHash": "0532ad29d44da4a2",
+  "takenAt": "2026-10-20T13:14:40.421Z",
   "how": "pnpm styleguide:shell (scripts/styleguide-shell-shots.mjs) against pnpm build:player, served by vite preview",
   "viewports": [
     {
