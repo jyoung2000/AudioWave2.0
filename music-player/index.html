@@ -18219,7 +18219,10 @@ window.AW.startStats = function () {
             if (!t) return d;
             if (!d) return t;
             return { title: t.title, artist: t.artist, programme: d.programme || '',
-                     genre: d.genre || '', bitrate: d.bitrate || 0 };
+                     genre: d.genre || '', bitrate: d.bitrate || 0,
+                     /* The tuned station is exactly where the broadcast position is shown, so its
+                        timing must survive this merge too -- the station list is not the only reader. */
+                     startedAt: t.startedAt || null, duration: t.duration || null };
           });
         });
       metaCache[url] = { at: now, val: c ? c.val : null, pending: pr };
