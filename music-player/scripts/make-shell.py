@@ -4940,6 +4940,46 @@ replace("""    var metaTimers = [];
       if (!every) return;
       metaRefresh = setTimeout(function () { if (!radio.hidden) radioFillMeta(metaItems); }, every * 1000);
     };
+    /* A song ending on the tuned station is the moment that station's row is wrong, and waiting out
+       the interval is how a listener comes to see a finished song sitting in the list -- observed
+       live: the WGCI row still read `Residuals` seconds after the player itself had let it go. The
+       one row that changed is re-read immediately, on its own, rather than restarting the whole
+       pass: one request, not thirty-eight. */
+    window.radioRowChanged = function (id) {
+      if (!metaItems || typeof window.radioMeta !== 'function') return;
+      var hit = null;
+      for (var i = 0; i < metaItems.length; i++) {
+        var st = metaItems[i].station;
+        if (st && st.id === id) { hit = st; break; }
+      }
+      if (!hit) return;
+      window.radioMeta(hit.url, true).then(function (t) {
+        if (t && t.slow) return;
+        if (t && (t.title || t.genre || t.bitrate)) {
+          trackByStation[hit.id] = t;
+          if (t.title) delete metaMiss[hit.id]; else metaMiss[hit.id] = true;
+        } else {
+          /* The tuned station's own reading says there is no song now. The full pass deliberately
+             leaves the tuned row alone (it would flicker against the player's own faster polling),
+             but here the player has just told us this very station changed, so the row is the stale
+             one and clearing it is the whole point: measured, it went on showing `Stand (Live)` for
+             66s after the player had already let it go. */
+          delete trackByStation[hit.id];
+          metaMiss[hit.id] = true;
+        }
+        paintMetaRow(hit);
+      }, function () { return null; });
+    };
+    /* The tuned station naming a new song is the signal; the list follows it rather than waiting for
+       its own turn to come round. */
+    document.addEventListener('radio:track', function (e) {
+      var d = e.detail || {};
+      if (d.id) window.radioRowChanged(d.id);
+    });
+    document.addEventListener('radio:clear-track', function (e) {
+      var d = e.detail || {};
+      if (d.id) window.radioRowChanged(d.id);
+    });
     /* The glyph turns while a reading pass is actually running, so the list says "I am re-reading
        this" whether a person asked for it or the minute came round on its own. Spinning for a fixed
        0.9s on click only said it about the click. */
@@ -4981,7 +5021,7 @@ replace("""    var metaTimers = [];
           } else return one();
         });
       }
-      for (var k = 0; k < Math.min(4, pick.length); k++) one();
+      for (var k = 0; k < Math.min(8, pick.length); k++) one();
     }""")
 replace("""      if (song) song.textContent = songCell(st);
       if (artist) artist.textContent = artistCell(st);""",

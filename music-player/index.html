@@ -11307,6 +11307,46 @@ window.AW.startStats = function () {
       if (!every) return;
       metaRefresh = setTimeout(function () { if (!radio.hidden) radioFillMeta(metaItems); }, every * 1000);
     };
+    /* A song ending on the tuned station is the moment that station's row is wrong, and waiting out
+       the interval is how a listener comes to see a finished song sitting in the list -- observed
+       live: the WGCI row still read `Residuals` seconds after the player itself had let it go. The
+       one row that changed is re-read immediately, on its own, rather than restarting the whole
+       pass: one request, not thirty-eight. */
+    window.radioRowChanged = function (id) {
+      if (!metaItems || typeof window.radioMeta !== 'function') return;
+      var hit = null;
+      for (var i = 0; i < metaItems.length; i++) {
+        var st = metaItems[i].station;
+        if (st && st.id === id) { hit = st; break; }
+      }
+      if (!hit) return;
+      window.radioMeta(hit.url, true).then(function (t) {
+        if (t && t.slow) return;
+        if (t && (t.title || t.genre || t.bitrate)) {
+          trackByStation[hit.id] = t;
+          if (t.title) delete metaMiss[hit.id]; else metaMiss[hit.id] = true;
+        } else {
+          /* The tuned station's own reading says there is no song now. The full pass deliberately
+             leaves the tuned row alone (it would flicker against the player's own faster polling),
+             but here the player has just told us this very station changed, so the row is the stale
+             one and clearing it is the whole point: measured, it went on showing `Stand (Live)` for
+             66s after the player had already let it go. */
+          delete trackByStation[hit.id];
+          metaMiss[hit.id] = true;
+        }
+        paintMetaRow(hit);
+      }, function () { return null; });
+    };
+    /* The tuned station naming a new song is the signal; the list follows it rather than waiting for
+       its own turn to come round. */
+    document.addEventListener('radio:track', function (e) {
+      var d = e.detail || {};
+      if (d.id) window.radioRowChanged(d.id);
+    });
+    document.addEventListener('radio:clear-track', function (e) {
+      var d = e.detail || {};
+      if (d.id) window.radioRowChanged(d.id);
+    });
     /* The glyph turns while a reading pass is actually running, so the list says "I am re-reading
        this" whether a person asked for it or the minute came round on its own. Spinning for a fixed
        0.9s on click only said it about the click. */
@@ -11393,7 +11433,7 @@ window.AW.startStats = function () {
           arm();
         });
       }
-      for (var k = 0; k < Math.min(4, pick.length); k++) one();
+      for (var k = 0; k < Math.min(8, pick.length); k++) one();
     }
 
     /* Patch the two cells in place. Re-rendering the whole table for one
@@ -18327,6 +18367,12 @@ window.AW.startStats = function () {
          ended. Measured live: two of four iHeart stations were serving cues about a minute
          past their own duration, so the tolerance has to be small enough to catch that. */
       if (runs && secs > runs + 15) return null;
+      /* Past its end but inside the tolerance, the position is no longer known: clamping it to
+         the length pinned the bar at 100% with `-00:00` for the whole guard window -- a song
+         frozen at the finish line, which is what a listener reports as "it stopped updating"
+         (measured on WGCI: 11s of exactly that after `Residuals` ended). The song is still named,
+         because the station is probably still playing it, but the position is not claimed. */
+      if (runs && secs > runs) return { elapsed: null, duration: runs, over: true };
       return { elapsed: runs ? Math.min(secs, runs) : secs, duration: runs || null };
     }
     window.radioAir = radioAir;
@@ -18354,6 +18400,12 @@ window.AW.startStats = function () {
            an answer: clear the song and let the bar fall back to the live edge. */
         if (!t) {
           if (nowTrack) { nowTrack = null; applyMode(mode); }
+          /* A 204 between songs is the feed drawing breath, not the end of the matter: measured on
+             Big 95.5, it answered 204 and published the next song six seconds later. Asking again
+             shortly turns most of that gap into the next song's name instead of a minute of
+             "Song not available". */
+          clearTimeout(cueTimer);
+          cueTimer = setTimeout(pollTrack, 5000);
           return;
         }
         /* The harder case, and the one actually reported: the feed keeps serving the SAME cue
@@ -18399,10 +18451,21 @@ window.AW.startStats = function () {
           }
         }
         /* Waiting out the poll means the finished song lingers and the bar sits full for
-           up to twenty seconds. The cue says when it ends; ask again a moment after. */
+           up to twenty seconds. The cue says when it ends; ask again a moment after -- and keep
+           asking, because one question at the end is not enough.
+
+           Measured on Big 95.5 at a real boundary: the feed went on serving the finished cue for
+           **47s** past its own end, answered 204 briefly, and only published the next song at
+           **55s**. A single retry at the end lands squarely in that dead window, gets the same
+           stale answer, and then nothing asks again until the twenty second tick -- which is why
+           the song appeared not to update for most of a minute. So from the cue's end the feed is
+           asked every 5s until it says something new, for up to 90s, which covers the lag
+           measured with room to spare. */
         clearTimeout(cueTimer);
         if (t.startedAt && t.duration) {
-          var left = (t.startedAt + t.duration * 1000 + 1500) - Date.now();
+          var endsIn = (t.startedAt + t.duration * 1000 + 1500) - Date.now();
+          var left = endsIn > 0 ? endsIn : 5000;
+          if (endsIn <= 0 && Date.now() - (t.startedAt + t.duration * 1000) > 90000) left = 0;
           if (left > 0 && left < 600000) cueTimer = setTimeout(pollTrack, left);
         }
       });
@@ -18485,10 +18548,19 @@ window.AW.startStats = function () {
          tuned in, and our 0:00 described how long we had been listening rather than where the
          song was. Feeds that time their cues let us say the latter. */
       var air = typeof radioAir === 'function' ? radioAir() : null;
-      if (air) cur = air.elapsed;
+      if (air && air.elapsed != null) cur = air.elapsed;
       elapsedEl.textContent = fmt(cur);
       if (isLive()) {
-        if (air && air.duration) {
+        if (air && air.over) {
+          /* The cue has run past its stated length and the feed has not caught up. The song is
+             still named, but where the broadcast is in it is no longer known, so the bar reports
+             nothing rather than sitting full at `-00:00`. */
+          fill.style.width = '0%';
+          elapsedEl.textContent = fmt(0);
+          remainEl.hidden = true;
+          remainEl.textContent = '';
+          track.setAttribute('aria-label', 'Live broadcast, position not published');
+        } else if (air && air.duration) {
           /* A song with a known length gets a real progress bar, filled to where the broadcast
              is. The stream stays live and unseekable; this reports, it does not offer. */
           fill.style.width = Math.max(0, Math.min(100, (air.elapsed / air.duration) * 100)) + '%';

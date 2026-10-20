@@ -17046,6 +17046,12 @@ window.AW.startStats = function () {
          ended. Measured live: two of four iHeart stations were serving cues about a minute
          past their own duration, so the tolerance has to be small enough to catch that. */
       if (runs && secs > runs + 15) return null;
+      /* Past its end but inside the tolerance, the position is no longer known: clamping it to
+         the length pinned the bar at 100% with `-00:00` for the whole guard window -- a song
+         frozen at the finish line, which is what a listener reports as "it stopped updating"
+         (measured on WGCI: 11s of exactly that after `Residuals` ended). The song is still named,
+         because the station is probably still playing it, but the position is not claimed. */
+      if (runs && secs > runs) return { elapsed: null, duration: runs, over: true };
       return { elapsed: runs ? Math.min(secs, runs) : secs, duration: runs || null };
     }
     window.radioAir = radioAir;
@@ -17072,6 +17078,12 @@ window.AW.startStats = function () {
            an answer: clear the song and let the bar fall back to the live edge. */
         if (!t) {
           if (nowTrack) { nowTrack = null; applyMode(mode); }
+          /* A 204 between songs is the feed drawing breath, not the end of the matter: measured on
+             Big 95.5, it answered 204 and published the next song six seconds later. Asking again
+             shortly turns most of that gap into the next song's name instead of a minute of
+             "Song not available". */
+          clearTimeout(cueTimer);
+          cueTimer = setTimeout(pollTrack, 5000);
           return;
         }
         /* The harder case, and the one actually reported: the feed keeps serving the SAME cue
@@ -17116,10 +17128,21 @@ window.AW.startStats = function () {
           }
         }
         /* Waiting out the poll means the finished song lingers and the bar sits full for
-           up to twenty seconds. The cue says when it ends; ask again a moment after. */
+           up to twenty seconds. The cue says when it ends; ask again a moment after -- and keep
+           asking, because one question at the end is not enough.
+
+           Measured on Big 95.5 at a real boundary: the feed went on serving the finished cue for
+           **47s** past its own end, answered 204 briefly, and only published the next song at
+           **55s**. A single retry at the end lands squarely in that dead window, gets the same
+           stale answer, and then nothing asks again until the twenty second tick -- which is why
+           the song appeared not to update for most of a minute. So from the cue's end the feed is
+           asked every 5s until it says something new, for up to 90s, which covers the lag
+           measured with room to spare. */
         clearTimeout(cueTimer);
         if (t.startedAt && t.duration) {
-          var left = (t.startedAt + t.duration * 1000 + 1500) - Date.now();
+          var endsIn = (t.startedAt + t.duration * 1000 + 1500) - Date.now();
+          var left = endsIn > 0 ? endsIn : 5000;
+          if (endsIn <= 0 && Date.now() - (t.startedAt + t.duration * 1000) > 90000) left = 0;
           if (left > 0 && left < 600000) cueTimer = setTimeout(pollTrack, left);
         }
       });
@@ -17202,10 +17225,19 @@ window.AW.startStats = function () {
          tuned in, and our 0:00 described how long we had been listening rather than where the
          song was. Feeds that time their cues let us say the latter. */
       var air = typeof radioAir === 'function' ? radioAir() : null;
-      if (air) cur = air.elapsed;
+      if (air && air.elapsed != null) cur = air.elapsed;
       elapsedEl.textContent = fmt(cur);
       if (isLive()) {
-        if (air && air.duration) {
+        if (air && air.over) {
+          /* The cue has run past its stated length and the feed has not caught up. The song is
+             still named, but where the broadcast is in it is no longer known, so the bar reports
+             nothing rather than sitting full at `-00:00`. */
+          fill.style.width = '0%';
+          elapsedEl.textContent = fmt(0);
+          remainEl.hidden = true;
+          remainEl.textContent = '';
+          track.setAttribute('aria-label', 'Live broadcast, position not published');
+        } else if (air && air.duration) {
           /* A song with a known length gets a real progress bar, filled to where the broadcast
              is. The stream stays live and unseekable; this reports, it does not offer. */
           fill.style.width = Math.max(0, Math.min(100, (air.elapsed / air.duration) * 100)) + '%';
