@@ -16961,8 +16961,10 @@ window.AW.startStats = function () {
       if (!isFinite(secs) || secs < 0) return null;
       var runs = nowTrack.duration || 0;
       /* A cue that has outlived its own length is stale: the feed has not caught up yet, and
-         filling past the end would be a lie dressed as precision. */
-      if (runs && secs > runs + 90) return null;
+         holding the bar at 100% would claim the song is ending when it has probably already
+         ended. Measured live: two of four iHeart stations were serving cues about a minute
+         past their own duration, so the tolerance has to be small enough to catch that. */
+      if (runs && secs > runs + 15) return null;
       return { elapsed: runs ? Math.min(secs, runs) : secs, duration: runs || null };
     }
     window.radioAir = radioAir;
