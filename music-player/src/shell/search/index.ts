@@ -2668,7 +2668,7 @@ export function installSearch(): SearchApi {
   /** Kept for the shell's "keep this song" (the radio's on-air menu): songs for a query, in the old row shape. */
   w.NP_FIND = async (q: string) => {
     const found = await findTracks(q, AbortSignal.timeout(8000)).catch(() => null);
-    return (found?.tracks ?? []).slice(0, 10).map((t) => {
+    return (found?.tracks ?? []).map((t) => {
       const s = songFor(t);
       return {
         t: t.title,
@@ -2678,6 +2678,9 @@ export function installSearch(): SearchApi {
         bpm: s.bpm,
         p: s.platform,
         u: s.url || null,
+        // A store listing is a useful match for Search, but not a fetchable recording for
+        // the radio's Up Next/playlist actions. Reuse the catalog's source-order policy.
+        fetchable: Boolean(pickDownloadSource(t.sources)),
       };
     });
   };

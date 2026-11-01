@@ -2732,7 +2732,7 @@
       "id": "NP-RADIO-002",
       "group": "np-radio",
       "title": "A song heard on the radio can be kept",
-      "contract": "Right-clicking a station (a long press on touch) whose song is known adds an “On air” section to its menu: Add Song to Up Next, Add Song to Group Queue, and Add Song to Playlist with New Playlist…. The song becomes a library entry of this player's own — filled in by the same search chain when it finds that song by that artist, labelled Radio when it does not — and it survives a reload. The group item names the group when there is one, lists them when there are several, and is disabled with the reason when the player is unpaired or in no group; the container queues a playable copy by name, the way Discord's /play does, and says why when there is none. A same-titled song by someone else is never taken for it.",
+      "contract": "Right-clicking a station (a long press on touch) whose song is known adds an “On air” section to its menu: Add Song to Up Next, Add Song to Group Queue, and Add Song to Playlist with New Playlist…. The song becomes a library entry of this player's own only when the player already owns a local copy or a connected catalog supplies the exact song and artist with a fetchable source (YouTube Music, YouTube, SoundCloud, Bandcamp, or Spotify); a store-only match or missing match does not create an unplayable Radio placeholder and reports that no fetchable copy was found. The source URL and platform survive reload. The group item names the group when there is one, lists them when there are several, and is disabled with the reason when the player is unpaired or in no group; the container queues a playable copy by name, the way Discord's /play does, and says why when there is none. A same-titled song by someone else is never taken for it.",
       "example": "",
       "authority": "adopted",
       "owners": [
@@ -2761,6 +2761,24 @@
           "path": "docker-container/tests/integration/radio-and-requests.test.ts",
           "name": "never queues a same-titled song by someone else"
         }
+      ]
+    },
+    {
+      "id": "NP-RADIO-003",
+      "group": "np-radio",
+      "title": "The radio bar reports only a trustworthy broadcast position",
+      "contract": "When the station publishes a start and a length, the progress bar follows the published millisecond cue clock while visible and catches up when a tab returns; the whole-second stamps never run ahead of it. A feed that republishes the cue on the air as a heartbeat (Triton re-stamps cue_time_start about every 12 seconds) is read from the oldest stamp of the unbroken run, so a song playing for minutes is not reported as just begun. A new start for the same named song inside its previously published length contradicts the position: keep the song name, show position unavailable and its published length, and do not jump the bar backwards. A legitimate re-cue after the old song ends, or a different song, restores a timed bar. When no length is published, the elapsed stamp can advance but the bar stays empty instead of sitting full. Older overlapping replies cannot replace a newer one; bfcache restoration re-reads the station; and when the tuned station stops naming a song, its own list row lets go of it too.",
+      "example": "Radio: a timed song advances smoothly; an inconsistent station says —:— and Length 04:17 instead of moving backward or sitting at 100%.",
+      "authority": "adopted",
+      "owners": ["music-player/scripts/make-shell.py", "music-player/index.html"],
+      "evidence": [
+        { "type": "test", "path": "music-player/tests/e2e/np/radio-elapsed.spec.ts", "name": "radio fill tracks the published cue clock without pausing a second behind it" },
+        { "type": "test", "path": "music-player/tests/e2e/np/radio-elapsed.spec.ts", "name": "a Triton heartbeat does not reset the song: the oldest stamp of the run is its start" },
+        { "type": "test", "path": "music-player/tests/dom/radio-triton-heartbeat.test.ts", "name": "the cue on the air, republished every twelve seconds" },
+        { "type": "test", "path": "music-player/tests/e2e/np/radio-elapsed.spec.ts", "name": "conflicting same-song re-cues stop claiming a broadcast position until a new song" },
+        { "type": "test", "path": "music-player/tests/e2e/np/radio-elapsed.spec.ts", "name": "a timed cue with no published length advances elapsed but never shows a permanently full bar" },
+        { "type": "test", "path": "music-player/tests/e2e/np/radio-elapsed.spec.ts", "name": "a late old feed reply cannot replace the new song on the same station" },
+        { "type": "test", "path": "music-player/tests/e2e/np/radio-elapsed.spec.ts", "name": "a station that stops naming a song stops claiming one" }
       ]
     },
     {

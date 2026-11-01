@@ -20,6 +20,7 @@ interface Cue {
   programme?: string | null;
   startedAt: number | null;
   duration: number | null;
+  timingUnreliable?: boolean;
 }
 
 interface Applied {
@@ -36,10 +37,19 @@ function sameNameAs(a: string | null | undefined, b: string | null | undefined):
 }
 
 /** The accept/reject decision in the shell's `pollTrack`, with the cue-identity rule. */
-function apply(now: Cue | null, next: Cue): Applied {
+function apply(now: Cue | null, incoming: Cue): Applied {
   const events: string[] = [];
-  const sameName = Boolean(now && sameNameAs(now.title, next.title) && sameNameAs(now.artist, next.artist) && (now.programme ?? null) === (next.programme ?? null));
-  const sameTiming = Boolean(now && now.startedAt === next.startedAt && now.duration === next.duration);
+  const sameName = Boolean(now && sameNameAs(now.title, incoming.title) && sameNameAs(now.artist, incoming.artist) && (now.programme ?? null) === (incoming.programme ?? null));
+  let next = incoming;
+  if (sameName && now?.timingUnreliable) {
+    next = { ...incoming, startedAt: null, timingUnreliable: true };
+  } else if (sameName && now?.startedAt && now.duration && incoming.startedAt
+             && incoming.startedAt > now.startedAt + 500
+             && incoming.startedAt < now.startedAt + now.duration * 1000 - 15_000) {
+    next = { ...incoming, startedAt: null, timingUnreliable: true };
+  }
+  const sameTiming = Boolean(now && now.startedAt === next.startedAt && now.duration === next.duration
+    && Boolean(now.timingUnreliable) === Boolean(next.timingUnreliable));
   let track = now;
   if (!sameName || !sameTiming) {
     const renamed = !sameName;
@@ -70,6 +80,44 @@ describe('the same song re-cued with a fresh start', () => {
   it('takes a changed length too', () => {
     const relength = cue('You Shook Me All Night Long', expired.startedAt, 300);
     expect(apply(expired, relength).track?.duration).toBe(300);
+  });
+});
+
+describe('one title repeatedly re-cued before its own published end', () => {
+  const first = cue('Come On Eileen', 1_792_508_565_000, 257, 'Dexys Midnight Runners');
+  const shifted = cue('Come On Eileen', first.startedAt! + 24_000, 257, 'Dexys Midnight Runners');
+
+  it('stops claiming a false position instead of running the bar backwards 24 seconds', () => {
+    const result = apply(first, shifted);
+    expect(result.track?.title).toBe(first.title);
+    expect(result.track?.startedAt).toBeNull();
+    expect(result.track?.timingUnreliable).toBe(true);
+    expect(result.events).toEqual([]);
+    expect(shifted.startedAt).toBe(first.startedAt! + 24_000); // the feed's cache is untouched
+  });
+
+  it('keeps the position unclaimed when the feed re-cues that same name again', () => {
+    const unreliable = apply(first, shifted).track;
+    const shiftedAgain = cue('Come On Eileen', first.startedAt! + 42_000, 257, 'Dexys Midnight Runners');
+    expect(apply(unreliable, shiftedAgain).track?.startedAt).toBeNull();
+  });
+
+  it('takes a new valid cue when the feed finally names a different song', () => {
+    const unreliable = apply(first, shifted).track;
+    const next = cue('New Song', first.startedAt! + 100_000, 240, 'New Artist');
+    expect(apply(unreliable, next)).toEqual({ track: next, events: ['radio:track'] });
+  });
+
+  it('treats a 1.9-second backward jump as visible, but tolerates sub-second feed jitter', () => {
+    const small = cue('Come On Eileen', first.startedAt! + 1_900, 257, 'Dexys Midnight Runners');
+    expect(apply(first, small).track?.timingUnreliable).toBe(true);
+    const jitter = cue('Come On Eileen', first.startedAt! + 300, 257, 'Dexys Midnight Runners');
+    expect(apply(first, jitter).track?.startedAt).toBe(jitter.startedAt);
+  });
+
+  it('still accepts a same-name re-cue once the old song has actually finished', () => {
+    const later = cue('Come On Eileen', first.startedAt! + 260_000, 257, 'Dexys Midnight Runners');
+    expect(apply(first, later).track?.startedAt).toBe(later.startedAt);
   });
 });
 

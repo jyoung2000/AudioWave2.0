@@ -1814,9 +1814,12 @@
         "station list",
         "the song on the air, read from the stream (paired or with the companion)",
         "no feed and nothing to read the stream: the programme format, no invented title",
-        "station directory from the paired Hub (metadata only, not a stream proxy); the public directory when unpaired, on an older Hub, or after a named refusal"
+        "station directory from the paired Hub (metadata only, not a stream proxy); the public directory when unpaired, on an older Hub, or after a named refusal",
+        "timed radio cue advancing smoothly from its published start and length, including tab return",
+        "conflicting start times for one song: song named, length shown, broadcast position unavailable",
+        "published start with no length: elapsed stamp advances, progress bar empty"
       ],
-      "rules": ["NP-LIVE-001", "NP-RADIO-001", "NP-RADIO-002"],
+      "rules": ["NP-LIVE-001", "NP-RADIO-001", "NP-RADIO-002", "NP-RADIO-003"],
       "guideAnchor": "shell",
       "authority": "adopted"
     },

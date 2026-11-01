@@ -1,13 +1,16 @@
 /**
  * The song on the air (NP-RADIO-001) and keeping it (NP-RADIO-002).
  *
- * A browser never sees a stream's ICY metadata, so the title comes from whoever can read it: the
- * companion's helper here (stubbed on 127.0.0.1:17999), or the paired container. The station used,
- * WFMT, publishes no feed of its own, so nothing but the ICY route can name its song. Streams answer
- * with decodable silence, and the directory is unreachable, so the bundled shelf answers.
+ * The title comes from whoever can read it, in a fixed order: a station's own published feed, then
+ * whoever is paired (the companion's helper here, stubbed on 127.0.0.1:17999, or the container),
+ * then the stream's own in-band ICY metadata where the station's CORS admits this page, then the
+ * Icecast status page. The station used, WFMT, publishes no feed of its own, so nothing but those
+ * later routes can name its song. Streams answer with decodable silence, and the directory is
+ * unreachable, so the bundled shelf answers.
  */
 import { expect, test, type Page } from '@playwright/test';
 import { boot, CORS, HUB, silentWav, watchErrors } from './_shell';
+import { done, fulfillStream, results, src, status, track } from './_catalog';
 
 const COMPANION = 'http://127.0.0.1:17999';
 const ON_AIR = { raw: 'Air Artist - Air Song', artist: 'Air Artist', title: 'Air Song', station: 'WFMT', reason: null };
@@ -56,6 +59,95 @@ test('a station with no feed shows the song its stream carries, read by the comp
   await expect(stationRow(page).locator('.rlist-song')).toHaveText('Air Song');
   await expect(stationRow(page).locator('.rlist-artist')).toHaveText('Air Artist');
   expect(asked.some((u) => /wfmt\.streamguys1\.com/.test(u)), JSON.stringify(asked)).toBe(true);
+});
+
+/* The stream names the song in band to anyone whose CORS it admits, and the page can read it with
+   no PC in the path at all. Measured against the Illinois shelf the directory lists: 43 of 109
+   stations answer `Access-Control-Allow-Origin: *`, expose `icy-metaint` and carry a real
+   `StreamTitle`. Nexus Radio is the first row of the Chicago shelf, publishes
+   `Kungs x Boys Noize - Get Away` in band, and read "Song not available" for a whole watched
+   quarter hour because nobody had asked the stream.
+
+   The reader is last and conditional on purpose, so the two drills that matter are: it answers when
+   nothing else did, and it never displaces something that did. */
+/** A stream that carries ICY metadata: `step` audio bytes, a length in sixteens, then the block. */
+function icyStream(step: number, block: string): Buffer {
+  const body = Buffer.from(block, 'utf8');
+  const sixteens = Math.ceil(body.length / 16);
+  const out = Buffer.alloc(step + 1 + sixteens * 16, 0x55);
+  out[step] = sixteens;
+  body.copy(out, step + 1);
+  out.fill(0, step + 1 + body.length);
+  return out;
+}
+
+test('with nothing paired, the station names its own song straight to the page', async ({ page }) => {
+  const stations = [{ stationuuid: 'icy-1', name: 'In Band FM', url_resolved: 'https://radio.example/inband', state: 'Chicago, IL', country: 'United States', countrycode: 'US', tags: '', bitrate: 0 }];
+  await page.route(/radio-browser\.info/i, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stations) }));
+  /* No Companion and no Hub: this is the unpaired listener, who had been shown nothing. */
+  let icyReads = 0;
+  await page.route(/radio\.example\/inband/, (r) => {
+    icyReads += 1;
+    return r.fulfill({
+      status: 200,
+      headers: { ...CORS, 'access-control-expose-headers': 'icy-metaint,icy-br,icy-genre,icy-name',
+                 'content-type': 'audio/mpeg', 'icy-metaint': '4096', 'icy-genre': 'Electronic Dance', 'icy-br': '128' },
+      body: icyStream(4096, "StreamTitle='Kungs x Boys Noize - Get Away ';StreamUrl='';"),
+    });
+  });
+  await boot(page);
+  await page.click('.tb__btn[data-view="radio"]');
+  await expect(page.locator('#libScopeLabel')).toHaveText('Chicago', { timeout: 15_000 });
+  const row = page.locator('#radioMenu .rlist tbody tr', { hasText: 'In Band FM' });
+  await expect(row.locator('.rlist-song')).toHaveText('Get Away', { timeout: 25_000 });
+  await expect(row.locator('.rlist-artist')).toHaveText('Kungs x Boys Noize');
+  // The stream also states its own genre and bitrate, which the directory left empty.
+  await expect(row.locator('.rlist-genre')).toHaveText('Electronic Dance');
+  expect(icyReads, 'the stream was actually asked').toBeGreaterThan(0);
+});
+
+test('a paired reader still wins: the stream is only asked when nobody else answered', async ({ page }) => {
+  /* The in-band read is a fallback, not a replacement. A Companion that names the song must be
+     what the listener sees, and the station must not be opened a second time to contradict it. */
+  const stations = [
+    { stationuuid: 'ord-1', name: 'Answered FM', url_resolved: 'https://radio.example/answered', state: 'Chicago, IL', country: 'United States', countrycode: 'US', tags: '', bitrate: 0 },
+    { stationuuid: 'ord-2', name: 'Silent FM', url_resolved: 'https://radio.example/silent', state: 'Chicago, IL', country: 'United States', countrycode: 'US', tags: '', bitrate: 0 },
+  ];
+  await page.route(/radio-browser\.info/i, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stations) }));
+  await page.route(`${COMPANION}/helper/v1/radio/now-playing**`, (r) => {
+    const u = new URL(r.request().url()).searchParams.get('url') ?? '';
+    const body = /answered/.test(u)
+      ? { raw: 'Companion Artist - Companion Song', artist: 'Companion Artist', title: 'Companion Song', station: 'Answered FM', reason: null }
+      : { raw: null, artist: null, title: null, station: null, programme: null, programmeSource: null, reason: 'The station sent no song title' };
+    return r.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  });
+  /* Both streams would gladly name a different song if asked. Only the one the Companion could
+     not read should ever be opened. */
+  const opened: string[] = [];
+  for (const [path, song] of [['answered', 'In Band Song'], ['silent', 'Rescued Song']] as const) {
+    await page.route(new RegExp(`radio\\.example/${path}`), (r) => {
+      opened.push(path);
+      return r.fulfill({
+        status: 200,
+        headers: { ...CORS, 'access-control-expose-headers': 'icy-metaint', 'content-type': 'audio/mpeg', 'icy-metaint': '4096' },
+        body: icyStream(4096, `StreamTitle='In Band Artist - ${song}';`),
+      });
+    });
+  }
+  await boot(page);
+  await page.evaluate((c) => { (window as unknown as { COMPANION: string }).COMPANION = c; }, COMPANION);
+  await page.click('.tb__btn[data-view="radio"]');
+  await expect(page.locator('#libScopeLabel')).toHaveText('Chicago', { timeout: 15_000 });
+
+  const answered = page.locator('#radioMenu .rlist tbody tr', { hasText: 'Answered FM' });
+  const silent = page.locator('#radioMenu .rlist tbody tr', { hasText: 'Silent FM' });
+  // The station the Companion could not read is rescued by its own stream.
+  await expect(silent.locator('.rlist-song')).toHaveText('Rescued Song', { timeout: 25_000 });
+  // The station it could read keeps the Companion's answer, unchanged.
+  await expect(answered.locator('.rlist-song')).toHaveText('Companion Song');
+  await expect(answered.locator('.rlist-artist')).toHaveText('Companion Artist');
+  expect(opened.includes('silent'), 'the unread station was asked itself').toBe(true);
+  expect(opened.includes('answered'), 'the answered station was not opened to second-guess the Companion').toBe(false);
 });
 
 test('every station in the list shows what is on the air, never its genre', async ({ page }) => {
@@ -235,6 +327,13 @@ test('right-click keeps the song: Up Next, a new playlist, and it survives a rel
   await page.evaluate((c) => { (window as unknown as { COMPANION: string }).COMPANION = c; }, COMPANION);
   await tuneWfmt(page);
   await expect(page.locator('.player__title')).toHaveText('Air Song', { timeout: 10_000 });
+  // One connected platform found the exact recording with a fetchable source, not merely a
+  // same-titled store listing. Its URL and provenance must survive queueing and reload.
+  await page.evaluate(() => { (window as unknown as { NP_FIND: (q: string) => Promise<unknown[]> }).NP_FIND = async () => [
+    { t: 'Air Song', a: 'Air Artist', al: 'Air Album', p: 'Apple Music', u: 'https://music.apple.com/song/42', fetchable: false },
+    { t: 'Air Song', a: 'Air Artist', al: 'Air Album', d: 212, p: 'YouTube Music',
+      u: 'https://music.youtube.com/watch?v=air-song-123', fetchable: true },
+  ]; });
 
   await stationRow(page).click({ button: 'right', position: { x: 120, y: 8 } });
   await expect(page.locator('#ctx .ctx__head')).toHaveText('On air: Air Artist — Air Song');
@@ -246,6 +345,7 @@ test('right-click keeps the song: Up Next, a new playlist, and it survives a rel
   let s = await state(page);
   const kept = s.kept.find((k) => k.title === 'Air Song');
   expect(kept?.artist).toBe('Air Artist');
+  expect(kept).toMatchObject({ album: 'Air Album', platform: 'YouTube Music', url: 'https://music.youtube.com/watch?v=air-song-123' });
   expect(s.queue).toContain(kept!.id);
 
   await stationRow(page).click({ button: 'right', position: { x: 120, y: 8 } });
@@ -263,6 +363,131 @@ test('right-click keeps the song: Up Next, a new playlist, and it survives a rel
   await boot(page);
   s = await state(page);
   expect(s.kept.map((k) => k.id), 'kept across a reload').toContain(kept!.id);
+});
+
+test('the paired companion catalog supplies a fetchable recording to the radio queue', async ({ page }) => {
+  const asked: string[] = [];
+  await companionReads(page);
+  await page.route(`${COMPANION}/helper/v1/catalog/search?**`, async (r) => {
+    const q = new URL(r.request().url()).searchParams.get('q') ?? '';
+    asked.push(q);
+    const song = track('deezer:901', 'Air Song', { artist: 'Air Artist', artists: ['Air Artist'], album: 'Air Album',
+      sources: [src('deezer', '901', { url: 'https://www.deezer.com/track/901' }),
+        src('soundcloud', 'air-song', { url: 'https://soundcloud.com/air-artist/air-song' })],
+    });
+    const st = status([{ provider: 'deezer', state: 'ok', count: 1 }]);
+    await fulfillStream(r, [results(0, 'deezer', q, { tracks: [song] }, st), done(1, q, st, { tracks: false })]);
+  });
+  await boot(page);
+  await page.evaluate((c) => { (window as unknown as { COMPANION: string }).COMPANION = c; }, COMPANION);
+  await tuneWfmt(page);
+  await expect(page.locator('.player__title')).toHaveText('Air Song', { timeout: 10_000 });
+  await stationRow(page).click({ button: 'right', position: { x: 120, y: 8 } });
+  await page.click('#ctx [data-act="ls-air-next"]');
+  await expect(page.locator('#toast')).toContainText('Up Next: “Air Song”', { timeout: 15_000 });
+  expect(asked.some((q) => /air artist air song/i.test(q))).toBe(true);
+  const s = await state(page);
+  const kept = s.kept.find((k) => k.title === 'Air Song');
+  expect(kept).toMatchObject({ artist: 'Air Artist', platform: 'SoundCloud', url: 'https://soundcloud.com/air-artist/air-song' });
+  expect(s.queue).toContain(kept!.id);
+});
+
+test('the paired Hub catalog supplies a fetchable recording to the radio playlist', async ({ page }) => {
+  const asked: string[] = [];
+  await boot(page);
+  await page.evaluate(async (a) => { await (window as unknown as { kv: { set(k: string, v: unknown): Promise<void> } }).kv.set('player:hub', a); }, ACCT);
+  await page.route(`${HUB}/**`, async (r) => {
+    const u = new URL(r.request().url());
+    if (r.request().method() === 'OPTIONS') return r.fulfill({ status: 204, headers: CORS });
+    if (u.pathname === '/api/v1/radio/now-playing') return r.fulfill({ status: 200, headers: { ...CORS, 'content-type': 'application/json' }, body: JSON.stringify(ON_AIR) });
+    if (u.pathname === '/api/v1/catalog/search') {
+      const q = u.searchParams.get('q') ?? '';
+      asked.push(q);
+      const song = track('deezer:902', 'Air Song', { artist: 'Air Artist', artists: ['Air Artist'], album: 'Air Album',
+        sources: [src('deezer', '902'), src('youtube', 'air-902', { url: 'https://www.youtube.com/watch?v=air902' })],
+      });
+      const st = status([{ provider: 'deezer', state: 'ok', count: 1 }]);
+      return fulfillStream(r, [results(0, 'deezer', q, { tracks: [song] }, st), done(1, q, st, { tracks: false })]);
+    }
+    return r.fulfill({ status: 404, headers: { ...CORS, 'content-type': 'application/json' }, body: '{}' });
+  });
+  await page.goto('about:blank');
+  await boot(page);
+  await tuneWfmt(page);
+  await expect(page.locator('.player__title')).toHaveText('Air Song', { timeout: 10_000 });
+  await stationRow(page).click({ button: 'right', position: { x: 120, y: 8 } });
+  await page.locator('#ctx .ctx__item--parent', { hasText: 'Add Song to Playlist' }).click();
+  await page.click('#ctx [data-act="ls-air-new"]');
+  await page.waitForSelector('#sheet[open]', { timeout: 15_000 });
+  await page.fill('#sheetInput', 'From Hub Radio');
+  await page.click('#sheetCreate');
+  await expect(page.locator('#toast')).toContainText('Added to “From Hub Radio”');
+  expect(asked.some((q) => /air artist air song/i.test(q))).toBe(true);
+  const s = await state(page);
+  const kept = s.kept.find((k) => k.title === 'Air Song');
+  expect(kept).toMatchObject({ platform: 'YouTube', url: 'https://www.youtube.com/watch?v=air902' });
+  expect(s.playlists.find((p) => p.name === 'From Hub Radio')?.songs).toContain(kept!.id);
+});
+
+test('a local copy already on this player can be queued without a catalog answer', async ({ page }) => {
+  await companionReads(page);
+  await boot(page);
+  await page.evaluate((c) => { (window as unknown as { COMPANION: string }).COMPANION = c; }, COMPANION);
+  await tuneWfmt(page);
+  await expect(page.locator('.player__title')).toHaveText('Air Song', { timeout: 10_000 });
+  await page.evaluate(() => {
+    const w = window as unknown as { LIBRARY: unknown[]; NP_FIND: (q: string) => Promise<unknown[]> };
+    w.LIBRARY.push({ id: 'local-air-song', kind: 'music', title: 'Air Song', artist: 'Air Artist', local: true, platform: 'Local' });
+    w.NP_FIND = async () => [];
+  });
+  await stationRow(page).click({ button: 'right', position: { x: 120, y: 8 } });
+  await page.click('#ctx [data-act="ls-air-next"]');
+  await expect(page.locator('#toast')).toContainText('Up Next: “Air Song”');
+  expect((await state(page)).queue).toContain('local-air-song');
+});
+
+test('radio menu refuses to queue a song no connected catalog can fetch', async ({ page }) => {
+  await companionReads(page);
+  await boot(page);
+  await page.evaluate((c) => { (window as unknown as { COMPANION: string }).COMPANION = c; }, COMPANION);
+  await tuneWfmt(page);
+  await expect(page.locator('.player__title')).toHaveText('Air Song', { timeout: 10_000 });
+  // A plausible title in the broadcast does not prove any connected platform can fetch that track.
+  await page.evaluate(() => { (window as unknown as { NP_FIND: (q: string) => Promise<unknown[]> }).NP_FIND = async () => []; });
+  const before = await state(page);
+  await stationRow(page).click({ button: 'right', position: { x: 120, y: 8 } });
+  await page.click('#ctx [data-act="ls-air-next"]');
+  await expect(page.locator('#toast')).toContainText('could not find', { timeout: 10_000 });
+  const after = await state(page);
+  expect(after).toEqual(before);
+});
+
+test('a store-only or different-artist match cannot be filed as the radio song', async ({ page }) => {
+  await companionReads(page);
+  await boot(page);
+  await page.evaluate((c) => { (window as unknown as { COMPANION: string }).COMPANION = c; }, COMPANION);
+  await tuneWfmt(page);
+  await expect(page.locator('.player__title')).toHaveText('Air Song', { timeout: 10_000 });
+  // A store-only row may already be in the listener's library; it still cannot become a
+  // fetchable recording just because a station happens to announce the same title.
+  await page.evaluate(() => { (window as unknown as { LIBRARY: unknown[] }).LIBRARY.push({
+    id: 'store-only-air-song', kind: 'music', title: 'Air Song', artist: 'Air Artist',
+    platform: 'Apple Music', url: 'https://music.apple.com/song/42', duration: 212,
+  }); });
+  const before = await state(page);
+  for (const rows of [
+    [{ t: 'Air Song', a: 'Air Artist', p: 'Apple Music', u: 'https://music.apple.com/song/42', fetchable: false }],
+    [{ t: 'Air Song', a: 'Air Artist Cover', p: 'YouTube Music', u: 'https://music.youtube.com/watch?v=cover', fetchable: true }],
+  ]) {
+    await page.evaluate((result) => { (window as unknown as { NP_FIND: (q: string) => Promise<unknown[]> }).NP_FIND = async () => result; }, rows);
+    await stationRow(page).click({ button: 'right', position: { x: 120, y: 8 } });
+    await page.locator('#ctx .ctx__item--parent', { hasText: 'Add Song to Playlist' }).click();
+    await page.click('#ctx [data-act="ls-air-new"]');
+    await expect(page.locator('#toast')).toContainText('could not find', { timeout: 10_000 });
+    const s = await state(page);
+    expect(s).toEqual(before);
+    await expect(page.locator('#sheet[open]')).toHaveCount(0);
+  }
 });
 
 test('paired: the container reads the title, and the song goes to the group’s queue by name', async ({ page }) => {

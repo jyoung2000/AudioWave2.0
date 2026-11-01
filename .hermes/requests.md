@@ -10,6 +10,11 @@ Checked by `python scripts/open-loops.py`, which exits non-zero while anything h
 
 ## Open
 
+- [ ] "Open radio on the app and test listening to music and changing stations and playing /
+  pausing and all the features of radio. Ensure every feature works as expected and if not fix the
+  behavior. Ensure radio works and behaves as expected on and off the hub / companion app. Test and
+  watch for atleast 15 minutes and test the music player pwa / app radio feature and ensure the
+  duration and progress work smooth & as expected"
 - [ ] "ensure music data for the algorithm can get fetched from each platform also ensure discovery
   works and can pull from each platform. no feature should be broken" — genre/tag reach is ~8-10%
   on live rows; roughly half of YouTube rows are DJ mixes and shorts that no store carries. Needs

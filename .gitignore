@@ -63,3 +63,9 @@ music-player/awsp-web/target/
 # Per-machine agent CLI config (Codex). Machine-local and a common place for provider
 # credentials to end up, so it is never committed from this repo.
 .codex/
+
+# The discovery demo (discovery-demo/): Python environment and runtime data (DCLAP model, SQLite, logs).
+discovery-demo/server/.venv/
+discovery-demo/.data/
+discovery-demo/windows/release/
+.pytest_cache/

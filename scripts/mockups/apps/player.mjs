@@ -198,7 +198,15 @@ export default {
   // Outside services the shell asks and copes without: the station directory and station logos,
   // stations' now-playing feeds, oEmbed for a pasted link, tempo and artwork lookups. (The search
   // itself is answered: the companion's catalog, from lib/stock-search.mjs.)
-  unanswered: [/^GET https:\/\/(?:[a-z0-9-]+\.)*(radio-browser\.info|tritondigital\.com|iheart\.com|radio\.co|youtube\.com\/oembed|noembed\.com|deezer\.com|itunes\.apple\.com|musicbrainz\.org|coverartarchive\.org)[/?]/i, /^GET https:\/\/[^ ]+\.(png|jpe?g|ico|svg|webp)(\?|$)/i],
+  // Radio shelf reads the paired helper for ICY and tries Icecast status-json as a browser-direct
+  // fallback. Mockups have neither a live broadcaster nor a running helper, so both intentionally
+  // fail; the shell still renders its station directory and untimed LIVE state.
+  unanswered: [
+    /^GET https:\/\/(?:[a-z0-9-]+\.)*(radio-browser\.info|tritondigital\.com|iheart\.com|radio\.co|youtube\.com\/oembed|noembed\.com|deezer\.com|itunes\.apple\.com|musicbrainz\.org|coverartarchive\.org)[/?]/i,
+    /^GET https:\/\/[^ ]+\.(png|jpe?g|ico|svg|webp)(\?|$)/i,
+    /^GET https:\/\/[^ ]+\/status-json\.xsl(\?|$)/i,
+    /^GET http:\/\/127\.0\.0\.1:17342\/helper\/v1\/radio\/now-playing\?url=/i,
+  ],
   expectedErrors: [],
   links: LINKS,
   /** Small readable scripts the mockup runs on its captured markup (not the app's code): search on stock songs. */

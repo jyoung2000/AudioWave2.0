@@ -16935,6 +16935,127 @@ window.AW.startStats = function () {
     var icecastAsked = {};
     function hostOf(u) { var m = String(u || '').match(/^https?:\/\/([^/]+)/i); return m ? m[1].toLowerCase() : ''; }
 
+    /* `StreamTitle='Artist - Title'` is the shoutcast/Icecast convention, and both the server's
+       status page and the stream's own in-band metadata fill the same template just as loosely:
+       CRIS Radio publishes 'Peter Katt -  -  ', an artist with the title left blank, which split
+       naively leaves a lone dash sitting in the song column. Each side is taken only if it says
+       something, and an artist with no song is still worth saying. One parser, so a station reads
+       the same whichever of the two answered. */
+    function splitStreamTitle(line, fallbackArtist) {
+      var s = String(line == null ? '' : line).trim();
+      if (!s) return null;
+      var at = s.indexOf(' - ');
+      var title = at > 0 ? s.slice(at + 3) : s;
+      var artist = at > 0 ? s.slice(0, at) : (fallbackArtist || '');
+      title = String(title).replace(/\s*-\s*/g, ' ').trim();
+      artist = String(artist).trim();
+      if (/^[\s-]*$/.test(title)) title = '';
+      if (/^[\s-]*$/.test(artist)) artist = '';
+      if (!title && artist) { title = artist; artist = ''; }
+      if (!title) return null;
+      return { title: title, artist: artist };
+    }
+
+    /* The stream itself names the song, in band, to anyone who asks with `Icy-MetaData: 1` --
+       no Hub and no Companion in the path. Measured against the Illinois shelf the directory
+       lists: 43 of 109 stations answer `Access-Control-Allow-Origin: *`, expose `icy-metaint`
+       to the page and carry a real `StreamTitle` (94.7 WLS: `Mariah Carey - Fantasy`; Nexus
+       Radio: `Kungs x Boys Noize - Get Away`). Nexus Radio is the first row of the Chicago shelf
+       and read 'Song not available' for the whole of a watched quarter hour while the bytes
+       naming the song were going past.
+
+       This is deliberately the narrowest possible read: one request, cancelled the moment the
+       first metadata block has been seen, never left open to pull the stream in the background.
+       `icy-metaint` says how many audio bytes sit between metadata blocks, so exactly that many
+       are skipped, the length byte is read, and the block is decoded -- typically about 20KB for
+       a 16000-byte interval, which is why a station with a large interval is given up on rather
+       than chased. A station whose CORS does not admit the page fails the fetch, is remembered,
+       and is never asked again. It states no cue timing, so it never claims a position. */
+    var ICY_DEADLINE = 6000;
+    var ICY_MAX_BYTES = 80000;
+    var icyDirectAsked = {};
+    function icyDirect(url) {
+      if (typeof fetch !== 'function' || typeof AbortController !== 'function') return Promise.resolve(null);
+      var host = hostOf(url);
+      if (!host || icyDirectAsked[host] === false) return Promise.resolve(null);
+      /* An https page cannot read an http stream, and the audio element has the same problem --
+         there is nothing to gain by trying and a console error to be had by it. */
+      if (location.protocol === 'https:' && /^http:/i.test(String(url))) return Promise.resolve(null);
+      var ctl = new AbortController();
+      var killer = setTimeout(function () { ctl.abort(); }, ICY_DEADLINE);
+      var reader = null;
+      var done = function (val) {
+        clearTimeout(killer);
+        if (reader) { try { reader.cancel(); } catch (e) { /* already closed */ } }
+        try { ctl.abort(); } catch (e) { /* already aborted */ }
+        return val;
+      };
+      return fetch(url, { headers: { 'Icy-MetaData': '1' }, cache: 'no-store', signal: ctl.signal })
+        .then(function (r) {
+          if (!r.ok || !r.body) { icyDirectAsked[host] = false; return done(null); }
+          /* Exposed only when the server says so in Access-Control-Expose-Headers; without it
+             the interval is unknown and the audio bytes cannot be told from the metadata. */
+          var step = Number(r.headers.get('icy-metaint') || 0);
+          var genre = String(r.headers.get('icy-genre') || '').trim();
+          var bitrate = Number(r.headers.get('icy-br') || 0) || 0;
+          if (!step || step > ICY_MAX_BYTES) { icyDirectAsked[host] = false; return done(null); }
+          reader = r.body.getReader();
+          var seen = 0, parts = [];
+          var need = step + 1 + 16 * 255;
+          function pump() {
+            return reader.read().then(function (res) {
+              if (res.done) return null;
+              parts.push(res.value);
+              seen += res.value.length;
+              if (seen < Math.min(need, ICY_MAX_BYTES)) return pump();
+              return null;
+            });
+          }
+          return pump().then(function () {
+            if (seen <= step) { icyDirectAsked[host] = false; return done(null); }
+            var buf = new Uint8Array(seen), at = 0, i;
+            for (i = 0; i < parts.length; i++) { buf.set(parts[i], at); at += parts[i].length; }
+            var len = buf[step] * 16;
+            /* A zero length byte is the server saying "nothing has changed since the last block",
+               which is a real answer about the song and not a failure of the host: the genre and
+               bitrate it stated are still worth returning, and it stays askable. */
+            if (!len || step + 1 + len > seen) {
+              return done((genre || bitrate) ? { title: '', artist: '', genre: genre, bitrate: bitrate, startedAt: null, duration: null } : null);
+            }
+            var raw = '';
+            for (i = step + 1; i < step + 1 + len; i++) {
+              if (!buf[i]) break;
+              raw += String.fromCharCode(buf[i]);
+            }
+            /* The block is UTF-8 on the wire; decoding it byte-wise above would mangle any
+               non-ASCII title, so it is re-decoded properly where the browser can. */
+            try {
+              if (typeof TextDecoder === 'function') {
+                var end = step + 1 + len, stop = end;
+                for (i = step + 1; i < end; i++) { if (!buf[i]) { stop = i; break; } }
+                raw = new TextDecoder('utf-8').decode(buf.subarray(step + 1, stop));
+              }
+            } catch (e) { /* keep the byte-wise reading */ }
+            var m = /StreamTitle='([\s\S]*?)';/.exec(raw) || /StreamTitle='([\s\S]*)$/.exec(raw);
+            var t = splitStreamTitle(m ? m[1] : '', '');
+            if (!t) return done((genre || bitrate) ? { title: '', artist: '', genre: genre, bitrate: bitrate, startedAt: null, duration: null } : null);
+            t.genre = genre;
+            t.bitrate = bitrate;
+            /* In-band metadata carries no cue clock, so the position is not claimed. */
+            t.startedAt = null;
+            t.duration = null;
+            return done(t);
+          });
+        })
+        .catch(function () {
+          /* A CORS refusal, a redirect to a host that refuses, or a stream that will not open:
+             the page cannot read this one, and asking again each pass costs a connection. */
+          icyDirectAsked[host] = false;
+          return done(null);
+        });
+    }
+    window.icyDirect = icyDirect;
+
     function icecastMeta(url) {
       var m = String(url || '').match(/^(https?:\/\/[^/]+)\/([^/?#]+?)(?:\.[a-z0-9]+)?(?:\?|#|$)/i);
       if (!m) return Promise.resolve(null);
@@ -16959,23 +17080,11 @@ window.AW.startStats = function () {
           if (!pick && all.length === 1) pick = all[0];
           if (!pick) return null;
           var line = String(pick.title || pick.yp_currently_playing || '').trim();
-          /* Icecast's convention is StreamTitle='Artist - Title'; the artist leads. Stations fill
-             that template loosely: CRIS Radio publishes 'Peter Katt -  -  ', an artist with the
-             title left blank, which split naively leaves a lone dash sitting in the song column.
-             Each side is taken only if it says something. */
-          var at = line.indexOf(' - ');
-          var title = at > 0 ? line.slice(at + 3) : line;
-          var artist = at > 0 ? line.slice(0, at) : (pick.artist || '');
-          title = String(title).replace(/\s*-\s*/g, ' ').trim();
-          artist = String(artist).trim();
-          if (/^[\s-]*$/.test(title)) title = '';
-          if (/^[\s-]*$/.test(artist)) artist = '';
-          /* An artist with no song is still worth saying, and the row has a column for it. */
-          if (!title && artist) { title = artist; artist = ''; }
-          if (!title) return null;
+          var t = splitStreamTitle(line, pick.artist || '');
+          if (!t) return null;
           /* The server states its own genre and bitrate: the station's words, not a guess made
              here, so they are reportable. It states no cue timing, so no position is claimed. */
-          return { title: title, artist: artist, genre: pick.genre || '',
+          return { title: t.title, artist: t.artist, genre: pick.genre || '',
                    bitrate: pick.bitrate || 0, startedAt: null, duration: null };
         })
         .catch(function () {
@@ -17075,8 +17184,14 @@ window.AW.startStats = function () {
         /* A station that has stopped naming a song -- an ad break, a talk segment, a feed that
            answered 204 -- used to leave the last song on screen with its clock still running,
            so a track that finished minutes ago still looked like it was playing. No answer is
-           an answer: clear the song and let the bar fall back to the live edge. */
-        if (!t) {
+           an answer: clear the song and let the bar fall back to the live edge.
+
+           A reading that names no song is the same answer. The stream readers return what the
+           station said about ITSELF (its genre and bitrate, which the Song column's neighbours
+           want) even when its metadata block named no track, and that object is truthy: taken
+           as a cue it put an empty headline on screen where "Song not available" belongs.
+           Measured on Nexus Radio: 38 of 197 samples of a watched quarter hour. */
+        if (!t || !String(t.title == null ? '' : t.title).trim()) {
           if (nowTrack) { nowTrack = null; applyMode(mode); }
           /* A 204 between songs is the feed drawing breath, not the end of the matter: measured on
              Big 95.5, it answered 204 and published the next song six seconds later. Asking again

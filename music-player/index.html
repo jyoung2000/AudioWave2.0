@@ -9901,37 +9901,50 @@ window.AW.startStats = function () {
         '</div>';
     }
 
-    /* The song as a library entry: the one already there, or a new one the
-       search chain fills in (album, length, link) when it finds the same
-       song by the same artist. Nothing is guessed from a different artist. */
+    /* The song as a library entry: only keep an existing playable copy or an exact catalog match
+       from a connected source the downloader can fetch. Broadcast text by itself is not a
+       recording; inventing a Radio row with no URL made Up Next/playlist silently unplayable. */
     function airSong(t) {
       function same(s) {
-        return s.title.toLowerCase() === t.title.toLowerCase() &&
-          String(s.artist || '').toLowerCase() === String(t.artist || '').toLowerCase();
+        return String(s.title || '').trim().toLowerCase() === String(t.title || '').trim().toLowerCase() &&
+          String(s.artist || '').trim().toLowerCase() === String(t.artist || '').trim().toLowerCase();
       }
-      for (var i = 0; i < LIB.length; i++) if (same(LIB[i])) return Promise.resolve(LIB[i]);
+      function fetchable(s) {
+        /* A saved store listing (Apple/Deezer) is no more playable than a search result from
+           that store. An already-downloaded local song is playable; otherwise only source
+           types the catalog's downloader accepts can back Up Next. */
+        return !!s.local || (/^(YouTube Music|YouTube|SoundCloud|Bandcamp|Spotify)$/i.test(s.platform || '') &&
+          /^https?:\/\//i.test(s.url || ''));
+      }
+      for (var i = 0; i < LIB.length; i++) {
+        if (same(LIB[i]) && fetchable(LIB[i])) return Promise.resolve(LIB[i]);
+      }
       var look = window.NP_FIND
         ? window.NP_FIND((t.artist ? t.artist + ' ' : '') + t.title).then(function (rows) {
             for (var k = 0; k < (rows || []).length; k++) {
               var r = rows[k];
-              if (r && String(r.t || '').toLowerCase() === t.title.toLowerCase() &&
-                  (!t.artist || String(r.a || '').toLowerCase().indexOf(t.artist.toLowerCase()) === 0)) return r;
+              if (r && r.fetchable === true && /^https?:\/\//i.test(r.u || '') &&
+                  String(r.t || '').trim().toLowerCase() === String(t.title || '').trim().toLowerCase() &&
+                  String(r.a || '').trim().toLowerCase() === String(t.artist || '').trim().toLowerCase()) return r;
             }
             return null;
           }, function () { return null; })
         : Promise.resolve(null);
       return look.then(function (m) {
-        for (var j = 0; j < LIB.length; j++) if (same(LIB[j])) return LIB[j];   // added meanwhile
+        for (var j = 0; j < LIB.length; j++) {
+          if (same(LIB[j]) && fetchable(LIB[j])) return LIB[j];
+        }
+        if (!m) return null; // no connected platform offered a fetchable copy: don't promise one
         var sg = {
           id: 'song-air-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
           kind: 'music',
           title: String(t.title).slice(0, 120),
           artist: String(t.artist || '').slice(0, 80),
-          album: m && m.al ? String(m.al).slice(0, 80) : '',
-          duration: m && m.d ? Math.max(0, Math.round(m.d)) : 0,
-          bpm: m && m.bpm ? m.bpm : null,
-          platform: m && m.p ? m.p : 'Radio',     // the badge says where it came from
-          url: m && m.u ? m.u : null,
+          album: m.al ? String(m.al).slice(0, 80) : '',
+          duration: m.d ? Math.max(0, Math.round(m.d)) : 0,
+          bpm: m.bpm || null,
+          platform: m.p,
+          url: m.u,
         };
         LIB.push(sg);
         state.kept.push(sg);
@@ -9954,6 +9967,7 @@ window.AW.startStats = function () {
         return;
       }
       airSong(t).then(function (sg) {
+        if (!sg) { say('We could not find a fetchable copy of “' + t.title + '” on your connected platforms'); return; }
         if (act === 'ls-air-next') {
           if (state.queue.indexOf(sg.id) < 0) state.queue.push(sg.id);
           save();
@@ -11262,9 +11276,18 @@ window.AW.startStats = function () {
       return 'Live broadcast';
     }
 
+    /* A cue that has outlived its own published length names a song that has stopped playing. The
+       player already refuses one (measured on iHeart: a finished cue was still served 47s past its
+       own end), but the list believed it -- so on a live watch the tuned row went on showing `MUTT`
+       for 626 one-second samples after the player had correctly let it go. Same rule, same
+       tolerance, both places. */
+    function cueOver(t) {
+      return !!(t && t.startedAt && t.duration
+                && (Date.now() - t.startedAt) / 1000 > t.duration + 15);
+    }
     function songCell(st) {
       var t = trackByStation[st.id];
-      return (t && t.title) ? t.title : '';
+      return (t && t.title && !cueOver(t)) ? t.title : '';
     }
 
     /* Why a cell is empty, for the tooltip: asked and told nothing, or not
@@ -11273,13 +11296,14 @@ window.AW.startStats = function () {
     function songHint(st) {
       var t = trackByStation[st.id];
       if (t && t.about) return 'Scheduled programme (no song right now)';
-      if (t && t.title) return '';
+      if (t && t.title && !cueOver(t)) return '';
+      if (cueOver(t)) return 'The station is still sending a song that has already finished';
       return metaMiss[st.id] ? 'This station is not naming a song right now' : '';
     }
 
     function artistCell(st) {
       var t = trackByStation[st.id];
-      return (t && t.artist) ? t.artist : '';
+      return (t && t.artist && !cueOver(t)) ? t.artist : '';
     }
 
     /* Filling the columns costs one request per station, so it is capped and
@@ -18041,6 +18065,7 @@ window.AW.startStats = function () {
        answers, the programme format the directory carries takes the line. */
     var nowTrack = null;      // { title, artist } for the tuned station
     var trackTimer = 0;
+    var trackPollSeq = 0;
     /* A cue knows when it ends, so there is no reason to find out late: the twenty-second
        poll is the floor, and this fires once, just after the song is due to finish. */
     var cueTimer = 0;
@@ -18067,21 +18092,50 @@ window.AW.startStats = function () {
            extension, so no lookup table is needed. */
         match: /(?:streamtheworld|tritondigital)\.com\/(?:api\/livestream-redirect\/)?([A-Za-z0-9_]+?)(?:\.[a-z0-9]+)?(?:\?|$)/i,
         url: function (m) {
+          /* 24 entries, not 1: Triton republishes the cue that is on the air every ~12s with a
+             FRESH cue_time_start, so the newest entry alone says the song started seconds ago
+             however long it has really been playing. The history is what carries its true start.
+             24 x ~12s covers nearly five minutes of song. */
           return 'https://np.tritondigital.com/public/nowplaying?mountName=' +
-                 encodeURIComponent(m[1]) + '&numberToFetch=1&eventType=track&t=' + Date.now();
+                 encodeURIComponent(m[1]) + '&numberToFetch=24&eventType=track&t=' + Date.now();
         },
         text: true,
         read: function (t) {
-          function prop(n) {
-            var m2 = t.match(new RegExp('name="' + n + '"><!\\[CDATA\\[([\\s\\S]*?)\\]\\]>'));
+          function prop(block, n) {
+            var m2 = String(block).match(new RegExp('name="' + n + '"><!\\[CDATA\\[([\\s\\S]*?)\\]\\]>'));
             return m2 ? m2[1].trim() : '';
           }
-          var title = prop('cue_title');
+          var items = String(t).match(/<nowplaying-info[\s\S]*?<\/nowplaying-info>/g) || [];
+          if (!items.length) return null;
+          var head = items[0];                                   // newest cue first
+          var title = prop(head, 'cue_title');
           if (!title) return null;
           /* Triton times its cues: when it started, in epoch milliseconds, and how long it runs,
-             also in milliseconds. It times programmes the same way it times songs. */
-          var began = Number(prop('cue_time_start')), runs = Number(prop('cue_time_duration'));
-          return { title: title, artist: prop('track_artist_name'),
+             also in milliseconds. It times programmes the same way it times songs.
+
+             But it re-stamps the cue on the air about every twelve seconds, keeping the title,
+             artist, programme and length and only moving cue_time_start forward. Measured on
+             WLSFM: "Take Me Home Tonight" (205.6s) carried 14 stamps spanning 198.1s, and the
+             song that followed began 5s after the first stamp plus that length -- so the OLDEST
+             stamp of an unbroken run is the broadcast's real start, and the newest is a
+             heartbeat. Reading the newest one alone pinned every song near 0:00 and knocked the
+             position backwards every poll: the reported stuck-and-lagging progress bar.
+
+             So walk back while the cue is still the same one and keep the earliest start. A
+             different title, artist or programme ends the run, which is also what stops a later
+             replay of the same song from borrowing the earlier airing's start. */
+          var artist = prop(head, 'track_artist_name');
+          var prog = prop(head, 'program_id');
+          var runs = Number(prop(head, 'cue_time_duration'));
+          var began = Number(prop(head, 'cue_time_start'));
+          for (var i = 1; i < items.length; i++) {
+            if (prop(items[i], 'cue_title') !== title
+                || prop(items[i], 'track_artist_name') !== artist
+                || prop(items[i], 'program_id') !== prog) break;
+            var earlier = Number(prop(items[i], 'cue_time_start'));
+            if (isFinite(earlier) && earlier > 0 && (!isFinite(began) || earlier < began)) began = earlier;
+          }
+          return { title: title, artist: artist,
                    startedAt: isFinite(began) && began > 0 ? began : null,
                    duration: isFinite(runs) && runs > 0 ? Math.round(runs / 1000) : null };
         },
@@ -18144,6 +18198,127 @@ window.AW.startStats = function () {
     var icecastAsked = {};
     function hostOf(u) { var m = String(u || '').match(/^https?:\/\/([^/]+)/i); return m ? m[1].toLowerCase() : ''; }
 
+    /* `StreamTitle='Artist - Title'` is the shoutcast/Icecast convention, and both the server's
+       status page and the stream's own in-band metadata fill the same template just as loosely:
+       CRIS Radio publishes 'Peter Katt -  -  ', an artist with the title left blank, which split
+       naively leaves a lone dash sitting in the song column. Each side is taken only if it says
+       something, and an artist with no song is still worth saying. One parser, so a station reads
+       the same whichever of the two answered. */
+    function splitStreamTitle(line, fallbackArtist) {
+      var s = String(line == null ? '' : line).trim();
+      if (!s) return null;
+      var at = s.indexOf(' - ');
+      var title = at > 0 ? s.slice(at + 3) : s;
+      var artist = at > 0 ? s.slice(0, at) : (fallbackArtist || '');
+      title = String(title).replace(/\s*-\s*/g, ' ').trim();
+      artist = String(artist).trim();
+      if (/^[\s-]*$/.test(title)) title = '';
+      if (/^[\s-]*$/.test(artist)) artist = '';
+      if (!title && artist) { title = artist; artist = ''; }
+      if (!title) return null;
+      return { title: title, artist: artist };
+    }
+
+    /* The stream itself names the song, in band, to anyone who asks with `Icy-MetaData: 1` --
+       no Hub and no Companion in the path. Measured against the Illinois shelf the directory
+       lists: 43 of 109 stations answer `Access-Control-Allow-Origin: *`, expose `icy-metaint`
+       to the page and carry a real `StreamTitle` (94.7 WLS: `Mariah Carey - Fantasy`; Nexus
+       Radio: `Kungs x Boys Noize - Get Away`). Nexus Radio is the first row of the Chicago shelf
+       and read 'Song not available' for the whole of a watched quarter hour while the bytes
+       naming the song were going past.
+
+       This is deliberately the narrowest possible read: one request, cancelled the moment the
+       first metadata block has been seen, never left open to pull the stream in the background.
+       `icy-metaint` says how many audio bytes sit between metadata blocks, so exactly that many
+       are skipped, the length byte is read, and the block is decoded -- typically about 20KB for
+       a 16000-byte interval, which is why a station with a large interval is given up on rather
+       than chased. A station whose CORS does not admit the page fails the fetch, is remembered,
+       and is never asked again. It states no cue timing, so it never claims a position. */
+    var ICY_DEADLINE = 6000;
+    var ICY_MAX_BYTES = 80000;
+    var icyDirectAsked = {};
+    function icyDirect(url) {
+      if (typeof fetch !== 'function' || typeof AbortController !== 'function') return Promise.resolve(null);
+      var host = hostOf(url);
+      if (!host || icyDirectAsked[host] === false) return Promise.resolve(null);
+      /* An https page cannot read an http stream, and the audio element has the same problem --
+         there is nothing to gain by trying and a console error to be had by it. */
+      if (location.protocol === 'https:' && /^http:/i.test(String(url))) return Promise.resolve(null);
+      var ctl = new AbortController();
+      var killer = setTimeout(function () { ctl.abort(); }, ICY_DEADLINE);
+      var reader = null;
+      var done = function (val) {
+        clearTimeout(killer);
+        if (reader) { try { reader.cancel(); } catch (e) { /* already closed */ } }
+        try { ctl.abort(); } catch (e) { /* already aborted */ }
+        return val;
+      };
+      return fetch(url, { headers: { 'Icy-MetaData': '1' }, cache: 'no-store', signal: ctl.signal })
+        .then(function (r) {
+          if (!r.ok || !r.body) { icyDirectAsked[host] = false; return done(null); }
+          /* Exposed only when the server says so in Access-Control-Expose-Headers; without it
+             the interval is unknown and the audio bytes cannot be told from the metadata. */
+          var step = Number(r.headers.get('icy-metaint') || 0);
+          var genre = String(r.headers.get('icy-genre') || '').trim();
+          var bitrate = Number(r.headers.get('icy-br') || 0) || 0;
+          if (!step || step > ICY_MAX_BYTES) { icyDirectAsked[host] = false; return done(null); }
+          reader = r.body.getReader();
+          var seen = 0, parts = [];
+          var need = step + 1 + 16 * 255;
+          function pump() {
+            return reader.read().then(function (res) {
+              if (res.done) return null;
+              parts.push(res.value);
+              seen += res.value.length;
+              if (seen < Math.min(need, ICY_MAX_BYTES)) return pump();
+              return null;
+            });
+          }
+          return pump().then(function () {
+            if (seen <= step) { icyDirectAsked[host] = false; return done(null); }
+            var buf = new Uint8Array(seen), at = 0, i;
+            for (i = 0; i < parts.length; i++) { buf.set(parts[i], at); at += parts[i].length; }
+            var len = buf[step] * 16;
+            /* A zero length byte is the server saying "nothing has changed since the last block",
+               which is a real answer about the song and not a failure of the host: the genre and
+               bitrate it stated are still worth returning, and it stays askable. */
+            if (!len || step + 1 + len > seen) {
+              return done((genre || bitrate) ? { title: '', artist: '', genre: genre, bitrate: bitrate, startedAt: null, duration: null } : null);
+            }
+            var raw = '';
+            for (i = step + 1; i < step + 1 + len; i++) {
+              if (!buf[i]) break;
+              raw += String.fromCharCode(buf[i]);
+            }
+            /* The block is UTF-8 on the wire; decoding it byte-wise above would mangle any
+               non-ASCII title, so it is re-decoded properly where the browser can. */
+            try {
+              if (typeof TextDecoder === 'function') {
+                var end = step + 1 + len, stop = end;
+                for (i = step + 1; i < end; i++) { if (!buf[i]) { stop = i; break; } }
+                raw = new TextDecoder('utf-8').decode(buf.subarray(step + 1, stop));
+              }
+            } catch (e) { /* keep the byte-wise reading */ }
+            var m = /StreamTitle='([\s\S]*?)';/.exec(raw) || /StreamTitle='([\s\S]*)$/.exec(raw);
+            var t = splitStreamTitle(m ? m[1] : '', '');
+            if (!t) return done((genre || bitrate) ? { title: '', artist: '', genre: genre, bitrate: bitrate, startedAt: null, duration: null } : null);
+            t.genre = genre;
+            t.bitrate = bitrate;
+            /* In-band metadata carries no cue clock, so the position is not claimed. */
+            t.startedAt = null;
+            t.duration = null;
+            return done(t);
+          });
+        })
+        .catch(function () {
+          /* A CORS refusal, a redirect to a host that refuses, or a stream that will not open:
+             the page cannot read this one, and asking again each pass costs a connection. */
+          icyDirectAsked[host] = false;
+          return done(null);
+        });
+    }
+    window.icyDirect = icyDirect;
+
     function icecastMeta(url) {
       var m = String(url || '').match(/^(https?:\/\/[^/]+)\/([^/?#]+?)(?:\.[a-z0-9]+)?(?:\?|#|$)/i);
       if (!m) return Promise.resolve(null);
@@ -18168,23 +18343,11 @@ window.AW.startStats = function () {
           if (!pick && all.length === 1) pick = all[0];
           if (!pick) return null;
           var line = String(pick.title || pick.yp_currently_playing || '').trim();
-          /* Icecast's convention is StreamTitle='Artist - Title'; the artist leads. Stations fill
-             that template loosely: CRIS Radio publishes 'Peter Katt -  -  ', an artist with the
-             title left blank, which split naively leaves a lone dash sitting in the song column.
-             Each side is taken only if it says something. */
-          var at = line.indexOf(' - ');
-          var title = at > 0 ? line.slice(at + 3) : line;
-          var artist = at > 0 ? line.slice(0, at) : (pick.artist || '');
-          title = String(title).replace(/\s*-\s*/g, ' ').trim();
-          artist = String(artist).trim();
-          if (/^[\s-]*$/.test(title)) title = '';
-          if (/^[\s-]*$/.test(artist)) artist = '';
-          /* An artist with no song is still worth saying, and the row has a column for it. */
-          if (!title && artist) { title = artist; artist = ''; }
-          if (!title) return null;
+          var t = splitStreamTitle(line, pick.artist || '');
+          if (!t) return null;
           /* The server states its own genre and bitrate: the station's words, not a guess made
              here, so they are reportable. It states no cue timing, so no position is claimed. */
-          return { title: title, artist: artist, genre: pick.genre || '',
+          return { title: t.title, artist: t.artist, genre: pick.genre || '',
                    bitrate: pick.bitrate || 0, startedAt: null, duration: null };
         })
         .catch(function () {
@@ -18301,7 +18464,7 @@ window.AW.startStats = function () {
 
     window.radioMeta = function (url, tuned) {
       var hit = feedFor(url);
-      if (!hit) return icyMeta(url).then(function (d) { return d || icecastMeta(url); });
+      if (!hit) return icyMeta(url).then(function (d) { return d || icyDirect(url); }).then(function (d) { return d || icecastMeta(url); });
       var now = Date.now();
       var c = metaCache[url];
       if (c && c.pending) return c.pending;
@@ -18340,8 +18503,10 @@ window.AW.startStats = function () {
                      startedAt: t.startedAt || null, duration: t.duration || null };
           });
         })
-        /* A matched feed that said nothing and a stream that said nothing still leave the
-           Icecast server itself unasked, and it answers from the page. */
+        /* A matched feed that said nothing and a stream the Hub could not read still leave
+           the station itself unasked: its in-band ICY metadata and then its Icecast status
+           page both answer this page directly, with no PC in the path. */
+        .then(function (t) { return t || icyDirect(url); })
         .then(function (t) { return t || icecastMeta(url); });
       metaCache[url] = { at: now, val: c ? c.val : null, pending: pr };
       return pr;
@@ -18358,8 +18523,15 @@ window.AW.startStats = function () {
           === String(b == null ? '' : b).trim().replace(/\s+/g, ' ').toLowerCase();
     }
     function radioAir() {
-      if (!station || !nowTrack || !nowTrack.startedAt) return null;
-      var secs = Math.floor((Date.now() - nowTrack.startedAt) / 1000);
+      if (!station || !nowTrack) return null;
+      /* A feed that repeatedly re-cues the same name before its previous published end has
+         contradicted itself. Keep the song name, but report no position until a different song
+         gives us a fresh, independently identifiable cue. */
+      if (nowTrack.timingUnreliable) return { elapsed: null, duration: nowTrack.duration || null, uncertain: true };
+      if (!nowTrack.startedAt) return null;
+      /* Keep the feed's millisecond start: rounding here quantised the fill to one-second steps,
+         even while the broadcast itself and Date.now() continued moving. */
+      var secs = (Date.now() - nowTrack.startedAt) / 1000;
       if (!isFinite(secs) || secs < 0) return null;
       var runs = nowTrack.duration || 0;
       /* A cue that has outlived its own length is stale: the feed has not caught up yet, and
@@ -18376,30 +18548,48 @@ window.AW.startStats = function () {
       return { elapsed: runs ? Math.min(secs, runs) : secs, duration: runs || null };
     }
     window.radioAir = radioAir;
-    /* The broadcast clock has to run on its own: the song is advancing whether or not the feed
-       is polled, and the feed is only read every 20s. */
+    /* Use the published start time as the clock, not a count of timer callbacks. Browsers can
+       delay callbacks while another tab is active; a repaint on return catches up instantly. */
+    function paintAirClock() {
+      if (station && nowTrack && nowTrack.startedAt && typeof window.npPaint === 'function') window.npPaint();
+    }
     function startAirClock() {
       clearInterval(airClock);
       airClock = setInterval(function () {
-        if (station && nowTrack && nowTrack.startedAt && typeof window.npPaint === 'function') window.npPaint();
-      }, 1000);
+        if (!document.hidden) paintAirClock();
+      }, 200);
     }
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) { paintAirClock(); pollTrack(); }
+    });
+    window.addEventListener('pageshow', function (e) { paintAirClock(); if (e.persisted) pollTrack(); });
     startAirClock();
 
     function pollTrack() {
       if (!station) return;
       var mine = station.id;
+      var seq = ++trackPollSeq;
       var url = station.url;
       delete metaCache[url];                              // the point is freshness
       delete metaCache['icy:' + url];
       window.radioMeta(url, true).then(function (t) {
-        if (!station || station.id !== mine) return;        // tuned away meanwhile
+        if (!station || station.id !== mine || seq !== trackPollSeq) return; // stale request or tuned away
         /* A station that has stopped naming a song -- an ad break, a talk segment, a feed that
            answered 204 -- used to leave the last song on screen with its clock still running,
            so a track that finished minutes ago still looked like it was playing. No answer is
-           an answer: clear the song and let the bar fall back to the live edge. */
-        if (!t) {
-          if (nowTrack) { nowTrack = null; applyMode(mode); }
+           an answer: clear the song and let the bar fall back to the live edge.
+
+           A reading that names no song is the same answer. The stream readers return what the
+           station said about ITSELF (its genre and bitrate, which the Song column's neighbours
+           want) even when its metadata block named no track, and that object is truthy: taken
+           as a cue it put an empty headline on screen where "Song not available" belongs.
+           Measured on Nexus Radio: 38 of 197 samples of a watched quarter hour. */
+        if (!t || !String(t.title == null ? '' : t.title).trim()) {
+          if (nowTrack) {
+            nowTrack = null;
+            applyMode(mode);
+            document.dispatchEvent(new CustomEvent('radio:clear-track', { detail: { id: mine } }));
+          }
           /* A 204 between songs is the feed drawing breath, not the end of the matter: measured on
              Big 95.5, it answered 204 and published the next song six seconds later. Asking again
              shortly turns most of that gap into the next song's name instead of a minute of
@@ -18416,7 +18606,11 @@ window.AW.startStats = function () {
            until it catches up rather than once every twenty. */
         if (t.startedAt && t.duration
             && (Date.now() - t.startedAt) / 1000 > t.duration + 15) {
-          if (nowTrack) { nowTrack = null; applyMode(mode); }
+          if (nowTrack) {
+            nowTrack = null;
+            applyMode(mode);
+            document.dispatchEvent(new CustomEvent('radio:clear-track', { detail: { id: mine } }));
+          }
           clearTimeout(cueTimer);
           cueTimer = setTimeout(pollTrack, 5000);
           return;
@@ -18437,8 +18631,24 @@ window.AW.startStats = function () {
         var sameName = nowTrack && sameName_(nowTrack.title, t.title)
                                 && sameName_(nowTrack.artist, t.artist)
                                 && nowTrack.programme === t.programme;
+        /* WLSFM supplied Come On Eileen with a 257s duration, then republished the SAME title
+           with starts 24s, 18s and 12s later, while the old cue had barely begun. Accepting
+           each timestamp sent the bar backwards every poll. Neither start can be called the
+           broadcast's true position once the feed contradicts itself inside a single song.
+           An expired cue followed by a new start is different: the station may have repeated
+           the song, and that re-cue remains usable (the earlier WLS stuck-title fix). */
+        if (sameName && nowTrack.timingUnreliable) {
+          t = Object.assign({}, t, { startedAt: null, timingUnreliable: true });
+        } else if (sameName && nowTrack.startedAt && nowTrack.duration && t.startedAt
+                   && t.startedAt > nowTrack.startedAt + 500
+                   && t.startedAt < nowTrack.startedAt + nowTrack.duration * 1000 - 15000) {
+          /* The list and radioMeta cache may share this object; do not erase the feed's actual
+             reply for another reader just because this station's cue history contradicts it. */
+          t = Object.assign({}, t, { startedAt: null, timingUnreliable: true });
+        }
         var sameTiming = nowTrack && nowTrack.startedAt === t.startedAt
-                                  && nowTrack.duration === t.duration;
+                                 && nowTrack.duration === t.duration
+                                 && !!nowTrack.timingUnreliable === !!t.timingUnreliable;
         if (!sameName || !sameTiming) {
           var renamed = !sameName;
           nowTrack = t;
@@ -18475,6 +18685,7 @@ window.AW.startStats = function () {
       clearInterval(trackTimer);
       clearTimeout(cueTimer);
       nowTrack = null;
+      trackPollSeq++;  // invalidate any in-flight reply from the previous tune
       if (!station) return;
       pollTrack();
       trackTimer = setInterval(pollTrack, 20000);
@@ -18550,11 +18761,20 @@ window.AW.startStats = function () {
       var air = typeof radioAir === 'function' ? radioAir() : null;
       if (air && air.elapsed != null) cur = air.elapsed;
       elapsedEl.textContent = fmt(cur);
+      elapsedEl.title = '';
       if (isLive()) {
-        if (air && air.over) {
-          /* The cue has run past its stated length and the feed has not caught up. The song is
-             still named, but where the broadcast is in it is no longer known, so the bar reports
-             nothing rather than sitting full at `-00:00`. */
+        if (air && air.uncertain) {
+          /* The broadcaster published overlapping starts for one named song. A moving bar would
+             repeatedly jump backwards; 00:00 would look stuck. Show the length it published, but
+             make the UNKNOWN position explicit rather than guessing or silently freezing. */
+          fill.style.width = '0%';
+          elapsedEl.textContent = '—:—';
+          remainEl.hidden = !air.duration;
+          remainEl.textContent = air.duration ? 'Length ' + fmt(air.duration) : '';
+          elapsedEl.title = 'The station reported conflicting start times for this song';
+          track.setAttribute('aria-label', 'Live broadcast, position not published');
+        } else if (air && air.over) {
+          /* The cue has run past its stated length and the feed has not caught up. */
           fill.style.width = '0%';
           elapsedEl.textContent = fmt(0);
           remainEl.hidden = true;
@@ -18565,16 +18785,19 @@ window.AW.startStats = function () {
              is. The stream stays live and unseekable; this reports, it does not offer. */
           fill.style.width = Math.max(0, Math.min(100, (air.elapsed / air.duration) * 100)) + '%';
           remainEl.hidden = false;
-          remainEl.textContent = '-' + fmt(Math.max(0, air.duration - air.elapsed));
-          track.setAttribute('aria-label', 'Live broadcast, ' + fmt(air.elapsed) + ' of ' + fmt(air.duration));
+          remainEl.textContent = '-' + fmt(Math.ceil(Math.max(0, air.duration - air.elapsed)));
+          /* The fill can follow milliseconds; the stamps remain whole seconds. Floor elapsed and
+             ceil remaining so the label never runs ahead of the actual broadcast position. */
+          elapsedEl.textContent = fmt(Math.floor(air.elapsed));
+          track.setAttribute('aria-label', 'Live broadcast, ' + fmt(Math.floor(air.elapsed)) + ' of ' + fmt(air.duration));
         } else if (air) {
-          /* A cue with a start but no length: the elapsed figure is real, so it is shown, but
-             no total may be invented -- and with nothing to fill towards, the bar sits at the
-             live edge. */
-          fill.style.width = '100%';
+          /* A cue with a start but no length has a real elapsed figure, but no fraction to fill.
+             A permanently full bar looks frozen and falsely implies a finished song. */
+          fill.style.width = '0%';
           remainEl.hidden = true;
           remainEl.textContent = '';
-          track.setAttribute('aria-label', 'Live broadcast, ' + fmt(cur) + ' elapsed');
+          track.setAttribute('aria-label', 'Live broadcast, ' + fmt(Math.floor(cur)) + ' elapsed');
+          elapsedEl.textContent = fmt(Math.floor(cur));
         } else {
           /* No cue at all: a talk programme, an advert break, or a feed that publishes nothing.
              Measured on WGCI during 'Shay Diddy': the bar sat at 100% while the clock climbed to
@@ -18588,9 +18811,10 @@ window.AW.startStats = function () {
           track.setAttribute('aria-label', 'Live broadcast');
         }
       } else {
-        var dur = total() || 1;
-        fill.style.width = (cur / dur) * 100 + '%';
-        remainEl.textContent = '-' + fmt(dur - cur);
+        var dur = total();
+        fill.style.width = dur ? (cur / dur) * 100 + '%' : '0%';
+        remainEl.hidden = !dur;
+        remainEl.textContent = dur ? '-' + fmt(dur - cur) : '';
         track.setAttribute('aria-valuemax', dur);
         track.setAttribute('aria-valuenow', Math.round(cur));
         track.setAttribute('aria-valuetext', fmt(cur) + ' of ' + fmt(dur));

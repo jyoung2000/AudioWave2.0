@@ -54,7 +54,7 @@ Airwave — the living mockup.
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="mockup-of" content="player">
-<meta name="mockup-inputs" content="9a586ecb15d96df6">
+<meta name="mockup-inputs" content="6d007723754fcfed">
 <title>Airwave — mockup</title>
 <style data-mock-source="music-player/index.html">
   :root {
@@ -1032,6 +1032,11 @@ Airwave — the living mockup.
     cursor: default;
   }
   .lib-scope__refresh[hidden] { display: none; }
+  /* One turn of the glyph, so a refresh that comes back with the same rows still reads as having run. */
+  /* Turns for as long as the pass runs, so it is a progress indicator and not a 0.9s flourish. */
+  .lib-scope__refresh.is-spinning { animation: scope-spin 0.9s linear infinite; }
+  @keyframes scope-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .lib-scope__refresh.is-spinning { animation: none; opacity: 0.55; } }
   .lib-scope__refresh:hover { background: rgba(0, 0, 0, 0.07); }
   .lib-scope__refresh:active { background: rgba(0, 0, 0, 0.13); border-color: var(--scope-btn-edge); }
   .lib-scope__refresh:focus { outline: none; }
@@ -2660,6 +2665,10 @@ Airwave — the living mockup.
 
   .library tbody tr,
   .rlist tbody tr { cursor: default; }
+  /* A separate Genre column must not crush the Song column on phones.
+     Let the radio list scroll sideways while preserving readable track and genre cells. */
+  .rlist { min-width: 700px; }
+  #radioMenu .ipod__list { overflow-x: auto; overscroll-behavior-x: contain; }
   .library tbody tr:nth-child(even),
   .rlist tbody tr:nth-child(even) { background: var(--lib-alt); }
 
@@ -5815,7 +5824,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 0%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:00
           </span>
           <span class="player__time" id="remaining">
@@ -5922,6 +5931,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" hidden aria-haspopup="menu" aria-expanded="false"></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" hidden aria-label="New songs" title="New songs — Shift-click to start over"></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden aria-label="Refresh the station list" title="Refresh the station list and what each station is playing"></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -6439,7 +6449,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -6470,7 +6480,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -6748,6 +6758,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -6770,7 +6802,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -6884,7 +6916,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -7406,7 +7438,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 0%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:00
           </span>
           <span class="player__time" id="remaining">
@@ -7513,6 +7545,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" hidden aria-haspopup="menu" aria-expanded="false"></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" hidden aria-label="New songs" title="New songs — Shift-click to start over"></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden aria-label="Refresh the station list" title="Refresh the station list and what each station is playing"></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -8347,7 +8380,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -8378,7 +8411,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -8656,6 +8689,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -8678,7 +8733,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -8792,7 +8847,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -9314,7 +9369,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 0%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:00
           </span>
           <span class="player__time" id="remaining">
@@ -9413,6 +9468,7 @@ button.seg:active .ico{transform:translateY(1px)}
         <span class="lib-scope__scope" id="libScope" hidden></span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" hidden aria-haspopup="menu" aria-expanded="false"></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" hidden aria-label="New songs" title="New songs — Shift-click to start over"></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden aria-label="Refresh the station list" title="Refresh the station list and what each station is playing"></button>
         <div class="lib-find" hidden></div>
         <p class="vh" id="libFindLive" role="status"></p>
       </div>
@@ -9874,7 +9930,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -9905,7 +9961,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -10183,6 +10239,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -10205,7 +10283,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -10319,7 +10397,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -10845,7 +10923,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -10952,6 +11030,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" hidden aria-haspopup="menu" aria-expanded="false"></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" hidden aria-label="New songs" title="New songs — Shift-click to start over"></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden aria-label="Refresh the station list" title="Refresh the station list and what each station is playing"></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -11797,7 +11876,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -11828,7 +11907,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -12106,6 +12185,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -12128,7 +12229,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -12242,7 +12343,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -12768,7 +12869,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -12875,6 +12976,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" hidden aria-haspopup="menu" aria-expanded="false"></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" hidden aria-label="New songs" title="New songs — Shift-click to start over"></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden aria-label="Refresh the station list" title="Refresh the station list and what each station is playing"></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -13746,7 +13848,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -13777,7 +13879,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -14055,6 +14157,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -14077,7 +14201,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -14191,7 +14315,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -14717,7 +14841,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -14824,6 +14948,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" hidden aria-haspopup="menu" aria-expanded="false"></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" hidden aria-label="New songs" title="New songs — Shift-click to start over"></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden aria-label="Refresh the station list" title="Refresh the station list and what each station is playing"></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -15705,7 +15830,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -15736,7 +15861,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -16014,6 +16139,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -16036,7 +16183,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -16150,7 +16297,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -16676,7 +16823,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -16783,6 +16930,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" hidden aria-haspopup="menu" aria-expanded="false"></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" hidden aria-label="New songs" title="New songs — Shift-click to start over"></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden aria-label="Refresh the station list" title="Refresh the station list and what each station is playing"></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -17648,7 +17796,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -17679,7 +17827,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -17957,6 +18105,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -17979,7 +18149,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -18093,7 +18263,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -18619,7 +18789,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -18735,6 +18905,7 @@ button.seg:active .ico{transform:translateY(1px)}
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over">
           ↻
         </button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden aria-label="Refresh the station list" title="Refresh the station list and what each station is playing"></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -19647,7 +19818,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -19678,7 +19849,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -19956,6 +20127,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -19978,7 +20171,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -20092,7 +20285,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -20618,7 +20811,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -20734,6 +20927,7 @@ button.seg:active .ico{transform:translateY(1px)}
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over">
           ↻
         </button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden aria-label="Refresh the station list" title="Refresh the station list and what each station is playing"></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -21708,7 +21902,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -21739,7 +21933,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -22017,6 +22211,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -22039,7 +22255,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -22153,7 +22369,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -22679,7 +22895,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -22795,6 +23011,7 @@ button.seg:active .ico{transform:translateY(1px)}
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over">
           ↻
         </button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden aria-label="Refresh the station list" title="Refresh the station list and what each station is playing"></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -23759,7 +23976,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -23790,7 +24007,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -24068,6 +24285,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -24090,7 +24329,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -24204,7 +24443,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -24730,7 +24969,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -24836,6 +25075,7 @@ button.seg:active .ico{transform:translateY(1px)}
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over">
           ↻
         </button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden aria-label="Refresh the station list" title="Refresh the station list and what each station is playing"></button>
         <div class="lib-find" hidden></div>
         <p class="vh" id="libFindLive" role="status">
           2 songs from the catalog, ranked by “Airwave default”
@@ -25285,7 +25525,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -25316,7 +25556,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -25594,6 +25834,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -25616,7 +25878,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -25730,7 +25992,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -26256,7 +26518,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -26369,6 +26631,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" aria-haspopup="menu" aria-expanded="false" title="Favours what sounds like what you play and artists you play most, little exploration. Click to change the algorithm or lean it." aria-label="Algorithm: Airwave default · For you. Favours what sounds like what you play and artists you play most, little exploration. Change the algorithm or lean it" hidden></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over" hidden></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden aria-label="Refresh the station list" title="Refresh the station list and what each station is playing"></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -27002,7 +27265,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -27033,7 +27296,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -27311,6 +27574,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -27333,7 +27618,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -27447,7 +27732,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -28601,7 +28886,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -28708,6 +28993,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" aria-haspopup="menu" aria-expanded="false" title="Favours what sounds like what you play and artists you play most, little exploration. Click to change the algorithm or lean it." aria-label="Algorithm: Airwave default · For you. Favours what sounds like what you play and artists you play most, little exploration. Change the algorithm or lean it" hidden></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over" hidden></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden aria-label="Refresh the station list" title="Refresh the station list and what each station is playing"></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -29555,7 +29841,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -29586,7 +29872,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -29864,6 +30150,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -29886,7 +30194,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -30000,7 +30308,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -31154,7 +31462,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -31261,6 +31569,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" aria-haspopup="menu" aria-expanded="false" title="Favours what sounds like what you play and artists you play most, little exploration. Click to change the algorithm or lean it." aria-label="Algorithm: Airwave default · For you. Favours what sounds like what you play and artists you play most, little exploration. Change the algorithm or lean it" hidden></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over" hidden></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden aria-label="Refresh the station list" title="Refresh the station list and what each station is playing"></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -32108,7 +32417,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -32139,7 +32448,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -32417,6 +32726,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -32439,7 +32770,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -32553,7 +32884,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -33079,7 +33410,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -33186,6 +33517,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" aria-haspopup="menu" aria-expanded="false" title="Favours what sounds like what you play and artists you play most, little exploration. Click to change the algorithm or lean it." aria-label="Algorithm: Airwave default · For you. Favours what sounds like what you play and artists you play most, little exploration. Change the algorithm or lean it" hidden></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over" hidden></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden aria-label="Refresh the station list" title="Refresh the station list and what each station is playing"></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -34033,7 +34365,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -34064,7 +34396,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -34342,6 +34674,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -34364,7 +34718,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -34478,7 +34832,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -35197,7 +35551,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -35304,6 +35658,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" aria-haspopup="menu" aria-expanded="false" title="Favours what sounds like what you play and artists you play most, little exploration. Click to change the algorithm or lean it." aria-label="Algorithm: Airwave default · For you. Favours what sounds like what you play and artists you play most, little exploration. Change the algorithm or lean it" hidden></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over" hidden></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden aria-label="Refresh the station list" title="Refresh the station list and what each station is playing"></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -36151,7 +36506,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -36182,7 +36537,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -36460,6 +36815,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -36482,7 +36859,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -36596,7 +36973,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -37750,7 +38127,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -37857,6 +38234,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" aria-haspopup="menu" aria-expanded="false" title="Favours what sounds like what you play and artists you play most, little exploration. Click to change the algorithm or lean it." aria-label="Algorithm: Airwave default · For you. Favours what sounds like what you play and artists you play most, little exploration. Change the algorithm or lean it" hidden></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over" hidden></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden aria-label="Refresh the station list" title="Refresh the station list and what each station is playing"></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -38726,7 +39104,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -38757,7 +39135,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -39035,6 +39413,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -39057,7 +39457,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -39171,7 +39571,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -39605,10 +40005,13 @@ button.seg:active .ico{transform:translateY(1px)}
                 </div>
               </div>
             </div>
+            <div class="srch__end">
+              That’s all 1 album.
+            </div>
           </div>
           <div class="srch__foot" id="srchFoot" hidden></div>
           <p class="srch__live" id="srchLive" role="status">
-            Cassette Bloom: 3 songs, 1 albums
+            Cassette Bloom: 3 songs, 1 album
           </p>
         </div>
       </div>
@@ -39963,7 +40366,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -40070,6 +40473,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" aria-haspopup="menu" aria-expanded="false" title="Favours what sounds like what you play and artists you play most, little exploration. Click to change the algorithm or lean it." aria-label="Algorithm: Airwave default · For you. Favours what sounds like what you play and artists you play most, little exploration. Change the algorithm or lean it" hidden></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over" hidden></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden aria-label="Refresh the station list" title="Refresh the station list and what each station is playing"></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -40917,7 +41321,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -40948,7 +41352,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -41226,6 +41630,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -41248,7 +41674,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -41362,7 +41788,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -41888,7 +42314,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -41995,6 +42421,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" aria-haspopup="menu" aria-expanded="false" title="Favours what sounds like what you play and artists you play most, little exploration. Click to change the algorithm or lean it." aria-label="Algorithm: Airwave default · For you. Favours what sounds like what you play and artists you play most, little exploration. Change the algorithm or lean it" hidden></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over" hidden></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden aria-label="Refresh the station list" title="Refresh the station list and what each station is playing"></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -42842,7 +43269,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -42873,7 +43300,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -43151,6 +43578,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -43173,7 +43622,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -43287,7 +43736,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -43989,7 +44438,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -44096,6 +44545,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" aria-haspopup="menu" aria-expanded="false" title="Favours what sounds like what you play and artists you play most, little exploration. Click to change the algorithm or lean it." aria-label="Algorithm: Airwave default · For you. Favours what sounds like what you play and artists you play most, little exploration. Change the algorithm or lean it" hidden></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over" hidden></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden aria-label="Refresh the station list" title="Refresh the station list and what each station is playing"></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -44943,7 +45393,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -44974,7 +45424,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -45252,6 +45702,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -45274,7 +45746,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -45388,7 +45860,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -46542,7 +47014,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -46649,6 +47121,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" aria-haspopup="menu" aria-expanded="false" title="Favours what sounds like what you play and artists you play most, little exploration. Click to change the algorithm or lean it." aria-label="Algorithm: Airwave default · For you. Favours what sounds like what you play and artists you play most, little exploration. Change the algorithm or lean it" hidden></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over" hidden></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden aria-label="Refresh the station list" title="Refresh the station list and what each station is playing"></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -47566,7 +48039,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -47597,7 +48070,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -47875,6 +48348,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -47897,7 +48392,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -48011,7 +48506,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -49185,7 +49680,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -49292,6 +49787,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" aria-haspopup="menu" aria-expanded="false" title="Favours what sounds like what you play and artists you play most, little exploration. Click to change the algorithm or lean it." aria-label="Algorithm: Airwave default · For you. Favours what sounds like what you play and artists you play most, little exploration. Change the algorithm or lean it" hidden></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over" hidden></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden aria-label="Refresh the station list" title="Refresh the station list and what each station is playing"></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -50139,7 +50635,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -50170,7 +50666,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -50448,6 +50944,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -50470,7 +50988,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -50584,7 +51102,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -51737,7 +52255,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -51844,6 +52362,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" aria-haspopup="menu" aria-expanded="false" title="Favours what sounds like what you play and artists you play most, little exploration. Click to change the algorithm or lean it." aria-label="Algorithm: Airwave default · For you. Favours what sounds like what you play and artists you play most, little exploration. Change the algorithm or lean it" hidden></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over" hidden></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden aria-label="Refresh the station list" title="Refresh the station list and what each station is playing"></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -52691,7 +53210,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -52722,7 +53241,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -53000,6 +53519,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -53022,7 +53563,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -53136,7 +53677,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -53704,7 +54245,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -53811,6 +54352,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" aria-haspopup="menu" aria-expanded="false" title="Favours what sounds like what you play and artists you play most, little exploration. Click to change the algorithm or lean it." aria-label="Algorithm: Airwave default · For you. Favours what sounds like what you play and artists you play most, little exploration. Change the algorithm or lean it" hidden></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over" hidden></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden aria-label="Refresh the station list" title="Refresh the station list and what each station is playing"></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -54658,7 +55200,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -54689,7 +55231,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -54967,6 +55509,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -54989,7 +55553,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -55103,7 +55667,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -55693,7 +56257,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -55800,6 +56364,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" aria-haspopup="menu" aria-expanded="false" title="Favours what sounds like what you play and artists you play most, little exploration. Click to change the algorithm or lean it." aria-label="Algorithm: Airwave default · For you. Favours what sounds like what you play and artists you play most, little exploration. Change the algorithm or lean it" hidden></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over" hidden></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden aria-label="Refresh the station list" title="Refresh the station list and what each station is playing"></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -56647,7 +57212,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -56678,7 +57243,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -56956,6 +57521,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -56978,7 +57565,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -57092,7 +57679,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -57618,7 +58205,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -57731,6 +58318,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" aria-haspopup="menu" aria-expanded="false" title="Favours what sounds like what you play and artists you play most, little exploration. Click to change the algorithm or lean it." aria-label="Algorithm: Airwave default · For you. Favours what sounds like what you play and artists you play most, little exploration. Change the algorithm or lean it" hidden></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over" hidden></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden aria-label="Refresh the station list" title="Refresh the station list and what each station is playing"></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -58604,7 +59192,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -58635,7 +59223,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -58913,6 +59501,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -58935,7 +59545,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -59049,7 +59659,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -59575,7 +60185,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -59688,6 +60298,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" aria-haspopup="menu" aria-expanded="false" title="Favours what sounds like what you play and artists you play most, little exploration. Click to change the algorithm or lean it." aria-label="Algorithm: Airwave default · For you. Favours what sounds like what you play and artists you play most, little exploration. Change the algorithm or lean it" hidden></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over" hidden></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" hidden aria-label="Refresh the station list" title="Refresh the station list and what each station is playing"></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -60561,7 +61172,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -60592,7 +61203,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -60870,6 +61481,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -60892,7 +61525,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -61006,7 +61639,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -61520,7 +62153,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -61629,6 +62262,9 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" aria-haspopup="menu" aria-expanded="false" title="Favours what sounds like what you play and artists you play most, little exploration. Click to change the algorithm or lean it." aria-label="Algorithm: Airwave default · For you. Favours what sounds like what you play and artists you play most, little exploration. Change the algorithm or lean it" hidden></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over" hidden></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" aria-label="Refresh the station list" title="Refresh the station list and what each station is playing">
+          ↻
+        </button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -61648,11 +62284,12 @@ button.seg:active .ico{transform:translateY(1px)}
           <table class="rlist" aria-label="Chicago">
             <colgroup>
               <col style="width: 28px">
-              <col style="width: 26%">
+              <col style="width: 24%">
               <col>
-              <col class="lib-col-artist" style="width: 20%">
+              <col class="lib-col-artist" style="width: 16%">
+              <col class="rlist-genre" style="width: 18%">
               <col class="lib-col-bpm" style="width: 46px">
-              <col class="lib-col-album" style="width: 16%">
+              <col class="lib-col-album" style="width: 12%">
             </colgroup>
             <thead>
               <tr>
@@ -61670,6 +62307,9 @@ button.seg:active .ico{transform:translateY(1px)}
                 <th scope="col" class="lib-col-artist">
                   Artist
                 </th>
+                <th scope="col" class="rlist-genre">
+                  Genre
+                </th>
                 <th scope="col" class="lib-num lib-col-bpm">
                   Kbps
                 </th>
@@ -61684,10 +62324,11 @@ button.seg:active .ico{transform:translateY(1px)}
                 <td class="lib-title">
                   107.5 WGCI
                 </td>
-                <td class="rlist-song">
+                <td class="rlist-song" title="This station is not naming a song right now"></td>
+                <td class="lib-col-artist rlist-artist"></td>
+                <td class="rlist-genre" title="Urban contemporary">
                   Urban contemporary
                 </td>
-                <td class="lib-col-artist rlist-artist"></td>
                 <td class="lib-num lib-col-bpm">
                   —
                 </td>
@@ -61700,10 +62341,11 @@ button.seg:active .ico{transform:translateY(1px)}
                 <td class="lib-title">
                   103.5 KISS FM
                 </td>
-                <td class="rlist-song">
+                <td class="rlist-song" title="This station is not naming a song right now"></td>
+                <td class="lib-col-artist rlist-artist"></td>
+                <td class="rlist-genre" title="Pop">
                   Pop
                 </td>
-                <td class="lib-col-artist rlist-artist"></td>
                 <td class="lib-num lib-col-bpm">
                   —
                 </td>
@@ -61716,10 +62358,11 @@ button.seg:active .ico{transform:translateY(1px)}
                 <td class="lib-title">
                   93.9 Lite FM
                 </td>
-                <td class="rlist-song">
+                <td class="rlist-song" title="This station is not naming a song right now"></td>
+                <td class="lib-col-artist rlist-artist"></td>
+                <td class="rlist-genre" title="Soft rock">
                   Soft rock
                 </td>
-                <td class="lib-col-artist rlist-artist"></td>
                 <td class="lib-num lib-col-bpm">
                   —
                 </td>
@@ -61732,10 +62375,11 @@ button.seg:active .ico{transform:translateY(1px)}
                 <td class="lib-title">
                   Rock 95.5 WCHI
                 </td>
-                <td class="rlist-song">
+                <td class="rlist-song" title="This station is not naming a song right now"></td>
+                <td class="lib-col-artist rlist-artist"></td>
+                <td class="rlist-genre" title="Rock">
                   Rock
                 </td>
-                <td class="lib-col-artist rlist-artist"></td>
                 <td class="lib-num lib-col-bpm">
                   —
                 </td>
@@ -61748,10 +62392,11 @@ button.seg:active .ico{transform:translateY(1px)}
                 <td class="lib-title">
                   Big 95.5 Country
                 </td>
-                <td class="rlist-song">
+                <td class="rlist-song" title="This station is not naming a song right now"></td>
+                <td class="lib-col-artist rlist-artist"></td>
+                <td class="rlist-genre" title="Country">
                   Country
                 </td>
-                <td class="lib-col-artist rlist-artist"></td>
                 <td class="lib-num lib-col-bpm">
                   —
                 </td>
@@ -61764,10 +62409,11 @@ button.seg:active .ico{transform:translateY(1px)}
                 <td class="lib-title">
                   Inspiration 1390
                 </td>
-                <td class="rlist-song">
+                <td class="rlist-song" title="This station is not naming a song right now"></td>
+                <td class="lib-col-artist rlist-artist"></td>
+                <td class="rlist-genre" title="Gospel">
                   Gospel
                 </td>
-                <td class="lib-col-artist rlist-artist"></td>
                 <td class="lib-num lib-col-bpm">
                   —
                 </td>
@@ -61780,10 +62426,11 @@ button.seg:active .ico{transform:translateY(1px)}
                 <td class="lib-title">
                   WLS 94.7 FM
                 </td>
-                <td class="rlist-song">
+                <td class="rlist-song" title="This station is not naming a song right now"></td>
+                <td class="lib-col-artist rlist-artist"></td>
+                <td class="rlist-genre" title="Classic hits">
                   Classic hits
                 </td>
-                <td class="lib-col-artist rlist-artist"></td>
                 <td class="lib-num lib-col-bpm">
                   80
                 </td>
@@ -61796,10 +62443,11 @@ button.seg:active .ico{transform:translateY(1px)}
                 <td class="lib-title">
                   WFMT 98.7 Classical
                 </td>
-                <td class="rlist-song">
+                <td class="rlist-song" title="This station is not naming a song right now"></td>
+                <td class="lib-col-artist rlist-artist"></td>
+                <td class="rlist-genre" title="Classical">
                   Classical
                 </td>
-                <td class="lib-col-artist rlist-artist"></td>
                 <td class="lib-num lib-col-bpm">
                   130
                 </td>
@@ -61812,10 +62460,11 @@ button.seg:active .ico{transform:translateY(1px)}
                 <td class="lib-title">
                   WDCB 90.9 Jazz
                 </td>
-                <td class="rlist-song">
+                <td class="rlist-song" title="This station is not naming a song right now"></td>
+                <td class="lib-col-artist rlist-artist"></td>
+                <td class="rlist-genre" title="Jazz">
                   Jazz
                 </td>
-                <td class="lib-col-artist rlist-artist"></td>
                 <td class="lib-num lib-col-bpm">
                   128
                 </td>
@@ -61828,10 +62477,11 @@ button.seg:active .ico{transform:translateY(1px)}
                 <td class="lib-title">
                   Smooth Jazz WNUA
                 </td>
-                <td class="rlist-song">
+                <td class="rlist-song" title="This station is not naming a song right now"></td>
+                <td class="lib-col-artist rlist-artist"></td>
+                <td class="rlist-genre" title="Jazz">
                   Jazz
                 </td>
-                <td class="lib-col-artist rlist-artist"></td>
                 <td class="lib-num lib-col-bpm">
                   128
                 </td>
@@ -61844,10 +62494,11 @@ button.seg:active .ico{transform:translateY(1px)}
                 <td class="lib-title">
                   WBEZ 91.5
                 </td>
-                <td class="rlist-song">
+                <td class="rlist-song" title="This station is not naming a song right now"></td>
+                <td class="lib-col-artist rlist-artist"></td>
+                <td class="rlist-genre" title="News">
                   News
                 </td>
-                <td class="lib-col-artist rlist-artist"></td>
                 <td class="lib-num lib-col-bpm">
                   64
                 </td>
@@ -61860,10 +62511,11 @@ button.seg:active .ico{transform:translateY(1px)}
                 <td class="lib-title">
                   Moody Radio WMBI 90.1
                 </td>
-                <td class="rlist-song">
+                <td class="rlist-song" title="This station is not naming a song right now"></td>
+                <td class="lib-col-artist rlist-artist"></td>
+                <td class="rlist-genre" title="Talk">
                   Talk
                 </td>
-                <td class="lib-col-artist rlist-artist"></td>
                 <td class="lib-num lib-col-bpm">
                   96
                 </td>
@@ -61876,10 +62528,11 @@ button.seg:active .ico{transform:translateY(1px)}
                 <td class="lib-title">
                   WCPT 820
                 </td>
-                <td class="rlist-song">
+                <td class="rlist-song" title="This station is not naming a song right now"></td>
+                <td class="lib-col-artist rlist-artist"></td>
+                <td class="rlist-genre" title="Talk">
                   Talk
                 </td>
-                <td class="lib-col-artist rlist-artist"></td>
                 <td class="lib-num lib-col-bpm">
                   64
                 </td>
@@ -61892,10 +62545,11 @@ button.seg:active .ico{transform:translateY(1px)}
                 <td class="lib-title">
                   FUBU Radio
                 </td>
-                <td class="rlist-song">
+                <td class="rlist-song" title="This station is not naming a song right now"></td>
+                <td class="lib-col-artist rlist-artist"></td>
+                <td class="rlist-genre" title="Hip hop">
                   Hip hop
                 </td>
-                <td class="lib-col-artist rlist-artist"></td>
                 <td class="lib-num lib-col-bpm">
                   192
                 </td>
@@ -61908,10 +62562,11 @@ button.seg:active .ico{transform:translateY(1px)}
                 <td class="lib-title">
                   011.fm House of Hair
                 </td>
-                <td class="rlist-song">
+                <td class="rlist-song" title="This station is not naming a song right now"></td>
+                <td class="lib-col-artist rlist-artist"></td>
+                <td class="rlist-genre" title="Rock">
                   Rock
                 </td>
-                <td class="lib-col-artist rlist-artist"></td>
                 <td class="lib-num lib-col-bpm">
                   192
                 </td>
@@ -61924,10 +62579,11 @@ button.seg:active .ico{transform:translateY(1px)}
                 <td class="lib-title">
                   Radio DePaul
                 </td>
-                <td class="rlist-song">
+                <td class="rlist-song" title="This station is not naming a song right now"></td>
+                <td class="lib-col-artist rlist-artist"></td>
+                <td class="rlist-genre" title="Pop">
                   Pop
                 </td>
-                <td class="lib-col-artist rlist-artist"></td>
                 <td class="lib-num lib-col-bpm">
                   56
                 </td>
@@ -61940,10 +62596,11 @@ button.seg:active .ico{transform:translateY(1px)}
                 <td class="lib-title">
                   Polskie Radio 1030
                 </td>
-                <td class="rlist-song">
+                <td class="rlist-song" title="This station is not naming a song right now"></td>
+                <td class="lib-col-artist rlist-artist"></td>
+                <td class="rlist-genre" title="World music">
                   World music
                 </td>
-                <td class="lib-col-artist rlist-artist"></td>
                 <td class="lib-num lib-col-bpm">
                   128
                 </td>
@@ -62377,7 +63034,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -62408,7 +63065,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -62686,6 +63343,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -62708,7 +63387,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -62822,7 +63501,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -63347,6 +64026,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" aria-haspopup="menu" aria-expanded="false" title="Favours what sounds like what you play and artists you play most, little exploration. Click to change the algorithm or lean it." aria-label="Algorithm: Airwave default · For you. Favours what sounds like what you play and artists you play most, little exploration. Change the algorithm or lean it" hidden></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over" hidden></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" aria-label="Refresh the station list" title="Refresh the station list and what each station is playing" hidden></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -63872,7 +64552,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -63903,7 +64583,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -64181,6 +64861,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -64203,7 +64905,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -64317,7 +65019,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -64841,6 +65543,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" aria-haspopup="menu" aria-expanded="false" title="Favours what sounds like what you play and artists you play most, little exploration. Click to change the algorithm or lean it." aria-label="Algorithm: Airwave default · For you. Favours what sounds like what you play and artists you play most, little exploration. Change the algorithm or lean it" hidden></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over" hidden></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" aria-label="Refresh the station list" title="Refresh the station list and what each station is playing" hidden></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -65281,7 +65984,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -65312,7 +66015,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -65590,6 +66293,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -65612,7 +66337,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -65726,7 +66451,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -66252,6 +66977,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" aria-haspopup="menu" aria-expanded="false" title="Favours what sounds like what you play and artists you play most, little exploration. Click to change the algorithm or lean it." aria-label="Algorithm: Airwave default · For you. Favours what sounds like what you play and artists you play most, little exploration. Change the algorithm or lean it" hidden></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over" hidden></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" aria-label="Refresh the station list" title="Refresh the station list and what each station is playing" hidden></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -66706,7 +67432,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -66737,7 +67463,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -67015,6 +67741,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -67037,7 +67785,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -67151,7 +67899,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -67675,6 +68423,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" aria-haspopup="menu" aria-expanded="false" title="Favours what sounds like what you play and artists you play most, little exploration. Click to change the algorithm or lean it." aria-label="Algorithm: Airwave default · For you. Favours what sounds like what you play and artists you play most, little exploration. Change the algorithm or lean it" hidden></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over" hidden></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" aria-label="Refresh the station list" title="Refresh the station list and what each station is playing" hidden></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -68115,7 +68864,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -68146,7 +68895,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -68424,6 +69173,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -68446,7 +69217,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -68560,7 +69331,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -69099,7 +69870,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -69206,6 +69977,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" aria-haspopup="menu" aria-expanded="false" title="Favours what sounds like what you play and artists you play most, little exploration. Click to change the algorithm or lean it." aria-label="Algorithm: Airwave default · For you. Favours what sounds like what you play and artists you play most, little exploration. Change the algorithm or lean it" hidden></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over" hidden></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" aria-label="Refresh the station list" title="Refresh the station list and what each station is playing" hidden></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -70965,7 +71737,7 @@ button.seg:active .ico{transform:translateY(1px)}
                     </th>
                     <th scope="col">
                       <span style="padding:4px 8px;display:block">
-
+                        
                       </span>
                     </th>
                   </tr>
@@ -71865,7 +72637,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -71972,6 +72744,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" aria-haspopup="menu" aria-expanded="false" title="Favours what sounds like what you play and artists you play most, little exploration. Click to change the algorithm or lean it." aria-label="Algorithm: Airwave default · For you. Favours what sounds like what you play and artists you play most, little exploration. Change the algorithm or lean it" hidden></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over" hidden></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" aria-label="Refresh the station list" title="Refresh the station list and what each station is playing" hidden></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -73731,7 +74504,7 @@ button.seg:active .ico{transform:translateY(1px)}
                     </th>
                     <th scope="col">
                       <span style="padding:4px 8px;display:block">
-
+                        
                       </span>
                     </th>
                   </tr>
@@ -75759,7 +76532,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -75866,6 +76639,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" aria-haspopup="menu" aria-expanded="false" title="Favours what sounds like what you play and artists you play most, little exploration. Click to change the algorithm or lean it." aria-label="Algorithm: Airwave default · For you. Favours what sounds like what you play and artists you play most, little exploration. Change the algorithm or lean it" hidden></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over" hidden></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" aria-label="Refresh the station list" title="Refresh the station list and what each station is playing" hidden></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -77625,7 +78399,7 @@ button.seg:active .ico{transform:translateY(1px)}
                     </th>
                     <th scope="col">
                       <span style="padding:4px 8px;display:block">
-
+                        
                       </span>
                     </th>
                   </tr>
@@ -78036,7 +78810,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -78067,7 +78841,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest" data-mock-go="settings-src-hub">
@@ -78345,6 +79119,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -78367,7 +79163,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -78481,7 +79277,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>
@@ -79020,7 +79816,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -79127,6 +79923,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" aria-haspopup="menu" aria-expanded="false" title="Favours what sounds like what you play and artists you play most, little exploration. Click to change the algorithm or lean it." aria-label="Algorithm: Airwave default · For you. Favours what sounds like what you play and artists you play most, little exploration. Change the algorithm or lean it" hidden></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over" hidden></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" aria-label="Refresh the station list" title="Refresh the station list and what each station is playing" hidden></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -80886,7 +81683,7 @@ button.seg:active .ico{transform:translateY(1px)}
                     </th>
                     <th scope="col">
                       <span style="padding:4px 8px;display:block">
-
+                        
                       </span>
                     </th>
                   </tr>
@@ -81978,7 +82775,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -82085,6 +82882,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" aria-haspopup="menu" aria-expanded="false" title="Favours what sounds like what you play and artists you play most, little exploration. Click to change the algorithm or lean it." aria-label="Algorithm: Airwave default · For you. Favours what sounds like what you play and artists you play most, little exploration. Change the algorithm or lean it" hidden></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over" hidden></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" aria-label="Refresh the station list" title="Refresh the station list and what each station is playing" hidden></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -83844,7 +84642,7 @@ button.seg:active .ico{transform:translateY(1px)}
                     </th>
                     <th scope="col">
                       <span style="padding:4px 8px;display:block">
-
+                        
                       </span>
                     </th>
                   </tr>
@@ -84996,7 +85794,7 @@ button.seg:active .ico{transform:translateY(1px)}
           <div class="player__fill" id="fill" style="width: 23.8579%;"></div>
         </div>
         <div class="player__stamps">
-          <span class="player__time" id="elapsed">
+          <span class="player__time" id="elapsed" title>
             00:47
           </span>
           <span class="player__time" id="remaining">
@@ -85103,6 +85901,7 @@ button.seg:active .ico{transform:translateY(1px)}
         </span>
         <button class="lib-scope__algo" type="button" id="libAlgoChip" aria-haspopup="menu" aria-expanded="false" title="Favours what sounds like what you play and artists you play most, little exploration. Click to change the algorithm or lean it." aria-label="Algorithm: Airwave default · For you. Favours what sounds like what you play and artists you play most, little exploration. Change the algorithm or lean it" hidden></button>
         <button class="lib-scope__refresh" type="button" id="libDiscRefresh" aria-label="New songs" title="New songs — Shift-click to start over" hidden></button>
+        <button class="lib-scope__refresh" type="button" id="libRadioRefresh" aria-label="Refresh the station list" title="Refresh the station list and what each station is playing" hidden></button>
         <div class="lib-find">
           <svg class="lib-find__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <circle cx="6.6" cy="6.6" r="4.4" stroke="currentColor" stroke-width="2.2" />
@@ -86862,7 +87661,7 @@ button.seg:active .ico{transform:translateY(1px)}
                     </th>
                     <th scope="col">
                       <span style="padding:4px 8px;display:block">
-
+                        
                       </span>
                     </th>
                   </tr>
@@ -87273,7 +88072,7 @@ button.seg:active .ico{transform:translateY(1px)}
                 <p class="prefs__hint" id="cfgTokenSaved" hidden></p>
                 <div class="prefs__row">
                   <span class="prefs__label">
-
+                    
                   </span>
                   <div class="conn__acts">
                     <button class="prefs__btn" type="button" id="cfgConnect">
@@ -87304,7 +88103,7 @@ button.seg:active .ico{transform:translateY(1px)}
               </div>
               <div class="prefs__row">
                 <span class="prefs__label">
-
+                  
                 </span>
                 <div class="conn__acts">
                   <button class="prefs__btn" type="button" id="hubTest">
@@ -87682,6 +88481,28 @@ button.seg:active .ico{transform:translateY(1px)}
           </fieldset>
           <fieldset class="prefs__group">
             <legend class="prefs__legend">
+              Radio
+            </legend>
+            <div class="prefs__row">
+              <label for="cfgRadioRefresh">
+                Check what is playing
+              </label>
+              <select class="prefs__select" id="cfgRadioRefresh">
+              <option value="30">Every 30 seconds</option>
+              <option value="60" selected>Every minute</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300">Every 5 minutes</option>
+              <option value="custom">A time I choose</option>
+              <option value="off">Only when I ask</option>
+            </select>
+            </div>
+            <div class="prefs__row" id="cfgRadioRefreshRow" hidden></div>
+            <p class="prefs__hint">
+              How often the station list re-reads the song and artist on every station. One read per station each time, so a long list over a slow connection is easier on it at 2 minutes than at 30 seconds. The refresh button next to the list always reads now, whatever this says.
+            </p>
+          </fieldset>
+          <fieldset class="prefs__group">
+            <legend class="prefs__legend">
               Live TV
             </legend>
             <div class="prefs__row">
@@ -87704,7 +88525,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </p>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div style="display: flex; gap: 8px; align-items: center">
                 <button class="prefs__btn" type="button" id="srcLoad">
@@ -87818,7 +88639,7 @@ button.seg:active .ico{transform:translateY(1px)}
             </div>
             <div class="prefs__row">
               <span class="prefs__label">
-
+                
               </span>
               <div class="conn__acts">
                 <button class="prefs__btn prefs__btn--def" type="button" id="bkNow" disabled>

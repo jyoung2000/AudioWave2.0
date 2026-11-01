@@ -116,7 +116,14 @@ test('playing a station: the player names it, LIVE shows, the transport refuses 
   expect((await page.isVisible('#playerWhere')) || ((await page.textContent('.player__album')) || '').length > 0, 'and where it is broadcasting from').toBe(true);
   expect(await page.isVisible('#live'), 'LIVE marker shows').toBe(true);
   expect(await page.getAttribute('#remaining', 'hidden'), 'remaining time stands down').not.toBeNull();
-  expect(await page.$eval('#fill', (n) => (n as HTMLElement).style.width), 'scrubber sits at the live edge').toBe('100%');
+  /* Ported from a build where a live station pinned the bar at 100%, which is what "the live edge"
+     meant. That reading was wrong and is now a fixed defect (radio-no-cue.test.ts): a full bar on a
+     station publishing no cue says a song is for ever about to end, and when the station does
+     publish one the bar belongs to that song's position, not to the stream's liveness. The stations
+     here are stubbed audio with no reachable metadata feed, so there is no cue and the bar is empty.
+     What marks the broadcast as live is #live and role="img", asserted either side of this. */
+  expect(await page.$eval('#fill', (n) => (n as HTMLElement).style.width), 'no cue published, so the bar claims no position').toBe('0%');
+  expect(await page.textContent('#elapsed'), 'and the clock does not show our listening time as the broadcast position').toBe('00:00');
   expect(await page.getAttribute('#track', 'role'), 'not a slider while live').toBe('img');
   expect(await page.getAttribute('#track', 'aria-valuenow'), 'no range ARIA while live').toBeNull();
   expect(await page.$eval('#radioAudio', (n) => !(n as HTMLAudioElement).paused), 'the stream is actually playing').toBe(true);

@@ -43,6 +43,9 @@ export default tseslint.config(
       'music-player/awsp-web/target/**',
       // The Android build copies the built player here (git-ignored output, like dist/).
       'android/app/src/main/assets/app/**',
+      // The discovery demo's Python environment and runtime data (models, SQLite): vendored and user data.
+      'discovery-demo/server/.venv/**',
+      'discovery-demo/.data/**',
       '**/*.d.ts',
     ],
   },
